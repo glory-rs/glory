@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use wasm_bindgen::{JsCast, UnwrapThrowExt};
+use wasm_bindgen::JsCast;
 
 use crate::{Holder, Scope, Truck, ViewId, Widget};
 

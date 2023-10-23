@@ -9,7 +9,9 @@ use glory::*;
 #[cfg(feature = "web-csr")]
 use wasm_bindgen::UnwrapThrowExt;
 
-use crate::models::{PageInfo, Post, PostMetadata};
+use crate::models::PageInfo;
+#[cfg(feature = "web-csr")]
+use crate::models::{Post, PostMetadata};
 
 #[derive(Debug)]
 pub struct App {}
@@ -21,7 +23,7 @@ impl App {
 
 impl Widget for App {
     fn build(&mut self, ctx: &mut Scope) {
-        crate::info!("App::build");
+        info!("App::build");
         let info = PageInfo::default();
         ctx.truck_mut().inject(info.clone());
 
@@ -82,18 +84,18 @@ impl Widget for ShowPost {
         info.description.revise(|mut v| *v = "This is show post page".to_owned());
     }
     fn build(&mut self, ctx: &mut Scope) {
-        crate::info!("ShowPost::build");
+        info!("ShowPost::build");
         let post_id: usize = {
             let truck = ctx.truck();
             let locator = truck.obtain::<Locator>().unwrap();
-            crate::info!("=====build====locator====={:?}", locator);
+            info!("=====build====locator====={:?}", locator);
             if let Some(id) = locator.params().get().get("id") {
                 id.parse().unwrap_or_default()
             } else {
                 0
             }
         };
-        crate::info!("=====build====lo  {}", post_id);
+        info!("=====build====lo  {}", post_id);
         cfg_if! {
             if #[cfg(feature = "web-csr")] {
                 let post = move || async move{
@@ -134,7 +136,7 @@ impl Widget for NoMatch {
         info.description.revise(|mut v| *v = "This is not found page".to_owned());
     }
     fn build(&mut self, ctx: &mut Scope) {
-        crate::info!("NoMatch::build");
+        info!("NoMatch::build");
         div()
             .fill(h2().html("Nothing to see here!"))
             .fill(a().attr("href", "/").html("Go to the home page"))

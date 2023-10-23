@@ -23,7 +23,7 @@ impl App {
 
 impl Widget for App {
     fn build(&mut self, ctx: &mut Scope) {
-        crate::info!("App::build");
+        info!("App::build");
         let info = PageInfo::default();
         ctx.truck_mut().inject(info.clone());
         body_meta().class(info.body_class.clone()).show_in(ctx);
@@ -70,7 +70,7 @@ impl Widget for About {
         info.body_class.revise(|mut v| *v = "about".to_owned());
     }
     fn build(&mut self, ctx: &mut Scope) {
-        crate::info!("About::build");
+        info!("About::build");
         div().fill(h2().html("About")).show_in(ctx);
     }
 }
@@ -79,7 +79,7 @@ impl Widget for About {
 struct Dashboard;
 impl Widget for Dashboard {
     fn attach(&mut self, ctx: &mut Scope) {
-        crate::info!("Dashboard+::attach");
+        info!("Dashboard+::attach");
         let truck = ctx.truck();
         let info = truck.obtain::<PageInfo>().unwrap();
         info.title.revise(|mut v| *v = "Dashboard page".to_owned());
@@ -87,7 +87,7 @@ impl Widget for Dashboard {
         info.body_class.revise(|mut v| *v = "dashboard".to_owned());
     }
     fn build(&mut self, ctx: &mut Scope) {
-        crate::info!("Dashboard::build");
+        info!("Dashboard::build");
         div().fill(h2().html("Dashboard")).show_in(ctx);
     }
 }
@@ -103,7 +103,7 @@ impl Widget for NoMatch {
         info.body_class.revise(|mut v| *v = "not-found".to_owned());
     }
     fn build(&mut self, ctx: &mut Scope) {
-        crate::info!("NoMatch::build");
+        info!("NoMatch::build");
         div()
             .fill(h2().html("Nothing to see here!"))
             .fill(a().attr("href", "/").html("Go to the home page"))

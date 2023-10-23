@@ -14,7 +14,7 @@ categories = { workspace = true }
 
 [features]
 default = ["web-csr"]
-web-csr = ["__single_holder", "dep:wasm-bindgen", "dep:wasm-bindgen-futures"]
+web-csr = ["__single_holder", "dep:wasm-bindgen"]
 web-ssr = ["dep:percent-encoding", "dep:tokio", "dep:xml-rs"]
 salvo = ["dep:salvo", "web-ssr"]
 __single_holder = []
@@ -28,7 +28,6 @@ serde_json = "1"
 tracing = { workspace = true }
 # tracing-subscriber = {workspace = true}
 wasm-bindgen = { workspace = true, optional = true }
-wasm-bindgen-futures = { workspace = true, optional = true }
 cfg-if = { workspace = true }
 paste = { workspace = true }
 percent-encoding = { workspace = true, optional = true }
@@ -47,6 +46,9 @@ glory-hot-reload = { workspace = true }
 futures = { workspace = true }
 regex = { workspace = true }
 xml-rs = { workspace = true, optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen-futures = { workspace = true }
 
 [package.metadata.cargo-all-features]
 denylist = ["stable"]

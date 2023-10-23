@@ -7,8 +7,7 @@ use serde::{Deserialize, Serialize};
 use wasm_bindgen::UnwrapThrowExt;
 
 use crate::reflow::{Cage, Record, Revisable};
-use crate::widget::{Filler, IntoFiller};
-use crate::{Scope, View, ViewFactory, ViewId, Widget};
+use crate::{Scope, Widget};
 
 #[derive(Serialize, Deserialize, Default, Debug)]
 #[serde(rename_all = "snake_case")]
@@ -27,25 +26,17 @@ where
     T: Serialize + for<'a> Deserialize<'a> + fmt::Debug + 'static,
 {
     pub fn is_idle(&self) -> bool {
-        match self {
-            Self::Idle => true,
-            _ => false,
-        }
+        matches!(self, Self::Idle)
     }
     pub fn is_loading(&self) -> bool {
-        match self {
-            Self::Loading => true,
-            _ => false,
-        }
+        matches!(self, Self::Loading)
     }
     pub fn is_loaded(&self) -> bool {
-        match self {
-            Self::Loaded(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Loaded(_))
     }
 }
 
+#[allow(clippy::type_complexity)]
 pub struct Loader<T, Fut>
 where
     T: Serialize + for<'a> Deserialize<'a> + fmt::Debug + 'static,

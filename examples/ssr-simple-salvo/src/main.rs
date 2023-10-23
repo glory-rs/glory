@@ -1,17 +1,17 @@
-use glory::routing::aviators::*;
-use glory::web::holders::*;
-use glory::*;
-
 mod app;
-use app::*;
 
 #[cfg(feature = "web-ssr")]
 #[tokio::main]
 async fn main() {
     tracing_subscriber::fmt().init();
 
+    use glory::routing::aviators::*;
+    use glory::web::holders::*;
+    use glory::*;
     use salvo::catcher::Catcher;
     use salvo::prelude::*;
+
+    use app::*;
 
     let handler = SalvoHandler::new(|config, url| {
         ServerHolder::new(config, url)
@@ -31,5 +31,15 @@ async fn main() {
 
 #[cfg(feature = "web-csr")]
 fn main() {
+    use glory::routing::aviators::*;
+    use glory::web::holders::*;
+    use glory::*;
+
+    use app::*;
+    
     BrowerHolder::new().enable(BrowserAviator::new(route(), catch())).mount(App::new());
+}
+
+#[cfg(all(not(feature = "web-ssr"), not(feature = "web-csr")))]
+fn main() {
 }

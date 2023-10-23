@@ -6,7 +6,6 @@ use glory::*;
 extern crate cfg_if;
 
 mod app;
-use app::*;
 
 #[cfg(feature = "web-ssr")]
 pub mod post;
@@ -20,7 +19,9 @@ async fn main() {
 
     use salvo::catcher::Catcher;
     use salvo::prelude::*;
+
     use crate::models::*;
+    use app::*;
 
     let handler = SalvoHandler::new(|config, url| {
         ServerHolder::new(config, url)
@@ -60,5 +61,11 @@ async fn main() {
 
 #[cfg(feature = "web-csr")]
 fn main() {
+    use app::*;
+
     BrowerHolder::new().enable(BrowserAviator::new(route(), catch())).mount(App::new());
+}
+
+#[cfg(all(not(feature = "web-ssr"), not(feature = "web-csr")))]
+fn main() {
 }

@@ -1,5 +1,3 @@
-use serde::{Deserialize, Serialize};
-
 use once_cell::sync::Lazy;
 
 use crate::models::{Post, PostMetadata};
