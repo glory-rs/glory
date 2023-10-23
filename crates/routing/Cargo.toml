@@ -1,0 +1,76 @@
+[package]
+name = "glory-routing"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+description = """
+TBD.
+"""
+homepage = { workspace = true }
+repository = { workspace = true }
+documentation = "https://docs.rs/glory-routing/"
+readme = { workspace = true }
+keywords = { workspace = true }
+license = { workspace = true }
+categories = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+
+[badges]
+codecov = { repository = "glory-rs/glory", branch = "main", service = "github" }
+
+[lib]
+path = "src/lib.rs"
+
+
+[features]
+default = ["web-csr"]
+web-csr = ["__single_holder", "dep:wasm-bindgen"]
+web-ssr = ["glory-core/web-ssr"]
+salvo = ["dep:salvo", "glory-core/salvo"]
+__single_holder = []
+
+[dependencies]
+cfg-if = { workspace = true }
+url = { workspace = true }
+glory-core = { workspace = true }
+once_cell = { workspace = true }
+indexmap = { workspace = true }
+multimap = { workspace = true }
+parking_lot = { workspace = true }
+regex = { workspace = true }
+tracing = { workspace = true }
+percent-encoding = { workspace = true }
+educe = { workspace = true }
+wasm-bindgen = { workspace = true, optional = true}
+salvo = {workspace = true, optional = true}
+path-slash = { workspace = true }
+
+[dependencies.web-sys]
+workspace = true
+features = [
+    # History/Routing
+    "History",
+    "HtmlAnchorElement",
+    "MouseEvent",
+    "Url",
+    # Form
+    "FormData",
+    "HtmlButtonElement",
+    "HtmlFormElement",
+    "HtmlInputElement",
+    "SubmitEvent",
+    "Url",
+    "UrlSearchParams",
+    # Fetching in Hydrate Mode
+    "Headers",
+    "Request",
+    "RequestInit",
+    "RequestMode",
+    "Response",
+    "Window",
+]
+
+[package.metadata.cargo-all-features]
+denylist = ["stable"]

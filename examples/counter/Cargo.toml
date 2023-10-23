@@ -1,0 +1,10 @@
+[package]
+name = "counter"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+glory = { workspace = true }
+wasm-bindgen = { version = "0.2", features = ["enable-interning"] }
+wasm-bindgen-futures = "0.4.31"
+web-sys = {workspace = true}

@@ -1,0 +1,55 @@
+[package]
+name = "glory-core"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+description = """
+TBD.
+"""
+homepage = { workspace = true }
+repository = { workspace = true }
+documentation = "https://docs.rs/glory/"
+readme = { workspace = true }
+keywords = { workspace = true }
+license = { workspace = true }
+categories = { workspace = true }
+
+[features]
+default = ["web-csr"]
+web-csr = ["__single_holder", "dep:wasm-bindgen", "dep:wasm-bindgen-futures"]
+web-ssr = ["dep:percent-encoding", "dep:tokio", "dep:xml-rs"]
+salvo = ["dep:salvo", "web-ssr"]
+__single_holder = []
+
+[dependencies]
+async-trait = { workspace = true }
+once_cell = { workspace = true }
+parking_lot = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = "1"
+tracing = { workspace = true }
+# tracing-subscriber = {workspace = true}
+wasm-bindgen = { workspace = true, optional = true }
+wasm-bindgen-futures = { workspace = true, optional = true }
+cfg-if = { workspace = true }
+paste = { workspace = true }
+percent-encoding = { workspace = true, optional = true }
+smallvec = { workspace = true }
+educe = { workspace = true }
+js-sys = { workspace = true }
+web-sys = { workspace = true }
+indexmap = { workspace = true }
+multimap = { workspace = true }
+url = { workspace = true }
+thiserror = { workspace = true }
+config = { workspace = true }
+tokio = { workspace = true, features = ["full"], optional = true }
+salvo = { workspace = true, optional = true }
+glory-hot-reload = { workspace = true }
+futures = { workspace = true }
+regex = { workspace = true }
+xml-rs = { workspace = true, optional = true }
+
+[package.metadata.cargo-all-features]
+denylist = ["stable"]
+skip_feature_sets = [["web-ssr", "web-csr"]]

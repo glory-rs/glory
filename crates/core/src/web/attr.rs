@@ -1,0 +1,191 @@
+use std::fmt;
+use std::ops::Deref;
+
+#[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+use wasm_bindgen::UnwrapThrowExt;
+
+use crate::node::Node;
+use crate::reflow::{Bond, Cage, Record, Revisable};
+use crate::ViewId;
+
+/// Represents the different possible values an attribute node could have.
+///
+/// This mostly exists for the [`view`](https://docs.rs/glory_macro/latest/glory_macro/macro.view.html)
+/// macro’s use. You usually won't need to interact with it directly.
+pub trait AttrValue: fmt::Debug {
+    fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool);
+    fn to_string(&self) -> Option<String>;
+}
+
+impl<T> AttrValue for Cage<T>
+where
+    T: AttrValue + fmt::Debug + Clone + 'static,
+{
+    #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+    fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
+        if self.is_revising() || first_time {
+            (*self.get()).inject_to(view_id, node, name, true);
+        }
+        if first_time {
+            self.bind_view(view_id);
+        }
+    }
+    #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
+    fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
+        if self.is_revising() || first_time {
+            (*self.get()).inject_to(view_id, node, name, true);
+        }
+        if first_time {
+            self.bind_view(view_id);
+        }
+    }
+    fn to_string(&self) -> Option<String> {
+        (*self.get()).to_string()
+    }
+}
+impl<F, T> AttrValue for Bond<F, T>
+where
+    F: Fn() -> T + Clone + 'static,
+    T: AttrValue + fmt::Debug + Clone + 'static,
+{
+    #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+    fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
+        if self.is_revising() || first_time {
+            (*self.get()).inject_to(view_id, node, name, true);
+        }
+        if first_time {
+            self.bind_view(view_id);
+        }
+    }
+    #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
+    fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
+        if self.is_revising() || first_time {
+            (*self.get()).inject_to(view_id, node, name, true);
+        }
+        if first_time {
+            self.bind_view(view_id);
+        }
+    }
+    fn to_string(&self) -> Option<String> {
+        (*self.get()).to_string()
+    }
+}
+
+impl AttrValue for bool {
+    #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+    fn inject_to(&self, _view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
+        if first_time {
+            if *self {
+                node.set_attribute(name, name).unwrap_throw();
+            } else {
+                node.remove_attribute(name).unwrap_throw();
+            }
+        }
+    }
+    #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
+    fn inject_to(&self, _view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
+        if first_time {
+            if *self {
+                node.attr(name.to_owned(), name.to_owned());
+            } else {
+                node.remove_attr(name);
+            }
+        }
+    }
+    fn to_string(&self) -> Option<String> {
+        if *self {
+            Some("".into())
+        } else {
+            None
+        }
+    }
+}
+
+impl AttrValue for ViewId {
+    #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+    fn inject_to(&self, _view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
+        if first_time {
+            node.set_attribute(name, self.deref()).unwrap_throw();
+        }
+    }
+    #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
+    fn inject_to(&self, _view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
+        if first_time {
+            node.attr(name.to_owned(), self.deref().to_owned());
+        }
+    }
+    fn to_string(&self) -> Option<String> {
+        Some(self.deref().to_owned())
+    }
+}
+
+macro_rules! attr_type {
+    ($attr_type:ty) => {
+        impl AttrValue for $attr_type {
+            #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+            fn inject_to(&self, _view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
+                if first_time {
+                    if name == "inner_html" || name == "inner_text" {
+                        node.set_inner_html(&ToString::to_string(self));
+                    } else {
+                        node.set_attribute(name, &ToString::to_string(self)).unwrap_throw();
+                    }
+                }
+            }
+            #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
+            fn inject_to(&self, _view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
+                if first_time {
+                    node.attr(name.to_owned(), ToString::to_string(self));
+                }
+            }
+            fn to_string(&self) -> Option<String> {
+                Some(ToString::to_string(self))
+            }
+        }
+
+        impl AttrValue for Option<$attr_type> {
+            #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+            fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
+                if first_time {
+                    if let Some(value) = self {
+                        AttrValue::inject_to(value, view_id, node, name, first_time);
+                    } else {
+                        node.remove_attribute(name).unwrap_throw();
+                    }
+                }
+            }
+            #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
+            fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
+                if first_time {
+                    if let Some(value) = self {
+                        AttrValue::inject_to(value, view_id, node, name, first_time);
+                    } else {
+                        node.remove_attr(name);
+                    }
+                }
+            }
+            fn to_string(&self) -> Option<String> {
+                self.as_ref().map(|v| ToString::to_string(&v))
+            }
+        }
+    };
+}
+
+attr_type!(String);
+attr_type!(&String);
+attr_type!(&str);
+attr_type!(usize);
+attr_type!(u8);
+attr_type!(u16);
+attr_type!(u32);
+attr_type!(u64);
+attr_type!(u128);
+attr_type!(isize);
+attr_type!(i8);
+attr_type!(i16);
+attr_type!(i32);
+attr_type!(i64);
+attr_type!(i128);
+attr_type!(f32);
+attr_type!(f64);
+attr_type!(char);

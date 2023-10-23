@@ -1,0 +1,41 @@
+[package]
+name = "glory"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+description = """
+TBD.
+"""
+homepage = { workspace = true }
+repository = { workspace = true }
+documentation = "https://docs.rs/glory/"
+readme = { workspace = true }
+keywords = { workspace = true }
+license = { workspace = true }
+categories = { workspace = true }
+
+[package.metadata.docs.rs]
+all-features = true
+
+[badges]
+codecov = { repository = "glory-rs/glory", branch = "main", service = "github" }
+
+[lib]
+name = "glory"
+path = "src/lib.rs"
+
+
+[features]
+default = ["web-csr"]
+web-csr = ["glory-core/web-csr", "glory-routing/web-csr"]
+web-ssr = ["glory-core/web-ssr", "glory-routing/web-ssr"]
+salvo = ["web-ssr", "glory-core/salvo", "routing", "glory-routing?/salvo"]
+routing = ["dep:glory-routing"]
+
+[dependencies]
+glory-core = { workspace = true }
+glory-routing = { workspace = true, optional = true }
+
+# [package.metadata.cargo-all-features]
+# denylist = ["stable"]
+# skip_feature_sets = [["web-ssr"]]

@@ -1,0 +1,10 @@
+[package]
+name = "counters"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+glory = { path = "../../crates/glory" }
+wasm-bindgen = { version = "0.2", features = ["enable-interning"] }
+wasm-bindgen-futures = "0.4.31"
+web-sys = {workspace = true}

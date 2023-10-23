@@ -1,0 +1,11 @@
+[package]
+name = "router-basic"
+version = "0.0.1"
+edition = "2021"
+
+[dependencies]
+glory = { workspace = true, features = ["routing"] }
+serde = { version = "^1.0", features = ["derive"] }
+serde_json = "^1.0"
+uuid = { version = "1", features = ["v4", "js", "serde"] }
+web-sys = { workspace = true, features = ["Storage"] }
