@@ -1,18 +1,11 @@
 use core::cell::RefCell;
-use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 
 use serde::{Deserialize, Serialize};
-use uuid::Uuid;
 
-use glory::reflow::*;
 use glory::routing::*;
 use glory::web::widgets::*;
-use glory::web::{event_target_checked, event_target_value, request_animation_frame, window_event_listener};
-use glory::web::{events, NodeRef};
-use glory::widgets::*;
 use glory::*;
-use web_sys::HtmlInputElement;
 
 #[derive(Debug)]
 pub struct App {}
@@ -78,11 +71,11 @@ impl Widget for NoMatch {
 
 pub fn route() -> Router {
     Router::new()
-        .push(Router::with_path("dashboard").goal(|depot: Rc<RefCell<Depot>>| depot.insert_stuff("section", Dashboard)))
-        .push(Router::with_path("about").goal(|depot: Rc<RefCell<Depot>>| depot.insert_stuff("section", About)))
-        .push(Router::with_path("/").goal(|depot: Rc<RefCell<Depot>>| depot.insert_stuff("section", Home)))
+        .push(Router::with_path("dashboard").goal(|truck: Rc<RefCell<Truck>>| truck.insert_stuff("section", Dashboard)))
+        .push(Router::with_path("about").goal(|truck: Rc<RefCell<Truck>>| truck.insert_stuff("section", About)))
+        .push(Router::with_path("/").goal(|truck: Rc<RefCell<Truck>>| truck.insert_stuff("section", Home)))
 }
 
 pub fn catch() -> impl Handler {
-    |depot: Rc<RefCell<Depot>>| depot.insert_stuff("section", NoMatch)
+    |truck: Rc<RefCell<Truck>>| truck.insert_stuff("section", NoMatch)
 }

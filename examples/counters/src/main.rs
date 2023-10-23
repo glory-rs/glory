@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use glory::reflow::Record;
 use glory::web::events;
@@ -9,7 +9,7 @@ use glory::widgets::*;
 use glory::*;
 
 const MANY_COUNTERS: usize = 1000;
-static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+static NEXT_ID: AtomicUsize = AtomicUsize::new(1);
 
 pub fn next_id() -> usize {
     NEXT_ID.fetch_add(1, Ordering::Relaxed)

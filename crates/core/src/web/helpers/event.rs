@@ -34,20 +34,10 @@ pub fn add_event_listener<E>(
 
 #[doc(hidden)]
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
-pub fn add_event_listener_undelegated<E>(target: &web_sys::Element, event_name: &str, mut cb: impl FnMut(E) + 'static)
+pub fn add_event_listener_undelegated<E>(target: &web_sys::Element, event_name: &str, cb: impl FnMut(E) + 'static)
 where
     E: FromWasmAbi + 'static,
 {
-    cfg_if! {
-      if #[cfg(debug_assertions)] {
-        let span = ::tracing::Span::current();
-        let cb = move |e| {
-          let _guard = span.enter();
-          cb(e);
-        };
-      }
-    }
-
     let event_name = intern(event_name);
     let cb = Closure::wrap(Box::new(cb) as Box<dyn FnMut(E)>).into_js_value();
     _ = target.add_event_listener_with_callback(event_name, cb.unchecked_ref());
