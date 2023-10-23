@@ -71,6 +71,7 @@ where
             };
             if let Some(exist_node) = exist_node {
                 self.node = wasm_bindgen::JsCast::unchecked_into(exist_node);
+                crate::info!("[hydrating]: node founded: {}", selector);
             } else {
                 crate::info!("[hydrating]: node not found: {}", selector);
             }

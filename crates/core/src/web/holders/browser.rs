@@ -41,6 +41,7 @@ impl Holder for BrowerHolder {
         if let Ok(list) = crate::web::document().query_selector_all("[gly-id]") {
             for i in 0..list.length() {
                 let ele = list.item(i).unwrap().unchecked_into::<web_sys::HtmlElement>();
+                crate::info!("[hydrating]: remove element: {}", ele.outer_html());
                 ele.remove();
             }
         }

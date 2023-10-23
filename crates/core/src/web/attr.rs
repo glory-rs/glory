@@ -75,9 +75,9 @@ impl AttrValue for bool {
     #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
     fn inject_to(&self, _view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
         if first_time {
-            if *self {
+            if *self && node.get_attribute("name").as_deref() != Some(name) {
                 node.set_attribute(name, name).unwrap_throw();
-            } else {
+            } else if !*self && node.has_attribute("name") {
                 node.remove_attribute(name).unwrap_throw();
             }
         }
@@ -104,7 +104,7 @@ impl AttrValue for bool {
 impl AttrValue for ViewId {
     #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
     fn inject_to(&self, _view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
-        if first_time {
+        if first_time && node.get_attribute("name").as_deref() != Some(self.deref()) {
             node.set_attribute(name, self.deref()).unwrap_throw();
         }
     }
@@ -125,10 +125,13 @@ macro_rules! attr_type {
             #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
             fn inject_to(&self, _view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
                 if first_time {
+                    let value = ToString::to_string(self);
                     if name == "inner_html" || name == "inner_text" {
-                        node.set_inner_html(&ToString::to_string(self));
-                    } else {
-                        node.set_attribute(name, &ToString::to_string(self)).unwrap_throw();
+                        if node.inner_html() != value {
+                            node.set_inner_html(&value);
+                        }
+                    } else if node.get_attribute(name).as_ref() != Some(&value) {
+                        node.set_attribute(name, &value).unwrap_throw();
                     }
                 }
             }

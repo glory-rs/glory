@@ -1,7 +1,6 @@
 use std::cell::Ref;
+use std::fmt;
 use std::future::Future;
-use std::pin::Pin;
-use std::{default, fmt};
 
 use serde::{Deserialize, Serialize};
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
