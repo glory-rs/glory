@@ -102,8 +102,18 @@ where
             if let Some(parent_node) = &ctx.parent_node {
                 if let Some(data) = parent_node.get_attribute(&key) {
                     parent_node.remove_attribute(&key).ok();
+                    let new_state: LoadState<T> = serde_json::from_str(&*&data).unwrap_throw();
+                    if new_state.is_loaded() {
+                        // Create fallback and remove it for server and client can create same view id.
+                        if let Some(fallback) = &self.fallback {
+                            (fallback)(ctx);
+                            for view_id in ctx.show_list.clone() {
+                                ctx.detach_child(&view_id);
+                            }
+                        }
+                    }
                     self.state.revise(|mut state| {
-                        *state = serde_json::from_str(&*&data).unwrap_throw();
+                        *state = new_state;
                     });
                 }
             }
