@@ -1,7 +1,7 @@
 [package]
 name = "glory-cli"
 license = "MIT"
-repository = "https://github.com/glory-rs/glory"
+repository = { workspace = true }
 description = "Build tool for Glory."
 categories = ["development-tools", "wasm", "web-programming"]
 keywords = ["glory"]

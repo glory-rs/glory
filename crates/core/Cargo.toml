@@ -3,9 +3,7 @@ name = "glory-core"
 version = { workspace = true }
 authors = { workspace = true }
 edition = { workspace = true }
-description = """
-TBD.
-"""
+description = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
 documentation = "https://docs.rs/glory/"

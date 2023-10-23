@@ -5,12 +5,12 @@ exclude = ["examples"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.1"
+version = "0.1.0"
 authors = ["Chrislearn Young <chrislearn@hotmail.com>"]
 edition = "2021"
 rust-version = "1.72"
 description = """
-Glory is a powerful web framework that can make your work easier.
+Glory is an experimental rust web front framework.
 """
 homepage = "https://glory.rs"
 repository = "https://github.com/glory-rs/glory"
@@ -24,7 +24,7 @@ categories = ["web-programming::http-server", "web-programming::websocket", "net
 [workspace.dependencies]
 url = "2"
 glory-core = { version = "0.1.0", path = "crates/core", default-features = false }
-salvo = { version = "0.58", default-features = true, path = "D:/Soncai/salvo-rs/salvo/crates/salvo"} #
+salvo = { version = "0.58", default-features = true} #
 glory-routing = { version = "0.1.0", path = "crates/routing", default-features = false }
 glory-hot-reload = { version = "0.1.0", path = "crates/hot-reload" }
 parking_lot = "0.12"
