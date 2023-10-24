@@ -4,11 +4,10 @@ license = "MIT"
 repository = { workspace = true }
 description = "Build tool for Glory."
 categories = ["development-tools", "wasm", "web-programming"]
-keywords = ["glory"]
-version = "0.1.1"
-edition = "2021"
-# OnceLock was stabailzed in 1.70
-rust-version = "1.70"
+keywords = { workspace = true }
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
 
 [[bin]]
 path = "src/main.rs"

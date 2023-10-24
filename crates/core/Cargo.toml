@@ -6,7 +6,7 @@ edition = { workspace = true }
 description = { workspace = true }
 homepage = { workspace = true }
 repository = { workspace = true }
-documentation = "https://docs.rs/glory/"
+documentation = { workspace = true }
 readme = { workspace = true }
 keywords = { workspace = true }
 license = { workspace = true }
