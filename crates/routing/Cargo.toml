@@ -24,7 +24,7 @@ path = "src/lib.rs"
 
 [features]
 default = ["web-csr"]
-web-csr = ["__single_holder", "dep:wasm-bindgen"]
+web-csr = ["__single_holder", "glory-core/web-csr", "dep:wasm-bindgen"]
 web-ssr = ["glory-core/web-ssr"]
 salvo = ["dep:salvo", "glory-core/salvo"]
 __single_holder = []
