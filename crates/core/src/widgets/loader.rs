@@ -119,14 +119,12 @@ where
             let fut = (self.future)();
 
             let state = self.state.clone();
-            crate::info!("===============load 0");
             crate::spawn::spawn_local(async move {
                 state.revise(|mut state| {
                     *state = LoadState::<T>::Loading;
                 });
                 let result = fut.await;
                 state.revise(|mut state| {
-                    crate::info!("===============loaded");
                     *state = LoadState::Loaded(result);
                 });
             });
@@ -134,13 +132,11 @@ where
     }
 
     fn patch(&mut self, ctx: &mut Scope) {
-        crate::info!("===============patch");
         if let LoadState::Loaded(result) = &*self.state.get() {
             for view_id in ctx.show_list.clone() {
                 ctx.detach_child(&view_id);
             }
 
-            crate::info!("===============patch 1");
             (self.callback)(result, ctx);
             for view_id in ctx.show_list.clone() {
                 ctx.attach_child(&view_id);

@@ -20,6 +20,11 @@ thread_local! {
     pub(crate) static RUNING: RefCell<IndexMap<HolderId, bool>> = RefCell::new(IndexMap::new());
 
     #[cfg(feature = "__single_holder")]
+    pub(crate) static UNTRACKING: Cell<bool> = Cell::new(false);
+    #[cfg(not(feature = "__single_holder"))]
+    pub(crate) static UNTRACKING: RefCell<IndexMap<HolderId, bool>> = RefCell::new(IndexMap::new());
+
+    #[cfg(feature = "__single_holder")]
     pub(crate) static BATCHING: Cell<bool> = Cell::new(false);
     #[cfg(not(feature = "__single_holder"))]
     pub(crate) static BATCHING: RefCell<IndexMap<HolderId, bool>> = RefCell::new(IndexMap::new());
@@ -33,6 +38,16 @@ pub fn is_running() -> bool {
 pub fn is_running(holder_id: HolderId) -> bool {
     RUNING.with_borrow(|running| running.get(&holder_id).map(|v| *v).unwrap_or(false))
 }
+
+#[cfg(feature = "__single_holder")]
+pub fn is_untracking() -> bool {
+    UNTRACKING.with(|untracking| untracking.get())
+}
+#[cfg(not(feature = "__single_holder"))]
+pub fn is_untracking(holder_id: HolderId) -> bool {
+    UNTRACKING.with_borrow(|untracking| untracking.get(&holder_id).map(|v| *v).unwrap_or(false))
+}
+
 
 #[cfg(feature = "__single_holder")]
 pub fn is_batching() -> bool {
@@ -91,9 +106,9 @@ pub fn schedule(holder_id: HolderId) {
     }
 }
 
-fn run(#[cfg(not(feature = "__single_holder"))]holder_id: HolderId) {
+fn run(#[cfg(not(feature = "__single_holder"))] holder_id: HolderId) {
     cfg_if! {
-        if #[cfg(feature = "__single_holder")]  {
+        if #[cfg(feature = "__single_holder")] {
             RUNING.with(|running| running.set(true));
         } else {
             RUNING.with_borrow_mut(|running| running.insert(holder_id, true));
@@ -104,7 +119,7 @@ fn run(#[cfg(not(feature = "__single_holder"))]holder_id: HolderId) {
         let mut revising_view_ids = IndexSet::<ViewId>::default();
         REVISING_ITEMS.with(|revising_items| {
             cfg_if! {
-                if #[cfg(feature = "__single_holder")]  {
+                if #[cfg(feature = "__single_holder")] {
                     let revising_items = revising_items.borrow_mut();
                 } else {
                     let mut revising_items = revising_items.borrow_mut();
@@ -147,9 +162,9 @@ fn run(#[cfg(not(feature = "__single_holder"))]holder_id: HolderId) {
             });
         }
         loop_counts += 1;
-        
+
         cfg_if! {
-            if #[cfg(feature = "__single_holder")]  {
+            if #[cfg(feature = "__single_holder")] {
                 let pending_items = PENDING_ITEMS.with(|pending_items| pending_items.take());
             } else {
                 let pending_items = PENDING_ITEMS.with_borrow_mut(|pending_items| pending_items.remove(&holder_id).unwrap_or_default());
@@ -162,7 +177,7 @@ fn run(#[cfg(not(feature = "__single_holder"))]holder_id: HolderId) {
             } else {
                 REVISING_ITEMS.with(|revising_items| {
                     cfg_if! {
-                        if #[cfg(feature = "__single_holder")]  {
+                        if #[cfg(feature = "__single_holder")] {
                             revising_items.replace(pending_items);
                         } else {
                             revising_items.borrow_mut().insert(holder_id, pending_items);
@@ -173,7 +188,7 @@ fn run(#[cfg(not(feature = "__single_holder"))]holder_id: HolderId) {
         } else {
             REVISING_ITEMS.with(|revising_items| {
                 cfg_if! {
-                    if #[cfg(feature = "__single_holder")]  {
+                    if #[cfg(feature = "__single_holder")] {
                         revising_items.borrow_mut().clear();
                     }  else {
                         revising_items.borrow_mut().remove(&holder_id);
@@ -185,7 +200,7 @@ fn run(#[cfg(not(feature = "__single_holder"))]holder_id: HolderId) {
     }
 
     cfg_if! {
-        if #[cfg(feature = "__single_holder")]  {
+        if #[cfg(feature = "__single_holder")] {
             RUNING.with(|running| running.set(false));
         } else {
             RUNING.with_borrow_mut(|running| running.insert(holder_id, false));

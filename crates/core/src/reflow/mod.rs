@@ -61,11 +61,11 @@ pub fn untrack<O, R>(opt: O) -> R
 where
     O: FnOnce() -> R,
 {
-    scheduler::BATCHING.with(|batching| {
-        if !batching.get() {
-            batching.set(true);
+    scheduler::UNTRACKING.with(|untracking| {
+        if !untracking.get() {
+            untracking.set(true);
             let out = opt();
-            batching.set(false);
+            untracking.set(false);
             out
         } else {
             opt()
@@ -79,11 +79,11 @@ pub fn untrack<O, R>(holder_id: HolderId, opt: O) -> R
 where
     O: FnOnce() -> R,
 {
-    scheduler::BATCHING.with(|batching| {
-        if !batching.borrow().get(&holder_id).map(|v| *v).unwrap_or(false) {
-            batching.borrow_mut().insert(holder_id, true);
+    scheduler::UNTRACKING.with(|untracking| {
+        if !untracking.borrow().get(&holder_id).map(|v| *v).unwrap_or(false) {
+            untracking.borrow_mut().insert(holder_id, true);
             let out = opt();
-            batching.borrow_mut().insert(holder_id, false);
+            untracking.borrow_mut().insert(holder_id, false);
             out
         } else {
             opt()

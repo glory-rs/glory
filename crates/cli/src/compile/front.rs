@@ -47,7 +47,6 @@ pub async fn front(proj: &Arc<Project>, changes: &ChangeSet) -> JoinHandle<Resul
 pub fn front_cargo_process(cmd: &str, wasm: bool, proj: &Project) -> Result<(String, String, Child)> {
     let mut command = Command::new("cargo");
     let (envs, line) = build_cargo_front_cmd(cmd, wasm, proj, &mut command);
-    println!("Build front: {}", line);
     Ok((envs, line, command.spawn()?))
 }
 

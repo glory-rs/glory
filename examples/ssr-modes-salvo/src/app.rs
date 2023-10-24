@@ -88,14 +88,12 @@ impl Widget for ShowPost {
         let post_id: usize = {
             let truck = ctx.truck();
             let locator = truck.obtain::<Locator>().unwrap();
-            info!("=====build====locator====={:?}", locator);
             if let Some(id) = locator.params().get().get("id") {
                 id.parse().unwrap_or_default()
             } else {
                 0
             }
         };
-        info!("=====build====lo  {}", post_id);
         cfg_if! {
             if #[cfg(feature = "web-csr")] {
                 let post = move || async move{
@@ -108,8 +106,14 @@ impl Widget for ShowPost {
                 let post = move || async move {crate::post::get_post(post_id)};
             }
         }
-        let loader = Loader::new(post, |post, ctx| {
+        let info = {
+            let truck = ctx.truck();
+            truck.obtain::<PageInfo>().unwrap().clone()
+        };
+        let loader = Loader::new(post, move |post, ctx| {
             if let Some(post) = post {
+                info.title.revise(|mut v| *v = post.title.clone());
+                info.description.revise(|mut v| *v = post.description.clone());
                 article()
                     .fill(h2().html(post.title.clone()))
                     .fill(section().html(post.content.clone()))

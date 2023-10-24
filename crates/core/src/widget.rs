@@ -1,7 +1,6 @@
 use std::fmt;
 
 use crate::node::Node;
-use crate::reflow::scheduler;
 use crate::{view::ViewPosition, Scope, View, ViewId};
 
 pub trait Widget: fmt::Debug + 'static {
@@ -55,11 +54,9 @@ pub trait Widget: fmt::Debug + 'static {
         };
         cfg_if! {
             if #[cfg(feature = "__single_holder")] {
-                crate::reflow::untrack(process);
-                scheduler::schedule();
+                crate::reflow::batch(process);
             } else {
-                crate::reflow::untrack(holder_id, process);
-                scheduler::schedule(holder_id);
+                crate::reflow::batch(holder_id, process);
             }
         }
         view_id

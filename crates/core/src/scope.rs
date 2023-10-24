@@ -214,7 +214,6 @@ impl Scope {
                 });
             } else {
                 reflow::batch(self.holder_id(), || {
-                    println!("-------------------detach_child1");
                     view.detach();
                 });
             }

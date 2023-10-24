@@ -8,7 +8,7 @@ use indexmap::IndexSet;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{Bond, Record, Revisable, RevisableId, Signal, PENDING_ITEMS, REVISING_ITEMS, TRACKING_STACK};
-use crate::reflow::scheduler;
+use crate::reflow::{self, scheduler};
 use crate::ViewId;
 
 #[derive(Educe)]
@@ -47,51 +47,43 @@ where
     fn view_ids(&self) -> Rc<RefCell<IndexSet<ViewId>>> {
         self.view_ids.clone()
     }
-    #[cfg(feature = "__single_holder")]
     fn signal(&self) {
-        if scheduler::is_running() {
-            let revising = REVISING_ITEMS.with_borrow(|items| items.contains_key(&self.id()));
-            if !revising {
-                PENDING_ITEMS.with(|items| {
-                    if !items.borrow().contains_key(&self.id()) {
-                        items.borrow_mut().insert(self.id(), self.clone_boxed());
-                    }
-                });
-            }
-        } else {
-            REVISING_ITEMS.with(|items| {
-                if !items.borrow().contains_key(&self.id()) {
-                    items.borrow_mut().insert(self.id(), self.clone_boxed());
-                    crate::reflow::schedule();
+        #[cfg(not(feature = "__single_holder"))]
+        let Some(holder_id) = self.holder_id() else {
+            tracing::debug!("Cage::signal: holder_id is None");
+            return;
+        };
+        if scheduler::is_untracking(
+            #[cfg(not(feature = "__single_holder"))]
+            holder_id,
+        ) {
+            return;
+        }
+        let is_running = scheduler::is_running(
+            #[cfg(not(feature = "__single_holder"))]
+            holder_id,
+        );
+
+        if is_running {
+            PENDING_ITEMS.with_borrow_mut(|items| {
+                #[cfg(not(feature = "__single_holder"))]
+                let items = items.entry(holder_id).or_default();
+                if !items.contains_key(&self.id()) {
+                    items.insert(self.id(), self.clone_boxed());
                 }
             });
-        }
-    }
-    #[cfg(not(feature = "__single_holder"))]
-    fn signal(&self) {
-        if let Some(holder_id) = self.holder_id() {
-            if scheduler::is_running(holder_id) {
-                let revising = REVISING_ITEMS.with_borrow(|items| items.get(&holder_id).map(|items| items.contains_key(&self.id())).unwrap_or(false));
-                if !revising {
-                    PENDING_ITEMS.with_borrow_mut(|items| {
-                        let items = items.entry(holder_id).or_default();
-                        if !items.contains_key(&self.id()) {
-                            items.insert(self.id(), self.clone_boxed());
-                        }
-                    });
-                }
-            } else {
-                REVISING_ITEMS.with(|items| {
-                    let mut items = items.borrow_mut();
-                    let items = items.entry(holder_id).or_default();
-                    if !items.contains_key(&self.id()) {
-                        items.insert(self.id(), self.clone_boxed());
-                        crate::reflow::schedule(holder_id);
-                    }
-                });
-            }
         } else {
-            tracing::debug!("Cage::signal: holder_id is None");
+            REVISING_ITEMS.with_borrow_mut(|items| {
+                #[cfg(not(feature = "__single_holder"))]
+                let items = items.entry(holder_id).or_default();
+                if !items.contains_key(&self.id()) {
+                    items.insert(self.id(), self.clone_boxed());
+                    reflow::schedule(
+                        #[cfg(not(feature = "__single_holder"))]
+                        holder_id,
+                    );
+                }
+            });
         }
     }
 
@@ -146,20 +138,22 @@ impl<T> Cage<T>
 where
     T: fmt::Debug,
 {
-    pub fn revise<F>(&self, opt: F)
+    pub fn revise<F, R>(&self, opt: F) -> R
     where
-        F: FnOnce(RefMut<'_, T>),
+        F: FnOnce(RefMut<'_, T>) -> R,
     {
-        (opt)(self.source.deref().borrow_mut());
+        let result = (opt)(self.source.deref().borrow_mut());
         self.version.set(self.version.get() + 1);
         self.signal();
+        result
     }
-    pub fn revise_silent<F>(&self, opt: F)
+    pub fn revise_silent<F, R>(&self, opt: F) -> R
     where
-        F: FnOnce(RefMut<'_, T>),
+        F: FnOnce(RefMut<'_, T>) -> R,
     {
-        (opt)(self.source.deref().borrow_mut());
+        let result = (opt)(self.source.deref().borrow_mut());
         self.version.set(self.version.get() + 1);
+        result
     }
     // pub fn source<'a>(&'a self) -> std::cell::Ref<'a, S> {
     //     self.source.borrow()

@@ -24,7 +24,8 @@ use std::rc::Rc;
 use std::{borrow::Cow, ops::Deref};
 
 use educe::Educe;
-use glory_core::{Cage, Truck, Scope, ViewId, Widget};
+use glory_core::reflow::Record;
+use glory_core::{Cage, Scope, Truck, ViewId, Widget};
 use indexmap::IndexMap;
 
 /// Handler
@@ -158,9 +159,11 @@ impl TruckExt for Rc<RefCell<Truck>> {
     }
     fn remove_stuff(&self, name: &str) -> Option<Stuff> {
         let mut stuff = None;
-        self.stuffs().revise(|mut stuffs| {
-            stuff = stuffs.remove(name);
-        });
+        if self.stuffs().get().contains_key(name) {
+            stuff = self.stuffs().revise(|mut stuffs| {
+                stuffs.remove(name)
+            });
+        }
         stuff
     }
     fn stuffs(&self) -> Cage<IndexMap<String, Stuff>> {
