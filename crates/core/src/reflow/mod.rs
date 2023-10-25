@@ -5,7 +5,7 @@ pub use bond::Bond;
 pub mod scheduler;
 pub use scheduler::{batch, schedule};
 
-use std::cell::{ Ref, RefCell};
+use std::cell::{Ref, RefCell};
 use std::fmt::{self, Display};
 use std::hash::Hash;
 use std::rc::Rc;
@@ -22,7 +22,7 @@ thread_local! {
     pub(crate) static REVISING_ITEMS: RefCell<IndexMap<RevisableId, Box<dyn Signal>>> = RefCell::default();
     #[cfg(not(feature = "__single_holder"))]
     pub(crate) static REVISING_ITEMS: RefCell<IndexMap<HolderId, IndexMap<RevisableId, Box<dyn Signal>>>> = RefCell::default();
-    
+
     #[cfg(feature = "__single_holder")]
     pub(crate) static PENDING_ITEMS: RefCell<IndexMap<RevisableId, Box<dyn Signal>>> = RefCell::default();
     #[cfg(not(feature = "__single_holder"))]
@@ -112,13 +112,13 @@ pub trait Revisable: fmt::Debug {
     fn version(&self) -> usize;
     fn bind_view(&self, view_id: &ViewId);
     fn is_revising(&self) -> bool {
-        REVISING_ITEMS.with(|revising_items| {
+        REVISING_ITEMS.with_borrow(|revising_items| {
             cfg_if! {
                 if #[cfg(feature = "__single_holder")] {
-                    revising_items.borrow().contains_key(&self.id())
+                    revising_items.contains_key(&self.id())
                 } else {
                     if let Some(holder_id) = self.holder_id() {
-                        revising_items.borrow_mut().entry(holder_id).or_default().contains_key(&self.id())
+                        revising_items.get(&holder_id).map(|items|items.contains_key(&self.id())).unwrap_or(false)
                     } else {
                         tracing::debug!("Revisable::is_revising: holder_id is None");
                         false

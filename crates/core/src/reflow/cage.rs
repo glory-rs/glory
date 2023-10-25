@@ -73,17 +73,22 @@ where
                 }
             });
         } else {
-            REVISING_ITEMS.with_borrow_mut(|items| {
+            let need_schedule = REVISING_ITEMS.with_borrow_mut(|items| {
                 #[cfg(not(feature = "__single_holder"))]
                 let items = items.entry(holder_id).or_default();
                 if !items.contains_key(&self.id()) {
                     items.insert(self.id(), self.clone_boxed());
-                    reflow::schedule(
-                        #[cfg(not(feature = "__single_holder"))]
-                        holder_id,
-                    );
+                    true
+                } else {
+                    false
                 }
             });
+            if need_schedule {
+                reflow::schedule(
+                    #[cfg(not(feature = "__single_holder"))]
+                    holder_id,
+                );
+            }
         }
     }
 

@@ -96,7 +96,6 @@ where
                     });
                 } else {
                     crate::reflow::batch(ctx.holder_id(), || {
-                        println!("-------------------eee 1");
                         for view_id in key_view_ids.values() {
                             ctx.detach_child(view_id);
                         }
