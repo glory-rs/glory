@@ -147,7 +147,7 @@ where
         if let Some(parent_node) = &ctx.parent_node {
             let key = format!("gly-{}", ctx.view_id());
             let data = xml::escape::escape_str_attribute(&serde_json::to_string(&*self.state.get()).unwrap()).to_string();
-            parent_node.attr(key, data);
+            parent_node.set_attribute(key, data);
         }
     }
 }

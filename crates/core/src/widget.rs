@@ -1,7 +1,6 @@
 use std::fmt;
 
-use crate::node::Node;
-use crate::{view::ViewPosition, Scope, View, ViewId};
+use crate::{view::ViewPosition, Node, Scope, View, ViewId};
 
 pub trait Widget: fmt::Debug + 'static {
     fn store_in(self, parent: &mut Scope) -> ViewId
@@ -22,11 +21,11 @@ pub trait Widget: fmt::Debug + 'static {
         view_id
     }
 
-    fn mount_to(self, scope: Scope, parent_node: &Node) -> ViewId
+    fn mount_to(self, ctx: Scope, parent_node: &Node) -> ViewId
     where
         Self: Sized,
     {
-        let mut view = View::new(scope, self);
+        let mut view = View::new(ctx, self);
 
         view.scope.parent_node = Some(parent_node.clone());
         view.scope.graff_node = Some(parent_node.clone());
@@ -149,5 +148,20 @@ where
         Filler::new(move |ctx: &mut Scope| {
             self.show_in(ctx);
         })
+    }
+}
+
+impl<W> IntoFiller for Option<W>
+where
+    W: Widget,
+{
+    fn into_filler(self) -> Filler {
+        if let Some(widget) = self {
+            Filler::new(move |ctx: &mut Scope| {
+                widget.show_in(ctx);
+            })
+        } else {
+            Filler::new(|_|{})
+        }
     }
 }

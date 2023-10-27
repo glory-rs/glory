@@ -28,7 +28,7 @@ pub struct Element {
     #[allow(clippy::type_complexity)]
     pub fillers: Vec<Filler>,
 
-    node: Node,
+    pub(crate) node: Node,
 }
 
 impl Widget for Element {
@@ -104,13 +104,31 @@ impl Element {
     pub fn node(&self) -> &Node {
         &self.node
     }
+    pub fn add_filler(&mut self, filler: impl IntoFiller) {
+        self.fillers.push(filler.into_filler());
+    }
     pub fn fill(mut self, filler: impl IntoFiller) -> Self {
         self.fillers.push(filler.into_filler());
         self
     }
 
+    pub fn then<F>(self, func: F) -> Self
+    where
+        F: FnOnce(Self) -> Self,
+    {
+        func(self)
+    }
+
     pub fn is_void(&self) -> bool {
         self.is_void
+    }
+
+    #[track_caller]
+    pub fn add_id<V>(&mut self, value: V)
+    where
+        V: AttrValue + 'static,
+    {
+        self.attrs.insert("id".into(), Box::new(value));
     }
 
     #[track_caller]
@@ -120,6 +138,14 @@ impl Element {
     {
         self.attrs.insert("id".into(), Box::new(value));
         self
+    }
+
+    #[track_caller]
+    pub fn add_class<V>(&mut self, value: V)
+    where
+        V: ClassPart + 'static,
+    {
+        self.classes.part(value);
     }
 
     #[track_caller]
@@ -155,6 +181,15 @@ impl Element {
 
     /// Adds an property to this element.
     #[track_caller]
+    pub fn add_prop<V>(&mut self, name: impl Into<Cow<'static, str>>, value: V)
+    where
+        V: PropValue + 'static,
+    {
+        self.props.insert(name.into(), Box::new(value));
+    }
+
+    /// Adds an property to this element.
+    #[track_caller]
     pub fn prop<V>(mut self, name: impl Into<Cow<'static, str>>, value: V) -> Self
     where
         V: PropValue + 'static,
@@ -163,6 +198,14 @@ impl Element {
         self
     }
 
+    /// Adds an attribute to this element.
+    #[track_caller]
+    pub fn add_attr<V>(&mut self, name: impl Into<Cow<'static, str>>, value: V)
+    where
+        V: AttrValue + 'static,
+    {
+        self.attrs.insert(name.into(), Box::new(value));
+    }
     /// Adds an attribute to this element.
     #[track_caller]
     pub fn attr<V>(mut self, name: impl Into<Cow<'static, str>>, value: V) -> Self
@@ -201,7 +244,7 @@ impl Element {
     /// Be very careful when using this method. Always remember to
     /// sanitize the input to avoid a cross-site scripting (XSS)
     /// vulnerability.
-    pub fn set_text<V>(&mut self, text: V)
+    pub fn set_inner_text<V>(&mut self, text: V)
     where
         V: AttrValue + 'static,
     {
@@ -214,7 +257,7 @@ impl Element {
     /// Be very careful when using this method. Always remember to
     /// sanitize the input to avoid a cross-site scripting (XSS)
     /// vulnerability.
-    pub fn text<V>(self, text: V) -> Self
+    pub fn inner_text<V>(self, text: V) -> Self
     where
         V: AttrValue + 'static,
     {

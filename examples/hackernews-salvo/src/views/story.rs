@@ -1,40 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use glory::reflow::*;
-use glory::routing::*;
-use glory::web::widgets::*;
-use glory::widgets::*;
-use glory::*;
-#[cfg(feature = "web-csr")]
-use wasm_bindgen::UnwrapThrowExt;
-
-use crate::models::PageInfo;
-#[cfg(feature = "web-csr")]
-use crate::models::{Post, PostMetadata};
-
-#[derive(Debug)]
-pub struct App {}
-impl App {
-    pub fn new() -> Self {
-        Self {}
-    }
-}
-
-impl Widget for App {
-    fn build(&mut self, ctx: &mut Scope) {
-        info!("App::build");
-        let info = PageInfo::default();
-        ctx.truck_mut().inject(info.clone());
-
-        head_mixin()
-            .fill(link().rel("stylesheet").href("/pkg/ssr-modes-salvo.css"))
-            .fill(meta().name("description").content(info.description.clone()))
-            .fill(title().html(info.title.clone()))
-            .show_in(ctx);
-        Graff::new("section").show_in(ctx);
-    }
-}
 
 #[derive(Debug, Clone)]
 struct ListPost;
@@ -61,7 +24,7 @@ impl Widget for ListPost {
         let loader = Loader::new(list, |posts, ctx| {
             let posts = posts
                 .into_iter()
-                .map(|p| li().fill(a().href(format!("/{}", p.id)).html(p.title.clone())))
+                .map(|p| li().fill(a().attr("href", format!("/{}", p.id)).html(p.title.clone())))
                 .collect::<Vec<_>>();
 
             ul().fill(posts).show_in(ctx);
@@ -143,7 +106,7 @@ impl Widget for NoMatch {
         info!("NoMatch::build");
         div()
             .fill(h2().html("Nothing to see here!"))
-            .fill(a().href("/").html("Go to the home page"))
+            .fill(a().attr("href", "/").html("Go to the home page"))
             .show_in(ctx);
     }
 }

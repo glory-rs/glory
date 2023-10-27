@@ -7,10 +7,10 @@ use std::sync::Arc;
 use educe::Educe;
 
 use crate::config::GloryConfig;
-use crate::reflow::scheduler::{BATCHING, RUNING};
+use crate::reflow::scheduler::{BATCHING, RUNNING};
 use crate::reflow::{PENDING_ITEMS, REVISING_ITEMS};
 use crate::{Truck, Holder, HolderId, Widget, Scope, ViewId, ROOT_VIEWS};
-use crate::web::widgets::Element;
+use crate::web::widgets::*;
 
 const DEPOT_URL_KEY: &str = "glory::url";
 
@@ -18,7 +18,7 @@ pub struct ServerHolder {
     id: HolderId,
     pub config: Arc<GloryConfig>,
     pub truck: Rc<RefCell<Truck>>,
-    pub host_node: Element,
+    pub host_node: Div,
     next_root_view_id: AtomicU64,
 }
 
@@ -54,8 +54,8 @@ impl Drop for ServerHolder {
             pending_items.remove(&self.id);
         });
 
-        RUNING.with_borrow_mut(|runing| {
-            runing.remove(&self.id);
+        RUNNING.with_borrow_mut(|running| {
+            running.remove(&self.id);
         });
         BATCHING.with_borrow_mut(|batching| {
             batching.remove(&self.id);

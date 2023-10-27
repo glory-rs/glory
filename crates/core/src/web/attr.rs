@@ -21,16 +21,6 @@ impl<T> AttrValue for Cage<T>
 where
     T: AttrValue + fmt::Debug + Clone + 'static,
 {
-    #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
-    fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
-        if self.is_revising() || first_time {
-            (*self.get()).inject_to(view_id, node, name, true);
-        }
-        if first_time {
-            self.bind_view(view_id);
-        }
-    }
-    #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
     fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
         if self.is_revising() || first_time {
             (*self.get()).inject_to(view_id, node, name, true);
@@ -48,16 +38,6 @@ where
     F: Fn() -> T + Clone + 'static,
     T: AttrValue + fmt::Debug + Clone + 'static,
 {
-    #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
-    fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
-        if self.is_revising() || first_time {
-            (*self.get()).inject_to(view_id, node, name, true);
-        }
-        if first_time {
-            self.bind_view(view_id);
-        }
-    }
-    #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
     fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
         if self.is_revising() || first_time {
             (*self.get()).inject_to(view_id, node, name, true);
@@ -86,9 +66,9 @@ impl AttrValue for bool {
     fn inject_to(&self, _view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
         if first_time {
             if *self {
-                node.attr(name.to_owned(), name.to_owned());
+                node.set_attribute(name.to_owned(), name.to_owned());
             } else {
-                node.remove_attr(name);
+                node.remove_attribute(name);
             }
         }
     }
@@ -111,7 +91,7 @@ impl AttrValue for ViewId {
     #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
     fn inject_to(&self, _view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
         if first_time {
-            node.attr(name.to_owned(), self.deref().to_owned());
+            node.set_attribute(name.to_owned(), self.deref().to_owned());
         }
     }
     fn to_string(&self) -> Option<String> {
@@ -138,7 +118,7 @@ macro_rules! attr_type {
             #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
             fn inject_to(&self, _view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
                 if first_time {
-                    node.attr(name.to_owned(), ToString::to_string(self));
+                    node.set_attribute(name.to_owned(), ToString::to_string(self));
                 }
             }
             fn to_string(&self) -> Option<String> {
@@ -163,7 +143,7 @@ macro_rules! attr_type {
                     if let Some(value) = self {
                         AttrValue::inject_to(value, view_id, node, name, first_time);
                     } else {
-                        node.remove_attr(name);
+                        node.remove_attribute(name);
                     }
                 }
             }

@@ -10,8 +10,8 @@ pub struct Node {
     name: Rc<RefCell<Cow<'static, str>>>,
     is_void: Rc<RefCell<bool>>,
     classes: Rc<RefCell<BTreeSet<Cow<'static, str>>>>,
-    attrs: Rc<RefCell<BTreeMap<Cow<'static, str>, Cow<'static, str>>>>,
-    props: Rc<RefCell<BTreeMap<Cow<'static, str>, Cow<'static, str>>>>,
+    attributes: Rc<RefCell<BTreeMap<Cow<'static, str>, Cow<'static, str>>>>,
+    properties: Rc<RefCell<BTreeMap<Cow<'static, str>, Cow<'static, str>>>>,
     children: Rc<RefCell<Vec<Node>>>,
 }
 
@@ -21,8 +21,8 @@ impl Node {
             name: Rc::new(RefCell::new(name.into())),
             is_void: Rc::new(RefCell::new(is_void)),
             classes: Default::default(),
-            attrs: Default::default(),
-            props: Default::default(),
+            attributes: Default::default(),
+            properties: Default::default(),
             children: Default::default(),
         }
     }
@@ -38,17 +38,17 @@ impl Node {
         self.classes.borrow_mut().remove(key);
     }
 
-    pub fn attr(&self, key: impl Into<Cow<'static, str>>, value: impl Into<Cow<'static, str>>) {
-        self.attrs.borrow_mut().insert(key.into(), value.into());
+    pub fn set_attribute(&self, key: impl Into<Cow<'static, str>>, value: impl Into<Cow<'static, str>>) {
+        self.attributes.borrow_mut().insert(key.into(), value.into());
     }
-    pub fn remove_attr(&self, key: &str) {
-        self.attrs.borrow_mut().remove(key);
+    pub fn remove_attribute(&self, key: &str) {
+        self.attributes.borrow_mut().remove(key);
     }
-    pub fn prop(&self, key: impl Into<Cow<'static, str>>, value: impl Into<Cow<'static, str>>) {
-        self.props.borrow_mut().insert(key.into(), value.into());
+    pub fn set_property(&self, key: impl Into<Cow<'static, str>>, value: impl Into<Cow<'static, str>>) {
+        self.properties.borrow_mut().insert(key.into(), value.into());
     }
-    pub fn remove_prop(&self, key: &str) {
-        self.props.borrow_mut().remove(key);
+    pub fn remove_property(&self, key: &str) {
+        self.properties.borrow_mut().remove(key);
     }
 
     pub fn prepend_with_node(&self, node: &Node) {
@@ -85,9 +85,21 @@ impl Node {
         } else {
             "".to_string()
         };
-        let attrs = if !self.attrs.borrow().is_empty() {
+
+        let properties = if !self.properties.borrow().is_empty() {
+            self.properties.borrow().iter().fold("".to_string(), |mut acc, (k, v)| {
+                if k != "text" {
+                    acc.push_str(&format!(" {k}=\"{v}\""));
+                }
+                acc
+            })
+        } else {
+            "".to_string()
+        };
+
+        let attributes = if !self.attributes.borrow().is_empty() {
             let mut value = "".to_string();
-            for (k, v) in self.attrs.borrow().iter() {
+            for (k, v) in self.attributes.borrow().iter() {
                 if k != "inner_html" && k != "inner_text" {
                     write!(&mut value, " {k}=\"{v}\"").unwrap();
                 }
@@ -97,19 +109,10 @@ impl Node {
             "".to_string()
         };
 
-        // let props = if !self.props.borrow().is_empty() {
-        //     self.props.borrow().iter().fold("".to_string(), |mut acc, (k, v)| {
-        //         acc.push_str(&format!(" {k}=\"{v}\""));
-        //         acc
-        //     })
-        // } else {
-        //     "".to_string()
-        // };
-
         if *self.is_void.borrow() {
-            (format!("<{name}{attrs}{class} />"), "".into())
+            (format!("<{name}{properties}{attributes}{class} />"), "".into())
         } else {
-            (format!("<{name}{attrs}{class}>"), format!("</{name}>"))
+            (format!("<{name}{properties}{attributes}{class}>"), format!("</{name}>"))
         }
     }
 
@@ -128,10 +131,13 @@ impl Node {
                 write!(&mut html, "{}", child.outer_html()).unwrap();
             }
         } else {
-            let attrs = self.attrs.borrow();
-            let inner_html = attrs.get("inner_html");
-            let inner_text = attrs.get("inner_text");
-            if let Some(inner_html) = inner_html {
+            let properties = self.properties.borrow();
+            let attributes = self.attributes.borrow();
+            let inner_html = attributes.get("inner_html");
+            let inner_text = attributes.get("inner_text");
+            if let Some(text) = properties.get("text") {
+                write!(&mut html, "{}", &*text).unwrap();
+            } else if let Some(inner_html) = inner_html {
                 write!(&mut html, "{}", inner_html).unwrap();
             } else if let Some(inner_text) = inner_text {
                 write!(&mut html, "{}", inner_text).unwrap();

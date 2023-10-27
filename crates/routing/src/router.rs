@@ -1,9 +1,9 @@
 use std::fmt::{self, Formatter};
 use std::rc::Rc;
 
-#[cfg(feature = "salvo")]
+#[cfg(all(not(feature = "__single_holder"),feature = "salvo"))]
 use glory_core::web::holders::SalvoHandler;
-#[cfg(feature = "salvo")]
+#[cfg(all(not(feature = "__single_holder"),feature = "salvo"))]
 use indexmap::IndexSet;
 use url::Url;
 
@@ -238,7 +238,7 @@ impl Router {
         func(self)
     }
     cfg_feature! {
-        #![feature = "salvo"]
+        #![all(not(feature = "__single_holder"),feature = "salvo")]
         pub fn make_salvo_router(&self, handler: SalvoHandler) -> salvo::Router {
             let mut all_paths = IndexSet::new();
             let root_path = self.filtered_path();
