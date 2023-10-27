@@ -42,7 +42,7 @@ where
     T: Serialize + for<'a> Deserialize<'a> + fmt::Debug + 'static,
     Fut: Future<Output = T> + 'static,
 {
-    future: Box<dyn Fn() -> Fut>,
+    future: Option<Box<dyn FnOnce() -> Fut>>,
     callback: Box<dyn Fn(&T, &mut Scope)>,
     fallback: Option<Box<dyn Fn(&mut Scope)>>,
     state: Cage<LoadState<T>>,
@@ -62,9 +62,9 @@ where
     T: Serialize + for<'a> Deserialize<'a> + fmt::Debug + 'static,
     Fut: Future<Output = T> + 'static,
 {
-    pub fn new(future: impl Fn() -> Fut + 'static, callback: impl Fn(&T, &mut Scope) + 'static) -> Self {
+    pub fn new(future: impl FnOnce() -> Fut + 'static, callback: impl Fn(&T, &mut Scope) + 'static) -> Self {
         Self {
-            future: Box::new(future),
+            future: Some(Box::new(future)),
             callback: Box::new(callback),
             fallback: None,
             state: Cage::new(LoadState::Idle),
@@ -116,7 +116,7 @@ where
                 (fallback)(ctx);
             }
 
-            let fut = (self.future)();
+            let fut = (self.future.take().unwrap())();
 
             let state = self.state.clone();
             crate::spawn::spawn_local(async move {

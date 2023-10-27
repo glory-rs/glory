@@ -7,8 +7,10 @@ use glory::web::widgets::*;
 use glory::widgets::*;
 use glory::*;
 
+use crate::models::*;
+
 #[derive(Debug, Clone)]
-struct ShowUser;
+pub struct ShowUser;
 impl Widget for ShowUser {
     fn attach(&mut self, ctx: &mut Scope) {
         let truck = ctx.truck();
@@ -32,17 +34,17 @@ impl Widget for ShowUser {
             truck.obtain::<PageInfo>().unwrap().clone()
         };
         let loader = Loader::new(
-            || models::fetch_api::<User>(&api::user_api_url(&id)).await,
+            move || async move { fetch_api::<User>(&user_api_url(user_id)).await },
             move |user, ctx| {
                 if let Some(user) = user {
                     info.title.revise(|mut v| *v = format!("User:{}", user.id));
-                    info.description.revise(|mut v| *v = user.about.clone());
+                    info.description.revise(|mut v| *v = user.about.clone().unwrap_or_default());
 
                     h1().html(format!("User:{}", user.id)).show_in(ctx);
                     ul().class("meta")
-                        .fill(li().fill(span().class("label").html("Created: ").fill(user.created)))
-                        .fill(li().fill(span().class("label").html("Karma: ").fill(user.karma)))
-                        .fill(user.about.map(|about| ul.fill(li().fill(span().class("about").html(about)))))
+                        .fill(li().fill(span().class("label").html("Created: ").fill(user.created.to_string())))
+                        .fill(li().fill(span().class("label").html("Karma: ").fill(user.karma.to_string())))
+                        .fill(user.about.clone().map(|about| ul().fill(li().fill(span().class("about").html(about)))))
                         .fill(
                             p().class("links")
                                 .fill(

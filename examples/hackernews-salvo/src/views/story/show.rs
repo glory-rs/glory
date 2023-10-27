@@ -3,10 +3,14 @@ use std::rc::Rc;
 
 use glory::reflow::*;
 use glory::routing::*;
+use glory::web::events;
 use glory::web::widgets::*;
 use glory::widgets::*;
 use glory::*;
 
+use crate::models::*;
+
+#[derive(Debug)]
 pub struct ShowStory;
 impl Widget for ShowStory {
     fn attach(&mut self, ctx: &mut Scope) {
@@ -30,19 +34,22 @@ impl Widget for ShowStory {
             truck.obtain::<PageInfo>().unwrap().clone()
         };
         let loader = Loader::new(
-            || models::fetch_api::<User>(&api::user_api_url(&id)).await,
+            move || async move {
+                let url = user_api_url(user_id);
+                fetch_api::<Story>(&url).await
+            },
             move |story, ctx| {
-                if let Some(story) = user {
-                    info.title.revise(|mut v| *v = story.title);
+                if let Some(story) = story {
+                    info.title.revise(|mut v| *v = story.title.clone());
                     info.description.revise(|mut v| *v = story.title.clone());
                     div()
                         .class("item-view-header")
-                        .fill(a().href(&story.url).target("_blank").fill(h1().html(&story.title)))
-                        .fill(story.user.map(|user| {
+                        .fill(a().href(story.url.clone()).target("_blank").fill(h1().html(story.title.clone())))
+                        .fill(story.user.clone().map(|user| {
                             p().class("meta")
                                 .fill(story.points.to_string())
                                 .fill(" points | by ")
-                                .fill(a().href(format!("/users/{user}")).html(&user))
+                                .fill(a().href(format!("/users/{user}")).html(user.clone()))
                                 .fill(format!(" {}", story.time_ago))
                         }))
                         .show_in(ctx);
@@ -50,15 +57,15 @@ impl Widget for ShowStory {
                         .class("item-view-comments")
                         .fill(
                             p().class("item-view-comments-header")
-                                .fill(if story.comments_count.unwrap_or_default() > 0 {
-                                    format!("{} comments", story.comments_count.unwrap_or_default())
+                                .fill(if story.comments_count > 0 {
+                                    format!("{} comments", story.comments_count)
                                 } else {
                                     "No comments yet.".into()
                                 })
                                 .fill(ul().class("comment-children").fill(Each::new(
-                                    story.comments.iter(),
+                                    Cage::new(story.comments.clone()),
                                     |comment| comment.id,
-                                    |comment|ShowComment::new(comment.clone()) ,
+                                    |comment| ShowComment::new(comment.clone()),
                                 ))),
                         )
                         .show_in(ctx);
@@ -75,7 +82,8 @@ impl Widget for ShowStory {
     }
 }
 
-pub struct ShowComment{
+#[derive(Debug, Clone)]
+pub struct ShowComment {
     comment: Comment,
     opened: Cage<bool>,
 }
@@ -84,54 +92,67 @@ impl ShowComment {
         Self {
             comment,
             opened: Cage::new(false),
-            children: Cage::new(vec![]),
         }
     }
 }
 impl Widget for ShowComment {
     fn build(&mut self, ctx: &mut Scope) {
-        li().class("comment").fill(
-            div().class("by").fill(
-                a().href(format!("/users/{}", self.user.clone().unwrap_or_default())).text(self.user.clone())
-            ).fill(format!(" {}", self.time_ago))
-        ).fill(
-            div().class("text").html(&self.content)
-        ).then(|li| if !self.comments.is_empty() {
-            li.fill(
-                div().fill(
-                    div().class("toggle").toggle_class("open", ||{
-                        self.opened.get()
-                    }).fill(
-                        a().on(events::click, move|e|{
-                            let opened = ! self.opened.get();
-                            self.opened.revise(|v|*v = opened);
-                            self.children.revise(|v|*v = if opened {
-                                self.comment.comments.clone()
-                            } else {
-                                vec![]
-                            });
-                        }).html(Bond::new(||{
-                            if self.opened.get() {
-                                "[-]"
-                            } else {
-                                let len = self.comment.comments.len()
-                                format!("[+] {}{} collapsed", len, pluralize(len))
-                            }
-                        }))
-                    ).fill(
-                        Switch::new().case(self.opened, |ctx|{
-                            ul().class("comment-children").fill(Each::new(
-                                self.comment.comments.get().iter(),
-                                |comment| comment.id,
-                                |comment| ShowComment::new(comment.clone()),
-                            )).show_in(ctx);
-                        })
+        let comment = &self.comment;
+        let opened = self.opened.clone();
+        li().class("comment")
+            .fill(
+                div()
+                    .class("by")
+                    .fill(
+                        a().href(format!("/users/{}", comment.user.clone().unwrap_or_default()))
+                            .text(comment.user.clone()),
                     )
-                )
+                    .fill(format!(" {}", comment.time_ago)),
             )
-        } else {
-            li
-        }).show_in(ctx);
+            .fill(div().class("text").html(comment.content.clone()))
+            .then(|li| {
+                if !comment.comments.is_empty() {
+                    li.fill(
+                        div().fill(
+                            div()
+                                .class("toggle")
+                                .toggle_class("open", opened.clone())
+                                .fill(
+                                    a().on(events::click, {
+                                        let opened = opened.clone();
+                                        move |e| {
+                                            opened.revise(|mut v| *v = !*opened.get());
+                                        }
+                                    })
+                                    .html(Bond::new({
+                                        let opened = opened.clone();
+                                        let len = comment.comments.len();
+                                        move || {
+                                            if *opened.get() {
+                                                "[-]".to_owned()
+                                            } else {
+                                                format!("[+] {}{} collapsed", len, pluralize(len))
+                                            }
+                                        }
+                                    })),
+                                )
+                                .fill(Switch::new().case(opened.clone(), {
+                                    let comments = Cage::new(comment.comments.clone());
+                                    move || {
+                                        ul().class("comment-children").fill(Each::new(
+                                            comments.clone(),
+                                            |comment| comment.id,
+                                            |comment| ShowComment::new(comment.clone()),
+                                        ))
+                                    }
+                                })),
+                        ),
+                    )
+                } else {
+                    li
+                }
+            })
+            .show_in(ctx);
     }
 }
 

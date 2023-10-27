@@ -11,7 +11,8 @@ pub struct PageInfo {
 pub struct Story {
     pub id: usize,
     pub title: String,
-    pub points: Option<i32>,
+    #[serde(default)]
+    pub points: i32,
     pub user: Option<String>,
     pub time: usize,
     pub time_ago: String,
@@ -22,7 +23,8 @@ pub struct Story {
     pub domain: String,
     #[serde(default)]
     pub comments: Vec<Comment>,
-    pub comments_count: Option<usize>,
+    #[serde(default)]
+    pub comments_count: usize,
 }
 
 #[derive(Debug, Deserialize, Serialize, PartialEq, Eq, Clone)]
@@ -44,12 +46,12 @@ pub struct User {
     pub about: Option<String>,
 }
 
-pub fn story_api_url(path: &str) -> String {
-    format!("https://node-hnapi.herokuapp.com/{path}")
+pub fn story_api_url(path: impl AsRef<str>) -> String {
+    format!("https://node-hnapi.herokuapp.com/{}", path.as_ref())
 }
 
-pub fn user_api_url(path: &str) -> String {
-    format!("https://hacker-news.firebaseio.com/v0/user/{path}.json")
+pub fn user_api_url(user_id: usize) -> String {
+    format!("https://hacker-news.firebaseio.com/v0/user/{user_id}.json")
 }
 
 #[cfg(not(feature = "web-ssr"))]
@@ -58,7 +60,6 @@ where
     T: serde::de::DeserializeOwned,
 {
     let json = gloo_net::http::Request::get(path)
-        .abort_signal(abort_signal.as_ref())
         .send()
         .await
         .map_err(|e| glory::error!("{e}"))
@@ -72,8 +73,8 @@ where
 #[cfg(feature = "web-ssr")]
 pub async fn fetch_api<T>(path: &str) -> Option<T>
 where
-    T: Serialize,
+T: serde::de::DeserializeOwned,
 {
     let json = reqwest::get(path).await.map_err(|e| tracing::error!("{e}")).ok()?.text().await.ok()?;
-    T::de(&json).map_err(|e| tracing::error!("{e}")).ok()
+    serde_json::from_str(&json).map_err(|e| tracing::error!("{e}")).ok()
 }

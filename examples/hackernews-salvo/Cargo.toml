@@ -8,7 +8,7 @@ edition = "2021"
 
 [features]
 web-csr = ["glory/web-csr", "dep:wasm-bindgen"]
-web-ssr = ["glory/salvo", "dep:tokio", "dep:salvo"]
+web-ssr = ["glory/salvo", "dep:tokio", "dep:salvo", "dep:reqwest"]
 
 [dependencies]
 cfg-if = { workspace = true }
@@ -23,6 +23,7 @@ tracing-subscriber.workspace = true
 gloo-net = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
 once_cell = { workspace = true }
+reqwest = { workspace = true, optional = true }
 
 [package.metadata.glory]
 # The name used by wasm-bindgen/glory-cli for the JS/WASM bundle. Defaults to the crate name

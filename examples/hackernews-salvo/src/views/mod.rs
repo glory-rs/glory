@@ -1,6 +1,8 @@
 mod story;
 mod user;
 
+use std::rc::Rc;
+use std::cell::RefCell;
 
 use glory::reflow::*;
 use glory::routing::*;
@@ -8,8 +10,9 @@ use glory::web::widgets::*;
 use glory::widgets::*;
 use glory::*;
 
-use user::ShowUser;
 use story::{ListStories, ShowStory};
+use user::ShowUser;
+use crate::models::*;
 
 #[derive(Debug)]
 pub struct App;
@@ -76,8 +79,7 @@ pub fn route() -> Router {
     Router::new()
         .push(Router::with_path("users/<id>").goal(|tk: Rc<RefCell<Truck>>| tk.insert_stuff("section", ShowUser)))
         .push(Router::with_path("stories/<id>").goal(|tk: Rc<RefCell<Truck>>| tk.insert_stuff("section", ShowStory)))
-        .push(Router::with_path("<stories>").goal(|tk: Rc<RefCell<Truck>>| tk.insert_stuff("section", ListStories)))
-        .goal(|tk: Rc<RefCell<Truck>>| tk.insert_stuff("section", ListPost))
+        .push(Router::with_path("<**stories>").goal(|tk: Rc<RefCell<Truck>>| tk.insert_stuff("section", ListStories::new())))
 }
 
 pub fn catch() -> impl Handler {

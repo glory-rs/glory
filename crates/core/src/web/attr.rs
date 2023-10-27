@@ -127,22 +127,14 @@ macro_rules! attr_type {
         }
 
         impl AttrValue for Option<$attr_type> {
-            #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
             fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
                 if first_time {
                     if let Some(value) = self {
                         AttrValue::inject_to(value, view_id, node, name, first_time);
                     } else {
+                        #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
                         node.remove_attribute(name).unwrap_throw();
-                    }
-                }
-            }
-            #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
-            fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
-                if first_time {
-                    if let Some(value) = self {
-                        AttrValue::inject_to(value, view_id, node, name, first_time);
-                    } else {
+                        #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
                         node.remove_attribute(name);
                     }
                 }

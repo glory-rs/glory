@@ -20,16 +20,21 @@ impl PropValue for JsValue {
     }
 }
 impl PropValue for String {
-    #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
     fn inject_to(&self, _view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
         if first_time {
+            #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
             js_sys::Reflect::set(node, &JsValue::from_str(name), &self.into()).unwrap_throw();
+            #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
+            node.set_property(name.to_owned(), self.clone());
         }
     }
-    #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
-    fn inject_to(&self, _view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
+}
+impl PropValue for Option<String> {
+    fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
         if first_time {
-            node.set_property(name.to_owned(), self.clone());
+            if let Some(value) = self {
+                PropValue::inject_to(value, view_id, node, name, first_time);
+            }
         }
     }
 }
@@ -111,6 +116,16 @@ macro_rules! prop_type {
                 if first_time {
                     let value: String = (*self).to_string();
                     node.set_property(name.to_owned(), value);
+                }
+            }
+        }
+
+        impl PropValue for Option<$prop_type> {
+            fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
+                if first_time {
+                    if let Some(value) = self {
+                        PropValue::inject_to(value, view_id, node, name, first_time);
+                    }
                 }
             }
         }
