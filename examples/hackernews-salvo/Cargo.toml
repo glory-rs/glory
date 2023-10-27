@@ -20,13 +20,13 @@ salvo = { workspace = true, optional = true, features = ["serve-static"] }
 tokio = { workspace = true, optional = true }
 tracing.workspace = true
 tracing-subscriber.workspace = true
-gloo = { workspace = true }
+gloo-net = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
 once_cell = { workspace = true }
 
 [package.metadata.glory]
 # The name used by wasm-bindgen/glory-cli for the JS/WASM bundle. Defaults to the crate name
-output_name = "ssr-modes-salvo"
+output_name = "hackernews-salvo"
 # The site root folder is where glory-cli generate all output. WARNING: all content of this folder will be erased on a rebuild. Use it in your server setup.
 site_root = "target/site"
 # The site-root relative folder where all compiled output (JS, WASM and CSS) is written

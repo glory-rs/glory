@@ -20,7 +20,7 @@ salvo = { workspace = true, optional = true, features = ["serve-static"] }
 tokio = { workspace = true, optional = true }
 tracing.workspace = true
 tracing-subscriber.workspace = true
-gloo = { workspace = true }
+gloo-net = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
 once_cell = { workspace = true }
 

@@ -37,31 +37,29 @@ impl Widget for ShowUser {
                 if let Some(user) = user {
                     info.title.revise(|mut v| *v = format!("User:{}", user.id));
                     info.description.revise(|mut v| *v = user.about.clone());
-                    div()
-                        .fill(h1().html(format!("User:{}", user.id)))
+
+                    h1().html(format!("User:{}", user.id)).show_in(ctx);
+                    ul().class("meta")
+                        .fill(li().fill(span().class("label").html("Created: ").fill(user.created)))
+                        .fill(li().fill(span().class("label").html("Karma: ").fill(user.karma)))
+                        .fill(user.about.map(|about| ul.fill(li().fill(span().class("about").html(about)))))
                         .fill(
-                            ul().class("meta")
-                                .fill(li().fill(span().class("label").html("Created: ").fill(user.created)))
-                                .fill(li().fill(span().class("label").html("Karma: ").fill(user.karma)))
-                                .fill(user.about.map(|about| ul.fill(li().fill(span().class("about").html(about)))))
+                            p().class("links")
                                 .fill(
-                                    p().class("links")
-                                        .fill(
-                                            a().href(format!("https://news.ycombinator.com/submitted?id={}", user.id))
-                                                .text("submissions"),
-                                        )
-                                        .fill(" | ")
-                                        .fill(a().href(format!("https://news.ycombinator.com/threads?id={}", user.id)).text("comments")),
-                                ),
+                                    a().href(format!("https://news.ycombinator.com/submitted?id={}", user.id))
+                                        .text("submissions"),
+                                )
+                                .fill(" | ")
+                                .fill(a().href(format!("https://news.ycombinator.com/threads?id={}", user.id)).text("comments")),
                         )
                         .show_in(ctx);
                 } else {
-                    div().fill(h2().html("Not found")).show_in(ctx);
+                    h2().html("User not found").show_in(ctx);
                 }
             },
         )
         .fallback(|ctx| {
-            p().html("Loading...").show_in(ctx);
+            p().html("Loading user...").show_in(ctx);
         });
 
         div().class("user-view").fill(loader).show_in(ctx);

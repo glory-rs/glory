@@ -664,6 +664,12 @@ impl IntoFiller for String {
         span().html(self).into_filler()
     }
 }
+impl<'a> IntoFiller for &'a String {
+    fn into_filler(self) -> Filler {
+        span().html(self.to_owned()).into_filler()
+    }
+}
+
 impl<'a> IntoFiller for &'a str {
     fn into_filler(self) -> Filler {
         span().html(self.to_owned()).into_filler()

@@ -21,7 +21,7 @@ categories = ["web-programming::http-server", "web-programming::websocket", "net
 
 [workspace.dependencies]
 glory = { path = "../crates/glory", default-features = false}
-gloo = {version = "0.10", default-features = true }
+gloo-net = {version = "0.4", default-features = true }
 anyhow = "1"
 async-stream = "0.3.5"
 cfg-if = "1"
