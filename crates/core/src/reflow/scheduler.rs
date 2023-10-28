@@ -99,7 +99,7 @@ pub fn schedule() {
     }
 }
 #[cfg(not(feature = "__single_holder"))]
-pub async fn schedule(holder_id: HolderId) {
+pub fn schedule(holder_id: HolderId) {
     if !is_running(holder_id) && !is_batching(holder_id) {
         run(holder_id);
     }

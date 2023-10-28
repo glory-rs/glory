@@ -14,9 +14,7 @@ mod node_meta;
 pub use node_meta::*;
 
 use std::borrow::Cow;
-use std::collections::BTreeMap;
 use std::fmt;
-use std::ops::Deref;
 
 use crate::reflow::{Bond, Record};
 use crate::view::{ViewId, ViewPosition};

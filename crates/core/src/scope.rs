@@ -2,7 +2,6 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use futures::Future;
 use indexmap::{IndexMap, IndexSet};
 
 use crate::node::Node;

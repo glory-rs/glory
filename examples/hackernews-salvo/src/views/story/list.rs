@@ -50,7 +50,6 @@ impl Widget for ListStories {
         let api_url = format!("{}?page={}", category(&story_type), page);
         let loader = Loader::new(
             || async move {
-                println!("fetchingssss {}", story_api_url(&api_url));
                 fetch_api::<Vec<Story>>(story_api_url(&api_url).as_ref()).await 
             },
             |stories, ctx| {
