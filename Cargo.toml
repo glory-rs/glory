@@ -48,6 +48,7 @@ form_urlencoded = "1"
 thiserror = "1"
 config = "0.13"
 tokio = { version = "1", default-features = false }
+tokio-util = {version = "0.7", default-features = false}
 path-slash = "0.2"
 futures = "0.3"
 xml-rs = "0.8"

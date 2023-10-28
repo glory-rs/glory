@@ -1,6 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use glory::reflow::*;
 use glory::routing::*;
 use glory::web::events;
@@ -120,7 +117,7 @@ impl Widget for ShowComment {
                                 .fill(
                                     a().on(events::click, {
                                         let opened = opened.clone();
-                                        move |e| {
+                                        move |_| {
                                             opened.revise(|mut v| *v = !*opened.get());
                                         }
                                     })

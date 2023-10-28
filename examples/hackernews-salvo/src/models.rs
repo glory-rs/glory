@@ -75,6 +75,8 @@ pub async fn fetch_api<T>(path: &str) -> Option<T>
 where
 T: serde::de::DeserializeOwned,
 {
-    let json = reqwest::get(path).await.map_err(|e| tracing::error!("{e}")).ok()?.text().await.ok()?;
+    println!("fetching {}", path);
+    let json = reqwest::Client::new().get(path).send().await.map_err(|e| tracing::error!("{e}")).ok()?.text().await.ok()?;
+    println!("fetched {}", json);
     serde_json::from_str(&json).map_err(|e| tracing::error!("{e}")).ok()
 }

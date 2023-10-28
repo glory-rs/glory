@@ -1,6 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use glory::reflow::*;
 use glory::routing::*;
 use glory::web::widgets::*;
@@ -52,7 +49,10 @@ impl Widget for ListStories {
         };
         let api_url = format!("{}?page={}", category(&story_type), page);
         let loader = Loader::new(
-            || async move { fetch_api::<Vec<Story>>(story_api_url(&api_url).as_ref()).await },
+            || async move {
+                println!("fetchingssss {}", story_api_url(&api_url));
+                fetch_api::<Vec<Story>>(story_api_url(&api_url).as_ref()).await 
+            },
             |stories, ctx| {
                 if let Some(stories) = stories {
                     ul().fill(Each::new(Cage::new(stories.clone()), |story| story.id, |story| ShowStory(story.clone())))

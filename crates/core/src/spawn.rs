@@ -13,9 +13,8 @@ where
             wasm_bindgen_futures::spawn_local(fut)
         } else if #[cfg(any(test, doctest))] {
             tokio_test::block_on(fut);
-        // TODO: add #[cfg(feature = "web-ssr")]
-        // } else if #[cfg(feature = "web-ssr")] {
-        //     tokio::task::spawn_local(fut);
+        } else if #[cfg(feature = "web-ssr")] {
+            
         }  else {
             futures::executor::block_on(fut)
         }

@@ -23,7 +23,7 @@ tracing-subscriber.workspace = true
 gloo-net = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
 once_cell = { workspace = true }
-reqwest = { workspace = true, optional = true }
+reqwest = { workspace = true, optional = true, features = ["json"] }
 
 [package.metadata.glory]
 # The name used by wasm-bindgen/glory-cli for the JS/WASM bundle. Defaults to the crate name

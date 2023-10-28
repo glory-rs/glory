@@ -48,7 +48,6 @@ pub fn is_untracking(holder_id: HolderId) -> bool {
     UNTRACKING.with_borrow(|untracking| untracking.get(&holder_id).map(|v| *v).unwrap_or(false))
 }
 
-
 #[cfg(feature = "__single_holder")]
 pub fn is_batching() -> bool {
     BATCHING.with(|batching| batching.get())
@@ -100,7 +99,7 @@ pub fn schedule() {
     }
 }
 #[cfg(not(feature = "__single_holder"))]
-pub fn schedule(holder_id: HolderId) {
+pub async fn schedule(holder_id: HolderId) {
     if !is_running(holder_id) && !is_batching(holder_id) {
         run(holder_id);
     }

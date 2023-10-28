@@ -2,9 +2,6 @@ use glory::routing::aviators::*;
 use glory::web::holders::*;
 use glory::*;
 
-#[macro_use]
-extern crate cfg_if;
-
 mod views;
 use views::App;
 

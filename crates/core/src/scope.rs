@@ -2,6 +2,7 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use futures::Future;
 use indexmap::{IndexMap, IndexSet};
 
 use crate::node::Node;
@@ -21,6 +22,8 @@ pub struct Scope {
     pub(crate) child_views: IndexMap<ViewId, View>,
     pub(crate) show_list: IndexSet<ViewId>,
     pub(crate) position: ViewPosition,
+
+    pub(crate) task_ids: IndexSet<TaskId>,
 
     pub(crate) parent_node: Option<Node>,
     pub(crate) graff_node: Option<Node>,
@@ -44,6 +47,8 @@ impl Scope {
             show_list: IndexSet::new(),
             position: ViewPosition::Tail,
 
+            task_ids: IndexSet::new(),
+
             parent_node: None,
             graff_node: None,
             first_child_node: None,
@@ -64,6 +69,8 @@ impl Scope {
             child_views: IndexMap::new(),
             show_list: IndexSet::new(),
             position: ViewPosition::Tail,
+
+            task_ids: IndexSet::new(),
 
             parent_node: None,
             graff_node: None,
@@ -115,6 +122,12 @@ impl Scope {
     }
     pub fn truck_mut(&self) -> RefMut<'_, Truck> {
         self.truck.borrow_mut()
+    }
+
+    pub fn spawn_task(&mut self, task: impl FnOnce() -> Future<Output=()> + 'static) -> TaskId {
+        let id = TaskId::next(self.view_id.clone());
+        crate::reflow::spawn_task(id.clone(), task);
+        id
     }
 
     pub fn child_views(&self) -> &IndexMap<ViewId, View> {
