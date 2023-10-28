@@ -1,4 +1,61 @@
-use std::future::Future;
+use std::{future::Future, sync::OnceLock};
+
+cfg_feature! {
+    #![all(feature = "web-ssr", not(feature = "__single_holder"))]
+
+    use std::cell::RefCell;
+    use std::pin::Pin; use std::cell::OnceCell;
+
+    use indexmap::IndexMap;
+    use futures::StreamExt;
+    use futures_channel::mpsc::{self, UnboundedSender};
+    use tokio_util::task::LocalPoolHandle;
+
+    use crate::HolderId;
+
+    thread_local! {
+        pub(crate) static LOCAL_TASKS: RefCell<Vec<Pin<Box<dyn Future<Output = ()> + 'static>>>> = RefCell::default();
+    }
+
+    pub(crate) static NOTIFIER: OnceLock<UnboundedSender<()>> = OnceLock::new();
+
+    fn get_task_pool() -> LocalPoolHandle {
+        static LOCAL_POOL: OnceLock<LocalPoolHandle> = OnceLock::new();
+        LOCAL_POOL
+            .get_or_init(|| {
+                tokio_util::task::LocalPoolHandle::new(
+                    std::thread::available_parallelism().map(Into::into).unwrap_or(1),
+                )
+            })
+            .clone()
+    }
+    pub async fn start_serice() {
+        let (tx, mut rx) = mpsc::unbounded::<()>();
+        NOTIFIER.set(tx);
+        tokio::spawn(async move {
+            while let Some(()) = rx.next().await {
+                let tasks = LOCAL_TASKS.with_borrow_mut(|tasks| {
+                    std::mem::take(tasks)
+                });
+                // for task in tasks {
+                //     let pool_handle = get_task_pool();
+                //     pool_handle.spawn_pinned(move || task );
+                // }
+                // let local = tokio::task::LocalSet::new();
+                // for task in tasks {
+                //     local.spawn_local(async move {
+                //         task.await;
+                //     });
+                // }
+                // local.await;
+            }
+        });
+    }
+
+    fn notify() {
+        NOTIFIER.get().unwrap().unbounded_send(()).unwrap();
+    }
+}
 
 /// Spawns and runs a thread-local [`Future`] in a platform-independent way.
 ///
@@ -13,8 +70,11 @@ where
             wasm_bindgen_futures::spawn_local(fut)
         } else if #[cfg(any(test, doctest))] {
             tokio_test::block_on(fut);
-        } else if #[cfg(feature = "web-ssr")] {
-            
+        } else if #[cfg(all(feature = "web-ssr", not(feature = "__single_holder")))] {
+            LOCAL_TASKS.with_borrow_mut(|tasks| {
+                tasks.push(Box::pin(fut));
+            });
+            notify();
         }  else {
             futures::executor::block_on(fut)
         }

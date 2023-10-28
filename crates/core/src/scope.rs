@@ -23,8 +23,6 @@ pub struct Scope {
     pub(crate) show_list: IndexSet<ViewId>,
     pub(crate) position: ViewPosition,
 
-    pub(crate) task_ids: IndexSet<TaskId>,
-
     pub(crate) parent_node: Option<Node>,
     pub(crate) graff_node: Option<Node>,
     pub(crate) first_child_node: Option<Node>,
@@ -47,8 +45,6 @@ impl Scope {
             show_list: IndexSet::new(),
             position: ViewPosition::Tail,
 
-            task_ids: IndexSet::new(),
-
             parent_node: None,
             graff_node: None,
             first_child_node: None,
@@ -69,8 +65,6 @@ impl Scope {
             child_views: IndexMap::new(),
             show_list: IndexSet::new(),
             position: ViewPosition::Tail,
-
-            task_ids: IndexSet::new(),
 
             parent_node: None,
             graff_node: None,
@@ -124,11 +118,12 @@ impl Scope {
         self.truck.borrow_mut()
     }
 
-    pub fn spawn_task(&mut self, task: impl FnOnce() -> Future<Output=()> + 'static) -> TaskId {
-        let id = TaskId::next(self.view_id.clone());
-        crate::reflow::spawn_task(id.clone(), task);
-        id
-    }
+    // pub fn spawn_local<F>(&mut self, fut: F)
+    // where
+    //     F: Future<Output = ()> + 'static,
+    // {
+    //     crate::reflow::spawn_task(task);
+    // }
 
     pub fn child_views(&self) -> &IndexMap<ViewId, View> {
         &self.child_views

@@ -17,18 +17,11 @@ use indexmap::{IndexMap, IndexSet};
 use crate::HolderId;
 use crate::ViewId;
 
-pub type QueuingTask = Box<dyn FnOnce()-> Future<Output=() + 'static> + 'static;
-
 thread_local! {
     #[cfg(feature = "__single_holder")]
     pub(crate) static REVISING_ITEMS: RefCell<IndexMap<RevisableId, Box<dyn Signal>>> = RefCell::default();
     #[cfg(not(feature = "__single_holder"))]
     pub(crate) static REVISING_ITEMS: RefCell<IndexMap<HolderId, IndexMap<RevisableId, Box<dyn Signal>>>> = RefCell::default();
-    
-    #[cfg(feature = "__single_holder")]
-    pub(crate) static QUEUING_TASKS: RefCell<IndexMap<TaskId, QueuingTask>> = RefCell::default();
-    #[cfg(not(feature = "__single_holder"))]
-    pub(crate) static QUEUING_TASKS: RefCell<IndexMap<HolderId, IndexMap<RevisableId, QueuingTask>>> = RefCell::default();
 
     #[cfg(feature = "__single_holder")]
     pub(crate) static PENDING_ITEMS: RefCell<IndexMap<RevisableId, Box<dyn Signal>>> = RefCell::default();
@@ -98,13 +91,6 @@ where
     })
 }
 
-pub fn spawn_task(task_id: TaskId, task: impl FnOnce() -> Future<Output=()> + 'static) {
-    QUEUING_TASKS.with(|queuing_tasks| {
-        queuing_tasks.borrow_mut().insert(task_id, Box::new(task));
-    });
-    schedule();
-}
-
 static NEXT_REVISABLE_ID: AtomicU64 = AtomicU64::new(1);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct RevisableId(u64);
@@ -167,7 +153,6 @@ where
     fn get(&self) -> Ref<'_, S>;
     fn get_untracked(&self) -> Ref<'_, S>;
 }
-
 pub enum MaybeRecord<S> {
     Plain(S),
     Record(Box<dyn Record<S>>),

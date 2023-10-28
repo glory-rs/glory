@@ -119,7 +119,7 @@ where
             let state = self.state.clone();
             let fut = (self.future.take().unwrap())();
             println!("ds-------0");
-            ctx.spawn_local(async move {
+            crate::spawn::spawn_local(async move {
                 state.revise(|mut state| {
                     *state = LoadState::<T>::Loading;
                 });
