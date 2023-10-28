@@ -6,6 +6,8 @@ cfg_feature! {
     use std::cell::RefCell;
     use std::pin::Pin; use std::cell::OnceCell;
 
+    use once_cell::sync::Lazy;use parking_lot::RwLock;
+
     use indexmap::IndexMap;
     use futures::StreamExt;
     use futures_channel::mpsc::{self, UnboundedSender};
@@ -13,11 +15,7 @@ cfg_feature! {
 
     use crate::HolderId;
 
-    thread_local! {
-        pub(crate) static LOCAL_TASKS: RefCell<Vec<Pin<Box<dyn Future<Output = ()> + 'static>>>> = RefCell::default();
-    }
-
-    pub(crate) static NOTIFIER: OnceLock<UnboundedSender<()>> = OnceLock::new();
+    pub(crate) static NOTIFIER: OnceLock<UnboundedSender<Pin<Box<dyn Future<Output = ()> + 'static>>>> = OnceLock::new();
 
     fn get_task_pool() -> LocalPoolHandle {
         static LOCAL_POOL: OnceLock<LocalPoolHandle> = OnceLock::new();
@@ -33,10 +31,8 @@ cfg_feature! {
         let (tx, mut rx) = mpsc::unbounded::<()>();
         NOTIFIER.set(tx);
         tokio::spawn(async move {
-            while let Some(()) = rx.next().await {
-                let tasks = LOCAL_TASKS.with_borrow_mut(|tasks| {
-                    std::mem::take(tasks)
-                });
+            while let Some(fut) = rx.next().await {
+              fut.await;
                 // for task in tasks {
                 //     let pool_handle = get_task_pool();
                 //     pool_handle.spawn_pinned(move || task );
@@ -52,8 +48,8 @@ cfg_feature! {
         });
     }
 
-    fn notify() {
-        NOTIFIER.get().unwrap().unbounded_send(()).unwrap();
+    fn notify(fut: Pin<Box<dyn Future<Output = ()> + 'static>>) {
+        NOTIFIER.get().unwrap().unbounded_send(fut).unwrap();
     }
 }
 
@@ -71,10 +67,10 @@ where
         } else if #[cfg(any(test, doctest))] {
             tokio_test::block_on(fut);
         } else if #[cfg(all(feature = "web-ssr", not(feature = "__single_holder")))] {
-            LOCAL_TASKS.with_borrow_mut(|tasks| {
-                tasks.push(Box::pin(fut));
-            });
-            notify();
+            // LOCAL_TASKS.with_borrow_mut(|tasks| {
+            //     tasks.push(Box::pin(fut));
+            // });
+            notify(Box::pin(fut));
         }  else {
             futures::executor::block_on(fut)
         }
