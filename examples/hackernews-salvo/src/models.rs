@@ -1,5 +1,6 @@
 use glory::Cage;
 use serde::{Deserialize, Serialize};
+use serde_aux::prelude::*;
 
 #[derive(Clone, Debug, Default)]
 pub struct PageInfo {
@@ -12,6 +13,7 @@ pub struct Story {
     pub id: usize,
     pub title: String,
     #[serde(default)]
+    #[serde(deserialize_with = "deserialize_default_from_null")]
     pub points: i32,
     pub user: Option<String>,
     pub time: usize,
@@ -22,8 +24,10 @@ pub struct Story {
     #[serde(default)]
     pub domain: String,
     #[serde(default)]
+    #[serde(deserialize_with = "deserialize_default_from_null")]
     pub comments: Vec<Comment>,
     #[serde(default)]
+    #[serde(deserialize_with = "deserialize_default_from_null")]
     pub comments_count: usize,
 }
 

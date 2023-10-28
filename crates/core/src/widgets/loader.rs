@@ -118,14 +118,11 @@ where
 
             let state = self.state.clone();
             let fut = (self.future.take().unwrap())();
-            println!("ds-------0");
             crate::spawn::spawn_local(async move {
                 state.revise(|mut state| {
                     *state = LoadState::<T>::Loading;
                 });
-                println!("ds--------1");
                 let result = fut.await;
-                println!("ds--------2");
                 state.revise(|mut state| {
                     *state = LoadState::Loaded(result);
                 });

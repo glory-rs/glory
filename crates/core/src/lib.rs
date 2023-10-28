@@ -94,12 +94,6 @@ pub const fn is_release() -> bool {
     !is_dev()
 }
 
-
-#[cfg(all(feature = "web-ssr", not(feature = "__single_holder")))]
-pub async fn start() {
-    crate::spawn::start_serice().await;
-}
-
 #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
 pub use tracing::{error, info, warn};
 
