@@ -153,3 +153,7 @@ where
     fn get(&self) -> Ref<'_, S>;
     fn get_untracked(&self) -> Ref<'_, S>;
 }
+pub enum MaybeRecord<S> {
+    Plain(S),
+    Record(Box<dyn Record<S>>),
+}

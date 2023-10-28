@@ -1,4 +1,4 @@
-use std::future::Future;
+use std::{future::Future, sync::OnceLock};
 
 /// Spawns and runs a thread-local [`Future`] in a platform-independent way.
 ///
@@ -13,9 +13,14 @@ where
             wasm_bindgen_futures::spawn_local(fut)
         } else if #[cfg(any(test, doctest))] {
             tokio_test::block_on(fut);
-        // TODO: add #[cfg(feature = "web-ssr")]
-        // } else if #[cfg(feature = "web-ssr")] {
-        //     tokio::task::spawn_local(fut);
+        } else if #[cfg(all(feature = "web-ssr", not(feature = "__single_holder")))] {
+            tokio::task::block_in_place(move || {
+                tokio::runtime::Handle::current().block_on(async move {
+                    let local = tokio::task::LocalSet::new();
+                    local.spawn_local(fut);
+                    local.await;
+                });
+            });
         }  else {
             futures::executor::block_on(fut)
         }

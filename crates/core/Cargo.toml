@@ -15,7 +15,7 @@ categories = { workspace = true }
 [features]
 default = ["web-csr"]
 web-csr = ["__single_holder", "dep:wasm-bindgen"]
-web-ssr = ["dep:percent-encoding", "dep:tokio", "dep:xml-rs"]
+web-ssr = ["dep:percent-encoding", "dep:tokio", "dep:tokio-util", "dep:xml-rs", "dep:futures-channel"]
 salvo = ["dep:salvo", "web-ssr"]
 __single_holder = []
 
@@ -41,11 +41,13 @@ url = { workspace = true }
 thiserror = { workspace = true }
 config = { workspace = true }
 tokio = { workspace = true, features = ["full"], optional = true }
+tokio-util = { workspace = true, optional = true, features = ["rt"] }
 salvo = { workspace = true, optional = true }
 glory-hot-reload = { workspace = true }
 futures = { workspace = true }
 regex = { workspace = true }
 xml-rs = { workspace = true, optional = true }
+futures-channel = { workspace = true, optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = { workspace = true }

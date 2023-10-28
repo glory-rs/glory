@@ -5,7 +5,7 @@ cfg_feature! {
 }
 
 cfg_feature! {
-    #![feature = "web-ssr"]
+    #![all(not(feature = "__single_holder"), feature = "web-ssr")]
     mod server;
     pub use server::*;
 }

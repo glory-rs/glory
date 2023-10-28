@@ -28,15 +28,15 @@ impl Widget for App {
         ctx.truck_mut().inject(info.clone());
         body_meta().class(info.body_class.clone()).show_in(ctx);
         head_mixin()
-            .fill(meta().attr("name", "description").attr("content", info.description.clone()))
-            .fill(title().html(info.title.clone()))
+            .fill(meta().name("description").content(info.description.clone()))
+            .fill(title().text(info.title.clone()))
             .show_in(ctx);
         div()
             .fill(h1().html("Basic Router Example"))
             .fill(
-                ul().fill(li().fill(a().attr("href", "/").html("Home")))
-                    .fill(li().fill(a().attr("href", "/dashboard").html("Dashboard")))
-                    .fill(li().fill(a().attr("href", "/about").html("About"))),
+                ul().fill(li().fill(a().href("/").html("Home")))
+                    .fill(li().fill(a().href("/dashboard").html("Dashboard")))
+                    .fill(li().fill(a().href("/about").html("About"))),
             )
             .fill(p().html("This example demonstrates a basic router that uses the browser's history API."))
             .fill(Graff::new("section"))
@@ -79,7 +79,6 @@ impl Widget for About {
 struct Dashboard;
 impl Widget for Dashboard {
     fn attach(&mut self, ctx: &mut Scope) {
-        info!("Dashboard+::attach");
         let truck = ctx.truck();
         let info = truck.obtain::<PageInfo>().unwrap();
         info.title.revise(|mut v| *v = "Dashboard page".to_owned());
@@ -106,7 +105,7 @@ impl Widget for NoMatch {
         info!("NoMatch::build");
         div()
             .fill(h2().html("Nothing to see here!"))
-            .fill(a().attr("href", "/").html("Go to the home page"))
+            .fill(a().href("/").html("Go to the home page"))
             .show_in(ctx);
     }
 }

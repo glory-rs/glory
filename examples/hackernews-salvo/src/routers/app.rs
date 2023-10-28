@@ -28,8 +28,8 @@ impl Widget for App {
         ctx.truck_mut().inject(info.clone());
 
         head_mixin()
-            .fill(link().rel("stylesheet").href("/pkg/ssr-modes-salvo.css"))
-            .fill(meta().name("description").content(info.description.clone()))
+            .fill(link().attr("rel", "stylesheet").attr("href", "/pkg/ssr-modes-salvo.css"))
+            .fill(meta().attr("name", "description").attr("content", info.description.clone()))
             .fill(title().html(info.title.clone()))
             .show_in(ctx);
         Graff::new("section").show_in(ctx);
@@ -61,7 +61,7 @@ impl Widget for ListPost {
         let loader = Loader::new(list, |posts, ctx| {
             let posts = posts
                 .into_iter()
-                .map(|p| li().fill(a().href(format!("/{}", p.id)).html(p.title.clone())))
+                .map(|p| li().fill(a().attr("href", format!("/{}", p.id)).html(p.title.clone())))
                 .collect::<Vec<_>>();
 
             ul().fill(posts).show_in(ctx);
@@ -143,7 +143,7 @@ impl Widget for NoMatch {
         info!("NoMatch::build");
         div()
             .fill(h2().html("Nothing to see here!"))
-            .fill(a().href("/").html("Go to the home page"))
+            .fill(a().attr("href", "/").html("Go to the home page"))
             .show_in(ctx);
     }
 }

@@ -15,9 +15,9 @@ use crate::{ViewId, ROOT_VIEWS};
 
 thread_local! {
     #[cfg(feature = "__single_holder")]
-    pub(crate) static RUNING: Cell<bool> = Cell::new(false);
+    pub(crate) static RUNNING: Cell<bool> = Cell::new(false);
     #[cfg(not(feature = "__single_holder"))]
-    pub(crate) static RUNING: RefCell<IndexMap<HolderId, bool>> = RefCell::new(IndexMap::new());
+    pub(crate) static RUNNING: RefCell<IndexMap<HolderId, bool>> = RefCell::new(IndexMap::new());
 
     #[cfg(feature = "__single_holder")]
     pub(crate) static UNTRACKING: Cell<bool> = Cell::new(false);
@@ -32,11 +32,11 @@ thread_local! {
 
 #[cfg(feature = "__single_holder")]
 pub fn is_running() -> bool {
-    RUNING.with(|running| running.get())
+    RUNNING.with(|running| running.get())
 }
 #[cfg(not(feature = "__single_holder"))]
 pub fn is_running(holder_id: HolderId) -> bool {
-    RUNING.with_borrow(|running| running.get(&holder_id).map(|v| *v).unwrap_or(false))
+    RUNNING.with_borrow(|running| running.get(&holder_id).map(|v| *v).unwrap_or(false))
 }
 
 #[cfg(feature = "__single_holder")]
@@ -47,7 +47,6 @@ pub fn is_untracking() -> bool {
 pub fn is_untracking(holder_id: HolderId) -> bool {
     UNTRACKING.with_borrow(|untracking| untracking.get(&holder_id).map(|v| *v).unwrap_or(false))
 }
-
 
 #[cfg(feature = "__single_holder")]
 pub fn is_batching() -> bool {
@@ -100,7 +99,7 @@ pub fn schedule() {
     }
 }
 #[cfg(not(feature = "__single_holder"))]
-pub fn schedule(holder_id: HolderId) {
+pub async fn schedule(holder_id: HolderId) {
     if !is_running(holder_id) && !is_batching(holder_id) {
         run(holder_id);
     }
@@ -109,9 +108,9 @@ pub fn schedule(holder_id: HolderId) {
 fn run(#[cfg(not(feature = "__single_holder"))] holder_id: HolderId) {
     cfg_if! {
         if #[cfg(feature = "__single_holder")] {
-            RUNING.with(|running| running.set(true));
+            RUNNING.with(|running| running.set(true));
         } else {
-            RUNING.with_borrow_mut(|running| running.insert(holder_id, true));
+            RUNNING.with_borrow_mut(|running| running.insert(holder_id, true));
         }
     }
     let mut loop_counts = 0;
@@ -201,9 +200,9 @@ fn run(#[cfg(not(feature = "__single_holder"))] holder_id: HolderId) {
 
     cfg_if! {
         if #[cfg(feature = "__single_holder")] {
-            RUNING.with(|running| running.set(false));
+            RUNNING.with(|running| running.set(false));
         } else {
-            RUNING.with_borrow_mut(|running| running.insert(holder_id, false));
+            RUNNING.with_borrow_mut(|running| running.insert(holder_id, false));
         }
     }
 }

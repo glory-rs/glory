@@ -1,5 +1,5 @@
 [package]
-name = "ssr-modes-salvo"
+name = "hackernews-salvo"
 version = "0.0.1"
 edition = "2021"
 
@@ -8,12 +8,13 @@ edition = "2021"
 
 [features]
 web-csr = ["glory/web-csr", "dep:wasm-bindgen"]
-web-ssr = ["glory/salvo", "dep:tokio", "dep:salvo"]
+web-ssr = ["glory/salvo", "dep:tokio", "dep:salvo", "dep:reqwest"]
 
 [dependencies]
 cfg-if = { workspace = true }
 glory = { workspace = true, features = ["routing"] }
 serde = { version = "^1.0", features = ["derive"] }
+serde-aux = { version = "4" }
 serde_json = "^1.0"
 web-sys = { workspace = true, features = ["Storage"] }
 salvo = { workspace = true, optional = true, features = ["serve-static"] }
@@ -23,10 +24,11 @@ tracing-subscriber.workspace = true
 gloo-net = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
 once_cell = { workspace = true }
+reqwest = { workspace = true, optional = true, features = ["json"] }
 
 [package.metadata.glory]
 # The name used by wasm-bindgen/glory-cli for the JS/WASM bundle. Defaults to the crate name
-output_name = "ssr-modes-salvo"
+output_name = "hackernews-salvo"
 # The site root folder is where glory-cli generate all output. WARNING: all content of this folder will be erased on a rebuild. Use it in your server setup.
 site_root = "target/site"
 # The site-root relative folder where all compiled output (JS, WASM and CSS) is written

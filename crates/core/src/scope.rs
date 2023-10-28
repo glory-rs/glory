@@ -2,6 +2,7 @@ use std::cell::{Ref, RefCell, RefMut};
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
+use futures::Future;
 use indexmap::{IndexMap, IndexSet};
 
 use crate::node::Node;
@@ -116,6 +117,13 @@ impl Scope {
     pub fn truck_mut(&self) -> RefMut<'_, Truck> {
         self.truck.borrow_mut()
     }
+
+    // pub fn spawn_local<F>(&mut self, fut: F)
+    // where
+    //     F: Future<Output = ()> + 'static,
+    // {
+    //     crate::reflow::spawn_task(task);
+    // }
 
     pub fn child_views(&self) -> &IndexMap<ViewId, View> {
         &self.child_views

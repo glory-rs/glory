@@ -11,8 +11,8 @@ use crate::reflow::{Bond, Record};
 use crate::view::{ViewId, ViewPosition};
 use crate::web::events::EventDescriptor;
 use crate::web::{AttrValue, ClassPart, Classes, PropValue};
-use crate::{NodeRef, Scope, Widget};
 use crate::widget::{Filler, IntoFiller};
+use crate::{NodeRef, Scope, Widget};
 
 #[derive(Educe)]
 #[educe(Debug)]
@@ -30,7 +30,7 @@ where
     #[educe(Debug(ignore))]
     pub fillers: Vec<Filler>,
 
-    node: T,
+    pub(crate) node: T,
 }
 
 impl<T> Widget for Element<T>
@@ -148,13 +148,31 @@ where
         &self.node
     }
 
+    pub fn add_filler(&mut self, filler: impl IntoFiller) {
+        self.fillers.push(filler.into_filler());
+    }
     pub fn fill(mut self, filler: impl IntoFiller) -> Self {
         self.fillers.push(filler.into_filler());
         self
     }
 
+    pub fn then<F>(self, func: F) -> Self
+    where
+        F: FnOnce(Self) -> Self,
+    {
+        func(self)
+    }
+
     pub fn is_void(&self) -> bool {
         self.is_void
+    }
+
+    #[track_caller]
+    pub fn add_id<V>(&mut self, value: V)
+    where
+        V: AttrValue + 'static,
+    {
+        self.attrs.insert("id".into(), Box::new(value));
     }
 
     #[track_caller]
@@ -166,6 +184,13 @@ where
         self
     }
 
+    #[track_caller]
+    pub fn add_class<V>(&mut self, value: V)
+    where
+        V: ClassPart + 'static,
+    {
+        self.classes.part(value);
+    }
     #[track_caller]
     pub fn class<V>(mut self, value: V) -> Self
     where
@@ -199,12 +224,29 @@ where
 
     /// Adds an property to this element.
     #[track_caller]
+    pub fn add_prop<V>(&mut self, name: impl Into<Cow<'static, str>>, value: V)
+    where
+        V: PropValue + 'static,
+    {
+        self.props.insert(name.into(), Box::new(value));
+    }
+    /// Adds an property to this element.
+    #[track_caller]
     pub fn prop<V>(mut self, name: impl Into<Cow<'static, str>>, value: V) -> Self
     where
         V: PropValue + 'static,
     {
         self.props.insert(name.into(), Box::new(value));
         self
+    }
+
+    /// Adds an attribute to this element.
+    #[track_caller]
+    pub fn add_attr<V>(&mut self, name: impl Into<Cow<'static, str>>, value: V)
+    where
+        V: AttrValue + 'static,
+    {
+        self.attrs.insert(name.into(), Box::new(value));
     }
 
     /// Adds an attribute to this element.
@@ -273,7 +315,7 @@ where
     /// Be very careful when using this method. Always remember to
     /// sanitize the input to avoid a cross-site scripting (XSS)
     /// vulnerability.
-    pub fn set_text<V>(&mut self, text: V)
+    pub fn set_inner_text<V>(&mut self, text: V)
     where
         V: AttrValue + 'static,
     {
@@ -286,11 +328,12 @@ where
     /// Be very careful when using this method. Always remember to
     /// sanitize the input to avoid a cross-site scripting (XSS)
     /// vulnerability.
-    pub fn text<V>(self, text: V) -> Self
+    pub fn inner_text<V>(mut self, text: V) -> Self
     where
         V: AttrValue + 'static,
     {
-        self.attr("inner_text", text)
+        self.set_inner_text(text);
+        self
     }
 
     /// Sets the inner HTML of this element from the provided
@@ -313,20 +356,15 @@ where
     /// Be very careful when using this method. Always remember to
     /// sanitize the input to avoid a cross-site scripting (XSS)
     /// vulnerability.
-    pub fn html<V>(self, html: V) -> Self
+    pub fn html<V>(mut self, html: V) -> Self
     where
         V: AttrValue + 'static,
     {
-        self.attr("inner_html", html)
+        self.set_html(html);
+        self
     }
 
-    #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
-    pub fn node_ref(self, node_ref: &NodeRef<T>) -> Self {
-        #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+    pub fn node_ref(self, node_ref: &NodeRef<T>) {
         node_ref.set(self.node.clone());
-
-        #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
-        let _ = node_ref;
-        self
     }
 }
