@@ -261,9 +261,7 @@ impl Router {
                 add_child(&mut all_paths, root_path.as_deref().unwrap_or_default(), router);
             }
 
-            let mut all_paths  = all_paths.into_iter().collect::<Vec<_>>();
-            all_paths.sort_by(|a, b| b.len().cmp(&a.len()));
-            println!("{:?}", all_paths);
+            let mut all_paths  = all_paths.into_iter().rev().collect::<Vec<_>>();
 
             let mut root = salvo::Router::new();
             fn add_path(all_paths: &mut Vec<String>, parent: &mut salvo::Router, path: String, handler: SalvoHandler) {

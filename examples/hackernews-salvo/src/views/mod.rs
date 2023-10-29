@@ -27,6 +27,7 @@ impl Widget for App {
             .fill(meta().name("description").content(info.description.clone()))
             .fill(title().html(info.title.clone()))
             .show_in(ctx);
+        Nav.show_in(ctx);
         Graff::new("section").show_in(ctx);
     }
 }

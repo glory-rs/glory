@@ -39,19 +39,21 @@ impl Widget for ListStories {
         let (page, story_type) = {
             let truck = ctx.truck();
             let locator = truck.obtain::<Locator>().unwrap();
-            let page = locator
-                .params()
-                .get()
-                .get("page")
-                .and_then(|page| page.parse::<usize>().ok())
-                .unwrap_or_default();
-            (page, locator.params().get().get("type").cloned().unwrap_or("top".into()))
+            let params = locator.params();
+            let page = Bond::new(move || params.clone().get().get("page").and_then(|page| page.parse::<usize>().ok()).unwrap_or(1));
+            let params = locator.params();
+            let story_type = Bond::new(move || params.get().get("type").cloned().unwrap_or("top".into()));
+            (page, story_type)
         };
-        let api_url = format!("{}?page={}", category(&story_type), page);
         let loader = Loader::new(
-            || async move {
-                println!("fetchingssss {}", story_api_url(&api_url));
-                fetch_api::<Vec<Story>>(story_api_url(&api_url).as_ref()).await 
+            {
+                let page = page.clone();
+                let story_type = story_type.clone();
+
+                || async move {
+                    let api_url = format!("{}?page={}", category(&*story_type.get()), &*page.get() - 1);
+                    fetch_api::<Vec<Story>>(story_api_url(&api_url).as_ref()).await
+                }
             },
             |stories, ctx| {
                 if let Some(stories) = stories {
@@ -63,7 +65,7 @@ impl Widget for ListStories {
             },
         )
         .fallback(|ctx| {
-            p().html("Loading story...").show_in(ctx);
+            p().html("Loading stories...").show_in(ctx);
         });
 
         div()
@@ -74,11 +76,15 @@ impl Widget for ListStories {
                     .fill(
                         span().fill(
                             Switch::new()
-                                .case(Cage::new(page > 1), {
-                                    let story_type = story_type.clone();
+                                .case(page.map(|v| *v > 1), {
+                                    let href = Bond::new({
+                                        let story_type = story_type.clone();
+                                        let page = page.clone();
+                                        move || format!("/{}?page={}", *story_type.clone().get(), *page.clone().get() - 1)
+                                    });
                                     move || {
                                         a().class("page-link")
-                                            .href(format!("/{}?page={}", story_type, page - 1))
+                                            .href(href.clone())
                                             .attr("aria-label", "Previous Page")
                                             .html("< prev")
                                     }
@@ -88,16 +94,20 @@ impl Widget for ListStories {
                                 }),
                         ),
                     )
-                    .fill(span().html(format!("page {page}")))
+                    .fill(span().html(format!("page {}", *page.get())))
                     .fill(
                         span()
                             .class("page-link")
                             .toggle_class("disabled", self.hide_more_link.clone())
                             .attr("aria-hidden", self.hide_more_link.clone())
                             .fill(
-                                a().href(format!("/{}?page={}", story_type, page + 1))
-                                    .attr("aria-label", "Next Page")
-                                    .html("more >"),
+                                a().href(Bond::new({
+                                    let story_type = story_type.clone();
+                                    let page = page.clone();
+                                    move || format!("/{}?page={}", *story_type.get(), *page.get() + 1)
+                                }))
+                                .attr("aria-label", "Next Page")
+                                .html("more >"),
                             ),
                     ),
             )

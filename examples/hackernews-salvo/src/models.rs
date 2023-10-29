@@ -54,8 +54,8 @@ pub fn story_api_url(path: impl AsRef<str>) -> String {
     format!("https://node-hnapi.herokuapp.com/{}", path.as_ref())
 }
 
-pub fn user_api_url(user_id: usize) -> String {
-    format!("https://hacker-news.firebaseio.com/v0/user/{user_id}.json")
+pub fn user_api_url(user_id: impl AsRef<str>) -> String {
+    format!("https://hacker-news.firebaseio.com/v0/user/{}.json", user_id.as_ref())
 }
 
 #[cfg(not(feature = "web-ssr"))]
@@ -63,6 +63,7 @@ pub async fn fetch_api<T>(path: &str) -> Option<T>
 where
     T: serde::de::DeserializeOwned,
 {
+    glory::info!("fetching {}", path);
     let json = gloo_net::http::Request::get(path)
         .send()
         .await
@@ -81,6 +82,5 @@ T: serde::de::DeserializeOwned,
 {
     println!("fetching {}", path);
     let json = reqwest::Client::new().get(path).send().await.map_err(|e| tracing::error!("{e}")).ok()?.text().await.ok()?;
-    println!("fetched {}", json);
     serde_json::from_str(&json).map_err(|e| tracing::error!("{e}")).ok()
 }

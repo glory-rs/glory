@@ -17,7 +17,7 @@ impl Widget for ShowStory {
     }
     fn build(&mut self, ctx: &mut Scope) {
         info!("ShowStory::build");
-        let user_id: usize = {
+        let story_id: usize = {
             let truck = ctx.truck();
             let locator = truck.obtain::<Locator>().unwrap();
             if let Some(id) = locator.params().get().get("id") {
@@ -32,7 +32,7 @@ impl Widget for ShowStory {
         };
         let loader = Loader::new(
             move || async move {
-                let url = user_api_url(user_id);
+                let url = story_api_url(format!("item/{story_id}"));
                 fetch_api::<Story>(&url).await
             },
             move |story, ctx| {

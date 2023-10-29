@@ -1,6 +1,3 @@
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use glory::reflow::*;
 use glory::routing::*;
 use glory::web::widgets::*;
@@ -20,14 +17,10 @@ impl Widget for ShowUser {
     }
     fn build(&mut self, ctx: &mut Scope) {
         info!("ShowUser::build");
-        let user_id: usize = {
+        let user_id = {
             let truck = ctx.truck();
             let locator = truck.obtain::<Locator>().unwrap();
-            if let Some(id) = locator.params().get().get("id") {
-                id.parse().unwrap_or_default()
-            } else {
-                0
-            }
+            locator.params().get().get("id").cloned().unwrap_or_default()
         };
         let info = {
             let truck = ctx.truck();
