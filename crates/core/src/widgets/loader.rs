@@ -139,6 +139,7 @@ where
         }
         self.gathers = gathers;
         for gather in self.gathers.values() {
+            println!("VVVVVVVVVV");
             gather.bind_view(ctx.view_id());
         }
     }
