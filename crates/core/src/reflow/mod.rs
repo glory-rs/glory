@@ -56,6 +56,13 @@ impl TrackingStack {
     }
 }
 
+pub fn gather<R>(func: impl FnOnce() -> R) -> (IndexMap<RevisableId, Box<dyn Signal>>, R) {
+    TRACKING_STACK.with(|tracking_items| tracking_items.borrow_mut().push_layer());
+    let result = (func)();
+    let gathers = TRACKING_STACK.with(|tracking_items| tracking_items.borrow_mut().pop_layer().unwrap());
+    (gathers, result)
+}
+
 #[cfg(feature = "__single_holder")]
 pub fn untrack<O, R>(opt: O) -> R
 where
@@ -111,6 +118,8 @@ pub trait Revisable: fmt::Debug {
     fn holder_id(&self) -> Option<HolderId>;
     fn version(&self) -> usize;
     fn bind_view(&self, view_id: &ViewId);
+    fn unbind_view(&self, view_id: &ViewId);
+    fn unlace_view(&self, view_id: &ViewId, loose: usize);
     fn is_revising(&self) -> bool {
         REVISING_ITEMS.with_borrow(|revising_items| {
             cfg_if! {
@@ -152,8 +161,4 @@ where
 {
     fn get(&self) -> Ref<'_, S>;
     fn get_untracked(&self) -> Ref<'_, S>;
-}
-pub enum MaybeRecord<S> {
-    Plain(S),
-    Record(Box<dyn Record<S>>),
 }

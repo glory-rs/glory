@@ -39,6 +39,14 @@ where
     fn bind_view(&self, view_id: &ViewId) {
         (*self.view_ids).borrow_mut().insert(view_id.clone());
     }
+    fn unbind_view(&self, view_id: &ViewId) {
+        (*self.view_ids).borrow_mut().remove(view_id);
+    }
+    fn unlace_view(&self, view_id: &ViewId, loose: usize) {
+        if loose > 0 {
+            (*self.view_ids).borrow_mut().remove(view_id);
+        }
+    }
 }
 impl<T> Signal for Cage<T>
 where
@@ -166,6 +174,7 @@ where
     pub fn borrow(&self) -> Ref<'_, T> {
         self.source.borrow()
     }
+    
     pub fn map<M, G>(&self, mapper: M) -> Bond<impl Fn() -> G + Clone + 'static, G>
     where
         M: Fn(Ref<'_, T>) -> G + Clone + 'static,
@@ -267,7 +276,13 @@ where
         self.0.version.get()
     }
     fn bind_view(&self, view_id: &ViewId) {
-        (*self.0.view_ids).borrow_mut().insert(view_id.clone());
+        self.0.bind_view(view_id);
+    }
+    fn unbind_view(&self, view_id: &ViewId){
+        self.0.unbind_view(view_id);
+    }
+    fn unlace_view(&self, view_id: &ViewId, loose: usize){
+        self.0.unlace_view(view_id, loose);
     }
 }
 impl<T> Record<T> for ReadCage<T>

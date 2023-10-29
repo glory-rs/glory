@@ -54,8 +54,8 @@ pub fn story_api_url(path: impl AsRef<str>) -> String {
     format!("https://node-hnapi.herokuapp.com/{}", path.as_ref())
 }
 
-pub fn user_api_url(user_id: usize) -> String {
-    format!("https://hacker-news.firebaseio.com/v0/user/{user_id}.json")
+pub fn user_api_url(user_id: impl AsRef<str>) -> String {
+    format!("https://hacker-news.firebaseio.com/v0/user/{}.json", user_id.as_ref())
 }
 
 #[cfg(not(feature = "web-ssr"))]

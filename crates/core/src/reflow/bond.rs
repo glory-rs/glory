@@ -19,7 +19,7 @@ where
     id: RevisableId,
     version: Rc<Cell<usize>>,
     gathers: Rc<RefCell<IndexMap<RevisableId, Box<dyn Signal>>>>,
-    view_ids: Rc<RefCell<IndexSet<ViewId>>>,
+    view_ids: Rc<RefCell<IndexMap<ViewId, usize>>>,
     #[educe(Debug(ignore))]
     mapper: F,
     #[educe(Debug(ignore))]
@@ -44,6 +44,15 @@ where
             mapper,
             value: Rc::new(RefCell::new(value)),
         }
+    }
+    
+    pub fn map<M, G>(&self, mapper: M) -> Bond<impl Fn() -> G + Clone + 'static, G>
+    where
+        M: Fn(Ref<'_, T>) -> G + Clone + 'static,
+        G: fmt::Debug + 'static,
+    {
+        let this = self.clone();
+        Bond::new(move || mapper(this.get()))
     }
 }
 
@@ -72,12 +81,9 @@ where
     fn get(&self) -> Ref<'_, T> {
         let new_version = self.gathers.borrow().values().map(|g| g.version()).sum();
         if self.version() != new_version {
-            TRACKING_STACK.with(|tracking_items| tracking_items.borrow_mut().push_layer());
-            self.value.replace((self.mapper)());
-            let gathers = TRACKING_STACK.with(|tracking_items| tracking_items.borrow_mut().pop_layer().unwrap());
-            *self.gathers.borrow_mut() = gathers;
+            *self.gathers.borrow_mut() = crate::reflow::gather(|| self.value.replace((self.mapper)())).0;
             self.version.set(new_version);
-            for view_id in self.view_ids.borrow().iter() {
+            for view_id in self.view_ids.borrow().keys() {
                 for (_, gather) in self.gathers.borrow().deref() {
                     gather.bind_view(view_id);
                 }
@@ -116,7 +122,7 @@ where
     }
     #[cfg(not(feature = "__single_holder"))]
     fn holder_id(&self) -> Option<crate::HolderId> {
-        self.view_ids.borrow().first().map(|view_id| view_id.holder_id())
+        self.view_ids.borrow().first().map(|(view_id, _)| view_id.holder_id())
     }
     fn version(&self) -> usize {
         self.version.get()
@@ -130,9 +136,30 @@ where
         false
     }
     fn bind_view(&self, view_id: &ViewId) {
-        self.view_ids.borrow_mut().insert(view_id.clone());
+        let mut view_ids = self.view_ids.borrow_mut();
+        let count = view_ids.get(view_id).cloned().unwrap_or(0);
+        view_ids.insert(view_id.clone(), count + 1);
         for (_, gather) in self.gathers.borrow().deref() {
             gather.bind_view(view_id);
+        }
+    }
+    fn unbind_view(&self, view_id: &ViewId) {
+        let count = self.view_ids.borrow_mut().remove(view_id).unwrap_or(0);
+        for (_, gather) in self.gathers.borrow().deref() {
+            gather.unlace_view(view_id, count);
+        }
+    }
+    fn unlace_view(&self, view_id: &ViewId, loose: usize) {
+        let count = self.view_ids.borrow_mut().get(view_id).cloned().unwrap_or(0);
+        let loose = if loose >= count {
+            self.view_ids.borrow_mut().remove(view_id);
+            count
+        } else {
+            self.view_ids.borrow_mut().insert(view_id.clone(), count - loose);
+            loose
+        };
+        for (_, gather) in self.gathers.borrow().deref() {
+            gather.unlace_view(view_id, loose);
         }
     }
 }

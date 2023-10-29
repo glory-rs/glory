@@ -2,11 +2,12 @@ use std::cell::Ref;
 use std::fmt;
 use std::future::Future;
 
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
 use wasm_bindgen::UnwrapThrowExt;
 
-use crate::reflow::{Cage, Record, Revisable};
+use crate::reflow::{Cage, Record, Revisable, Signal, RevisableId};
 use crate::{Scope, Widget};
 
 #[derive(Serialize, Deserialize, Default, Debug)]
@@ -46,6 +47,7 @@ where
     callback: Box<dyn Fn(&T, &mut Scope)>,
     fallback: Option<Box<dyn Fn(&mut Scope)>>,
     state: Cage<LoadState<T>>,
+    gathers: IndexMap<RevisableId, Box<dyn Signal>>,
 }
 impl<T, Fut> fmt::Debug for Loader<T, Fut>
 where
@@ -68,6 +70,7 @@ where
             callback: Box::new(callback),
             fallback: None,
             state: Cage::new(LoadState::Idle),
+            gathers: IndexMap::new(),
         }
     }
     pub fn fallback(mut self, fallback: impl Fn(&mut Scope) + 'static) -> Self {
@@ -111,13 +114,13 @@ where
         }
         self.state.bind_view(ctx.view_id());
 
-        if !self.state().is_loaded() {
+        let gathers = if !self.state().is_loaded() {
             if let Some(fallback) = &self.fallback {
                 (fallback)(ctx);
             }
 
             let state = self.state.clone();
-            let fut = (self.future.take().unwrap())();
+            let (gathers, fut) = crate::reflow::gather(|| (self.future.take().unwrap())());
             crate::spawn::spawn_local(async move {
                 state.revise(|mut state| {
                     *state = LoadState::<T>::Loading;
@@ -127,6 +130,16 @@ where
                     *state = LoadState::Loaded(result);
                 });
             });
+            gathers
+        } else {
+            crate::reflow::gather(|| _ = (self.future.take().unwrap())()).0
+        };
+        for gather in self.gathers.values() {
+            gather.unbind_view(ctx.view_id());
+        }
+        self.gathers = gathers;
+        for gather in self.gathers.values() {
+            gather.bind_view(ctx.view_id());
         }
     }
 
@@ -137,6 +150,7 @@ where
             }
 
             (self.callback)(result, ctx);
+
             for view_id in ctx.show_list.clone() {
                 ctx.attach_child(&view_id);
             }
