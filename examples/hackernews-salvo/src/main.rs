@@ -25,7 +25,7 @@ async fn main() {
     let site_addr = handler.config.site_addr.clone();
     let router = Router::new()
         .push(views::route().make_salvo_router(handler.clone()))
-        .push(Router::with_path("<**path>").get(StaticDir::new(["target/site", "hackernews-salvo/target/site"])));
+        .push(Router::with_path("<**path>").get(StaticDir::new("target/site")));
     println!("{:#?}", router);
     let service = salvo::Service::new(router).catcher(Catcher::default().hoop(handler));
     let acceptor = TcpListener::new(site_addr).bind().await;
