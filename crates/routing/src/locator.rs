@@ -117,7 +117,6 @@ impl Locator {
         cfg_if! {
             if #[cfg(feature = "__single_holder")] {
                 reflow::batch(update);
-                glory_core::info!("=======rawxxx");
             } else {
                 use glory_core::reflow::Revisable;
                 if let Some(holder_id) = self.path.holder_id() {

@@ -13,7 +13,7 @@ impl Widget for ShowStory {
     fn attach(&mut self, ctx: &mut Scope) {
         let truck = ctx.truck();
         let info = truck.obtain::<PageInfo>().unwrap();
-        info.title.revise(|mut v| *v = "User".to_owned());
+        info.title.revise(|mut v| *v = "Story".to_owned());
     }
     fn build(&mut self, ctx: &mut Scope) {
         info!("ShowStory::build");
@@ -118,7 +118,9 @@ impl Widget for ShowComment {
                                     a().on(events::click, {
                                         let opened = opened.clone();
                                         move |_| {
-                                            opened.revise(|mut v| *v = !*opened.get());
+                                            crate::info!("zzzz  {}", *opened.get());
+                                            opened.revise(|mut v| *v = !*v);
+                                            crate::info!("zzzz xx  {}", *opened.get());
                                         }
                                     })
                                     .html(Bond::new({
