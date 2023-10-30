@@ -109,8 +109,7 @@ impl Locator {
                 .collect();
             if new_queries != *me.queries().borrow() {
                 me.queries.revise(|mut queries| {
-                    queries.retain(|key, _| new_queries.contains_key(key));
-                    queries.extend(new_queries);
+                    *queries = new_queries;
                 });
             }
             me.raw_url.revise(|mut raw_url| *raw_url = new_url.to_string());
@@ -118,6 +117,7 @@ impl Locator {
         cfg_if! {
             if #[cfg(feature = "__single_holder")] {
                 reflow::batch(update);
+                glory_core::info!("=======rawxxx");
             } else {
                 use glory_core::reflow::Revisable;
                 if let Some(holder_id) = self.path.holder_id() {

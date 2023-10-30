@@ -32,9 +32,7 @@ where
     T: fmt::Debug + 'static,
 {
     pub fn new(mapper: F) -> Self {
-        TRACKING_STACK.with(|tracking_stack| tracking_stack.borrow_mut().push_layer());
-        let value = (mapper)();
-        let gathers = TRACKING_STACK.with(|tracking_stack| tracking_stack.borrow_mut().pop_layer().unwrap());
+        let (gathers, value) = crate::reflow::gather(mapper.clone());
         let version = gathers.values().map(|g| g.version()).sum();
         Self {
             id: RevisableId::next(),
