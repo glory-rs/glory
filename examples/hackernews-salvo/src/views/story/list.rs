@@ -22,6 +22,7 @@ pub struct ListStories {
 }
 impl ListStories {
     pub fn new() -> Self {
+        info!("ListStories::new");
         Self {
             hide_more_link: Cage::new(false),
         }
@@ -29,18 +30,19 @@ impl ListStories {
 }
 impl Widget for ListStories {
     fn attach(&mut self, ctx: &mut Scope) {
+        info!("ListStories::attach");
         let truck = ctx.truck();
         let info = truck.obtain::<PageInfo>().unwrap();
         info.title.revise(|mut v| *v = "Stories".into());
         info.description.revise(|mut v| *v = "stories".into());
     }
     fn build(&mut self, ctx: &mut Scope) {
-        info!("ShowStory::build");
+        info!("ListStories::build");
         let (page, story_type) = {
             let truck = ctx.truck();
             let locator = truck.obtain::<Locator>().unwrap();
-            let params = locator.params();
-            let page = Bond::new(move || params.clone().get().get("page").and_then(|page| page.parse::<usize>().ok()).unwrap_or(1));
+            let queries = locator.queries();
+            let page = Bond::new(move || queries.clone().get().get("page").and_then(|page| page.parse::<usize>().ok()).unwrap_or(1));
             let params = locator.params();
             let story_type = Bond::new(move || params.get().get("type").cloned().unwrap_or("top".into()));
             (page, story_type)
@@ -94,7 +96,7 @@ impl Widget for ListStories {
                                 }),
                         ),
                     )
-                    .fill(span().html(format!("page {}", *page.get())))
+                    .fill(span().html(page.map(|page|format!("page {}", page))))
                     .fill(
                         span()
                             .class("page-link")
