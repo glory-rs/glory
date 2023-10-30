@@ -1,9 +1,8 @@
 use glory_hot_reload::diff::Patches;
+use once_cell::sync::Lazy;
 use tokio::sync::broadcast;
 
-lazy_static::lazy_static! {
-  static ref RELOAD_CHANNEL: broadcast::Sender::<ReloadType> = broadcast::channel::<ReloadType>(1).0;
-}
+static RELOAD_CHANNEL: Lazy<broadcast::Sender<ReloadType>> = Lazy::new(|| broadcast::channel::<ReloadType>(1).0);
 
 #[derive(Debug, Clone)]
 pub enum ReloadType {

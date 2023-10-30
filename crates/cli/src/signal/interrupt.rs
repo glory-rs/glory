@@ -1,3 +1,4 @@
+use once_cell::sync::Lazy;
 use tokio::{
     signal,
     sync::{broadcast, RwLock},
@@ -6,13 +7,11 @@ use tokio::{
 
 use crate::compile::{Change, ChangeSet};
 
-lazy_static::lazy_static! {
-  static ref ANY_INTERRUPT: broadcast::Sender<()> = broadcast::channel(10).0;
-  static ref SHUTDOWN: broadcast::Sender<()> = broadcast::channel(1).0;
+static ANY_INTERRUPT: Lazy<broadcast::Sender<()>> = Lazy::new(|| broadcast::channel(10).0);
+static SHUTDOWN: Lazy<broadcast::Sender<()>> = Lazy::new(|| broadcast::channel(1).0);
 
-  static ref SHUTDOWN_REQUESTED: RwLock<bool> = RwLock::new(false);
-  static ref SOURCE_CHANGES: RwLock<ChangeSet> = RwLock::new(ChangeSet::default());
-}
+static SHUTDOWN_REQUESTED: Lazy<RwLock<bool>> = Lazy::new(|| RwLock::new(false));
+static SOURCE_CHANGES: Lazy<RwLock<ChangeSet>> = Lazy::new(|| RwLock::new(ChangeSet::default()));
 
 pub struct Interrupt {}
 

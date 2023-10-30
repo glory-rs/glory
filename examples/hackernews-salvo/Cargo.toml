@@ -42,7 +42,7 @@ style_file = "styles/main.scss"
 # Optional. Env: GLORY_ASSETS_DIR.
 assets_dir = "assets"
 # The IP and port (ex: 127.0.0.1:8000) where the server serves the content. Use it in your server setup.
-site_addr = "0.0.0.0:8000"
+site_addr = "0.0.0.0:8005"
 # The port to use for automatic reload monitoring
 reload_port = 8001
 # [Optional] Command to use when running end2end tests. It will run in the end2end dir.
