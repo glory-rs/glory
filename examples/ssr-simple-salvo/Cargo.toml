@@ -8,7 +8,7 @@ edition = "2021"
 
 [features]
 web-csr = ["glory/web-csr"]
-web-ssr = ["glory/salvo", "dep:tokio", "dep:salvo"]
+web-ssr = ["glory/salvo", "dep:tokio", "dep:salvo", "dep:tracing-subscriber"]
 
 [dependencies]
 glory = { workspace = true, features = ["routing"] }
@@ -18,7 +18,7 @@ web-sys = { workspace = true, features = ["Storage"] }
 salvo = {workspace = true, optional = true, features = ["serve-static"]}
 tokio = {workspace = true, optional = true}
 tracing.workspace = true
-tracing-subscriber.workspace = true
+tracing-subscriber = { workspace = true, optional = true }
 
 [package.metadata.glory]
 # The name used by wasm-bindgen/glory-cli for the JS/WASM bundle. Defaults to the crate name

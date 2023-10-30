@@ -8,7 +8,7 @@ edition = "2021"
 
 [features]
 web-csr = ["glory/web-csr", "dep:wasm-bindgen"]
-web-ssr = ["glory/salvo", "dep:tokio", "dep:salvo", "dep:reqwest"]
+web-ssr = ["glory/salvo", "dep:tokio", "dep:salvo", "dep:reqwest", "dep:tracing-subscriber"]
 
 [dependencies]
 cfg-if = { workspace = true }
@@ -20,7 +20,7 @@ web-sys = { workspace = true, features = ["Storage"] }
 salvo = { workspace = true, optional = true, features = ["serve-static"] }
 tokio = { workspace = true, optional = true }
 tracing.workspace = true
-tracing-subscriber.workspace = true
+tracing-subscriber = { workspace = true, optional = true }
 gloo-net = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
 once_cell = { workspace = true }
