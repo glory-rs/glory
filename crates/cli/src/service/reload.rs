@@ -1,20 +1,20 @@
 use std::sync::Arc;
 use std::{fmt::Display, net::SocketAddr};
 
+use salvo::prelude::*;
+use salvo::websocket::{Message, WebSocket};
+use serde::Serialize;
+use tokio::{net::TcpStream, select, sync::RwLock, task::JoinHandle};
+use once_cell::sync::Lazy;
+
 use crate::config::Project;
 use crate::ext::sync::wait_for_socket;
 use crate::logger::GRAY;
 use crate::signal::Interrupt;
 use crate::signal::{ReloadSignal, ReloadType};
-use salvo::prelude::*;
-use salvo::websocket::{Message, WebSocket};
-use serde::Serialize;
-use tokio::{net::TcpStream, select, sync::RwLock, task::JoinHandle};
 
-lazy_static::lazy_static! {
-  static ref SITE_ADDR: RwLock<SocketAddr> = RwLock::new(SocketAddr::new([127,0,0,1].into(), 3000));
-  static ref CSS_LINK: RwLock<String> = RwLock::new(String::default());
-}
+static SITE_ADDR: Lazy<RwLock<SocketAddr>> = Lazy::new(|| RwLock::new(SocketAddr::new([127, 0, 0, 1].into(), 3000)));
+static CSS_LINK: Lazy<RwLock<String>> = Lazy::new(|| RwLock::new(String::default()));
 
 pub async fn spawn(proj: &Arc<Project>) -> JoinHandle<()> {
     let proj = proj.clone();

@@ -3,6 +3,7 @@ use flexi_logger::{
     filter::{LogLineFilter, LogLineWriter},
     DeferredNow, Level, Record,
 };
+use once_cell::sync::Lazy;
 use std::io::Write;
 use std::sync::OnceLock;
 
@@ -10,17 +11,15 @@ use crate::ext::anyhow::Context;
 use crate::{config::Log, ext::StrAdditions};
 
 // https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797
-lazy_static::lazy_static! {
-   static ref ERR_RED: ansi_term::Color = Fixed(196);
-   static ref WARN_YELLOW: ansi_term::Color = Fixed(214);
-   pub static ref INFO_GREEN: ansi_term::Color = Fixed(77);
-   static ref DBG_BLUE: ansi_term::Color = Fixed(26);
-   static ref TRACE_VIOLET: ansi_term::Color = Fixed(98);
+static ERR_RED: Lazy<ansi_term::Color> = Lazy::new(|| Fixed(196));
+static WARN_YELLOW: Lazy<ansi_term::Color> = Lazy::new(|| Fixed(214));
+pub static INFO_GREEN: Lazy<ansi_term::Color> = Lazy::new(|| Fixed(77));
+static DBG_BLUE: Lazy<ansi_term::Color> = Lazy::new(|| Fixed(26));
+static TRACE_VIOLET: Lazy<ansi_term::Color> = Lazy::new(|| Fixed(98));
 
-   pub static ref GRAY: ansi_term::Color = Fixed(241);
-   pub static ref BOLD: ansi_term::Style = Style::new().bold();
-   static ref LOG_SELECT: OnceLock<LogFlag> = OnceLock::new();
-}
+pub static GRAY: Lazy<ansi_term::Color> = Lazy::new(|| Fixed(241));
+pub static BOLD: Lazy<ansi_term::Style> = Lazy::new(|| Style::new().bold());
+static LOG_SELECT: Lazy<OnceLock<LogFlag>> = Lazy::new(|| OnceLock::new());
 
 pub fn setup(verbose: u8, logs: &[Log]) {
     let log_level = match verbose {

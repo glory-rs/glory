@@ -1,11 +1,10 @@
 use derive_more::Display;
 use itertools::Itertools;
+use once_cell::sync::Lazy;
 use std::{collections::HashSet, fmt};
 use tokio::sync::broadcast;
 
-lazy_static::lazy_static! {
-  static ref SERVER_RESTART_CHANNEL: broadcast::Sender::<()> = broadcast::channel::<()>(1).0;
-}
+static SERVER_RESTART_CHANNEL: Lazy<broadcast::Sender<()>> = Lazy::new(|| broadcast::channel::<()>(1).0);
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum Outcome<T> {

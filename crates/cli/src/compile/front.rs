@@ -124,6 +124,7 @@ async fn optimize(file: &Utf8Path, interrupt: broadcast::Receiver<()>) -> Result
     let wasm_opt = Exe::WasmOpt.get().await.dot()?;
 
     let args = [file.as_str(), "-Os", "-o", file.as_str()];
+    println!(">>>>>>>>>>>>>>>>>>>>>>>Optimizing WASM: {} {}", wasm_opt.display(), args.join(" "));
     let process = Command::new(wasm_opt).args(args).spawn().context("Could not spawn command")?;
     wait_interruptible("wasm-opt", process, interrupt).await
 }

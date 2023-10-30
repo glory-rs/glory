@@ -9,6 +9,7 @@ use std::{
     path::{Path, PathBuf},
     sync::Once,
 };
+use once_cell::sync::Lazy;
 
 use std::env;
 
@@ -32,9 +33,7 @@ pub struct ExeMeta {
     manual: String,
 }
 
-lazy_static::lazy_static! {
-    static ref ON_STARTUP_DEBUG_ONCE: Once = Once::new();
-}
+static ON_STARTUP_DEBUG_ONCE: Lazy<Once> = Lazy::new(||Once::new());
 
 pub const ENV_VAR_GLORY_CARGO_GENERATE_VERSION: &str = "GLORY_CARGO_GENERATE_VERSION";
 pub const ENV_VAR_GLORY_TAILWIND_VERSION: &str = "GLORY_TAILWIND_VERSION";
