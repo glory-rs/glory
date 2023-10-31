@@ -24,7 +24,7 @@ path = "src/lib.rs"
 
 [features]
 default = ["web-csr"]
-web-csr = ["__single_holder", "glory-core/web-csr", "dep:wasm-bindgen"]
+web-csr = ["__single_holder", "glory-core/web-csr", "dep:wasm-bindgen", "dep:web-sys"]
 web-ssr = ["glory-core/web-ssr"]
 salvo = ["dep:salvo", "glory-core/salvo"]
 __single_holder = []
@@ -36,7 +36,6 @@ glory-core = { workspace = true }
 once_cell = { workspace = true }
 indexmap = { workspace = true }
 multimap = { workspace = true }
-parking_lot = { workspace = true }
 regex = { workspace = true }
 tracing = { workspace = true }
 percent-encoding = { workspace = true }
@@ -45,30 +44,15 @@ wasm-bindgen = { workspace = true, optional = true}
 salvo = {workspace = true, optional = true}
 path-slash = { workspace = true }
 
-[dependencies.web-sys]
+[target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
 workspace = true
+optional = true
 features = [
-    # History/Routing
     "History",
     "HtmlAnchorElement",
-    "MouseEvent",
-    "Url",
-    # Form
-    "FormData",
-    "HtmlButtonElement",
-    "HtmlFormElement",
-    "HtmlInputElement",
-    "SubmitEvent",
-    "Url",
-    "UrlSearchParams",
-    # Fetching in Hydrate Mode
-    "Headers",
-    "Request",
-    "RequestInit",
-    "RequestMode",
-    "Response",
-    "Window",
+    "MouseEvent"
 ]
 
 [package.metadata.cargo-all-features]
 denylist = ["stable"]
+skip_feature_sets = [["web-ssr", "web-csr"]]
