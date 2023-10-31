@@ -3,8 +3,8 @@ name = "hackernews-salvo"
 version = "0.0.1"
 edition = "2021"
 
-# [lib]
-# crate-type = ["cdylib", "rlib"]
+[lib]
+crate-type = ["cdylib", "rlib"]
 
 [features]
 web-csr = ["glory/web-csr", "dep:wasm-bindgen", "dep:gloo-net"]
