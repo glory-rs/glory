@@ -19,12 +19,22 @@ mod csr;
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
 pub use csr::*;
 
-#[cfg(feature = "web-ssr")]
+#[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+pub fn escape(s: &str) -> String {
+    js_sys::encode_uri(s).as_string().unwrap()
+}
+#[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
 pub fn escape(s: &str) -> String {
     percent_encoding::utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC).to_string()
 }
-#[cfg(feature = "web-ssr")]
-pub fn unescape<'a>(s: &'a str) -> std::borrow::Cow<'a, str> {
-    percent_encoding::percent_decode_str(s).decode_utf8_lossy()
+
+
+#[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+pub fn unescape<'a>(s: &'a str) -> String {
+    js_sys::decode_uri(s).unwrap().into()
+}
+#[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
+pub fn unescape<'a>(s: &'a str) -> String {
+    percent_encoding::percent_decode_str(s).decode_utf8_lossy().to_string()
 }
 

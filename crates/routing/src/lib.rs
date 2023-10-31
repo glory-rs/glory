@@ -18,6 +18,11 @@ pub use graff::Graff;
 pub use locator::Locator;
 pub use router::Router;
 
+#[cfg(not(target_arch = "wasm32"))]
+pub use regex;
+#[cfg(target_arch = "wasm32")]
+pub mod regex;
+
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -137,7 +142,7 @@ impl PathState {
 
 #[inline]
 fn decode_url_path_safely(path: &str) -> String {
-    percent_encoding::percent_decode_str(path).decode_utf8_lossy().to_string()
+    glory_core::web::unescape(path)
 }
 
 #[derive(Educe)]
