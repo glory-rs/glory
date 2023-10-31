@@ -17,8 +17,8 @@ name = "glory"
 
 [dependencies]
 clap = { version = "4.0", features = ["derive"] }
-serde = { version = "1.0", features = ["derive"] }
-anyhow = "1.0"
+serde = { workspace = true, features = ["derive"] }
+anyhow = { workspace = true }
 log = "0.4"
 flexi_logger = "0.26"
 lightningcss = { version = "1.0.0-alpha.47", features = ["browserslist"] }

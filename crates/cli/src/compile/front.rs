@@ -93,7 +93,7 @@ async fn bindgen(proj: &Project) -> Result<Outcome<Product>> {
     let mut bindgen = Bindgen::new().input_path(&wasm_file.source).web(true).dot()?.generate_output().dot()?;
 
     bindgen.wasm_mut().emit_wasm_file(&wasm_file.dest).dot()?;
-    log::trace!("Front wrote wasm to {:?}", wasm_file.dest.as_str());
+    log::info!("Front wrote wasm to {:?}", wasm_file.dest.as_str());
     if proj.release {
         match optimize(&wasm_file.dest, interrupt).await.dot()? {
             CommandResult::Interrupted => return Ok(Outcome::Stopped),
@@ -110,8 +110,8 @@ async fn bindgen(proj: &Project) -> Result<Outcome<Product>> {
 
     let wasm_changed = proj.site.did_file_change(&proj.lib.wasm_file.as_site_file()).await.dot()?;
     js_changed |= proj.site.updated_with(&proj.lib.js_file, bindgen.js().as_bytes()).await.dot()?;
-    log::debug!("Front js changed: {js_changed}");
-    log::debug!("Front wasm changed: {wasm_changed}");
+    log::info!("Front js changed: {js_changed}");
+    log::info!("Front wasm changed: {wasm_changed}");
 
     if js_changed || wasm_changed {
         Ok(Outcome::Success(Product::Front))

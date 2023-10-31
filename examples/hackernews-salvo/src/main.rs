@@ -6,7 +6,6 @@ mod views;
 use views::App;
 
 pub mod models;
-use crate::models::*;
 
 #[cfg(feature = "web-ssr")]
 #[tokio::main]

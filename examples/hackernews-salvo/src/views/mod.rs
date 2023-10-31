@@ -4,10 +4,8 @@ mod user;
 use std::rc::Rc;
 use std::cell::RefCell;
 
-use glory::reflow::*;
 use glory::routing::*;
 use glory::web::widgets::*;
-use glory::widgets::*;
 use glory::*;
 
 use story::{ListStories, ShowStory};

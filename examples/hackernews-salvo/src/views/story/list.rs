@@ -59,7 +59,7 @@ impl Widget for ListStories {
             },
             |stories, ctx| {
                 if let Some(stories) = stories {
-                    ul().fill(Each::new(Cage::new(stories.clone()), |story| story.id, |story| ShowStory(story.clone())))
+                    ul().fill(Each::new(Cage::new(stories.clone()), |story| story.id, |story| ShowStory::new(story.clone())))
                         .show_in(ctx);
                 } else {
                     h2().html("News not found").show_in(ctx);
@@ -168,13 +168,5 @@ impl Widget for ShowStory {
                 }
             })
             .show_in(ctx);
-    }
-}
-
-fn pluralize(n: usize) -> &'static str {
-    if n == 1 {
-        " reply"
-    } else {
-        " replies"
     }
 }

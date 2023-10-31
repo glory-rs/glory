@@ -17,9 +17,9 @@ use std::borrow::Cow;
 use std::fmt;
 
 use crate::reflow::{Bond, Record};
-use crate::view::{ViewId, ViewPosition};
+use crate::view::{ViewId};
 use crate::web::events::EventDescriptor;
-use crate::web::{AttrValue, ClassPart, Classes, PropValue};
+use crate::web::{AttrValue, ClassPart, PropValue};
 use crate::widget::{Filler, IntoFiller};
 use crate::{Cage, Node, NodeRef, Scope, Widget};
 

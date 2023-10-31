@@ -26,6 +26,10 @@ wasm-bindgen = { version = "0.2", optional = true }
 once_cell = "1"
 reqwest = { version = "0.11", optional = true, features = ["json"] }
 
+[profile.release]
+codegen-units = 1
+lto = true
+
 [package.metadata.glory]
 # The name used by wasm-bindgen/glory-cli for the JS/WASM bundle. Defaults to the crate name
 output_name = "hackernews-salvo"
