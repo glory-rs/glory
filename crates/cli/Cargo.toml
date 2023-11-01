@@ -27,7 +27,7 @@ tokio = { version = "1.4", default-features = false, features = ["full"] }
 # not using notify 5.0 because it uses Crossbeam which has an issue with tokio
 notify = "4"
 once_cell ={ workspace = true }
-which = "4.4"
+which = "5.0"
 cargo_metadata = { version = "0.18", features = ["builder"] }
 serde_json = "1.0"
 wasm-bindgen-cli-support = "0.2"
