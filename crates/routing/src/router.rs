@@ -5,10 +5,10 @@ use std::rc::Rc;
 use glory_core::web::holders::SalvoHandler;
 #[cfg(all(not(feature = "__single_holder"),feature = "salvo"))]
 use indexmap::IndexSet;
-use url::Url;
 
 use super::{Filter, FnFilter, PathFilter, PathState};
 use crate::{Truck, DetectMatched, Handler, WhenHoop};
+use crate::url::Url;
 
 #[macro_export]
 macro_rules! join_path {

@@ -1,4 +1,4 @@
-use std::{future::Future, sync::OnceLock};
+use std::future::Future;
 
 /// Spawns and runs a thread-local [`Future`] in a platform-independent way.
 ///

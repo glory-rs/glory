@@ -6,9 +6,9 @@ use std::rc::Rc;
 use glory_core::Truck;
 use indexmap::IndexSet;
 use once_cell::unsync::Lazy;
-use regex::Regex;
-use url::Url;
 
+use crate::url::Url;
+use crate::regex::Regex;
 use crate::{Filter, PathState};
 
 /// PathWisp

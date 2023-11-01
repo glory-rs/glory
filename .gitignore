@@ -11,3 +11,4 @@ debug.log
 dump.rdb
 .idea
 .vscode
+examples/_*

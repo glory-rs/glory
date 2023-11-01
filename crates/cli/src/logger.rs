@@ -1,4 +1,4 @@
-use ansi_term::{Colour::Fixed, Style};
+use ansi_term::Colour::Fixed;
 use flexi_logger::{
     filter::{LogLineFilter, LogLineWriter},
     DeferredNow, Level, Record,
@@ -18,7 +18,7 @@ static DBG_BLUE: Lazy<ansi_term::Color> = Lazy::new(|| Fixed(26));
 static TRACE_VIOLET: Lazy<ansi_term::Color> = Lazy::new(|| Fixed(98));
 
 pub static GRAY: Lazy<ansi_term::Color> = Lazy::new(|| Fixed(241));
-pub static BOLD: Lazy<ansi_term::Style> = Lazy::new(|| Style::new().bold());
+// pub static BOLD: Lazy<ansi_term::Style> = Lazy::new(|| Style::new().bold());
 static LOG_SELECT: Lazy<OnceLock<LogFlag>> = Lazy::new(|| OnceLock::new());
 
 pub fn setup(verbose: u8, logs: &[Log]) {

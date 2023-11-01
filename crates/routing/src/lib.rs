@@ -18,6 +18,13 @@ pub use graff::Graff;
 pub use locator::Locator;
 pub use router::Router;
 
+#[cfg(not(target_arch = "wasm32"))]
+pub use regex;
+#[cfg(target_arch = "wasm32")]
+pub mod regex;
+
+pub mod url;
+
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -62,7 +69,8 @@ pub struct PathState {
 impl PathState {
     /// Create new `PathState`.
     #[inline]
-    pub fn new(url_path: &str) -> Self {
+    pub fn new(url_path: impl AsRef<str>) -> Self {
+        let url_path = url_path.as_ref();
         let end_slash = url_path.ends_with('/');
         let parts = url_path
             .trim_start_matches('/')
@@ -137,7 +145,7 @@ impl PathState {
 
 #[inline]
 fn decode_url_path_safely(path: &str) -> String {
-    percent_encoding::percent_decode_str(path).decode_utf8_lossy().to_string()
+    glory_core::web::unescape(path)
 }
 
 #[derive(Educe)]

@@ -31,44 +31,33 @@ __single_holder = []
 
 [dependencies]
 cfg-if = { workspace = true }
-url = { workspace = true }
 glory-core = { workspace = true }
 once_cell = { workspace = true }
 indexmap = { workspace = true }
 multimap = { workspace = true }
-parking_lot = { workspace = true }
-regex = { workspace = true }
 tracing = { workspace = true }
-percent-encoding = { workspace = true }
 educe = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true}
 salvo = {workspace = true, optional = true}
 path-slash = { workspace = true }
+form_urlencoded = {workspace = true}
 
-[dependencies.web-sys]
+[target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
 workspace = true
 features = [
-    # History/Routing
     "History",
     "HtmlAnchorElement",
     "MouseEvent",
-    "Url",
-    # Form
-    "FormData",
-    "HtmlButtonElement",
-    "HtmlFormElement",
-    "HtmlInputElement",
-    "SubmitEvent",
-    "Url",
-    "UrlSearchParams",
-    # Fetching in Hydrate Mode
-    "Headers",
-    "Request",
-    "RequestInit",
-    "RequestMode",
-    "Response",
-    "Window",
+    "Url"
 ]
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+regex = { workspace = true }
+url = { workspace = true }
 
 [package.metadata.cargo-all-features]
 denylist = ["stable"]
+skip_feature_sets = [["web-ssr", "web-csr"]]

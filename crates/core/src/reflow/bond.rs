@@ -4,7 +4,7 @@ use std::ops::Deref;
 use std::rc::Rc;
 
 use educe::Educe;
-use indexmap::{IndexMap, IndexSet};
+use indexmap::{IndexMap};
 
 use super::{Record, Revisable, RevisableId, Signal, TRACKING_STACK};
 use crate::ViewId;

@@ -1,7 +1,7 @@
 use std::fmt::{self, Formatter};
 
 use glory_core::Truck;
-use url::Url;
+use crate::url::Url;
 
 use crate::{Filter, PathState};
 

@@ -9,10 +9,11 @@ mod path;
 use std::fmt::{self, Formatter};
 
 use glory_core::Truck;
-use url::Url;
+
+use crate::url::Url;
+use crate::PathState;
 
 use self::opts::*;
-use crate::PathState;
 
 pub use path::*;
 

@@ -8,7 +8,7 @@ resolver = "2"
 version = "0.1.0"
 authors = ["Chrislearn Young <chrislearn@hotmail.com>"]
 edition = "2021"
-rust-version = "1.72"
+rust-version = "1.73"
 description = """
 Glory is an experimental rust web front framework.
 """
@@ -20,8 +20,8 @@ keywords = ["http", "async", "web", "framework", "server"]
 license = "MIT OR Apache-2.0"
 categories = ["web-programming::http-server", "web-programming::websocket", "network-programming", "asynchronous"]
 
-
 [workspace.dependencies]
+anyhow = "1"
 url = "2"
 glory-core = { version = "0.1.0", path = "crates/core", default-features = false }
 salvo = { version = "0.58", default-features = true }                                    #

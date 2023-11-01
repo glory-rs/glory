@@ -15,7 +15,7 @@ categories = { workspace = true }
 [features]
 default = ["web-csr"]
 web-csr = ["__single_holder", "dep:wasm-bindgen"]
-web-ssr = ["dep:percent-encoding", "dep:tokio", "dep:tokio-util", "dep:xml-rs", "dep:futures-channel"]
+web-ssr = ["dep:tokio", "dep:tokio-util", "dep:xml-rs", "dep:futures-channel"]
 salvo = ["dep:salvo", "web-ssr"]
 __single_holder = []
 
@@ -30,7 +30,6 @@ tracing = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
 cfg-if = { workspace = true }
 paste = { workspace = true }
-percent-encoding = { workspace = true, optional = true }
 smallvec = { workspace = true }
 educe = { workspace = true }
 js-sys = { workspace = true }
@@ -51,6 +50,9 @@ futures-channel = { workspace = true, optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+percent-encoding = { workspace = true }
 
 [package.metadata.cargo-all-features]
 denylist = ["stable"]

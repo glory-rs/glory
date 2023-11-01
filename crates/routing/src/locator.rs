@@ -1,9 +1,10 @@
 use std::collections::BTreeMap;
 
 use multimap::MultiMap;
-use url::Url;
 
 use glory_core::reflow::{self, Cage, ReadCage};
+
+use crate::url::Url;
 
 #[derive(Default, Clone, Debug)]
 pub struct LocatorModifier {
@@ -74,7 +75,7 @@ impl Locator {
         ReadCage::new(self.queries.clone())
     }
 
-    pub fn receive(&self, raw_url: impl Into<String>, raw_params: BTreeMap<String, String>) -> Result<(), url::ParseError> {
+    pub fn receive(&self, raw_url: impl Into<String>, raw_params: BTreeMap<String, String>) -> Result<(), crate::url::ParseError> {
         let raw_url = raw_url.into();
         if raw_url == *self.raw_url.borrow() {
             return Ok(());
@@ -89,8 +90,8 @@ impl Locator {
             if *me.authority.borrow() != new_url.authority() {
                 me.authority.revise(|mut authority| *authority = new_url.authority().to_string());
             }
-            if (*me.host.borrow()).as_deref() != new_url.host_str() {
-                me.host.revise(|mut host| *host = new_url.host_str().map(|v| v.to_owned()));
+            if (*me.host.borrow()).as_deref() != new_url.host().as_deref() {
+                me.host.revise(|mut host| *host = new_url.host().map(|v| v.to_owned()));
             }
             if *me.port.borrow() != new_url.port() {
                 me.port.revise(|mut port| *port = new_url.port().map(|v| v.to_owned()));
@@ -98,13 +99,13 @@ impl Locator {
             if *me.path.borrow() != new_url.path() {
                 me.path.revise(|mut path| *path = new_url.path().to_owned());
             }
-            if (*me.fragment.borrow()).as_deref() != new_url.fragment() {
+            if (*me.fragment.borrow()).as_deref() != new_url.fragment().as_deref() {
                 me.fragment.revise(|mut fragment| *fragment = new_url.fragment().map(|v| v.to_owned()));
             }
             if *me.params.borrow() != raw_params {
                 me.params.revise(|mut params| *params = raw_params);
             }
-            let new_queries: MultiMap<String, String> = url::form_urlencoded::parse(new_url.query().unwrap_or_default().as_bytes())
+            let new_queries: MultiMap<String, String> = form_urlencoded::parse(new_url.query().unwrap_or_default().as_bytes())
                 .into_owned()
                 .collect();
             if new_queries != *me.queries().borrow() {
