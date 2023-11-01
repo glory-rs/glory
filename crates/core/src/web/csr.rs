@@ -27,7 +27,3 @@ pub fn document() -> web_sys::Document {
 pub fn is_hydrating() -> bool {
     HYDRATING.load(Ordering::Relaxed)
 }
-
-pub fn unescape(s: &str) -> String {
-    js_sys::decode_uri(s).unwrap().into()
-}
