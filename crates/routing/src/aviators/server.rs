@@ -4,8 +4,8 @@ use std::rc::Rc;
 use educe::Educe;
 use glory_core::holder::Enabler;
 use glory_core::Truck;
-use url::Url;
 
+use crate::url::Url;
 use crate::{Aviator, Handler, Locator, PathState, Router};
 
 #[derive(Educe, Clone)]

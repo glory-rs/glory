@@ -23,6 +23,8 @@ pub use regex;
 #[cfg(target_arch = "wasm32")]
 pub mod regex;
 
+pub mod url;
+
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -67,7 +69,8 @@ pub struct PathState {
 impl PathState {
     /// Create new `PathState`.
     #[inline]
-    pub fn new(url_path: &str) -> Self {
+    pub fn new(url_path: impl AsRef<str>) -> Self {
+        let url_path = url_path.as_ref();
         let end_slash = url_path.ends_with('/');
         let parts = url_path
             .trim_start_matches('/')

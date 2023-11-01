@@ -5,10 +5,10 @@ use educe::Educe;
 use glory_core::holder::Enabler;
 use glory_core::web::unescape;
 use glory_core::Truck;
-use url::Url;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 
 use crate::locator::LocatorModifier;
+use crate::url::Url;
 use crate::{Aviator, Handler, Locator, PathState, Router};
 
 #[derive(Educe, Clone)]
@@ -30,7 +30,7 @@ impl BrowserAviator {
             base_path: Default::default(),
         }
     }
-    pub(crate) fn locate(&self, raw_url: impl Into<String>) -> Result<(), url::ParseError> {
+    pub(crate) fn locate(&self, raw_url: impl Into<String>) -> Result<(), crate::url::ParseError> {
         let raw_url = raw_url.into();
         let locator = {
             let truck = self.truck.borrow();
@@ -101,7 +101,7 @@ impl BrowserAviator {
 
             // let browser handle this event if it leaves our domain
             // or our base path
-            if url.origin().unicode_serialization() != glory_core::web::location().origin().unwrap_or_default()
+            if url.origin() != glory_core::web::location().origin().unwrap_or_default()
                 || (!self.base_path.is_empty() && !path_name.is_empty() && !path_name.to_lowercase().starts_with(&self.base_path.to_lowercase()))
             {
                 return;
@@ -110,12 +110,12 @@ impl BrowserAviator {
             let query = if url.query().unwrap_or_default().is_empty() {
                 "".to_owned()
             } else {
-                format!("?{}", unescape(url.query().unwrap_or_default()))
+                format!("?{}", unescape(&url.query().unwrap_or_default()))
             };
             let fragment = if url.fragment().unwrap_or_default().is_empty() {
                 "".to_owned()
             } else {
-                format!("#{}", unescape(url.fragment().unwrap_or_default()))
+                format!("#{}", unescape(&url.fragment().unwrap_or_default()))
             };
 
             event.prevent_default();
