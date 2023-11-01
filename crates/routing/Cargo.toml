@@ -21,7 +21,6 @@ codecov = { repository = "glory-rs/glory", branch = "main", service = "github" }
 [lib]
 path = "src/lib.rs"
 
-
 [features]
 default = ["web-csr"]
 web-csr = ["__single_holder", "glory-core/web-csr", "dep:wasm-bindgen"]
