@@ -43,7 +43,7 @@ impl ServerAviator {
             self.catcher.handle(self.truck.clone());
         }
         self.truck.borrow_mut().inject(locator.clone());
-        locator.receive(raw_url, detect_state.params)
+        locator.receive(raw_url, Some(detect_state.params))
     }
 }
 

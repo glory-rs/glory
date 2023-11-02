@@ -5,4 +5,4 @@ pub use each::Each;
 pub use switch::Switch;
 
 mod loader;
-pub use loader::Loader;
+pub use loader::{Loader, OnceLoader};

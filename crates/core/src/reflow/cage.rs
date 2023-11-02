@@ -36,6 +36,9 @@ where
     fn version(&self) -> usize {
         self.version.get()
     }
+    fn view_ids(&self) -> Rc<RefCell<IndexSet<ViewId>>> {
+        self.view_ids.clone()
+    }
     fn bind_view(&self, view_id: &ViewId) {
         (*self.view_ids).borrow_mut().insert(view_id.clone());
     }
@@ -47,14 +50,14 @@ where
             (*self.view_ids).borrow_mut().remove(view_id);
         }
     }
+    fn clone_boxed_revisable(&self) -> Box<dyn Revisable> {
+        Box::new(self.clone())
+    }
 }
 impl<T> Signal for Cage<T>
 where
     T: fmt::Debug + 'static,
 {
-    fn view_ids(&self) -> Rc<RefCell<IndexSet<ViewId>>> {
-        self.view_ids.clone()
-    }
     fn signal(&self) {
         #[cfg(not(feature = "__single_holder"))]
         let Some(holder_id) = self.holder_id() else {
@@ -77,7 +80,7 @@ where
                 #[cfg(not(feature = "__single_holder"))]
                 let items = items.entry(holder_id).or_default();
                 if !items.contains_key(&self.id()) {
-                    items.insert(self.id(), self.clone_boxed());
+                    items.insert(self.id(), self.clone_boxed_revisable());
                 }
             });
         } else {
@@ -85,7 +88,7 @@ where
                 #[cfg(not(feature = "__single_holder"))]
                 let items = items.entry(holder_id).or_default();
                 if !items.contains_key(&self.id()) {
-                    items.insert(self.id(), self.clone_boxed());
+                    items.insert(self.id(), self.clone_boxed_revisable());
                     true
                 } else {
                     false
@@ -100,7 +103,7 @@ where
         }
     }
 
-    fn clone_boxed(&self) -> Box<dyn Signal> {
+    fn clone_boxed_signal(&self) -> Box<dyn Signal> {
         Box::new(self.clone())
     }
 }
@@ -113,7 +116,7 @@ where
         TRACKING_STACK.with(|tracking_items| {
             let mut tracking_items = tracking_items.borrow_mut();
             if !tracking_items.is_idle() {
-                tracking_items.track(this.clone_boxed());
+                tracking_items.track(this.clone_boxed_revisable());
             }
         });
         self.source.borrow()
@@ -275,6 +278,9 @@ where
     fn version(&self) -> usize {
         self.0.version.get()
     }
+    fn view_ids(&self) -> Rc<RefCell<IndexSet<ViewId>>> {
+        self.0.view_ids.clone()
+    }
     fn bind_view(&self, view_id: &ViewId) {
         self.0.bind_view(view_id);
     }
@@ -283,6 +289,9 @@ where
     }
     fn unlace_view(&self, view_id: &ViewId, loose: usize){
         self.0.unlace_view(view_id, loose);
+    }
+    fn clone_boxed_revisable(&self) -> Box<dyn Revisable> {
+        Box::new(self.0.clone())
     }
 }
 impl<T> Record<T> for ReadCage<T>

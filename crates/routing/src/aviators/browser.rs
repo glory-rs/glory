@@ -19,6 +19,7 @@ pub struct BrowserAviator {
     #[educe(Debug(ignore))]
     pub catcher: Rc<dyn Handler>,
     base_path: String,
+    curr_path: RefCell<String>,
 }
 
 impl BrowserAviator {
@@ -28,6 +29,7 @@ impl BrowserAviator {
             router: router.into(),
             catcher: Rc::new(catcher),
             base_path: Default::default(),
+            curr_path: Default::default(),
         }
     }
     pub(crate) fn locate(&self, raw_url: impl Into<String>) -> Result<(), crate::url::ParseError> {
@@ -40,10 +42,17 @@ impl BrowserAviator {
             return Ok(());
         }
         let url = Url::parse(&raw_url)?;
-        let mut detect_state = PathState::new(url.path());
+        let new_path = url.path();
+        if new_path == *self.curr_path.borrow() {
+            locator.receive(raw_url.clone(), None)?;
+            return Ok(())
+        }
+        *self.curr_path.borrow_mut() = new_path.clone();
+
+        let mut detect_state = PathState::new(new_path);
         let matched = self.router.detect(&url, &self.truck.borrow(), &mut detect_state);
-        glory_core::info!("=======rawurl: {}", raw_url);
-        locator.receive(raw_url.clone(), detect_state.params)?;
+        glory_core::info!("[locate]: {}", raw_url);
+        locator.receive(raw_url.clone(), Some(detect_state.params))?;
         if let Some(dm) = matched {
             for hoop in [&dm.hoops[..], &[dm.goal]].concat() {
                 hoop.handle(self.truck.clone());
