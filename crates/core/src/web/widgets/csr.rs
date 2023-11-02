@@ -40,8 +40,8 @@ where
     fn flood(&mut self, ctx: &mut Scope) {
         let parent_node = ctx.parent_node.as_ref().unwrap_throw();
         let node = <T as AsRef<web_sys::Element>>::as_ref(&self.node);
-        if crate::web::is_hydrating() && node.has_attribute("gly-id") {
-            node.remove_attribute("gly-id").unwrap_throw();
+        if crate::web::is_hydrating() && node.has_attribute("gly-hydrating") {
+            node.remove_attribute("gly-hydrating").unwrap_throw();
         } else {
             match &ctx.position {
                 ViewPosition::Head => parent_node.prepend_with_node_1(node).unwrap_throw(),
@@ -60,24 +60,30 @@ where
             ctx.attach_child(&id);
         }
     }
-
     fn build(&mut self, ctx: &mut Scope) {
         if crate::web::is_hydrating() {
             let selector = format!("{}[gly-id='{}']", self.name, ctx.view_id);
             let exist_node = if let Some(pnode) = &ctx.parent_node {
-                pnode.query_selector(&selector).unwrap_throw()
+                let node = pnode.query_selector(&selector).unwrap_throw();
+                if node.is_none() {
+                    crate::warn!("[hydrating]: node not found: {} {}", selector, pnode.outer_html());
+                }
+                node
             } else {
-                crate::web::document().query_selector(&selector).unwrap_throw()
+                let node = crate::web::document().query_selector(&selector).unwrap_throw();
+                if node.is_none() {
+                    crate::warn!("[hydrating]: node not found2: {}", selector);
+                }
+                node
             };
             if let Some(exist_node) = exist_node {
                 self.node = wasm_bindgen::JsCast::unchecked_into(exist_node);
-                crate::info!("[hydrating]: node founded: {}", selector);
-            } else {
-                crate::info!("[hydrating]: node not found: {}", selector);
-            }
-        }
+                crate::info!("[hydrating]: node exist: {}", selector);
+            } 
+        } 
 
         let node = <T as AsRef<web_sys::Element>>::as_ref(&self.node);
+
         ctx.graff_node = Some(node.clone());
         ctx.first_child_node = node.first_element_child();
         ctx.last_child_node = node.last_element_child();

@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use wasm_bindgen::JsCast;
+use wasm_bindgen::{UnwrapThrowExt, JsCast};
 
 use crate::{Holder, Scope, Truck, ViewId, Widget};
 
@@ -34,11 +34,17 @@ impl Debug for BrowerHolder {
 impl Holder for BrowerHolder {
     fn mount(self, widget: impl Widget) -> Self {
         crate::web::HYDRATING.store(true, Ordering::Relaxed);
+        if let Ok(list) = crate::web::document().query_selector_all("[gly-id]") {
+              for i in 0..list.length() {
+                let ele = list.item(i).unwrap().unchecked_into::<web_sys::HtmlElement>();
+                ele.set_attribute("gly-hydrating", "true").unwrap_throw();
+            }
+        }
         let view_id = ViewId::new(self.next_root_view_id.fetch_add(1, Ordering::Relaxed).to_string());
         let scope = Scope::new_root(view_id, self.truck.clone());
         widget.mount_to(scope, &self.host_node);
         crate::web::HYDRATING.store(false, Ordering::Relaxed);
-        if let Ok(list) = crate::web::document().query_selector_all("[gly-id]") {
+        if let Ok(list) = crate::web::document().query_selector_all("[gly-hydrating]") {
             for i in 0..list.length() {
                 let ele = list.item(i).unwrap().unchecked_into::<web_sys::HtmlElement>();
                 crate::info!("[hydrating]: remove element: {}", ele.outer_html());

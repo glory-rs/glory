@@ -59,8 +59,12 @@ impl Widget for ListStories {
             },
             |stories, ctx| {
                 if let Some(stories) = stories {
-                    ul().fill(Each::new(Cage::new(stories.clone()), |story| story.id, |story| ShowStory::new(story.clone())))
-                        .show_in(ctx);
+                    ul().fill(Each::new(
+                        Cage::new(stories.clone()),
+                        |story| story.id,
+                        |story| ShowStory::new(story.clone()),
+                    ))
+                    .show_in(ctx);
                 } else {
                     h2().html("News not found").show_in(ctx);
                 }
@@ -96,7 +100,7 @@ impl Widget for ListStories {
                                 }),
                         ),
                     )
-                    .fill(span().html(page.map(|page|format!("page {}", page))))
+                    .fill(span().html(page.map(|page| format!("page {}", page))))
                     .fill(
                         span()
                             .class("page-link")
@@ -143,30 +147,33 @@ impl Widget for ShowStory {
                 }
             }))
             .fill(br())
-            .fill(span().class("meta").then(|meta| {
-                if story.story_type != "job" {
-                    meta.fill(
-                        span()
-                            .fill("by ")
-                            .fill(story.user.clone().map(|user| a().href(format!("/users/{}", user)).text(user)))
-                            .fill(format!(" {} | ", story.time_ago))
-                            .fill(a().href(format!("/stories/{}", story.id)).text(if story.comments_count > 0 {
-                                format!("{} comments", story.comments_count)
-                            } else {
-                                "discuss".into()
-                            })),
-                    )
-                } else {
-                    meta.fill(a().href(format!("/item/{}", story.id)).text(story.title.clone()))
-                }
+            .fill(
+                span().class("meta").fill(
+                    Switch::new()
+                        .case(Cage::new(story.story_type != "job"), {
+                            let story = story.clone();
+                            move || {
+                                span()
+                                    .fill("by ")
+                                    .fill(story.user.clone().map(|user| a().href(format!("/users/{}", user)).text(user)))
+                                    .fill(format!(" {} | ", story.time_ago))
+                                    .fill(a().href(format!("/stories/{}", story.id)).text(if story.comments_count > 0 {
+                                        format!("{} comments", story.comments_count)
+                                    } else {
+                                        "discuss".into()
+                                    }))
+                            }
+                        })
+                        .case(Cage::new(true), {
+                            let story = story.clone();
+                            move || a().href(format!("/item/{}", story.id)).text(story.title.clone())
+                        }),
+                ),
+            )
+            .fill(Switch::new().case(Cage::new(story.story_type != "link"), {
+                let story = story.clone();
+                move || span().class("label").html(story.story_type.clone())
             }))
-            .then(|meta| {
-                if story.story_type != "link" {
-                    meta.fill(" ").fill(span().class("label").html(story.story_type.clone()))
-                } else {
-                    meta
-                }
-            })
             .show_in(ctx);
     }
 }

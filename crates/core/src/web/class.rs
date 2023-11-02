@@ -1,8 +1,4 @@
-use std::cell::RefCell;
 use std::fmt;
-
-#[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
-use std::ops::Deref;
 
 use crate::node::Node;
 use crate::reflow::{Bond, Cage, Record, Revisable};
@@ -15,14 +11,11 @@ use wasm_bindgen::{JsValue, UnwrapThrowExt};
 #[derive(Debug, Default)]
 pub struct Classes {
     parts: Vec<Box<dyn ClassPart>>,
-    #[allow(unused)]
-    value: RefCell<Option<String>>,
 }
 impl Classes {
     pub fn new() -> Self {
         Self {
             parts: Vec::new(),
-            value: RefCell::new(None),
         }
     }
     pub fn part(&mut self, part: impl ClassPart + 'static) -> &mut Self {
@@ -53,9 +46,9 @@ impl AttrValue for Classes {
     fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
         let is_revising = self.parts.iter().any(|part| part.is_revising());
         if is_revising || first_time {
-            *self.value.borrow_mut() = AttrValue::to_string(self);
-            if let Some(value) = self.value.borrow().deref() {
-                node.set_attribute(name, value).unwrap_throw();
+            let value = AttrValue::to_string(self);
+            if let Some(value) = value {
+                node.set_attribute(name, &value).unwrap_throw();
             } else {
                 node.remove_attribute(name).unwrap_throw();
             }
@@ -67,7 +60,16 @@ impl AttrValue for Classes {
         }
     }
     #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
-    fn inject_to(&self, view_id: &ViewId, _node: &mut Node, _name: &str, first_time: bool) {
+    fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
+        let is_revising = self.parts.iter().any(|part| part.is_revising());
+        if is_revising || first_time {
+            let value = AttrValue::to_string(self);
+            if let Some(value) = value {
+                node.set_attribute(name.to_owned(), value);
+            } else {
+                node.remove_attribute(name);
+            }
+        }
         if first_time {
             for part in &self.parts {
                 part.bind_view(view_id);

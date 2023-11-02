@@ -86,8 +86,9 @@ pub fn html_parts_separated(config: &GloryConfig, truck: &Truck) -> (String, Str
     <head>
         <meta charset="utf-8"/>
         <meta name="viewport" content="width=device-width, initial-scale=1"/>
-        <link rel="modulepreload" href="/{pkg_path}/{output_name}.js"{nonce}>
-        <link rel="preload" href="/{pkg_path}/{wasm_output_name}.wasm" as="fetch" type="application/wasm" crossorigin=""{nonce}>
+        {head_mixin}
+        <link href="/{pkg_path}/{output_name}.js"{nonce}>
+        <link href="/{pkg_path}/{wasm_output_name}.wasm" as="fetch" type="application/wasm" crossorigin=""{nonce}>
         <script type="module"{nonce}>
         function idle(c) {{
             if ("requestIdleCallback" in window) {{window.requestIdleCallback(c);}} else {{c();}}
@@ -95,7 +96,7 @@ pub fn html_parts_separated(config: &GloryConfig, truck: &Truck) -> (String, Str
         idle(() => {{
             import('/{pkg_path}/{output_name}.js').then(mod => {{mod.default('/{pkg_path}/{wasm_output_name}.wasm')}});
         }});
-        </script>{glory_auto_reload}{head_mixin}"#
+        </script>{glory_auto_reload}"#
         ),
         format!("\n    </head>\n    {body_open}"),
         "\n    </body>\n</html>",

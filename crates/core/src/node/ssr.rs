@@ -31,7 +31,7 @@ impl Node {
         self.children.borrow_mut().retain(|item| item != node);
     }
 
-    pub fn class(&self, value: impl Into<Cow<'static, str>>) {
+    pub fn add_class(&self, value: impl Into<Cow<'static, str>>) {
         self.classes.borrow_mut().insert(value.into());
     }
     pub fn remove_class(&self, key: &str) {

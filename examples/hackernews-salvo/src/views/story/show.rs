@@ -54,11 +54,14 @@ impl Widget for ShowStory {
                         .class("item-view-comments")
                         .fill(
                             p().class("item-view-comments-header")
-                                .fill(if story.comments_count > 0 {
-                                    format!("{} comments", story.comments_count)
-                                } else {
-                                    "No comments yet.".into()
-                                })
+                                .fill(
+                                    Switch::new()
+                                        .case(Cage::new(story.comments_count > 0), {
+                                            let story = story.clone();
+                                            move || span().html(format!("{} comments", story.comments_count))
+                                        })
+                                        .case(Cage::new(true), || span().html("No comments yet.")),
+                                )
                                 .fill(ul().class("comment-children").fill(Each::new(
                                     Cage::new(story.comments.clone()),
                                     |comment| comment.id,
@@ -107,50 +110,46 @@ impl Widget for ShowComment {
                     .fill(format!(" {}", comment.time_ago)),
             )
             .fill(div().class("text").html(comment.content.clone()))
-            .then(|li| {
-                if !comment.comments.is_empty() {
-                    li.fill(
-                        div().fill(
-                            div()
-                                .class("toggle")
-                                .toggle_class("open", opened.clone())
-                                .fill(
-                                    a().on(events::click, {
-                                        let opened = opened.clone();
-                                        move |_| {
-                                            crate::info!("zzzz  {}", *opened.get());
-                                            opened.revise(|mut v| *v = !*v);
-                                            crate::info!("zzzz xx  {}", *opened.get());
-                                        }
-                                    })
-                                    .html(Bond::new({
-                                        let opened = opened.clone();
-                                        let len = comment.comments.len();
-                                        move || {
-                                            if *opened.get() {
-                                                "[-]".to_owned()
-                                            } else {
-                                                format!("[+] {}{} collapsed", len, pluralize(len))
-                                            }
-                                        }
-                                    })),
-                                )
-                                .fill(Switch::new().case(opened.clone(), {
-                                    let comments = Cage::new(comment.comments.clone());
+            .fill(Switch::new().case(Cage::new(!comment.comments.is_empty()), {
+                let opened = opened.clone();
+                let comment = comment.clone();
+                move || {
+                    div().fill(
+                        div()
+                            .class("toggle")
+                            .toggle_class("open", opened.clone())
+                            .fill(
+                                a().on(events::click, {
+                                    let opened = opened.clone();
+                                    move |_| {
+                                        opened.revise(|mut v| *v = !*v);
+                                    }
+                                })
+                                .html(Bond::new({
+                                    let opened = opened.clone();
+                                    let len = comment.comments.len();
                                     move || {
-                                        ul().class("comment-children").fill(Each::new(
-                                            comments.clone(),
-                                            |comment| comment.id,
-                                            |comment| ShowComment::new(comment.clone()),
-                                        ))
+                                        if *opened.get() {
+                                            "[-]".to_owned()
+                                        } else {
+                                            format!("[+] {}{} collapsed", len, pluralize(len))
+                                        }
                                     }
                                 })),
-                        ),
+                            )
+                            .fill(Switch::new().case(opened.clone(), {
+                                let comments = Cage::new(comment.comments.clone());
+                                move || {
+                                    ul().class("comment-children").fill(Each::new(
+                                        comments.clone(),
+                                        |comment| comment.id,
+                                        |comment| ShowComment::new(comment.clone()),
+                                    ))
+                                }
+                            })),
                     )
-                } else {
-                    li
                 }
-            })
+            }))
             .show_in(ctx);
     }
 }
