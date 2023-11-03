@@ -47,11 +47,12 @@ impl BrowserAviator {
             locator.receive(raw_url.clone(), None)?;
             return Ok(())
         }
+
+        glory_core::info!("[locate]: {}  new_path: {}  old_path: {}", raw_url, new_path, *self.curr_path.borrow_mut());
         *self.curr_path.borrow_mut() = new_path.clone();
 
         let mut detect_state = PathState::new(new_path);
         let matched = self.router.detect(&url, &self.truck.borrow(), &mut detect_state);
-        glory_core::info!("[locate]: {}", raw_url);
         locator.receive(raw_url.clone(), Some(detect_state.params))?;
         if let Some(dm) = matched {
             for hoop in [&dm.hoops[..], &[dm.goal]].concat() {

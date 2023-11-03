@@ -56,7 +56,7 @@ where
 {
     fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
         if self.is_revising() || first_time {
-            self.get_untracked().clone().into().inject_to(view_id, node, name, first_time);
+            self.get_untracked().clone().into().inject_to(view_id, node, name, true);
         }
         if first_time {
             self.bind_view(view_id);
@@ -87,7 +87,7 @@ where
 {
     fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
         if self.is_revising() || first_time {
-            self.get_untracked().clone().into().inject_to(view_id, node, name, first_time);
+            self.get_untracked().clone().into().inject_to(view_id, node, name, true);
         }
         if first_time {
             self.bind_view(view_id);
