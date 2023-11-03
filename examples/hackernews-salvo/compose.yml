@@ -1,7 +1,6 @@
 services:
   hackernews-salvo:
     image: ubuntu:latest
-    cpu_percent: 50
     restart: always
     logging:
       driver: json-file
