@@ -22,6 +22,7 @@ categories = ["web-programming::http-server", "web-programming::websocket", "net
 
 [workspace.dependencies]
 anyhow = "1"
+base64 = "0.21"
 url = "2"
 glory-core = { version = "0.1.0", path = "crates/core", default-features = false }
 salvo = { version = "0.58", default-features = true }                                    #
@@ -31,10 +32,12 @@ parking_lot = "0.12"
 tracing = "0.1"
 # tracing-subscriber = "0.3"
 serde = { version = "1" }
+serde_json = { version = "1" }
 async-trait = "0.1.42"
 once_cell = "1.5.2"
 wasm-bindgen = { version = "0.2", features = ["enable-interning"] }
 wasm-bindgen-futures = "0.4.31"
+serde-wasm-bindgen = { version = "0.6" }
 paste = "1"
 cfg-if = "1"
 smallvec = "1"
@@ -52,7 +55,6 @@ tokio-util = { version = "0.7", default-features = false }
 path-slash = "0.2"
 futures = "0.3"
 futures-channel = { version = "0.3", default-features = true }
-xml-rs = "0.8"
 
 [workspace.dependencies.web-sys]
 version = "0.3"

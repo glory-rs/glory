@@ -64,23 +64,28 @@ where
     T: serde::de::DeserializeOwned,
 {
     glory::info!("fetching {}", path);
-    let json = gloo_net::http::Request::get(path)
+    gloo_net::http::Request::get(path)
         .send()
         .await
         .map_err(|e| glory::error!("{e}"))
         .ok()?
-        .text()
+        .json::<T>()
         .await
-        .ok()?;
-
-    serde_json::from_str(&json).ok()
+        .ok()
 }
 #[cfg(feature = "web-ssr")]
 pub async fn fetch_api<T>(path: &str) -> Option<T>
 where
-T: serde::de::DeserializeOwned,
+    T: serde::de::DeserializeOwned,
 {
     println!("fetching {}", path);
-    let json = reqwest::Client::new().get(path).send().await.map_err(|e| tracing::error!("{e}")).ok()?.text().await.ok()?;
-    serde_json::from_str(&json).map_err(|e| tracing::error!("{e}")).ok()
+    reqwest::Client::new()
+        .get(path)
+        .send()
+        .await
+        .map_err(|e| tracing::error!("{e}"))
+        .ok()?
+        .json::<T>()
+        .await
+        .ok()
 }

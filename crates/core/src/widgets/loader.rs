@@ -98,24 +98,19 @@ where
     fn build(&mut self, ctx: &mut Scope) {
         #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
         if crate::web::is_hydrating() {
-            let key = format!("gly-{}", ctx.view_id());
-            if let Some(parent_node) = &ctx.parent_node {
-                if let Some(data) = parent_node.get_attribute(&key) {
-                    parent_node.remove_attribute(&key).ok();
-                    let new_state: LoadState<T> = serde_json::from_str(&*&data).unwrap_throw();
-                    if new_state.is_loaded() {
-                        // Create fallback and remove it for server and client can create same view id.
-                        if let Some(fallback) = &self.fallback {
-                            (fallback)(ctx);
-                            for view_id in ctx.show_list.clone() {
-                                ctx.detach_child(&view_id);
-                            }
+            if let Some(new_state) = load_state(ctx) {
+                if new_state.is_loaded() {
+                    // Create fallback and remove it for server and client can create same view id.
+                    if let Some(fallback) = &self.fallback {
+                        (fallback)(ctx);
+                        for view_id in ctx.show_list.clone() {
+                            ctx.detach_child(&view_id);
                         }
                     }
-                    self.state.revise(|mut state| {
-                        *state = new_state;
-                    });
                 }
+                self.state.revise(|mut state| {
+                    *state = new_state;
+                });
             }
         }
         self.state.bind_view(ctx.view_id());
@@ -164,7 +159,7 @@ where
                     break;
                 }
             }
-        } 
+        }
         if is_revising {
             self.state.revise_silent(|mut state| {
                 *state = LoadState::Loading;
@@ -199,16 +194,41 @@ where
 
             for view_id in ctx.show_list.clone() {
                 ctx.attach_child(&view_id);
-            } 
+            }
         }
 
         #[cfg(feature = "web-ssr")]
-        if let Some(parent_node) = &ctx.parent_node {
-            let key = format!("gly-{}", ctx.view_id());
-            let data = xml::escape::escape_str_attribute(&serde_json::to_string(&*self.state.get()).unwrap()).to_string();
-            parent_node.set_attribute(key, data);
+        save_state(ctx, &*self.state.get());
+    }
+}
+
+#[cfg(feature = "web-ssr")]
+fn save_state<T>(ctx: &Scope, state: &LoadState<T>)
+where
+    T: Serialize + for<'a> Deserialize<'a> + fmt::Debug + 'static,
+{
+    pub use base64::prelude::*;
+    if let Some(parent_node) = &ctx.parent_node {
+        let key = format!("gly-{}", ctx.view_id());
+        let data = serde_json::to_string(&state).unwrap();
+        parent_node.set_attribute(key, BASE64_STANDARD_NO_PAD.encode(&data));
+    }
+}
+
+#[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+fn load_state<T>(ctx: &Scope) -> Option<LoadState<T>>
+where
+    T: Serialize + for<'a> Deserialize<'a> + fmt::Debug + 'static,
+{
+    let key = format!("gly-{}", ctx.view_id());
+    if let Some(parent_node) = &ctx.parent_node {
+        if let Some(data) = parent_node.get_attribute(&key) {
+            parent_node.remove_attribute(&key).ok();
+            let data = crate::web::window().atob(&data).unwrap_throw();
+            return serde_json::from_str(&data).ok();
         }
     }
+    None
 }
 
 #[allow(clippy::type_complexity)]
@@ -264,24 +284,19 @@ where
     fn build(&mut self, ctx: &mut Scope) {
         #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
         if crate::web::is_hydrating() {
-            let key = format!("gly-{}", ctx.view_id());
-            if let Some(parent_node) = &ctx.parent_node {
-                if let Some(data) = parent_node.get_attribute(&key) {
-                    parent_node.remove_attribute(&key).ok();
-                    let new_state: LoadState<T> = serde_json::from_str(&*&data).unwrap_throw();
-                    if new_state.is_loaded() {
-                        // Create fallback and remove it for server and client can create same view id.
-                        if let Some(fallback) = &self.fallback {
-                            (fallback)(ctx);
-                            for view_id in ctx.show_list.clone() {
-                                ctx.detach_child(&view_id);
-                            }
+            if let Some(new_state) = load_state(ctx) {
+                if new_state.is_loaded() {
+                    // Create fallback and remove it for server and client can create same view id.
+                    if let Some(fallback) = &self.fallback {
+                        (fallback)(ctx);
+                        for view_id in ctx.show_list.clone() {
+                            ctx.detach_child(&view_id);
                         }
                     }
-                    self.state.revise(|mut state| {
-                        *state = new_state;
-                    });
                 }
+                self.state.revise(|mut state| {
+                    *state = new_state;
+                });
             }
         }
         self.state.bind_view(ctx.view_id());
@@ -321,10 +336,6 @@ where
         }
 
         #[cfg(feature = "web-ssr")]
-        if let Some(parent_node) = &ctx.parent_node {
-            let key = format!("gly-{}", ctx.view_id());
-            let data = xml::escape::escape_str_attribute(&serde_json::to_string(&*self.state.get()).unwrap()).to_string();
-            parent_node.set_attribute(key, data);
-        }
+        save_state(ctx, &*self.state());
     }
 }
