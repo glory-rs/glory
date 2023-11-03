@@ -96,7 +96,7 @@ impl Widget for ListStories {
                                     }
                                 })
                                 .case(Cage::new(true), || {
-                                    span().class("page-link disabled").attr("aria-hidden", true).html("< prev")
+                                    span().class("page-link disabled").attr("aria-hidden", "true").html("< prev")
                                 }),
                         ),
                     )
@@ -105,7 +105,7 @@ impl Widget for ListStories {
                         span()
                             .class("page-link")
                             .toggle_class("disabled", self.hide_more_link.clone())
-                            .attr("aria-hidden", self.hide_more_link.clone())
+                            .attr("aria-hidden", self.hide_more_link.map(|v|v.to_string()))
                             .fill(
                                 a().href(Bond::new({
                                     let story_type = story_type.clone();
