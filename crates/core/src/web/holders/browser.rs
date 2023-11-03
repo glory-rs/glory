@@ -51,7 +51,7 @@ impl Holder for BrowerHolder {
                     crate::info!("[hydrating]: remove element: {}", ele.outer_html());
                     ele.remove();
                 } else {
-                    ele.remove_attribute("gly-id").unwrap_throw();
+                    ele.remove_attribute("gly-id").ok();
                 }
             }
         }
