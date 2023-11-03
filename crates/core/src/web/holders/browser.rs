@@ -44,11 +44,15 @@ impl Holder for BrowerHolder {
         let scope = Scope::new_root(view_id, self.truck.clone());
         widget.mount_to(scope, &self.host_node);
         crate::web::HYDRATING.store(false, Ordering::Relaxed);
-        if let Ok(list) = crate::web::document().query_selector_all("[gly-hydrating]") {
+        if let Ok(list) = crate::web::document().query_selector_all("[gly-id]") {
             for i in 0..list.length() {
                 let ele = list.item(i).unwrap().unchecked_into::<web_sys::HtmlElement>();
-                crate::info!("[hydrating]: remove element: {}", ele.outer_html());
-                ele.remove();
+                if ele.has_attribute("gly-hydrating") {
+                    crate::info!("[hydrating]: remove element: {}", ele.outer_html());
+                    ele.remove();
+                } else {
+                    ele.remove_attribute("gly-id").unwrap_throw();
+                }
             }
         }
         self
