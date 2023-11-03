@@ -1,16 +1,18 @@
 services:
   hackernews-salvo:
-    image: ubuntu:latest
+    build: './'
+    # context: .
     container_name: "hackernews-salvo"
-    restart: always
-    logging:
-      driver: json-file
-      options:
-        max-size: "1m"
-        max-file: "10"
-    entrypoint: "chmod +x /site/hackernews-salvo && /site/hackernews-salvo"
+    # restart: always
+    # working_dir: "/target"
+    entrypoint: /bin/bash
+    command: -c "chmod +x hackernews-salvo && ./hackernews-salvo"
     ports:
       - 8000:8000
+    environment:
+      GLORY_SITE_ADDR: "0.0.0.0:8000"
     volumes:
-      - "/target/site:/site"
-      - "/target/server/release/hackernews-salvo:/site/hackernews-salvo"
+      - "./target:/target"
+      # - "./public:/site/public"
+      # - "./Cargo.toml:/site/Cargo.toml"
+      - "./target/server/release/hackernews-salvo:/hackernews-salvo"
