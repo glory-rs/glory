@@ -84,11 +84,11 @@ pub fn html_parts_separated(config: &GloryConfig, truck: &Truck) -> (String, Str
             r#"<!DOCTYPE html>
 {html_open}
     <head>
-        <meta charset="utf-8"/>
-        <meta name="viewport" content="width=device-width, initial-scale=1"/>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
         {head_mixin}
-        <link href="/{pkg_path}/{output_name}.js"{nonce}>
-        <link href="/{pkg_path}/{wasm_output_name}.wasm" as="fetch" type="application/wasm" crossorigin=""{nonce}>
+        <link rel="modulepreload" href="/{pkg_path}/{output_name}.js"{nonce}>
+        <link rel="preload" href="/{pkg_path}/{wasm_output_name}.wasm" as="fetch" type="application/wasm" crossorigin=""{nonce}>
         <script type="module"{nonce}>
         function idle(c) {{
             if ("requestIdleCallback" in window) {{window.requestIdleCallback(c);}} else {{c();}}
