@@ -110,7 +110,7 @@ impl Node {
         };
 
         if *self.is_void.borrow() {
-            (format!("<{name}{properties}{attributes}{class} />"), "".into())
+            (format!("<{name}{properties}{attributes}{class}>"), "".into())
         } else {
             (format!("<{name}{properties}{attributes}{class}>"), format!("</{name}>"))
         }

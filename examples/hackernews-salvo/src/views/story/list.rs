@@ -116,7 +116,7 @@ impl Widget for ListStories {
                             ),
                     ),
             )
-            .fill(main_().class("news-list").fill(div().fill(loader)))
+            .fill(main().class("news-list").fill(div().fill(loader)))
             .show_in(ctx);
     }
 }

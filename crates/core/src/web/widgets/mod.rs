@@ -339,7 +339,7 @@ generate_tags![
   h6 H6 HtmlHeadingElement [],
 
   /// The `<main>` HTML element represents the dominant content of the body of a document. The main content area consists of content that is directly related to or expands upon the central topic of a document, or the central functionality of an application.
-  main_ Main HtmlElement [],
+  main Main HtmlElement [],
 
   /// The `<nav>` HTML element represents a section of a page whose purpose is to provide navigation links, either within the current document or to other documents. Common examples of navigation sections are menus, tables of contents, and indexes.
   nav Nav HtmlElement [],
@@ -372,7 +372,7 @@ generate_tags![
   figure Figure HtmlElement [],
 
   /// The `<hr>` HTML element represents a thematic break between paragraph-level elements: for example, a change of scene in a story, or a shift of topic within a section.
- hr Hr HtmlHrElement [] void,
+  hr Hr HtmlHrElement [] void,
 
   /// The `<li>` HTML element is used to represent an item in a list. It must be contained in a parent element: an ordered list (ol), an unordered list (ul), or a menu (menu). In menus and unordered lists, list items are usually displayed using bullet points. In ordered lists, they are usually displayed with an ascending counter on the left, such as a number or letter.
   li Li HtmlLiElement [value],
@@ -492,7 +492,7 @@ generate_tags![
   img Img HtmlImageElement [alt, cross_origin "crossOrigin", decoding, fetch_priority "fetchPriority", height, is_map "isMap", loading, referrer_policy "referrerPolicy", sizes, src, srcset, use_map "useMap", width] void,
 
   /// The `<map>` HTML element is used with area elements to define an image map (a clickable link area).
- map Map HtmlMapElement [name],
+  map Map HtmlMapElement [name],
 
   /// The `<track>` HTML element is used as a child of the media elements, audio and video. It lets you specify timed text tracks (or time-based data), for example to automatically handle subtitles. The tracks are formatted in WebVTT format (.vtt files) — Web Video Text Tracks.
   track Track HtmlTrackElement [kind, src, src_lang "srclang", label, default] void,

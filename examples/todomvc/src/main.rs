@@ -160,7 +160,7 @@ impl Widget for TodoMvc {
             });
         }
 
-        main_()
+        div()
             .fill(
                 section()
                     .class("todoapp")
