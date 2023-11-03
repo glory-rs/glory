@@ -13,7 +13,7 @@ use crate::logger::GRAY;
 use crate::signal::Interrupt;
 use crate::signal::{ReloadSignal, ReloadType};
 
-static SITE_ADDR: Lazy<RwLock<SocketAddr>> = Lazy::new(|| RwLock::new(SocketAddr::new([127, 0, 0, 1].into(), 3000)));
+static SITE_ADDR: Lazy<RwLock<SocketAddr>> = Lazy::new(|| RwLock::new(SocketAddr::new([127, 0, 0, 1].into(), 8000)));
 static CSS_LINK: Lazy<RwLock<String>> = Lazy::new(|| RwLock::new(String::default()));
 
 pub async fn spawn(proj: &Arc<Project>) -> JoinHandle<()> {

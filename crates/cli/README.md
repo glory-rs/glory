@@ -251,8 +251,8 @@ js_dir = "src"
 
 # The IP and port where the server serves the content. Use it in your server setup.
 #
-# Optional, defaults to 127.0.0.1:3000. Env: GLORY_SITE_ADDR.
-site_addr = "127.0.0.1:3000"
+# Optional, defaults to 127.0.0.1:8000. Env: GLORY_SITE_ADDR.
+site_addr = "127.0.0.1:8000"
 
 # The port number used by the reload server (only used in watch mode).
 #

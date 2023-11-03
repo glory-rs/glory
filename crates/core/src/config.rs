@@ -19,11 +19,11 @@ pub struct GloryConfig {
     pub site_pkg_dir: String,
     /// Provides a way to control the address glory is served from.
     /// Using an env variable here would allow you to run the same code in dev and prod
-    /// Defaults to `127.0.0.1:3000`
+    /// Defaults to `127.0.0.1:8000`
     #[serde(default = "default_site_addr")]
     pub site_addr: SocketAddr,
     /// The port the Websocket watcher listens on. Should match the `reload_port` in glory-cli(if using).
-    /// Defaults to `3001`
+    /// Defaults to `8001`
     #[serde(default = "default_reload_port")]
     pub reload_port: u32,
     /// The port the Websocket watcher listens on when on the client, e.g., when behind a reverse proxy.
@@ -92,7 +92,7 @@ impl GloryConfig {
             output_name,
             site_root: env_with_default("GLORY_SITE_ROOT", "target/site")?,
             site_pkg_dir: env_with_default("GLORY_SITE_PKG_DIR", "pkg")?,
-            site_addr: env_with_default("GLORY_SITE_ADDR", "127.0.0.1:3000")?.parse()?,
+            site_addr: env_with_default("GLORY_SITE_ADDR", "127.0.0.1:8000")?.parse()?,
             reload_port: env_with_default("GLORY_RELOAD_PORT", "3001")?.parse()?,
             reload_external_port: match env_without_default("GLORY_RELOAD_EXTERNAL_PORT")? {
                 Some(val) => Some(val.parse()?),

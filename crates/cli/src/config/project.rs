@@ -257,7 +257,7 @@ fn glory_metadata(metadata: &serde_json::Value) -> Option<&serde_json::Value> {
 }
 
 fn default_site_addr() -> SocketAddr {
-    SocketAddr::new([127, 0, 0, 1].into(), 3000)
+    SocketAddr::new([127, 0, 0, 1].into(), 8000)
 }
 
 fn default_pkg_dir() -> Utf8PathBuf {
