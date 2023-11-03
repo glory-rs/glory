@@ -4,9 +4,9 @@ use std::ops::Deref;
 use std::rc::Rc;
 
 use educe::Educe;
-use indexmap::{IndexMap};
+use indexmap::{IndexMap, IndexSet};
 
-use super::{Record, Revisable, RevisableId, Signal, TRACKING_STACK};
+use super::{Record, Revisable, RevisableId, TRACKING_STACK};
 use crate::ViewId;
 
 #[derive(Educe)]
@@ -18,7 +18,7 @@ where
 {
     id: RevisableId,
     version: Rc<Cell<usize>>,
-    gathers: Rc<RefCell<IndexMap<RevisableId, Box<dyn Signal>>>>,
+    gathers: Rc<RefCell<IndexMap<RevisableId, Box<dyn Revisable>>>>,
     view_ids: Rc<RefCell<IndexMap<ViewId, usize>>>,
     #[educe(Debug(ignore))]
     mapper: F,
@@ -43,7 +43,7 @@ where
             value: Rc::new(RefCell::new(value)),
         }
     }
-    
+
     pub fn map<M, G>(&self, mapper: M) -> Bond<impl Fn() -> G + Clone + 'static, G>
     where
         M: Fn(Ref<'_, T>) -> G + Clone + 'static,
@@ -65,7 +65,7 @@ where
             version: self.version.clone(),
             gathers: self.gathers.clone(),
             view_ids: self.view_ids.clone(),
-            value: Rc::new(RefCell::new((self.mapper)())),
+            value: self.value.clone(),
             mapper: self.mapper.clone(),
         }
     }
@@ -91,8 +91,8 @@ where
             TRACKING_STACK.with(|tracking_items| {
                 let mut tracking_items = tracking_items.borrow_mut();
                 if !tracking_items.is_idle() {
-                    for singal in gathers.borrow().values() {
-                        tracking_items.track(singal.clone_boxed());
+                    for revisable in gathers.borrow().values() {
+                        tracking_items.track(revisable.clone_boxed_revisable());
                     }
                 }
             });
@@ -124,6 +124,9 @@ where
     }
     fn version(&self) -> usize {
         self.version.get()
+    }
+    fn view_ids(&self) -> Rc<RefCell<IndexSet<ViewId>>> {
+        Rc::new(RefCell::new(IndexSet::from_iter(self.view_ids.borrow().keys().cloned())))
     }
     fn is_revising(&self) -> bool {
         for (_, gather) in self.gathers.borrow().deref() {
@@ -159,5 +162,8 @@ where
         for (_, gather) in self.gathers.borrow().deref() {
             gather.unlace_view(view_id, loose);
         }
+    }
+    fn clone_boxed_revisable(&self) -> Box<dyn Revisable> {
+        Box::new(self.clone())
     }
 }

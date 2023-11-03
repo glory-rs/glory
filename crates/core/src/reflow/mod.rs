@@ -19,21 +19,21 @@ use crate::ViewId;
 
 thread_local! {
     #[cfg(feature = "__single_holder")]
-    pub(crate) static REVISING_ITEMS: RefCell<IndexMap<RevisableId, Box<dyn Signal>>> = RefCell::default();
+    pub(crate) static REVISING_ITEMS: RefCell<IndexMap<RevisableId, Box<dyn Revisable>>> = RefCell::default();
     #[cfg(not(feature = "__single_holder"))]
-    pub(crate) static REVISING_ITEMS: RefCell<IndexMap<HolderId, IndexMap<RevisableId, Box<dyn Signal>>>> = RefCell::default();
+    pub(crate) static REVISING_ITEMS: RefCell<IndexMap<HolderId, IndexMap<RevisableId, Box<dyn Revisable>>>> = RefCell::default();
 
     #[cfg(feature = "__single_holder")]
-    pub(crate) static PENDING_ITEMS: RefCell<IndexMap<RevisableId, Box<dyn Signal>>> = RefCell::default();
+    pub(crate) static PENDING_ITEMS: RefCell<IndexMap<RevisableId, Box<dyn Revisable>>> = RefCell::default();
     #[cfg(not(feature = "__single_holder"))]
-    pub(crate) static PENDING_ITEMS: RefCell<IndexMap<HolderId, IndexMap<RevisableId, Box<dyn Signal>>>> = RefCell::default();
+    pub(crate) static PENDING_ITEMS: RefCell<IndexMap<HolderId, IndexMap<RevisableId, Box<dyn Revisable>>>> = RefCell::default();
 
     pub(crate) static TRACKING_STACK: RefCell<TrackingStack> = RefCell::new(TrackingStack::new());
 }
 
 #[derive(Default)]
 pub(crate) struct TrackingStack {
-    pub layers: Vec<IndexMap<RevisableId, Box<dyn Signal>>>,
+    pub layers: Vec<IndexMap<RevisableId, Box<dyn Revisable>>>,
 }
 impl TrackingStack {
     pub(crate) fn new() -> Self {
@@ -45,18 +45,18 @@ impl TrackingStack {
     pub(crate) fn push_layer(&mut self) {
         self.layers.push(Default::default());
     }
-    pub(crate) fn pop_layer(&mut self) -> Option<IndexMap<RevisableId, Box<dyn Signal>>> {
+    pub(crate) fn pop_layer(&mut self) -> Option<IndexMap<RevisableId, Box<dyn Revisable>>> {
         self.layers.pop()
     }
-    pub(crate) fn track(&mut self, item: impl Into<Box<dyn Signal>>) {
+    pub(crate) fn track(&mut self, item: impl Into<Box<dyn Revisable>>) {
         let item = item.into();
         for layer in &mut self.layers {
-            layer.insert(item.id(), item.clone_boxed());
+            layer.insert(item.id(), item.clone_boxed_revisable());
         }
     }
 }
 
-pub fn gather<R>(func: impl FnOnce() -> R) -> (IndexMap<RevisableId, Box<dyn Signal>>, R) {
+pub fn gather<R>(func: impl FnOnce() -> R) -> (IndexMap<RevisableId, Box<dyn Revisable>>, R) {
     TRACKING_STACK.with(|tracking_items| tracking_items.borrow_mut().push_layer());
     let result = (func)();
     let gathers = TRACKING_STACK.with(|tracking_items| tracking_items.borrow_mut().pop_layer().unwrap());
@@ -117,6 +117,7 @@ pub trait Revisable: fmt::Debug {
     #[cfg(not(feature = "__single_holder"))]
     fn holder_id(&self) -> Option<HolderId>;
     fn version(&self) -> usize;
+    fn view_ids(&self) -> Rc<RefCell<IndexSet<ViewId>>>;
     fn bind_view(&self, view_id: &ViewId);
     fn unbind_view(&self, view_id: &ViewId);
     fn unlace_view(&self, view_id: &ViewId, loose: usize);
@@ -136,6 +137,7 @@ pub trait Revisable: fmt::Debug {
             }
         })
     }
+    fn clone_boxed_revisable(&self) -> Box<dyn Revisable>;
 }
 impl Eq for dyn Revisable {}
 impl PartialEq for dyn Revisable {
@@ -150,9 +152,8 @@ impl Hash for dyn Revisable {
 }
 
 pub trait Signal: Revisable + fmt::Debug {
-    fn view_ids(&self) -> Rc<RefCell<IndexSet<ViewId>>>;
     fn signal(&self);
-    fn clone_boxed(&self) -> Box<dyn Signal>;
+    fn clone_boxed_signal(&self) -> Box<dyn Signal>;
 }
 
 pub trait Record<S>: Revisable

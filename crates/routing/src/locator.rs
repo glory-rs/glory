@@ -75,7 +75,7 @@ impl Locator {
         ReadCage::new(self.queries.clone())
     }
 
-    pub fn receive(&self, raw_url: impl Into<String>, raw_params: BTreeMap<String, String>) -> Result<(), crate::url::ParseError> {
+    pub fn receive(&self, raw_url: impl Into<String>, raw_params: Option<BTreeMap<String, String>>) -> Result<(), crate::url::ParseError> {
         let raw_url = raw_url.into();
         if raw_url == *self.raw_url.borrow() {
             return Ok(());
@@ -102,8 +102,10 @@ impl Locator {
             if (*me.fragment.borrow()).as_deref() != new_url.fragment().as_deref() {
                 me.fragment.revise(|mut fragment| *fragment = new_url.fragment().map(|v| v.to_owned()));
             }
-            if *me.params.borrow() != raw_params {
-                me.params.revise(|mut params| *params = raw_params);
+            if let Some(raw_params) = raw_params {
+                if *me.params.borrow() != raw_params {
+                    me.params.revise(|mut params| *params = raw_params);
+                }
             }
             let new_queries: MultiMap<String, String> = form_urlencoded::parse(new_url.query().unwrap_or_default().as_bytes())
                 .into_owned()

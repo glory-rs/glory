@@ -152,6 +152,16 @@ a {
 	}
 }
 
+.loading {
+	position: absolute;
+	left: 0;
+	right: 0;
+	top: 0;
+	bottom: 0;
+	z-index: 99999;
+	text-align: center;
+}
+
 .news-item {
 	background-color: #fff;
 	padding: 20px 30px 20px 80px;

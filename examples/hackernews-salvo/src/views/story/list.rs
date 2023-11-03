@@ -51,10 +51,9 @@ impl Widget for ListStories {
             {
                 let page = page.clone();
                 let story_type = story_type.clone();
-
-                || async move {
-                    let api_url = format!("{}?page={}", category(&*story_type.get()), &*page.get() - 1);
-                    fetch_api::<Vec<Story>>(story_api_url(&api_url).as_ref()).await
+                move || {
+                    let api_url = format!("{}?page={}", category(&*story_type.clone().get()), &*page.clone().get() - 1);
+                    async move { fetch_api::<Vec<Story>>(story_api_url(&api_url).as_ref()).await }
                 }
             },
             |stories, ctx| {
@@ -71,7 +70,7 @@ impl Widget for ListStories {
             },
         )
         .fallback(|ctx| {
-            p().html("Loading stories...").show_in(ctx);
+            div().class("loading").fill(p().html("Loading stories...")).show_in(ctx);
         });
 
         div()

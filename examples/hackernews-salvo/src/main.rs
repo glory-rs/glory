@@ -23,6 +23,7 @@ async fn main() {
     .await;
     let site_addr = handler.config.site_addr.clone();
     let router = Router::new()
+        .push(Router::with_path("favicon.ico").get(StaticFile::new("public/favicon.ico")))
         .push(views::route().make_salvo_router(handler.clone()))
         .push(Router::with_path("<**path>").get(StaticDir::new("target/site")));
     println!("{:#?}", router);

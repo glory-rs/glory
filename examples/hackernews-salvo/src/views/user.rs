@@ -27,7 +27,10 @@ impl Widget for ShowUser {
             truck.obtain::<PageInfo>().unwrap().clone()
         };
         let loader = Loader::new(
-            move || async move { fetch_api::<User>(&user_api_url(user_id)).await },
+            move || {
+                let api_url = user_api_url(user_id.clone());
+                async move { fetch_api::<User>(&api_url).await }
+            },
             move |user, ctx| {
                 if let Some(user) = user {
                     info.title.revise(|mut v| *v = format!("User:{}", user.id));
@@ -54,7 +57,7 @@ impl Widget for ShowUser {
             },
         )
         .fallback(|ctx| {
-            p().html("Loading user...").show_in(ctx);
+            div().class("loading").fill(p().html("Loading user...")).show_in(ctx);
         });
 
         div().class("user-view").fill(loader).show_in(ctx);
