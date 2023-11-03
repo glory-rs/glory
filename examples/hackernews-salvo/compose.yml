@@ -1,6 +1,7 @@
 services:
   hackernews-salvo:
     image: ubuntu:latest
+    container_name: "hackernews-salvo"
     restart: always
     logging:
       driver: json-file
