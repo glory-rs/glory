@@ -50,12 +50,31 @@ pub struct User {
     pub about: Option<String>,
 }
 
-pub fn story_api_url(path: impl AsRef<str>) -> String {
-    format!("https://node-hnapi.herokuapp.com/{}", path.as_ref())
+#[cfg(feature = "web-ssr")]
+pub fn show_story_api_url(id: usize) -> String {
+    format!("https://node-hnapi.herokuapp.com/item/{}", id)
+}
+#[cfg(not(feature = "web-ssr"))]
+pub fn show_story_api_url(id: usize) -> String {
+    format!("/api/stories/{}", id)
 }
 
-pub fn user_api_url(user_id: impl AsRef<str>) -> String {
+#[cfg(feature = "web-ssr")]
+pub fn list_stories_api_url(cate: impl AsRef<str>, page: usize) -> String {
+    format!("https://node-hnapi.herokuapp.com/{}?page={}", cate.as_ref(), page)
+}
+#[cfg(not(feature = "web-ssr"))]
+pub fn list_stories_api_url(cate: impl AsRef<str>, page: usize) -> String {
+    format!("/api/stories/?cate={}&page={}", cate.as_ref(), page)
+}
+
+#[cfg(feature = "web-ssr")]
+pub fn show_user_api_url(user_id: impl AsRef<str>) -> String {
     format!("https://hacker-news.firebaseio.com/v0/user/{}.json", user_id.as_ref())
+}
+#[cfg(not(feature = "web-ssr"))]
+pub fn show_user_api_url(user_id: impl AsRef<str>) -> String {
+    format!("/api/users/{}", user_id.as_ref())
 }
 
 #[cfg(not(feature = "web-ssr"))]

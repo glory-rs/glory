@@ -28,7 +28,7 @@ impl Widget for ShowUser {
         };
         let loader = Loader::new(
             move || {
-                let api_url = user_api_url(user_id.clone());
+                let api_url = show_user_api_url(user_id.clone());
                 async move { fetch_api::<User>(&api_url).await }
             },
             move |user, ctx| {

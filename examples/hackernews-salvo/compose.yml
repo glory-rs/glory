@@ -1,0 +1,16 @@
+services:
+  hackernews-salvo:
+    image: ubuntu:latest
+    cpu_percent: 50
+    restart: always
+    logging:
+      driver: json-file
+      options:
+        max-size: "1m"
+        max-file: "10"
+    entrypoint: ["/site/hackernews-salvo"]
+    ports:
+      - 8000:8000
+    volumes:
+      - "/target/site:/site"
+      - "/target/server/release/hackernews-salvo:/site/hackernews-salvo"

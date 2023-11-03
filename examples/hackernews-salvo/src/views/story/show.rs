@@ -32,7 +32,7 @@ impl Widget for ShowStory {
         };
         let loader = Loader::new(
             move || async move {
-                let url = story_api_url(format!("item/{story_id}"));
+                let url = show_story_api_url(story_id);
                 fetch_api::<Story>(&url).await
             },
             move |story, ctx| {
