@@ -65,7 +65,7 @@ where
             version: self.version.clone(),
             gathers: self.gathers.clone(),
             view_ids: self.view_ids.clone(),
-            value: Rc::new(RefCell::new((self.mapper)())),
+            value: self.value.clone(),
             mapper: self.mapper.clone(),
         }
     }
@@ -91,8 +91,8 @@ where
             TRACKING_STACK.with(|tracking_items| {
                 let mut tracking_items = tracking_items.borrow_mut();
                 if !tracking_items.is_idle() {
-                    for singal in gathers.borrow().values() {
-                        tracking_items.track(singal.clone_boxed_revisable());
+                    for revisable in gathers.borrow().values() {
+                        tracking_items.track(revisable.clone_boxed_revisable());
                     }
                 }
             });

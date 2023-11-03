@@ -110,7 +110,6 @@ impl Locator {
             let new_queries: MultiMap<String, String> = form_urlencoded::parse(new_url.query().unwrap_or_default().as_bytes())
                 .into_owned()
                 .collect();
-            glory_core::info!("========================new queryies: {:?}     {:?}  {:?}", new_queries,   new_url.query(), raw_url);
             if new_queries != *me.queries().borrow() {
                 me.queries.revise(|mut queries| {
                     *queries = new_queries;

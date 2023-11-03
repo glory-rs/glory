@@ -18,6 +18,9 @@ pub trait Widget: fmt::Debug + 'static {
     {
         let view_id = self.store_in(parent);
         parent.show_list.insert(view_id.clone());
+        if parent.is_attached() {
+            parent.attach_child(&view_id);
+        }
         view_id
     }
 

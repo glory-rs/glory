@@ -57,7 +57,7 @@ impl Widget for ShowUser {
             },
         )
         .fallback(|ctx| {
-            p().html("Loading user...").show_in(ctx);
+            div().class("loading").fill(p().html("Loading user...")).show_in(ctx);
         });
 
         div().class("user-view").fill(loader).show_in(ctx);

@@ -130,10 +130,10 @@ where
 
             let state = self.state.clone();
             let (gathers, fut) = reflow::gather(|| (self.fut_maker.as_ref().unwrap())());
+            state.revise_silent(|mut state| {
+                *state = LoadState::<T>::Loading;
+            });
             crate::spawn::spawn_local(async move {
-                state.revise(|mut state| {
-                    *state = LoadState::<T>::Loading;
-                });
                 let result = fut.await;
                 state.revise(|mut state| {
                     *state = LoadState::Loaded(result);
@@ -150,22 +150,22 @@ where
     }
 
     fn patch(&mut self, ctx: &mut Scope) {
-        let mut is_resvising = false;
+        let mut is_revising = false;
         for item in self.observing.values() {
             if item.is_revising() {
-                is_resvising = true;
+                is_revising = true;
                 break;
             }
         }
-        if !is_resvising {
+        if !is_revising {
             for item in self.gathers.values() {
                 if item.is_revising() {
-                    is_resvising = true;
+                    is_revising = true;
                     break;
                 }
             }
-        }
-        if is_resvising {
+        } 
+        if is_revising {
             self.state.revise_silent(|mut state| {
                 *state = LoadState::Loading;
             });
@@ -179,7 +179,7 @@ where
             }
 
             let state = self.state.clone();
-            let (gathers, fut) = reflow::gather(|| (self.fut_maker.take().unwrap())());
+            let (gathers, fut) = reflow::gather(|| (self.fut_maker.as_ref().unwrap())());
             crate::spawn::spawn_local(async move {
                 let result = fut.await;
                 state.revise(|mut state| {
@@ -190,25 +190,23 @@ where
             for gather in self.gathers.values() {
                 gather.bind_view(ctx.view_id());
             }
-        } else {
-            if let LoadState::Loaded(result) = &*self.state.get() {
-                for view_id in ctx.show_list.clone() {
-                    ctx.detach_child(&view_id);
-                }
-
-                (self.callback)(result, ctx);
-
-                for view_id in ctx.show_list.clone() {
-                    ctx.attach_child(&view_id);
-                }
+        } else if let LoadState::Loaded(result) = &*self.state.get() {
+            for view_id in ctx.show_list.clone() {
+                ctx.detach_child(&view_id);
             }
 
-            #[cfg(feature = "web-ssr")]
-            if let Some(parent_node) = &ctx.parent_node {
-                let key = format!("gly-{}", ctx.view_id());
-                let data = xml::escape::escape_str_attribute(&serde_json::to_string(&*self.state.get()).unwrap()).to_string();
-                parent_node.set_attribute(key, data);
-            }
+            (self.callback)(result, ctx);
+
+            for view_id in ctx.show_list.clone() {
+                ctx.attach_child(&view_id);
+            } 
+        }
+
+        #[cfg(feature = "web-ssr")]
+        if let Some(parent_node) = &ctx.parent_node {
+            let key = format!("gly-{}", ctx.view_id());
+            let data = xml::escape::escape_str_attribute(&serde_json::to_string(&*self.state.get()).unwrap()).to_string();
+            parent_node.set_attribute(key, data);
         }
     }
 }
@@ -295,10 +293,10 @@ where
 
             let state = self.state.clone();
             let fut = (self.fut_maker.take().unwrap())();
+            state.revise_silent(|mut state| {
+                *state = LoadState::<T>::Loading;
+            });
             crate::spawn::spawn_local(async move {
-                state.revise(|mut state| {
-                    *state = LoadState::<T>::Loading;
-                });
                 let result = fut.await;
                 state.revise(|mut state| {
                     *state = LoadState::Loaded(result);

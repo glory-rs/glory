@@ -75,7 +75,7 @@ impl Widget for ShowStory {
             },
         )
         .fallback(|ctx| {
-            p().html("Loading story...").show_in(ctx);
+            div().class("loading").fill(p().html("Loading story...")).show_in(ctx);
         });
 
         div().class("user-view").fill(loader).show_in(ctx);
