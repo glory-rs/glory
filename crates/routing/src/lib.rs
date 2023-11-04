@@ -153,26 +153,50 @@ fn decode_url_path_safely(path: &str) -> String {
 pub struct Stuff(#[educe(Debug(ignore))] Box<dyn FnOnce(&mut Scope) -> ViewId>);
 
 pub trait TruckExt {
-    fn insert_stuff(&self, name: impl Into<String>, widget: impl Widget + 'static);
-    fn remove_stuff(&self, name: &str) -> Option<Stuff>;
+    fn insert_stuff(&self, graff: impl Into<String>, widget: impl Widget + 'static);
+    fn remove_stuff(&self, graff: &str) -> Option<Stuff>;
     fn stuffs(&self) -> Cage<IndexMap<String, Stuff>>;
+    fn stuff_keys(&self) -> Rc<RefCell<IndexMap<String, String>>>;
+    fn insert_stuff_key(&self, graff: impl Into<String>, key: impl Into<String>);
+    fn remove_stuff_key(&self, graff: &str) -> Option<String>;
+    fn contains_stuff_key(&self, graff: &str, key: &str) -> bool;
 }
 
 impl TruckExt for Rc<RefCell<Truck>> {
-    fn insert_stuff(&self, name: impl Into<String>, widget: impl Widget) {
+    fn insert_stuff(&self, graff_and_key: impl Into<String>, widget: impl Widget) {
+        let graff_and_key = graff_and_key.into();
+        let graff = if let Some((graff, key)) = graff_and_key.split_once('@') {
+            if self.contains_stuff_key(&graff, &key) {
+                return;
+            }
+            self.insert_stuff_key(graff, key);
+            graff.to_owned()
+        } else {
+            self.remove_stuff_key(&graff_and_key);
+            graff_and_key
+        };
         self.stuffs().revise(|mut stuffs| {
             let stuff = move |ctx: &mut Scope| -> ViewId { widget.store_in(ctx) };
-            stuffs.insert(name.into(), Stuff(Box::new(stuff)));
+            stuffs.insert(graff, Stuff(Box::new(stuff)));
         });
     }
-    fn remove_stuff(&self, name: &str) -> Option<Stuff> {
+    fn remove_stuff(&self, graff: &str) -> Option<Stuff> {
         let mut stuff = None;
-        if self.stuffs().get().contains_key(name) {
-            stuff = self.stuffs().revise(|mut stuffs| {
-                stuffs.remove(name)
-            });
+        if self.stuffs().get().contains_key(graff) {
+            stuff = self.stuffs().revise(|mut stuffs| stuffs.remove(graff));
         }
         stuff
+    }
+    fn insert_stuff_key(&self, graff: impl Into<String>, key: impl Into<String>) {
+        let graff = graff.into();
+        let key = key.into();
+        self.stuff_keys().borrow_mut().insert(graff, key);
+    }
+    fn remove_stuff_key(&self, graff: &str) -> Option<String> {
+        self.stuff_keys().borrow_mut().remove(graff)
+    }
+    fn contains_stuff_key(&self, graff: &str, key: &str) -> bool {
+        self.stuff_keys().borrow().get(graff).map(|s| &**s) == Some(key)
     }
     fn stuffs(&self) -> Cage<IndexMap<String, Stuff>> {
         const KEY: &str = "glory::routing::stuffs";
@@ -182,6 +206,15 @@ impl TruckExt for Rc<RefCell<Truck>> {
             (*self).deref().borrow_mut().insert(KEY.to_owned(), stuffs);
         }
         self.deref().borrow().get::<Cage<IndexMap<String, Stuff>>>(KEY).unwrap().clone()
+    }
+    fn stuff_keys(&self) -> Rc<RefCell<IndexMap<String, String>>> {
+        const KEY: &str = "glory::routing::stuff_keys";
+        let exists = (*self).deref().borrow().contains_key(KEY);
+        if !exists {
+            let stuff_keys: Rc<RefCell<IndexMap<String, String>>> = Default::default();
+            (*self).deref().borrow_mut().insert(KEY.to_owned(), stuff_keys);
+        }
+        self.deref().borrow().get::<Rc<RefCell<IndexMap<String, String>>>>(KEY).unwrap().clone()
     }
 }
 

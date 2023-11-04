@@ -44,7 +44,7 @@ impl Widget for ListStories {
             let queries = locator.queries();
             let page = Bond::new(move || queries.clone().get().get("page").and_then(|page| page.parse::<usize>().ok()).unwrap_or(1));
             let params = locator.params();
-            let story_type = Bond::new(move || params.get().get("type").cloned().unwrap_or("top".into()));
+            let story_type = Bond::new(move || params.get().get("*?story_type").cloned().unwrap_or("top".into()));
             (page, story_type)
         };
         let loader = Loader::new(
