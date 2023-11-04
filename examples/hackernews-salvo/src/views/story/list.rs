@@ -53,7 +53,7 @@ impl Widget for ListStories {
                 let story_type = story_type.clone();
                 move || {
                     let cate = category(&*story_type.clone().get());
-                    let page = &*page.clone().get() - 1;
+                    let page = *page.clone().get();
                     async move { fetch_api::<Vec<Story>>(list_stories_api_url(cate, page).as_ref()).await }
                 }
             },
