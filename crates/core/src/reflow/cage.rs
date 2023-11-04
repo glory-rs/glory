@@ -7,7 +7,7 @@ use educe::Educe;
 use indexmap::IndexSet;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::{Bond, Record, Revisable, RevisableId, Signal, PENDING_ITEMS, REVISING_ITEMS, TRACKING_STACK};
+use super::{Bond, Record, Revisable, RevisableId, PENDING_ITEMS, REVISING_ITEMS, TRACKING_STACK};
 use crate::reflow::{self, scheduler};
 use crate::ViewId;
 
@@ -54,59 +54,7 @@ where
         Box::new(self.clone())
     }
 }
-impl<T> Signal for Cage<T>
-where
-    T: fmt::Debug + 'static,
-{
-    fn signal(&self) {
-        #[cfg(not(feature = "__single_holder"))]
-        let Some(holder_id) = self.holder_id() else {
-            tracing::debug!("Cage::signal: holder_id is None");
-            return;
-        };
-        if scheduler::is_untracking(
-            #[cfg(not(feature = "__single_holder"))]
-            holder_id,
-        ) {
-            return;
-        }
-        let is_running = scheduler::is_running(
-            #[cfg(not(feature = "__single_holder"))]
-            holder_id,
-        );
 
-        if is_running {
-            PENDING_ITEMS.with_borrow_mut(|items| {
-                #[cfg(not(feature = "__single_holder"))]
-                let items = items.entry(holder_id).or_default();
-                if !items.contains_key(&self.id()) {
-                    items.insert(self.id(), self.clone_boxed_revisable());
-                }
-            });
-        } else {
-            let need_schedule = REVISING_ITEMS.with_borrow_mut(|items| {
-                #[cfg(not(feature = "__single_holder"))]
-                let items = items.entry(holder_id).or_default();
-                if !items.contains_key(&self.id()) {
-                    items.insert(self.id(), self.clone_boxed_revisable());
-                    true
-                } else {
-                    false
-                }
-            });
-            if need_schedule {
-                reflow::schedule(
-                    #[cfg(not(feature = "__single_holder"))]
-                    holder_id,
-                );
-            }
-        }
-    }
-
-    fn clone_boxed_signal(&self) -> Box<dyn Signal> {
-        Box::new(self.clone())
-    }
-}
 impl<T> Record<T> for Cage<T>
 where
     T: fmt::Debug,
@@ -177,7 +125,7 @@ where
     pub fn borrow(&self) -> Ref<'_, T> {
         self.source.borrow()
     }
-    
+
     pub fn map<M, G>(&self, mapper: M) -> Bond<impl Fn() -> G + Clone + 'static, G>
     where
         M: Fn(Ref<'_, T>) -> G + Clone + 'static,
@@ -189,6 +137,50 @@ where
 
     pub fn read(&self) -> ReadCage<T> {
         ReadCage::new(self.clone())
+    }
+    fn signal(&self) {
+        #[cfg(not(feature = "__single_holder"))]
+        let Some(holder_id) = self.holder_id() else {
+            tracing::debug!("Cage::signal: holder_id is None");
+            return;
+        };
+        if scheduler::is_untracking(
+            #[cfg(not(feature = "__single_holder"))]
+            holder_id,
+        ) {
+            return;
+        }
+        let is_running = scheduler::is_running(
+            #[cfg(not(feature = "__single_holder"))]
+            holder_id,
+        );
+
+        if is_running {
+            PENDING_ITEMS.with_borrow_mut(|items| {
+                #[cfg(not(feature = "__single_holder"))]
+                let items = items.entry(holder_id).or_default();
+                if !items.contains_key(&self.id()) {
+                    items.insert(self.id(), self.clone_boxed_revisable());
+                }
+            });
+        } else {
+            let need_schedule = REVISING_ITEMS.with_borrow_mut(|items| {
+                #[cfg(not(feature = "__single_holder"))]
+                let items = items.entry(holder_id).or_default();
+                if !items.contains_key(&self.id()) {
+                    items.insert(self.id(), self.clone_boxed_revisable());
+                    true
+                } else {
+                    false
+                }
+            });
+            if need_schedule {
+                reflow::schedule(
+                    #[cfg(not(feature = "__single_holder"))]
+                    holder_id,
+                );
+            }
+        }
     }
 }
 
@@ -284,10 +276,10 @@ where
     fn bind_view(&self, view_id: &ViewId) {
         self.0.bind_view(view_id);
     }
-    fn unbind_view(&self, view_id: &ViewId){
+    fn unbind_view(&self, view_id: &ViewId) {
         self.0.unbind_view(view_id);
     }
-    fn unlace_view(&self, view_id: &ViewId, loose: usize){
+    fn unlace_view(&self, view_id: &ViewId, loose: usize) {
         self.0.unlace_view(view_id, loose);
     }
     fn clone_boxed_revisable(&self) -> Box<dyn Revisable> {

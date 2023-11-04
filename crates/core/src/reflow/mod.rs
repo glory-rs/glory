@@ -151,11 +151,6 @@ impl Hash for dyn Revisable {
     }
 }
 
-pub trait Signal: Revisable + fmt::Debug {
-    fn signal(&self);
-    fn clone_boxed_signal(&self) -> Box<dyn Signal>;
-}
-
 pub trait Record<S>: Revisable
 where
     S: fmt::Debug,
