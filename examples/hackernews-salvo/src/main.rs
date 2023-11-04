@@ -49,7 +49,7 @@ async fn main() {
     #[handler]
     async fn list_stories(req: &mut Request) -> Json<Vec<Story>> {
         let cate = req.query::<&str>("cate").unwrap_or_default();
-        let page = req.query::<usize>("page").unwrap_or_default();
+        let page = req.query::<usize>("page").unwrap_or(1);
         let api_url = list_stories_api_url(cate, page);
         Json(fetch_api::<Vec<Story>>(&api_url).await.unwrap_or_default())
     }
