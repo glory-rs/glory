@@ -48,7 +48,7 @@ impl BrowserAviator {
             return Ok(())
         }
 
-        glory_core::info!("[locate]: {}  new_path: {}  old_path: {}", raw_url, new_path, *self.curr_path.borrow_mut());
+        glory_core::info!("[locate]: {}  new_path: {}  old_path: {}", raw_url, new_path, *self.curr_path.borrow());
         *self.curr_path.borrow_mut() = new_path.clone();
 
         let mut detect_state = PathState::new(new_path);
@@ -62,7 +62,6 @@ impl BrowserAviator {
             glory_core::info!("No matched route found for {:?}", raw_url);
             self.catcher.handle(self.truck.clone());
         }
-        // self.truck.borrow_mut().inject(locator.clone());
         Ok(())
     }
     pub fn goto(&self, modifier: impl Into<LocatorModifier>) {

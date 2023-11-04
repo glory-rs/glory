@@ -78,7 +78,7 @@ pub fn route() -> Router {
     Router::new()
         .push(Router::with_path("users/<id>").goal(|tk: Rc<RefCell<Truck>>| tk.insert_stuff("section", ShowUser)))
         .push(Router::with_path("stories/<id>").goal(|tk: Rc<RefCell<Truck>>| tk.insert_stuff("section", ShowStory)))
-        .push(Router::with_path("<*?stories:/[^.]*/>").goal(|tk: Rc<RefCell<Truck>>| tk.insert_stuff("section", ListStories::new())))
+        .push(Router::with_path("<*?story_type:/[^.]*/>").goal(|tk: Rc<RefCell<Truck>>| tk.insert_stuff("section@list-stories", ListStories::new())))
 }
 
 pub fn catch() -> impl Handler {

@@ -58,7 +58,7 @@ impl Widget for Graff {
                     }
                 }
             }
-            glory_core::info!("mounting stuff: {:?}", self.name);
+            glory_core::info!("[routing]: mounting stuff {:?}", self.name);
             let view_id = (stuff.0)(ctx);
             ctx.attach_child(&view_id);
         }
