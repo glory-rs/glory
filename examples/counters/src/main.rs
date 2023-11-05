@@ -1,6 +1,6 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use glory::reflow::Record;
+use glory::reflow::Lotus;
 use glory::web::events;
 use glory::web::helpers::event_target_value;
 use glory::web::widgets::*;

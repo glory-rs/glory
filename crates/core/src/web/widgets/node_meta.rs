@@ -5,7 +5,7 @@ use educe::Educe;
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
 use wasm_bindgen::{JsValue, UnwrapThrowExt};
 
-use crate::reflow::{Bond, Record};
+use crate::reflow::{Bond, Lotus};
 use crate::web::{AttrValue, ClassPart, Classes, PropValue};
 use crate::{Node, Scope, Widget};
 
@@ -110,7 +110,7 @@ impl NodeMeta {
     pub fn toggle_class<V, C>(self, value: V, cond: C) -> Self
     where
         V: Into<String>,
-        C: Record<bool> + Clone + 'static,
+        C: Lotus<bool> + Clone + 'static,
     {
         self.switch_class(value, "", cond)
     }
@@ -120,7 +120,7 @@ impl NodeMeta {
     where
         TV: Into<String>,
         FV: Into<String>,
-        C: Record<bool> + Clone + 'static,
+        C: Lotus<bool> + Clone + 'static,
     {
         let tv = tv.into();
         let fv = fv.into();

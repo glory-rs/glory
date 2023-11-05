@@ -51,7 +51,7 @@ impl TrackingStack {
     pub(crate) fn track(&mut self, item: impl Into<Box<dyn Revisable>>) {
         let item = item.into();
         for layer in &mut self.layers {
-            layer.insert(item.id(), item.clone_boxed_revisable());
+            layer.insert(item.id(), item.clone_boxed());
         }
     }
 }
@@ -137,7 +137,7 @@ pub trait Revisable: fmt::Debug {
             }
         })
     }
-    fn clone_boxed_revisable(&self) -> Box<dyn Revisable>;
+    fn clone_boxed(&self) -> Box<dyn Revisable>;
 }
 impl Eq for dyn Revisable {}
 impl PartialEq for dyn Revisable {
@@ -151,7 +151,7 @@ impl Hash for dyn Revisable {
     }
 }
 
-pub trait Record<S>: Revisable
+pub trait Lotus<S>: Revisable
 where
     S: fmt::Debug,
 {

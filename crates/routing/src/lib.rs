@@ -31,7 +31,7 @@ use std::rc::Rc;
 use std::{borrow::Cow, ops::Deref};
 
 use educe::Educe;
-use glory_core::reflow::Record;
+use glory_core::reflow::Lotus;
 use glory_core::{Cage, Scope, Truck, ViewId, Widget};
 use indexmap::IndexMap;
 

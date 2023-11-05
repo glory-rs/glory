@@ -7,7 +7,7 @@ use educe::Educe;
 use indexmap::IndexSet;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::{Bond, Record, Revisable, RevisableId, PENDING_ITEMS, REVISING_ITEMS, TRACKING_STACK};
+use super::{Bond, Lotus, Revisable, RevisableId, PENDING_ITEMS, REVISING_ITEMS, TRACKING_STACK};
 use crate::reflow::{self, scheduler};
 use crate::ViewId;
 
@@ -50,12 +50,12 @@ where
             (*self.view_ids).borrow_mut().remove(view_id);
         }
     }
-    fn clone_boxed_revisable(&self) -> Box<dyn Revisable> {
+    fn clone_boxed(&self) -> Box<dyn Revisable> {
         Box::new(self.clone())
     }
 }
 
-impl<T> Record<T> for Cage<T>
+impl<T> Lotus<T> for Cage<T>
 where
     T: fmt::Debug,
 {
@@ -64,7 +64,7 @@ where
         TRACKING_STACK.with(|tracking_items| {
             let mut tracking_items = tracking_items.borrow_mut();
             if !tracking_items.is_idle() {
-                tracking_items.track(this.clone_boxed_revisable());
+                tracking_items.track(this.clone_boxed());
             }
         });
         self.source.borrow()
@@ -160,7 +160,7 @@ where
                 #[cfg(not(feature = "__single_holder"))]
                 let items = items.entry(holder_id).or_default();
                 if !items.contains_key(&self.id()) {
-                    items.insert(self.id(), self.clone_boxed_revisable());
+                    items.insert(self.id(), self.clone_boxed());
                 }
             });
         } else {
@@ -168,7 +168,7 @@ where
                 #[cfg(not(feature = "__single_holder"))]
                 let items = items.entry(holder_id).or_default();
                 if !items.contains_key(&self.id()) {
-                    items.insert(self.id(), self.clone_boxed_revisable());
+                    items.insert(self.id(), self.clone_boxed());
                     true
                 } else {
                     false
@@ -282,11 +282,11 @@ where
     fn unlace_view(&self, view_id: &ViewId, loose: usize) {
         self.0.unlace_view(view_id, loose);
     }
-    fn clone_boxed_revisable(&self) -> Box<dyn Revisable> {
+    fn clone_boxed(&self) -> Box<dyn Revisable> {
         Box::new(self.0.clone())
     }
 }
-impl<T> Record<T> for ReadCage<T>
+impl<T> Lotus<T> for ReadCage<T>
 where
     T: fmt::Debug + 'static,
 {

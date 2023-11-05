@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
 use wasm_bindgen::UnwrapThrowExt;
 
-use crate::reflow::{self, Cage, Record, Revisable, RevisableId};
+use crate::reflow::{self, Cage, Lotus, Revisable, RevisableId};
 use crate::{Scope, Widget};
 
 #[derive(Serialize, Deserialize, Default, Debug)]

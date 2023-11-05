@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 use educe::Educe;
 use indexmap::IndexMap;
 
-use crate::reflow::Record;
+use crate::reflow::Lotus;
 use crate::{Scope, ViewId, Widget};
 
 #[derive(Educe)]
@@ -13,7 +13,7 @@ use crate::{Scope, ViewId, Widget};
 pub struct Each<Value, ITter, Items, KeyFn, Key, TmplFn, Tmpl>
 where
     Value: fmt::Debug + 'static,
-    Items: Record<ITter> + fmt::Debug + 'static,
+    Items: Lotus<ITter> + fmt::Debug + 'static,
     ITter: AsRef<[Value]> + fmt::Debug + 'static,
     KeyFn: Fn(&Value) -> Key + 'static,
     Key: Eq + Hash + Clone + fmt::Debug + 'static,
@@ -33,7 +33,7 @@ where
 impl<Value, ITter, Items, KeyFn, Key, TmplFn, Tmpl> Each<Value, ITter, Items, KeyFn, Key, TmplFn, Tmpl>
 where
     Value: fmt::Debug + 'static,
-    Items: Record<ITter> + fmt::Debug + 'static,
+    Items: Lotus<ITter> + fmt::Debug + 'static,
     ITter: AsRef<[Value]> + fmt::Debug + 'static,
     KeyFn: Fn(&Value) -> Key + 'static,
     Key: Eq + Hash + Clone + fmt::Debug + 'static,
@@ -54,7 +54,7 @@ where
 impl<Value, ITter, Items, KeyFn, Key, TmplFn, Tmpl> Widget for Each<Value, ITter, Items, KeyFn, Key, TmplFn, Tmpl>
 where
     Value: fmt::Debug + 'static,
-    Items: Record<ITter> + fmt::Debug + 'static,
+    Items: Lotus<ITter> + fmt::Debug + 'static,
     ITter: AsRef<[Value]> + fmt::Debug + 'static,
     KeyFn: Fn(&Value) -> Key + 'static,
     Key: Eq + Hash + Clone + fmt::Debug + 'static,
