@@ -4,7 +4,7 @@ version = "0.0.1"
 edition = "2021"
 
 [features]
-web-csr = ["glory/web-csr", "dep:wasm-bindgen", "dep:gloo-net", "dep:serde-wasm-bindgen"]
+web-csr = ["glory/web-csr", "dep:wasm-bindgen", "dep:gloo-net"]
 web-ssr = ["glory/salvo", "dep:tokio", "dep:salvo", "dep:reqwest", "dep:tracing-subscriber", "dep:serde_json"]
 
 [dependencies]
@@ -20,7 +20,6 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", optional = true }
 gloo-net = { version = "0.4", default-features = false, features = ["http", "json"], optional = true }
 wasm-bindgen = { version = "0.2", optional = true }
-serde-wasm-bindgen = { version = "0.2", optional = true }
 once_cell = "1"
 reqwest = { version = "0.11", optional = true, features = ["json"] }
 
