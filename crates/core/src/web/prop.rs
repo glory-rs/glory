@@ -112,6 +112,37 @@ where
     }
 }
 
+#[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+impl<T> PropValue for dyn Lotus<T>
+where
+    T: Into<JsValue> + fmt::Debug + Clone + 'static,
+{
+    fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
+        if self.is_revising() || first_time {
+            self.get_untracked().clone().into().inject_to(view_id, node, name, true);
+        }
+        if first_time {
+            self.bind_view(view_id);
+        }
+    }
+}
+
+#[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
+impl<T> PropValue for dyn Lotus<T>
+where
+    T: Into<String> + fmt::Debug + Clone + 'static,
+{
+    fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
+        if self.is_revising() || first_time {
+            let value: String = (*self.get()).clone().into();
+            node.set_property(name.to_owned(), value);
+        }
+        if first_time {
+            self.bind_view(view_id);
+        }
+    }
+}
+
 macro_rules! prop_type {
     ($prop_type:ty) => {
         impl PropValue for $prop_type {
