@@ -79,8 +79,8 @@ where
             if let Some(exist_node) = exist_node {
                 self.node = wasm_bindgen::JsCast::unchecked_into(exist_node);
                 crate::info!("[hydrating]: node exist: {}", selector);
-            } 
-        } 
+            }
+        }
 
         let node = <T as AsRef<web_sys::Element>>::as_ref(&self.node);
 
@@ -138,7 +138,13 @@ impl<T> Element<T>
 where
     T: AsRef<web_sys::Element> + JsCast + Clone + fmt::Debug,
 {
-    pub fn new(name: impl Into<Cow<'static, str>>, is_void: bool, node: T) -> Self {
+    pub fn new(name: impl Into<Cow<'static, str>>, is_void: bool) -> Self {
+        let name = name.into();
+        let node = crate::web::document().create_element(&name).unwrap_throw();
+        let node =  wasm_bindgen::JsCast::unchecked_into::<T>(node);
+        Self::with_node(name, is_void, node)
+    }
+    pub fn with_node(name: impl Into<Cow<'static, str>>, is_void: bool, node: T) -> Self {
         Self {
             name: name.into(),
             is_void,

@@ -90,7 +90,7 @@ macro_rules! generate_tags {
                     #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
                     pub fn new() -> $name {
                         let inner = [<ELE_ $tag:upper>].with(|el| wasm_bindgen::JsCast::unchecked_into(el.clone_node().unwrap()));
-                        $name($crate::web::widgets::Element::new(stringify!($tag), generate_tags!{ @void $($void)? }, inner))
+                        $name($crate::web::widgets::Element::with_node(stringify!($tag), generate_tags!{ @void $($void)? }, inner))
                     }
                     #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
                     pub fn new() -> $name {
