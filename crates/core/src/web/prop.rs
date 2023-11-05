@@ -4,7 +4,7 @@ use std::fmt;
 use wasm_bindgen::{JsValue, UnwrapThrowExt};
 
 use crate::node::Node;
-use crate::reflow::{Bond, Cage, Record, Revisable};
+use crate::reflow::{Bond, Cage, Lotus, Revisable};
 use crate::ViewId;
 
 pub trait PropValue: fmt::Debug {

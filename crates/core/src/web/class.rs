@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::node::Node;
-use crate::reflow::{Bond, Cage, Record, Revisable};
+use crate::reflow::{Bond, Cage, Lotus, Revisable};
 use crate::web::AttrValue;
 use crate::ViewId;
 

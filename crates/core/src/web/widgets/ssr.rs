@@ -7,7 +7,7 @@ use educe::Educe;
 use wasm_bindgen::UnwrapThrowExt;
 
 use crate::node::{Node, NodeRef};
-use crate::reflow::{Bond, Record};
+use crate::reflow::{Bond, Lotus};
 use crate::view::{ViewId, ViewPosition};
 use crate::web::events::EventDescriptor;
 use crate::web::{AttrValue, ClassPart, Classes, PropValue};
@@ -161,7 +161,7 @@ impl Element {
     pub fn toggle_class<V, C>(self, value: V, cond: C) -> Self
     where
         V: Into<String>,
-        C: Record<bool> + Clone + 'static,
+        C: Lotus<bool> + Clone + 'static,
     {
         self.switch_class(value, "", cond)
     }
@@ -171,7 +171,7 @@ impl Element {
     where
         TV: Into<String>,
         FV: Into<String>,
-        C: Record<bool> + Clone + 'static,
+        C: Lotus<bool> + Clone + 'static,
     {
         let tv = tv.into();
         let fv = fv.into();

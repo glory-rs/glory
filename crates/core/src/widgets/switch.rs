@@ -1,16 +1,16 @@
 use std::fmt;
 
-use crate::reflow::Record;
+use crate::reflow::Lotus;
 use crate::{Scope, View, ViewFactory, ViewId, Widget};
 
 pub struct Case {
-    pub cond: Box<dyn Record<bool>>,
+    pub cond: Box<dyn Lotus<bool>>,
     pub tmpl: Box<dyn ViewFactory>,
     use_cache: bool,
     cached_view: Option<View>,
 }
 impl Case {
-    pub fn new<T>(cond: impl Record<bool> + 'static, tmpl: T) -> Self
+    pub fn new<T>(cond: impl Lotus<bool> + 'static, tmpl: T) -> Self
     where
         T: ViewFactory + 'static,
     {
@@ -48,7 +48,7 @@ impl Switch {
             active_view_id: None,
         }
     }
-    pub fn case<T>(self, cond: impl Record<bool> + 'static, tmpl: T) -> Self
+    pub fn case<T>(self, cond: impl Lotus<bool> + 'static, tmpl: T) -> Self
     where
         T: ViewFactory + 'static,
     {

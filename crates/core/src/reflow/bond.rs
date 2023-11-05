@@ -6,7 +6,7 @@ use std::rc::Rc;
 use educe::Educe;
 use indexmap::{IndexMap, IndexSet};
 
-use super::{Record, Revisable, RevisableId, TRACKING_STACK};
+use super::{Lotus, Revisable, RevisableId, TRACKING_STACK};
 use crate::ViewId;
 
 #[derive(Educe)]
@@ -71,7 +71,7 @@ where
     }
 }
 
-impl<F, T> Record<T> for Bond<F, T>
+impl<F, T> Lotus<T> for Bond<F, T>
 where
     F: Fn() -> T + Clone + 'static,
     T: fmt::Debug + 'static,
@@ -92,7 +92,7 @@ where
                 let mut tracking_items = tracking_items.borrow_mut();
                 if !tracking_items.is_idle() {
                     for revisable in gathers.borrow().values() {
-                        tracking_items.track(revisable.clone_boxed_revisable());
+                        tracking_items.track(revisable.clone_boxed());
                     }
                 }
             });
@@ -163,7 +163,7 @@ where
             gather.unlace_view(view_id, loose);
         }
     }
-    fn clone_boxed_revisable(&self) -> Box<dyn Revisable> {
+    fn clone_boxed(&self) -> Box<dyn Revisable> {
         Box::new(self.clone())
     }
 }

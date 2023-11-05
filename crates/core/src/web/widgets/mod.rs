@@ -16,8 +16,8 @@ pub use node_meta::*;
 use std::borrow::Cow;
 use std::fmt;
 
-use crate::reflow::{Bond, Record};
-use crate::view::{ViewId};
+use crate::reflow::{Bond, Lotus};
+use crate::view::ViewId;
 use crate::web::events::EventDescriptor;
 use crate::web::{AttrValue, ClassPart, PropValue};
 use crate::widget::{Filler, IntoFiller};
@@ -131,7 +131,7 @@ macro_rules! generate_tags {
                     pub fn toggle_class<V, C>(self, value: V, cond: C) -> Self
                     where
                         V: Into<String>,
-                        C: Record<bool> + Clone + 'static,
+                        C: Lotus<bool> + Clone + 'static,
                     {
                         self.switch_class(value, "", cond)
                     }
@@ -141,7 +141,7 @@ macro_rules! generate_tags {
                     where
                         TV: Into<String>,
                         FV: Into<String>,
-                        C: Record<bool> + Clone + 'static,
+                        C: Lotus<bool> + Clone + 'static,
                     {
                         let tv = tv.into();
                         let fv = fv.into();
@@ -684,7 +684,7 @@ where
     T: AsRef<str> + fmt::Debug + 'static,
 {
     fn into_filler(self) -> Filler {
-        let html:String = (*self.get()).as_ref().to_owned();
+        let html: String = (*self.get()).as_ref().to_owned();
         span().html(html).into_filler()
     }
 }
@@ -695,7 +695,7 @@ where
     T: AsRef<str> + fmt::Debug + 'static,
 {
     fn into_filler(self) -> Filler {
-        let html:String = (*self.get()).as_ref().to_owned();
+        let html: String = (*self.get()).as_ref().to_owned();
         span().html(html).into_filler()
     }
 }
