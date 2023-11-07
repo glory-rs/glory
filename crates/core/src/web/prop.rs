@@ -23,20 +23,19 @@ impl PropValue for JsValue {
     }
 }
 impl PropValue for String {
-    fn inject_to(&self, _view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
+    #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+    fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
         if first_time {
-            cfg_if! {
-                if #[cfg(all(target_arch = "wasm32", feature = "web-csr"))] {
-                    let name = JsValue::from_str(name);
-                    let value = self.into();
-                    if js_sys::Reflect::get(node, &name).as_ref() != Ok(&value) {
-                        js_sys::Reflect::set(node, &name, &value).unwrap_throw();
-                    }
-                } else {
-                    node.set_property(name.to_owned(), self.clone());
-                }
+            let name = JsValue::from_str(name);
+            let value = self.into();
+            if js_sys::Reflect::get(node, &name).as_ref() != Ok(&value) {
+                js_sys::Reflect::set(node, &name, &value).unwrap_throw();
             }
         }
+    }
+    #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
+    fn inject_to(&self, _view_id: &ViewId, node: &mut Node, name: &str, _first_time: bool) {
+        node.set_property(name.to_owned(), Some(self.clone().into()));
     }
 }
 impl PropValue for Option<String> {
@@ -49,29 +48,13 @@ impl PropValue for Option<String> {
     }
 }
 
-#[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
 impl<T> PropValue for Cage<T>
 where
-    T: Into<JsValue> + fmt::Debug + Clone + 'static,
+    T: PropValue + fmt::Debug + Clone + 'static,
 {
     fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
         if self.is_revising() || first_time {
-            self.get_untracked().clone().into().inject_to(view_id, node, name, true);
-        }
-        if first_time {
-            self.bind_view(view_id);
-        }
-    }
-}
-#[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
-impl<T> PropValue for Cage<T>
-where
-    T: Into<String> + fmt::Debug + Clone + 'static,
-{
-    fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
-        if self.is_revising() || first_time {
-            let value: String = (*self.get()).clone().into();
-            node.set_property(name.to_owned(), value);
+            (*self.get_untracked()).inject_to(view_id, node, name, true);
         }
         if first_time {
             self.bind_view(view_id);
@@ -79,15 +62,13 @@ where
     }
 }
 
-#[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
-impl<F, T> PropValue for Bond<F, T>
+impl<T> PropValue for Bond<T>
 where
-    F: Fn() -> T + Clone + 'static,
-    T: Into<JsValue> + fmt::Debug + Clone + 'static,
+    T: PropValue + fmt::Debug + Clone + 'static,
 {
     fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
         if self.is_revising() || first_time {
-            self.get_untracked().clone().into().inject_to(view_id, node, name, true);
+            (*self.get_untracked()).inject_to(view_id, node, name, true);
         }
         if first_time {
             self.bind_view(view_id);
@@ -95,16 +76,13 @@ where
     }
 }
 
-#[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
-impl<F, T> PropValue for Bond<F, T>
+impl<T> PropValue for Lotus<T>
 where
-    F: Fn() -> T + Clone + 'static,
-    T: Into<String> + fmt::Debug + Clone + 'static,
+    T: PropValue + fmt::Debug + Clone + 'static,
 {
     fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
         if self.is_revising() || first_time {
-            let value: String = (*self.get()).clone().into();
-            node.set_property(name.to_owned(), value);
+            (*self.get_untracked()).inject_to(view_id, node, name, true);
         }
         if first_time {
             self.bind_view(view_id);
@@ -112,33 +90,35 @@ where
     }
 }
 
-#[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
-impl<T> PropValue for dyn Lotus<T>
-where
-    T: Into<JsValue> + fmt::Debug + Clone + 'static,
-{
-    fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
-        if self.is_revising() || first_time {
-            self.get_untracked().clone().into().inject_to(view_id, node, name, true);
-        }
+impl PropValue for bool {
+    #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+    fn inject_to(&self, _view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
         if first_time {
-            self.bind_view(view_id);
+            let name = JsValue::from_str(name);
+            let value = (*self).into();
+            if js_sys::Reflect::get(node, &name).as_ref() != Ok(&value) {
+                js_sys::Reflect::set(node, &name, &value).unwrap_throw();
+            }
+        }
+    }
+    #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
+    fn inject_to(&self, _view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
+        if first_time {
+            if *self {
+                node.set_property(name.to_owned(), None);
+            } else {
+                node.remove_property(name);
+            }
         }
     }
 }
 
-#[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
-impl<T> PropValue for dyn Lotus<T>
-where
-    T: Into<String> + fmt::Debug + Clone + 'static,
-{
+impl PropValue for Option<bool> {
     fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
-        if self.is_revising() || first_time {
-            let value: String = (*self.get()).clone().into();
-            node.set_property(name.to_owned(), value);
-        }
         if first_time {
-            self.bind_view(view_id);
+            if let Some(value) = self {
+                PropValue::inject_to(value, view_id, node, name, first_time);
+            }
         }
     }
 }
@@ -160,7 +140,7 @@ macro_rules! prop_type {
             fn inject_to(&self, _view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
                 if first_time {
                     let value: String = (*self).to_string();
-                    node.set_property(name.to_owned(), value);
+                    node.set_property(name.to_owned(), Some(value.into()));
                 }
             }
         }
@@ -193,4 +173,3 @@ prop_type!(i64);
 prop_type!(i128);
 prop_type!(f32);
 prop_type!(f64);
-prop_type!(bool);

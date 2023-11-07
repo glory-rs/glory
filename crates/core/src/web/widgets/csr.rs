@@ -5,12 +5,12 @@ use std::ops::Deref;
 
 use educe::Educe;
 // #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
-use wasm_bindgen::{JsCast, UnwrapThrowExt};
+use wasm_bindgen::{intern, JsCast, JsValue, UnwrapThrowExt};
 
-use crate::reflow::{Bond, Lotus};
+use crate::reflow::{Bond, Lotus, Revisable};
 use crate::view::{ViewId, ViewPosition};
 use crate::web::events::EventDescriptor;
-use crate::web::{AttrValue, ClassPart, Classes, PropValue};
+use crate::web::{AttrValue, Classes, PropValue};
 use crate::widget::{Filler, IntoFiller};
 use crate::{NodeRef, Scope, Widget};
 
@@ -141,7 +141,7 @@ where
     pub fn new(name: impl Into<Cow<'static, str>>, is_void: bool) -> Self {
         let name = name.into();
         let node = crate::web::document().create_element(&name).unwrap_throw();
-        let node =  wasm_bindgen::JsCast::unchecked_into::<T>(node);
+        let node = wasm_bindgen::JsCast::unchecked_into::<T>(node);
         Self::with_node(name, is_void, node)
     }
     pub fn with_node(name: impl Into<Cow<'static, str>>, is_void: bool, node: T) -> Self {
@@ -199,14 +199,14 @@ where
     #[track_caller]
     pub fn add_class<V>(&mut self, value: V)
     where
-        V: ClassPart + 'static,
+        V: Into<Lotus<String>>,
     {
         self.classes.part(value);
     }
     #[track_caller]
     pub fn class<V>(mut self, value: V) -> Self
     where
-        V: ClassPart + 'static,
+        V: Into<Lotus<String>>,
     {
         self.classes.part(value);
         self
@@ -216,7 +216,7 @@ where
     pub fn toggle_class<V, C>(self, value: V, cond: C) -> Self
     where
         V: Into<String>,
-        C: Lotus<bool> + Clone + 'static,
+        C: Into<Lotus<bool>>,
     {
         self.switch_class(value, "", cond)
     }
@@ -226,14 +226,14 @@ where
     where
         TV: Into<String>,
         FV: Into<String>,
-        C: Lotus<bool> + Clone + 'static,
+        C: Into<Lotus<bool>>,
     {
         let tv = tv.into();
         let fv = fv.into();
+        let cond = cond.into();
         self.classes.part(Bond::new(move || if *cond.get() { tv.clone() } else { fv.clone() }));
         self
     }
-
     /// Adds an property to this element.
     #[track_caller]
     pub fn add_prop<V>(&mut self, name: impl Into<Cow<'static, str>>, value: V)

@@ -38,14 +38,14 @@ impl BrowserAviator {
             let truck = self.truck.borrow();
             truck.obtain::<Locator>().unwrap_throw().clone()
         };
-        if &raw_url == &*locator.raw_url().borrow() {
+        if &raw_url == &*locator.raw_url().get() {
             return Ok(());
         }
         let url = Url::parse(&raw_url)?;
         let new_path = url.path();
         if new_path == *self.curr_path.borrow() {
             locator.receive(raw_url.clone(), None)?;
-            return Ok(())
+            return Ok(());
         }
 
         glory_core::info!("[locate]: {}  new_path: {}  old_path: {}", raw_url, new_path, *self.curr_path.borrow());

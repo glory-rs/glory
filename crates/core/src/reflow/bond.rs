@@ -11,9 +11,8 @@ use crate::ViewId;
 
 #[derive(Educe)]
 #[educe(Debug)]
-pub struct Bond<F, T>
+pub struct Bond<T>
 where
-    F: Fn() -> T + Clone + 'static,
     T: fmt::Debug + 'static,
 {
     id: RevisableId,
@@ -21,62 +20,28 @@ where
     gathers: Rc<RefCell<IndexMap<RevisableId, Box<dyn Revisable>>>>,
     view_ids: Rc<RefCell<IndexMap<ViewId, usize>>>,
     #[educe(Debug(ignore))]
-    mapper: F,
+    mapper: Rc<Box<dyn Fn() -> T + 'static>>,
     #[educe(Debug(ignore))]
     value: Rc<RefCell<T>>,
 }
 
-impl<F, T> Bond<F, T>
+impl<T> Bond<T>
 where
-    F: Fn() -> T + Clone + 'static,
     T: fmt::Debug + 'static,
 {
-    pub fn new(mapper: F) -> Self {
-        let (gathers, value) = crate::reflow::gather(mapper.clone());
+    pub fn new(mapper: impl Fn() -> T + 'static) -> Self {
+        let (gathers, value) = crate::reflow::gather(&mapper);
         let version = gathers.values().map(|g| g.version()).sum();
         Self {
             id: RevisableId::next(),
             version: Rc::new(Cell::new(version)),
             gathers: Rc::new(RefCell::new(gathers)),
             view_ids: Default::default(),
-            mapper,
+            mapper: Rc::new(Box::new(mapper)),
             value: Rc::new(RefCell::new(value)),
         }
     }
-
-    pub fn map<M, G>(&self, mapper: M) -> Bond<impl Fn() -> G + Clone + 'static, G>
-    where
-        M: Fn(Ref<'_, T>) -> G + Clone + 'static,
-        G: fmt::Debug + 'static,
-    {
-        let this = self.clone();
-        Bond::new(move || mapper(this.get()))
-    }
-}
-
-impl<F, T> Clone for Bond<F, T>
-where
-    F: Fn() -> T + Clone + 'static,
-    T: fmt::Debug + 'static,
-{
-    fn clone(&self) -> Self {
-        Self {
-            id: self.id,
-            version: self.version.clone(),
-            gathers: self.gathers.clone(),
-            view_ids: self.view_ids.clone(),
-            value: self.value.clone(),
-            mapper: self.mapper.clone(),
-        }
-    }
-}
-
-impl<F, T> Lotus<T> for Bond<F, T>
-where
-    F: Fn() -> T + Clone + 'static,
-    T: fmt::Debug + 'static,
-{
-    fn get(&self) -> Ref<'_, T> {
+    pub fn get(&self) -> Ref<'_, T> {
         let new_version = self.gathers.borrow().values().map(|g| g.version()).sum();
         if self.version() != new_version {
             *self.gathers.borrow_mut() = crate::reflow::gather(|| self.value.replace((self.mapper)())).0;
@@ -100,7 +65,7 @@ where
 
         self.value.borrow()
     }
-    fn get_untracked(&self) -> Ref<'_, T> {
+    pub fn get_untracked(&self) -> Ref<'_, T> {
         let new_version = self.gathers.borrow().values().map(|g| g.version()).sum();
         if self.version() != new_version {
             self.value.replace((self.mapper)());
@@ -108,11 +73,35 @@ where
         }
         self.value.borrow()
     }
+
+    pub fn map<M, G>(&self, mapper: M) -> Bond<G>
+    where
+        M: Fn(Ref<'_, T>) -> G + Clone + 'static,
+        G: fmt::Debug + 'static,
+    {
+        let this = self.clone();
+        Bond::new(move || mapper(this.get()))
+    }
 }
 
-impl<F, T> Revisable for Bond<F, T>
+impl<T> Clone for Bond<T>
 where
-    F: Fn() -> T + Clone + 'static,
+    T: fmt::Debug + 'static,
+{
+    fn clone(&self) -> Self {
+        Self {
+            id: self.id,
+            version: self.version.clone(),
+            gathers: self.gathers.clone(),
+            view_ids: self.view_ids.clone(),
+            value: self.value.clone(),
+            mapper: self.mapper.clone(),
+        }
+    }
+}
+
+impl<T> Revisable for Bond<T>
+where
     T: fmt::Debug + 'static,
 {
     fn id(&self) -> RevisableId {
@@ -122,6 +111,7 @@ where
     fn holder_id(&self) -> Option<crate::HolderId> {
         self.view_ids.borrow().first().map(|(view_id, _)| view_id.holder_id())
     }
+
     fn version(&self) -> usize {
         self.version.get()
     }

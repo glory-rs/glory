@@ -1,7 +1,9 @@
 mod cage;
-pub use cage::{Cage, ReadCage};
+pub use cage::Cage;
 mod bond;
 pub use bond::Bond;
+mod lotus;
+pub use lotus::Lotus;
 pub mod scheduler;
 pub use scheduler::{batch, schedule};
 
@@ -149,12 +151,4 @@ impl Hash for dyn Revisable {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.id().hash(state);
     }
-}
-
-pub trait Lotus<S>: Revisable
-where
-    S: fmt::Debug,
-{
-    fn get(&self) -> Ref<'_, S>;
-    fn get_untracked(&self) -> Ref<'_, S>;
 }

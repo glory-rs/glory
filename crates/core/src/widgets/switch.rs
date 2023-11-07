@@ -1,21 +1,21 @@
 use std::fmt;
 
-use crate::reflow::Lotus;
+use crate::reflow::{Lotus, Revisable};
 use crate::{Scope, View, ViewFactory, ViewId, Widget};
 
 pub struct Case {
-    pub cond: Box<dyn Lotus<bool>>,
+    pub cond: Lotus<bool>,
     pub tmpl: Box<dyn ViewFactory>,
     use_cache: bool,
     cached_view: Option<View>,
 }
 impl Case {
-    pub fn new<T>(cond: impl Lotus<bool> + 'static, tmpl: T) -> Self
+    pub fn new<T>(cond: impl Into<Lotus<bool>>, tmpl: T) -> Self
     where
         T: ViewFactory + 'static,
     {
         Self {
-            cond: Box::new(cond),
+            cond: cond.into(),
             tmpl: Box::new(tmpl),
             use_cache: false,
             cached_view: None,
@@ -48,7 +48,7 @@ impl Switch {
             active_view_id: None,
         }
     }
-    pub fn case<T>(self, cond: impl Lotus<bool> + 'static, tmpl: T) -> Self
+    pub fn case<T>(self, cond: impl Into<Lotus<bool>>, tmpl: T) -> Self
     where
         T: ViewFactory + 'static,
     {

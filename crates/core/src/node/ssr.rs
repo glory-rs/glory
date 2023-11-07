@@ -11,7 +11,7 @@ pub struct Node {
     is_void: Rc<RefCell<bool>>,
     classes: Rc<RefCell<BTreeSet<Cow<'static, str>>>>,
     attributes: Rc<RefCell<BTreeMap<Cow<'static, str>, Cow<'static, str>>>>,
-    properties: Rc<RefCell<BTreeMap<Cow<'static, str>, Cow<'static, str>>>>,
+    properties: Rc<RefCell<BTreeMap<Cow<'static, str>, Option<Cow<'static, str>>>>>,
     children: Rc<RefCell<Vec<Node>>>,
 }
 
@@ -44,7 +44,7 @@ impl Node {
     pub fn remove_attribute(&self, key: &str) {
         self.attributes.borrow_mut().remove(key);
     }
-    pub fn set_property(&self, key: impl Into<Cow<'static, str>>, value: impl Into<Cow<'static, str>>) {
+    pub fn set_property(&self, key: impl Into<Cow<'static, str>>, value: impl Into<Option<Cow<'static, str>>>) {
         self.properties.borrow_mut().insert(key.into(), value.into());
     }
     pub fn remove_property(&self, key: &str) {
@@ -66,7 +66,7 @@ impl Node {
     }
 
     pub fn after_with_node(&self, node: &Node) {
-        let index = self.children.borrow().iter().position(|n| n == node);
+        let index: Option<usize> = self.children.borrow().iter().position(|n| n == node);
         if let Some(index) = index {
             self.children.borrow_mut().insert(index + 1, node.clone());
         }
@@ -89,7 +89,11 @@ impl Node {
         let properties = if !self.properties.borrow().is_empty() {
             self.properties.borrow().iter().fold("".to_string(), |mut acc, (k, v)| {
                 if k != "text" {
-                    acc.push_str(&format!(" {k}=\"{v}\""));
+                    if let Some(v) = v {
+                        acc.push_str(&format!(" {k}=\"{v}\""));
+                    } else {
+                        acc.push_str(&format!(" {k}"));
+                    }
                 }
                 acc
             })
@@ -135,7 +139,7 @@ impl Node {
             let attributes = self.attributes.borrow();
             let inner_html = attributes.get("inner_html");
             let inner_text = attributes.get("inner_text");
-            if let Some(text) = properties.get("text") {
+            if let Some(Some(text)) = properties.get("text") {
                 write!(&mut html, "{}", &*text).unwrap();
             } else if let Some(inner_html) = inner_html {
                 write!(&mut html, "{}", inner_html).unwrap();
