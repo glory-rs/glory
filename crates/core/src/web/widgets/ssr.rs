@@ -1,16 +1,17 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt::Debug;
+use std::rc::Rc;
 
 use educe::Educe;
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
 use wasm_bindgen::UnwrapThrowExt;
 
 use crate::node::{Node, NodeRef};
-use crate::reflow::{Bond, Lotus};
+use crate::reflow::{Bond, Lotus, Revisable};
 use crate::view::{ViewId, ViewPosition};
 use crate::web::events::EventDescriptor;
-use crate::web::{AttrValue, ClassPart, Classes, PropValue};
+use crate::web::{AttrValue, Classes, PropValue};
 use crate::widget::{Filler, IntoFiller};
 use crate::{Scope, Widget};
 
@@ -42,6 +43,7 @@ impl Widget for Element {
         for (name, value) in &self.props {
             value.inject_to(&ctx.view_id, &mut self.node, name, true);
         }
+
         self.attrs.insert("gly-id".into(), Box::new(ctx.view_id.clone()));
         for (name, value) in &self.attrs {
             value.inject_to(&ctx.view_id, &mut self.node, name, true);
@@ -143,7 +145,7 @@ impl Element {
     #[track_caller]
     pub fn add_class<V>(&mut self, value: V)
     where
-        V: ClassPart + 'static,
+        V: Into<Lotus<String>>,
     {
         self.classes.part(value);
     }
@@ -151,7 +153,7 @@ impl Element {
     #[track_caller]
     pub fn class<V>(mut self, value: V) -> Self
     where
-        V: ClassPart + 'static,
+        V: Into<Lotus<String>>,
     {
         self.classes.part(value);
         self
@@ -161,7 +163,7 @@ impl Element {
     pub fn toggle_class<V, C>(self, value: V, cond: C) -> Self
     where
         V: Into<String>,
-        C: Lotus<bool> + Clone + 'static,
+        C: Into<Lotus<bool>>,
     {
         self.switch_class(value, "", cond)
     }
@@ -171,10 +173,11 @@ impl Element {
     where
         TV: Into<String>,
         FV: Into<String>,
-        C: Lotus<bool> + Clone + 'static,
+        C: Into<Lotus<bool>>,
     {
         let tv = tv.into();
         let fv = fv.into();
+        let cond = cond.into();
         self.classes.part(Bond::new(move || if *cond.get() { tv.clone() } else { fv.clone() }));
         self
     }
@@ -197,7 +200,6 @@ impl Element {
         self.props.insert(name.into(), Box::new(value));
         self
     }
-
     /// Adds an attribute to this element.
     #[track_caller]
     pub fn add_attr<V>(&mut self, name: impl Into<Cow<'static, str>>, value: V)
@@ -257,11 +259,12 @@ impl Element {
     /// Be very careful when using this method. Always remember to
     /// sanitize the input to avoid a cross-site scripting (XSS)
     /// vulnerability.
-    pub fn inner_text<V>(self, text: V) -> Self
+    pub fn inner_text<V>(mut self, text: V) -> Self
     where
         V: AttrValue + 'static,
     {
-        self.attr("inner_text", text)
+        self.set_inner_text(text);
+        self
     }
 
     /// Sets the inner HTML of this element from the provided
@@ -284,11 +287,12 @@ impl Element {
     /// Be very careful when using this method. Always remember to
     /// sanitize the input to avoid a cross-site scripting (XSS)
     /// vulnerability.
-    pub fn html<V>(self, html: V) -> Self
+    pub fn html<V>(mut self, html: V) -> Self
     where
         V: AttrValue + 'static,
     {
-        self.attr("inner_html", html)
+        self.set_html(html);
+        self
     }
 
     pub fn node_ref<T>(self, _node_ref: &NodeRef<T>) -> Self

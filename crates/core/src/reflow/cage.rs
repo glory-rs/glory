@@ -7,8 +7,8 @@ use educe::Educe;
 use indexmap::IndexSet;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::{Bond, Lotus, Revisable, RevisableId, PENDING_ITEMS, REVISING_ITEMS, TRACKING_STACK};
-use crate::reflow::{self, scheduler};
+use super::{Bond, Revisable, RevisableId, PENDING_ITEMS, REVISING_ITEMS, TRACKING_STACK};
+use crate::reflow::{self, scheduler, Lotus};
 use crate::ViewId;
 
 #[derive(Educe)]
@@ -55,25 +55,6 @@ where
     }
 }
 
-impl<T> Lotus<T> for Cage<T>
-where
-    T: fmt::Debug,
-{
-    fn get(&self) -> Ref<'_, T> {
-        let this = self;
-        TRACKING_STACK.with(|tracking_items| {
-            let mut tracking_items = tracking_items.borrow_mut();
-            if !tracking_items.is_idle() {
-                tracking_items.track(this.clone_boxed());
-            }
-        });
-        self.source.borrow()
-    }
-    fn get_untracked(&self) -> Ref<'_, T> {
-        self.source.borrow()
-    }
-}
-
 impl<'de, T> Deserialize<'de> for Cage<T>
 where
     T: Deserialize<'de> + fmt::Debug + 'static,
@@ -102,6 +83,20 @@ impl<T> Cage<T>
 where
     T: fmt::Debug,
 {
+    pub fn get(&self) -> Ref<'_, T> {
+        let this = self;
+        TRACKING_STACK.with(|tracking_items| {
+            let mut tracking_items = tracking_items.borrow_mut();
+            if !tracking_items.is_idle() {
+                tracking_items.track(this.clone_boxed());
+            }
+        });
+        self.source.borrow()
+    }
+    pub fn get_untracked(&self) -> Ref<'_, T> {
+        self.source.borrow()
+    }
+
     pub fn revise<F, R>(&self, opt: F) -> R
     where
         F: FnOnce(RefMut<'_, T>) -> R,
@@ -126,7 +121,7 @@ where
         self.source.borrow()
     }
 
-    pub fn map<M, G>(&self, mapper: M) -> Bond<impl Fn() -> G + Clone + 'static, G>
+    pub fn map<M, G>(&self, mapper: M) -> Bond<G>
     where
         M: Fn(Ref<'_, T>) -> G + Clone + 'static,
         G: fmt::Debug + 'static,
@@ -135,8 +130,8 @@ where
         Bond::new(move || mapper(this.get()))
     }
 
-    pub fn read(&self) -> ReadCage<T> {
-        ReadCage::new(self.clone())
+    pub fn read(&self) -> Lotus<T> {
+        Lotus::Cage(self.clone())
     }
     fn signal(&self) {
         #[cfg(not(feature = "__single_holder"))]
@@ -248,118 +243,5 @@ impl<'a> From<&'a str> for Cage<String> {
 impl<'a> From<&'a String> for Cage<String> {
     fn from(source: &'a String) -> Self {
         Self::new(source.to_owned())
-    }
-}
-
-#[derive(Debug)]
-pub struct ReadCage<T>(Cage<T>)
-where
-    T: fmt::Debug + 'static;
-
-impl<T> Revisable for ReadCage<T>
-where
-    T: fmt::Debug + 'static,
-{
-    fn id(&self) -> RevisableId {
-        self.0.id
-    }
-    #[cfg(not(feature = "__single_holder"))]
-    fn holder_id(&self) -> Option<crate::HolderId> {
-        self.0.holder_id()
-    }
-    fn version(&self) -> usize {
-        self.0.version.get()
-    }
-    fn view_ids(&self) -> Rc<RefCell<IndexSet<ViewId>>> {
-        self.0.view_ids.clone()
-    }
-    fn bind_view(&self, view_id: &ViewId) {
-        self.0.bind_view(view_id);
-    }
-    fn unbind_view(&self, view_id: &ViewId) {
-        self.0.unbind_view(view_id);
-    }
-    fn unlace_view(&self, view_id: &ViewId, loose: usize) {
-        self.0.unlace_view(view_id, loose);
-    }
-    fn clone_boxed(&self) -> Box<dyn Revisable> {
-        Box::new(self.0.clone())
-    }
-}
-impl<T> Lotus<T> for ReadCage<T>
-where
-    T: fmt::Debug + 'static,
-{
-    fn get(&self) -> Ref<'_, T> {
-        self.0.get()
-    }
-    fn get_untracked(&self) -> Ref<'_, T> {
-        self.0.get_untracked()
-    }
-}
-
-impl<'de, T> Deserialize<'de> for ReadCage<T>
-where
-    T: Deserialize<'de> + fmt::Debug + 'static,
-{
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        T::deserialize(deserializer).map(|v| ReadCage::new(Cage::new(v)))
-    }
-}
-
-impl<T> Serialize for ReadCage<T>
-where
-    T: Serialize + fmt::Debug + 'static,
-{
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        T::serialize(self.0.source.deref().borrow().deref(), serializer)
-    }
-}
-
-impl<T> ReadCage<T>
-where
-    T: fmt::Debug,
-{
-    pub fn borrow(&self) -> Ref<'_, T> {
-        self.0.borrow()
-    }
-    pub fn map<M, G>(&self, mapper: M) -> Bond<impl Fn() -> G + Clone + 'static, G>
-    where
-        M: Fn(Ref<'_, T>) -> G + Clone + 'static,
-        G: fmt::Debug + 'static,
-    {
-        self.0.map(mapper)
-    }
-}
-
-impl<T> ReadCage<T>
-where
-    T: fmt::Debug,
-{
-    pub fn new(cage: Cage<T>) -> Self {
-        ReadCage(cage)
-    }
-}
-impl<T> Default for ReadCage<T>
-where
-    T: fmt::Debug + Default,
-{
-    fn default() -> Self {
-        Self::new(Default::default())
-    }
-}
-
-impl<T> Clone for ReadCage<T>
-where
-    T: fmt::Debug,
-{
-    fn clone(&self) -> Self {
-        Self::new(self.0.clone())
     }
 }

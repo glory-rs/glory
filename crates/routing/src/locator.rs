@@ -1,8 +1,9 @@
+use std::borrow::Borrow;
 use std::collections::BTreeMap;
 
 use multimap::MultiMap;
 
-use glory_core::reflow::{self, Cage, ReadCage};
+use glory_core::reflow::{self, Cage, Lotus};
 
 use crate::url::Url;
 
@@ -59,20 +60,20 @@ impl Locator {
         Self::default()
     }
 
-    pub fn raw_url(&self) -> ReadCage<String> {
-        ReadCage::new(self.raw_url.clone())
+    pub fn raw_url(&self) -> Lotus<String> {
+        Lotus::Cage(self.raw_url.clone())
     }
 
-    pub fn path(&self) -> ReadCage<String> {
-        ReadCage::new(self.path.clone())
+    pub fn path(&self) -> Lotus<String> {
+        Lotus::Cage(self.path.clone())
     }
 
-    pub fn params(&self) -> ReadCage<BTreeMap<String, String>> {
-        ReadCage::new(self.params.clone())
+    pub fn params(&self) -> Lotus<BTreeMap<String, String>> {
+        Lotus::Cage(self.params.clone())
     }
 
-    pub fn queries(&self) -> ReadCage<MultiMap<String, String>> {
-        ReadCage::new(self.queries.clone())
+    pub fn queries(&self) -> Lotus<MultiMap<String, String>> {
+        Lotus::Cage(self.queries.clone())
     }
 
     pub fn receive(&self, raw_url: impl Into<String>, raw_params: Option<BTreeMap<String, String>>) -> Result<(), crate::url::ParseError> {
@@ -110,7 +111,7 @@ impl Locator {
             let new_queries: MultiMap<String, String> = form_urlencoded::parse(new_url.query().unwrap_or_default().as_bytes())
                 .into_owned()
                 .collect();
-            if new_queries != *me.queries().borrow() {
+            if new_queries != *me.queries().get() {
                 me.queries.revise(|mut queries| {
                     *queries = new_queries;
                 });

@@ -10,7 +10,7 @@ use wasm_bindgen::{JsValue, UnwrapThrowExt};
 
 #[derive(Debug, Default)]
 pub struct Classes {
-    parts: Vec<Box<dyn ClassPart>>,
+    parts: Vec<Lotus<String>>,
 }
 impl Classes {
     pub fn new() -> Self {
@@ -18,27 +18,19 @@ impl Classes {
             parts: Vec::new(),
         }
     }
-    pub fn part(&mut self, part: impl ClassPart + 'static) -> &mut Self {
-        self.parts.push(Box::new(part));
+    pub fn part(&mut self, part: impl Into<Lotus<String>>) -> &mut Self {
+        self.parts.push(part.into());
         self
     }
 
     pub fn raw_parts(&self) -> Vec<String> {
-        self.parts.iter().filter_map(|part| part.to_string()).collect()
+        self.parts.iter().map(|part| part.get().to_string()).collect()
     }
 
     #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
     pub fn to_array(&self) -> js_sys::Array {
         FromIterator::from_iter(self.raw_parts().iter().map(|v| JsValue::from_str(v)))
     }
-}
-
-pub trait ClassPart: fmt::Debug {
-    fn bind_view(&self, _view_id: &ViewId) {}
-    fn is_revising(&self) -> bool {
-        false
-    }
-    fn to_string(&self) -> Option<String>;
 }
 
 impl AttrValue for Classes {
@@ -85,54 +77,3 @@ impl AttrValue for Classes {
         }
     }
 }
-
-impl<T> ClassPart for Cage<T>
-where
-    T: ClassPart + fmt::Debug + Clone + 'static,
-{
-    fn bind_view(&self, view_id: &ViewId) {
-        Revisable::bind_view(self, view_id);
-    }
-    fn is_revising(&self) -> bool {
-        Revisable::is_revising(self)
-    }
-    fn to_string(&self) -> Option<String> {
-        (*self.get()).to_string()
-    }
-}
-impl<F, T> ClassPart for Bond<F, T>
-where
-    F: Fn() -> T + Clone + 'static,
-    T: ClassPart + fmt::Debug + Clone + 'static,
-{
-    fn bind_view(&self, view_id: &ViewId) {
-        Revisable::bind_view(self, view_id);
-    }
-    fn is_revising(&self) -> bool {
-        Revisable::is_revising(self)
-    }
-    fn to_string(&self) -> Option<String> {
-        (*self.get()).to_string()
-    }
-}
-
-macro_rules! class_part {
-    ($part_type:ty) => {
-        impl ClassPart for $part_type {
-            fn to_string(&self) -> Option<String> {
-                Some(ToString::to_string(self))
-            }
-        }
-
-        impl ClassPart for Option<$part_type> {
-            fn to_string(&self) -> Option<String> {
-                self.as_ref().map(|v| ToString::to_string(&v))
-            }
-        }
-    };
-}
-
-class_part!(String);
-class_part!(&String);
-class_part!(&str);
-class_part!(char);

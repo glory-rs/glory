@@ -5,22 +5,21 @@ use std::marker::PhantomData;
 use educe::Educe;
 use indexmap::IndexMap;
 
-use crate::reflow::Lotus;
+use crate::reflow::{Revisable, Lotus};
 use crate::{Scope, ViewId, Widget};
 
 #[derive(Educe)]
 #[educe(Debug)]
-pub struct Each<Value, ITter, Items, KeyFn, Key, TmplFn, Tmpl>
+pub struct Each<Value, ITter,  KeyFn, Key, TmplFn, Tmpl>
 where
     Value: fmt::Debug + 'static,
-    Items: Lotus<ITter> + fmt::Debug + 'static,
     ITter: AsRef<[Value]> + fmt::Debug + 'static,
     KeyFn: Fn(&Value) -> Key + 'static,
     Key: Eq + Hash + Clone + fmt::Debug + 'static,
     TmplFn: Fn(&Value) -> Tmpl + 'static,
     Tmpl: Widget + 'static,
 {
-    items: Items,
+    items: Lotus<ITter>,
     #[educe(Debug(ignore))]
     key_fn: KeyFn,
     #[educe(Debug(ignore))]
@@ -30,17 +29,16 @@ where
     _pd: PhantomData<(Value, ITter)>,
 }
 
-impl<Value, ITter, Items, KeyFn, Key, TmplFn, Tmpl> Each<Value, ITter, Items, KeyFn, Key, TmplFn, Tmpl>
+impl<Value, ITter, KeyFn, Key, TmplFn, Tmpl> Each<Value, ITter, KeyFn, Key, TmplFn, Tmpl>
 where
     Value: fmt::Debug + 'static,
-    Items: Lotus<ITter> + fmt::Debug + 'static,
     ITter: AsRef<[Value]> + fmt::Debug + 'static,
     KeyFn: Fn(&Value) -> Key + 'static,
     Key: Eq + Hash + Clone + fmt::Debug + 'static,
     TmplFn: Fn(&Value) -> Tmpl + 'static,
     Tmpl: Widget + 'static,
 {
-    pub fn new(items: Items, key_fn: KeyFn, tmpl_fn: TmplFn) -> Self {
+    pub fn new(items: Lotus<ITter>, key_fn: KeyFn, tmpl_fn: TmplFn) -> Self {
         Self {
             items,
             key_fn,
@@ -51,10 +49,9 @@ where
     }
 }
 
-impl<Value, ITter, Items, KeyFn, Key, TmplFn, Tmpl> Widget for Each<Value, ITter, Items, KeyFn, Key, TmplFn, Tmpl>
+impl<Value, ITter, KeyFn, Key, TmplFn, Tmpl> Widget for Each<Value, ITter, KeyFn, Key, TmplFn, Tmpl>
 where
     Value: fmt::Debug + 'static,
-    Items: Lotus<ITter> + fmt::Debug + 'static,
     ITter: AsRef<[Value]> + fmt::Debug + 'static,
     KeyFn: Fn(&Value) -> Key + 'static,
     Key: Eq + Hash + Clone + fmt::Debug + 'static,

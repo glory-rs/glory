@@ -23,31 +23,30 @@ where
 {
     fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
         if self.is_revising() || first_time {
-            (*self.get()).inject_to(view_id, node, name, true);
+            (*self.get_untracked()).inject_to(view_id, node, name, true);
         }
         if first_time {
             self.bind_view(view_id);
         }
     }
     fn to_string(&self) -> Option<String> {
-        (*self.get()).to_string()
+        (*self.get_untracked()).to_string()
     }
 }
-impl<F, T> AttrValue for Bond<F, T>
+impl<T> AttrValue for Bond<T>
 where
-    F: Fn() -> T + Clone + 'static,
     T: AttrValue + fmt::Debug + Clone + 'static,
 {
     fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
         if self.is_revising() || first_time {
-            (*self.get()).inject_to(view_id, node, name, true);
+            (*self.get_untracked()).inject_to(view_id, node, name, true);
         }
         if first_time {
             self.bind_view(view_id);
         }
     }
     fn to_string(&self) -> Option<String> {
-        (*self.get()).to_string()
+        (*self.get_untracked()).to_string()
     }
 }
 

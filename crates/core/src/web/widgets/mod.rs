@@ -19,7 +19,7 @@ use std::fmt;
 use crate::reflow::{Bond, Lotus};
 use crate::view::ViewId;
 use crate::web::events::EventDescriptor;
-use crate::web::{AttrValue, ClassPart, PropValue};
+use crate::web::{AttrValue, PropValue};
 use crate::widget::{Filler, IntoFiller};
 use crate::{Cage, Node, NodeRef, Scope, Widget};
 
@@ -121,7 +121,7 @@ macro_rules! generate_tags {
                     #[track_caller]
                     pub fn class<V>(mut self, value: V) -> Self
                     where
-                        V: ClassPart + 'static,
+                    V: Into<Lotus<String>>,
                     {
                         self.0.add_class(value);
                         self
@@ -131,7 +131,7 @@ macro_rules! generate_tags {
                     pub fn toggle_class<V, C>(self, value: V, cond: C) -> Self
                     where
                         V: Into<String>,
-                        C: Lotus<bool> + Clone + 'static,
+                        C: Into<Lotus<bool>>,
                     {
                         self.switch_class(value, "", cond)
                     }
@@ -141,23 +141,24 @@ macro_rules! generate_tags {
                     where
                         TV: Into<String>,
                         FV: Into<String>,
-                        C: Lotus<bool> + Clone + 'static,
+                        C: Into<Lotus<bool>>,
                     {
                         let tv = tv.into();
                         let fv = fv.into();
+                        let cond = cond.into();
                         self.0.classes.part(Bond::new(move || if *cond.get() { tv.clone() } else { fv.clone() }));
                         self
                     }
 
-                    /// Adds an property to this element.
-                    #[track_caller]
-                    pub fn prop<V>(mut self, name: impl Into<Cow<'static, str>>, value: V) -> Self
-                    where
-                        V: PropValue + 'static,
-                    {
-                        self.0.add_prop(name, value);
-                        self
-                    }
+                    // /// Adds an property to this element.
+                    // #[track_caller]
+                    // pub fn prop<V>(mut self, name: impl Into<Cow<'static, str>>, value: V) -> Self
+                    // where
+                    //     V: PropValue + 'static,
+                    // {
+                    //     self.0.add_prop(name, value);
+                    //     self
+                    // }
 
                     /// Adds an attribute to this element.
                     #[track_caller]
@@ -182,7 +183,7 @@ macro_rules! generate_tags {
                     }
                     pub fn inner_text<V>(mut self, text: V) -> Self
                     where
-                        V: AttrValue + 'static,
+                    V: AttrValue + 'static,
                     {
                         self.0.set_inner_text(text);
                         self
@@ -196,7 +197,7 @@ macro_rules! generate_tags {
                     /// vulnerability.
                     pub fn html<V>(mut self, html: V) -> Self
                     where
-                        V: AttrValue + 'static,
+                    V: AttrValue + 'static,
                     {
                         self.0.set_html(html);
                         self
@@ -689,9 +690,8 @@ where
     }
 }
 
-impl<F, T> IntoFiller for Bond<F, T>
+impl<T> IntoFiller for Bond<T>
 where
-    F: Fn() -> T + Clone + 'static,
     T: AsRef<str> + fmt::Debug + 'static,
 {
     fn into_filler(self) -> Filler {
