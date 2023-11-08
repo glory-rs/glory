@@ -47,24 +47,24 @@ impl Widget for Counters {
         let clear_counters = move |_| {
             counters.revise(|mut counters| counters.clear());
         };
-        button().on(events::click, add_counter).text("Add Counter").show_in(ctx);
+        button().on(events::click, add_counter).html("Add Counter").show_in(ctx);
         button()
             .on(events::click, add_many_counters)
-            .text(format!("Add {MANY_COUNTERS} Counters"))
+            .html(format!("Add {MANY_COUNTERS} Counters"))
             .show_in(ctx);
-        button().on(events::click, clear_counters).text("Clear Counters").show_in(ctx);
+        button().on(events::click, clear_counters).html("Clear Counters").show_in(ctx);
 
         let counters = self.counters.clone();
         let total = counters.map(|counters| counters.iter().map(|c| *c.value.get()).sum::<i32>().to_string());
         let count = counters.map(|counters| counters.len().to_string());
-        p().fill(span().text("Total: "))
-            .fill(span().text(total))
-            .fill(span().text(" from "))
-            .fill(span().text(count))
+        p().fill(span().html("Total: "))
+            .fill(span().html(total))
+            .fill(span().html(" from "))
+            .fill(span().html(count))
             .show_in(ctx);
 
         ul().fill(Each::new(
-            counters,
+            Lotus::<Vec<Counter>>::from(counters),
             |counter| counter.id,
             |counter| {
                 let counter = counter.to_owned();

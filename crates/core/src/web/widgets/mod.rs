@@ -150,15 +150,15 @@ macro_rules! generate_tags {
                         self
                     }
 
-                    // /// Adds an property to this element.
-                    // #[track_caller]
-                    // pub fn prop<V>(mut self, name: impl Into<Cow<'static, str>>, value: V) -> Self
-                    // where
-                    //     V: PropValue + 'static,
-                    // {
-                    //     self.0.add_prop(name, value);
-                    //     self
-                    // }
+                    /// Adds an property to this element.
+                    #[track_caller]
+                    pub fn prop<V>(mut self, name: impl Into<Cow<'static, str>>, value: V) -> Self
+                    where
+                        V: PropValue + 'static,
+                    {
+                        self.0.add_prop(name, value);
+                        self
+                    }
 
                     /// Adds an attribute to this element.
                     #[track_caller]
