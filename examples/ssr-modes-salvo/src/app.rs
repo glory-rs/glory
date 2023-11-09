@@ -49,7 +49,7 @@ impl Widget for ListPost {
         cfg_if! {
             if #[cfg(feature = "web-csr")] {
                 let list = || async {
-                    let text = gloo::net::http::Request::get("/api/posts")
+                    let text = gloo_net::http::Request::get("/api/posts")
                         .send()
                         .await.unwrap_throw().text().await.unwrap_throw();
                         serde_json::from_str::<Vec<PostMetadata>>(&text).unwrap_throw()
@@ -97,7 +97,7 @@ impl Widget for ShowPost {
         cfg_if! {
             if #[cfg(feature = "web-csr")] {
                 let post = move || async move{
-                    let text = gloo::net::http::Request::get(&format!("/api/posts/{post_id}"))
+                    let text = gloo_net::http::Request::get(&format!("/api/posts/{post_id}"))
                         .send()
                         .await.unwrap_throw().text().await.unwrap_throw();
                         Some(serde_json::from_str::<Post>(&text).unwrap_throw())

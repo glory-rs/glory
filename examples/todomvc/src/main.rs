@@ -177,7 +177,7 @@ impl Widget for TodoMvc {
                     .fill(
                         section()
                             .class("main")
-                            .class(Bond::new(|| if todos().get().is_empty() { "hidden" } else { "" }))
+                            .class(Bond::new(|| if todos().get().is_empty() { "hidden".to_owned() } else { "".to_owned() }))
                             .fill(
                                 input()
                                     .id("toggle-all")
@@ -188,13 +188,13 @@ impl Widget for TodoMvc {
                             .fill(label().attr("for", "toggle-all").html("Mark all as complete"))
                             .fill(
                                 ul().class("todo-list")
-                                    .fill(Each::new(filtered_todos, |todo| todo.id, |todo| todo.clone())),
+                                    .fill(Each::new(Lotus::<Vec<TodoItem>>::from(filtered_todos), |todo| todo.id, |todo| todo.clone())),
                             ),
                     )
                     .fill(
                         footer()
                             .class("footer")
-                            .class(Bond::new(|| if todos().get().is_empty() { "hidden" } else { "" }))
+                            .class(Bond::new(|| if todos().get().is_empty() { "hidden".to_owned() } else { "".to_owned() }))
                             .fill(
                                 span()
                                     .class("todo-count")
@@ -207,7 +207,7 @@ impl Widget for TodoMvc {
                                         li().fill(
                                             a().class(Bond::new({
                                                 let mode = self.mode.clone();
-                                                move || if *mode.get() == Mode::All { "selected" } else { "" }
+                                                move || if *mode.get() == Mode::All { "selected".to_owned() } else { "".to_owned() }
                                             }))
                                             .attr("href", "#/")
                                             .html("All"),
@@ -217,7 +217,7 @@ impl Widget for TodoMvc {
                                         li().fill(
                                             a().class(Bond::new({
                                                 let mode = self.mode.clone();
-                                                move || if *mode.get() == Mode::Active { "selected" } else { "" }
+                                                move || if *mode.get() == Mode::Active { "selected".to_owned() } else { "".to_owned() }
                                             }))
                                             .attr("href", "#/active")
                                             .html("Active"),
@@ -227,7 +227,7 @@ impl Widget for TodoMvc {
                                         li().fill(
                                             a().class(Bond::new({
                                                 let mode = self.mode.clone();
-                                                move || if *mode.get() == Mode::Completed { "selected" } else { "" }
+                                                move || if *mode.get() == Mode::Completed { "selected".to_owned() } else { "".to_owned() }
                                             }))
                                             .attr("href", "#/completed")
                                             .html("Completed"),
@@ -237,7 +237,7 @@ impl Widget for TodoMvc {
                             .fill(
                                 button()
                                     .class("clear-completed")
-                                    .class(Bond::new(|| if todos().completed() == 0 { "hidden" } else { "" }))
+                                    .class(Bond::new(|| if todos().completed() == 0 { "hidden".to_owned() } else { "".to_owned() }))
                                     .html("Clear completed"),
                             ),
                     ),
