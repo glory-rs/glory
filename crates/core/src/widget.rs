@@ -164,7 +164,7 @@ where
                 widget.show_in(ctx);
             })
         } else {
-            Filler::new(|_|{})
+            Filler::new(|_| {})
         }
     }
 }

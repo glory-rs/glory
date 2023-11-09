@@ -1,5 +1,5 @@
-use std::fmt::Formatter;
 use std::fmt::Display;
+use std::fmt::Formatter;
 
 #[non_exhaustive]
 pub enum RegexError {
@@ -27,7 +27,7 @@ impl Regex {
         self.0.as_string().unwrap_or_default()
     }
     pub fn captures(&self, haystack: &str) -> Option<Captures> {
-       self.0.exec(haystack).map(|arr|Captures(arr))
+        self.0.exec(haystack).map(|arr| Captures(arr))
     }
 }
 

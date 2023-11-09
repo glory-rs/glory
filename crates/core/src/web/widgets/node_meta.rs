@@ -6,7 +6,7 @@ use educe::Educe;
 use wasm_bindgen::{JsValue, UnwrapThrowExt};
 
 use crate::reflow::{Bond, Lotus};
-use crate::web::{AttrValue, Classes, PropValue, ClassPart};
+use crate::web::{AttrValue, ClassPart, Classes, PropValue};
 use crate::{Node, Scope, Widget};
 
 #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
@@ -100,7 +100,7 @@ impl NodeMeta {
     #[track_caller]
     pub fn class<V>(mut self, value: V) -> Self
     where
-        V:  ClassPart + 'static,
+        V: ClassPart + 'static,
     {
         self.classes.part(value);
         self

@@ -1,4 +1,5 @@
-use std::fmt::{self, Formatter, Display};use std::str::FromStr;
+use std::fmt::{self, Display, Formatter};
+use std::str::FromStr;
 
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -37,9 +38,7 @@ impl Url {
     /// Parse an absolute URL from a string.
     #[inline]
     pub fn parse(input: &str) -> Result<Url, ParseError> {
-        web_sys::Url::new(input)
-            .map(Url)
-            .map_err(|_| ParseError::RelativeUrlWithoutBase)
+        web_sys::Url::new(input).map(Url).map_err(|_| ParseError::RelativeUrlWithoutBase)
     }
 
     /// Return the serialization of this URL.
@@ -68,12 +67,12 @@ impl Url {
 
     /// Return the password for this URL, if any, as a percent-encoded ASCII string.
     pub fn password(&self) -> Option<String> {
-       let password = self.0.password();
-       if password.is_empty() {
-           None
-       } else {
-           Some(password)
-       }
+        let password = self.0.password();
+        if password.is_empty() {
+            None
+        } else {
+            Some(password)
+        }
     }
 
     /// Return the authority of this URL as an ASCII string.
@@ -109,7 +108,7 @@ impl Url {
     pub fn port(&self) -> Option<u16> {
         self.0.port().parse().ok()
     }
-    
+
     /// Return the path for this URL, as a percent-encoded ASCII string.
     /// For cannot-be-a-base URLs, this is an arbitrary string that doesn’t start with '/'.
     /// For other URLs, this starts with a '/' slash
@@ -162,7 +161,7 @@ impl Url {
     }
 
     /// Change this URL’s query string.
-    pub fn set_query(&mut self, query:&str) {
+    pub fn set_query(&mut self, query: &str) {
         self.0.set_search(query)
     }
 

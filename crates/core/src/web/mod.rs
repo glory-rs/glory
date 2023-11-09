@@ -9,7 +9,7 @@ mod prop;
 pub mod utils;
 
 pub use attr::AttrValue;
-pub use class::{Classes, ClassPart};
+pub use class::{ClassPart, Classes};
 pub use helpers::*;
 pub use prop::PropValue;
 pub use widgets::Element;
@@ -28,7 +28,6 @@ pub fn escape(s: &str) -> String {
     percent_encoding::utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC).to_string()
 }
 
-
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
 pub fn unescape<'a>(s: &'a str) -> String {
     js_sys::decode_uri(s).unwrap().into()
@@ -37,4 +36,3 @@ pub fn unescape<'a>(s: &'a str) -> String {
 pub fn unescape<'a>(s: &'a str) -> String {
     percent_encoding::percent_decode_str(s).decode_utf8_lossy().to_string()
 }
-

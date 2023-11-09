@@ -38,7 +38,7 @@ impl Url {
 
     /// Return the password for this URL, if any, as a percent-encoded ASCII string.
     pub fn password(&self) -> Option<String> {
-        self.0.password().map(|v|v.into())
+        self.0.password().map(|v| v.into())
     }
 
     /// Return the authority of this URL as an ASCII string.
@@ -52,7 +52,7 @@ impl Url {
     /// of a special URL, or percent encoded for non-special URLs.
     /// IPv6 addresses are given between `[` and `]` brackets.
     pub fn host(&self) -> Option<String> {
-        self.0.host_str().map(|v|v.into())
+        self.0.host_str().map(|v| v.into())
     }
 
     /// Return the port number for this URL, if any.
@@ -74,7 +74,7 @@ impl Url {
 
     /// Return this URL’s query string, if any, as a percent-encoded ASCII string.
     pub fn query(&self) -> Option<String> {
-        self.0.query().map(|v|v.into())
+        self.0.query().map(|v| v.into())
     }
 
     /// Return this URL’s fragment identifier, if any.
@@ -91,7 +91,7 @@ impl Url {
     /// **Note:** the parser did *not* percent-encode this component,
     /// but the input may have been percent-encoded already.
     pub fn fragment(&self) -> Option<String> {
-        self.0.fragment().map(|v|v.into())
+        self.0.fragment().map(|v| v.into())
     }
 
     /// Change this URL’s fragment identifier.
