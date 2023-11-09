@@ -66,9 +66,7 @@ impl<E: 'static> EventDescriptor for Custom<E> {
 }
 
 impl<E> Custom<E> {
-    /// Creates a custom event type that can be used within
-    /// [`HtmlElement::on`](crate::HtmlElement::on), for events
-    /// which are not covered in the [`ev`](crate::ev) module.
+    /// Creates a custom event type.
     pub fn new(name: impl Into<Cow<'static, str>>) -> Self {
         Self {
             name: name.into(),
