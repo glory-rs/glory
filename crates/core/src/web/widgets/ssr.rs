@@ -145,7 +145,7 @@ impl Element {
     #[track_caller]
     pub fn add_class<V>(&mut self, value: V)
     where
-        V: Into<Lotus<String>>,
+        V: ClassPart + 'static,
     {
         self.classes.part(value);
     }
@@ -153,7 +153,7 @@ impl Element {
     #[track_caller]
     pub fn class<V>(mut self, value: V) -> Self
     where
-        V: Into<Lotus<String>>,
+        V: ClassPart + 'static,
     {
         self.classes.part(value);
         self

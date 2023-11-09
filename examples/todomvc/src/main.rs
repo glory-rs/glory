@@ -177,7 +177,7 @@ impl Widget for TodoMvc {
                     .fill(
                         section()
                             .class("main")
-                            .class(Bond::new(|| if todos().get().is_empty() { "hidden".to_owned() } else { "".to_owned() }))
+                            .class(Bond::new(|| if todos().get().is_empty() { "hidden" } else { "" }))
                             .fill(
                                 input()
                                     .id("toggle-all")
@@ -194,7 +194,7 @@ impl Widget for TodoMvc {
                     .fill(
                         footer()
                             .class("footer")
-                            .class(Bond::new(|| if todos().get().is_empty() { "hidden".to_owned() } else { "".to_owned() }))
+                            .class(Bond::new(|| if todos().get().is_empty() { "hidden" } else { "" }))
                             .fill(
                                 span()
                                     .class("todo-count")
@@ -207,7 +207,7 @@ impl Widget for TodoMvc {
                                         li().fill(
                                             a().class(Bond::new({
                                                 let mode = self.mode.clone();
-                                                move || if *mode.get() == Mode::All { "selected".to_owned() } else { "".to_owned() }
+                                                move || if *mode.get() == Mode::All { "selected" } else { "" }
                                             }))
                                             .attr("href", "#/")
                                             .html("All"),
@@ -217,7 +217,7 @@ impl Widget for TodoMvc {
                                         li().fill(
                                             a().class(Bond::new({
                                                 let mode = self.mode.clone();
-                                                move || if *mode.get() == Mode::Active { "selected".to_owned() } else { "".to_owned() }
+                                                move || if *mode.get() == Mode::Active { "selected" } else { "" }
                                             }))
                                             .attr("href", "#/active")
                                             .html("Active"),
@@ -227,7 +227,7 @@ impl Widget for TodoMvc {
                                         li().fill(
                                             a().class(Bond::new({
                                                 let mode = self.mode.clone();
-                                                move || if *mode.get() == Mode::Completed { "selected".to_owned() } else { "".to_owned() }
+                                                move || if *mode.get() == Mode::Completed { "selected" } else { "" }
                                             }))
                                             .attr("href", "#/completed")
                                             .html("Completed"),
@@ -237,7 +237,7 @@ impl Widget for TodoMvc {
                             .fill(
                                 button()
                                     .class("clear-completed")
-                                    .class(Bond::new(|| if todos().completed() == 0 { "hidden".to_owned() } else { "".to_owned() }))
+                                    .class(Bond::new(|| if todos().completed() == 0 { "hidden" } else { "" }))
                                     .html("Clear completed"),
                             ),
                     ),

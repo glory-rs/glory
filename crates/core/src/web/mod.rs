@@ -9,7 +9,7 @@ mod prop;
 pub mod utils;
 
 pub use attr::AttrValue;
-pub use class::{Classes};
+pub use class::{Classes, ClassPart};
 pub use helpers::*;
 pub use prop::PropValue;
 pub use widgets::Element;

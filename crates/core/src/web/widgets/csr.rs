@@ -10,7 +10,7 @@ use wasm_bindgen::{intern, JsCast, JsValue, UnwrapThrowExt};
 use crate::reflow::{Bond, Lotus, Revisable};
 use crate::view::{ViewId, ViewPosition};
 use crate::web::events::EventDescriptor;
-use crate::web::{AttrValue, Classes, PropValue};
+use crate::web::{AttrValue, ClassPart, Classes, PropValue};
 use crate::widget::{Filler, IntoFiller};
 use crate::{NodeRef, Scope, Widget};
 
@@ -199,14 +199,14 @@ where
     #[track_caller]
     pub fn add_class<V>(&mut self, value: V)
     where
-        V: Into<Lotus<String>>,
+        V: ClassPart + 'static,
     {
         self.classes.part(value);
     }
     #[track_caller]
     pub fn class<V>(mut self, value: V) -> Self
     where
-        V: Into<Lotus<String>>,
+        V: ClassPart + 'static,
     {
         self.classes.part(value);
         self

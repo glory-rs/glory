@@ -19,7 +19,7 @@ use std::fmt;
 use crate::reflow::{Bond, Lotus};
 use crate::view::ViewId;
 use crate::web::events::EventDescriptor;
-use crate::web::{AttrValue, PropValue};
+use crate::web::{AttrValue, ClassPart, PropValue};
 use crate::widget::{Filler, IntoFiller};
 use crate::{Cage, Node, NodeRef, Scope, Widget};
 
@@ -121,7 +121,7 @@ macro_rules! generate_tags {
                     #[track_caller]
                     pub fn class<V>(mut self, value: V) -> Self
                     where
-                    V: Into<Lotus<String>>,
+                    V:  ClassPart + 'static,
                     {
                         self.0.add_class(value);
                         self
