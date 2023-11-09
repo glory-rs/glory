@@ -1,12 +1,10 @@
 #[cfg(not(feature = "__single_holder"))]
 use std::cell::Cell;
 use std::cell::{Ref, RefCell};
-use std::fmt::{self, Display};
-use std::hash::Hash;
+use std::fmt;
 use std::rc::Rc;
-use std::sync::atomic::{AtomicU64, Ordering};
 
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexSet;
 
 use super::{Bond, Cage, Revisable, RevisableId};
 #[cfg(not(feature = "__single_holder"))]
@@ -137,7 +135,7 @@ where
     fn bind_view(&self, view_id: &ViewId) {
         match self {
             #[cfg(feature = "__single_holder")]
-            Self::Bare(value_) => {}
+            Self::Bare(_value) => {}
             #[cfg(not(feature = "__single_holder"))]
             Self::Bare { holder_id, .. } => {
                 holder_id.set(Some(view_id.holder_id()));

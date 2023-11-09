@@ -1,17 +1,16 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt::Debug;
-use std::rc::Rc;
 
 use educe::Educe;
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
 use wasm_bindgen::UnwrapThrowExt;
 
 use crate::node::{Node, NodeRef};
-use crate::reflow::{Bond, Lotus, Revisable};
+use crate::reflow::{Bond, Lotus};
 use crate::view::{ViewId, ViewPosition};
 use crate::web::events::EventDescriptor;
-use crate::web::{AttrValue, Classes, PropValue};
+use crate::web::{AttrValue, ClassPart, Classes, PropValue};
 use crate::widget::{Filler, IntoFiller};
 use crate::{Scope, Widget};
 

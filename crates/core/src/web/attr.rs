@@ -5,7 +5,7 @@ use std::ops::Deref;
 use wasm_bindgen::UnwrapThrowExt;
 
 use crate::node::Node;
-use crate::reflow::{Bond, Cage, Lotus, Revisable};
+use crate::reflow::{Bond, Cage, Revisable};
 use crate::ViewId;
 
 /// Represents the different possible values an attribute node could have.

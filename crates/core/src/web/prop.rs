@@ -24,7 +24,7 @@ impl PropValue for JsValue {
 }
 impl PropValue for String {
     #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
-    fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
+    fn inject_to(&self, _view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
         if first_time {
             let name = JsValue::from_str(name);
             let value = self.into();

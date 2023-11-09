@@ -7,7 +7,7 @@ pub use lotus::Lotus;
 pub mod scheduler;
 pub use scheduler::{batch, schedule};
 
-use std::cell::{Ref, RefCell};
+use std::cell::RefCell;
 use std::fmt::{self, Display};
 use std::hash::Hash;
 use std::rc::Rc;

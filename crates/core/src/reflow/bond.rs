@@ -6,7 +6,7 @@ use std::rc::Rc;
 use educe::Educe;
 use indexmap::{IndexMap, IndexSet};
 
-use super::{Lotus, Revisable, RevisableId, TRACKING_STACK};
+use super::{Revisable, RevisableId, TRACKING_STACK};
 use crate::ViewId;
 
 #[derive(Educe)]
