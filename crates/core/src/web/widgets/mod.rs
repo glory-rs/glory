@@ -181,11 +181,11 @@ macro_rules! generate_tags {
                         self.0.add_event_listener(event, event_handler);
                         self
                     }
-                    pub fn inner_text<V>(mut self, text: V) -> Self
+                    pub fn text<V>(mut self, text: V) -> Self
                     where
                     V: AttrValue + 'static,
                     {
-                        self.0.set_inner_text(text);
+                        self.0.set_text(text);
                         self
                     }
                     /// Sets the inner HTML of this element from the provided
@@ -292,7 +292,7 @@ generate_tags![
   style Style HtmlStyleElement [media, disabled],
 
   /// The `<title>` HTML element defines the document's title that is shown in a Browser's title bar or a page's tab. It only contains text; tags within the element are ignored.
-  title Title HtmlTitleElement [text],
+  title Title HtmlTitleElement [],
 
   // ==========================
   //     Sectioning Root
@@ -394,7 +394,7 @@ generate_tags![
   //    Inline Text Semantics
   // ==========================
   /// The `<a>` HTML element (or anchor element), with its href attribute, creates a hyperlink to web pages, files, email addresses, locations in the same page, or anything else a URL can address.
-  a A HtmlAnchorElement [access_key "accessKey", download, hash, host, host_name "hostname", href, href_lang "hreflang", password, path_name "pathname", port, protocol, referrer_policy "referrerPolicy", rel, search, tab_index "tabIndex", target, text, type_ "type", user_name "username"],
+  a A HtmlAnchorElement [access_key "accessKey", download, hash, host, host_name "hostname", href, href_lang "hreflang", password, path_name "pathname", port, protocol, referrer_policy "referrerPolicy", rel, search, tab_index "tabIndex", target, type_ "type", user_name "username"],
 
   /// The `<abbr>` HTML element represents an abbreviation or acronym; the optional title attribute can provide an expansion or description for the abbreviation. If present, title must contain this full description and nothing else.
   abbr Abbr HtmlElement [],
@@ -544,7 +544,7 @@ generate_tags![
   noscript NoScript HtmlElement [],
 
   /// The `<script>` HTML element is used to embed executable code or data; this is typically used to embed or refer to JavaScript code. The `<script>` element can also be used with other languages, such as WebGL's GLSL shader programming language and JSON.
-  script Script HtmlScriptElement [type_ "type", src, async_ "async", defer, cross_origin "crossOrigin", text, fetch_priority "fetchPriority", referrer_policy "referrerPolicy"],
+  script Script HtmlScriptElement [type_ "type", src, async_ "async", defer, cross_origin "crossOrigin", fetch_priority "fetchPriority", referrer_policy "referrerPolicy"],
 
   // ==========================
   //     Demarcating Edits
@@ -619,7 +619,7 @@ generate_tags![
   optgroup OptGroup HtmlOptGroupElement [disabled, label],
 
   /// The `<option>` HTML element is used to define an item contained in a select, an optgroup, or a datalist element. As such, `<option>` can represent menu items in popups and other lists of items in an HTML document.
-  option_ Option HtmlOptionElement [default_selected "defaultSelected", disabled, selected, text, value],
+  option_ Option HtmlOptionElement [default_selected "defaultSelected", disabled, selected, value],
 
   /// The `<output>` HTML element is a container element into which a site or app can inject the results of a calculation or the outcome of a user action.
   output Output HtmlOutputElement [default_value "defaultValue", name, value],

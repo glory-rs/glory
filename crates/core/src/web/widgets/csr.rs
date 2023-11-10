@@ -327,7 +327,7 @@ where
     /// Be very careful when using this method. Always remember to
     /// sanitize the input to avoid a cross-site scripting (XSS)
     /// vulnerability.
-    pub fn set_inner_text<V>(&mut self, text: V)
+    pub fn set_text<V>(&mut self, text: V)
     where
         V: AttrValue + 'static,
     {
@@ -340,11 +340,11 @@ where
     /// Be very careful when using this method. Always remember to
     /// sanitize the input to avoid a cross-site scripting (XSS)
     /// vulnerability.
-    pub fn inner_text<V>(mut self, text: V) -> Self
+    pub fn text<V>(mut self, text: V) -> Self
     where
         V: AttrValue + 'static,
     {
-        self.set_inner_text(text);
+        self.set_text(text);
         self
     }
 

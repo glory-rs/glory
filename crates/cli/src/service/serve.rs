@@ -81,8 +81,8 @@ impl ServerProcess {
             // windows doesn't like to overwrite a running binary, so we copy it to a new name
             let bin_path = if cfg!(target_os = "windows") {
                 // solution to allow cargo to overwrite a running binary on some platforms:
-                //   copy cargo's output bin to [filename]_glory and then run it
-                let new_bin_path = append_str_to_filename(bin, "_glory")?;
+                //   copy cargo's output bin to [filename].serving and then run it
+                let new_bin_path = append_str_to_filename(bin, ".serving")?;
                 log::debug!(
                     "Copying server binary {} to {}",
                     GRAY.paint(bin.as_str()),
@@ -91,7 +91,7 @@ impl ServerProcess {
                 fs::copy(bin, &new_bin_path).await?;
                 // also copy the .pdb file if it exists to allow debugging to attach
                 if let Some(pdb) = determine_pdb_filename(bin) {
-                    let new_pdb_path = append_str_to_filename(&pdb, "_glory")?;
+                    let new_pdb_path = append_str_to_filename(&pdb, ".serving")?;
                     log::debug!(
                         "Copying server binary debug info {} to {}",
                         GRAY.paint(pdb.as_str()),

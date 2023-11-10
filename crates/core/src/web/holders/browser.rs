@@ -37,7 +37,7 @@ impl Holder for BrowerHolder {
         if let Ok(list) = crate::web::document().query_selector_all("[gly-id]") {
               for i in 0..list.length() {
                 let ele = list.item(i).unwrap().unchecked_into::<web_sys::HtmlElement>();
-                ele.set_attribute("gly-hydrating", "true").unwrap_throw();
+                ele.set_attribute("gly-hydrating", "1").unwrap_throw();
             }
         }
         let view_id = ViewId::new(self.next_root_view_id.fetch_add(1, Ordering::Relaxed).to_string());
