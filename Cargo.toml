@@ -21,39 +21,40 @@ license = "MIT OR Apache-2.0"
 categories = ["web-programming::http-server", "web-programming::websocket", "network-programming", "asynchronous"]
 
 [workspace.dependencies]
+glory-core = { version = "0.2.0", path = "crates/core", default-features = false }#
+glory-routing = { version = "0.2.0", path = "crates/routing", default-features = false }
+glory-hot-reload = { version = "0.2.0", path = "crates/hot-reload" }
+
 anyhow = "1"
-base64 = "0.21"
-url = "2"
-glory-core = { version = "0.1.0", path = "crates/core", default-features = false }
-salvo = { version = "0.58", default-features = true }                                    #
-glory-routing = { version = "0.1.0", path = "crates/routing", default-features = false }
-glory-hot-reload = { version = "0.1.0", path = "crates/hot-reload" }
-parking_lot = "0.12"
-tracing = "0.1"
-# tracing-subscriber = "0.3"
-serde = { version = "1" }
-serde_json = { version = "1" }
 async-trait = "0.1.42"
-once_cell = "1.5.2"
-wasm-bindgen = { version = "0.2", features = ["enable-interning"] }
-wasm-bindgen-futures = "0.4.31"
-paste = "1"
+base64 = "0.21"
 cfg-if = "1"
-smallvec = "1"
-educe = "0.4"
-js-sys = "0.3"
-regex = "1"
-indexmap = "2.0"
-multimap = "0.9"
-percent-encoding = "2"
-form_urlencoded = "1"
-thiserror = "1"
 config = { version = "0.13", default-features = false, features = ["toml"] }
-tokio = { version = "1", default-features = false }
-tokio-util = { version = "0.7", default-features = false }
-path-slash = "0.2"
+educe = "0.4"
+form_urlencoded = "1"
 futures = "0.3"
 futures-channel = { version = "0.3", default-features = true }
+indexmap = "2.0"
+js-sys = "0.3"
+multimap = "0.9"
+once_cell = "1.5.2"
+parking_lot = "0.12"
+paste = "1"
+percent-encoding = "2"
+path-slash = "0.2"
+regex = "1"
+salvo = { version = "0.58", default-features = true }    
+serde = { version = "1" }
+serde_json = { version = "1" }    
+smallvec = "1"
+thiserror = "1"                            
+tokio = { version = "1", default-features = false }
+tokio-util = { version = "0.7", default-features = false }
+tracing = "0.1"
+# tracing-subscriber = "0.3"
+url = "2"
+wasm-bindgen = { version = "0.2", features = ["enable-interning"] }
+wasm-bindgen-futures = "0.4.31"
 
 [workspace.dependencies.web-sys]
 version = "0.3"
