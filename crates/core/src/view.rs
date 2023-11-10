@@ -165,6 +165,10 @@ impl View {
         if self.is_built() {
             return;
         }
+        #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+        if crate::web::is_hydrating() {
+            self.widget.hydrate(&mut self.scope);
+        }
         cfg_if! {
             if #[cfg(feature = "__single_holder")] {
                 crate::reflow::batch(|| {
