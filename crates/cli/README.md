@@ -218,12 +218,12 @@ site_pkg_dir = "pkg"
 # into CSS and processed by lightning css. When release is set, then it will also be minified.
 #
 # Optional. Env: GLORY_STYLE_FILE.
-style_file = "style/main.scss"
+style_file = "styles/main.scss"
 
 # The tailwind input file.
 #
 # Optional, Activates the tailwind build
-tailwind_input_file = "style/tailwind.css"
+tailwind_input_file = "styles/tailwind.css"
 
 # The tailwind config file.
 #
