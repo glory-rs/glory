@@ -7,8 +7,8 @@ use glory_core::Truck;
 use indexmap::IndexSet;
 use once_cell::unsync::Lazy;
 
-use crate::url::Url;
 use crate::regex::Regex;
+use crate::url::Url;
 use crate::{Filter, PathState};
 
 /// PathWisp

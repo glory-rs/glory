@@ -5,12 +5,12 @@ use std::marker::PhantomData;
 use educe::Educe;
 use indexmap::IndexMap;
 
-use crate::reflow::{Revisable, Lotus};
+use crate::reflow::{Lotus, Revisable};
 use crate::{Scope, ViewId, Widget};
 
 #[derive(Educe)]
 #[educe(Debug)]
-pub struct Each<Value, ITter,  KeyFn, Key, TmplFn, Tmpl>
+pub struct Each<Value, ITter, KeyFn, Key, TmplFn, Tmpl>
 where
     Value: fmt::Debug + 'static,
     ITter: AsRef<[Value]> + fmt::Debug + 'static,

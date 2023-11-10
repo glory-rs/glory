@@ -1,11 +1,11 @@
 use std::sync::Arc;
 use std::{fmt::Display, net::SocketAddr};
 
+use once_cell::sync::Lazy;
 use salvo::prelude::*;
 use salvo::websocket::{Message, WebSocket};
 use serde::Serialize;
 use tokio::{net::TcpStream, select, sync::RwLock, task::JoinHandle};
-use once_cell::sync::Lazy;
 
 use crate::config::Project;
 use crate::ext::sync::wait_for_socket;

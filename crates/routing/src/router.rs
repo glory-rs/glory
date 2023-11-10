@@ -1,14 +1,14 @@
 use std::fmt::{self, Formatter};
 use std::rc::Rc;
 
-#[cfg(all(not(feature = "__single_holder"),feature = "salvo"))]
+#[cfg(all(not(feature = "__single_holder"), feature = "salvo"))]
 use glory_core::web::holders::SalvoHandler;
-#[cfg(all(not(feature = "__single_holder"),feature = "salvo"))]
+#[cfg(all(not(feature = "__single_holder"), feature = "salvo"))]
 use indexmap::IndexSet;
 
 use super::{Filter, FnFilter, PathFilter, PathState};
-use crate::{Truck, DetectMatched, Handler, WhenHoop};
 use crate::url::Url;
+use crate::{DetectMatched, Handler, Truck, WhenHoop};
 
 #[macro_export]
 macro_rules! join_path {

@@ -4,7 +4,7 @@ use std::ops::{Deref, DerefMut};
 
 use indexmap::IndexMap;
 
-use crate::{Scope, Node, Widget};
+use crate::{Node, Scope, Widget};
 
 #[cfg(not(feature = "__single_holder"))]
 use crate::HolderId;
@@ -270,7 +270,7 @@ impl View {
 }
 
 pub trait ViewFactory {
-    fn make_view(&self, parent: & mut Scope) -> ViewId;
+    fn make_view(&self, parent: &mut Scope) -> ViewId;
 }
 
 impl<F, T> ViewFactory for F
