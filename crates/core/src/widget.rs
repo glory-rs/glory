@@ -1,7 +1,6 @@
 use std::fmt;
 
 use crate::{view::ViewPosition, Node, Scope, View, ViewId};
-
 pub trait Widget: fmt::Debug + 'static {
     fn store_in(self, parent: &mut Scope) -> ViewId
     where
@@ -73,26 +72,7 @@ pub trait Widget: fmt::Debug + 'static {
 
     fn attach(&mut self, _ctx: &mut Scope) {}
     #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
-    fn hydrate(&mut self, ctx: &mut Scope) {
-        let selector = format!("{}[gly-id='{}']", self.name, ctx.view_id);
-        let exist_node = if let Some(pnode) = &ctx.parent_node {
-            let node = pnode.query_selector(&selector).unwrap_throw();
-            if node.is_none() {
-                crate::warn!("[hydrating]: node not found: {} {}", selector, pnode.outer_html());
-            }
-            node
-        } else {
-            let node = crate::web::document().query_selector(&selector).unwrap_throw();
-            if node.is_none() {
-                crate::warn!("[hydrating]: node not found2: {}", selector);
-            }
-            node
-        };
-        if let Some(exist_node) = exist_node {
-            self.node = wasm_bindgen::JsCast::unchecked_into(exist_node);
-            crate::info!("[hydrating]: node exist: {}", selector);
-        }
-    }
+    fn hydrate(&mut self, _ctx: &mut Scope) {}
     fn build(&mut self, _ctx: &mut Scope);
 
     /// Attach children

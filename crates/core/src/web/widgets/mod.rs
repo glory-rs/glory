@@ -238,6 +238,10 @@ macro_rules! generate_tags {
                     fn attach(&mut self, ctx: &mut Scope) {
                         self.0.attach(ctx)
                     }
+                    #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+                    fn hydrate(&mut self, ctx: &mut Scope) {
+                        self.0.hydrate(ctx)
+                    }
                     fn build(&mut self, ctx: &mut Scope) {
                         self.0.build(ctx)
                     }
