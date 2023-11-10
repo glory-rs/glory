@@ -6,7 +6,6 @@ use glory::routing::*;
 use glory::web::widgets::*;
 use glory::*;
 
-
 #[derive(Clone, Debug, Default)]
 struct PageInfo {
     title: Cage<String>,
@@ -31,12 +30,26 @@ impl Widget for App {
             .fill(link().rel("stylesheet").href("pkg/tailwind-salvo.css"))
             .fill(title().text("Glory + Tailwind"))
             .show_in(ctx);
-        div().class("bg-gradient-to-tl from-blue-800 to-blue-500 text-white font-mono flex flex-col min-h-screen")
-            .fill(h1().html("Basic Router Example"))
+        let path = ctx.truck().obtain::<Locator>().unwrap().path();
+        div()
+            .class("font-mono flex flex-col min-h-screen")
             .fill(
-                ul().fill(li().fill(a().href("/").html("Home")))
-                    .fill(li().fill(a().href("/dashboard").html("Dashboard")))
-                    .fill(li().fill(a().href("/about").html("About"))),
+                ul().class("flex justify-between bg-gray-200")
+                    .fill(
+                        li().class("p-4")
+                            .toggle_class("bg-blue-500 text-white", path.map(|path|path == "/"))
+                            .fill(a().href("/").html("Home")),
+                    )
+                    .fill(
+                        li().class("p-4")
+                            .toggle_class("bg-blue-500 text-white", path.map(|path|path.starts_with("/dashboard")))
+                            .fill(a().href("/dashboard").html("Dashboard")),
+                    )
+                    .fill(
+                        li().class("p-4")
+                            .toggle_class("bg-blue-500 text-white", path.map(|path|path.starts_with("/about")))
+                            .fill(a().href("/about").html("About")),
+                    ),
             )
             .fill(p().html("This example demonstrates a basic router that uses the browser's history API."))
             .fill(Graff::new("section"))
