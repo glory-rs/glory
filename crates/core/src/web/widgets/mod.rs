@@ -172,15 +172,14 @@ macro_rules! generate_tags {
 
                     /// Adds an event listener to this element.
                     #[track_caller]
-                    pub fn on<E: EventDescriptor>(
-                        self,
-                        event: E,
-                        #[allow(unused_mut)] // used for tracing in debug
-                        mut event_handler: impl FnMut(E::EventType) + 'static,
-                    ) -> Self {
-                        self.0.add_event_listener(event, event_handler);
+                    pub fn on<E, H>(#[allow(unused_mut)]mut self, event: E, handler: H) -> Self
+                    where
+                        E: EventDescriptor + 'static,
+                        H: FnMut(E::EventType) + 'static, {
+                        self.0.add_event_listener(event, handler);
                         self
                     }
+
                     pub fn text<V>(mut self, text: V) -> Self
                     where
                     V: AttrValue + 'static,
