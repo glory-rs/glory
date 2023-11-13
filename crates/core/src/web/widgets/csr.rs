@@ -5,7 +5,8 @@ use std::ops::Deref;
 
 use educe::Educe;
 // #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
-use wasm_bindgen::{JsCast, UnwrapThrowExt};
+use wasm_bindgen::closure::Closure;
+use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 
 use crate::reflow::{Bond, Lotus};
 use crate::view::{ViewId, ViewPosition};
@@ -29,6 +30,9 @@ where
     pub props: BTreeMap<Cow<'static, str>, Box<dyn PropValue>>,
     #[educe(Debug(ignore))]
     pub fillers: Vec<Filler>,
+
+    #[educe(Debug(ignore))]
+    listeners: Vec<Box<dyn FnOnce(&T)>>,
 
     pub(crate) node: T,
 }
@@ -99,6 +103,10 @@ where
             value.inject_to(&ctx.view_id, &mut node.clone(), name, true);
         }
         self.classes.inject_to(&ctx.view_id, &mut node.clone(), "class", true);
+
+        for listener in std::mem::take(&mut self.listeners) {
+            (listener)(&self.node);
+        }
     }
     fn detach(&mut self, ctx: &mut Scope) {
         if let Some(parent_node) = ctx.parent_node.as_ref() {
@@ -153,6 +161,7 @@ where
             props: BTreeMap::new(),
             fillers: vec![],
             node,
+            listeners: vec![],
         }
     }
 
@@ -273,50 +282,42 @@ where
 
     /// Adds an event listener to this element.
     #[track_caller]
-    pub fn add_event_listener<E: EventDescriptor>(
-        &self,
-        event: E,
-        #[allow(unused_mut)] // used for tracing in debug
-        mut event_handler: impl FnMut(E::EventType) + 'static,
-    ) {
-        #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
-        {
-            cfg_if! {
-                if #[cfg(debug_assertions)] {
-                    let onspan = ::tracing::span!(
-                        // parent: &self.span,
-                        ::tracing::Level::TRACE,
-                        "on",
-                        event = %event.name()
-                    );
-                    let _onguard = onspan.enter();
-                }
+    pub fn add_event_listener<E, H>(&mut self, event: E, handler: H)
+    where
+        E: EventDescriptor + 'static,
+        H: FnMut(E::EventType) + 'static,
+    {
+        cfg_if! {
+            if #[cfg(debug_assertions)] {
+                let onspan = ::tracing::span!(
+                    // parent: &self.span,
+                    ::tracing::Level::TRACE,
+                    "on",
+                    event = %event.name()
+                );
+                let _onguard = onspan.enter();
             }
+        }
+
+        self.listeners.push(Box::new(move |node| {
             let event_name = event.name();
 
             if event.bubbles() {
-                crate::web::add_event_listener(self.node.as_ref(), event_name, event_handler);
+                crate::web::add_event_listener(node.as_ref(), event_name, handler);
             } else {
-                crate::web::add_event_listener_undelegated(self.node.as_ref(), &event_name, event_handler);
+                crate::web::add_event_listener_undelegated(node.as_ref(), &event_name, handler);
             }
-        }
-
-        #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
-        {
-            _ = event;
-            _ = event_handler;
-        }
+        }));
     }
 
     /// Adds an event listener to this element.
     #[track_caller]
-    pub fn on<E: EventDescriptor>(
-        self,
-        event: E,
-        #[allow(unused_mut)] // used for tracing in debug
-        mut event_handler: impl FnMut(E::EventType) + 'static,
-    ) -> Self {
-        self.add_event_listener(event, event_handler);
+    pub fn on<E, H>(mut self, event: E, handler: H) -> Self
+    where
+        E: EventDescriptor + 'static,
+        H: FnMut(E::EventType) + 'static,
+    {
+        self.add_event_listener(event, handler);
         self
     }
 
