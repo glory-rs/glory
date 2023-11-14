@@ -81,7 +81,7 @@ pub fn html_parts_separated(config: &GloryConfig, truck: &Truck) -> (String, Str
 
     (
         format!(
-            r#"<!DOCTYPE html>
+            r#"<!doctype html>
 {html_open}
     <head>
         <meta charset="utf-8">

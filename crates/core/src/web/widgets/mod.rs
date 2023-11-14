@@ -26,7 +26,7 @@ use crate::{Cage, Node, NodeRef, Scope, Widget};
 #[macro_export]
 macro_rules! generate_tags {
     ($(
-        #[$meta:meta]
+        $(#[$meta:meta])*
         $tag:ident $name:ident $inner:ident [$($prop_fn:ident $($prop_key:expr)?),*] $($void:ident)?
     ),* $(,)?) => {
         paste::paste! {
@@ -256,7 +256,7 @@ macro_rules! generate_tags {
                     }
                 }
 
-                #[$meta]
+                $(#[$meta])*
                 pub fn $tag() -> $name {
                     $name::new()
                 }
