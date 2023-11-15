@@ -290,7 +290,7 @@ impl Command for CommandTailwind {
         "tailwindcss"
     }
     fn default_version(&self) -> &'static str {
-        "v3.3.3"
+        "v3.3.5"
     }
     fn env_var_version_name(&self) -> &'static str {
         ENV_VAR_GLORY_TAILWIND_VERSION

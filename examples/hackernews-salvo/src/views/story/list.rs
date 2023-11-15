@@ -59,8 +59,7 @@ impl Widget for ListStories {
             },
             |stories, ctx| {
                 if let Some(stories) = stories {
-                    ul().fill(Each::new(
-                        Lotus::<Vec<Story>>::from(stories.clone()),
+                    ul().fill(Each::from_vec(stories.clone(),
                         |story: &Story| story.id,
                         |story| ShowStory::new(story.clone()),
                     ))

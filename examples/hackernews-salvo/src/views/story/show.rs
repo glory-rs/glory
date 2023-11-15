@@ -62,8 +62,7 @@ impl Widget for ShowStory {
                                         })
                                         .case(Cage::new(true), || span().html("No comments yet.")),
                                 )
-                                .fill(ul().class("comment-children").fill(Each::new(
-                                    Lotus::<Vec<Comment>>::from(story.comments.clone()),
+                                .fill(ul().class("comment-children").fill(Each::from_vec(story.comments.clone(),
                                     |comment| comment.id,
                                     |comment| ShowComment::new(comment.clone()),
                                 ))),
@@ -140,8 +139,7 @@ impl Widget for ShowComment {
                             .fill(Switch::new().case(opened.clone(), {
                                 let comments = Cage::new(comment.comments.clone());
                                 move || {
-                                    ul().class("comment-children").fill(Each::new(
-                                        Lotus::<Vec<Comment>>::from(comments.clone()),
+                                    ul().class("comment-children").fill(Each::from_vec(comments.clone(),
                                         |comment| comment.id,
                                         |comment| ShowComment::new(comment.clone()),
                                     ))
