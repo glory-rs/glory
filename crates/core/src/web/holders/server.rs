@@ -18,7 +18,7 @@ pub struct ServerHolder {
     id: HolderId,
     pub config: Arc<GloryConfig>,
     pub truck: Rc<RefCell<Truck>>,
-    pub host_node: Div,
+    pub host_node: HtmlDiv,
     next_root_view_id: AtomicU64,
 }
 
