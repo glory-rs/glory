@@ -38,9 +38,27 @@ where
     TmplFn: Fn(&Value) -> Tmpl + 'static,
     Tmpl: Widget + 'static,
 {
-    pub fn new(items: Lotus<ITter>, key_fn: KeyFn, tmpl_fn: TmplFn) -> Self {
+    pub fn new(items: impl Into<Lotus<ITter>>, key_fn: KeyFn, tmpl_fn: TmplFn) -> Self {
         Self {
-            items,
+            items: items.into(),
+            key_fn,
+            tmpl_fn,
+            key_view_ids: IndexMap::new(),
+            _pd: PhantomData,
+        }
+    }
+}
+impl<Value, KeyFn, Key, TmplFn, Tmpl> Each<Value, Vec<Value>, KeyFn, Key, TmplFn, Tmpl>
+where
+    Value: fmt::Debug + 'static,
+    KeyFn: Fn(&Value) -> Key + 'static,
+    Key: Eq + Hash + Clone + fmt::Debug + 'static,
+    TmplFn: Fn(&Value) -> Tmpl + 'static,
+    Tmpl: Widget + 'static,
+{
+    pub fn from_vec(items: impl Into<Lotus<Vec<Value>>>, key_fn: KeyFn, tmpl_fn: TmplFn) -> Self {
+        Self {
+            items: items.into(),
             key_fn,
             tmpl_fn,
             key_view_ids: IndexMap::new(),
