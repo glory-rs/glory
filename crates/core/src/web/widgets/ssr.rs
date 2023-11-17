@@ -43,11 +43,13 @@ impl Widget for Element {
             value.inject_to(&ctx.view_id, &mut self.node, name, true);
         }
 
-        self.attrs.insert("gly-id".into(), Box::new(ctx.view_id.clone()));
+        self.attrs
+            .insert("gly-id".into(), Box::new(ctx.view_id.clone()));
         for (name, value) in &self.attrs {
             value.inject_to(&ctx.view_id, &mut self.node, name, true);
         }
-        self.classes.inject_to(&ctx.view_id, &mut self.node, "class", true);
+        self.classes
+            .inject_to(&ctx.view_id, &mut self.node, "class", true);
     }
 
     fn flood(&mut self, ctx: &mut Scope) {
@@ -84,7 +86,8 @@ impl Widget for Element {
         for (name, value) in &self.attrs {
             value.inject_to(&ctx.view_id, &mut self.node, name, false);
         }
-        self.classes.inject_to(&ctx.view_id, &mut self.node, "class", false);
+        self.classes
+            .inject_to(&ctx.view_id, &mut self.node, "class", false);
     }
 }
 
@@ -177,7 +180,8 @@ impl Element {
         let tv = tv.into();
         let fv = fv.into();
         let cond = cond.into();
-        self.classes.part(Bond::new(move || if *cond.get() { tv.clone() } else { fv.clone() }));
+        let part = Bond::new(move || if *cond.get() { tv.clone() } else { fv.clone() });
+        self.classes.part(part);
         self
     }
 

@@ -8,9 +8,10 @@ use crate::ViewId;
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
 use wasm_bindgen::{JsValue, UnwrapThrowExt};
 
+#[non_exhaustive]
 #[derive(Debug, Default)]
 pub struct Classes {
-    parts: Vec<Box<dyn ClassPart>>,
+    pub parts: Vec<Box<dyn ClassPart>>,
 }
 impl Classes {
     pub fn new() -> Self {

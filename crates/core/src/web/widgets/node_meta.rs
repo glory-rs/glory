@@ -38,7 +38,8 @@ impl Widget for NodeMeta {
         for (name, value) in &self.attrs {
             value.inject_to(&ctx.view_id, &mut self.node, name, true);
         }
-        self.classes.inject_to(&ctx.view_id, &mut self.node, "class", true);
+        self.classes
+            .inject_to(&ctx.view_id, &mut self.node, "class", true);
 
         #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
         ctx.truck_mut().insert(self.truck_key, self.node.clone());
@@ -52,7 +53,10 @@ impl Widget for NodeMeta {
         for name in self.attrs.keys() {
             self.node.remove_attribute(name).unwrap_throw();
         }
-        self.node.class_list().remove(&self.classes.to_array()).unwrap_throw();
+        self.node
+            .class_list()
+            .remove(&self.classes.to_array())
+            .unwrap_throw();
     }
 
     #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
@@ -63,7 +67,8 @@ impl Widget for NodeMeta {
         for (name, value) in &self.attrs {
             value.inject_to(&ctx.view_id, &mut self.node, name, false);
         }
-        self.classes.inject_to(&ctx.view_id, &mut self.node, "class", false);
+        self.classes
+            .inject_to(&ctx.view_id, &mut self.node, "class", false);
     }
 }
 
@@ -125,7 +130,8 @@ impl NodeMeta {
         let tv = tv.into();
         let fv = fv.into();
         let cond = cond.into();
-        self.classes.part(Bond::new(move || if *cond.get() { tv.clone() } else { fv.clone() }));
+        let part = Bond::new(move || if *cond.get() { tv.clone() } else { fv.clone() });
+        self.classes.part(part);
         self
     }
 

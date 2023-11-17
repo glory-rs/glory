@@ -224,7 +224,7 @@ where
     #[track_caller]
     pub fn toggle_class<V, C>(self, value: V, cond: C) -> Self
     where
-        V: Into<String>,
+    V: Into<String>,
         C: Into<Lotus<bool>>,
     {
         self.switch_class(value, "", cond)
@@ -233,14 +233,15 @@ where
     #[track_caller]
     pub fn switch_class<TV, FV, C>(mut self, tv: TV, fv: FV, cond: C) -> Self
     where
-        TV: Into<String>,
-        FV: Into<String>,
+    TV: Into<String>,
+    FV: Into<String>,
         C: Into<Lotus<bool>>,
     {
         let tv = tv.into();
         let fv = fv.into();
         let cond = cond.into();
-        self.classes.part(Bond::new(move || if *cond.get() { tv.clone() } else { fv.clone() }));
+        let part = Bond::new(move || if *cond.get() { tv.clone() } else { fv.clone() });
+        self.classes.part(part);
         self
     }
     /// Adds an property to this element.

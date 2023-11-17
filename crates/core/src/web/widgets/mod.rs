@@ -139,14 +139,15 @@ macro_rules! generate_tags {
                     #[track_caller]
                     pub fn switch_class<TV, FV, C>(mut self, tv: TV, fv: FV, cond: C) -> Self
                     where
-                        TV: Into<String>,
-                        FV: Into<String>,
+                    TV: Into<String>,
+                    FV: Into<String>,
                         C: Into<Lotus<bool>>,
                     {
                         let tv = tv.into();
                         let fv = fv.into();
                         let cond = cond.into();
-                        self.0.classes.part(Bond::new(move || if *cond.get() { tv.clone() } else { fv.clone() }));
+                        let part = Bond::new(move || if *cond.get() { tv.clone() } else { fv.clone() });
+                        self.0.classes.part(part);
                         self
                     }
 
