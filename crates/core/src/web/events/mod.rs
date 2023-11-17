@@ -8,6 +8,8 @@ mod ssr;
 #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
 pub use ssr::*;
 
+use std::borrow::Cow;
+
 macro_rules! generate_event_types {
     {$(
       $( #[$does_not_bubble:ident] )?
