@@ -74,3 +74,8 @@ impl<E> Custom<E> {
         }
     }
 }
+
+/// Creates a custom event type, this is equal to [`Custom::new`].
+pub fn custom<E: 'static>(name: impl Into<Cow<'static, str>>) -> Custom<E> {
+    Custom::new(name)
+}

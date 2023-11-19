@@ -6,6 +6,7 @@ use anyhow::{bail, Result};
 #[derive(Clone, Debug)]
 pub struct TailwindConfig {
     pub input_file: Utf8PathBuf,
+    pub output_file: Utf8PathBuf,
     pub config_file: Utf8PathBuf,
 }
 
@@ -20,12 +21,20 @@ impl TailwindConfig {
             return Ok(None);
         };
 
+        let mut output_file = Utf8PathBuf::new();
+        output_file.push("target/front/");
+        output_file.push(&input_file);
+
         let config_file = conf.config_dir.join(
             conf.tailwind_config_file
                 .clone()
                 .unwrap_or_else(|| Utf8PathBuf::from("tailwind.config.js")),
         );
 
-        Ok(Some(Self { input_file, config_file }))
+        Ok(Some(Self {
+            input_file,
+            output_file,
+            config_file,
+        }))
     }
 }

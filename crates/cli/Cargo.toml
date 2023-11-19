@@ -21,7 +21,7 @@ serde = { workspace = true, features = ["derive"] }
 anyhow = { workspace = true }
 log = "0.4"
 flexi_logger = "0.27"
-lightningcss = { version = "1.0.0-alpha.47", features = ["browserslist"] }
+lightningcss = { version = "1.0.0-alpha.51", features = ["browserslist"] }
 salvo = { workspace = true, features = ["websocket"] }
 tokio = { version = "1.4", default-features = false, features = ["full"] }
 # not using notify 5.0 because it uses Crossbeam which has an issue with tokio
