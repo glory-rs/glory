@@ -105,20 +105,20 @@ async fn bindgen(proj: &Project) -> Result<Outcome<Product>> {
             _ => {}
         }
         let data = fs::read(&wasm_file.dest).await?;
-
-        let br_file = File::create(format!("{}.br", wasm_file.dest.as_str()))?;
-        let mut br_writer = CompressorWriter::new(
-            br_file,
-            32 * 1024, // 32 KiB buffer
-            11,        // BROTLI_PARAM_QUALITY
-            22,        // BROTLI_PARAM_LGWIN
-        );
-        br_writer.write_all(&data)?;
-
-        let zstd_data = zstd::encode_all(&*data, 21)?;
-        let mut zstd_file = File::create(format!("{}.zst", wasm_file.dest.as_str()))?;
-        zstd_file.write_all(&zstd_data)?;
     }
+
+    let br_file = File::create(format!("{}.br", wasm_file.dest.as_str()))?;
+    let mut br_writer = CompressorWriter::new(
+        br_file,
+        32 * 1024, // 32 KiB buffer
+        11,        // BROTLI_PARAM_QUALITY
+        22,        // BROTLI_PARAM_LGWIN
+    );
+    br_writer.write_all(&data)?;
+
+    let zstd_data = zstd::encode_all(&*data, 21)?;
+    let mut zstd_file = File::create(format!("{}.zst", wasm_file.dest.as_str()))?;
+    zstd_file.write_all(&zstd_data)?;
 
     let mut js_changed = false;
 
