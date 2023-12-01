@@ -104,9 +104,9 @@ async fn bindgen(proj: &Project) -> Result<Outcome<Product>> {
             CommandResult::Failure(_) => return Ok(Outcome::Failed),
             _ => {}
         }
-        let data = fs::read(&wasm_file.dest).await?;
     }
 
+    let data = fs::read(&wasm_file.dest).await?;
     let br_file = File::create(format!("{}.br", wasm_file.dest.as_str()))?;
     let mut br_writer = CompressorWriter::new(
         br_file,
