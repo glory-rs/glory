@@ -116,7 +116,7 @@ async fn bindgen(proj: &Project) -> Result<Outcome<Product>> {
         br_writer.write_all(&data)?;
 
         let zstd_data = zstd::encode_all(&*data, 21)?;
-        let mut zstd_file = File::create(format!("{}.br", wasm_file.dest.as_str()))?;
+        let mut zstd_file = File::create(format!("{}.zst", wasm_file.dest.as_str()))?;
         zstd_file.write_all(&zstd_data)?;
     }
 

@@ -1,0 +1,2 @@
+[build]
+target-dir = "target" # path of where to place all generated artifacts
