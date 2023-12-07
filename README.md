@@ -11,6 +11,8 @@ Glory is a experimental rust web front framework modified from leptos.
 
 Your can find examples in [examples](./examples/) folder. 
 
+Online example: [http://glory.rs:8000](http://glory.rs:8000).
+
 ## 🩸 Contributing
 
 Contributions are absolutely, positively welcome and encouraged! Contributions come in many forms. You could:
