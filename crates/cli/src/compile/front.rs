@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use brotli::CompressorWriter;
 use camino::{Utf8Path, Utf8PathBuf};
+use flate2::write::GzEncoder;
 use tokio::process::Child;
 use tokio::{process::Command, sync::broadcast, task::JoinHandle};
 use wasm_bindgen_cli_support::Bindgen;
@@ -119,6 +120,10 @@ async fn bindgen(proj: &Project) -> Result<Outcome<Product>> {
     let zstd_data = zstd::encode_all(&*data, 21)?;
     let mut zstd_file = File::create(format!("{}.zst", wasm_file.dest.as_str()))?;
     zstd_file.write_all(&zstd_data)?;
+
+    let gzip_file = File::create(format!("{}.gz", wasm_file.dest.as_str()))?;
+    let mut gzip_encoder = GzEncoder::new(gzip_file, flate2::Compression::best());
+    gzip_encoder.write_all(&data)?;
 
     let mut js_changed = false;
 

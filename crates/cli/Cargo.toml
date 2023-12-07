@@ -36,7 +36,7 @@ lightningcss = { version = "1.0.0-alpha.51", features = ["browserslist"] }
 log = "0.4"
 # not using notify 5.0 because it uses Crossbeam which has an issue with tokio
 notify = "4"
-once_cell ={ workspace = true }
+once_cell = { workspace = true }
 reqwest = { version = "0.11", features = ["blocking", "__tls", "default-tls", "native-tls-crate", "json"], default-features = false }
 salvo = { workspace = true, features = ["websocket"] }
 seahash = "4.1"
