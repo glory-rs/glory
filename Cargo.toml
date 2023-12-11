@@ -5,7 +5,7 @@ exclude = ["examples"]
 resolver = "2"
 
 [workspace.package]
-version = "0.3.0"
+version = "0.3.1"
 authors = ["Chrislearn Young <chrislearn@hotmail.com>"]
 edition = "2021"
 rust-version = "1.73"
@@ -21,9 +21,9 @@ license = "MIT OR Apache-2.0"
 categories = ["web-programming::http-server", "web-programming::websocket", "network-programming", "asynchronous"]
 
 [workspace.dependencies]
-glory-core = { version = "0.3.0", path = "crates/core", default-features = false }#
-glory-routing = { version = "0.3.0", path = "crates/routing", default-features = false }
-glory-hot-reload = { version = "0.3.0", path = "crates/hot-reload" }
+glory-core = { version = "0.3.1", path = "crates/core", default-features = false }#
+glory-routing = { version = "0.3.1", path = "crates/routing", default-features = false }
+glory-hot-reload = { version = "0.3.1", path = "crates/hot-reload" }
 
 anyhow = "1"
 async-trait = "0.1.42"
