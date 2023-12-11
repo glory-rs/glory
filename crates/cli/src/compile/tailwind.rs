@@ -26,7 +26,8 @@ pub async fn compile_tailwind(_proj: &Project, tw_conf: &TailwindConfig) -> Resu
 
             if done {
                 log::info!("Tailwind finished {}", GRAY.paint(line));
-                Ok(Outcome::Success(output.stdout()))
+                let css = std::fs::read_to_string(&tw_conf.output_file).context("read tailwind output")?;
+                Ok(Outcome::Success(css))
             } else {
                 log::warn!("Tailwind failed {}", GRAY.paint(line));
                 println!("{}\n{}", output.stdout(), output.stderr());
@@ -64,7 +65,14 @@ async fn create_default_tailwind_config(tw_conf: &TailwindConfig) -> Result<()> 
 pub async fn tailwind_process(cmd: &str, tw_conf: &TailwindConfig) -> Result<(String, Command)> {
     let tailwind = Exe::Tailwind.get().await.dot()?;
 
-    let args: Vec<&str> = vec!["--input", tw_conf.input_file.as_str(), "--config", tw_conf.config_file.as_str()];
+    let args: Vec<&str> = vec![
+        "--input",
+        tw_conf.input_file.as_str(),
+        "--output",
+        tw_conf.output_file.as_str(),
+        "--config",
+        tw_conf.config_file.as_str(),
+    ];
     let line = format!("{} {}", cmd, args.join(" "));
     let mut command = Command::new(tailwind);
     command.args(args);

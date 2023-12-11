@@ -1,5 +1,14 @@
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Write;
 use std::sync::Arc;
+
+use brotli::CompressorWriter;
+use camino::{Utf8Path, Utf8PathBuf};
+use flate2::write::GzEncoder;
+use tokio::process::Child;
+use tokio::{process::Command, sync::broadcast, task::JoinHandle};
+use wasm_bindgen_cli_support::Bindgen;
 
 use super::ChangeSet;
 use crate::config::Project;
@@ -14,10 +23,6 @@ use crate::{
     },
     logger::GRAY,
 };
-use camino::{Utf8Path, Utf8PathBuf};
-use tokio::process::Child;
-use tokio::{process::Command, sync::broadcast, task::JoinHandle};
-use wasm_bindgen_cli_support::Bindgen;
 
 pub async fn front(proj: &Arc<Project>, changes: &ChangeSet) -> JoinHandle<Result<Outcome<Product>>> {
     let proj = proj.clone();
@@ -101,6 +106,24 @@ async fn bindgen(proj: &Project) -> Result<Outcome<Product>> {
             _ => {}
         }
     }
+
+    let data = fs::read(&wasm_file.dest).await?;
+    let br_file = File::create(format!("{}.br", wasm_file.dest.as_str()))?;
+    let mut br_writer = CompressorWriter::new(
+        br_file,
+        32 * 1024, // 32 KiB buffer
+        11,        // BROTLI_PARAM_QUALITY
+        22,        // BROTLI_PARAM_LGWIN
+    );
+    br_writer.write_all(&data)?;
+
+    let zstd_data = zstd::encode_all(&*data, 21)?;
+    let mut zstd_file = File::create(format!("{}.zst", wasm_file.dest.as_str()))?;
+    zstd_file.write_all(&zstd_data)?;
+
+    let gzip_file = File::create(format!("{}.gz", wasm_file.dest.as_str()))?;
+    let mut gzip_encoder = GzEncoder::new(gzip_file, flate2::Compression::best());
+    gzip_encoder.write_all(&data)?;
 
     let mut js_changed = false;
 

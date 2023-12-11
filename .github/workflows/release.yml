@@ -54,7 +54,7 @@ jobs:
           - crate: glory
             path: crates/glory
           - crate: glory-cli
-            path: crates/glory-cli
+            path: crates/cli
     steps:
       - uses: dtolnay/rust-toolchain@stable
         with:

@@ -85,7 +85,7 @@ fn browser_lists(query: &str) -> Result<Option<Browsers>> {
 async fn process_css(proj: &Project, css: String) -> Result<Product> {
     let browsers = browser_lists(&proj.style.browser_query).context("glory.style.browser_query")?;
 
-    let mut stylesheet = StyleSheet::parse(&css, ParserOptions::default()).map_err(|e| anyhow!("{e}"))?;
+    let mut stylesheet = StyleSheet::parse(&css, ParserOptions::default()).map_err(|e| anyhow!("lightingcss: {e}"))?;
 
     if proj.release {
         stylesheet.minify(MinifyOptions::default())?;
