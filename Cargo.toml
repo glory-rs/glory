@@ -29,7 +29,7 @@ anyhow = "1"
 async-trait = "0.1.42"
 base64 = "0.21"
 cfg-if = "1"
-config = { version = "0.13", default-features = false, features = ["toml"] }
+config = { version = "0.14", default-features = false, features = ["toml"] }
 educe = "0.5"
 form_urlencoded = "1"
 futures = "0.3"
