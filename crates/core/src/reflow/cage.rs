@@ -7,9 +7,9 @@ use educe::Educe;
 use indexmap::IndexSet;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::{Bond, Revisable, RevisableId, PENDING_ITEMS, REVISING_ITEMS, TRACKING_STACK};
-use crate::reflow::{self, scheduler, Lotus};
+use super::{Bond, PENDING_ITEMS, REVISING_ITEMS, Revisable, RevisableId, TRACKING_STACK};
 use crate::ViewId;
+use crate::reflow::{self, Lotus, scheduler};
 
 #[derive(Educe)]
 #[educe(Debug)]

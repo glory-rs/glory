@@ -13,7 +13,7 @@ use wasm_bindgen_cli_support::Bindgen;
 use super::ChangeSet;
 use crate::config::Project;
 use crate::ext::fs;
-use crate::ext::sync::{wait_interruptible, CommandResult};
+use crate::ext::sync::{CommandResult, wait_interruptible};
 use crate::service::site::SiteFile;
 use crate::signal::{Interrupt, Outcome, Product};
 use crate::{

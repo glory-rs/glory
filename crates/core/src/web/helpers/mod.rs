@@ -4,7 +4,7 @@ use std::time::Duration;
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
 use tracing::instrument;
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
-use wasm_bindgen::{closure::Closure, JsCast, JsValue, UnwrapThrowExt};
+use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt, closure::Closure};
 
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
 use crate::{

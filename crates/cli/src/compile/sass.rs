@@ -1,7 +1,7 @@
 use crate::{
     ext::{
         anyhow::{Context, Result},
-        sync::{wait_piped_interruptible, CommandResult, OutputExt},
+        sync::{CommandResult, OutputExt, wait_piped_interruptible},
     },
     logger::GRAY,
     signal::{Interrupt, Outcome},

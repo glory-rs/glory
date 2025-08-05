@@ -4,7 +4,7 @@ use super::ChangeSet;
 use crate::{
     config::Project,
     ext::anyhow::{Context, Result},
-    ext::sync::{wait_interruptible, CommandResult},
+    ext::sync::{CommandResult, wait_interruptible},
     logger::GRAY,
     signal::{Interrupt, Outcome, Product},
 };

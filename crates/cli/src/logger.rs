@@ -1,7 +1,7 @@
 use ansi_term::Colour::Fixed;
 use flexi_logger::{
-    filter::{LogLineFilter, LogLineWriter},
     DeferredNow, Level, Record,
+    filter::{LogLineFilter, LogLineWriter},
 };
 use once_cell::sync::Lazy;
 use std::io::Write;

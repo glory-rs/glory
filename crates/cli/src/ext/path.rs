@@ -1,4 +1,4 @@
-use crate::ext::anyhow::{anyhow, Context, Result};
+use crate::ext::anyhow::{Context, Result, anyhow};
 use camino::{Utf8Path, Utf8PathBuf};
 
 pub trait PathExt {
@@ -46,11 +46,7 @@ impl PathExt for Utf8Path {
             .strip_prefix(base)
             .map(|p| p.to_path_buf())
             .map_err(|_| anyhow!("Could not remove base {base:?} from {self:?}"))?;
-        if path == "" {
-            Ok(Utf8PathBuf::from("."))
-        } else {
-            Ok(path)
-        }
+        if path == "" { Ok(Utf8PathBuf::from(".")) } else { Ok(path) }
     }
 }
 
@@ -62,11 +58,7 @@ impl PathBufExt for Utf8PathBuf {
 
     fn test_string(&self) -> String {
         let s = self.to_string().replace('\\', "/");
-        if s.ends_with(".exe") {
-            s[..s.len() - 4].to_string()
-        } else {
-            s
-        }
+        if s.ends_with(".exe") { s[..s.len() - 4].to_string() } else { s }
     }
 
     fn starts_with_any(&self, of: &[Utf8PathBuf]) -> bool {
@@ -214,11 +206,7 @@ pub fn determine_pdb_filename(path: &Utf8PathBuf) -> Option<Utf8PathBuf> {
             let new_filename: Utf8PathBuf = format!("{stem}.pdb").into();
             let mut full_path: Utf8PathBuf = path.parent().unwrap_or("".into()).into();
             full_path.push(new_filename);
-            if full_path.exists() {
-                Some(full_path)
-            } else {
-                None
-            }
+            if full_path.exists() { Some(full_path) } else { None }
         }
         None => None,
     }

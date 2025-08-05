@@ -3,8 +3,8 @@ use crate::{
     compile::{sass::compile_sass, tailwind::compile_tailwind},
     config::Project,
     ext::{
-        anyhow::{anyhow, bail, Context, Result},
         PathBufExt,
+        anyhow::{Context, Result, anyhow, bail},
     },
     fs,
     logger::GRAY,

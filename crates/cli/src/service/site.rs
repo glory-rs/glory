@@ -10,8 +10,9 @@ use tokio::sync::RwLock;
 use crate::{
     config::ProjectConfig,
     ext::{
+        PathBufExt,
         anyhow::{Context, Result},
-        fs, PathBufExt,
+        fs,
     },
 };
 

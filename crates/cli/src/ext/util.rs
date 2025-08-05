@@ -1,4 +1,4 @@
-use crate::ext::anyhow::{bail, Context, Result};
+use crate::ext::anyhow::{Context, Result, bail};
 use camino::Utf8PathBuf;
 use std::borrow::Cow;
 

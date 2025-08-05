@@ -5,7 +5,7 @@ use crate::{
     compile::ChangeSet,
     config::{Config, Project},
     ext::{
-        anyhow::{anyhow, Context, Result},
+        anyhow::{Context, Result, anyhow},
         fs,
     },
 };

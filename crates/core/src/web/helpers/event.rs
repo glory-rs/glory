@@ -1,6 +1,6 @@
 use std::{borrow::Cow, cell::RefCell, collections::HashSet};
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
-use wasm_bindgen::{closure::Closure, convert::FromWasmAbi, intern, JsCast, JsValue, UnwrapThrowExt};
+use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt, closure::Closure, convert::FromWasmAbi, intern};
 
 thread_local! {
     pub static GLOBAL_EVENTS: RefCell<HashSet<Cow<'static, str>>> = RefCell::new(HashSet::new());

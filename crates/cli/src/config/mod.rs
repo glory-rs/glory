@@ -16,8 +16,8 @@ use std::{fmt::Debug, sync::Arc};
 
 pub use self::cli::{Cli, Commands, Log, Opts};
 use crate::ext::{
-    anyhow::{Context, Result},
     MetadataExt,
+    anyhow::{Context, Result},
 };
 use anyhow::bail;
 use camino::{Utf8Path, Utf8PathBuf};

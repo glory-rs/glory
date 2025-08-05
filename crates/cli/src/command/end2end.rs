@@ -5,7 +5,7 @@ use camino::Utf8Path;
 use tokio::process::Command;
 
 use crate::config::{Config, Project};
-use crate::ext::anyhow::{anyhow, Context, Result};
+use crate::ext::anyhow::{Context, Result, anyhow};
 use crate::service::serve;
 use crate::signal::Interrupt;
 

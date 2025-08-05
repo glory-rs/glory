@@ -11,7 +11,7 @@ use indexmap::IndexSet;
 use super::{PENDING_ITEMS, REVISING_ITEMS};
 #[cfg(not(feature = "__single_holder"))]
 use crate::HolderId;
-use crate::{ViewId, ROOT_VIEWS};
+use crate::{ROOT_VIEWS, ViewId};
 
 thread_local! {
     #[cfg(feature = "__single_holder")]

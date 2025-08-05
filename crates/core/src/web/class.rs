@@ -1,9 +1,9 @@
 use std::fmt;
 
+use crate::ViewId;
 use crate::node::Node;
 use crate::reflow::{Bond, Cage, Lotus, Revisable};
 use crate::web::AttrValue;
-use crate::ViewId;
 
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
 use wasm_bindgen::{JsValue, UnwrapThrowExt};
@@ -69,11 +69,7 @@ impl AttrValue for Classes {
     }
     fn to_string(&self) -> Option<String> {
         let value = self.raw_parts().join(" ");
-        if value.is_empty() {
-            None
-        } else {
-            Some(value)
-        }
+        if value.is_empty() { None } else { Some(value) }
     }
 }
 

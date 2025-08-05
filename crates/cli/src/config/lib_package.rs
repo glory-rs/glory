@@ -1,15 +1,15 @@
 use crate::{
     config::Opts,
     ext::{
-        anyhow::{anyhow, Result},
         MetadataExt, PathBufExt, PathExt,
+        anyhow::{Result, anyhow},
     },
     service::site::{SiteFile, SourcedSiteFile},
 };
 use camino::Utf8PathBuf;
 use cargo_metadata::Metadata;
 
-use super::{project::ProjectDefinition, Profile, ProjectConfig};
+use super::{Profile, ProjectConfig, project::ProjectDefinition};
 
 pub struct LibPackage {
     pub name: String,

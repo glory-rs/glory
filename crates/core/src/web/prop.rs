@@ -3,9 +3,9 @@ use std::fmt;
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
 use wasm_bindgen::{JsValue, UnwrapThrowExt};
 
+use crate::ViewId;
 use crate::node::Node;
 use crate::reflow::{Bond, Cage, Lotus, Revisable};
-use crate::ViewId;
 
 pub trait PropValue: fmt::Debug {
     fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool);

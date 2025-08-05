@@ -1,9 +1,9 @@
 use crate::compile::Change;
 use crate::config::Project;
-use crate::ext::anyhow::{anyhow, Result};
+use crate::ext::anyhow::{Result, anyhow};
 use crate::signal::Interrupt;
 use crate::{
-    ext::{remove_nested, PathBufExt, PathExt},
+    ext::{PathBufExt, PathExt, remove_nested},
     logger::GRAY,
 };
 use camino::Utf8PathBuf;

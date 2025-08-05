@@ -68,11 +68,7 @@ impl Url {
     /// Return the password for this URL, if any, as a percent-encoded ASCII string.
     pub fn password(&self) -> Option<String> {
         let password = self.0.password();
-        if password.is_empty() {
-            None
-        } else {
-            Some(password)
-        }
+        if password.is_empty() { None } else { Some(password) }
     }
 
     /// Return the authority of this URL as an ASCII string.
@@ -96,11 +92,7 @@ impl Url {
     /// IPv6 addresses are given between `[` and `]` brackets.
     pub fn host(&self) -> Option<String> {
         let host = self.0.host();
-        if host.is_empty() {
-            None
-        } else {
-            Some(host)
-        }
+        if host.is_empty() { None } else { Some(host) }
     }
 
     /// Return the port number for this URL, if any.

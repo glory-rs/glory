@@ -1,7 +1,7 @@
 use once_cell::sync::Lazy;
 use tokio::{
     signal,
-    sync::{broadcast, RwLock},
+    sync::{RwLock, broadcast},
     task::JoinHandle,
 };
 

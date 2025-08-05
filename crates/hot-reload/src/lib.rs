@@ -14,9 +14,9 @@ use std::{
     sync::Arc,
 };
 use syn::{
+    Macro,
     spanned::Spanned,
     visit::{self, Visit},
-    Macro,
 };
 use walkdir::WalkDir;
 

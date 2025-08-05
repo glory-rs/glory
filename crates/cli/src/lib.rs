@@ -10,8 +10,8 @@ pub mod service;
 pub mod signal;
 
 use crate::config::Commands;
-use crate::ext::anyhow::{Context, Result};
 use crate::ext::PathBufExt;
+use crate::ext::anyhow::{Context, Result};
 use crate::logger::GRAY;
 use camino::Utf8PathBuf;
 use config::{Cli, Config};

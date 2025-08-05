@@ -10,8 +10,8 @@ use std::fmt::{self, Formatter};
 
 use glory_core::Truck;
 
-use crate::url::Url;
 use crate::PathState;
+use crate::url::Url;
 
 use self::opts::*;
 

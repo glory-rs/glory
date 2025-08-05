@@ -4,9 +4,9 @@ use std::ops::Deref;
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
 use wasm_bindgen::UnwrapThrowExt;
 
+use crate::ViewId;
 use crate::node::Node;
 use crate::reflow::{Bond, Cage, Revisable};
-use crate::ViewId;
 
 /// Represents the different possible values an attribute node could have.
 ///
@@ -72,11 +72,7 @@ impl AttrValue for bool {
         }
     }
     fn to_string(&self) -> Option<String> {
-        if *self {
-            Some("".into())
-        } else {
-            None
-        }
+        if *self { Some("".into()) } else { None }
     }
 }
 

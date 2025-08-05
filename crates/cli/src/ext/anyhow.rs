@@ -2,9 +2,9 @@ use core::convert::Infallible;
 use std::fmt::Display;
 use std::panic::Location;
 
+pub use anyhow::{Chain, Error, Ok, Result};
 /// re-exports
 pub use anyhow::{anyhow, bail, ensure};
-pub use anyhow::{Chain, Error, Ok, Result};
 
 pub trait Context<T, E> {
     fn context<C>(self, context: C) -> Result<T>

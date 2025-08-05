@@ -4,11 +4,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use indexmap::{IndexMap, IndexSet};
 
-use crate::node::Node;
-use crate::view::{View, ViewId, ViewPosition, VIEW_ID_DELIMITER};
 #[cfg(not(feature = "__single_holder"))]
 use crate::HolderId;
-use crate::{reflow, Truck};
+use crate::node::Node;
+use crate::view::{VIEW_ID_DELIMITER, View, ViewId, ViewPosition};
+use crate::{Truck, reflow};
 
 #[derive(Debug)]
 pub struct Scope {

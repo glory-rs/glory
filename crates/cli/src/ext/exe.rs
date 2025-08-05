@@ -1,5 +1,5 @@
 use crate::{
-    ext::anyhow::{bail, Context, Result},
+    ext::anyhow::{Context, Result, bail},
     logger::GRAY,
 };
 use bytes::Bytes;

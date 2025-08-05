@@ -4,10 +4,10 @@ use tokio::process::Command;
 use crate::{
     config::{Project, TailwindConfig},
     ext::{
+        Exe,
         anyhow::Context,
         fs,
-        sync::{wait_piped_interruptible, CommandResult, OutputExt},
-        Exe,
+        sync::{CommandResult, OutputExt, wait_piped_interruptible},
     },
     logger::GRAY,
     signal::{Interrupt, Outcome},

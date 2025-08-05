@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::{view::ViewPosition, Node, Scope, View, ViewId};
+use crate::{Node, Scope, View, ViewId, view::ViewPosition};
 pub trait Widget: fmt::Debug + 'static {
     fn store_in(self, parent: &mut Scope) -> ViewId
     where

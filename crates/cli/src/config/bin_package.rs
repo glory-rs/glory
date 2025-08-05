@@ -4,12 +4,12 @@ use cargo_metadata::{Metadata, Target};
 use crate::{
     config::Opts,
     ext::{
-        anyhow::{anyhow, bail, Error, Result},
         MetadataExt, PackageExt, PathBufExt, PathExt,
+        anyhow::{Error, Result, anyhow, bail},
     },
 };
 
-use super::{project::ProjectDefinition, Profile, ProjectConfig};
+use super::{Profile, ProjectConfig, project::ProjectDefinition};
 
 pub struct BinPackage {
     pub name: String,
