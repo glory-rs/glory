@@ -1,4 +1,5 @@
 use rstml::node::{NodeElement, NodeName};
+use rstml::Infallible;
 
 ///
 /// Converts `syn::Block` to simple expression
@@ -60,6 +61,6 @@ pub fn is_component_tag_name(name: &NodeName) -> bool {
     }
 }
 
-pub fn is_component_node(node: &NodeElement) -> bool {
+pub fn is_component_node(node: &NodeElement<Infallible>) -> bool {
     is_component_tag_name(node.name())
 }

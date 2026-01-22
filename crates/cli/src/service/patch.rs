@@ -8,7 +8,7 @@ use crate::{
 use camino::Utf8PathBuf;
 use glory_hot_reload::ViewMacros;
 use itertools::Itertools;
-use notify::{DebouncedEvent, RecursiveMode, Watcher};
+use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
@@ -31,24 +31,29 @@ pub async fn spawn(proj: &Arc<Project>, view_macros: &ViewMacros) -> Result<Join
 }
 
 async fn run(paths: &[Utf8PathBuf], proj: Arc<Project>, view_macros: ViewMacros) {
-    let (sync_tx, sync_rx) = std::sync::mpsc::channel::<DebouncedEvent>();
+    let (sync_tx, sync_rx) = std::sync::mpsc::channel::<Result<Event, notify::Error>>();
 
     let proj = proj.clone();
     std::thread::spawn(move || {
-        while let Ok(event) = sync_rx.recv() {
-            match Watched::try_new(&event, &proj) {
-                Ok(Some(watched)) => handle(watched, proj.clone(), view_macros.clone()),
-                Err(e) => log::error!("Notify error {e}"),
-                _ => log::trace!("Notify not handled {}", GRAY.paint(format!("{:?}", event))),
+        while let Ok(event_result) = sync_rx.recv() {
+            match event_result {
+                Ok(event) => match Watched::try_new(&event, &proj) {
+                    Ok(Some(watched)) => handle(watched, proj.clone(), view_macros.clone()),
+                    Err(e) => log::error!("Notify error {e}"),
+                    _ => log::trace!("Notify not handled {}", GRAY.paint(format!("{:?}", event))),
+                },
+                Err(e) => log::error!("Notify watch error: {e}"),
             }
         }
         log::debug!("Notify stopped");
     });
 
-    let mut watcher = notify::watcher(sync_tx, Duration::from_millis(200)).expect("failed to build file system watcher");
+    let config = Config::default().with_poll_interval(Duration::from_millis(200));
+    let mut watcher: RecommendedWatcher =
+        Watcher::new(sync_tx, config).expect("failed to build file system watcher");
 
     for path in paths {
-        if let Err(e) = watcher.watch(path, RecursiveMode::Recursive) {
+        if let Err(e) = watcher.watch(path.as_std_path(), RecursiveMode::Recursive) {
             log::error!("Notify could not watch {path:?} due to {e:?}");
         }
     }

@@ -22,13 +22,12 @@ impl PackageExt for Package {
         Box::new(self.targets.iter().filter(|t| t.is_bin()))
     }
     fn cdylib_target(&self) -> Option<&Target> {
-        let cdylib: String = "cdylib".to_string();
-        self.targets.iter().find(|t| t.crate_types.contains(&cdylib))
+        self.targets.iter().find(|t| t.crate_types.iter().any(|ct| ct.to_string() == "cdylib"))
     }
     fn target_list(&self) -> String {
         self.targets
             .iter()
-            .map(|t| format!("{} ({})", t.name, t.crate_types.join(", ")))
+            .map(|t| format!("{} ({})", t.name, t.crate_types.iter().map(|ct| ct.to_string()).collect::<Vec<_>>().join(", ")))
             .collect::<Vec<_>>()
             .join(", ")
     }

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
 use std::io::Write;
 use std::sync::Arc;
@@ -152,7 +152,7 @@ async fn optimize(file: &Utf8Path, interrupt: broadcast::Receiver<()>) -> Result
     wait_interruptible("wasm-opt", process, interrupt).await
 }
 
-async fn write_snippets(proj: &Project, snippets: &HashMap<String, Vec<String>>) -> Result<bool> {
+async fn write_snippets(proj: &Project, snippets: &BTreeMap<String, Vec<String>>) -> Result<bool> {
     let mut js_changed = false;
 
     // Provide inline JS files

@@ -8,7 +8,7 @@ use crate::{
 };
 use camino::Utf8PathBuf;
 use itertools::Itertools;
-use notify::{DebouncedEvent, RecursiveMode, Watcher};
+use notify::{Config, Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::HashSet;
 use std::path::Path;
 use std::sync::Arc;
@@ -44,24 +44,29 @@ pub async fn spawn(proj: &Arc<Project>) -> Result<JoinHandle<()>> {
 }
 
 async fn run(paths: &[Utf8PathBuf], proj: Arc<Project>) {
-    let (sync_tx, sync_rx) = std::sync::mpsc::channel::<DebouncedEvent>();
+    let (sync_tx, sync_rx) = std::sync::mpsc::channel::<Result<Event, notify::Error>>();
 
     let proj = proj.clone();
     std::thread::spawn(move || {
-        while let Ok(event) = sync_rx.recv() {
-            match Watched::try_new(&event, &proj) {
-                Ok(Some(watched)) => handle(watched, proj.clone()),
-                Err(e) => log::error!("Notify error {e}"),
-                _ => log::trace!("Notify not handled {}", GRAY.paint(format!("{:?}", event))),
+        while let Ok(event_result) = sync_rx.recv() {
+            match event_result {
+                Ok(event) => match Watched::try_new(&event, &proj) {
+                    Ok(Some(watched)) => handle(watched, proj.clone()),
+                    Err(e) => log::error!("Notify error {e}"),
+                    _ => log::trace!("Notify not handled {}", GRAY.paint(format!("{:?}", event))),
+                },
+                Err(e) => log::error!("Notify watch error: {e}"),
             }
         }
         log::debug!("Notify stopped");
     });
 
-    let mut watcher = notify::watcher(sync_tx, Duration::from_millis(200)).expect("failed to build file system watcher");
+    let config = Config::default().with_poll_interval(Duration::from_millis(200));
+    let mut watcher: RecommendedWatcher =
+        Watcher::new(sync_tx, config).expect("failed to build file system watcher");
 
     for path in paths {
-        if let Err(e) = watcher.watch(path, RecursiveMode::Recursive) {
+        if let Err(e) = watcher.watch(path.as_std_path(), RecursiveMode::Recursive) {
             log::error!("Notify could not watch {path:?} due to {e:?}");
         }
     }
@@ -138,24 +143,38 @@ fn convert(p: &Path, proj: &Project) -> Result<Utf8PathBuf> {
 }
 
 impl Watched {
-    pub(crate) fn try_new(event: &DebouncedEvent, proj: &Project) -> Result<Option<Self>> {
-        use DebouncedEvent::{Chmod, Create, Error, NoticeRemove, NoticeWrite, Remove, Rename, Rescan, Write};
+    pub(crate) fn try_new(event: &Event, proj: &Project) -> Result<Option<Self>> {
+        use EventKind::*;
 
-        Ok(match event {
-            Chmod(_) | NoticeRemove(_) | NoticeWrite(_) => None,
-            Create(f) => Some(Self::Create(convert(f, proj)?)),
-            Remove(f) => Some(Self::Remove(convert(f, proj)?)),
-            Rename(f, t) => Some(Self::Rename(convert(f, proj)?, convert(t, proj)?)),
-            Write(f) => Some(Self::Write(convert(f, proj)?)),
-            Rescan => Some(Self::Rescan),
-            Error(e, Some(p)) => {
-                log::error!("Notify error watching {p:?}: {e:?}");
-                None
+        let paths = &event.paths;
+        if paths.is_empty() {
+            return Ok(None);
+        }
+
+        Ok(match &event.kind {
+            Access(_) => None,
+            Create(_) => Some(Self::Create(convert(&paths[0], proj)?)),
+            Remove(_) => Some(Self::Remove(convert(&paths[0], proj)?)),
+            Modify(modify_kind) => {
+                use notify::event::ModifyKind;
+                match modify_kind {
+                    ModifyKind::Name(rename_mode) => {
+                        use notify::event::RenameMode;
+                        match rename_mode {
+                            RenameMode::Both if paths.len() >= 2 => {
+                                Some(Self::Rename(convert(&paths[0], proj)?, convert(&paths[1], proj)?))
+                            }
+                            RenameMode::From => Some(Self::Remove(convert(&paths[0], proj)?)),
+                            RenameMode::To => Some(Self::Create(convert(&paths[0], proj)?)),
+                            _ => None,
+                        }
+                    }
+                    ModifyKind::Data(_) | ModifyKind::Any => Some(Self::Write(convert(&paths[0], proj)?)),
+                    _ => None,
+                }
             }
-            Error(e, None) => {
-                log::error!("Notify error: {e:?}");
-                None
-            }
+            Other => Some(Self::Rescan),
+            Any => Some(Self::Write(convert(&paths[0], proj)?)),
         })
     }
 
