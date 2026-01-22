@@ -1,5 +1,5 @@
-use rstml::node::{NodeElement, NodeName};
 use rstml::Infallible;
+use rstml::node::{NodeElement, NodeName};
 
 ///
 /// Converts `syn::Block` to simple expression

@@ -49,8 +49,7 @@ async fn run(paths: &[Utf8PathBuf], proj: Arc<Project>, view_macros: ViewMacros)
     });
 
     let config = Config::default().with_poll_interval(Duration::from_millis(200));
-    let mut watcher: RecommendedWatcher =
-        Watcher::new(sync_tx, config).expect("failed to build file system watcher");
+    let mut watcher: RecommendedWatcher = Watcher::new(sync_tx, config).expect("failed to build file system watcher");
 
     for path in paths {
         if let Err(e) = watcher.watch(path.as_std_path(), RecursiveMode::Recursive) {

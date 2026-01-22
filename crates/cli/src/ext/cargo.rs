@@ -27,7 +27,13 @@ impl PackageExt for Package {
     fn target_list(&self) -> String {
         self.targets
             .iter()
-            .map(|t| format!("{} ({})", t.name, t.crate_types.iter().map(|ct| ct.to_string()).collect::<Vec<_>>().join(", ")))
+            .map(|t| {
+                format!(
+                    "{} ({})",
+                    t.name,
+                    t.crate_types.iter().map(|ct| ct.to_string()).collect::<Vec<_>>().join(", ")
+                )
+            })
             .collect::<Vec<_>>()
             .join(", ")
     }

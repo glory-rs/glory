@@ -62,8 +62,7 @@ async fn run(paths: &[Utf8PathBuf], proj: Arc<Project>) {
     });
 
     let config = Config::default().with_poll_interval(Duration::from_millis(200));
-    let mut watcher: RecommendedWatcher =
-        Watcher::new(sync_tx, config).expect("failed to build file system watcher");
+    let mut watcher: RecommendedWatcher = Watcher::new(sync_tx, config).expect("failed to build file system watcher");
 
     for path in paths {
         if let Err(e) = watcher.watch(path.as_std_path(), RecursiveMode::Recursive) {
@@ -161,9 +160,7 @@ impl Watched {
                     ModifyKind::Name(rename_mode) => {
                         use notify::event::RenameMode;
                         match rename_mode {
-                            RenameMode::Both if paths.len() >= 2 => {
-                                Some(Self::Rename(convert(&paths[0], proj)?, convert(&paths[1], proj)?))
-                            }
+                            RenameMode::Both if paths.len() >= 2 => Some(Self::Rename(convert(&paths[0], proj)?, convert(&paths[1], proj)?)),
                             RenameMode::From => Some(Self::Remove(convert(&paths[0], proj)?)),
                             RenameMode::To => Some(Self::Create(convert(&paths[0], proj)?)),
                             _ => None,
