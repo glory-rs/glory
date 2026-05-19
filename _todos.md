@@ -53,7 +53,7 @@
 - [x] **P2** `operations.reverse(); while pop` 的写法不直观。改为正向迭代 + 显式 cursor,降低维护成本。 — 重写后整段消失。
 - [ ] **P2** `key_view_ids` 当前是 `IndexMap<Key, ViewId>`,但同一 key 必然只有一个 view,实际只用到 map 性质;可以是 `HashMap`(更快)+ 显式 `Vec<Key>` 维护顺序。
 - [ ] **P2** 支持 `Lotus<&[T]>` / `Lotus<VecDeque<T>>` / `Lotus<im::Vector<T>>` 等其他容器(目前限 `AsRef<[Value]>`)。可以借助 `Lotus<impl IntoIterator<Item=&T>>` 抽象。
-- [ ] **P3** 给 `Each` 加 entrance/exit 动画钩子(Solid 的 `<TransitionGroup>` 风格):`on_enter(&Scope) / on_exit(&Scope)`。复杂度低、用户价值高。
+- [x] **P3** 给 `Each` 加 entrance/exit 动画钩子(Solid 的 `<TransitionGroup>` 风格):`on_enter(&Scope) / on_exit(&Scope)`。复杂度低、用户价值高。 — `Each::on_enter(|view_id|)` / `Each::on_exit(|view_id|)` builder 方法。on_enter 在 attach 之后触发(节点已在 DOM 上),on_exit 在 detach 之前触发(用户可读取消失视图的状态)。`each_on_enter_on_exit_hooks_fire` 测试覆盖 initial/append/remove/reverse 四种情况。
 - [ ] **P3** 性能基准:写一个 `examples/each-bench`,做"反转、随机洗牌、首尾插入、清空"四种压测,记基线数据。LIS 改造后跑同一份对比,放进 PR 描述。
 
 **算法落地伪代码(供实现参考):**
@@ -194,7 +194,7 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 - 额外:发现并修复 SSR Node / Element 锚点 / 默认 flood / `shift_remove` 等 7 处隐藏 bug
 
 **M2(响应式现代化,独立分支)**
-- §2 P0(代际盒 + `SyncStorage`,这是真正破坏性的 API 重构)
+- §2 P0(代际盒 + `SyncStorage`,这是真正破坏性的 API 重构;`crates/core/src/reflow/storage.rs` 已经把 arena + `Handle<T>: Copy` 的地基铺好,4 个单测覆盖;真正切换 `Cage` 到 arena 需要解决 `Cage::get()` 返回 `Ref<'_, T>` 的自引用问题,这是 PR 量级)
 - §5 P2 `subsecond` 风格 hot reload(依赖代际盒)
 
 **M3(渲染层抽象,4–6 周,独立分支)**
