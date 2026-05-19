@@ -2,6 +2,7 @@
 /target
 /**/target
 debug.log
+*.log
 /**/dist
 **/Cargo.lock
 
@@ -13,4 +14,6 @@ dump.rdb
 .vscode
 .temp
 .temp/
-examples/_*
+.history/
+.claude/local/
+examples/_*/

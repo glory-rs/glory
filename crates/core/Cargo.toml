@@ -17,6 +17,13 @@ default = []
 web-csr = ["__single_holder", "dep:wasm-bindgen"]
 web-ssr = ["dep:tokio", "dep:tokio-util", "dep:futures-channel", "dep:base64"]
 salvo = ["dep:salvo", "web-ssr"]
+
+# Internal optimisation flag, automatically enabled by `web-csr`. When on,
+# the framework assumes there is at most one application instance per
+# process (true for browser/WASM) and skips the `HolderId`-keyed thread
+# locals in the reactive scheduler. Enabling this manually in a non-CSR
+# build is unsupported; the double-underscore prefix marks it as
+# internal/unstable on purpose.
 __single_holder = []
 
 [dependencies]
