@@ -44,21 +44,21 @@ impl Debug for ServerHolder {
 impl Drop for ServerHolder {
     fn drop(&mut self) {
         ROOT_VIEWS.with_borrow_mut(|root_views| {
-            root_views.remove(&self.id);
+            root_views.shift_remove(&self.id);
         });
 
         REVISING_ITEMS.with_borrow_mut(|revising_items| {
-            revising_items.remove(&self.id);
+            revising_items.shift_remove(&self.id);
         });
         PENDING_ITEMS.with_borrow_mut(|pending_items| {
-            pending_items.remove(&self.id);
+            pending_items.shift_remove(&self.id);
         });
 
         RUNNING.with_borrow_mut(|running| {
-            running.remove(&self.id);
+            running.shift_remove(&self.id);
         });
         BATCHING.with_borrow_mut(|batching| {
-            batching.remove(&self.id);
+            batching.shift_remove(&self.id);
         });
     }
 }

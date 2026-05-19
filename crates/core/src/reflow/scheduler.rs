@@ -155,7 +155,7 @@ fn run(#[cfg(not(feature = "__single_holder"))] holder_id: HolderId) {
 
                 for view_id in not_found_view_ids {
                     for (_, item) in revising_items.iter() {
-                        item.view_ids().borrow_mut().remove(&view_id);
+                        item.view_ids().borrow_mut().shift_remove(&view_id);
                     }
                 }
             });
@@ -166,7 +166,7 @@ fn run(#[cfg(not(feature = "__single_holder"))] holder_id: HolderId) {
             if #[cfg(feature = "__single_holder")] {
                 let pending_items = PENDING_ITEMS.with(|pending_items| pending_items.take());
             } else {
-                let pending_items = PENDING_ITEMS.with_borrow_mut(|pending_items| pending_items.remove(&holder_id).unwrap_or_default());
+                let pending_items = PENDING_ITEMS.with_borrow_mut(|pending_items| pending_items.shift_remove(&holder_id).unwrap_or_default());
             }
         }
         if !pending_items.is_empty() {
@@ -190,7 +190,7 @@ fn run(#[cfg(not(feature = "__single_holder"))] holder_id: HolderId) {
                     if #[cfg(feature = "__single_holder")] {
                         revising_items.borrow_mut().clear();
                     }  else {
-                        revising_items.borrow_mut().remove(&holder_id);
+                        revising_items.borrow_mut().shift_remove(&holder_id);
                     }
                 }
             });

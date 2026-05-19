@@ -166,7 +166,7 @@ where
         }
     }
     fn unbind_view(&self, view_id: &ViewId) {
-        let count = self.view_ids.borrow_mut().remove(view_id).unwrap_or(0);
+        let count = self.view_ids.borrow_mut().shift_remove(view_id).unwrap_or(0);
         for (_, gather) in self.gathers.borrow().deref() {
             gather.unlace_view(view_id, count);
         }
@@ -174,7 +174,7 @@ where
     fn unlace_view(&self, view_id: &ViewId, loose: usize) {
         let count = self.view_ids.borrow_mut().get(view_id).cloned().unwrap_or(0);
         let loose = if loose >= count {
-            self.view_ids.borrow_mut().remove(view_id);
+            self.view_ids.borrow_mut().shift_remove(view_id);
             count
         } else {
             self.view_ids.borrow_mut().insert(view_id.clone(), count - loose);

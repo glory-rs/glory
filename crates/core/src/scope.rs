@@ -202,7 +202,7 @@ impl Scope {
     }
 
     pub fn detach_child(&mut self, view_id: &ViewId) -> Option<View> {
-        self.show_list.remove(view_id);
+        self.show_list.shift_remove(view_id);
 
         let Some(view) = self.child_views.get_mut(view_id) else {
             return None;
@@ -210,7 +210,12 @@ impl Scope {
         if !view.scope.is_attached() {
             return None;
         }
-        let Some(mut view) = self.child_views.remove(view_id) else {
+        // `shift_remove` preserves the order of remaining siblings, which
+        // sibling-positioning in `attach_child` and reorder paths in
+        // widgets like `Each` depend on. The deprecated `remove` aliases
+        // to `swap_remove`, which would relocate the last view into the
+        // gap and silently corrupt sibling order.
+        let Some(mut view) = self.child_views.shift_remove(view_id) else {
             return None;
         };
 

@@ -43,11 +43,11 @@ where
         (*self.view_ids).borrow_mut().insert(view_id.clone());
     }
     fn unbind_view(&self, view_id: &ViewId) {
-        (*self.view_ids).borrow_mut().remove(view_id);
+        (*self.view_ids).borrow_mut().shift_remove(view_id);
     }
     fn unlace_view(&self, view_id: &ViewId, loose: usize) {
         if loose > 0 {
-            (*self.view_ids).borrow_mut().remove(view_id);
+            (*self.view_ids).borrow_mut().shift_remove(view_id);
         }
     }
     fn clone_boxed(&self) -> Box<dyn Revisable> {
