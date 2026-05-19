@@ -11,11 +11,22 @@
 
 ## 0. 紧急 / 现存 Bug
 
-- [ ] **P0** [`crates/core/src/widgets/each.rs:103`](crates/core/src/widgets/each.rs) 留着 `crate::warn!("key_view_ids: {:?}", key_view_ids);` 调试日志,生产构建噪声且暗示算法没收尾。先移除,然后做下面的 §1 重排算法。
-- [ ] **P1** [`crates/core/src/widgets/switch.rs`](crates/core/src/widgets/switch.rs) `Case::cached_view` 路径:`detach_child` 后 View 从 `ctx.child_views` 移除并存在 `Case::cached_view`,再次激活时只调 `attach_child(&view_id)`,但 `child_views` 已没这个 id。需要把 cached_view 重新塞回 `child_views`(或重做缓存语义)。补一个回归测试。
-- [ ] **P1** [`crates/core/src/widgets/loader.rs`](crates/core/src/widgets/loader.rs) `patch` 中先 `detach_child` 再 `attach_child` 走 `show_list.clone()` 两遍,中间没清空 `show_list`,重复调用会越积越多。审一遍。
-- [ ] **P2** `Bond::version` 用 `.map(|g| g.version()).sum()`([reflow/bond.rs](crates/core/src/reflow/bond.rs)),依赖版本号会碰撞(理论上不同组合可能和相同)。改成 `(id, version)` 对组成的 hash,或者每次依赖变化就单调递增。
+- [x] **P0** [`crates/core/src/widgets/each.rs:103`](crates/core/src/widgets/each.rs) 留着 `crate::warn!("key_view_ids: {:?}", key_view_ids);` 调试日志,生产构建噪声且暗示算法没收尾。先移除,然后做下面的 §1 重排算法。 — 已在 M1 移除([commit 30f6701](https://github.com/glory-rs/glory/pull/32))。
+- [x] **P1** [`crates/core/src/widgets/switch.rs`](crates/core/src/widgets/switch.rs) `Case::cached_view` 路径:`detach_child` 后 View 从 `ctx.child_views` 移除并存在 `Case::cached_view`,再次激活时只调 `attach_child(&view_id)`,但 `child_views` 已没这个 id。需要把 cached_view 重新塞回 `child_views`(或重做缓存语义)。补一个回归测试。 — 已修;`switch_toggles_and_restores_cached_view` 快照测试覆盖。
+- [x] **P1** [`crates/core/src/widgets/loader.rs`](crates/core/src/widgets/loader.rs) `patch` 中先 `detach_child` 再 `attach_child` 走 `show_list.clone()` 两遍,中间没清空 `show_list`,重复调用会越积越多。审一遍。 — 实际 bug 在 `is_revising` 分支前没 detach 旧 result/fallback,导致连续 dep 变化时 subtree 堆叠;已修。
+- [x] **P2** `Bond::version` 用 `.map(|g| g.version()).sum()`([reflow/bond.rs](crates/core/src/reflow/bond.rs)),依赖版本号会碰撞(理论上不同组合可能和相同)。改成 `(id, version)` 对组成的 hash,或者每次依赖变化就单调递增。 — 改为 `(id, version)` 快照逐项比较 + 单调 re-run 计数器。
 - [ ] **P2** `__single_holder` 命名带双下划线,Rust 社区惯例表示"不稳定内部 API"。如果它确实稳定,改名为 `single-app`;否则文档化清楚。
+
+### M1 实现过程中发现并修复的其他 bug(原清单未列)
+
+- [x] **P0** SSR `Node::before_with_node` / `after_with_node` 语义完全坏掉:在 `self.children` 里找新节点的位置,然后把同一个新节点插到那里——等价空操作。所有非默认 reorder 路径在 SSR 下都是坏的。已替换为 parent 视角的 `Node::insert_before` / `Node::insert_after`(配合恒等去重),并加 `Node::ptr_eq`(基于 `Rc::ptr_eq`)。
+- [x] **P0** Element(CSR + SSR)`build` 把 `scope.first_child_node` / `last_child_node` 设成 `node.last_element_child()`,对叶节点(如 `<li>text</li>`)返回 `None`,导致 `Scope::attach_child` 的邻居查找全部回退到 `Tail`,reorder 不工作。改为 `Some(self.node.clone())`(元素自身就是子树外层锚点)。CSR 也修了(浏览器 DOM 之前隐式地"移动而非追加"掩盖了这条 bug)。
+- [x] **P0** 默认 `Widget::flood` 实现统一把所有子视图的 `scope.position = Tail`。结合 `attach_child` 在 `is_attached=true` 时早退(不会执行末尾的 `position = Unset` 重置),Tail 永远留下,后续 patch 时邻居搜索被跳过。删掉这行预设。
+- [x] **P1** `Scope::attach_child` 反向 sibling 查找用 `for i in (index - 1)..=0`,当 `index > 0` 时是空 range。改为 `(0..index).rev()`。
+- [x] **P1** `IndexMap::remove` / `IndexSet::remove` 在新版 indexmap 已 deprecated 并别名到 `swap_remove`(把最后一项搬到删除位)。`Scope::child_views` / `show_list` 依赖顺序,这等于静默数据破坏。全部 core 调用点改为 `shift_remove`(`Scope::detach_child` / `Cage::unbind_view` / `Bond::unbind_view` / `scheduler::run` / `ServerHolder::drop`)。
+- [x] **P2** `GloryConfig::default` ↔ `GloryConfig::new` 互相递归调用,首次调用即 stack overflow。改为直接通过现有 `default_*` 函数构造。
+- [x] **P2** [`crates/core/src/truck.rs`](crates/core/src/truck.rs) 的测试 mod 引用了不存在的 `crate::prelude` / `crate::test` / `transfer` 方法,从来无法编译。清理掉,保留有意义的那个断言。
+- [x] **P2** [`crates/core/src/spawn.rs`](crates/core/src/spawn.rs) `spawn_local` 的 `cfg(any(test, doctest))` 分支调用 `tokio_test::block_on`,但 `tokio_test` 不是依赖,导致 `cargo test` 编译失败。改为让 test 走 `futures::executor` 分支。
 
 ---
 
@@ -29,17 +40,17 @@
 - 应用 operation 时:每个 `Reuse` 都做 `IndexMap::move_index` + `is_attached=false` + `attach_child`,每个 `Insert` 同样把刚 store 的 view `move_index` + `attach_child`。
 
 **算法问题清单:**
-- [ ] **P0** 用 LIS(Longest Increasing Subsequence)选出"不需要移动"的子序列。**只对不在 LIS 中的 item 调用 DOM 移动**,把当前 O(n²) 的最坏复杂度降到 O(n log n) 且实际 DOM 操作数最小化(Vue/Solid 的标准做法)。
-- [ ] **P0** Reuse 路径"位置未变也照样 attach"是浪费。判断:若上一轮 `child_views` 中的 view 索引 == 这一轮目标索引,**完全不动 DOM**。
-- [ ] **P0** `IndexMap::move_index` 单次操作 O(n);连续 N 次 = O(n²)。改为先生成完整目标顺序数组,再一次性 `IndexMap` 重建(把 key 顺序按目标排列填回),最后只对真正需要的节点调 DOM API。
+- [x] **P0** 用 LIS(Longest Increasing Subsequence)选出"不需要移动"的子序列。**只对不在 LIS 中的 item 调用 DOM 移动**,把当前 O(n²) 的最坏复杂度降到 O(n log n) 且实际 DOM 操作数最小化(Vue/Solid 的标准做法)。 — patience-sort 实现见 `lis_positions`,11 个 LIS 单元测试覆盖。
+- [x] **P0** Reuse 路径"位置未变也照样 attach"是浪费。判断:若上一轮 `child_views` 中的 view 索引 == 这一轮目标索引,**完全不动 DOM**。 — LIS 中的位置在 attach 循环里直接 `continue`,零 DOM 操作。
+- [x] **P0** `IndexMap::move_index` 单次操作 O(n);连续 N 次 = O(n²)。改为先生成完整目标顺序数组,再一次性 `IndexMap` 重建(把 key 顺序按目标排列填回),最后只对真正需要的节点调 DOM API。 — 改为单次 `IndexMap::sort_by(target_index)`,稳定 O(n log n)。
 - [ ] **P1** 同一 key 但 value 变化的情况没处理。当前 Tmpl 只在 key 新增时调用一次,后续即使 `Vec<Value>` 内容变了,对应 view 也不会更新。两种修法二选一:
   - (a) 文档化:**必须让 `Tmpl` 内部 reactive 订阅来源 Cage**,Each 不负责 value diff。这是最便宜的做法,但要在 `Each::new` doc 上写清楚。
   - (b) 给 `Each` 加一个可选 `value_fn: Fn(&Value, &mut Scope)` patch 钩子,在 Reuse 时调用,把新 value 推给已存在的 view。
-- [ ] **P1** 把 `ViewOperation::Reuse` / `Insert` 拓展为 `Reuse | Insert | Move | Remove`,语义化区分**位置变化**和**节点变化**;现在 Insert 和 Reuse 都隐含 "需要 attach_child",信号不清。
-- [ ] **P1** 增加"swap two items"快路径:LIS = 1 且只有 2 个 item 时直接 swap,跳过 LIS 计算。
-- [ ] **P1** 增加"head append / tail append / clear"的 O(1)/O(n) 快路径检测,避免普通追加也走 LIS。
-- [ ] **P2** Removed key 的 detach 与 reorder 在同一个 batch 内顺序无保证。当前先 detach removed 再 reorder reused,理论上正确但需要回归测试覆盖"删第一个 + 移动剩余"这种组合。
-- [ ] **P2** `operations.reverse(); while pop` 的写法不直观。改为正向迭代 + 显式 cursor,降低维护成本。
+- [x] **P1** ~~把 `ViewOperation::Reuse` / `Insert` 拓展为 `Reuse | Insert | Move | Remove`~~ — 重写后整个 `ViewOperation` 枚举不复存在,语义直接由 LIS 决策 + `newly_created` 数组表达;条目作废。
+- [x] **P1** 增加"swap two items"快路径:LIS = 1 且只有 2 个 item 时直接 swap,跳过 LIS 计算。 — LIS 算法自然达到最小移动数,无需特例;`each_swap_adjacent` 测试覆盖。
+- [x] **P1** 增加"head append / tail append / clear"的 O(1)/O(n) 快路径检测,避免普通追加也走 LIS。 — LIS 在 append / clear / 大段不变时是 O(n) 路径,DOM 操作数最小;`each_append_tail` / `each_prepend_head` / `each_clear` 测试覆盖。如果未来 profiling 显示 LIS 开销可见,再考虑显式快路径。
+- [x] **P2** Removed key 的 detach 与 reorder 在同一个 batch 内顺序无保证。当前先 detach removed 再 reorder reused,理论上正确但需要回归测试覆盖"删第一个 + 移动剩余"这种组合。 — `each_remove_middle` / `each_remove_then_readd_same_key` / `each_shuffle_keeps_all_keys` 覆盖。
+- [x] **P2** `operations.reverse(); while pop` 的写法不直观。改为正向迭代 + 显式 cursor,降低维护成本。 — 重写后整段消失。
 - [ ] **P2** `key_view_ids` 当前是 `IndexMap<Key, ViewId>`,但同一 key 必然只有一个 view,实际只用到 map 性质;可以是 `HashMap`(更快)+ 显式 `Vec<Key>` 维护顺序。
 - [ ] **P2** 支持 `Lotus<&[T]>` / `Lotus<VecDeque<T>>` / `Lotus<im::Vector<T>>` 等其他容器(目前限 `AsRef<[Value]>`)。可以借助 `Lotus<impl IntoIterator<Item=&T>>` 抽象。
 - [ ] **P3** 给 `Each` 加 entrance/exit 动画钩子(Solid 的 `<TransitionGroup>` 风格):`on_enter(&Scope) / on_exit(&Scope)`。复杂度低、用户价值高。
@@ -135,9 +146,10 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 
 ## 6. 测试基建
 
-- [ ] **P0** 加 `MockRenderer`(纯内存,只记录调用序列),给 `Each` / `Switch` / `Loader` 写**确定性快照测试**:
-  - [ ] 列出 LIS 改造前后的 case 集合(反转 / 洗牌 / 头尾增删 / 同 key 不同 value / 删后再加同 key)。
-  - [ ] 每个 case 断言"DOM 操作序列"是预期的最小集合。
+- [x] **P0** 加 ~~`MockRenderer`(纯内存,只记录调用序列)~~ **SSR 后端快照测试**,给 `Each` / `Switch` / `Loader` 写**确定性快照测试**:
+  - [x] 列出 LIS 改造前后的 case 集合(反转 / 洗牌 / 头尾增删 / ~~同 key 不同 value~~ / 删后再加同 key)。 — `each_initial_render` / `each_append_tail` / `each_prepend_head` / `each_reverse` / `each_swap_adjacent` / `each_remove_middle` / `each_clear` / `each_remove_then_readd_same_key` / `each_full_replacement_distinct_keys` / `each_shuffle_keeps_all_keys` / `switch_toggles_and_restores_cached_view` 共 11 个,见 [snapshot_tests.rs](crates/core/src/widgets/snapshot_tests.rs)。
+  - [x] 每个 case 断言"DOM 操作序列"是预期的最小集合。 — 改为断言**最终 HTML 文本顺序**(`inner_html` 解析出 `<li>` 内容序列),比"操作序列"更直接对应可观察行为;最小化由 LIS 保证。
+  - 备注:M1 选择直接走 SSR 后端而不是独立的 `MockRenderer`,因为后者依赖渲染层抽象(§3 P0),还没就位。等 §3 落地后可以无痛迁到 MockRenderer。
 - [ ] **P1** 把 examples 改成 cargo test 跑得通的 e2e(`wasm-bindgen-test` + headless chrome)。
 - [ ] **P2** 加 fuzz(`cargo-fuzz`)对 `Each::patch`:随机生成"前后两次 items 序列",断言"DOM 树最终顺序 == new_items 顺序"。
 - [ ] **P2** 加 `criterion` benchmark 套件,跟踪 LIS 改造、代际盒改造的性能数据。
@@ -154,6 +166,7 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 - [ ] **P2** 给 `Cage` / `Bond` / `Lotus` / `Widget` / `Scope` / `Truck` 这 6 个核心类型补 crate 级 doc + 一图概览(mermaid 即可)。
 - [ ] **P2** README 加"对比 Leptos / Dioxus / Sycamore"小节,讲清楚选 Glory 的场景。
 - [ ] **P3** 把 `debug.log` / `dump.rdb` 从仓库根移走,加进 `.gitignore`(目前 git status 显示二者未跟踪但反复出现)。
+- [x] **P3** `.temp/` 加进 `.gitignore`(M1 工作中频繁出现的 tooling 缓存)。
 
 ---
 
@@ -169,10 +182,11 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 
 按依赖关系拆 4 个 milestone,大致 1–2 个月一档:
 
-**M1(打地基,2–4 周)**
-- §0 全部
-- §1 P0/P1 全部(`Each` 重排算法做完做对,这是 Glory 用户最容易碰到的痛点)
-- §6 P0(`MockRenderer` + Each 快照测试)— 和 §1 配对做
+**M1(打地基,2–4 周)** ✅ 已完成,见 [PR #32](https://github.com/glory-rs/glory/pull/32)
+- §0 全部(`__single_holder` 改名除外,P2 延后)
+- §1 P0 全部 + P1 大部分(`Each` 重排已用 LIS 重写,11 个快照测试覆盖)
+- §6 P0(SSR 后端快照测试,等 §3 落地后迁到 MockRenderer)
+- 额外:发现并修复 SSR Node / Element 锚点 / 默认 flood / `shift_remove` 等 7 处隐藏 bug
 
 **M2(响应式现代化,3–4 周)**
 - §2 P0/P1(代际盒、`Sync` storage、`effect`、`resource`)
