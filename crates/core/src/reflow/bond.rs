@@ -76,7 +76,35 @@ where
     {
         self.with_eq(|a: &T, b: &T| a == b)
     }
+}
 
+/// One-shot "stable derived value": equivalent to
+/// `Bond::new(mapper).with_partial_eq()`. Use it when you want a
+/// `Bond` that only triggers downstream re-renders when its mapped
+/// value actually changes.
+///
+/// ```ignore
+/// use glory::reflow::{Cage, selector};
+///
+/// let count = Cage::new(0_i32);
+/// // `is_positive` only fires re-renders when the truth value of
+/// // count > 0 actually flips, not on every `count.revise`.
+/// let is_positive = selector({
+///     let count = count.clone();
+///     move || *count.get() > 0
+/// });
+/// ```
+pub fn selector<T>(mapper: impl Fn() -> T + 'static) -> Bond<T>
+where
+    T: fmt::Debug + PartialEq + 'static,
+{
+    Bond::new(mapper).with_partial_eq()
+}
+
+impl<T> Bond<T>
+where
+    T: fmt::Debug + 'static,
+{
     /// Returns `true` when any current dependency has bumped its version
     /// since the last mapper run, or when the dependency set has changed.
     fn deps_changed(&self) -> bool {

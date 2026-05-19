@@ -28,7 +28,7 @@
 mod cage;
 pub use cage::Cage;
 mod bond;
-pub use bond::Bond;
+pub use bond::{Bond, selector};
 mod lotus;
 pub use lotus::Lotus;
 mod effect;
