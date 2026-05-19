@@ -165,6 +165,13 @@ where
                 *state = LoadState::Loading;
             });
 
+            // Tear down the previous cycle's children (loaded result or stale
+            // fallback) before re-rendering the fallback, otherwise repeated
+            // dep-change cycles stack child views on top of each other.
+            for view_id in ctx.show_list.clone() {
+                ctx.detach_child(&view_id);
+            }
+
             if let Some(fallback) = &self.fallback {
                 (fallback)(ctx);
             }

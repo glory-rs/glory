@@ -89,8 +89,12 @@ where
         let node = <T as AsRef<web_sys::Element>>::as_ref(&self.node);
 
         ctx.graff_node = Some(node.clone());
-        ctx.first_child_node = node.first_element_child();
-        ctx.last_child_node = node.last_element_child();
+        // The element itself is the outermost DOM anchor of this view's
+        // subtree, so sibling-positioning logic in `Scope::attach_child`
+        // can rely on it (`last_element_child()` returns None for leaf
+        // elements such as `<li>text</li>`, which breaks Each reordering).
+        ctx.first_child_node = Some(node.clone());
+        ctx.last_child_node = Some(node.clone());
 
         let fillers = std::mem::take(&mut self.fillers);
         for filler in fillers {

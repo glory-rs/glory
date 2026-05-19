@@ -145,7 +145,7 @@ impl Scope {
         if view.scope.position == ViewPosition::Unset {
             let index = self.child_views.get_index_of(view_id).unwrap();
             if index > 0 {
-                for i in (index - 1)..=0 {
+                for i in (0..index).rev() {
                     let (_, prev_view) = self.child_views.get_index(i).unwrap();
                     if prev_view.scope.is_attached() {
                         if let Some(prev_node) = prev_view.last_child_node() {

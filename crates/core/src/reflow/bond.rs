@@ -16,8 +16,14 @@ where
     T: fmt::Debug + 'static,
 {
     id: RevisableId,
+    /// Monotonic counter bumped each time the mapper re-runs. Reported as
+    /// this Bond's `Revisable::version()` so downstream observers detect
+    /// any change without depending on a sum-of-dep-versions heuristic.
     version: Rc<Cell<usize>>,
     gathers: Rc<RefCell<IndexMap<RevisableId, Box<dyn Revisable>>>>,
+    /// Per-dependency version snapshot at the last mapper run, in the same
+    /// order as `gathers`. Used to detect changes without sum collisions.
+    dep_versions: Rc<RefCell<Vec<usize>>>,
     view_ids: Rc<RefCell<IndexMap<ViewId, usize>>>,
     #[educe(Debug(ignore))]
     mapper: Rc<Box<dyn Fn() -> T + 'static>>,
@@ -31,21 +37,42 @@ where
 {
     pub fn new(mapper: impl Fn() -> T + 'static) -> Self {
         let (gathers, value) = crate::reflow::gather(&mapper);
-        let version = gathers.values().map(|g| g.version()).sum();
+        let dep_versions: Vec<usize> = gathers.values().map(|g| g.version()).collect();
         Self {
             id: RevisableId::next(),
-            version: Rc::new(Cell::new(version)),
+            version: Rc::new(Cell::new(1)),
             gathers: Rc::new(RefCell::new(gathers)),
+            dep_versions: Rc::new(RefCell::new(dep_versions)),
             view_ids: Default::default(),
             mapper: Rc::new(Box::new(mapper)),
             value: Rc::new(RefCell::new(value)),
         }
     }
+
+    /// Returns `true` when any current dependency has bumped its version
+    /// since the last mapper run, or when the dependency set has changed.
+    fn deps_changed(&self) -> bool {
+        let gathers = self.gathers.borrow();
+        let snapshot = self.dep_versions.borrow();
+        if gathers.len() != snapshot.len() {
+            return true;
+        }
+        for (gather, prev) in gathers.values().zip(snapshot.iter()) {
+            if gather.version() != *prev {
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn get(&self) -> Ref<'_, T> {
-        let new_version = self.gathers.borrow().values().map(|g| g.version()).sum();
-        if self.version() != new_version {
-            *self.gathers.borrow_mut() = crate::reflow::gather(|| self.value.replace((self.mapper)())).0;
-            self.version.set(new_version);
+        if self.deps_changed() {
+            let (new_gathers, new_value) = crate::reflow::gather(|| (self.mapper)());
+            self.value.replace(new_value);
+            let new_snapshot: Vec<usize> = new_gathers.values().map(|g| g.version()).collect();
+            *self.gathers.borrow_mut() = new_gathers;
+            *self.dep_versions.borrow_mut() = new_snapshot;
+            self.version.set(self.version.get().wrapping_add(1));
             for view_id in self.view_ids.borrow().keys() {
                 for (_, gather) in self.gathers.borrow().deref() {
                     gather.bind_view(view_id);
@@ -66,10 +93,13 @@ where
         self.value.borrow()
     }
     pub fn get_untracked(&self) -> Ref<'_, T> {
-        let new_version = self.gathers.borrow().values().map(|g| g.version()).sum();
-        if self.version() != new_version {
-            self.value.replace((self.mapper)());
-            self.version.set(new_version);
+        if self.deps_changed() {
+            let (new_gathers, new_value) = crate::reflow::gather(|| (self.mapper)());
+            self.value.replace(new_value);
+            let new_snapshot: Vec<usize> = new_gathers.values().map(|g| g.version()).collect();
+            *self.gathers.borrow_mut() = new_gathers;
+            *self.dep_versions.borrow_mut() = new_snapshot;
+            self.version.set(self.version.get().wrapping_add(1));
         }
         self.value.borrow()
     }
@@ -93,6 +123,7 @@ where
             id: self.id,
             version: self.version.clone(),
             gathers: self.gathers.clone(),
+            dep_versions: self.dep_versions.clone(),
             view_ids: self.view_ids.clone(),
             value: self.value.clone(),
             mapper: self.mapper.clone(),

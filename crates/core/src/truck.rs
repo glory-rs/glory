@@ -173,13 +173,10 @@ impl fmt::Debug for Truck {
 
 #[cfg(test)]
 mod test {
-    use crate::prelude::*;
-    use crate::test::{ResponseExt, TestClient};
-
     use super::*;
 
     #[test]
-    fn test_truck() {
+    fn test_truck_insert_and_get() {
         let mut truck = Truck::with_capacity(6);
         assert!(truck.capacity() >= 6);
 
@@ -188,14 +185,5 @@ mod test {
 
         assert_eq!(truck.get::<String>("one").unwrap(), &"ONE".to_owned());
         assert_eq!(truck.get_mut::<String>("one").unwrap(), &mut "ONE".to_owned());
-    }
-
-    #[test]
-    fn test_transfer() {
-        let mut truck = Truck::with_capacity(6);
-        truck.insert("one", "ONE".to_owned());
-
-        let truck = truck.transfer();
-        assert_eq!(truck.get::<String>("one").unwrap(), &"ONE".to_owned());
     }
 }

@@ -41,7 +41,16 @@ pub struct GloryConfig {
 
 impl Default for GloryConfig {
     fn default() -> Self {
-        Self::new()
+        Self {
+            output_name: String::new(),
+            site_root: default_site_root(),
+            site_pkg_dir: default_site_pkg_dir(),
+            site_addr: default_site_addr(),
+            reload_port: default_reload_port(),
+            reload_external_port: None,
+            reload_ws_protocol: ReloadWSProtocol::default(),
+            not_found_path: default_not_found_path(),
+        }
     }
 }
 

@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::{Node, Scope, View, ViewId, view::ViewPosition};
+use crate::{Node, Scope, View, ViewId};
 pub trait Widget: fmt::Debug + 'static {
     fn store_in(self, parent: &mut Scope) -> ViewId
     where
@@ -75,12 +75,17 @@ pub trait Widget: fmt::Debug + 'static {
     fn hydrate(&mut self, _ctx: &mut Scope) {}
     fn build(&mut self, _ctx: &mut Scope);
 
-    /// Attach children
+    /// Attach children.
+    ///
+    /// The default implementation simply walks any children that were
+    /// inserted via `store_in` during `build` and attaches them.  It must
+    /// NOT pre-set their `scope.position` — already-attached children have
+    /// `position == Unset` (reset by the end of `attach_child`), and
+    /// forcing it back to `Tail` here would survive `attach_child`'s
+    /// early-return on `is_attached` and break neighbour-relative
+    /// re-positioning during later patches (e.g. `Each` reordering).
     fn flood(&mut self, ctx: &mut Scope) {
         let ids: Vec<ViewId> = ctx.child_views.keys().cloned().collect();
-        for view in ctx.child_views.values_mut() {
-            view.scope.position = ViewPosition::Tail;
-        }
         for id in ids {
             ctx.attach_child(&id);
         }
