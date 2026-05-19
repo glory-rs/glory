@@ -23,9 +23,8 @@ use crate::{Scope, ViewId, Widget};
 /// Implements `Widget` so it plugs into the existing scheduler / scope
 /// machinery without adding a parallel runtime. Has no DOM presence.
 ///
-/// Use [`effect_in`] (this module) or `Scope::effect` (re-exported as
-/// such) to construct one; direct construction is allowed but rarely
-/// useful.
+/// Use [`effect_in`] (this module) or [`Scope::effect`](crate::Scope::effect)
+/// to construct one; direct construction is allowed but rarely useful.
 #[derive(Educe)]
 #[educe(Debug)]
 pub struct Effect<F>

@@ -205,7 +205,10 @@ impl TruckExt for Rc<RefCell<Truck>> {
     fn remove_stuff(&self, graff: &str) -> Option<Stuff> {
         let mut stuff = None;
         if self.stuffs().get().contains_key(graff) {
-            stuff = self.stuffs().revise(|mut stuffs| stuffs.remove(graff));
+            // `shift_remove` preserves iteration order; consistent with the
+            // glory-core migration. The deprecated `remove` aliases
+            // `swap_remove` in current indexmap and would corrupt order.
+            stuff = self.stuffs().revise(|mut stuffs| stuffs.shift_remove(graff));
         }
         stuff
     }
@@ -215,7 +218,7 @@ impl TruckExt for Rc<RefCell<Truck>> {
         self.stuff_keys().borrow_mut().insert(graff, key);
     }
     fn remove_stuff_key(&self, graff: &str) -> Option<String> {
-        self.stuff_keys().borrow_mut().remove(graff)
+        self.stuff_keys().borrow_mut().shift_remove(graff)
     }
     fn contains_stuff_key(&self, graff: &str, key: &str) -> bool {
         self.stuff_keys().borrow().get(graff).map(|s| &**s) == Some(key)

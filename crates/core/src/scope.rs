@@ -157,6 +157,28 @@ impl Scope {
     pub fn child_views(&self) -> &IndexMap<ViewId, View> {
         &self.child_views
     }
+
+    /// Register a reactive side effect on this scope. Convenience wrapper
+    /// around [`crate::reflow::effect_in`]; see that function for the
+    /// semantics.
+    pub fn effect<F>(&mut self, closure: F) -> ViewId
+    where
+        F: FnMut() + 'static,
+    {
+        crate::reflow::effect_in(self, closure)
+    }
+
+    /// Register an asynchronous derived signal on this scope. Convenience
+    /// wrapper around [`crate::reflow::resource_in`]; see that function
+    /// for the stale-write caveat and SSR-hydration alternative.
+    pub fn resource<T, F, Fut>(&mut self, future_fn: F) -> reflow::Cage<Option<T>>
+    where
+        T: std::fmt::Debug + 'static,
+        F: Fn() -> Fut + 'static,
+        Fut: std::future::Future<Output = T> + 'static,
+    {
+        crate::reflow::resource_in(self, future_fn)
+    }
     // pub fn child_views_mut(&mut self) -> &mut IndexMap<ViewId, View> {
     //     &mut self.child_views
     // }
