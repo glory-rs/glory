@@ -187,7 +187,7 @@ where
     fn id(&self) -> RevisableId {
         self.id
     }
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     fn holder_id(&self) -> Option<crate::HolderId> {
         self.view_ids.borrow().first().map(|(view_id, _)| view_id.holder_id())
     }

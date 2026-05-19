@@ -77,7 +77,7 @@ pub use truck::Truck;
 
 pub mod holder;
 pub use holder::Holder;
-#[cfg(not(feature = "__single_holder"))]
+#[cfg(not(feature = "single-app"))]
 pub use holder::HolderId;
 
 pub mod spawn;
@@ -86,13 +86,13 @@ pub use reflow::Cage;
 
 use std::cell::RefCell;
 
-#[cfg(not(feature = "__single_holder"))]
+#[cfg(not(feature = "single-app"))]
 use indexmap::IndexMap;
 
 thread_local! {
-    #[cfg(feature = "__single_holder")]
+    #[cfg(feature = "single-app")]
     pub(crate) static ROOT_VIEWS: RefCell<ViewMap> = RefCell::default();
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     pub(crate) static ROOT_VIEWS: RefCell<IndexMap<HolderId, ViewMap>> = RefCell::default();
 }
 

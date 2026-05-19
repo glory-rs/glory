@@ -42,19 +42,19 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use indexmap::{IndexMap, IndexSet};
 
-#[cfg(not(feature = "__single_holder"))]
+#[cfg(not(feature = "single-app"))]
 use crate::HolderId;
 use crate::ViewId;
 
 thread_local! {
-    #[cfg(feature = "__single_holder")]
+    #[cfg(feature = "single-app")]
     pub(crate) static REVISING_ITEMS: RefCell<IndexMap<RevisableId, Box<dyn Revisable>>> = RefCell::default();
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     pub(crate) static REVISING_ITEMS: RefCell<IndexMap<HolderId, IndexMap<RevisableId, Box<dyn Revisable>>>> = RefCell::default();
 
-    #[cfg(feature = "__single_holder")]
+    #[cfg(feature = "single-app")]
     pub(crate) static PENDING_ITEMS: RefCell<IndexMap<RevisableId, Box<dyn Revisable>>> = RefCell::default();
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     pub(crate) static PENDING_ITEMS: RefCell<IndexMap<HolderId, IndexMap<RevisableId, Box<dyn Revisable>>>> = RefCell::default();
 
     pub(crate) static TRACKING_STACK: RefCell<TrackingStack> = RefCell::new(TrackingStack::new());
@@ -139,7 +139,7 @@ pub fn untracked_read<R>(func: impl FnOnce() -> R) -> R {
 /// Mainly useful for one-shot bookkeeping mutations that don't represent
 /// user-visible state changes (e.g. updating an internal cursor while
 /// processing a list).
-#[cfg(feature = "__single_holder")]
+#[cfg(feature = "single-app")]
 pub fn untrack<O, R>(opt: O) -> R
 where
     O: FnOnce() -> R,
@@ -158,7 +158,7 @@ where
 
 /// See the single-holder variant above. In multi-holder mode the
 /// suppression is scoped to a specific `HolderId`.
-#[cfg(not(feature = "__single_holder"))]
+#[cfg(not(feature = "single-app"))]
 pub fn untrack<O, R>(holder_id: HolderId, opt: O) -> R
 where
     O: FnOnce() -> R,
@@ -191,7 +191,7 @@ impl Display for RevisableId {
 
 pub trait Revisable: fmt::Debug {
     fn id(&self) -> RevisableId;
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     fn holder_id(&self) -> Option<HolderId>;
     fn version(&self) -> usize;
     fn view_ids(&self) -> Rc<RefCell<IndexSet<ViewId>>>;
@@ -201,7 +201,7 @@ pub trait Revisable: fmt::Debug {
     fn is_revising(&self) -> bool {
         REVISING_ITEMS.with_borrow(|revising_items| {
             cfg_if! {
-                if #[cfg(feature = "__single_holder")] {
+                if #[cfg(feature = "single-app")] {
                     revising_items.contains_key(&self.id())
                 } else {
                     if let Some(holder_id) = self.holder_id() {

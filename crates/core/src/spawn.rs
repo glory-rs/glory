@@ -11,7 +11,7 @@ where
     cfg_if! {
         if #[cfg(target_arch = "wasm32")] {
             wasm_bindgen_futures::spawn_local(fut)
-        } else if #[cfg(all(feature = "web-ssr", not(feature = "__single_holder"), not(test)))] {
+        } else if #[cfg(all(feature = "web-ssr", not(feature = "single-app"), not(test)))] {
             tokio::task::block_in_place(move || {
                 tokio::runtime::Handle::current().block_on(async move {
                     let local = tokio::task::LocalSet::new();

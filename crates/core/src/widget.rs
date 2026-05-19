@@ -83,7 +83,7 @@ pub trait Widget: fmt::Debug + 'static {
 
         let view_id = view.id.clone();
         cfg_if! {
-            if #[cfg(not(feature = "__single_holder"))] {
+            if #[cfg(not(feature = "single-app"))] {
                 let holder_id = view.holder_id();
             }
         }
@@ -91,7 +91,7 @@ pub trait Widget: fmt::Debug + 'static {
             crate::ROOT_VIEWS.with(|root_views| {
                 let mut root_views = root_views.borrow_mut();
                 cfg_if! {
-                    if #[cfg(not(feature = "__single_holder"))] {
+                    if #[cfg(not(feature = "single-app"))] {
                         let holder_id = view.holder_id();
                         let root_views = root_views.entry(holder_id).or_default();
                     }
@@ -102,7 +102,7 @@ pub trait Widget: fmt::Debug + 'static {
             })
         };
         cfg_if! {
-            if #[cfg(feature = "__single_holder")] {
+            if #[cfg(feature = "single-app")] {
                 crate::reflow::batch(process);
             } else {
                 crate::reflow::batch(holder_id, process);
@@ -147,7 +147,7 @@ pub trait Widget: fmt::Debug + 'static {
         let ids: Vec<ViewId> = ctx.child_views.keys().cloned().collect();
         if !ids.is_empty() {
             cfg_if! {
-                if #[cfg(feature = "__single_holder")] {
+                if #[cfg(feature = "single-app")] {
                     crate::reflow::batch(|| {
                         for id in ids {
                             ctx.detach_child(&id);

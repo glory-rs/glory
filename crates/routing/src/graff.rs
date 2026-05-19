@@ -19,7 +19,7 @@ impl Widget for Graff {
         ctx.truck.stuffs().bind_view(ctx.view_id());
 
         cfg_if! {
-            if #[cfg(feature = "__single_holder")] {
+            if #[cfg(feature = "single-app")] {
                 let stuff = reflow::untrack(|| ctx.truck.remove_stuff(&self.name));
             } else {
                 let stuff = reflow::untrack(ctx.holder_id(), || ctx.truck.remove_stuff(&self.name));
@@ -33,7 +33,7 @@ impl Widget for Graff {
 
     fn patch(&mut self, ctx: &mut Scope) {
         cfg_if! {
-            if #[cfg(feature = "__single_holder")] {
+            if #[cfg(feature = "single-app")] {
                 let stuff = glory_core::reflow::untrack(|| ctx.truck.remove_stuff(&self.name));
             } else {
                 let stuff = glory_core::reflow::untrack(ctx.holder_id(), || ctx.truck.remove_stuff(&self.name));
@@ -43,7 +43,7 @@ impl Widget for Graff {
             let view_ids: Vec<ViewId> = ctx.child_views().keys().cloned().collect();
             if !view_ids.is_empty() {
                 cfg_if! {
-                    if #[cfg(feature = "__single_holder")] {
+                    if #[cfg(feature = "single-app")] {
                         glory_core::reflow::batch(|| {
                             for view_id in &view_ids {
                                 ctx.detach_child(view_id);

@@ -6,7 +6,7 @@ use indexmap::IndexMap;
 
 use crate::{Node, Scope, Widget};
 
-#[cfg(not(feature = "__single_holder"))]
+#[cfg(not(feature = "single-app"))]
 use crate::HolderId;
 
 pub const VIEW_ID_DELIMITER: char = '-';
@@ -14,19 +14,19 @@ pub const VIEW_ID_DELIMITER: char = '-';
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ViewId {
     pub(crate) raw_value: String,
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     holder_id: HolderId,
 }
 impl ViewId {
-    #[cfg(feature = "__single_holder")]
+    #[cfg(feature = "single-app")]
     pub fn new(raw_value: String) -> Self {
         Self { raw_value }
     }
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     pub fn new(holder_id: HolderId, raw_value: String) -> Self {
         Self { raw_value, holder_id }
     }
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     pub fn holder_id(&self) -> HolderId {
         self.holder_id
     }
@@ -39,7 +39,7 @@ impl ViewId {
         let mut cval = segs.pop().unwrap().to_owned();
         let mut list = Vec::with_capacity(segs.len());
         cfg_if! {
-            if #[cfg(feature = "__single_holder")] {
+            if #[cfg(feature = "single-app")] {
                 list.push(ViewId::new(cval.clone()));
             } else {
                 list.push(ViewId::new(self.holder_id, cval.clone()));
@@ -49,7 +49,7 @@ impl ViewId {
             cval.push(VIEW_ID_DELIMITER);
             cval.push_str(segs.pop().unwrap());
             cfg_if! {
-                if #[cfg(feature = "__single_holder")] {
+                if #[cfg(feature = "single-app")] {
                     list.push(ViewId::new(cval.clone()));
                 } else {
                     list.push(ViewId::new(self.holder_id, cval.clone()));
@@ -145,7 +145,7 @@ impl View {
             scope,
         }
     }
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     pub fn holder_id(&self) -> HolderId {
         self.id.holder_id
     }
@@ -170,7 +170,7 @@ impl View {
             self.widget.hydrate(&mut self.scope);
         }
         cfg_if! {
-            if #[cfg(feature = "__single_holder")] {
+            if #[cfg(feature = "single-app")] {
                 crate::reflow::batch(|| {
                     self.widget.build(&mut self.scope);
                 });
@@ -188,7 +188,7 @@ impl View {
             return;
         }
 
-        #[cfg(not(feature = "__single_holder"))]
+        #[cfg(not(feature = "single-app"))]
         let holder_id = self.holder_id();
         let process = || {
             self.widget.attach(&mut self.scope);
@@ -199,7 +199,7 @@ impl View {
             self.widget.flood(&mut self.scope);
         };
         cfg_if! {
-            if #[cfg(feature = "__single_holder")] {
+            if #[cfg(feature = "single-app")] {
                 crate::reflow::batch(process);
             } else {
                 crate::reflow::batch(holder_id, process);

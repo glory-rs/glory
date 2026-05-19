@@ -49,7 +49,7 @@ pub fn get(&self) -> Ref<'_, T> {
 **特点 / 优点**
 - **细粒度**:patch 只走那些真正被订阅的 view,不重渲整个组件子树。
 - **思路清晰**:`Revisable::view_ids()` 把"哪个状态影响哪些 DOM 视图"显式存下来,debug 时极方便。
-- **支持多实例**(`__single_holder` off):通过 `HolderId` 隔离调度,可在同一进程跑多个独立应用。
+- **支持多实例**(`single-app` off):通过 `HolderId` 隔离调度,可在同一进程跑多个独立应用。
 
 **问题**
 1. **不是 `Copy`**。每次跨闭包都得手动 `.clone()`(counter 示例里就有 `let value = self.value.clone();`)。多写一层样板代码,且每个状态本身已经持有 4 个 `Rc`。
@@ -280,7 +280,7 @@ pub fn launch<W: Widget + 'static>(root: impl Fn() -> W + 'static);
 - **`tracing` 字段化日志**:Glory 已用 tracing,但调用面较窄。可以学 dioxus 在每个 mutation / patch 打 trace span,便于 devtools 接入。
 - **`AGENTS.md` 风格的"贡献者向 AI 提示"**:dioxus 有 `AGENTS.md`(项目根),减少 AI 协作时的来回。Glory 可以放一份,把"signals 不要替换成第三方"、"feature flag 规则"等惯例写下。
 - **example 组织**:dioxus 在 `examples/` 下平铺;Glory 现在 examples 也铺得不错,但缺一个 `examples/_README.md` 把每个示例对应特性标出来,便于新用户挑入口。
-- **`__single_holder` 命名**:双下划线在 Rust 社区一般表示"内部 unstable"。如果它是稳定的优化开关,建议改成 `single-app`;如果不是,加文档注释把它的语义讲清楚。
+- **`single-app` 命名**:双下划线在 Rust 社区一般表示"内部 unstable"。如果它是稳定的优化开关,建议改成 `single-app`;如果不是,加文档注释把它的语义讲清楚。
 
 ---
 

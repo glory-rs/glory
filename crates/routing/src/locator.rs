@@ -118,7 +118,7 @@ impl Locator {
             me.raw_url.revise(|mut raw_url| *raw_url = new_url.to_string());
         };
         cfg_if! {
-            if #[cfg(feature = "__single_holder")] {
+            if #[cfg(feature = "single-app")] {
                 reflow::batch(update);
             } else {
                 use glory_core::reflow::Revisable;

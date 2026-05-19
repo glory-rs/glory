@@ -160,7 +160,7 @@ where
         drop(kept);
 
         if !to_detach.is_empty() {
-            #[cfg(not(feature = "__single_holder"))]
+            #[cfg(not(feature = "single-app"))]
             let holder_id = ctx.holder_id();
             let detach_all = || {
                 for view_id in &to_detach {
@@ -168,7 +168,7 @@ where
                 }
             };
             cfg_if! {
-                if #[cfg(feature = "__single_holder")] {
+                if #[cfg(feature = "single-app")] {
                     crate::reflow::batch(detach_all);
                 } else {
                     crate::reflow::batch(holder_id, detach_all);

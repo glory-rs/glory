@@ -4,7 +4,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use indexmap::{IndexMap, IndexSet};
 
-#[cfg(not(feature = "__single_holder"))]
+#[cfg(not(feature = "single-app"))]
 use crate::HolderId;
 use crate::node::Node;
 use crate::view::{VIEW_ID_DELIMITER, View, ViewId, ViewPosition};
@@ -42,7 +42,7 @@ use crate::{Truck, reflow};
 /// [`detach_child`][Scope::detach_child].
 #[derive(Debug)]
 pub struct Scope {
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     holder_id: HolderId,
     pub view_id: ViewId,
     pub(crate) is_root: bool,
@@ -64,7 +64,7 @@ pub struct Scope {
 impl Scope {
     pub fn new(view_id: ViewId, truck: Rc<RefCell<Truck>>) -> Self {
         Self {
-            #[cfg(not(feature = "__single_holder"))]
+            #[cfg(not(feature = "single-app"))]
             holder_id: view_id.holder_id(),
             view_id,
             is_root: false,
@@ -85,7 +85,7 @@ impl Scope {
     }
     pub fn new_root(view_id: ViewId, truck: Rc<RefCell<Truck>>) -> Self {
         Self {
-            #[cfg(not(feature = "__single_holder"))]
+            #[cfg(not(feature = "single-app"))]
             holder_id: view_id.holder_id(),
             view_id,
             is_root: true,
@@ -114,7 +114,7 @@ impl Scope {
         self.is_built
     }
 
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     pub fn holder_id(&self) -> HolderId {
         self.holder_id
     }
@@ -126,7 +126,7 @@ impl Scope {
     }
     pub(crate) fn next_child_view_id(&self) -> ViewId {
         cfg_if! {
-          if #[cfg(feature = "__single_holder")] {
+          if #[cfg(feature = "single-app")] {
             ViewId::new(format!("{}{VIEW_ID_DELIMITER}{}", self.view_id, self.next_child_view_id.fetch_add(1, Ordering::Relaxed)))
           } else {
             ViewId::new(self.holder_id, format!("{}{VIEW_ID_DELIMITER}{}", self.view_id, self.next_child_view_id.fetch_add(1, Ordering::Relaxed)))
@@ -218,7 +218,7 @@ impl Scope {
         debug_assert!(view.scope.graff_node.is_some(), "view.scope.parent_node should not None");
 
         cfg_if! {
-            if #[cfg(feature = "__single_holder")] {
+            if #[cfg(feature = "single-app")] {
                 reflow::batch(|| {
                     view.attach();
                 });
@@ -250,7 +250,7 @@ impl Scope {
         };
 
         cfg_if! {
-            if #[cfg(feature = "__single_holder")] {
+            if #[cfg(feature = "single-app")] {
                 reflow::batch(|| {
                     view.detach();
                 });

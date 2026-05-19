@@ -5,7 +5,7 @@ use std::rc::Rc;
 use crate::{Truck, Widget};
 
 cfg_feature! {
-    #![not(feature = "__single_holder")]
+    #![not(feature = "single-app")]
 
     use std::sync::atomic::{Ordering, AtomicU64};
     use std::fmt::Display;

@@ -1,63 +1,63 @@
-#[cfg(feature = "__single_holder")]
+#[cfg(feature = "single-app")]
 use std::cell::Cell;
-#[cfg(not(feature = "__single_holder"))]
+#[cfg(not(feature = "single-app"))]
 use std::cell::RefCell;
 use std::ops::Deref;
 
-#[cfg(not(feature = "__single_holder"))]
+#[cfg(not(feature = "single-app"))]
 use indexmap::IndexMap;
 use indexmap::IndexSet;
 
 use super::{PENDING_ITEMS, REVISING_ITEMS};
-#[cfg(not(feature = "__single_holder"))]
+#[cfg(not(feature = "single-app"))]
 use crate::HolderId;
 use crate::{ROOT_VIEWS, ViewId};
 
 thread_local! {
-    #[cfg(feature = "__single_holder")]
+    #[cfg(feature = "single-app")]
     pub(crate) static RUNNING: Cell<bool> = Cell::new(false);
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     pub(crate) static RUNNING: RefCell<IndexMap<HolderId, bool>> = RefCell::new(IndexMap::new());
 
-    #[cfg(feature = "__single_holder")]
+    #[cfg(feature = "single-app")]
     pub(crate) static UNTRACKING: Cell<bool> = Cell::new(false);
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     pub(crate) static UNTRACKING: RefCell<IndexMap<HolderId, bool>> = RefCell::new(IndexMap::new());
 
-    #[cfg(feature = "__single_holder")]
+    #[cfg(feature = "single-app")]
     pub(crate) static BATCHING: Cell<bool> = Cell::new(false);
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     pub(crate) static BATCHING: RefCell<IndexMap<HolderId, bool>> = RefCell::new(IndexMap::new());
 }
 
-#[cfg(feature = "__single_holder")]
+#[cfg(feature = "single-app")]
 pub fn is_running() -> bool {
     RUNNING.with(|running| running.get())
 }
-#[cfg(not(feature = "__single_holder"))]
+#[cfg(not(feature = "single-app"))]
 pub fn is_running(holder_id: HolderId) -> bool {
     RUNNING.with_borrow(|running| running.get(&holder_id).map(|v| *v).unwrap_or(false))
 }
 
-#[cfg(feature = "__single_holder")]
+#[cfg(feature = "single-app")]
 pub fn is_untracking() -> bool {
     UNTRACKING.with(|untracking| untracking.get())
 }
-#[cfg(not(feature = "__single_holder"))]
+#[cfg(not(feature = "single-app"))]
 pub fn is_untracking(holder_id: HolderId) -> bool {
     UNTRACKING.with_borrow(|untracking| untracking.get(&holder_id).map(|v| *v).unwrap_or(false))
 }
 
-#[cfg(feature = "__single_holder")]
+#[cfg(feature = "single-app")]
 pub fn is_batching() -> bool {
     BATCHING.with(|batching| batching.get())
 }
-#[cfg(not(feature = "__single_holder"))]
+#[cfg(not(feature = "single-app"))]
 pub fn is_batching(holder_id: HolderId) -> bool {
     BATCHING.with_borrow(|batching| batching.get(&holder_id).map(|v| *v).unwrap_or(false))
 }
 
-#[cfg(feature = "__single_holder")]
+#[cfg(feature = "single-app")]
 pub fn batch<O, R>(opt: O) -> R
 where
     O: FnOnce() -> R,
@@ -74,7 +74,7 @@ where
         }
     })
 }
-#[cfg(not(feature = "__single_holder"))]
+#[cfg(not(feature = "single-app"))]
 pub fn batch<O, R>(holder_id: HolderId, opt: O) -> R
 where
     O: FnOnce() -> R,
@@ -92,22 +92,22 @@ where
     })
 }
 
-#[cfg(feature = "__single_holder")]
+#[cfg(feature = "single-app")]
 pub fn schedule() {
     if !is_running() && !is_batching() {
         run();
     }
 }
-#[cfg(not(feature = "__single_holder"))]
+#[cfg(not(feature = "single-app"))]
 pub fn schedule(holder_id: HolderId) {
     if !is_running(holder_id) && !is_batching(holder_id) {
         run(holder_id);
     }
 }
 
-fn run(#[cfg(not(feature = "__single_holder"))] holder_id: HolderId) {
+fn run(#[cfg(not(feature = "single-app"))] holder_id: HolderId) {
     cfg_if! {
-        if #[cfg(feature = "__single_holder")] {
+        if #[cfg(feature = "single-app")] {
             RUNNING.with(|running| running.set(true));
         } else {
             RUNNING.with_borrow_mut(|running| running.insert(holder_id, true));
@@ -118,7 +118,7 @@ fn run(#[cfg(not(feature = "__single_holder"))] holder_id: HolderId) {
         let mut revising_view_ids = IndexSet::<ViewId>::default();
         REVISING_ITEMS.with(|revising_items| {
             cfg_if! {
-                if #[cfg(feature = "__single_holder")] {
+                if #[cfg(feature = "single-app")] {
                     let revising_items = revising_items.borrow_mut();
                 } else {
                     let mut revising_items = revising_items.borrow_mut();
@@ -135,7 +135,7 @@ fn run(#[cfg(not(feature = "__single_holder"))] holder_id: HolderId) {
         let mut not_found_view_ids = Vec::with_capacity(revising_view_ids.len());
         if !revising_view_ids.is_empty() {
             ROOT_VIEWS.with_borrow_mut(|root_views| {
-                #[cfg(not(feature = "__single_holder"))]
+                #[cfg(not(feature = "single-app"))]
                 let root_views = root_views.entry(holder_id).or_default();
 
                 for view_id in revising_view_ids {
@@ -150,7 +150,7 @@ fn run(#[cfg(not(feature = "__single_holder"))] holder_id: HolderId) {
         }
         if !not_found_view_ids.is_empty() {
             REVISING_ITEMS.with_borrow_mut(|revising_items| {
-                #[cfg(not(feature = "__single_holder"))]
+                #[cfg(not(feature = "single-app"))]
                 let revising_items = revising_items.entry(holder_id).or_default();
 
                 for view_id in not_found_view_ids {
@@ -163,7 +163,7 @@ fn run(#[cfg(not(feature = "__single_holder"))] holder_id: HolderId) {
         loop_counts += 1;
 
         cfg_if! {
-            if #[cfg(feature = "__single_holder")] {
+            if #[cfg(feature = "single-app")] {
                 let pending_items = PENDING_ITEMS.with(|pending_items| pending_items.take());
             } else {
                 let pending_items = PENDING_ITEMS.with_borrow_mut(|pending_items| pending_items.shift_remove(&holder_id).unwrap_or_default());
@@ -176,7 +176,7 @@ fn run(#[cfg(not(feature = "__single_holder"))] holder_id: HolderId) {
             } else {
                 REVISING_ITEMS.with(|revising_items| {
                     cfg_if! {
-                        if #[cfg(feature = "__single_holder")] {
+                        if #[cfg(feature = "single-app")] {
                             revising_items.replace(pending_items);
                         } else {
                             revising_items.borrow_mut().insert(holder_id, pending_items);
@@ -187,7 +187,7 @@ fn run(#[cfg(not(feature = "__single_holder"))] holder_id: HolderId) {
         } else {
             REVISING_ITEMS.with(|revising_items| {
                 cfg_if! {
-                    if #[cfg(feature = "__single_holder")] {
+                    if #[cfg(feature = "single-app")] {
                         revising_items.borrow_mut().clear();
                     }  else {
                         revising_items.borrow_mut().shift_remove(&holder_id);
@@ -199,7 +199,7 @@ fn run(#[cfg(not(feature = "__single_holder"))] holder_id: HolderId) {
     }
 
     cfg_if! {
-        if #[cfg(feature = "__single_holder")] {
+        if #[cfg(feature = "single-app")] {
             RUNNING.with(|running| running.set(false));
         } else {
             RUNNING.with_borrow_mut(|running| running.insert(holder_id, false));

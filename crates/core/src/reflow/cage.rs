@@ -29,7 +29,7 @@ where
     fn id(&self) -> RevisableId {
         self.id
     }
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     fn holder_id(&self) -> Option<crate::HolderId> {
         self.view_ids().borrow().first().map(|view_id| view_id.holder_id())
     }
@@ -134,25 +134,25 @@ where
         Lotus::Cage(self.clone())
     }
     fn signal(&self) {
-        #[cfg(not(feature = "__single_holder"))]
+        #[cfg(not(feature = "single-app"))]
         let Some(holder_id) = self.holder_id() else {
             tracing::debug!("Cage::signal: holder_id is None");
             return;
         };
         if scheduler::is_untracking(
-            #[cfg(not(feature = "__single_holder"))]
+            #[cfg(not(feature = "single-app"))]
             holder_id,
         ) {
             return;
         }
         let is_running = scheduler::is_running(
-            #[cfg(not(feature = "__single_holder"))]
+            #[cfg(not(feature = "single-app"))]
             holder_id,
         );
 
         if is_running {
             PENDING_ITEMS.with_borrow_mut(|items| {
-                #[cfg(not(feature = "__single_holder"))]
+                #[cfg(not(feature = "single-app"))]
                 let items = items.entry(holder_id).or_default();
                 if !items.contains_key(&self.id()) {
                     items.insert(self.id(), self.clone_boxed());
@@ -160,7 +160,7 @@ where
             });
         } else {
             let need_schedule = REVISING_ITEMS.with_borrow_mut(|items| {
-                #[cfg(not(feature = "__single_holder"))]
+                #[cfg(not(feature = "single-app"))]
                 let items = items.entry(holder_id).or_default();
                 if !items.contains_key(&self.id()) {
                     items.insert(self.id(), self.clone_boxed());
@@ -171,7 +171,7 @@ where
             });
             if need_schedule {
                 reflow::schedule(
-                    #[cfg(not(feature = "__single_holder"))]
+                    #[cfg(not(feature = "single-app"))]
                     holder_id,
                 );
             }

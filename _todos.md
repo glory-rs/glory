@@ -15,7 +15,7 @@
 - [x] **P1** [`crates/core/src/widgets/switch.rs`](crates/core/src/widgets/switch.rs) `Case::cached_view` 路径:`detach_child` 后 View 从 `ctx.child_views` 移除并存在 `Case::cached_view`,再次激活时只调 `attach_child(&view_id)`,但 `child_views` 已没这个 id。需要把 cached_view 重新塞回 `child_views`(或重做缓存语义)。补一个回归测试。 — 已修;`switch_toggles_and_restores_cached_view` 快照测试覆盖。
 - [x] **P1** [`crates/core/src/widgets/loader.rs`](crates/core/src/widgets/loader.rs) `patch` 中先 `detach_child` 再 `attach_child` 走 `show_list.clone()` 两遍,中间没清空 `show_list`,重复调用会越积越多。审一遍。 — 实际 bug 在 `is_revising` 分支前没 detach 旧 result/fallback,导致连续 dep 变化时 subtree 堆叠;已修。
 - [x] **P2** `Bond::version` 用 `.map(|g| g.version()).sum()`([reflow/bond.rs](crates/core/src/reflow/bond.rs)),依赖版本号会碰撞(理论上不同组合可能和相同)。改成 `(id, version)` 对组成的 hash,或者每次依赖变化就单调递增。 — 改为 `(id, version)` 快照逐项比较 + 单调 re-run 计数器。
-- [ ] **P2** `__single_holder` 命名带双下划线,Rust 社区惯例表示"不稳定内部 API"。如果它确实稳定,改名为 `single-app`;否则文档化清楚。
+- [ ] **P2** `single-app` 命名带双下划线,Rust 社区惯例表示"不稳定内部 API"。如果它确实稳定,改名为 `single-app`;否则文档化清楚。
 
 ### M1 实现过程中发现并修复的其他 bug(原清单未列)
 
@@ -183,7 +183,7 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 按依赖关系拆 4 个 milestone,大致 1–2 个月一档:
 
 **M1+(打地基 + 周边收拢,本分支)** ✅ 已完成,见 [PR #32](https://github.com/glory-rs/glory/pull/32)
-- §0 全部(`__single_holder` 改名留作 P2,改为加 Cargo.toml 注释说明其内部/不稳定状态)
+- §0 全部(`single-app` 改名留作 P2,改为加 Cargo.toml 注释说明其内部/不稳定状态)
 - §1 P0 全部 + P1 大部分(`Each` LIS 重写,14 个 widget 快照测试覆盖,含 200/100 项大规模 reorder 回归)
 - §2 P1 大部分:`untracked_read` + `untrack` 文档、CSR 事件自动 `batch`、`Bond::with_eq` / `with_partial_eq`
 - §3 P1 大部分:`glory::launch` / `launch_with_host`、`crates/routing` 历史抽象文档化
@@ -210,7 +210,7 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 
 刻意留空的子项原因如下,需要独立 milestone:
 
-- §0 P2 `__single_holder` 改名 → 影响所有 `cfg(feature = "__single_holder")` 站点,在改名前要把 §3 P0 的 cfg 收敛先做。
+- §0 P2 `single-app` 改名 → 影响所有 `cfg(feature = "single-app")` 站点,在改名前要把 §3 P0 的 cfg 收敛先做。
 - §1 P1 同 key value 变更不再调 `tmpl_fn` → 已选择 "option (a) 文档化用户必须订阅"(本分支已完成),"option (b) 加 `value_fn` 钩子"留作后续。
 - §1 P2 `key_view_ids` 改 HashMap+Vec → 仅微优化;IndexMap 双重身份(有序 + O(1) lookup)已经满足需求,暂不做。
 - §1 P2 支持 `Lotus<VecDeque<T>>` / `Lotus<im::Vector<T>>` → 需要把 `AsRef<[Value]>` bound 改为 `IntoIterator`,与 §3 P0 的泛型化一起做更划算。

@@ -29,10 +29,10 @@ examples/       per-app crates (counter, todomvc, hackernews-salvo, ssr-*, ...)
 ## Feature flags and combinations
 
 `glory-core` features (also re-exported through `glory`):
-- `web-csr` — client-side rendering in the browser. Implies `__single_holder`.
+- `web-csr` — client-side rendering in the browser. Implies `single-app`.
 - `web-ssr` — server-side rendering, in-memory `Node` tree → HTML string.
 - `salvo` — Salvo HTTP integration, implies `web-ssr`.
-- `__single_holder` — **internal**. Automatic with `web-csr`. Switches the
+- `single-app` — **internal**. Automatic with `web-csr`. Switches the
   reactive scheduler to a single global instance instead of `HolderId`-keyed
   thread locals. Don't toggle manually outside CSR.
 
@@ -47,15 +47,18 @@ exclusion — see `[package.metadata.cargo-all-features].skip_feature_sets`.
   `Copy` via a generational-box arena (`_todos.md` §2 P0); until then, accept
   the clones rather than reinventing a wrapper.
 - `Bond<T>` re-runs its mapper when any dependency's `(id, version)` changes.
-  Output is not value-compared — write `Bond::with_eq` (todo) or
-  `bond.map(...)` when you specifically want PartialEq gating.
+  Output is not value-compared by default — chain `.with_eq(|a, b| ...)`
+  or `.with_partial_eq()` (for `T: PartialEq`) when you specifically want
+  PartialEq gating, so observers only re-run on actual value change.
 - Inside `Widget::build` / `Widget::patch`, calling `.get()` on a `Cage` or
   `Bond` **subscribes** the current view via `TRACKING_STACK`. Inside an
   event handler it does NOT subscribe (no active tracking layer). Use
   `.get_untracked()` if you want to read without subscribing.
 - Mutations: call `Cage::revise(|mut v| ...)`. Repeated writes inside one
   user action should be wrapped in `reflow::batch(...)` to avoid intermediate
-  re-renders. Event handlers do **not** auto-batch yet (`_todos.md` §2 P1).
+  re-renders. CSR event handlers are auto-batched by
+  `Element::add_event_listener`, so writes inside a `.on(click, ...)`
+  callback already flush once at the end of the event tick.
 
 ## Widget lifecycle
 
@@ -100,7 +103,7 @@ children) → later `Widget::patch` when a bound signal revises → eventually
   default feature set.
 - `cargo test -p glory-core --lib --features web-ssr` runs the LIS tests
   PLUS the `widgets::snapshot_tests` SSR-driven scenarios (gated on
-  `web-ssr` + `not(__single_holder)`). Add new keyed-list / branch / loader
+  `web-ssr` + `not(single-app)`). Add new keyed-list / branch / loader
   regressions to `crates/core/src/widgets/snapshot_tests.rs`.
 - `glory-routing` and `glory-cli` carry **pre-existing** broken test
   modules from older snapshots — don't gate your PR on `cargo test
@@ -118,7 +121,7 @@ children) → later `Widget::patch` when a bound signal revises → eventually
   generation (`generate_tags!`) are fine — those are codegen, not DSL.
 - Don't break `web-csr` exclusivity with `web-ssr`. They never both compile
   in the same target.
-- Don't enable `__single_holder` outside the implication chain from `web-csr`.
+- Don't enable `single-app` outside the implication chain from `web-csr`.
 - Don't fix `glory-routing` / `glory-cli` pre-existing test brokenness as a
   drive-by. Open a dedicated PR for those — their failures predate any
   current branch.
