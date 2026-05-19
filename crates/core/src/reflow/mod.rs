@@ -25,6 +25,7 @@
 //! - [`schedule`] — internal; invoked by `Cage::revise`. Walks
 //!   `REVISING_ITEMS`, calls `Widget::patch` for each bound view.
 
+pub(crate) mod storage;
 mod cage;
 pub use cage::Cage;
 mod bond;
