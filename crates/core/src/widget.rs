@@ -1,6 +1,54 @@
 use std::fmt;
 
 use crate::{Node, Scope, View, ViewId};
+
+/// A reactive component.
+///
+/// `Widget` is the trait every renderable Glory type implements. The
+/// lifecycle, in order, is:
+///
+/// 1. **Construction** — the widget is built as a plain Rust value
+///    (e.g. `div().class("…")`). Builder methods only set fields;
+///    nothing reactive happens yet.
+/// 2. **`store_in(parent)` / `show_in(parent)`** — registers the
+///    widget as a child of `parent`'s [`Scope`]. `show_in` additionally
+///    marks it visible and attaches it if the parent is already
+///    attached. `mount_to(scope, parent_node)` is the entry point for
+///    a root widget; it inserts into the global `ROOT_VIEWS` map and
+///    drives the rest of the lifecycle inside a [`crate::reflow::batch`].
+/// 3. **`build(ctx)`** — runs once. Set up child widgets (via
+///    `show_in(ctx)`), wire event handlers, register reactive
+///    subscriptions. Anything captured by `.get()` on a `Cage` or
+///    `Bond` here will trigger `patch` later.
+/// 4. **`attach(ctx)`** — default no-op. Hook for "I've just been
+///    inserted into the DOM tree" side-effects (autofocus, IO start,
+///    timers, etc.).
+/// 5. **`flood(ctx)`** — attaches the widget's children. Default
+///    implementation calls `attach_child` on each. Element widgets
+///    override this to first position their own node in the parent
+///    DOM, then attach children.
+/// 6. **`patch(ctx)`** — fires whenever a subscribed `Cage` / `Bond`
+///    revises. The default is a no-op; override when the widget owns
+///    derived structure (e.g. `Each::patch` reorders its children).
+/// 7. **`detach(ctx)`** — runs when the parent removes this widget.
+///    Default detaches all children.
+///
+/// # Visibility rules
+///
+/// - The widget's value is moved into a [`View`] via `store_in` /
+///   `show_in`. After that, the original Rust binding is gone; the
+///   `View` owns the widget and exposes only the trait methods.
+/// - Each widget's reactive subscriptions are scoped to its own
+///   `ViewId`. Drop the parent view and all descendant subscriptions
+///   are released.
+///
+/// # Implementing your own
+///
+/// For HTML elements, prefer the `generate_tags!` macro in
+/// `crate::web::widgets` rather than hand-writing the boilerplate.
+/// For higher-level components (containers, controllers, etc.),
+/// implement `Widget` directly and call `show_in` on child widgets
+/// inside `build`.
 pub trait Widget: fmt::Debug + 'static {
     fn store_in(self, parent: &mut Scope) -> ViewId
     where

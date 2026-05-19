@@ -1,3 +1,30 @@
+//! Fine-grained reactivity primitives.
+//!
+//! Glory's reactivity is built on three concrete types and a thread-local
+//! scheduler:
+//!
+//! - [`Cage<T>`][Cage] — mutable cell. Reads in a tracking context
+//!   subscribe; writes via `revise` queue re-renders for subscribers.
+//! - [`Bond<T>`][Bond] — derived value with a mapper closure. Re-runs
+//!   when any captured dependency's `(id, version)` changes. Optional
+//!   equality gate via [`Bond::with_eq`].
+//! - [`Lotus<T>`][Lotus] — read-only enum of `Bare(T) | Cage(_) |
+//!   Bond(_)`. Use it for "anything reactively observable" type
+//!   parameters.
+//!
+//! Scheduling primitives:
+//! - [`batch`] — defer signal propagation until the closure returns,
+//!   then flush all re-renders once. Use around code that does many
+//!   writes in a row.
+//! - [`untrack`] — suppress signal propagation for writes (the
+//!   re-renders are dropped, not just deferred). Rare; mainly for
+//!   bookkeeping mutations.
+//! - [`untracked_read`] — peek at a reactive value without subscribing
+//!   the current tracking layer. Common inside `Bond` mappers that
+//!   want to read auxiliary state.
+//! - [`schedule`] — internal; invoked by `Cage::revise`. Walks
+//!   `REVISING_ITEMS`, calls `Widget::patch` for each bound view.
+
 mod cage;
 pub use cage::Cage;
 mod bond;

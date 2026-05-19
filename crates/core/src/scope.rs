@@ -10,6 +10,36 @@ use crate::node::Node;
 use crate::view::{VIEW_ID_DELIMITER, View, ViewId, ViewPosition};
 use crate::{Truck, reflow};
 
+/// Per-view runtime state.
+///
+/// Every [`Widget`][crate::Widget] receives a `&mut Scope` in
+/// `build` / `patch` / `attach`. Scope owns:
+///
+/// - **`view_id`** — stable identifier of this view in the holder.
+/// - **`child_views`** — `IndexMap<ViewId, View>` whose iteration
+///   order mirrors sibling rendering order in the DOM. Never use
+///   `.remove`; always `shift_remove` to preserve order.
+/// - **`show_list`** — visible children (`IndexSet<ViewId>`). A
+///   stored-but-not-shown child does not appear in the DOM.
+/// - **`parent_node` / `graff_node`** — where this widget's nodes
+///   live in the DOM tree. `parent_node` is the enclosing element,
+///   `graff_node` is the element under which this widget renders
+///   (usually the same; differs for fragment-like widgets that don't
+///   create their own DOM node).
+/// - **`first_child_node` / `last_child_node`** — anchors used by
+///   sibling positioning logic in [`attach_child`][Scope::attach_child].
+///   Element widgets set both to their own node in `build`.
+/// - **`position`** — the [`ViewPosition`] this view is about to be
+///   placed at (`Tail`, `Head`, `Prev(node)`, `Next(node)`). Set by
+///   the parent during `attach_child`, reset to `Unset` at the end
+///   so subsequent re-attaches go through fresh neighbour search.
+/// - **`truck`** — shared `Rc<RefCell<Truck>>` for app-wide context.
+///
+/// Mutating these fields from inside a widget is the framework's
+/// extension point; widgets like `Each` and `Switch` poke at
+/// `child_views` directly during `patch`. External code should
+/// stick to [`attach_child`][Scope::attach_child] and
+/// [`detach_child`][Scope::detach_child].
 #[derive(Debug)]
 pub struct Scope {
     #[cfg(not(feature = "__single_holder"))]
