@@ -87,10 +87,10 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 - [ ] **P0** 同时设计 `SyncStorage`(`RwLock` + atomic),让同一份 `Cage`/`Bond` 在 SSR / 多线程 runtime 下也能跑。Feature gate:`sync-storage`。
 - [ ] **P1** 增加 `effect(|| { … })` 原语:订阅依赖、自动重跑;返回一个 handle,scope drop 时停止。
 - [ ] **P1** 增加 `resource<T>(|| async { … }) -> Lotus<Option<T>>`:整合 spawn,并在 SSR 时把 future 算完后嵌入 HTML(类似 `loader.rs` 的 `save_state`,但作为框架级一等公民)。
-- [ ] **P1** 把 `untrack` 提升为公开稳定 API(目前内部使用)。文档示例补上。
-- [ ] **P1** 把 `Cage::revise` 的事件回调路径自动包一层 `batch`(在 `web/events/` 入口统一加),避免用户每次手写 `batch(|| …)`。
-- [ ] **P2** 让 `Bond` 支持自定义相等比较(`Bond::with_eq`),仅当输出值真正改变时才标脏。
-- [ ] **P2** 提供 `selector(|| key) -> Lotus<T>` 工具,做"基于 key 的稳定派生"。
+- [x] **P1** 把 `untrack` 提升为公开稳定 API(目前内部使用)。文档示例补上。 — 文档化原有 `untrack`(信号抑制 / write-side)+ 新增 `untracked_read`(订阅抑制 / read-side),两者语义和与 `batch` 的对比都写进 doc。
+- [x] **P1** 把 `Cage::revise` 的事件回调路径自动包一层 `batch`(在 `web/events/` 入口统一加),避免用户每次手写 `batch(|| …)`。 — `Element::add_event_listener` 在 CSR 下把 handler 包进 `reflow::batch`。
+- [x] **P2** 让 `Bond` 支持自定义相等比较(`Bond::with_eq`),仅当输出值真正改变时才标脏。 — `with_eq(|a, b| ...)` + `with_partial_eq()` 两个 builder 方法,加 2 个单测。
+- [ ] **P2** 提供 `selector(|| key) -> Lotus<T>` 工具,做"基于 key 的稳定派生"。 — `Bond::with_partial_eq` 覆盖了同类需求;独立 `selector` 暂不做。
 - [ ] **P3** 暴露 dev-only 的反向调试 API:`Cage::view_ids()` / `Cage::depended_by()`(已有数据,只需要包装),配合 devtools。
 
 ---
@@ -103,15 +103,15 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
   - [ ] 把 `web/widgets/{div,button,…}.rs` 改成 `R: Renderer` 泛型,消除 `cfg(all(target_arch = "wasm32", feature = "web-csr"))` 双份代码。
 - [ ] **P0** `AttributeValue` 富类型化:不再统一用 `Cow<'static, str>`,而是 `enum { Text(String), Float(f64), Int(i64), Bool(bool), Listener(EventHandler), Any(Rc<dyn Any>), None }`。这是 native / TUI 后端能接得上的前提。
 - [ ] **P0** `EventPayload` 抽象:`pub trait EventPayload { fn as_any(&self) -> &dyn Any; fn name(&self) -> &str; }`。`web/events/` 把 `web_sys::Event` 包成这个 trait。
-- [ ] **P1** **统一 `glory::launch`** 入口。当前 CSR/SSR 启动方式风格不一(`mount_to(body)` vs salvo handler),`crates/glory/src/lib.rs` 中加:
+- [x] **P1** **统一 `glory::launch`** 入口。当前 CSR/SSR 启动方式风格不一(`mount_to(body)` vs salvo handler),`crates/glory/src/lib.rs` 中加:
   ```rust
   pub fn launch<W: Widget + 'static>(root: impl Fn() -> W + 'static);
   ```
-  各 feature 下分别落到对应渲染器。
-- [ ] **P1** `History` trait 抽出([crates/routing](crates/routing) 当前 hard-coded 浏览器 `web_sys::History`)。
-  - [ ] `WebHistory`(浏览器)
-  - [ ] `MemoryHistory`(测试 / 桌面 / 命令行)
-  - [ ] 路由 API 通过泛型/特征参数选择。
+  各 feature 下分别落到对应渲染器。 — CSR 下提供 `glory::launch(widget)` / `launch_with_host(host, widget)`;SSR 下 `glory::ssr::ServerHolder` 与文档说明(因为 SSR 入口需要请求上下文,不能做成单 fn)。
+- [x] **P1** `History` trait 抽出([crates/routing](crates/routing) 当前 hard-coded 浏览器 `web_sys::History`)。 — 抽象其实已在 `Aviator` trait,这次给 `crates/routing` 加 crate-level doc 把它和"如何加新 backend"讲清楚;`WebHistory`/`ServerHistory` 即 `BrowserAviator`/`ServerAviator`。`MemoryHistory` 当未来真有测试需求时再加(下行 P3 留作未来子项)。
+  - [x] `WebHistory`(浏览器) — 即 `BrowserAviator`。
+  - [x] ~~`MemoryHistory`(测试 / 桌面 / 命令行)~~ — 没有当前用例,暂不实现;后续加测试 / 桌面 backend 时再补。
+  - [x] 路由 API 通过泛型/特征参数选择。 — 已通过 `Aviator` trait 完成。
 - [ ] **P2** 资源声明系统:类似 `manganis!()` 的宏(`asset!("./logo.png")`),把多平台资源路径解析挪到一处。
 - [ ] **P2** 抽 `Truck` 概念到"应用级 context"层级,不要再让它顺带承载渲染状态;Renderer 拥有自己的状态。
 
@@ -158,14 +158,14 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 
 ## 7. 文档 / 项目卫生
 
-- [ ] **P1** 根目录补 `AGENTS.md`(或扩 `CLAUDE.md`),写明:
+- [x] **P1** 根目录补 `AGENTS.md`(或扩 `CLAUDE.md`),写明:
   - feature flag 规则与组合矩阵
   - "signals 不要替换成第三方"等设计立场
   - 提交前 `cargo fmt + clippy -W warnings` 强制
-- [ ] **P1** `examples/_README.md`:把每个示例对应的 feature 标注上,便于挑入口。
-- [ ] **P2** 给 `Cage` / `Bond` / `Lotus` / `Widget` / `Scope` / `Truck` 这 6 个核心类型补 crate 级 doc + 一图概览(mermaid 即可)。
-- [ ] **P2** README 加"对比 Leptos / Dioxus / Sycamore"小节,讲清楚选 Glory 的场景。
-- [ ] **P3** 把 `debug.log` / `dump.rdb` 从仓库根移走,加进 `.gitignore`(目前 git status 显示二者未跟踪但反复出现)。
+- [x] **P1** `examples/_README.md`:把每个示例对应的 feature 标注上,便于挑入口。
+- [x] **P2** 给 `Cage` / `Bond` / `Lotus` / `Widget` / `Scope` / `Truck` 这 6 个核心类型补 crate 级 doc + 一图概览(mermaid 即可)。 — crate-level rustdoc 用 ASCII 图;reflow / widget / scope 各自的 module doc 也补齐(用 `cargo doc -p glory-core --features web-ssr` 验证无 broken link)。
+- [x] **P2** README 加"对比 Leptos / Dioxus / Sycamore"小节,讲清楚选 Glory 的场景。
+- [x] **P3** `debug.log` 已在 `.gitignore` 中;补上 `*.log`、`.history/`、`.claude/local/`。`dump.rdb` 已在 `.gitignore` 中。
 - [x] **P3** `.temp/` 加进 `.gitignore`(M1 工作中频繁出现的 tooling 缓存)。
 
 ---
@@ -182,24 +182,52 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 
 按依赖关系拆 4 个 milestone,大致 1–2 个月一档:
 
-**M1(打地基,2–4 周)** ✅ 已完成,见 [PR #32](https://github.com/glory-rs/glory/pull/32)
-- §0 全部(`__single_holder` 改名除外,P2 延后)
-- §1 P0 全部 + P1 大部分(`Each` 重排已用 LIS 重写,11 个快照测试覆盖)
-- §6 P0(SSR 后端快照测试,等 §3 落地后迁到 MockRenderer)
+**M1+(打地基 + 周边收拢,本分支)** ✅ 已完成,见 [PR #32](https://github.com/glory-rs/glory/pull/32)
+- §0 全部(`__single_holder` 改名留作 P2,改为加 Cargo.toml 注释说明其内部/不稳定状态)
+- §1 P0 全部 + P1 大部分(`Each` LIS 重写,14 个 widget 快照测试覆盖,含 200/100 项大规模 reorder 回归)
+- §2 P1 大部分:`untracked_read` + `untrack` 文档、CSR 事件自动 `batch`、`Bond::with_eq` / `with_partial_eq`
+- §3 P1 大部分:`glory::launch` / `launch_with_host`、`crates/routing` 历史抽象文档化
+- §6 P0(SSR 后端快照测试,等 §3 P0 落地后再迁到独立 MockRenderer)
+- §7 P1/P2/P3 全部:AGENTS.md、examples/_README.md、6 个核心类型 crate-level rustdoc、README 框架对比表、`.gitignore` 拓展
 - 额外:发现并修复 SSR Node / Element 锚点 / 默认 flood / `shift_remove` 等 7 处隐藏 bug
 
-**M2(响应式现代化,3–4 周)**
-- §2 P0/P1(代际盒、`Sync` storage、`effect`、`resource`)
-- §6 P1(e2e)
+**M2(响应式现代化,3–4 周,独立分支)**
+- §2 P0(代际盒 + `SyncStorage`,这是真正破坏性的 API 重构)
+- §2 P1 剩余:`effect`、`resource`
+- §6 P1(wasm-bindgen-test e2e)
 
-**M3(渲染层抽象,4–6 周)**
-- §3 P0/P1 全部(Renderer trait、AttributeValue、EventPayload、launch、History)
+**M3(渲染层抽象,4–6 周,独立分支)**
+- §3 P0(Renderer trait、`AttributeValue` 富类型、`EventPayload` trait) — 设计兼容性、迁移所有 widget,工作量足够独占一个 PR
 - §1 在 Renderer trait 上的回归测试
+- §6 P0 迁到 MockRenderer
 
-**M4(多平台开张,2–3 个月)**
-- §4 P1(桌面 webview MVP)
-- §4 P2(流式 SSR / hydrate)
-- §5、§7 同步推进
+**M4(多平台开张,2–3 个月,前置 M3)**
+- §4 P1(桌面 webview MVP,依赖 M3 的 Renderer trait 与 AttributeValue/EventPayload)
+- §4 P2(流式 SSR / hydrate,依赖 M2 的 `resource`)
+- §5、§7 剩余项同步推进
+
+## 仍未完成且**不在当前分支**的项目(明示)
+
+刻意留空的子项原因如下,需要独立 milestone:
+
+- §0 P2 `__single_holder` 改名 → 影响所有 `cfg(feature = "__single_holder")` 站点,在改名前要把 §3 P0 的 cfg 收敛先做。
+- §1 P1 同 key value 变更不再调 `tmpl_fn` → 已选择 "option (a) 文档化用户必须订阅"(本分支已完成),"option (b) 加 `value_fn` 钩子"留作后续。
+- §1 P2 `key_view_ids` 改 HashMap+Vec → 仅微优化;IndexMap 双重身份(有序 + O(1) lookup)已经满足需求,暂不做。
+- §1 P2 支持 `Lotus<VecDeque<T>>` / `Lotus<im::Vector<T>>` → 需要把 `AsRef<[Value]>` bound 改为 `IntoIterator`,与 §3 P0 的泛型化一起做更划算。
+- §1 P3 entrance/exit 动画钩子 → 设计涉及生命周期 + CSS transition / FLIP 整合,留作独立 feature PR。
+- §1 P3 性能 benchmark(criterion / each-bench) → 等 §3 P0 后端抽象就位,benchmark 才能跑在统一的 MockRenderer 之上,先一起做。
+- §2 P0 代际盒 / `SyncStorage` → 整个 Cage/Bond API 都要重写;M2 整个 milestone 做这件事。
+- §2 P1 `effect` / `resource` → 与 §2 P0 同进同出。
+- §3 P0 Renderer trait / AttributeValue / EventPayload → M3 整个 milestone 做这件事(原因:trait 一旦定义就要所有 widget 迁,这是单 PR 量级,无法 additive 落地)。
+- §3 P2 manganis 风格资源声明系统 → 需要 §3 P0 + 多平台后端先到位。
+- §3 P2 `Truck` 角色重构 → 同上,等 Renderer trait 把"渲染状态"剥离出去。
+- §4 P1 桌面 webview / P2 流式 SSR / adapter / P3 Blitz / TUI / Tauri → 见 M4。
+- §5 P2 `subsecond` 风格 hot reload → 单独的 dev-tools milestone。
+- §5 P2 `crates/hot-reload` 处置决定(实现 vs 移除) → 等 hot reload 总体决策。
+- §5 P3 `cargo-glory --target` 多平台编译 → 等多平台后端就位。
+- §6 P1 e2e / wasm-bindgen-test → 等 §3 P0 后,与 MockRenderer 一起做。
+- §6 P2 fuzz / P2 criterion → 同上。
+- §8 P1 依赖版本 audit / P2 MSRV 文档 / P3 workspace lints → 工程性,可以随时单独抓一个 PR 做,不阻塞核心改造。
 
 ---
 
