@@ -145,23 +145,11 @@ fn each_full_replacement_distinct_keys() {
 
 #[test]
 fn each_shuffle_keeps_all_keys() {
-    let items = Cage::new(vec![
-        "a".to_string(),
-        "b".to_string(),
-        "c".to_string(),
-        "d".to_string(),
-        "e".to_string(),
-    ]);
+    let items = Cage::new(vec!["a".to_string(), "b".to_string(), "c".to_string(), "d".to_string(), "e".to_string()]);
     let holder = make_holder().mount(EachListWidget { items: items.clone() });
 
     items.revise(|mut v| {
-        *v = vec![
-            "c".to_string(),
-            "e".to_string(),
-            "a".to_string(),
-            "d".to_string(),
-            "b".to_string(),
-        ];
+        *v = vec!["c".to_string(), "e".to_string(), "a".to_string(), "d".to_string(), "b".to_string()];
     });
     assert_eq!(each_html_items(&holder), vec!["c", "e", "a", "d", "b"]);
 }
@@ -292,15 +280,8 @@ impl Widget for SwitchHostWidget {
         div()
             .fill(
                 Switch::new()
-                    .push(
-                        crate::widgets::switch::Case::new(show_left, || {
-                            div().class("left").text("LEFT")
-                        })
-                        .cache(true),
-                    )
-                    .push(crate::widgets::switch::Case::new(show_right, || {
-                        div().class("right").text("RIGHT")
-                    })),
+                    .push(crate::widgets::switch::Case::new(show_left, || div().class("left").text("LEFT")).cache(true))
+                    .push(crate::widgets::switch::Case::new(show_right, || div().class("right").text("RIGHT"))),
             )
             .show_in(ctx);
     }
@@ -400,7 +381,9 @@ fn effect_runs_once_on_mount_then_per_revision() {
 #[test]
 fn switch_toggles_and_restores_cached_view() {
     let show_left = Cage::new(true);
-    let holder = make_holder().mount(SwitchHostWidget { show_left: show_left.clone() });
+    let holder = make_holder().mount(SwitchHostWidget {
+        show_left: show_left.clone(),
+    });
 
     let initial = render_html(&holder);
     assert!(initial.contains("LEFT"));
@@ -418,4 +401,3 @@ fn switch_toggles_and_restores_cached_view() {
     assert!(after_restore.contains("LEFT"));
     assert!(!after_restore.contains("RIGHT"));
 }
-

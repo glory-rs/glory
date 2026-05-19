@@ -152,11 +152,7 @@ where
 
         // Detach any view whose key disappeared.
         let kept: HashSet<&ViewId> = new_key_view_ids.values().collect();
-        let to_detach: Vec<ViewId> = prev_keys
-            .values()
-            .filter(|vid| !kept.contains(*vid))
-            .cloned()
-            .collect();
+        let to_detach: Vec<ViewId> = prev_keys.values().filter(|vid| !kept.contains(*vid)).cloned().collect();
         drop(kept);
 
         if !to_detach.is_empty() {
@@ -185,11 +181,7 @@ where
         // Reorder ctx.child_views to match the new ordering. Items that
         // belong to other widgets (rare for Each, but possible if mixed
         // children exist) sort to the end.
-        let target_index: IndexMap<ViewId, usize> = ordered_view_ids
-            .iter()
-            .enumerate()
-            .map(|(i, vid)| (vid.clone(), i))
-            .collect();
+        let target_index: IndexMap<ViewId, usize> = ordered_view_ids.iter().enumerate().map(|(i, vid)| (vid.clone(), i)).collect();
         ctx.child_views.sort_by(|a, _, b, _| {
             let ai = target_index.get(a).copied().unwrap_or(usize::MAX);
             let bi = target_index.get(b).copied().unwrap_or(usize::MAX);
@@ -241,11 +233,7 @@ where
 ///
 /// Runs in O(n log n) via the patience-sort variant.
 fn lis_positions(seq: &[Option<usize>]) -> Vec<usize> {
-    let pairs: Vec<(usize, usize)> = seq
-        .iter()
-        .enumerate()
-        .filter_map(|(i, v)| v.map(|val| (val, i)))
-        .collect();
+    let pairs: Vec<(usize, usize)> = seq.iter().enumerate().filter_map(|(i, v)| v.map(|val| (val, i))).collect();
     if pairs.is_empty() {
         return Vec::new();
     }
