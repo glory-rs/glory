@@ -1,5 +1,28 @@
-//! Routing and filters
-//! Router can router http requests to different handlers.
+//! Routing and filters.
+//!
+//! A [`Router`] matches a URL against registered [`Graff`]s (route
+//! definitions) and dispatches to the matched [`Handler`]. The
+//! [`Aviator`] trait is glory-routing's history / navigation
+//! abstraction: each platform backend implements `goto(url)` (and
+//! optionally listens for `popstate`-style events). The platform
+//! variants live under [`aviators`]:
+//!
+//! - [`aviators::BrowserAviator`] — wraps `window.history` and
+//!   listens for `popstate` + delegated anchor clicks.
+//! - [`aviators::ServerAviator`] — used during SSR; resolves the
+//!   request URL once and panics on programmatic `goto` (there is
+//!   no browser history to push to on the server).
+//!
+//! To navigate from app code, obtain the active `Aviator` from the
+//! `Truck` and call `goto`. The `<a>` element's default click is
+//! intercepted by `BrowserAviator` so plain links also work.
+//!
+//! ## Adding a new history backend
+//!
+//! Implement [`Aviator`] (and optionally [`glory_core::holder::Enabler`]
+//! if your backend needs lifecycle wiring), then inject your
+//! implementation into the app's `Truck` from inside a holder. The
+//! routing core only depends on the trait, not on `web_sys`.
 
 #[macro_use]
 mod cfg;
@@ -182,7 +205,10 @@ impl TruckExt for Rc<RefCell<Truck>> {
     fn remove_stuff(&self, graff: &str) -> Option<Stuff> {
         let mut stuff = None;
         if self.stuffs().get().contains_key(graff) {
-            stuff = self.stuffs().revise(|mut stuffs| stuffs.remove(graff));
+            // `shift_remove` preserves iteration order; consistent with the
+            // glory-core migration. The deprecated `remove` aliases
+            // `swap_remove` in current indexmap and would corrupt order.
+            stuff = self.stuffs().revise(|mut stuffs| stuffs.shift_remove(graff));
         }
         stuff
     }
@@ -192,7 +218,7 @@ impl TruckExt for Rc<RefCell<Truck>> {
         self.stuff_keys().borrow_mut().insert(graff, key);
     }
     fn remove_stuff_key(&self, graff: &str) -> Option<String> {
-        self.stuff_keys().borrow_mut().remove(graff)
+        self.stuff_keys().borrow_mut().shift_remove(graff)
     }
     fn contains_stuff_key(&self, graff: &str, key: &str) -> bool {
         self.stuff_keys().borrow().get(graff).map(|s| &**s) == Some(key)

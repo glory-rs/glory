@@ -1,4 +1,4 @@
-#[cfg(not(feature = "__single_holder"))]
+#[cfg(not(feature = "single-app"))]
 use std::cell::Cell;
 use std::cell::{Ref, RefCell};
 use std::fmt;
@@ -7,7 +7,7 @@ use std::rc::Rc;
 use indexmap::IndexSet;
 
 use super::{Bond, Cage, Revisable, RevisableId};
-#[cfg(not(feature = "__single_holder"))]
+#[cfg(not(feature = "single-app"))]
 use crate::HolderId;
 use crate::ViewId;
 
@@ -16,9 +16,9 @@ pub enum Lotus<T>
 where
     T: fmt::Debug + 'static,
 {
-    #[cfg(feature = "__single_holder")]
+    #[cfg(feature = "single-app")]
     Bare(Rc<RefCell<T>>),
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     Bare {
         holder_id: Rc<Cell<Option<HolderId>>>,
         data: Rc<RefCell<T>>,
@@ -33,9 +33,9 @@ where
 {
     pub fn get(&self) -> Ref<'_, T> {
         match self {
-            #[cfg(feature = "__single_holder")]
+            #[cfg(feature = "single-app")]
             Self::Bare(value) => RefCell::borrow(&**value),
-            #[cfg(not(feature = "__single_holder"))]
+            #[cfg(not(feature = "single-app"))]
             Self::Bare { data, .. } => RefCell::borrow(&**data),
             Self::Cage(cage) => cage.get(),
             Self::Bond(bond) => bond.get(),
@@ -43,9 +43,9 @@ where
     }
     pub fn get_untracked(&self) -> Ref<'_, T> {
         match self {
-            #[cfg(feature = "__single_holder")]
+            #[cfg(feature = "single-app")]
             Self::Bare(value) => RefCell::borrow(&**value),
-            #[cfg(not(feature = "__single_holder"))]
+            #[cfg(not(feature = "single-app"))]
             Self::Bare { data, .. } => RefCell::borrow(&**data),
             Self::Cage(cage) => cage.get_untracked(),
             Self::Bond(bond) => bond.get_untracked(),
@@ -56,9 +56,9 @@ where
         O: fmt::Debug + 'static,
     {
         match self {
-            #[cfg(feature = "__single_holder")]
+            #[cfg(feature = "single-app")]
             Self::Bare(value) => Lotus::Bare(Rc::new(RefCell::new(mapper(&value.borrow())))),
-            #[cfg(not(feature = "__single_holder"))]
+            #[cfg(not(feature = "single-app"))]
             Self::Bare { data, holder_id } => Lotus::Bare {
                 data: Rc::new(RefCell::new(mapper(&data.borrow()))),
                 holder_id: holder_id.clone(),
@@ -77,9 +77,9 @@ where
 {
     fn clone(&self) -> Self {
         match self {
-            #[cfg(feature = "__single_holder")]
+            #[cfg(feature = "single-app")]
             Self::Bare(rc) => Self::Bare(rc.clone()),
-            #[cfg(not(feature = "__single_holder"))]
+            #[cfg(not(feature = "single-app"))]
             Self::Bare { data, holder_id } => Self::Bare {
                 data: data.clone(),
                 holder_id: holder_id.clone(),
@@ -96,15 +96,15 @@ where
 {
     fn id(&self) -> RevisableId {
         match self {
-            #[cfg(feature = "__single_holder")]
+            #[cfg(feature = "single-app")]
             Self::Bare(_) => RevisableId(0),
-            #[cfg(not(feature = "__single_holder"))]
+            #[cfg(not(feature = "single-app"))]
             Self::Bare { .. } => RevisableId(0),
             Self::Cage(cage) => cage.id(),
             Self::Bond(bond) => bond.id(),
         }
     }
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     fn holder_id(&self) -> Option<HolderId> {
         match self {
             Self::Bare { holder_id, .. } => (&*holder_id.clone()).clone().into_inner(),
@@ -114,9 +114,9 @@ where
     }
     fn version(&self) -> usize {
         match self {
-            #[cfg(feature = "__single_holder")]
+            #[cfg(feature = "single-app")]
             Self::Bare(_) => 0,
-            #[cfg(not(feature = "__single_holder"))]
+            #[cfg(not(feature = "single-app"))]
             Self::Bare { .. } => 0,
             Self::Cage(cage) => cage.version(),
             Self::Bond(bond) => bond.version(),
@@ -124,9 +124,9 @@ where
     }
     fn view_ids(&self) -> Rc<RefCell<IndexSet<ViewId>>> {
         match self {
-            #[cfg(feature = "__single_holder")]
+            #[cfg(feature = "single-app")]
             Self::Bare(_) => Rc::new(RefCell::new(IndexSet::new())),
-            #[cfg(not(feature = "__single_holder"))]
+            #[cfg(not(feature = "single-app"))]
             Self::Bare { .. } => Rc::new(RefCell::new(IndexSet::new())),
             Self::Cage(cage) => cage.view_ids(),
             Self::Bond(bond) => bond.view_ids(),
@@ -134,9 +134,9 @@ where
     }
     fn bind_view(&self, view_id: &ViewId) {
         match self {
-            #[cfg(feature = "__single_holder")]
+            #[cfg(feature = "single-app")]
             Self::Bare(_value) => {}
-            #[cfg(not(feature = "__single_holder"))]
+            #[cfg(not(feature = "single-app"))]
             Self::Bare { holder_id, .. } => {
                 holder_id.set(Some(view_id.holder_id()));
             }
@@ -146,9 +146,9 @@ where
     }
     fn unbind_view(&self, view_id: &ViewId) {
         match self {
-            #[cfg(feature = "__single_holder")]
+            #[cfg(feature = "single-app")]
             Self::Bare(_) => {}
-            #[cfg(not(feature = "__single_holder"))]
+            #[cfg(not(feature = "single-app"))]
             Self::Bare { .. } => {}
             Self::Cage(cage) => cage.unbind_view(view_id),
             Self::Bond(bond) => bond.unbind_view(view_id),
@@ -156,9 +156,9 @@ where
     }
     fn unlace_view(&self, view_id: &ViewId, loose: usize) {
         match self {
-            #[cfg(feature = "__single_holder")]
+            #[cfg(feature = "single-app")]
             Self::Bare(_) => {}
-            #[cfg(not(feature = "__single_holder"))]
+            #[cfg(not(feature = "single-app"))]
             Self::Bare { .. } => {}
             Self::Cage(cage) => cage.unlace_view(view_id, loose),
             Self::Bond(bond) => bond.unlace_view(view_id, loose),
@@ -166,9 +166,9 @@ where
     }
     fn is_revising(&self) -> bool {
         match self {
-            #[cfg(feature = "__single_holder")]
+            #[cfg(feature = "single-app")]
             Self::Bare(_) => false,
-            #[cfg(not(feature = "__single_holder"))]
+            #[cfg(not(feature = "single-app"))]
             Self::Bare { .. } => false,
             Self::Cage(cage) => cage.is_revising(),
             Self::Bond(bond) => bond.is_revising(),
@@ -176,9 +176,9 @@ where
     }
     fn clone_boxed(&self) -> Box<dyn Revisable> {
         match self {
-            #[cfg(feature = "__single_holder")]
+            #[cfg(feature = "single-app")]
             Self::Bare(rc) => Box::new(Self::Bare(rc.clone())),
-            #[cfg(not(feature = "__single_holder"))]
+            #[cfg(not(feature = "single-app"))]
             Self::Bare { data, holder_id } => Box::new(Self::Bare {
                 data: data.clone(),
                 holder_id: holder_id.clone(),
@@ -208,11 +208,11 @@ where
 }
 
 impl<'a> From<&'a str> for Lotus<String> {
-    #[cfg(feature = "__single_holder")]
+    #[cfg(feature = "single-app")]
     fn from(value: &'a str) -> Self {
         Self::Bare(Rc::new(RefCell::new(value.to_owned())))
     }
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     fn from(value: &'a str) -> Self {
         Self::Bare {
             data: Rc::new(RefCell::new(value.to_owned())),
@@ -221,11 +221,11 @@ impl<'a> From<&'a str> for Lotus<String> {
     }
 }
 impl<'a> From<&'a String> for Lotus<String> {
-    #[cfg(feature = "__single_holder")]
+    #[cfg(feature = "single-app")]
     fn from(value: &'a String) -> Self {
         Self::Bare(Rc::new(RefCell::new(value.to_owned())))
     }
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     fn from(value: &'a String) -> Self {
         Self::Bare {
             data: Rc::new(RefCell::new(value.to_owned())),
@@ -235,11 +235,11 @@ impl<'a> From<&'a String> for Lotus<String> {
 }
 
 impl<'a> From<&'a str> for Lotus<Option<String>> {
-    #[cfg(feature = "__single_holder")]
+    #[cfg(feature = "single-app")]
     fn from(value: &'a str) -> Self {
         Self::Bare(Rc::new(RefCell::new(Some(value.to_owned()))))
     }
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     fn from(value: &'a str) -> Self {
         Self::Bare {
             data: Rc::new(RefCell::new(Some(value.to_owned()))),
@@ -248,11 +248,11 @@ impl<'a> From<&'a str> for Lotus<Option<String>> {
     }
 }
 impl<'a> From<&'a String> for Lotus<Option<String>> {
-    #[cfg(feature = "__single_holder")]
+    #[cfg(feature = "single-app")]
     fn from(value: &'a String) -> Self {
         Self::Bare(Rc::new(RefCell::new(Some(value.to_owned()))))
     }
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     fn from(value: &'a String) -> Self {
         Self::Bare {
             data: Rc::new(RefCell::new(Some(value.to_owned()))),
@@ -265,11 +265,11 @@ impl<T> From<T> for Lotus<T>
 where
     T: fmt::Debug + 'static,
 {
-    #[cfg(feature = "__single_holder")]
+    #[cfg(feature = "single-app")]
     fn from(value: T) -> Self {
         Self::Bare(Rc::new(RefCell::new(value)))
     }
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     fn from(value: T) -> Self {
         Self::Bare {
             data: Rc::new(RefCell::new(value)),
@@ -282,11 +282,11 @@ impl<T> From<T> for Lotus<Option<T>>
 where
     T: fmt::Debug + 'static,
 {
-    #[cfg(feature = "__single_holder")]
+    #[cfg(feature = "single-app")]
     fn from(value: T) -> Self {
         Self::Bare(Rc::new(RefCell::new(Some(value))))
     }
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     fn from(value: T) -> Self {
         Self::Bare {
             data: Rc::new(RefCell::new(Some(value))),
@@ -308,11 +308,11 @@ impl<T> Default for Lotus<T>
 where
     T: Default + fmt::Debug + 'static,
 {
-    #[cfg(feature = "__single_holder")]
+    #[cfg(feature = "single-app")]
     fn default() -> Self {
         Self::Bare(Default::default())
     }
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     fn default() -> Self {
         Self::Bare {
             data: Default::default(),

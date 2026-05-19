@@ -34,6 +34,12 @@ pub struct Element {
 impl Widget for Element {
     fn build(&mut self, ctx: &mut Scope) {
         ctx.graff_node = Some(self.node.clone());
+        // For an Element view, the entire subtree is anchored on this
+        // element's node. Expose it as both the first- and last-child
+        // anchor so sibling-positioning logic in `Scope::attach_child`
+        // can find a real DOM neighbour to insert relative to.
+        ctx.first_child_node = Some(self.node.clone());
+        ctx.last_child_node = Some(self.node.clone());
 
         let fillers = std::mem::take(&mut self.fillers);
         for filler in fillers {
@@ -54,8 +60,8 @@ impl Widget for Element {
         let parent_node = ctx.parent_node.as_ref().unwrap();
         match &ctx.position {
             ViewPosition::Head => parent_node.prepend_with_node(&self.node),
-            ViewPosition::Prev(prev_node) => prev_node.after_with_node(&self.node),
-            ViewPosition::Next(next_node) => next_node.before_with_node(&self.node),
+            ViewPosition::Prev(prev_node) => parent_node.insert_after(prev_node, &self.node),
+            ViewPosition::Next(next_node) => parent_node.insert_before(next_node, &self.node),
             ViewPosition::Tail => parent_node.append_with_node(&self.node),
             ViewPosition::Unset => {
                 crate::warn!("node position is unset. {:#?}", &self.node);

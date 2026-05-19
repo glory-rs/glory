@@ -27,8 +27,17 @@ impl Node {
         }
     }
 
+    /// Identity comparison. Two Node values are considered the same DOM
+    /// instance iff they share the underlying `Rc` allocation (i.e. one
+    /// was produced from the other via `Clone`). Content equality (via
+    /// `PartialEq`) is not appropriate for child-of operations because
+    /// distinct nodes can carry identical content.
+    pub fn ptr_eq(&self, other: &Node) -> bool {
+        Rc::ptr_eq(&self.children, &other.children)
+    }
+
     pub fn remove_child(&self, node: &Node) {
-        self.children.borrow_mut().retain(|item| item != node);
+        self.children.borrow_mut().retain(|item| !item.ptr_eq(node));
     }
 
     pub fn add_class(&self, value: impl Into<Cow<'static, str>>) {
@@ -51,24 +60,45 @@ impl Node {
         self.properties.borrow_mut().remove(key);
     }
 
+    /// Move `node` to be the first child of `self`. If `node` already lives
+    /// in `self`'s children, it is removed from its previous position first.
     pub fn prepend_with_node(&self, node: &Node) {
-        self.children.borrow_mut().insert(0, node.clone());
+        let mut children = self.children.borrow_mut();
+        children.retain(|n| !n.ptr_eq(node));
+        children.insert(0, node.clone());
     }
+    /// Move `node` to be the last child of `self`. If `node` already lives
+    /// in `self`'s children, it is removed from its previous position first.
     pub fn append_with_node(&self, node: &Node) {
-        self.children.borrow_mut().push(node.clone());
+        let mut children = self.children.borrow_mut();
+        children.retain(|n| !n.ptr_eq(node));
+        children.push(node.clone());
     }
 
-    pub fn before_with_node(&self, node: &Node) {
-        let index = self.children.borrow().iter().position(|n| n == node);
-        if let Some(index) = index {
-            self.children.borrow_mut().insert(index, node.clone());
+    /// Move `new_node` to the position immediately AFTER `anchor` among
+    /// `self`'s children. If `new_node` is already a child of `self`, it
+    /// is removed from its previous slot first. If `anchor` is not a
+    /// child of `self`, `new_node` is appended.
+    pub fn insert_after(&self, anchor: &Node, new_node: &Node) {
+        let mut children = self.children.borrow_mut();
+        children.retain(|n| !n.ptr_eq(new_node));
+        let pos = children.iter().position(|n| n.ptr_eq(anchor));
+        match pos {
+            Some(idx) => children.insert(idx + 1, new_node.clone()),
+            None => children.push(new_node.clone()),
         }
     }
-
-    pub fn after_with_node(&self, node: &Node) {
-        let index: Option<usize> = self.children.borrow().iter().position(|n| n == node);
-        if let Some(index) = index {
-            self.children.borrow_mut().insert(index + 1, node.clone());
+    /// Move `new_node` to the position immediately BEFORE `anchor` among
+    /// `self`'s children. If `new_node` is already a child of `self`, it
+    /// is removed from its previous slot first. If `anchor` is not a
+    /// child of `self`, `new_node` is appended.
+    pub fn insert_before(&self, anchor: &Node, new_node: &Node) {
+        let mut children = self.children.borrow_mut();
+        children.retain(|n| !n.ptr_eq(new_node));
+        let pos = children.iter().position(|n| n.ptr_eq(anchor));
+        match pos {
+            Some(idx) => children.insert(idx, new_node.clone()),
+            None => children.push(new_node.clone()),
         }
     }
 

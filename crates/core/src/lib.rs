@@ -1,3 +1,54 @@
+//! Glory's reactive web framework core.
+//!
+//! # The six types every Glory app touches
+//!
+//! ```text
+//!   ┌──────────┐   .map()    ┌──────────┐  .read()  ┌──────────┐
+//!   │  Cage<T> │ ─────────►  │  Bond<T> │ ────────► │ Lotus<T> │
+//!   └──────────┘             └──────────┘           └──────────┘
+//!        ▲                                              │
+//!        │ revise(...)                                  │ bind_view
+//!        │                                              ▼
+//!   user code                                       ┌──────────┐
+//!                                                   │  Widget  │
+//!                                                   │  build / │
+//!                                                   │  patch   │
+//!                                                   └──────────┘
+//!                                                        │
+//!                                                        ▼
+//!                                                   ┌──────────┐
+//!                                                   │  Scope   │ ──► child_views,
+//!                                                   │          │     show_list,
+//!                                                   │          │     parent_node,
+//!                                                   │          │     truck (ctx)
+//!                                                   └──────────┘
+//! ```
+//!
+//! - [`Cage<T>`][reflow::Cage] — mutable reactive cell. Reading it inside
+//!   a tracking context (a `Bond` mapper or a `Widget` build/patch)
+//!   subscribes the caller. Writing via [`Cage::revise`][reflow::Cage::revise]
+//!   schedules re-renders for all subscribed views.
+//! - [`Bond<T>`][reflow::Bond] — derived value. Re-runs its mapper when
+//!   any of its tracked dependencies' `(id, version)` pair changes. Use
+//!   [`Bond::with_eq`][reflow::Bond::with_eq] / `with_partial_eq()` to
+//!   gate version bumps on actual output change.
+//! - [`Lotus<T>`][reflow::Lotus] — read-only union of "any reactive
+//!   value or bare T". Pass this when you accept "anything observable".
+//! - [`Widget`] — a component. Implements `build` (initial layout),
+//!   `patch` (re-render after signal change), `attach` / `flood` /
+//!   `detach` for lifecycle hooks. Created in [`Widget::build`] by
+//!   chaining HTML element factories like `div().class("..").show_in(ctx)`.
+//! - [`Scope`] — the local context passed to every `build` / `patch`.
+//!   Holds the component's `child_views`, current `show_list`, the
+//!   parent DOM node, and a shared [`Truck`] for app-wide state.
+//! - [`Truck`] — typed key-value bag for app-level context (URL,
+//!   config, anything you'd put in a React context). Cloned by `Rc<RefCell<_>>`
+//!   into each [`Scope`].
+//!
+//! See [`reflow::batch`] / [`reflow::untrack`] /
+//! [`reflow::untracked_read`] for the write- vs read-side scheduling
+//! controls.
+
 #[macro_use]
 mod cfg;
 
@@ -26,7 +77,7 @@ pub use truck::Truck;
 
 pub mod holder;
 pub use holder::Holder;
-#[cfg(not(feature = "__single_holder"))]
+#[cfg(not(feature = "single-app"))]
 pub use holder::HolderId;
 
 pub mod spawn;
@@ -35,13 +86,13 @@ pub use reflow::Cage;
 
 use std::cell::RefCell;
 
-#[cfg(not(feature = "__single_holder"))]
+#[cfg(not(feature = "single-app"))]
 use indexmap::IndexMap;
 
 thread_local! {
-    #[cfg(feature = "__single_holder")]
+    #[cfg(feature = "single-app")]
     pub(crate) static ROOT_VIEWS: RefCell<ViewMap> = RefCell::default();
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     pub(crate) static ROOT_VIEWS: RefCell<IndexMap<HolderId, ViewMap>> = RefCell::default();
 }
 

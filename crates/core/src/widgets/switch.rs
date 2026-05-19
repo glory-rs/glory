@@ -83,19 +83,22 @@ impl Widget for Switch {
             }
         }
         if index != self.active_index {
-            if let Some(active_view_id) = &self.active_view_id {
+            if let Some(active_view_id) = &self.active_view_id.clone() {
                 if let (Some(active_index), Some(active_view)) = (self.active_index, ctx.detach_child(active_view_id)) {
                     let active_case = self.cases.get_mut(active_index).unwrap();
                     if active_case.use_cache {
                         active_case.cached_view = Some(active_view);
                     }
                 }
+                self.active_view_id = None;
             }
             self.active_index = index;
             if let Some(index) = index {
                 let case = self.cases.get_mut(index).unwrap();
-                let view_id = if let Some(view) = &case.cached_view {
-                    view.id.clone()
+                let view_id = if let Some(view) = case.cached_view.take() {
+                    let view_id = view.id.clone();
+                    ctx.child_views.insert(view_id.clone(), view);
+                    view_id
                 } else {
                     case.tmpl.make_view(ctx)
                 };

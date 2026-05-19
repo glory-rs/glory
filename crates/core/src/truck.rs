@@ -2,7 +2,26 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::fmt::{self, Formatter};
 
-/// Truck is for store temp data of current request. Each handler can read or write data to it.
+/// Application-level typed context.
+///
+/// `Truck` is a heterogeneous key-value map (`HashMap<String, Box<dyn
+/// Any>>`) attached to each Glory app instance and re-exposed on every
+/// [`crate::Scope`]. Use it for **app-wide context** that doesn't
+/// belong on a specific component:
+///
+/// - The current request URL (`"glory::url"`) — populated by the
+///   `ServerHolder` and read by routing's `ServerAviator`.
+/// - The router / aviator handle, so widgets can call
+///   `aviator.goto("/...")` from anywhere.
+/// - User-supplied config (theme, locale, feature flags) that any
+///   component might want to read.
+///
+/// **Don't** put per-component state in here — use `Cage` /
+/// signals scoped to the component instead. The Truck has no
+/// reactivity; reads don't subscribe and writes don't trigger
+/// re-renders. (Putting a `Cage` *handle* in the Truck is fine: the
+/// handle is the app-wide context, the reactivity comes from the
+/// Cage's normal subscription mechanism when components read it.)
 ///
 /// # Example
 ///
@@ -173,13 +192,10 @@ impl fmt::Debug for Truck {
 
 #[cfg(test)]
 mod test {
-    use crate::prelude::*;
-    use crate::test::{ResponseExt, TestClient};
-
     use super::*;
 
     #[test]
-    fn test_truck() {
+    fn test_truck_insert_and_get() {
         let mut truck = Truck::with_capacity(6);
         assert!(truck.capacity() >= 6);
 
@@ -188,14 +204,5 @@ mod test {
 
         assert_eq!(truck.get::<String>("one").unwrap(), &"ONE".to_owned());
         assert_eq!(truck.get_mut::<String>("one").unwrap(), &mut "ONE".to_owned());
-    }
-
-    #[test]
-    fn test_transfer() {
-        let mut truck = Truck::with_capacity(6);
-        truck.insert("one", "ONE".to_owned());
-
-        let truck = truck.transfer();
-        assert_eq!(truck.get::<String>("one").unwrap(), &"ONE".to_owned());
     }
 }

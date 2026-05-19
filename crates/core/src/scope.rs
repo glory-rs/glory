@@ -4,15 +4,45 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use indexmap::{IndexMap, IndexSet};
 
-#[cfg(not(feature = "__single_holder"))]
+#[cfg(not(feature = "single-app"))]
 use crate::HolderId;
 use crate::node::Node;
 use crate::view::{VIEW_ID_DELIMITER, View, ViewId, ViewPosition};
 use crate::{Truck, reflow};
 
+/// Per-view runtime state.
+///
+/// Every [`Widget`][crate::Widget] receives a `&mut Scope` in
+/// `build` / `patch` / `attach`. Scope owns:
+///
+/// - **`view_id`** — stable identifier of this view in the holder.
+/// - **`child_views`** — `IndexMap<ViewId, View>` whose iteration
+///   order mirrors sibling rendering order in the DOM. Never use
+///   `.remove`; always `shift_remove` to preserve order.
+/// - **`show_list`** — visible children (`IndexSet<ViewId>`). A
+///   stored-but-not-shown child does not appear in the DOM.
+/// - **`parent_node` / `graff_node`** — where this widget's nodes
+///   live in the DOM tree. `parent_node` is the enclosing element,
+///   `graff_node` is the element under which this widget renders
+///   (usually the same; differs for fragment-like widgets that don't
+///   create their own DOM node).
+/// - **`first_child_node` / `last_child_node`** — anchors used by
+///   sibling positioning logic in [`attach_child`][Scope::attach_child].
+///   Element widgets set both to their own node in `build`.
+/// - **`position`** — the [`ViewPosition`] this view is about to be
+///   placed at (`Tail`, `Head`, `Prev(node)`, `Next(node)`). Set by
+///   the parent during `attach_child`, reset to `Unset` at the end
+///   so subsequent re-attaches go through fresh neighbour search.
+/// - **`truck`** — shared `Rc<RefCell<Truck>>` for app-wide context.
+///
+/// Mutating these fields from inside a widget is the framework's
+/// extension point; widgets like `Each` and `Switch` poke at
+/// `child_views` directly during `patch`. External code should
+/// stick to [`attach_child`][Scope::attach_child] and
+/// [`detach_child`][Scope::detach_child].
 #[derive(Debug)]
 pub struct Scope {
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     holder_id: HolderId,
     pub view_id: ViewId,
     pub(crate) is_root: bool,
@@ -34,7 +64,7 @@ pub struct Scope {
 impl Scope {
     pub fn new(view_id: ViewId, truck: Rc<RefCell<Truck>>) -> Self {
         Self {
-            #[cfg(not(feature = "__single_holder"))]
+            #[cfg(not(feature = "single-app"))]
             holder_id: view_id.holder_id(),
             view_id,
             is_root: false,
@@ -55,7 +85,7 @@ impl Scope {
     }
     pub fn new_root(view_id: ViewId, truck: Rc<RefCell<Truck>>) -> Self {
         Self {
-            #[cfg(not(feature = "__single_holder"))]
+            #[cfg(not(feature = "single-app"))]
             holder_id: view_id.holder_id(),
             view_id,
             is_root: true,
@@ -84,7 +114,7 @@ impl Scope {
         self.is_built
     }
 
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     pub fn holder_id(&self) -> HolderId {
         self.holder_id
     }
@@ -96,7 +126,7 @@ impl Scope {
     }
     pub(crate) fn next_child_view_id(&self) -> ViewId {
         cfg_if! {
-          if #[cfg(feature = "__single_holder")] {
+          if #[cfg(feature = "single-app")] {
             ViewId::new(format!("{}{VIEW_ID_DELIMITER}{}", self.view_id, self.next_child_view_id.fetch_add(1, Ordering::Relaxed)))
           } else {
             ViewId::new(self.holder_id, format!("{}{VIEW_ID_DELIMITER}{}", self.view_id, self.next_child_view_id.fetch_add(1, Ordering::Relaxed)))
@@ -127,6 +157,28 @@ impl Scope {
     pub fn child_views(&self) -> &IndexMap<ViewId, View> {
         &self.child_views
     }
+
+    /// Register a reactive side effect on this scope. Convenience wrapper
+    /// around [`crate::reflow::effect_in`]; see that function for the
+    /// semantics.
+    pub fn effect<F>(&mut self, closure: F) -> ViewId
+    where
+        F: FnMut() + 'static,
+    {
+        crate::reflow::effect_in(self, closure)
+    }
+
+    /// Register an asynchronous derived signal on this scope. Convenience
+    /// wrapper around [`crate::reflow::resource_in`]; see that function
+    /// for the stale-write caveat and SSR-hydration alternative.
+    pub fn resource<T, F, Fut>(&mut self, future_fn: F) -> reflow::Cage<Option<T>>
+    where
+        T: std::fmt::Debug + 'static,
+        F: Fn() -> Fut + 'static,
+        Fut: std::future::Future<Output = T> + 'static,
+    {
+        crate::reflow::resource_in(self, future_fn)
+    }
     // pub fn child_views_mut(&mut self) -> &mut IndexMap<ViewId, View> {
     //     &mut self.child_views
     // }
@@ -145,7 +197,7 @@ impl Scope {
         if view.scope.position == ViewPosition::Unset {
             let index = self.child_views.get_index_of(view_id).unwrap();
             if index > 0 {
-                for i in (index - 1)..=0 {
+                for i in (0..index).rev() {
                     let (_, prev_view) = self.child_views.get_index(i).unwrap();
                     if prev_view.scope.is_attached() {
                         if let Some(prev_node) = prev_view.last_child_node() {
@@ -188,7 +240,7 @@ impl Scope {
         debug_assert!(view.scope.graff_node.is_some(), "view.scope.parent_node should not None");
 
         cfg_if! {
-            if #[cfg(feature = "__single_holder")] {
+            if #[cfg(feature = "single-app")] {
                 reflow::batch(|| {
                     view.attach();
                 });
@@ -202,7 +254,7 @@ impl Scope {
     }
 
     pub fn detach_child(&mut self, view_id: &ViewId) -> Option<View> {
-        self.show_list.remove(view_id);
+        self.show_list.shift_remove(view_id);
 
         let Some(view) = self.child_views.get_mut(view_id) else {
             return None;
@@ -210,12 +262,17 @@ impl Scope {
         if !view.scope.is_attached() {
             return None;
         }
-        let Some(mut view) = self.child_views.remove(view_id) else {
+        // `shift_remove` preserves the order of remaining siblings, which
+        // sibling-positioning in `attach_child` and reorder paths in
+        // widgets like `Each` depend on. The deprecated `remove` aliases
+        // to `swap_remove`, which would relocate the last view into the
+        // gap and silently corrupt sibling order.
+        let Some(mut view) = self.child_views.shift_remove(view_id) else {
             return None;
         };
 
         cfg_if! {
-            if #[cfg(feature = "__single_holder")] {
+            if #[cfg(feature = "single-app")] {
                 reflow::batch(|| {
                     view.detach();
                 });

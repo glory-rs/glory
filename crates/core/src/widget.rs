@@ -1,6 +1,54 @@
 use std::fmt;
 
-use crate::{Node, Scope, View, ViewId, view::ViewPosition};
+use crate::{Node, Scope, View, ViewId};
+
+/// A reactive component.
+///
+/// `Widget` is the trait every renderable Glory type implements. The
+/// lifecycle, in order, is:
+///
+/// 1. **Construction** — the widget is built as a plain Rust value
+///    (e.g. `div().class("…")`). Builder methods only set fields;
+///    nothing reactive happens yet.
+/// 2. **`store_in(parent)` / `show_in(parent)`** — registers the
+///    widget as a child of `parent`'s [`Scope`]. `show_in` additionally
+///    marks it visible and attaches it if the parent is already
+///    attached. `mount_to(scope, parent_node)` is the entry point for
+///    a root widget; it inserts into the global `ROOT_VIEWS` map and
+///    drives the rest of the lifecycle inside a [`crate::reflow::batch`].
+/// 3. **`build(ctx)`** — runs once. Set up child widgets (via
+///    `show_in(ctx)`), wire event handlers, register reactive
+///    subscriptions. Anything captured by `.get()` on a `Cage` or
+///    `Bond` here will trigger `patch` later.
+/// 4. **`attach(ctx)`** — default no-op. Hook for "I've just been
+///    inserted into the DOM tree" side-effects (autofocus, IO start,
+///    timers, etc.).
+/// 5. **`flood(ctx)`** — attaches the widget's children. Default
+///    implementation calls `attach_child` on each. Element widgets
+///    override this to first position their own node in the parent
+///    DOM, then attach children.
+/// 6. **`patch(ctx)`** — fires whenever a subscribed `Cage` / `Bond`
+///    revises. The default is a no-op; override when the widget owns
+///    derived structure (e.g. `Each::patch` reorders its children).
+/// 7. **`detach(ctx)`** — runs when the parent removes this widget.
+///    Default detaches all children.
+///
+/// # Visibility rules
+///
+/// - The widget's value is moved into a [`View`] via `store_in` /
+///   `show_in`. After that, the original Rust binding is gone; the
+///   `View` owns the widget and exposes only the trait methods.
+/// - Each widget's reactive subscriptions are scoped to its own
+///   `ViewId`. Drop the parent view and all descendant subscriptions
+///   are released.
+///
+/// # Implementing your own
+///
+/// For HTML elements, prefer the `generate_tags!` macro in
+/// `crate::web::widgets` rather than hand-writing the boilerplate.
+/// For higher-level components (containers, controllers, etc.),
+/// implement `Widget` directly and call `show_in` on child widgets
+/// inside `build`.
 pub trait Widget: fmt::Debug + 'static {
     fn store_in(self, parent: &mut Scope) -> ViewId
     where
@@ -35,7 +83,7 @@ pub trait Widget: fmt::Debug + 'static {
 
         let view_id = view.id.clone();
         cfg_if! {
-            if #[cfg(not(feature = "__single_holder"))] {
+            if #[cfg(not(feature = "single-app"))] {
                 let holder_id = view.holder_id();
             }
         }
@@ -43,7 +91,7 @@ pub trait Widget: fmt::Debug + 'static {
             crate::ROOT_VIEWS.with(|root_views| {
                 let mut root_views = root_views.borrow_mut();
                 cfg_if! {
-                    if #[cfg(not(feature = "__single_holder"))] {
+                    if #[cfg(not(feature = "single-app"))] {
                         let holder_id = view.holder_id();
                         let root_views = root_views.entry(holder_id).or_default();
                     }
@@ -54,7 +102,7 @@ pub trait Widget: fmt::Debug + 'static {
             })
         };
         cfg_if! {
-            if #[cfg(feature = "__single_holder")] {
+            if #[cfg(feature = "single-app")] {
                 crate::reflow::batch(process);
             } else {
                 crate::reflow::batch(holder_id, process);
@@ -75,12 +123,17 @@ pub trait Widget: fmt::Debug + 'static {
     fn hydrate(&mut self, _ctx: &mut Scope) {}
     fn build(&mut self, _ctx: &mut Scope);
 
-    /// Attach children
+    /// Attach children.
+    ///
+    /// The default implementation simply walks any children that were
+    /// inserted via `store_in` during `build` and attaches them.  It must
+    /// NOT pre-set their `scope.position` — already-attached children have
+    /// `position == Unset` (reset by the end of `attach_child`), and
+    /// forcing it back to `Tail` here would survive `attach_child`'s
+    /// early-return on `is_attached` and break neighbour-relative
+    /// re-positioning during later patches (e.g. `Each` reordering).
     fn flood(&mut self, ctx: &mut Scope) {
         let ids: Vec<ViewId> = ctx.child_views.keys().cloned().collect();
-        for view in ctx.child_views.values_mut() {
-            view.scope.position = ViewPosition::Tail;
-        }
         for id in ids {
             ctx.attach_child(&id);
         }
@@ -94,7 +147,7 @@ pub trait Widget: fmt::Debug + 'static {
         let ids: Vec<ViewId> = ctx.child_views.keys().cloned().collect();
         if !ids.is_empty() {
             cfg_if! {
-                if #[cfg(feature = "__single_holder")] {
+                if #[cfg(feature = "single-app")] {
                     crate::reflow::batch(|| {
                         for id in ids {
                             ctx.detach_child(&id);

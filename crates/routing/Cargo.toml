@@ -23,10 +23,10 @@ path = "src/lib.rs"
 
 [features]
 default = ["web-csr"]
-web-csr = ["__single_holder", "glory-core/web-csr", "dep:wasm-bindgen"]
+web-csr = ["single-app", "glory-core/web-csr", "dep:wasm-bindgen"]
 web-ssr = ["glory-core/web-ssr"]
 salvo = ["dep:salvo", "glory-core/salvo"]
-__single_holder = []
+single-app = []
 
 [dependencies]
 cfg-if = { workspace = true }
@@ -60,3 +60,5 @@ url = { workspace = true }
 [package.metadata.cargo-all-features]
 denylist = ["stable"]
 skip_feature_sets = [["web-ssr", "web-csr"]]
+[lints]
+workspace = true

@@ -1,9 +1,38 @@
+//! Fine-grained reactivity primitives.
+//!
+//! Glory's reactivity is built on three concrete types and a thread-local
+//! scheduler:
+//!
+//! - [`Cage<T>`][Cage] — mutable cell. Reads in a tracking context
+//!   subscribe; writes via `revise` queue re-renders for subscribers.
+//! - [`Bond<T>`][Bond] — derived value with a mapper closure. Re-runs
+//!   when any captured dependency's `(id, version)` changes. Optional
+//!   equality gate via [`Bond::with_eq`].
+//! - [`Lotus<T>`][Lotus] — read-only enum of `Bare(T) | Cage(_) |
+//!   Bond(_)`. Use it for "anything reactively observable" type
+//!   parameters.
+//!
+//! Scheduling primitives:
+//! - [`batch`] — defer signal propagation until the closure returns,
+//!   then flush all re-renders once. Use around code that does many
+//!   writes in a row.
+//! - [`untrack`] — suppress signal propagation for writes (the
+//!   re-renders are dropped, not just deferred). Rare; mainly for
+//!   bookkeeping mutations.
+//! - [`untracked_read`] — peek at a reactive value without subscribing
+//!   the current tracking layer. Common inside `Bond` mappers that
+//!   want to read auxiliary state.
+//! - [`schedule`] — internal; invoked by `Cage::revise`. Walks
+//!   `REVISING_ITEMS`, calls `Widget::patch` for each bound view.
+
 mod cage;
 pub use cage::Cage;
 mod bond;
-pub use bond::Bond;
+pub use bond::{Bond, selector};
 mod lotus;
 pub use lotus::Lotus;
+mod effect;
+pub use effect::{Effect, effect_in, resource_in};
 pub mod scheduler;
 pub use scheduler::{batch, schedule};
 
@@ -15,19 +44,19 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use indexmap::{IndexMap, IndexSet};
 
-#[cfg(not(feature = "__single_holder"))]
+#[cfg(not(feature = "single-app"))]
 use crate::HolderId;
 use crate::ViewId;
 
 thread_local! {
-    #[cfg(feature = "__single_holder")]
+    #[cfg(feature = "single-app")]
     pub(crate) static REVISING_ITEMS: RefCell<IndexMap<RevisableId, Box<dyn Revisable>>> = RefCell::default();
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     pub(crate) static REVISING_ITEMS: RefCell<IndexMap<HolderId, IndexMap<RevisableId, Box<dyn Revisable>>>> = RefCell::default();
 
-    #[cfg(feature = "__single_holder")]
+    #[cfg(feature = "single-app")]
     pub(crate) static PENDING_ITEMS: RefCell<IndexMap<RevisableId, Box<dyn Revisable>>> = RefCell::default();
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     pub(crate) static PENDING_ITEMS: RefCell<IndexMap<HolderId, IndexMap<RevisableId, Box<dyn Revisable>>>> = RefCell::default();
 
     pub(crate) static TRACKING_STACK: RefCell<TrackingStack> = RefCell::new(TrackingStack::new());
@@ -65,7 +94,54 @@ pub fn gather<R>(func: impl FnOnce() -> R) -> (IndexMap<RevisableId, Box<dyn Rev
     (gathers, result)
 }
 
-#[cfg(feature = "__single_holder")]
+/// Read reactive values inside `func` **without subscribing** the current
+/// tracking layer to them. Useful inside a `Bond` mapper or a widget
+/// `build` / `patch` where you want to peek at a `Cage` / `Bond` value
+/// without forcing a re-run when that source changes.
+///
+/// ```ignore
+/// let derived = Bond::new(move || {
+///     // re-runs when `must_track` changes
+///     let a = *must_track.get();
+///     // intentionally does NOT subscribe to `dont_track`
+///     let b = untracked_read(|| *dont_track.get());
+///     a + b
+/// });
+/// ```
+///
+/// Implementation note: temporarily swaps out the thread-local
+/// `TRACKING_STACK` so reads cannot push into any active gather layer.
+/// Restores the previous stack on return, even if `func` panics, so
+/// downstream tracking is unaffected.
+pub fn untracked_read<R>(func: impl FnOnce() -> R) -> R {
+    struct Guard(Option<TrackingStack>);
+    impl Drop for Guard {
+        fn drop(&mut self) {
+            if let Some(saved) = self.0.take() {
+                TRACKING_STACK.with(|stack| *stack.borrow_mut() = saved);
+            }
+        }
+    }
+    let saved = TRACKING_STACK.with(|stack| std::mem::take(&mut *stack.borrow_mut()));
+    let _guard = Guard(Some(saved));
+    func()
+}
+
+/// Suppress signal propagation for the duration of `opt`. Writes via
+/// `Cage::revise` inside `opt` mutate the state and bump the cage
+/// version, but do not enqueue re-renders on bound views; observers
+/// will still notice the bumped version the next time they read.
+///
+/// Different from [`gather`] / [`untracked_read`]: this gates the WRITE
+/// side (signal/scheduling), not the read side.
+///
+/// Different from [`batch`]: `batch` defers and then flushes all queued
+/// re-renders, whereas `untrack` drops them.
+///
+/// Mainly useful for one-shot bookkeeping mutations that don't represent
+/// user-visible state changes (e.g. updating an internal cursor while
+/// processing a list).
+#[cfg(feature = "single-app")]
 pub fn untrack<O, R>(opt: O) -> R
 where
     O: FnOnce() -> R,
@@ -82,8 +158,9 @@ where
     })
 }
 
-#[cfg(not(feature = "__single_holder"))]
-
+/// See the single-holder variant above. In multi-holder mode the
+/// suppression is scoped to a specific `HolderId`.
+#[cfg(not(feature = "single-app"))]
 pub fn untrack<O, R>(holder_id: HolderId, opt: O) -> R
 where
     O: FnOnce() -> R,
@@ -116,7 +193,7 @@ impl Display for RevisableId {
 
 pub trait Revisable: fmt::Debug {
     fn id(&self) -> RevisableId;
-    #[cfg(not(feature = "__single_holder"))]
+    #[cfg(not(feature = "single-app"))]
     fn holder_id(&self) -> Option<HolderId>;
     fn version(&self) -> usize;
     fn view_ids(&self) -> Rc<RefCell<IndexSet<ViewId>>>;
@@ -126,7 +203,7 @@ pub trait Revisable: fmt::Debug {
     fn is_revising(&self) -> bool {
         REVISING_ITEMS.with_borrow(|revising_items| {
             cfg_if! {
-                if #[cfg(feature = "__single_holder")] {
+                if #[cfg(feature = "single-app")] {
                     revising_items.contains_key(&self.id())
                 } else {
                     if let Some(holder_id) = self.holder_id() {

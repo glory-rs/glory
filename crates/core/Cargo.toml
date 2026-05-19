@@ -14,10 +14,17 @@ categories = { workspace = true }
 
 [features]
 default = []
-web-csr = ["__single_holder", "dep:wasm-bindgen"]
+web-csr = ["single-app", "dep:wasm-bindgen"]
 web-ssr = ["dep:tokio", "dep:tokio-util", "dep:futures-channel", "dep:base64"]
 salvo = ["dep:salvo", "web-ssr"]
-__single_holder = []
+
+# Optimisation flag, automatically enabled by `web-csr`. When on, the
+# framework assumes there is at most one application instance per
+# process (true for browser/WASM) and skips the `HolderId`-keyed thread
+# locals in the reactive scheduler. Enabling this manually in a non-CSR
+# build is unsupported and may break multi-app integrations such as the
+# Salvo handler.
+single-app = []
 
 [dependencies]
 async-trait = { workspace = true }
@@ -54,6 +61,20 @@ wasm-bindgen-futures = { workspace = true }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 percent-encoding = { workspace = true }
 
+[dev-dependencies]
+criterion = { workspace = true }
+
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
+wasm-bindgen-test = { workspace = true }
+
+[[bench]]
+name = "each_reorder"
+harness = false
+required-features = ["web-ssr"]
+
 [package.metadata.cargo-all-features]
 denylist = ["stable"]
 skip_feature_sets = [["web-ssr", "web-csr"]]
+
+[lints]
+workspace = true
