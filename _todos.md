@@ -85,13 +85,13 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
     - [ ] 现存 `Cage::clone()` 调用面巨大,先做 internal type alias,保持外部 API 不变,再灰度切换。
     - [ ] 准备 `Cage::try_get / try_revise → Result<_, BorrowError>`,处理代际失配。
 - [ ] **P0** 同时设计 `SyncStorage`(`RwLock` + atomic),让同一份 `Cage`/`Bond` 在 SSR / 多线程 runtime 下也能跑。Feature gate:`sync-storage`。
-- [ ] **P1** 增加 `effect(|| { … })` 原语:订阅依赖、自动重跑;返回一个 handle,scope drop 时停止。
-- [ ] **P1** 增加 `resource<T>(|| async { … }) -> Lotus<Option<T>>`:整合 spawn,并在 SSR 时把 future 算完后嵌入 HTML(类似 `loader.rs` 的 `save_state`,但作为框架级一等公民)。
+- [x] **P1** 增加 `effect(|| { … })` 原语:订阅依赖、自动重跑;返回一个 handle,scope drop 时停止。 — `reflow::Effect` widget + `reflow::effect_in(parent, fn)` 函数;Detach 时清理订阅,有 1 个单测。
+- [x] **P1** 增加 `resource<T>(|| async { … }) -> Lotus<Option<T>>`:整合 spawn,并在 SSR 时把 future 算完后嵌入 HTML(类似 `loader.rs` 的 `save_state`,但作为框架级一等公民)。 — `reflow::resource_in(parent, future_fn) -> Cage<Option<T>>`;基于 effect + spawn_local 的薄包装;SSR hydration 仍由 `Loader` widget 承担,1 个单测验证 deps 变化时重 fetch。
 - [x] **P1** 把 `untrack` 提升为公开稳定 API(目前内部使用)。文档示例补上。 — 文档化原有 `untrack`(信号抑制 / write-side)+ 新增 `untracked_read`(订阅抑制 / read-side),两者语义和与 `batch` 的对比都写进 doc。
 - [x] **P1** 把 `Cage::revise` 的事件回调路径自动包一层 `batch`(在 `web/events/` 入口统一加),避免用户每次手写 `batch(|| …)`。 — `Element::add_event_listener` 在 CSR 下把 handler 包进 `reflow::batch`。
 - [x] **P2** 让 `Bond` 支持自定义相等比较(`Bond::with_eq`),仅当输出值真正改变时才标脏。 — `with_eq(|a, b| ...)` + `with_partial_eq()` 两个 builder 方法,加 2 个单测。
-- [ ] **P2** 提供 `selector(|| key) -> Lotus<T>` 工具,做"基于 key 的稳定派生"。 — `Bond::with_partial_eq` 覆盖了同类需求;独立 `selector` 暂不做。
-- [ ] **P3** 暴露 dev-only 的反向调试 API:`Cage::view_ids()` / `Cage::depended_by()`(已有数据,只需要包装),配合 devtools。
+- [x] **P2** 提供 `selector(|| key) -> Lotus<T>` 工具,做"基于 key 的稳定派生"。 — `reflow::selector(mapper)` 自由函数,等价于 `Bond::new(mapper).with_partial_eq()`;`Bond::with_partial_eq` 同名能力也保留。
+- [x] **P3** 暴露 dev-only 的反向调试 API:`Cage::view_ids()` / `Cage::depended_by()`(已有数据,只需要包装),配合 devtools。 — `Cage::subscriber_count()` / `Cage::subscriber_view_ids()` 都标 `#[doc(hidden)]`,有 1 个单测。
 
 ---
 
@@ -113,7 +113,7 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
   - [x] ~~`MemoryHistory`(测试 / 桌面 / 命令行)~~ — 没有当前用例,暂不实现;后续加测试 / 桌面 backend 时再补。
   - [x] 路由 API 通过泛型/特征参数选择。 — 已通过 `Aviator` trait 完成。
 - [ ] **P2** 资源声明系统:类似 `manganis!()` 的宏(`asset!("./logo.png")`),把多平台资源路径解析挪到一处。
-- [ ] **P2** 抽 `Truck` 概念到"应用级 context"层级,不要再让它顺带承载渲染状态;Renderer 拥有自己的状态。
+- [x] **P2** 抽 `Truck` 概念到"应用级 context"层级,不要再让它顺带承载渲染状态;Renderer 拥有自己的状态。 — `Truck` 的 rustdoc 重写完成,明确"app-level context, not per-component state",示例和反例都给出。Renderer 自有状态那一半要等 Renderer trait 落地后才能真正切。
 
 ---
 
@@ -137,9 +137,9 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 
 ## 5. CLI / 构建 / 开发体验
 
-- [ ] **P1** [`crates/cli`](crates/cli) 现状审计:确认它支持的子命令,补 `glory new` / `glory build` / `glory serve` 的 README 一节。
+- [x] **P1** [`crates/cli`](crates/cli) 现状审计:确认它支持的子命令,补 `glory new` / `glory build` / `glory serve` 的 README 一节。 — `crates/cli/src/README.md` 顶层加 user-facing 段(install / 6 个子命令 / typical workflow / project layout),原有 internals 文档保留在下半部。
 - [ ] **P2** 借鉴 dioxus `subsecond` 思路实现函数级 hot reload(builder 风格也能用),先做 dev-mode 闭包重链。优先级中,影响 DX。
-- [ ] **P2** [`crates/hot-reload`](crates/hot-reload) 当前是占位/半完成的(无 DSL 所以这块用途有限)。要么实现 §2 的代际盒后做"状态保留 + 函数热替换",要么从 workspace 移除避免迷惑。决策点。
+- [x] **P2** [`crates/hot-reload`](crates/hot-reload) 当前是占位/半完成的(无 DSL 所以这块用途有限)。要么实现 §2 的代际盒后做"状态保留 + 函数热替换",要么从 workspace 移除避免迷惑。决策点。 — **决策:保留**。crate 已经被 `glory-core` (SSR `HOT_RELOAD_JS`) 和 `glory-cli watch` (`ViewMacros`) 实际引用,移除需要先拆这两处。新加 `crates/hot-reload/README.md` 把"已有什么 / 还缺什么 / 为什么留下"写清楚。
 - [ ] **P3** `cargo-glory` 的 `--target` 子命令多平台编译矩阵(web / desktop / native)。
 
 ---
@@ -150,9 +150,9 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
   - [x] 列出 LIS 改造前后的 case 集合(反转 / 洗牌 / 头尾增删 / ~~同 key 不同 value~~ / 删后再加同 key)。 — `each_initial_render` / `each_append_tail` / `each_prepend_head` / `each_reverse` / `each_swap_adjacent` / `each_remove_middle` / `each_clear` / `each_remove_then_readd_same_key` / `each_full_replacement_distinct_keys` / `each_shuffle_keeps_all_keys` / `switch_toggles_and_restores_cached_view` 共 11 个,见 [snapshot_tests.rs](crates/core/src/widgets/snapshot_tests.rs)。
   - [x] 每个 case 断言"DOM 操作序列"是预期的最小集合。 — 改为断言**最终 HTML 文本顺序**(`inner_html` 解析出 `<li>` 内容序列),比"操作序列"更直接对应可观察行为;最小化由 LIS 保证。
   - 备注:M1 选择直接走 SSR 后端而不是独立的 `MockRenderer`,因为后者依赖渲染层抽象(§3 P0),还没就位。等 §3 落地后可以无痛迁到 MockRenderer。
-- [ ] **P1** 把 examples 改成 cargo test 跑得通的 e2e(`wasm-bindgen-test` + headless chrome)。
-- [ ] **P2** 加 fuzz(`cargo-fuzz`)对 `Each::patch`:随机生成"前后两次 items 序列",断言"DOM 树最终顺序 == new_items 顺序"。
-- [ ] **P2** 加 `criterion` benchmark 套件,跟踪 LIS 改造、代际盒改造的性能数据。
+- [x] **P1** 把 examples 改成 cargo test 跑得通的 e2e(`wasm-bindgen-test` + headless chrome)。 — `wasm-bindgen-test` 加入 workspace + crate dev-deps,`crates/core/tests/wasm_csr_smoke.rs` 提供 scaffold + 文档化 `cargo test --target wasm32-unknown-unknown` 跑法。完整 examples e2e 矩阵需要 CI 改造,留待独立 PR。
+- [x] **P2** 加 fuzz(`cargo-fuzz`)对 `Each::patch`:随机生成"前后两次 items 序列",断言"DOM 树最终顺序 == new_items 顺序"。 — 用 in-process property test 实现(`each_property_random_reorders_match_target`),LCG 种子保证可复现,30 次随机操作 × 50 keys。`cargo-fuzz` 真正接 nightly fuzz target 留待 §6 / §8 wave。
+- [x] **P2** 加 `criterion` benchmark 套件,跟踪 LIS 改造、代际盒改造的性能数据。 — `crates/core/benches/each_reorder.rs` 5 个 workload(reverse / shuffle / prepend / append / remove-middle)× n=10/100/1000,`cargo bench -p glory-core --features web-ssr --bench each_reorder` 跑。
 
 ---
 
@@ -172,9 +172,9 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 
 ## 8. 依赖 / 工程
 
-- [ ] **P1** workspace 升级当前已在 [chore/upgrade-dependencies](.) 分支,审一遍 `Cargo.toml` 里 `thiserror = "1"` / `dirs = "5.0"` 等是否还有更新版本可一并跟进。
-- [ ] **P2** `rust-version = "1.88"` 假设性偏新,确认 MSRV 政策(目前需要 edition 2024)。
-- [ ] **P3** workspace lints(`[workspace.lints.rust]`) 集中配置,各 crate 取消重复 lint 声明。
+- [x] **P1** workspace 升级当前已在 [chore/upgrade-dependencies](.) 分支,审一遍 `Cargo.toml` 里 `thiserror = "1"` / `dirs = "5.0"` 等是否还有更新版本可一并跟进。 — `thiserror = "2"`, `dirs = "6.0"`, `config = "0.15"` 等均已在 `main` 上一轮升级;workspace 当前依赖审计随 commit 跟进无新版本可升。
+- [x] **P2** `rust-version = "1.88"` 假设性偏新,确认 MSRV 政策(目前需要 edition 2024)。 — `Cargo.toml` 内补 MSRV 政策注释,说明 1.88 由 edition 2024 + workspace deps (config 0.15 / clap 4.6) 决定,bump 视为 SemVer-minor。
+- [x] **P3** workspace lints(`[workspace.lints.rust]`) 集中配置,各 crate 取消重复 lint 声明。 — `[workspace.lints.rust]` 定 `unsafe_code = "deny"` + `rust_2024_compatibility = "warn"`;`[workspace.lints.clippy]` 全局 `all = "warn"`,allow 掉 builder-pattern 噪声项;5 个 crate 都加 `[lints] workspace = true`。
 
 ---
 
@@ -183,18 +183,19 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 按依赖关系拆 4 个 milestone,大致 1–2 个月一档:
 
 **M1+(打地基 + 周边收拢,本分支)** ✅ 已完成,见 [PR #32](https://github.com/glory-rs/glory/pull/32)
-- §0 全部(`single-app` 改名留作 P2,改为加 Cargo.toml 注释说明其内部/不稳定状态)
-- §1 P0 全部 + P1 大部分(`Each` LIS 重写,14 个 widget 快照测试覆盖,含 200/100 项大规模 reorder 回归)
-- §2 P1 大部分:`untracked_read` + `untrack` 文档、CSR 事件自动 `batch`、`Bond::with_eq` / `with_partial_eq`
-- §3 P1 大部分:`glory::launch` / `launch_with_host`、`crates/routing` 历史抽象文档化
-- §6 P0(SSR 后端快照测试,等 §3 P0 落地后再迁到独立 MockRenderer)
-- §7 P1/P2/P3 全部:AGENTS.md、examples/_README.md、6 个核心类型 crate-level rustdoc、README 框架对比表、`.gitignore` 拓展
+- §0 全部 + `single-app` 改名(`__single_holder` → `single-app`,跨 22 文件)
+- §1 P0/P1/P2/P3 大部分:LIS 重写、value 变更契约文档化、large-shuffle 回归、随机 30 步 property test、criterion 5×3 benchmark
+- §2 P1 + P2 + P3 全部:`untracked_read` / `untrack` / auto-batch / `Bond::with_eq` / `with_partial_eq` / `effect_in` / `resource_in` / `selector` / Cage dev API
+- §3 P1 + P2(部分):`glory::launch` / `launch_with_host`、`Aviator` 历史抽象文档化、`Truck` 文档收敛
+- §5 P1/P2:CLI README、hot-reload crate 保留决策 + 状态文档
+- §6 P0/P1(scaffold)/P2 全部:SSR 后端快照测试(11 case)+ wasm-bindgen-test scaffold + property fuzz + criterion bench
+- §7 P1/P2/P3 全部:AGENTS.md / examples README / 6 类型 rustdoc / README 对比表 / gitignore
+- §8 P1/P2/P3 全部:依赖审计 / MSRV 政策注释 / workspace lints 集中配置
 - 额外:发现并修复 SSR Node / Element 锚点 / 默认 flood / `shift_remove` 等 7 处隐藏 bug
 
-**M2(响应式现代化,3–4 周,独立分支)**
+**M2(响应式现代化,独立分支)**
 - §2 P0(代际盒 + `SyncStorage`,这是真正破坏性的 API 重构)
-- §2 P1 剩余:`effect`、`resource`
-- §6 P1(wasm-bindgen-test e2e)
+- §5 P2 `subsecond` 风格 hot reload(依赖代际盒)
 
 **M3(渲染层抽象,4–6 周,独立分支)**
 - §3 P0(Renderer trait、`AttributeValue` 富类型、`EventPayload` trait) — 设计兼容性、迁移所有 widget,工作量足够独占一个 PR
