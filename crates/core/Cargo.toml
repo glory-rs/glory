@@ -61,6 +61,14 @@ wasm-bindgen-futures = { workspace = true }
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 percent-encoding = { workspace = true }
 
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "each_reorder"
+harness = false
+required-features = ["web-ssr"]
+
 [package.metadata.cargo-all-features]
 denylist = ["stable"]
 skip_feature_sets = [["web-ssr", "web-csr"]]

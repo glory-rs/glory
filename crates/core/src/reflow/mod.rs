@@ -31,6 +31,8 @@ mod bond;
 pub use bond::Bond;
 mod lotus;
 pub use lotus::Lotus;
+mod effect;
+pub use effect::{Effect, effect_in, resource_in};
 pub mod scheduler;
 pub use scheduler::{batch, schedule};
 

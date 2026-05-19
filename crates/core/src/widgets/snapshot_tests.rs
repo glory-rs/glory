@@ -4,8 +4,11 @@
 //! the in-memory `Node` backend, so they catch regressions in both the
 //! widget logic and the surrounding scheduler/scope plumbing.
 
+use std::cell::Cell;
+use std::rc::Rc;
+
 use crate::config::GloryConfig;
-use crate::reflow::Cage;
+use crate::reflow::{Cage, effect_in, resource_in};
 use crate::web::holders::ServerHolder;
 use crate::web::widgets::{div, li, ul};
 use crate::widgets::{Each, Switch};
@@ -238,6 +241,97 @@ impl Widget for SwitchHostWidget {
             )
             .show_in(ctx);
     }
+}
+
+// ----------------------------------------------------------------------------
+// Effect
+// ----------------------------------------------------------------------------
+
+#[derive(Debug)]
+struct EffectHostWidget {
+    count: Cage<i32>,
+    runs: Rc<Cell<i32>>,
+    seen: Rc<Cell<i32>>,
+}
+
+impl Widget for EffectHostWidget {
+    fn build(&mut self, ctx: &mut Scope) {
+        let count = self.count.clone();
+        let runs = self.runs.clone();
+        let seen = self.seen.clone();
+        effect_in(ctx, move || {
+            runs.set(runs.get() + 1);
+            seen.set(*count.get());
+        });
+        // Render something so the SSR backend doesn't trip over an empty
+        // root scope.
+        div().show_in(ctx);
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Resource (async derived signal)
+// ----------------------------------------------------------------------------
+
+#[derive(Debug)]
+struct ResourceHostWidget {
+    seed: Cage<i32>,
+    result_handle: Rc<std::cell::RefCell<Option<Cage<Option<i32>>>>>,
+}
+
+impl Widget for ResourceHostWidget {
+    fn build(&mut self, ctx: &mut Scope) {
+        let seed = self.seed.clone();
+        let cell = resource_in(ctx, move || {
+            let v = *seed.get();
+            async move { v * 10 }
+        });
+        *self.result_handle.borrow_mut() = Some(cell);
+        div().show_in(ctx);
+    }
+}
+
+#[test]
+fn resource_resolves_initial_and_after_dep_change() {
+    let seed = Cage::new(2_i32);
+    let handle: Rc<std::cell::RefCell<Option<Cage<Option<i32>>>>> = Rc::new(std::cell::RefCell::new(None));
+    let _holder = make_holder().mount(ResourceHostWidget {
+        seed: seed.clone(),
+        result_handle: handle.clone(),
+    });
+
+    let cell = handle.borrow().clone().expect("resource cell was published");
+    assert_eq!(*cell.get(), Some(20));
+
+    seed.revise(|mut v| *v = 7);
+    assert_eq!(*cell.get(), Some(70));
+}
+
+#[test]
+fn effect_runs_once_on_mount_then_per_revision() {
+    let count = Cage::new(0_i32);
+    let runs = Rc::new(Cell::new(0));
+    let seen = Rc::new(Cell::new(-1));
+    let _holder = make_holder().mount(EffectHostWidget {
+        count: count.clone(),
+        runs: runs.clone(),
+        seen: seen.clone(),
+    });
+
+    // Initial run during build.
+    assert_eq!(runs.get(), 1, "effect should run once on mount");
+    assert_eq!(seen.get(), 0);
+
+    count.revise(|mut v| *v = 7);
+    assert_eq!(runs.get(), 2);
+    assert_eq!(seen.get(), 7);
+
+    count.revise(|mut v| *v = 7);
+    // Cage::revise bumps the version every write, so the effect re-runs
+    // even though the value is unchanged (matches today's `Cage` semantics
+    // — `Cage` does not deduplicate writes; use `Bond::with_partial_eq`
+    // when that's the goal).
+    assert_eq!(runs.get(), 3);
 }
 
 #[test]
