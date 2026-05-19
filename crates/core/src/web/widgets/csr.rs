@@ -286,6 +286,10 @@ where
     }
 
     /// Adds an event listener to this element.
+    ///
+    /// User-supplied handlers are wrapped in `reflow::batch` so that any
+    /// `Cage::revise` calls made during a single event flush re-renders
+    /// once at the end of the event tick instead of after every write.
     #[track_caller]
     pub fn add_event_listener<E, H>(&mut self, event: E, handler: H)
     where
@@ -304,13 +308,18 @@ where
             }
         }
 
+        let mut handler = handler;
+        let wrapped = move |e: E::EventType| {
+            crate::reflow::batch(|| handler(e));
+        };
+
         self.listeners.push(Box::new(move |node| {
             let event_name = event.name();
 
             if event.bubbles() {
-                crate::web::add_event_listener(node.as_ref(), event_name, handler);
+                crate::web::add_event_listener(node.as_ref(), event_name, wrapped);
             } else {
-                crate::web::add_event_listener_undelegated(node.as_ref(), &event_name, handler);
+                crate::web::add_event_listener_undelegated(node.as_ref(), &event_name, wrapped);
             }
         }));
     }
