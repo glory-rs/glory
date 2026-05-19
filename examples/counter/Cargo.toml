@@ -6,5 +6,5 @@ edition = "2024"
 [dependencies]
 glory = { path = "../../crates/glory", default-features = false, features = ["web-csr"] }
 wasm-bindgen = { version = "0.2", features = ["enable-interning"] }
-wasm-bindgen-futures = "0.4.31"
+wasm-bindgen-futures = "0.4.71"
 web-sys = "0.3"
