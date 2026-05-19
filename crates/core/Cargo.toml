@@ -38,6 +38,7 @@ tracing = { workspace = true }
 wasm-bindgen = { workspace = true, optional = true }
 cfg-if = { workspace = true }
 paste = { workspace = true }
+slab = { workspace = true }
 smallvec = { workspace = true }
 educe = { workspace = true }
 js-sys = { workspace = true }

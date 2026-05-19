@@ -26,6 +26,20 @@ where
     #[educe(Debug(ignore))]
     tmpl_fn: TmplFn,
     key_view_ids: IndexMap<Key, ViewId>,
+    /// Optional hook fired right after a brand-new row has been
+    /// attached (initial render OR patch). Receives the new row's
+    /// `ViewId`. Use it to trigger enter animations or kick off
+    /// per-row async work.
+    #[educe(Debug(ignore))]
+    on_enter: Option<Box<dyn Fn(&ViewId)>>,
+    /// Optional hook fired right before a row whose key has
+    /// disappeared is detached. Receives the leaving row's `ViewId`.
+    /// Use it to trigger exit animations or release per-row resources.
+    /// The hook runs synchronously before `detach_child`, so users
+    /// wanting delayed unmount (CSS transition completion) should
+    /// arrange the staging themselves.
+    #[educe(Debug(ignore))]
+    on_exit: Option<Box<dyn Fn(&ViewId)>>,
     #[educe(Debug(ignore))]
     _pd: PhantomData<(Value, ITter)>,
 }
@@ -75,8 +89,32 @@ where
             key_fn,
             tmpl_fn,
             key_view_ids: IndexMap::new(),
+            on_enter: None,
+            on_exit: None,
             _pd: PhantomData,
         }
+    }
+
+    /// Register an "on enter" hook fired right after a brand-new row
+    /// is attached (both on initial render and on later patches that
+    /// introduce a fresh key).
+    ///
+    /// ```ignore
+    /// Each::new(items, |it| it.id, |it| row(it))
+    ///     .on_enter(|view_id| start_fade_in(view_id))
+    /// ```
+    pub fn on_enter(mut self, hook: impl Fn(&ViewId) + 'static) -> Self {
+        self.on_enter = Some(Box::new(hook));
+        self
+    }
+
+    /// Register an "on exit" hook fired right before a row whose key
+    /// has disappeared is detached. The hook is synchronous; for CSS
+    /// transitions schedule the visual decay yourself before the
+    /// detach actually removes the node.
+    pub fn on_exit(mut self, hook: impl Fn(&ViewId) + 'static) -> Self {
+        self.on_exit = Some(Box::new(hook));
+        self
     }
 }
 impl<Value, KeyFn, Key, TmplFn, Tmpl> Each<Value, Vec<Value>, KeyFn, Key, TmplFn, Tmpl>
@@ -93,6 +131,8 @@ where
             key_fn,
             tmpl_fn,
             key_view_ids: IndexMap::new(),
+            on_enter: None,
+            on_exit: None,
             _pd: PhantomData,
         }
     }
@@ -109,10 +149,22 @@ where
 {
     fn build(&mut self, ctx: &mut Scope) {
         self.items.bind_view(ctx.view_id());
+        // Collect new view ids first so we can fire `on_enter` after the
+        // `items` borrow has been released (the hook is user code; we
+        // don't want to be holding the items Ref when it runs).
+        let mut entered: Vec<ViewId> = Vec::new();
         for item in self.items.get().as_ref() {
             let key = (self.key_fn)(item);
             let view_id = (self.tmpl_fn)(item).show_in(ctx);
-            self.key_view_ids.insert(key, view_id);
+            self.key_view_ids.insert(key, view_id.clone());
+            if self.on_enter.is_some() {
+                entered.push(view_id);
+            }
+        }
+        if let Some(hook) = &self.on_enter {
+            for view_id in &entered {
+                hook(view_id);
+            }
         }
     }
 
@@ -154,6 +206,15 @@ where
         let kept: HashSet<&ViewId> = new_key_view_ids.values().collect();
         let to_detach: Vec<ViewId> = prev_keys.values().filter(|vid| !kept.contains(*vid)).cloned().collect();
         drop(kept);
+
+        // Fire on_exit hooks BEFORE the detach actually removes the
+        // node, so user code can observe the leaving view's state
+        // (e.g. read DOM bounds for a FLIP animation).
+        if let Some(hook) = &self.on_exit {
+            for view_id in &to_detach {
+                hook(view_id);
+            }
+        }
 
         if !to_detach.is_empty() {
             #[cfg(not(feature = "single-app"))]
@@ -223,6 +284,17 @@ where
                 continue;
             }
             ctx.attach_child(view_id);
+        }
+
+        // Fire on_enter for freshly-created rows AFTER attach so the
+        // DOM node exists when the hook runs (CSS transitions need the
+        // element on the page to animate from).
+        if let Some(hook) = &self.on_enter {
+            for (i, view_id) in ordered_view_ids.iter().enumerate() {
+                if newly_created[i] {
+                    hook(view_id);
+                }
+            }
         }
     }
 }

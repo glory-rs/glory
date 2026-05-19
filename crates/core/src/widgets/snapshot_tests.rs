@@ -248,6 +248,55 @@ fn each_property_random_reorders_match_target() {
 }
 
 #[test]
+fn each_on_enter_on_exit_hooks_fire() {
+    #[derive(Debug)]
+    struct EachWithHooks {
+        items: Cage<Vec<String>>,
+        enter_count: Rc<Cell<usize>>,
+        exit_count: Rc<Cell<usize>>,
+    }
+    impl Widget for EachWithHooks {
+        fn build(&mut self, ctx: &mut Scope) {
+            let enter_count = self.enter_count.clone();
+            let exit_count = self.exit_count.clone();
+            ul().fill(
+                Each::from_vec(self.items.clone(), |s| s.clone(), |s| li().text(s.clone()))
+                    .on_enter(move |_vid| enter_count.set(enter_count.get() + 1))
+                    .on_exit(move |_vid| exit_count.set(exit_count.get() + 1)),
+            )
+            .show_in(ctx);
+        }
+    }
+
+    let enter_count = Rc::new(Cell::new(0_usize));
+    let exit_count = Rc::new(Cell::new(0_usize));
+    let items = Cage::new(vec!["a".to_string(), "b".to_string()]);
+    let _holder = make_holder().mount(EachWithHooks {
+        items: items.clone(),
+        enter_count: enter_count.clone(),
+        exit_count: exit_count.clone(),
+    });
+
+    // Initial render: two new rows → two enters, no exits.
+    assert_eq!(enter_count.get(), 2, "initial render fires on_enter per row");
+    assert_eq!(exit_count.get(), 0);
+
+    items.revise(|mut v| v.push("c".to_string()));
+    assert_eq!(enter_count.get(), 3);
+    assert_eq!(exit_count.get(), 0);
+
+    items.revise(|mut v| {
+        v.remove(0);
+    });
+    assert_eq!(enter_count.get(), 3);
+    assert_eq!(exit_count.get(), 1);
+
+    items.revise(|mut v| v.reverse());
+    assert_eq!(enter_count.get(), 3, "reorder does not fire on_enter");
+    assert_eq!(exit_count.get(), 1, "reorder does not fire on_exit");
+}
+
+#[test]
 fn each_repeated_revisions_stay_consistent() {
     let items = Cage::new(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
     let holder = make_holder().mount(EachListWidget { items: items.clone() });
