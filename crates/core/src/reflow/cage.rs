@@ -114,6 +114,24 @@ where
         self.version.set(self.version.get() + 1);
         result
     }
+
+    /// Returns the number of views currently subscribed to this Cage.
+    /// **Dev-only diagnostic** — useful for debugging "why doesn't my
+    /// component update?" / "why does my component update too often?"
+    /// scenarios. Don't gate runtime behaviour on the result; this is
+    /// not part of the stable API.
+    #[doc(hidden)]
+    pub fn subscriber_count(&self) -> usize {
+        self.view_ids.borrow().len()
+    }
+
+    /// Returns a snapshot of the [`ViewId`]s currently subscribed to
+    /// this Cage. **Dev-only diagnostic**; see
+    /// [`subscriber_count`](Self::subscriber_count).
+    #[doc(hidden)]
+    pub fn subscriber_view_ids(&self) -> Vec<crate::view::ViewId> {
+        self.view_ids.borrow().iter().cloned().collect()
+    }
     // pub fn source<'a>(&'a self) -> std::cell::Ref<'a, S> {
     //     self.source.borrow()
     // }

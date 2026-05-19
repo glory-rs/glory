@@ -64,6 +64,7 @@ tracing = "0.1"
 url = "2"
 wasm-bindgen = { version = "0.2", features = ["enable-interning"] }
 wasm-bindgen-futures = "0.4.71"
+wasm-bindgen-test = "0.3"
 
 # cli dependencies
 ansi_term = "0.12"

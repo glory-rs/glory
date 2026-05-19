@@ -197,6 +197,69 @@ fn each_large_random_shuffle() {
 }
 
 #[test]
+fn each_property_random_reorders_match_target() {
+    // Deterministic-random property test: from an initial set of 50
+    // keys, apply 30 random permutations (using a simple LCG for
+    // reproducibility) and assert each step's HTML matches the new
+    // items. This is the in-process equivalent of `cargo-fuzz` for
+    // the `Each::patch` invariant "after patch, DOM order == new
+    // items order".
+    let n: usize = 50;
+    let initial: Vec<String> = (0..n).map(|i| format!("k{i}")).collect();
+    let items = Cage::new(initial.clone());
+    let holder = make_holder().mount(EachListWidget { items: items.clone() });
+
+    // LCG: x_{n+1} = (a * x_n + c) mod m with values from Numerical Recipes
+    let mut seed: u64 = 0xdead_beef_cafe;
+    let mut next_u64 = || {
+        seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
+        seed
+    };
+
+    let mut current = initial.clone();
+    for _ in 0..30 {
+        // Random Fisher–Yates shuffle of a clone, sometimes drop one or
+        // add a new key, sometimes reverse a slice.
+        let op = next_u64() % 4;
+        match op {
+            0 => {
+                // shuffle in place
+                for i in (1..current.len()).rev() {
+                    let j = (next_u64() as usize) % (i + 1);
+                    current.swap(i, j);
+                }
+            }
+            1 if !current.is_empty() => {
+                // drop a random element
+                let i = (next_u64() as usize) % current.len();
+                current.remove(i);
+            }
+            2 => {
+                // append a new unique key
+                current.push(format!("new{}", next_u64() % 1_000_000));
+            }
+            _ => {
+                // reverse a random slice
+                if current.len() >= 2 {
+                    let a = (next_u64() as usize) % current.len();
+                    let b = (next_u64() as usize) % current.len();
+                    let (lo, hi) = if a < b { (a, b) } else { (b, a) };
+                    current[lo..=hi].reverse();
+                }
+            }
+        }
+
+        let expected = current.clone();
+        items.revise(|mut v| *v = expected.clone());
+        assert_eq!(
+            each_html_items(&holder),
+            expected,
+            "DOM order diverged from target after a random reorder step"
+        );
+    }
+}
+
+#[test]
 fn each_repeated_revisions_stay_consistent() {
     let items = Cage::new(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
     let holder = make_holder().mount(EachListWidget { items: items.clone() });

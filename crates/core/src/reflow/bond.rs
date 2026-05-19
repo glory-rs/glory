@@ -258,6 +258,23 @@ mod tests {
     }
 
     #[test]
+    fn cage_subscriber_count_tracks_bindings() {
+        // Without a view binding, count is zero.
+        let cage = Cage::new(1_i32);
+        assert_eq!(cage.subscriber_count(), 0);
+
+        // bind_view directly (the framework normally does this on a view's
+        // first `.get()` inside a tracking context).
+        cage.bind_view(&crate::view::ViewId::new(
+            #[cfg(not(feature = "single-app"))]
+            crate::HolderId::null(),
+            "test".to_string(),
+        ));
+        assert_eq!(cage.subscriber_count(), 1);
+        assert_eq!(cage.subscriber_view_ids().len(), 1);
+    }
+
+    #[test]
     fn bond_with_partial_eq_skips_version_bump_when_value_unchanged() {
         let cage = Cage::new(1_i32);
         let cage_for_bond = cage.clone();
