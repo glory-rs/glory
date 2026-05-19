@@ -39,6 +39,36 @@ where
     TmplFn: Fn(&Value) -> Tmpl + 'static,
     Tmpl: Widget + 'static,
 {
+    /// Build a keyed `Each` over an arbitrary slice-like container.
+    ///
+    /// `key_fn` extracts a stable identity for each item (keys should be
+    /// unique within one snapshot — duplicates collapse to a single
+    /// view). `tmpl_fn` is invoked **once per newly-inserted key** to
+    /// construct the child widget; on subsequent `patch` cycles the
+    /// existing widget is **reused** as long as the key stays present.
+    ///
+    /// # Reactivity contract for item value changes
+    ///
+    /// `tmpl_fn` is NOT re-invoked when the underlying item value
+    /// changes while the key stays the same. If you mutate an item
+    /// in place (e.g. `items.revise(|mut v| v[0].text = "new")`) and
+    /// expect the rendered child to update, the child widget must
+    /// subscribe to that value itself. The idiomatic pattern is to
+    /// model each entry as a struct holding its own `Cage<T>`:
+    ///
+    /// ```ignore
+    /// #[derive(Clone, Debug)]
+    /// struct TodoItem { id: u64, text: Cage<String> }
+    ///
+    /// // tmpl_fn captures a clone of the item, which clones the Cage
+    /// // handle — mutations via item.text.revise(...) re-render only
+    /// // this row.
+    /// Each::new(items, |it| it.id, |it| li().html(it.text.clone()))
+    /// ```
+    ///
+    /// If you pass a `Vec<PlainStruct>` with no inner `Cage`s and
+    /// rely on full-list replacement, reorder works correctly but
+    /// per-row content changes will be silently dropped.
     pub fn new(items: impl Into<Lotus<ITter>>, key_fn: KeyFn, tmpl_fn: TmplFn) -> Self {
         Self {
             items: items.into(),

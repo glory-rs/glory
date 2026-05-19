@@ -163,6 +163,53 @@ fn each_shuffle_keeps_all_keys() {
     assert_eq!(each_html_items(&holder), vec!["c", "e", "a", "d", "b"]);
 }
 
+#[test]
+fn each_large_reverse() {
+    // Stress the LIS path on a non-trivial input so accidental
+    // quadratic regressions show up.
+    let n: usize = 200;
+    let initial: Vec<String> = (0..n).map(|i| format!("k{i}")).collect();
+    let items = Cage::new(initial.clone());
+    let holder = make_holder().mount(EachListWidget { items: items.clone() });
+
+    items.revise(|mut v| v.reverse());
+
+    let expected: Vec<String> = initial.iter().rev().cloned().collect();
+    assert_eq!(each_html_items(&holder), expected);
+}
+
+#[test]
+fn each_large_random_shuffle() {
+    // Deterministic pseudo-shuffle so the test is reproducible.
+    let n: usize = 100;
+    let initial: Vec<String> = (0..n).map(|i| format!("k{i}")).collect();
+    let items = Cage::new(initial.clone());
+    let holder = make_holder().mount(EachListWidget { items: items.clone() });
+
+    // Cycle by step 7 (coprime to 100): produces an even spread.
+    let shuffled: Vec<String> = (0..n).map(|i| initial[(i * 7) % n].clone()).collect();
+    items.revise(|mut v| *v = shuffled.clone());
+
+    assert_eq!(each_html_items(&holder), shuffled);
+}
+
+#[test]
+fn each_repeated_revisions_stay_consistent() {
+    let items = Cage::new(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
+    let holder = make_holder().mount(EachListWidget { items: items.clone() });
+
+    items.revise(|mut v| v.push("d".to_string()));
+    items.revise(|mut v| v.reverse());
+    items.revise(|mut v| {
+        v.remove(0);
+    });
+    items.revise(|mut v| v.insert(0, "z".to_string()));
+
+    // After: push d → [a,b,c,d]; reverse → [d,c,b,a]; remove 0 → [c,b,a];
+    //        insert z at 0 → [z,c,b,a].
+    assert_eq!(each_html_items(&holder), vec!["z", "c", "b", "a"]);
+}
+
 // ----------------------------------------------------------------------------
 // Switch (with cached_view)
 // ----------------------------------------------------------------------------
