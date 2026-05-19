@@ -38,7 +38,7 @@ impl LibPackage {
 
         let package = packages
             .iter()
-            .find(|p| p.name == *name)
+            .find(|p| p.name.as_str() == name.as_str())
             .ok_or_else(|| anyhow!(r#"Could not find the project lib-package "{name}""#,))?;
 
         let mut features = if !cli.lib_features.is_empty() {
