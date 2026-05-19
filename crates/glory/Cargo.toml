@@ -37,3 +37,6 @@ glory-routing = { workspace = true, optional = true }
 # [package.metadata.cargo-all-features]
 # denylist = ["stable"]
 # skip_feature_sets = [["web-ssr"]]
+
+[lints]
+workspace = true

@@ -1,3 +1,66 @@
+# glory-cli — the Glory build tool
+
+`glory-cli` is installed as the `glory` binary. It bundles wasm
+compilation (via `wasm-bindgen`), Sass / Tailwind / Lightning CSS
+processing, static-asset mirroring, an HTTP serve loop, and a
+filesystem watcher into a single subcommand-driven CLI.
+
+## Install
+
+```sh
+cargo install --path crates/cli      # from this workspace
+# or
+cargo install glory-cli              # from crates.io once released
+```
+
+Both forms produce the `glory` binary on your `PATH`.
+
+## Subcommands
+
+```text
+glory new <name>     scaffold a new Glory project from the built-in template
+glory build          one-shot build (wasm + css + assets) into the site dir
+glory serve          like `build`, then host the result over HTTP
+glory watch          serve + filesystem notifier; rebuild on .rs/.css/.scss/.sass/assets changes
+glory test           run cargo-test for the current project
+glory end-to-end     run end-to-end tests (uses Playwright when configured)
+```
+
+Each subcommand accepts `--help` for its flags. Global flags live on
+`glory` itself (`--manifest-path`, `--release`, `--verbose`, etc.).
+
+## Typical workflow
+
+```sh
+glory new my-app
+cd my-app
+glory watch
+# edit src/...; refresh the browser; rebuilds run on save
+```
+
+For deployment:
+
+```sh
+glory build --release
+# the site/ directory is the deployable artefact
+```
+
+## Project layout the tool expects
+
+```
+my-app/
+  Cargo.toml          # contains [package.metadata.glory] config (output_name, site_*)
+  src/main.rs         # or src/lib.rs for SSR projects
+  style/main.scss     # optional, processed via Sass + Lightning CSS
+  public/             # assets, mirrored verbatim to site/
+```
+
+The `[package.metadata.glory]` keys correspond 1-to-1 with
+[`GloryConfig`](../core/src/config.rs) (`output_name`, `site_root`,
+`site_pkg_dir`, `site_addr`, `reload_port`, ...).
+
+---
+
 # Internals
 
 ## File view

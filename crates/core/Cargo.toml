@@ -64,3 +64,6 @@ percent-encoding = { workspace = true }
 [package.metadata.cargo-all-features]
 denylist = ["stable"]
 skip_feature_sets = [["web-ssr", "web-csr"]]
+
+[lints]
+workspace = true

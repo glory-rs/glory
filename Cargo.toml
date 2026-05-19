@@ -8,6 +8,10 @@ resolver = "2"
 version = "0.3.1"
 authors = ["Chrislearn Young <chris@acroidea.com>"]
 edition = "2024"
+# MSRV policy: bumped to match Rust edition 2024 (stabilised in 1.85);
+# 1.88 is chosen because workspace dependencies (config 0.15, clap 4.6,
+# etc.) require it. Bumping this in a new commit is a SemVer-minor
+# change for Glory itself.
 rust-version = "1.88"
 description = """
 Glory is an experimental rust web front framework.
@@ -214,3 +218,25 @@ features = [
 codegen-units = 1
 lto = true
 opt-level = 'z'
+
+[workspace.lints.rust]
+# Glory's core does not need `unsafe`. The wasm-bindgen / web-sys path
+# already routes through safe wrappers. Lift this to `forbid` once the
+# generational-box redesign confirms it stays that way.
+unsafe_code = "deny"
+# We're on edition 2024; surface anything that would block a future
+# edition upgrade so it shows up at PR time rather than years later.
+rust_2024_compatibility = { level = "warn", priority = -1 }
+
+[workspace.lints.clippy]
+# Pragmatic baseline: warn on everything in the standard clippy set,
+# but don't fail the build. Individual crates can override per-lint.
+all = { level = "warn", priority = -1 }
+# These trigger on common builder-pattern code that's idiomatic in
+# Glory; the noise outweighs the benefit.
+needless_return = "allow"
+new_without_default = "allow"
+type_complexity = "allow"
+# Closure-heavy callsites generate a lot of these on stable Rust.
+needless_lifetimes = "allow"
+too_many_arguments = "allow"

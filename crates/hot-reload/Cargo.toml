@@ -25,3 +25,6 @@ parking_lot = "0.12"
 walkdir = "2"
 camino = "1.2.2"
 indexmap = "2"
+
+[lints]
+workspace = true

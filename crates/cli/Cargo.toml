@@ -55,3 +55,5 @@ temp-dir = { workspace = true }
 [features]
 full_tests = []
 no_downloads = []
+[lints]
+workspace = true
