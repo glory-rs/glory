@@ -32,7 +32,7 @@
 //! the seam those backends will sit behind.
 
 use std::any::Any;
-use std::cell::{Ref, RefCell, RefMut};
+use std::cell::RefCell;
 use std::marker::PhantomData;
 
 use slab::Slab;

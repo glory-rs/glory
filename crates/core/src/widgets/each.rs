@@ -14,7 +14,8 @@ use crate::{Scope, ViewId, Widget};
 pub struct Each<Value, ITter, KeyFn, Key, TmplFn, Tmpl>
 where
     Value: fmt::Debug + 'static,
-    ITter: AsRef<[Value]> + fmt::Debug + 'static,
+    ITter: fmt::Debug + 'static,
+    for<'a> &'a ITter: IntoIterator<Item = &'a Value>,
     KeyFn: Fn(&Value) -> Key + 'static,
     Key: Eq + Hash + Clone + fmt::Debug + 'static,
     TmplFn: Fn(&Value) -> Tmpl + 'static,
@@ -47,7 +48,8 @@ where
 impl<Value, ITter, KeyFn, Key, TmplFn, Tmpl> Each<Value, ITter, KeyFn, Key, TmplFn, Tmpl>
 where
     Value: fmt::Debug + 'static,
-    ITter: AsRef<[Value]> + fmt::Debug + 'static,
+    ITter: fmt::Debug + 'static,
+    for<'a> &'a ITter: IntoIterator<Item = &'a Value>,
     KeyFn: Fn(&Value) -> Key + 'static,
     Key: Eq + Hash + Clone + fmt::Debug + 'static,
     TmplFn: Fn(&Value) -> Tmpl + 'static,
@@ -141,7 +143,8 @@ where
 impl<Value, ITter, KeyFn, Key, TmplFn, Tmpl> Widget for Each<Value, ITter, KeyFn, Key, TmplFn, Tmpl>
 where
     Value: fmt::Debug + 'static,
-    ITter: AsRef<[Value]> + fmt::Debug + 'static,
+    ITter: fmt::Debug + 'static,
+    for<'a> &'a ITter: IntoIterator<Item = &'a Value>,
     KeyFn: Fn(&Value) -> Key + 'static,
     Key: Eq + Hash + Clone + fmt::Debug + 'static,
     TmplFn: Fn(&Value) -> Tmpl + 'static,
@@ -153,7 +156,8 @@ where
         // `items` borrow has been released (the hook is user code; we
         // don't want to be holding the items Ref when it runs).
         let mut entered: Vec<ViewId> = Vec::new();
-        for item in self.items.get().as_ref() {
+        let items_ref = self.items.get();
+        for item in &*items_ref {
             let key = (self.key_fn)(item);
             let view_id = (self.tmpl_fn)(item).show_in(ctx);
             self.key_view_ids.insert(key, view_id.clone());
@@ -161,6 +165,7 @@ where
                 entered.push(view_id);
             }
         }
+        drop(items_ref);
         if let Some(hook) = &self.on_enter {
             for view_id in &entered {
                 hook(view_id);
@@ -175,15 +180,17 @@ where
         // borrow is released before we start mutating child_views deeply.
         let (mut new_key_view_ids, old_indices, newly_created, ordered_view_ids) = {
             let items_ref = self.items.get();
-            let items: &[Value] = items_ref.as_ref();
-            let new_len = items.len();
+            // Container types backing `Lotus<ITter>` aren't required to
+            // expose a slice; we walk via `for item in &*items_ref` which
+            // relies on the `&ITter: IntoIterator<Item = &Value>` bound.
+            // Capacity hints would need an explicit length, which not all
+            // iterables expose cheaply — let the `Vec`s grow as needed.
+            let mut new_key_view_ids: IndexMap<Key, ViewId> = IndexMap::new();
+            let mut old_indices: Vec<Option<usize>> = Vec::new();
+            let mut newly_created: Vec<bool> = Vec::new();
+            let mut ordered_view_ids: Vec<ViewId> = Vec::new();
 
-            let mut new_key_view_ids: IndexMap<Key, ViewId> = IndexMap::with_capacity(new_len);
-            let mut old_indices: Vec<Option<usize>> = Vec::with_capacity(new_len);
-            let mut newly_created: Vec<bool> = Vec::with_capacity(new_len);
-            let mut ordered_view_ids: Vec<ViewId> = Vec::with_capacity(new_len);
-
-            for item in items {
+            for item in &*items_ref {
                 let key = (self.key_fn)(item);
                 if let Some((old_idx, _, view_id)) = prev_keys.get_full(&key) {
                     old_indices.push(Some(old_idx));

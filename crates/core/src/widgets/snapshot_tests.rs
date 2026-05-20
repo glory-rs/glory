@@ -297,6 +297,45 @@ fn each_on_enter_on_exit_hooks_fire() {
 }
 
 #[test]
+fn each_supports_vec_deque() {
+    use std::collections::VecDeque;
+
+    #[derive(Debug)]
+    struct VecDequeListWidget {
+        items: Cage<VecDeque<String>>,
+    }
+    impl Widget for VecDequeListWidget {
+        fn build(&mut self, ctx: &mut Scope) {
+            // Turbofish needed because `Lotus<T>` also implements
+            // `From<Lotus<T>>` into `Lotus<Option<T>>`, making
+            // `impl Into<Lotus<_>>` ambiguous on bare collection
+            // containers other than the `from_vec` shortcut.
+            let each: Each<String, VecDeque<String>, _, String, _, crate::web::widgets::HtmlLi> =
+                Each::new(self.items.clone(), |s: &String| s.clone(), |s: &String| li().text(s.clone()));
+            ul().fill(each).show_in(ctx);
+        }
+    }
+
+    let mut initial = VecDeque::new();
+    initial.push_back("a".to_string());
+    initial.push_back("b".to_string());
+    initial.push_back("c".to_string());
+    let items = Cage::new(initial);
+    let holder = make_holder().mount(VecDequeListWidget { items: items.clone() });
+
+    assert_eq!(each_html_items(&holder), vec!["a", "b", "c"]);
+
+    // Push to the front (the move VecDeque is specifically good at).
+    items.revise(|mut v| v.push_front("z".to_string()));
+    assert_eq!(each_html_items(&holder), vec!["z", "a", "b", "c"]);
+
+    items.revise(|mut v| {
+        v.pop_back();
+    });
+    assert_eq!(each_html_items(&holder), vec!["z", "a", "b"]);
+}
+
+#[test]
 fn each_repeated_revisions_stay_consistent() {
     let items = Cage::new(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
     let holder = make_holder().mount(EachListWidget { items: items.clone() });

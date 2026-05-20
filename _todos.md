@@ -51,8 +51,8 @@
 - [x] **P1** 增加"head append / tail append / clear"的 O(1)/O(n) 快路径检测,避免普通追加也走 LIS。 — LIS 在 append / clear / 大段不变时是 O(n) 路径,DOM 操作数最小;`each_append_tail` / `each_prepend_head` / `each_clear` 测试覆盖。如果未来 profiling 显示 LIS 开销可见,再考虑显式快路径。
 - [x] **P2** Removed key 的 detach 与 reorder 在同一个 batch 内顺序无保证。当前先 detach removed 再 reorder reused,理论上正确但需要回归测试覆盖"删第一个 + 移动剩余"这种组合。 — `each_remove_middle` / `each_remove_then_readd_same_key` / `each_shuffle_keeps_all_keys` 覆盖。
 - [x] **P2** `operations.reverse(); while pop` 的写法不直观。改为正向迭代 + 显式 cursor,降低维护成本。 — 重写后整段消失。
-- [ ] **P2** `key_view_ids` 当前是 `IndexMap<Key, ViewId>`,但同一 key 必然只有一个 view,实际只用到 map 性质;可以是 `HashMap`(更快)+ 显式 `Vec<Key>` 维护顺序。
-- [ ] **P2** 支持 `Lotus<&[T]>` / `Lotus<VecDeque<T>>` / `Lotus<im::Vector<T>>` 等其他容器(目前限 `AsRef<[Value]>`)。可以借助 `Lotus<impl IntoIterator<Item=&T>>` 抽象。
+- [x] **P2** ~~`key_view_ids` 当前是 `IndexMap<Key, ViewId>`,但同一 key 必然只有一个 view,实际只用到 map 性质;可以是 `HashMap`(更快)+ 显式 `Vec<Key>` 维护顺序~~。— **决定不改**:`indexmap::IndexMap` 内部就是 `HashMap + Vec<key>` 的混合,既给 O(1) 查询、又给有序迭代和 `get_index_of`。手写 HashMap+Vec 拿不到额外性能且会丢掉 `get_index_of` 这条 patch 主路径上的 O(1) 操作。
+- [x] **P2** 支持 `Lotus<&[T]>` / `Lotus<VecDeque<T>>` / `Lotus<im::Vector<T>>` 等其他容器(目前限 `AsRef<[Value]>`)。可以借助 `Lotus<impl IntoIterator<Item=&T>>` 抽象。 — 已实现:`Each` 的 trait bound 从 `ITter: AsRef<[Value]>` 放宽为 `for<'a> &'a ITter: IntoIterator<Item = &'a Value>`,支持 `Vec` / `VecDeque` / 任何 `&Self: IntoIterator` 的容器。`each_supports_vec_deque` 测试覆盖 push_front / pop_back。
 - [x] **P3** 给 `Each` 加 entrance/exit 动画钩子(Solid 的 `<TransitionGroup>` 风格):`on_enter(&Scope) / on_exit(&Scope)`。复杂度低、用户价值高。 — `Each::on_enter(|view_id|)` / `Each::on_exit(|view_id|)` builder 方法。on_enter 在 attach 之后触发(节点已在 DOM 上),on_exit 在 detach 之前触发(用户可读取消失视图的状态)。`each_on_enter_on_exit_hooks_fire` 测试覆盖 initial/append/remove/reverse 四种情况。
 - [ ] **P3** 性能基准:写一个 `examples/each-bench`,做"反转、随机洗牌、首尾插入、清空"四种压测,记基线数据。LIS 改造后跑同一份对比,放进 PR 描述。
 
@@ -101,8 +101,8 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
   - [ ] 先把 `web/csr.rs` / `node/ssr.rs` 的差异点列成"必须方法表"(create / set_attr / set_class / append / remove / replace / attach_event ...)。
   - [ ] 在 `crates/core/src/renderer/` 下新增 trait + 默认 `WebRenderer` / `SsrRenderer` 两个实现。
   - [ ] 把 `web/widgets/{div,button,…}.rs` 改成 `R: Renderer` 泛型,消除 `cfg(all(target_arch = "wasm32", feature = "web-csr"))` 双份代码。
-- [ ] **P0** `AttributeValue` 富类型化:不再统一用 `Cow<'static, str>`,而是 `enum { Text(String), Float(f64), Int(i64), Bool(bool), Listener(EventHandler), Any(Rc<dyn Any>), None }`。这是 native / TUI 后端能接得上的前提。
-- [ ] **P0** `EventPayload` 抽象:`pub trait EventPayload { fn as_any(&self) -> &dyn Any; fn name(&self) -> &str; }`。`web/events/` 把 `web_sys::Event` 包成这个 trait。
+- [~] **P0** `AttributeValue` 富类型化:不再统一用 `Cow<'static, str>`,而是 `enum { Text(String), Float(f64), Int(i64), Bool(bool), Listener(EventHandler), Any(Rc<dyn Any>), None }`。这是 native / TUI 后端能接得上的前提。— **大部分已在**:`crates/core/src/web/attr.rs` 的 `AttrValue` trait 配合 `bool` / `ViewId` / `String` / `Cage<T>` / `Bond<T>` 等具体 impl 已经覆盖了"按类型分派 inject_to"的语义,等价于"trait + impls"形式的富类型。`enum` 形式更适合 Renderer trait 抽象出来时把指令序列化(IPC),那时再做转换。
+- [~] **P0** `EventPayload` 抽象:`pub trait EventPayload { fn as_any(&self) -> &dyn Any; fn name(&self) -> &str; }`。`web/events/` 把 `web_sys::Event` 包成这个 trait。 — **已 trait-based**:`crates/core/src/web/events/{csr,ssr}.rs` 的 `EventDescriptor` trait 配合 `EventType: FromWasmAbi` / `name() -> Cow<'static, str>` / `bubbles()` 已经把事件类型抽象出来了。新加 `EventPayload` 用 `Any` 做擦除属于多平台后端工作,等 Renderer trait 落地一起做更划算。
 - [x] **P1** **统一 `glory::launch`** 入口。当前 CSR/SSR 启动方式风格不一(`mount_to(body)` vs salvo handler),`crates/glory/src/lib.rs` 中加:
   ```rust
   pub fn launch<W: Widget + 'static>(root: impl Fn() -> W + 'static);
