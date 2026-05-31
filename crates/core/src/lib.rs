@@ -55,9 +55,11 @@ mod cfg;
 #[macro_use]
 extern crate cfg_if;
 
+pub mod assets;
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
 pub mod console;
 pub mod reflow;
+pub mod renderer;
 pub mod scope;
 pub mod view;
 pub mod web;

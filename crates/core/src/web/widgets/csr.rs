@@ -5,8 +5,7 @@ use std::ops::Deref;
 
 use educe::Educe;
 // #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
-use wasm_bindgen::closure::Closure;
-use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
+use wasm_bindgen::{JsCast, UnwrapThrowExt};
 
 use crate::reflow::{Bond, Lotus};
 use crate::view::{ViewId, ViewPosition};

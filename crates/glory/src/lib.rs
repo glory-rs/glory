@@ -11,6 +11,7 @@
 #[macro_use]
 mod cfg;
 
+pub use glory_core::asset;
 #[doc(no_inline)]
 pub use glory_core::*;
 

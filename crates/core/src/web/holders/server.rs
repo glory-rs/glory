@@ -4,12 +4,10 @@ use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
-use educe::Educe;
-
 use crate::config::GloryConfig;
 use crate::reflow::scheduler::{BATCHING, RUNNING};
 use crate::reflow::{PENDING_ITEMS, REVISING_ITEMS};
-use crate::{Truck, Holder, HolderId, Widget, Scope, ViewId, ROOT_VIEWS};
+use crate::{Holder, HolderId, ROOT_VIEWS, Scope, Truck, ViewId, Widget};
 use crate::web::widgets::*;
 
 const DEPOT_URL_KEY: &str = "glory::url";
@@ -85,6 +83,7 @@ cfg_feature! {
     #![feature = "salvo"]
     use std::convert::Infallible;
 
+    use educe::Educe;
     use salvo::prelude::{Request, Response, Depot, FlowCtrl, Scribe, StatusCode};
     use salvo::{async_trait};
 

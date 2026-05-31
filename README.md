@@ -19,10 +19,10 @@ Online example: [http://glory.rs:8000](http://glory.rs:8000).
 |---|---|---|---|---|
 | Component surface | Rust builder pattern (`div().class().on(click, ...)`)| `view!` macro (RSX-like) | `rsx!` macro | `view!` macro |
 | State primitive | `Cage<T>` (mutable) / `Bond<T>` (derived) / `Lotus<T>` (read-only union) | `RwSignal` / `Memo` | `Signal<T>` (Copy, generational-box) / `Memo` | `Signal` / `Memo` |
-| `Copy` state handles | not yet (planned via generational-box) | depends on signal flavour | yes | yes |
+| `Copy` state handles | `Cage<T>` is `Copy`; Owner reclamation is still in progress | depends on signal flavour | yes | yes |
 | Update model | Fine-grained subscription per view; no VDOM | Fine-grained, no VDOM | VirtualDom + `WriteMutations` per renderer | Fine-grained, no VDOM |
 | Targets today | Browser (CSR) + SSR (HTML / Salvo) | Browser + SSR + Axum/Actix + hydrate | Web / Desktop (webview) / Native (Blitz) / SSR / LiveView / Fullstack | Browser + SSR + hydrate |
-| Multi-platform path | Renderer abstraction is on the roadmap; today CSR / SSR share the builder API but the `Node` type is split by `cfg` | SSR / hydrate / Axum first-class | One VDOM, many renderer crates | DOM and SSR backends |
+| Multi-platform path | Renderer trait scaffold exists; widget migration is still in progress | SSR / hydrate / Axum first-class | One VDOM, many renderer crates | DOM and SSR backends |
 | DSL / macro | Generated tag factories (`generate_tags!`), no JSX-like macro on purpose | Yes (`view!`) | Yes (`rsx!`) | Yes (`view!`) |
 
 **When does Glory make sense?**

@@ -30,6 +30,7 @@
 //! `RwLock<Slab<_>>`) is on the roadmap for SSR workflows that want to
 //! pass `Cage`s across async task boundaries; the [`Storage`] trait is
 //! the seam those backends will sit behind.
+#![allow(dead_code)]
 
 use std::any::Any;
 use std::cell::RefCell;

@@ -24,7 +24,7 @@ path = "src/lib.rs"
 
 
 [features]
-default = ["web-csr"]
+default = []
 web-csr = ["glory-core/web-csr", "glory-routing?/web-csr"]
 web-ssr = ["glory-core/web-ssr", "glory-routing?/web-ssr"]
 salvo = ["web-ssr", "glory-core/salvo", "routing", "glory-routing?/salvo"]

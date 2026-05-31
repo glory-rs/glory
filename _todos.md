@@ -27,6 +27,7 @@
 - [x] **P2** `GloryConfig::default` ↔ `GloryConfig::new` 互相递归调用,首次调用即 stack overflow。改为直接通过现有 `default_*` 函数构造。
 - [x] **P2** [`crates/core/src/truck.rs`](crates/core/src/truck.rs) 的测试 mod 引用了不存在的 `crate::prelude` / `crate::test` / `transfer` 方法,从来无法编译。清理掉,保留有意义的那个断言。
 - [x] **P2** [`crates/core/src/spawn.rs`](crates/core/src/spawn.rs) `spawn_local` 的 `cfg(any(test, doctest))` 分支调用 `tokio_test::block_on`,但 `tokio_test` 不是依赖,导致 `cargo test` 编译失败。改为让 test 走 `futures::executor` 分支。
+- [x] **P2** `crates/glory` 默认启用 `web-csr`,导致 `cargo check -p glory --features web-ssr` 同时打开 CSR+SSR 并触发互斥 Node 定义。改为 `default = []`,CSR / SSR 必须显式选 feature。
 
 ---
 
@@ -80,11 +81,11 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 
 ## 2. 响应式核心(对应 _report.md §1)
 
-- [ ] **P0** **引入"作用域 + 代际盒"**:在 `crates/core/src/reflow/` 下新增 `storage.rs`(`Slab<Box<dyn Any>>` + `Generation: u64`),把 `Cage` 改为 `(slot_key, generation)` 句柄 → `Cage<T>: Copy`。
+- [~] **P0** **引入"作用域 + 代际盒"**:在 `crates/core/src/reflow/` 下新增 `storage.rs`(`Slab<Box<dyn Any>>` + `Generation: u64`),把 `Cage` 改为 `(slot_key, generation)` 句柄 → `Cage<T>: Copy`。— 第一批已完成:`Cage<T>` 改成 copyable leaked-state handle,实现 `Copy`,现有 `.clone()` 调用保持兼容但不再增加 refcount;新增 `try_get` / `try_get_untracked` / `try_revise` / `try_revise_silent`。执行清单见 [`_m2_reactivity_tasks.md`](_m2_reactivity_tasks.md)。剩余:Owner 回收与真正 slot generation 失效。
   - 子任务:
     - [ ] 设计 `Owner` 类型,绑定到 `Scope` 生命周期;scope drop → owner drop → 该作用域分配的所有信号失效。
-    - [ ] 现存 `Cage::clone()` 调用面巨大,先做 internal type alias,保持外部 API 不变,再灰度切换。
-    - [ ] 准备 `Cage::try_get / try_revise → Result<_, BorrowError>`,处理代际失配。
+    - [x] 现存 `Cage::clone()` 调用面巨大,先做 internal type alias,保持外部 API 不变,再灰度切换。— `Cage<T>: Copy`;`.clone()` 仍可用,语义退化为复制句柄。
+    - [x] 准备 `Cage::try_get / try_revise → Result<_, BorrowError>`,处理代际失配。— 已提供 borrow-conflict 级 `Result`;代际失配等 Owner 回收落地后接入同一 API。
 - [ ] **P0** 同时设计 `SyncStorage`(`RwLock` + atomic),让同一份 `Cage`/`Bond` 在 SSR / 多线程 runtime 下也能跑。Feature gate:`sync-storage`。
 - [x] **P1** 增加 `effect(|| { … })` 原语:订阅依赖、自动重跑;返回一个 handle,scope drop 时停止。 — `reflow::Effect` widget + `reflow::effect_in(parent, fn)` 函数;Detach 时清理订阅,有 1 个单测。
 - [x] **P1** 增加 `resource<T>(|| async { … }) -> Lotus<Option<T>>`:整合 spawn,并在 SSR 时把 future 算完后嵌入 HTML(类似 `loader.rs` 的 `save_state`,但作为框架级一等公民)。 — `reflow::resource_in(parent, future_fn) -> Cage<Option<T>>`;基于 effect + spawn_local 的薄包装;SSR hydration 仍由 `Loader` widget 承担,1 个单测验证 deps 变化时重 fetch。
@@ -99,8 +100,8 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 ## 3. 渲染层抽象 / 多平台前置(对应 _report.md §2、§4)
 
 - [ ] **P0** 设计 `Renderer` trait(草案见 _report.md §2.3 Step A),`Node` 作为关联类型,逐步替换 `crates/core/src/node/mod.rs` 中两套 `cfg` 切换的 Node。
-  - [ ] 先把 `web/csr.rs` / `node/ssr.rs` 的差异点列成"必须方法表"(create / set_attr / set_class / append / remove / replace / attach_event ...)。
-  - [ ] 在 `crates/core/src/renderer/` 下新增 trait + 默认 `WebRenderer` / `SsrRenderer` 两个实现。
+  - [x] 先把 `web/csr.rs` / `node/ssr.rs` 的差异点列成"必须方法表"(create / set_attr / set_class / append / remove / replace / attach_event ...)。— 见 [`_m3_renderer_tasks.md`](_m3_renderer_tasks.md)。
+  - [x] 在 `crates/core/src/renderer/` 下新增 trait + 默认 `WebRenderer` / `SsrRenderer` 两个实现。— `renderer::{Renderer, InsertPosition, EventPayload, SsrRenderer, WebRenderer}` 已落地;SSR 基础操作有单测。
   - [ ] 把 `web/widgets/{div,button,…}.rs` 改成 `R: Renderer` 泛型,消除 `cfg(all(target_arch = "wasm32", feature = "web-csr"))` 双份代码。
 - [~] **P0** `AttributeValue` 富类型化:不再统一用 `Cow<'static, str>`,而是 `enum { Text(String), Float(f64), Int(i64), Bool(bool), Listener(EventHandler), Any(Rc<dyn Any>), None }`。这是 native / TUI 后端能接得上的前提。— **大部分已在**:`crates/core/src/web/attr.rs` 的 `AttrValue` trait 配合 `bool` / `ViewId` / `String` / `Cage<T>` / `Bond<T>` 等具体 impl 已经覆盖了"按类型分派 inject_to"的语义,等价于"trait + impls"形式的富类型。`enum` 形式更适合 Renderer trait 抽象出来时把指令序列化(IPC),那时再做转换。
 - [~] **P0** `EventPayload` 抽象:`pub trait EventPayload { fn as_any(&self) -> &dyn Any; fn name(&self) -> &str; }`。`web/events/` 把 `web_sys::Event` 包成这个 trait。 — **已 trait-based**:`crates/core/src/web/events/{csr,ssr}.rs` 的 `EventDescriptor` trait 配合 `EventType: FromWasmAbi` / `name() -> Cow<'static, str>` / `bubbles()` 已经把事件类型抽象出来了。新加 `EventPayload` 用 `Any` 做擦除属于多平台后端工作,等 Renderer trait 落地一起做更划算。
@@ -113,7 +114,7 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
   - [x] `WebHistory`(浏览器) — 即 `BrowserAviator`。
   - [x] ~~`MemoryHistory`(测试 / 桌面 / 命令行)~~ — 没有当前用例,暂不实现;后续加测试 / 桌面 backend 时再补。
   - [x] 路由 API 通过泛型/特征参数选择。 — 已通过 `Aviator` trait 完成。
-- [ ] **P2** 资源声明系统:类似 `manganis!()` 的宏(`asset!("./logo.png")`),把多平台资源路径解析挪到一处。
+- [x] **P2** 资源声明系统:类似 `manganis!()` 的宏(`asset!("./logo.png")`),把多平台资源路径解析挪到一处。— 新增 `glory_core::assets::Asset` + `asset!` 宏;提供 logical / absolute filesystem / public URL path 三种表示,并从 `glory` 门面 crate 显式 re-export。
 - [x] **P2** 抽 `Truck` 概念到"应用级 context"层级,不要再让它顺带承载渲染状态;Renderer 拥有自己的状态。 — `Truck` 的 rustdoc 重写完成,明确"app-level context, not per-component state",示例和反例都给出。Renderer 自有状态那一半要等 Renderer trait 落地后才能真正切。
 
 ---
