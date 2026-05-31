@@ -14,8 +14,8 @@ generational arena remains large.
       `Cage::try_revise_silent` as fallible borrow APIs.
 - [x] Preserve current subscription, serialization, equality, and scheduler
       semantics under the new storage layout.
-- [x] Update `_todos.md` to record the completed sub-slice and the remaining
-      owner / sync-storage work.
+- [x] Update `_todos.md` to record the completed sub-slice and the later
+      owner / sync-storage completion.
 - [x] Run targeted tests for `glory-core` with `web-ssr`.
 
 ## Batch 2: Owner And Reclamation

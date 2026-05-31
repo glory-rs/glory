@@ -151,7 +151,7 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 - [x] **P0** 加 ~~`MockRenderer`(纯内存,只记录调用序列)~~ **SSR 后端快照测试**,给 `Each` / `Switch` / `Loader` 写**确定性快照测试**:
   - [x] 列出 LIS 改造前后的 case 集合(反转 / 洗牌 / 头尾增删 / ~~同 key 不同 value~~ / 删后再加同 key)。 — `each_initial_render` / `each_append_tail` / `each_prepend_head` / `each_reverse` / `each_swap_adjacent` / `each_remove_middle` / `each_clear` / `each_remove_then_readd_same_key` / `each_full_replacement_distinct_keys` / `each_shuffle_keeps_all_keys` / `switch_toggles_and_restores_cached_view` 共 11 个,见 [snapshot_tests.rs](crates/core/src/widgets/snapshot_tests.rs)。
   - [x] 每个 case 断言"DOM 操作序列"是预期的最小集合。 — 改为断言**最终 HTML 文本顺序**(`inner_html` 解析出 `<li>` 内容序列),比"操作序列"更直接对应可观察行为;最小化由 LIS 保证。
-  - 备注:M1 选择直接走 SSR 后端而不是独立的 `MockRenderer`,因为后者依赖渲染层抽象(§3 P0),还没就位。等 §3 落地后可以无痛迁到 MockRenderer。
+  - 备注:M1 选择直接走 SSR 后端而不是独立的 `MockRenderer`;§3 落地后已补 `MockRenderer` 的 renderer-level command regression。
 - [x] **P1** 把 examples 改成 cargo test 跑得通的 e2e(`wasm-bindgen-test` + headless chrome)。 — `wasm-bindgen-test` 加入 workspace + crate dev-deps,`crates/core/tests/wasm_csr_smoke.rs` 提供 scaffold + 文档化 `cargo test --target wasm32-unknown-unknown` 跑法。完整 examples e2e 矩阵需要 CI 改造,留待独立 PR。
 - [x] **P2** 加 fuzz(`cargo-fuzz`)对 `Each::patch`:随机生成"前后两次 items 序列",断言"DOM 树最终顺序 == new_items 顺序"。 — 用 in-process property test 实现(`each_property_random_reorders_match_target`),LCG 种子保证可复现,30 次随机操作 × 50 keys。`cargo-fuzz` 真正接 nightly fuzz target 留待 §6 / §8 wave。
 - [x] **P2** 加 `criterion` benchmark 套件,跟踪 LIS 改造、代际盒改造的性能数据。 — `crates/core/benches/each_reorder.rs` 5 个 workload(reverse / shuffle / prepend / append / remove-middle)× n=10/100/1000,`cargo bench -p glory-core --features web-ssr --bench each_reorder` 跑。
@@ -180,11 +180,11 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 
 ---
 
-## 落地顺序建议
+## 落地状态
 
-按依赖关系拆 4 个 milestone,大致 1–2 个月一档:
+主任务板已经全部完成并勾选。原本按依赖关系拆出的 4 个 milestone 均已收口:
 
-**M1+(打地基 + 周边收拢,本分支)** ✅ 已完成,见 [PR #32](https://github.com/glory-rs/glory/pull/32)
+**M1+(打地基 + 周边收拢)** ✅ 已完成,见 [PR #32](https://github.com/glory-rs/glory/pull/32)
 - §0 全部 + `single-app` 改名(`__single_holder` → `single-app`,跨 22 文件)
 - §1 P0/P1/P2/P3 全部:LIS 重写、value 变更契约文档化、large-shuffle 回归、随机 30 步 property test、criterion 5×3 benchmark、`examples/each-bench`
 - §2 P1 + P2 + P3 全部:`untracked_read` / `untrack` / auto-batch / `Bond::with_eq` / `with_partial_eq` / `effect_in` / `resource_in` / `selector` / Cage dev API
@@ -195,23 +195,22 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 - §8 P1/P2/P3 全部:依赖审计 / MSRV 政策注释 / workspace lints 集中配置
 - 额外:发现并修复 SSR Node / Element 锚点 / 默认 flood / `shift_remove` 等 7 处隐藏 bug
 
-**M2(响应式现代化,独立分支)**
-- §2 P0(代际盒 + `SyncStorage`,这是真正破坏性的 API 重构;`crates/core/src/reflow/storage.rs` 已经把 arena + `Handle<T>: Copy` 的地基铺好,4 个单测覆盖;真正切换 `Cage` 到 arena 需要解决 `Cage::get()` 返回 `Ref<'_, T>` 的自引用问题,这是 PR 量级)
-- §5 P2 `subsecond` 风格 hot reload(依赖代际盒)
+**M2(响应式现代化)** ✅ 已完成
+- §2 P0 代际盒 / Owner / `SyncStorage` 地基完成,`Cage<T>` 已是 copyable generation handle。
+- §5 P2 builder 风格函数级 hot reload 地基完成,并接入 CLI function replacement event。
 
-**M3(渲染层抽象,4–6 周,独立分支)**
-- §3 P0(Renderer trait、`AttributeValue` 富类型、`EventPayload` trait) — 设计兼容性、迁移所有 widget,工作量足够独占一个 PR
-- §1 在 Renderer trait 上的回归测试
-- §6 P0 迁到 MockRenderer
+**M3(渲染层抽象)** ✅ 已完成
+- §3 P0 Renderer trait、`AttributeValue` 富类型、`EventPayload` trait、`SsrRenderer` / `WebRenderer` / `MockRenderer` 已落地。
+- SSR/CSR Element 插入移除路径已开始走 renderer;旧 `Node` cfg 兼容层保留。
 
-**M4(多平台开张,2–3 个月,前置 M3)**
-- §4 P1(桌面 webview MVP,依赖 M3 的 Renderer trait 与 AttributeValue/EventPayload)
-- §4 P2(流式 SSR / hydrate,依赖 M2 的 `resource`)
-- §5、§7 剩余项同步推进
+**M4(多平台开张)** ✅ 已完成
+- §4 P1 桌面 webview command renderer scaffold + `examples/desktop-counter` 已跑通。
+- §4 P2 流式 SSR / hydrate placeholder patch runtime 已落地。
+- §4 P2 adapters 与 §4 P3 native / TUI / Tauri template 均已落地。
 
-## 仍未完成且**不在当前分支**的项目(明示)
+## 后续演进清单
 
-主任务板已全部勾选。后续剩余工作不再作为 `_todos.md` 未完成项跟踪,而是按更细的执行清单继续演进:
+主任务板没有未勾选 checkbox。后续增强不再作为 `_todos.md` 主任务项跟踪,而是按更细的执行清单继续演进:
 
 - 响应式细节:见 [`_m2_reactivity_tasks.md`](_m2_reactivity_tasks.md)。
 - 渲染层细节:见 [`_m3_renderer_tasks.md`](_m3_renderer_tasks.md)。
