@@ -17,6 +17,7 @@ default = []
 web-csr = ["single-app", "dep:wasm-bindgen"]
 web-ssr = ["dep:tokio", "dep:tokio-util", "dep:futures-channel", "dep:base64"]
 salvo = ["dep:salvo", "web-ssr"]
+sync-storage = []
 
 # Optimisation flag, automatically enabled by `web-csr`. When on, the
 # framework assumes there is at most one application instance per

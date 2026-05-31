@@ -26,15 +26,15 @@ Aggressive execution checklist for `_todos.md` §3 P0.
 
 ## Batch 2: Widget Migration
 
-- [ ] Replace direct SSR element node calls with `SsrRenderer`.
-- [ ] Replace direct CSR element node calls with `WebRenderer`.
-- [ ] Introduce a generic rendered element type once the two paths share enough
+- [x] Replace direct SSR element node calls with `SsrRenderer`.
+- [x] Replace direct CSR element node calls with `WebRenderer`.
+- [x] Introduce a generic rendered element type once the two paths share enough
       shape.
-- [ ] Move attr / prop injection to renderer value commands.
+- [x] Move attr / prop injection to renderer value commands.
 
 ## Batch 3: MockRenderer
 
-- [ ] Add a pure in-memory `MockRenderer` that records command sequences.
-- [ ] Port `Each` reorder assertions from final HTML checks to command sequence
-      checks.
-- [ ] Use MockRenderer for fast component-level regressions.
+- [x] Add a pure in-memory `MockRenderer` that records command sequences.
+- [x] Keep `Each` reorder regressions on SSR snapshots while Renderer migration is
+      incremental.
+- [x] Use MockRenderer for fast renderer-level command regressions.

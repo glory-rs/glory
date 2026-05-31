@@ -1,0 +1,8 @@
+[package]
+name = "desktop-counter"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+glory-core = { path = "../../crates/core" }
+glory-desktop = { path = "../../crates/desktop" }

@@ -17,30 +17,28 @@ yet because Glory has no `rsx!`/`view!` macro to hot-reload against.
   the JSON patches. Embedded into SSR HTML via
   `glory_hot_reload::HOT_RELOAD_JS` (see
   `crates/core/src/web/utils/ssr.rs`).
+- `FunctionRegistry` / `ReloadableFn` — a builder-style runtime
+  relink primitive. Existing handles keep calling the latest closure
+  body after `registry.replace(id, new_fn)`.
+- `HotFunctions` — scans `reloadable_fn!("id", ...)` /
+  `reloadable_view!("id", ...)` markers so `glory-cli watch
+  --hot-reload` can emit function replacement websocket events beside
+  macro patch payloads.
 - 5 unit tests in `src/diff.rs` cover the AST diff machinery.
 
 ## What's missing
 
-- **A macro to actually hot-reload.** Glory's design is intentionally
-  builder-pattern, no `rsx!` macro. To hot-reload builder code we'd
-  need either:
-  - a `subsecond`-style runtime function patcher (rebuild + relink
-    closures at runtime; see `_todos.md` §5 P2 and dioxus's
-    `packages/subsecond`); or
-  - an `rsx!`-equivalent thin macro purely for the parts that
-    benefit most from hot reload (icons, static layout chunks),
-    while keeping the main builder API unchanged.
-- **Devtools wire format.** Today the hot-reload pipeline lives only
-  inside the CLI process; nothing on the running app side listens to
-  it apart from the JS patch payload being loaded.
-- **`Cage` / `Bond` state preservation.** Without a stable identity
-  for signals across reloads, any reload will wipe app state. The
-  generational-box redesign in `_todos.md` §2 P0 is the prerequisite.
+- **Compiler transform.** There is still no procedural macro that
+  rewrites arbitrary builder-style closures into `reloadable_fn!`
+  registrations automatically.
+- **Native app-side relink transport.** The browser websocket now
+  dispatches `glory:function-reload`; a desktop/native runtime still
+  needs to consume the same event shape on its IPC channel.
 
 ## Status
 
 Crate is **kept** in the workspace (decision _todos.md §5 P2).
 Removing it would require unwiring `HOT_RELOAD_JS` from the SSR
 renderer and `ViewMacros` from `glory-cli watch`. The internals are
-useful as a base for future hot-reload work; revisit after §2 P0
-generational-box and the §5 P2 subsecond design land.
+useful as a base for future hot-reload work; see
+`examples/builder_relink.rs` for the minimal builder-style pattern.

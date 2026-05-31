@@ -8,6 +8,7 @@ use educe::Educe;
 use wasm_bindgen::{JsCast, UnwrapThrowExt};
 
 use crate::reflow::{Bond, Lotus};
+use crate::renderer::{InsertPosition, Renderer, WebRenderer};
 use crate::view::{ViewId, ViewPosition};
 use crate::web::events::EventDescriptor;
 use crate::web::{AttrValue, ClassPart, Classes, PropValue};
@@ -34,6 +35,8 @@ where
     listeners: Vec<Box<dyn FnOnce(&T)>>,
 
     pub(crate) node: T,
+    #[educe(Debug(ignore))]
+    pub(crate) renderer: WebRenderer,
 }
 
 impl<T> Widget for Element<T>
@@ -47,13 +50,13 @@ where
             node.remove_attribute("gly-hydrating").unwrap_throw();
         } else {
             match &ctx.position {
-                ViewPosition::Head => parent_node.prepend_with_node_1(node).unwrap_throw(),
-                ViewPosition::Prev(prev_node) => prev_node.after_with_node_1(node).unwrap_throw(),
-                ViewPosition::Next(next_node) => next_node.before_with_node_1(node).unwrap_throw(),
-                ViewPosition::Tail => parent_node.append_with_node_1(node).unwrap_throw(),
+                ViewPosition::Head => self.renderer.insert_child(parent_node, node, InsertPosition::Head),
+                ViewPosition::Prev(prev_node) => self.renderer.insert_child(parent_node, node, InsertPosition::After(prev_node)),
+                ViewPosition::Next(next_node) => self.renderer.insert_child(parent_node, node, InsertPosition::Before(next_node)),
+                ViewPosition::Tail => self.renderer.insert_child(parent_node, node, InsertPosition::Tail),
                 ViewPosition::Unset => {
                     crate::warn!("node position is unset. {:#?}", node);
-                    parent_node.append_with_node_1(node).unwrap_throw();
+                    self.renderer.insert_child(parent_node, node, InsertPosition::Tail);
                 }
             }
         }
@@ -114,7 +117,7 @@ where
     fn detach(&mut self, ctx: &mut Scope) {
         if let Some(parent_node) = ctx.parent_node.as_ref() {
             let node = <T as AsRef<web_sys::Element>>::as_ref(&self.node);
-            parent_node.remove_child(node).ok();
+            self.renderer.remove_child(parent_node, node);
         }
         let ids: Vec<ViewId> = ctx.child_views.keys().cloned().collect();
         for id in ids {
@@ -165,6 +168,7 @@ where
             fillers: vec![],
             node,
             listeners: vec![],
+            renderer: WebRenderer,
         }
     }
 

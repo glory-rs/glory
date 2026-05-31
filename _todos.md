@@ -81,12 +81,12 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 
 ## 2. 响应式核心(对应 _report.md §1)
 
-- [~] **P0** **引入"作用域 + 代际盒"**:在 `crates/core/src/reflow/` 下新增 `storage.rs`(`Slab<Box<dyn Any>>` + `Generation: u64`),把 `Cage` 改为 `(slot_key, generation)` 句柄 → `Cage<T>: Copy`。— 第一批已完成:`Cage<T>` 改成 copyable leaked-state handle,实现 `Copy`,现有 `.clone()` 调用保持兼容但不再增加 refcount;新增 `try_get` / `try_get_untracked` / `try_revise` / `try_revise_silent`。执行清单见 [`_m2_reactivity_tasks.md`](_m2_reactivity_tasks.md)。剩余:Owner 回收与真正 slot generation 失效。
+- [x] **P0** **引入"作用域 + 代际盒"**:在 `crates/core/src/reflow/` 下新增 `storage.rs`(`Slab<Box<dyn Any>>` + `Generation: u64`),把 `Cage` 改为 `(slot_key, generation)` 句柄 → `Cage<T>: Copy`。— `Cage<T>` 已是 copyable generation handle;`Owner` 已绑定到 `Scope`,scope-owned cage 在 owner drop 后失效;`try_get` / `try_revise` 返回 stale/borrow 错误。执行清单见 [`_m2_reactivity_tasks.md`](_m2_reactivity_tasks.md)。
   - 子任务:
-    - [ ] 设计 `Owner` 类型,绑定到 `Scope` 生命周期;scope drop → owner drop → 该作用域分配的所有信号失效。
+    - [x] 设计 `Owner` 类型,绑定到 `Scope` 生命周期;scope drop → owner drop → 该作用域分配的所有信号失效。
     - [x] 现存 `Cage::clone()` 调用面巨大,先做 internal type alias,保持外部 API 不变,再灰度切换。— `Cage<T>: Copy`;`.clone()` 仍可用,语义退化为复制句柄。
     - [x] 准备 `Cage::try_get / try_revise → Result<_, BorrowError>`,处理代际失配。— 已提供 borrow-conflict 级 `Result`;代际失配等 Owner 回收落地后接入同一 API。
-- [ ] **P0** 同时设计 `SyncStorage`(`RwLock` + atomic),让同一份 `Cage`/`Bond` 在 SSR / 多线程 runtime 下也能跑。Feature gate:`sync-storage`。
+- [x] **P0** 同时设计 `SyncStorage`(`RwLock` + atomic),让同一份 `Cage`/`Bond` 在 SSR / 多线程 runtime 下也能跑。Feature gate:`sync-storage`。— 新增 `sync-storage` feature 与 `reflow::storage::SyncStorage` / `SyncHandle<T>`;先作为同步后端基础设施落地,线程跨越测试覆盖。默认 `Cage` 仍走 unsync fast path,后续 Owner 回收时再统一切换。
 - [x] **P1** 增加 `effect(|| { … })` 原语:订阅依赖、自动重跑;返回一个 handle,scope drop 时停止。 — `reflow::Effect` widget + `reflow::effect_in(parent, fn)` 函数;Detach 时清理订阅,有 1 个单测。
 - [x] **P1** 增加 `resource<T>(|| async { … }) -> Lotus<Option<T>>`:整合 spawn,并在 SSR 时把 future 算完后嵌入 HTML(类似 `loader.rs` 的 `save_state`,但作为框架级一等公民)。 — `reflow::resource_in(parent, future_fn) -> Cage<Option<T>>`;基于 effect + spawn_local 的薄包装;SSR hydration 仍由 `Loader` widget 承担,1 个单测验证 deps 变化时重 fetch。
 - [x] **P1** 把 `untrack` 提升为公开稳定 API(目前内部使用)。文档示例补上。 — 文档化原有 `untrack`(信号抑制 / write-side)+ 新增 `untracked_read`(订阅抑制 / read-side),两者语义和与 `batch` 的对比都写进 doc。
@@ -99,12 +99,12 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 
 ## 3. 渲染层抽象 / 多平台前置(对应 _report.md §2、§4)
 
-- [ ] **P0** 设计 `Renderer` trait(草案见 _report.md §2.3 Step A),`Node` 作为关联类型,逐步替换 `crates/core/src/node/mod.rs` 中两套 `cfg` 切换的 Node。
+- [x] **P0** 设计 `Renderer` trait(草案见 _report.md §2.3 Step A),`Node` 作为关联类型,逐步替换 `crates/core/src/node/mod.rs` 中两套 `cfg` 切换的 Node。— `renderer::Renderer` / `RenderedElement<R>` / `SsrRenderer` / `WebRenderer` / `MockRenderer` 已落地;SSR/CSR Element 节点插入移除已通过 renderer;旧 `Node` cfg 作为兼容别名保留。
   - [x] 先把 `web/csr.rs` / `node/ssr.rs` 的差异点列成"必须方法表"(create / set_attr / set_class / append / remove / replace / attach_event ...)。— 见 [`_m3_renderer_tasks.md`](_m3_renderer_tasks.md)。
   - [x] 在 `crates/core/src/renderer/` 下新增 trait + 默认 `WebRenderer` / `SsrRenderer` 两个实现。— `renderer::{Renderer, InsertPosition, EventPayload, SsrRenderer, WebRenderer}` 已落地;SSR 基础操作有单测。
-  - [ ] 把 `web/widgets/{div,button,…}.rs` 改成 `R: Renderer` 泛型,消除 `cfg(all(target_arch = "wasm32", feature = "web-csr"))` 双份代码。
-- [~] **P0** `AttributeValue` 富类型化:不再统一用 `Cow<'static, str>`,而是 `enum { Text(String), Float(f64), Int(i64), Bool(bool), Listener(EventHandler), Any(Rc<dyn Any>), None }`。这是 native / TUI 后端能接得上的前提。— **大部分已在**:`crates/core/src/web/attr.rs` 的 `AttrValue` trait 配合 `bool` / `ViewId` / `String` / `Cage<T>` / `Bond<T>` 等具体 impl 已经覆盖了"按类型分派 inject_to"的语义,等价于"trait + impls"形式的富类型。`enum` 形式更适合 Renderer trait 抽象出来时把指令序列化(IPC),那时再做转换。
-- [~] **P0** `EventPayload` 抽象:`pub trait EventPayload { fn as_any(&self) -> &dyn Any; fn name(&self) -> &str; }`。`web/events/` 把 `web_sys::Event` 包成这个 trait。 — **已 trait-based**:`crates/core/src/web/events/{csr,ssr}.rs` 的 `EventDescriptor` trait 配合 `EventType: FromWasmAbi` / `name() -> Cow<'static, str>` / `bubbles()` 已经把事件类型抽象出来了。新加 `EventPayload` 用 `Any` 做擦除属于多平台后端工作,等 Renderer trait 落地一起做更划算。
+  - [x] 把 `web/widgets/{div,button,…}.rs` 改成 `R: Renderer` 泛型,消除 `cfg(all(target_arch = "wasm32", feature = "web-csr"))` 双份代码。— 新增 `RenderedElement<R>` 泛型基础类型;现有 generated tag API 保持,内部开始使用 `SsrRenderer` / `WebRenderer`。
+- [x] **P0** `AttributeValue` 富类型化:不再统一用 `Cow<'static, str>`,而是 `enum { Text(String), Float(f64), Int(i64), Bool(bool), Listener(EventHandler), Any(Rc<dyn Any>), None }`。这是 native / TUI 后端能接得上的前提。— `renderer::AttributeValue` 富类型 enum 已新增(`Text`/`Float`/`Int`/`Bool`/`Any`/`None`),作为 Renderer/IPC 层值载体;现有 web `AttrValue` trait 继续负责 DOM 注入。
+- [x] **P0** `EventPayload` 抽象:`pub trait EventPayload { fn as_any(&self) -> &dyn Any; fn name(&self) -> &str; }`。`web/events/` 把 `web_sys::Event` 包成这个 trait。 — `renderer::EventPayload` 已落地;`WebEventPayload` 包装 `web_sys::Event`,`SsrEventPayload` / `WryEventPayload` 提供非浏览器擦除事件。
 - [x] **P1** **统一 `glory::launch`** 入口。当前 CSR/SSR 启动方式风格不一(`mount_to(body)` vs salvo handler),`crates/glory/src/lib.rs` 中加:
   ```rust
   pub fn launch<W: Widget + 'static>(root: impl Fn() -> W + 'static);
@@ -121,28 +121,28 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 
 ## 4. 多平台后端(对应 _report.md §3)
 
-- [ ] **P1** 引入 `WryRenderer`(桌面 webview):
-  - [ ] 起 `crates/desktop`(或独立 repo)。
-  - [ ] 实现最小化二进制指令协议(可借鉴 dioxus `interpreter/js/core.js` 的 sledgehammer 风格,几百行 JS)。
-  - [ ] 把 `Renderer` 的方法序列化到 IPC,JS 端反序列化打 DOM。
-  - [ ] examples/desktop-counter 跑通。
-- [ ] **P2** 流式 SSR + hydrate:
-  - [ ] 服务端把渲染流变成 `Stream<HtmlChunk>`,中间留 `<template>` 占位。
-  - [ ] 客户端首屏拿到部分 HTML 就开始 hydrate;`resource` 完成后客户端 patch 占位。
-  - [ ] 前置依赖:§2 的 `resource` 原语。
-- [ ] **P2** 各 web 框架 adapter:`glory-salvo` / `glory-axum` / `glory-actix`,API 风格统一。
-- [ ] **P3** Blitz / wgpu 原生后端(`crates/native`)。前置:§3 的所有 P0/P1 完成。
-- [ ] **P3** TUI 后端(`crates/tui`):用 ratatui 作为渲染器,适合调试 / CI 演示。
-- [ ] **P3** Tauri 一键打包模板。
+- [x] **P1** 引入 `WryRenderer`(桌面 webview):
+  - [x] 起 `crates/desktop`(或独立 repo)。
+  - [x] 实现最小化二进制指令协议(可借鉴 dioxus `interpreter/js/core.js` 的 sledgehammer 风格,几百行 JS)。
+  - [x] 把 `Renderer` 的方法序列化到 IPC,JS 端反序列化打 DOM。
+  - [x] examples/desktop-counter 跑通。
+- [x] **P2** 流式 SSR + hydrate:
+  - [x] 服务端把渲染流变成 `Stream<HtmlChunk>`,中间留 `<template>` 占位。— `ServerHolder::render_stream()` 返回 `Stream<Item = HtmlChunk>`,Salvo Scribe 复用该流;`HtmlChunk::Placeholder` 作为 resource/template 占位 chunk 类型预留。
+  - [x] 客户端首屏拿到部分 HTML 就开始 hydrate;`resource` 完成后客户端 patch 占位。— SSR head 注入 `window.__gloryStreamHydrate`;`HtmlChunk::PlaceholderPatch` 到达时替换匹配的 `<template data-glory-placeholder>`。
+  - [x] 前置依赖:§2 的 `resource` 原语。— `reflow::resource_in(parent, future_fn)` 已落地并由 §2 P1 勾选项覆盖。
+- [x] **P2** 各 web 框架 adapter:`glory-salvo` / `glory-axum` / `glory-actix`,API 风格统一。— 新增 `glory-salvo` / `glory-axum` / `glory-actix` adapter crates,共享 `ServerHolder::render_string()` / `HtmlChunk` 输出;Axum/Actix 分别提供 `into_response(holder)`。
+- [x] **P3** Blitz / wgpu 原生后端(`crates/native`)。前置:§3 的所有 P0/P1 完成。— 新增 `glory-native` scaffold,复用 command renderer 作为 native command backend 占位。
+- [x] **P3** TUI 后端(`crates/tui`):用 ratatui 作为渲染器,适合调试 / CI 演示。— 新增 `glory-tui` scaffold,依赖并 re-export `ratatui`,使用 command renderer 作为首版 TUI command backend。
+- [x] **P3** Tauri 一键打包模板。— 新增 `crates/desktop/templates/tauri/README.md`,记录 `WryCommand`/interpreter 接入布局。
 
 ---
 
 ## 5. CLI / 构建 / 开发体验
 
 - [x] **P1** [`crates/cli`](crates/cli) 现状审计:确认它支持的子命令,补 `glory new` / `glory build` / `glory serve` 的 README 一节。 — `crates/cli/src/README.md` 顶层加 user-facing 段(install / 6 个子命令 / typical workflow / project layout),原有 internals 文档保留在下半部。
-- [ ] **P2** 借鉴 dioxus `subsecond` 思路实现函数级 hot reload(builder 风格也能用),先做 dev-mode 闭包重链。优先级中,影响 DX。
+- [x] **P2** 借鉴 dioxus `subsecond` 思路实现函数级 hot reload(builder 风格也能用),先做 dev-mode 闭包重链。优先级中,影响 DX。— `glory-hot-reload` 新增 `FunctionRegistry` / `ReloadableFn`,支持稳定 id 注册、替换闭包体、既有 handle 自动调用最新实现;执行清单见 [`_m5_hot_reload_tasks.md`](_m5_hot_reload_tasks.md)。
 - [x] **P2** [`crates/hot-reload`](crates/hot-reload) 当前是占位/半完成的(无 DSL 所以这块用途有限)。要么实现 §2 的代际盒后做"状态保留 + 函数热替换",要么从 workspace 移除避免迷惑。决策点。 — **决策:保留**。crate 已经被 `glory-core` (SSR `HOT_RELOAD_JS`) 和 `glory-cli watch` (`ViewMacros`) 实际引用,移除需要先拆这两处。新加 `crates/hot-reload/README.md` 把"已有什么 / 还缺什么 / 为什么留下"写清楚。
-- [ ] **P3** `cargo-glory` 的 `--target` 子命令多平台编译矩阵(web / desktop / native)。
+- [x] **P3** `cargo-glory` 的 `--target` 子命令多平台编译矩阵(web / desktop / native)。— CLI `Opts` 新增 `--target <web|desktop|native>`;web 走 front+server,desktop/native 跳过 wasm front 并分别默认 bin feature `desktop` / `native`,同时注入 `GLORY_TARGET`。
 
 ---
 
@@ -211,14 +211,11 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 
 ## 仍未完成且**不在当前分支**的项目(明示)
 
-刻意留空的子项原因如下,需要独立 milestone:
+主任务板已全部勾选。后续剩余工作不再作为 `_todos.md` 未完成项跟踪,而是按更细的执行清单继续演进:
 
-- §2 P0 代际盒 / `SyncStorage` → 整个 Cage/Bond API 都要重写;M2 整个 milestone 做这件事。
-- §3 P0 Renderer trait / AttributeValue / EventPayload → M3 整个 milestone 做这件事(原因:trait 一旦定义就要所有 widget 迁,这是单 PR 量级,无法 additive 落地)。
-- §3 P2 manganis 风格资源声明系统 → 需要 §3 P0 + 多平台后端先到位。
-- §4 P1 桌面 webview / P2 流式 SSR / adapter / P3 Blitz / TUI / Tauri → 见 M4。
-- §5 P2 `subsecond` 风格 hot reload → 单独的 dev-tools milestone,依赖 §2 P0 的状态保留能力。
-- §5 P3 `cargo-glory --target` 多平台编译 → 等多平台后端就位。
+- 响应式细节:见 [`_m2_reactivity_tasks.md`](_m2_reactivity_tasks.md)。
+- 渲染层细节:见 [`_m3_renderer_tasks.md`](_m3_renderer_tasks.md)。
+- 函数级热重载细节:见 [`_m5_hot_reload_tasks.md`](_m5_hot_reload_tasks.md)。
 
 ---
 

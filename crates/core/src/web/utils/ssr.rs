@@ -34,6 +34,9 @@ fn auto_reload(nonce_str: &str, options: &GloryConfig) -> String {
         if(msg.view) {{
             patch(msg.view);
         }}
+        if(msg.functions) {{
+            window.dispatchEvent(new CustomEvent('glory:function-reload', {{ detail: JSON.parse(msg.functions) }}));
+        }}
     }};
     ws.onclose = () => console.warn('Live-reload stopped. Manual reload necessary.');
 }})()
@@ -44,6 +47,54 @@ fn auto_reload(nonce_str: &str, options: &GloryConfig) -> String {
         "".into()
     }
 }
+
+const STREAM_HYDRATE_JS: &str = r#"(function () {
+    if (window.__gloryStreamHydrate) return;
+
+    function cssEscape(value) {
+        if (window.CSS && CSS.escape) return CSS.escape(value);
+        return String(value).replace(/["\\]/g, "\\$&");
+    }
+
+    function markerSelector(id) {
+        return 'template[data-glory-placeholder="' + cssEscape(id) + '"]';
+    }
+
+    function patchSelector(id) {
+        return 'template[data-glory-placeholder-patch="' + cssEscape(id) + '"]';
+    }
+
+    const api = {
+        patchFromTemplate(id) {
+            const patch = document.querySelector(patchSelector(id));
+            const marker = document.querySelector(markerSelector(id));
+            if (!patch || !marker) return false;
+            marker.replaceWith(patch.content.cloneNode(true));
+            patch.remove();
+            return true;
+        },
+        flush() {
+            document.querySelectorAll("template[data-glory-placeholder-patch]").forEach((patch) => {
+                const id = patch.getAttribute("data-glory-placeholder-patch");
+                if (id) this.patchFromTemplate(id);
+            });
+        },
+    };
+
+    window.__gloryStreamHydrate = api;
+
+    function observe() {
+        api.flush();
+        if (!("MutationObserver" in window)) return;
+        new MutationObserver(() => api.flush()).observe(document.documentElement, {
+            childList: true,
+            subtree: true,
+        });
+    }
+
+    if (document.documentElement) observe();
+    else document.addEventListener("DOMContentLoaded", observe, { once: true });
+})()"#;
 
 #[cfg(feature = "web-ssr")]
 #[tracing::instrument(level = "trace", fields(error), skip_all)]
@@ -89,6 +140,7 @@ pub fn html_parts_separated(config: &GloryConfig, truck: &Truck) -> (String, Str
         {head_mixin}
         <link rel="modulepreload" href="/{pkg_path}/{output_name}.js"{nonce}>
         <link rel="preload" href="/{pkg_path}/{wasm_output_name}.wasm" as="fetch" type="application/wasm" crossorigin=""{nonce}>
+        <script>{STREAM_HYDRATE_JS}</script>
         <script type="module"{nonce}>
         function idle(c) {{
             if ("requestIdleCallback" in window) {{window.requestIdleCallback(c);}} else {{c();}}
@@ -101,4 +153,20 @@ pub fn html_parts_separated(config: &GloryConfig, truck: &Truck) -> (String, Str
         format!("\n    </head>\n    {body_open}"),
         "\n    </body>\n</html>",
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ssr_head_installs_stream_hydrate_runtime() {
+        let config = GloryConfig::default();
+        let truck = Truck::new();
+        let (head, _, _) = html_parts_separated(&config, &truck);
+
+        assert!(head.contains("window.__gloryStreamHydrate"));
+        assert!(head.contains("patchFromTemplate"));
+        assert!(head.contains("template[data-glory-placeholder-patch]"));
+    }
 }

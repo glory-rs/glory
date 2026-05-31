@@ -35,6 +35,8 @@
 use std::any::Any;
 use std::cell::RefCell;
 use std::marker::PhantomData;
+#[cfg(feature = "sync-storage")]
+use std::sync::{Arc, RwLock};
 
 use slab::Slab;
 
@@ -150,6 +152,111 @@ impl<T: 'static> std::hash::Hash for Handle<T> {
     }
 }
 
+#[cfg(feature = "sync-storage")]
+/// Thread-safe storage backend for SSR and native runtimes.
+///
+/// This backend intentionally mirrors [`Arena`]'s generation checks,
+/// but stores slots behind `Arc<RwLock<_>>` so handles can be moved
+/// across threads. The current `Cage<T>` migration still uses the
+/// unsync fast path by default; this is the feature-gated foundation
+/// for switching the public reactive primitives to a sync backend.
+#[derive(Clone, Default)]
+pub struct SyncStorage {
+    arena: Arc<RwLock<SyncArena>>,
+}
+
+#[cfg(feature = "sync-storage")]
+#[derive(Default)]
+struct SyncArena {
+    slots: Slab<SyncSlot>,
+}
+
+#[cfg(feature = "sync-storage")]
+struct SyncSlot {
+    generation: u64,
+    data: Arc<dyn Any + Send + Sync>,
+}
+
+#[cfg(feature = "sync-storage")]
+impl SyncStorage {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn alloc<T>(&self, data: T) -> SyncHandle<T>
+    where
+        T: Send + Sync + 'static,
+    {
+        let mut arena = self.arena.write().expect("SyncStorage::alloc: lock poisoned");
+        let generation = 0_u64;
+        let slot = arena.slots.insert(SyncSlot {
+            generation,
+            data: Arc::new(RwLock::new(data)),
+        });
+        SyncHandle {
+            storage: self.clone(),
+            slot,
+            generation,
+            _phantom: PhantomData,
+        }
+    }
+
+    fn read_cell<T>(&self, slot: usize, generation: u64) -> Option<Arc<RwLock<T>>>
+    where
+        T: Send + Sync + 'static,
+    {
+        let arena = self.arena.read().ok()?;
+        let slot = arena.slots.get(slot)?;
+        if slot.generation != generation {
+            return None;
+        }
+        slot.data.clone().downcast::<RwLock<T>>().ok()
+    }
+}
+
+#[cfg(feature = "sync-storage")]
+#[derive(Clone)]
+pub struct SyncHandle<T>
+where
+    T: Send + Sync + 'static,
+{
+    storage: SyncStorage,
+    slot: usize,
+    generation: u64,
+    _phantom: PhantomData<T>,
+}
+
+#[cfg(feature = "sync-storage")]
+impl<T> std::fmt::Debug for SyncHandle<T>
+where
+    T: Send + Sync + 'static,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SyncHandle")
+            .field("slot", &self.slot)
+            .field("generation", &self.generation)
+            .finish()
+    }
+}
+
+#[cfg(feature = "sync-storage")]
+impl<T> SyncHandle<T>
+where
+    T: Send + Sync + 'static,
+{
+    pub fn with<R>(&self, f: impl FnOnce(&T) -> R) -> Option<R> {
+        let cell = self.storage.read_cell::<T>(self.slot, self.generation)?;
+        let guard = cell.read().ok()?;
+        Some(f(&*guard))
+    }
+
+    pub fn with_mut<R>(&self, f: impl FnOnce(&mut T) -> R) -> Option<R> {
+        let cell = self.storage.read_cell::<T>(self.slot, self.generation)?;
+        let mut guard = cell.write().ok()?;
+        Some(f(&mut *guard))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -181,5 +288,21 @@ mod tests {
         let a = Handle::<i32>::alloc(1);
         let b = Handle::<i32>::alloc(1);
         assert_ne!(a, b);
+    }
+
+    #[cfg(feature = "sync-storage")]
+    #[test]
+    fn sync_storage_handles_cross_threads() {
+        let storage = SyncStorage::new();
+        let handle = storage.alloc(1_i32);
+        let handle_for_thread = handle.clone();
+
+        std::thread::spawn(move || {
+            handle_for_thread.with_mut(|value| *value += 41).unwrap();
+        })
+        .join()
+        .unwrap();
+
+        assert_eq!(handle.with(|value| *value).unwrap(), 42);
     }
 }

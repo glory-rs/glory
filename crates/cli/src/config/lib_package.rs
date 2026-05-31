@@ -9,7 +9,7 @@ use crate::{
 use camino::Utf8PathBuf;
 use cargo_metadata::Metadata;
 
-use super::{Profile, ProjectConfig, project::ProjectDefinition};
+use super::{Profile, ProjectConfig, cli::BuildTarget, project::ProjectDefinition};
 
 pub struct LibPackage {
     pub name: String,
@@ -51,6 +51,9 @@ impl LibPackage {
 
         features.extend(config.features.clone());
         features.extend(cli.features.clone());
+        if features.is_empty() && cli.target == BuildTarget::Web {
+            features.push("web-csr".to_string());
+        }
 
         let abs_dir = package.manifest_path.clone().without_last();
         let rel_dir = abs_dir.unbase(&metadata.workspace_root)?;

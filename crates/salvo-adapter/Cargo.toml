@@ -1,0 +1,20 @@
+[package]
+name = "glory-salvo"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+description = "Salvo adapter for Glory SSR."
+homepage = { workspace = true }
+repository = { workspace = true }
+documentation = "https://docs.rs/glory-salvo/"
+readme = { workspace = true }
+keywords = { workspace = true }
+license = { workspace = true }
+categories = { workspace = true }
+
+[dependencies]
+glory-core = { workspace = true, features = ["salvo"] }
+salvo = { workspace = true }
+
+[lints]
+workspace = true

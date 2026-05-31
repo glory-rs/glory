@@ -14,6 +14,7 @@ where
     T: fmt::Debug + 'static,
 {
     inner: &'static CageInner<T>,
+    generation: u64,
 }
 
 struct CageInner<T>
@@ -21,6 +22,8 @@ where
     T: fmt::Debug + 'static,
 {
     id: RevisableId,
+    generation: Cell<u64>,
+    alive: Cell<bool>,
     version: Cell<usize>,
     source: RefCell<T>,
     view_ids: Rc<RefCell<IndexSet<ViewId>>>,
@@ -33,6 +36,7 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Cage")
             .field("id", &self.inner.id)
+            .field("generation", &self.generation)
             .field("version", &self.inner.version.get())
             .field("subscriber_count", &self.inner.view_ids.borrow().len())
             .finish_non_exhaustive()
@@ -100,6 +104,19 @@ impl<T> Cage<T>
 where
     T: fmt::Debug + 'static,
 {
+    pub(crate) fn invalidate(&self) {
+        self.inner.alive.set(false);
+        self.inner.generation.set(self.inner.generation.get().wrapping_add(1));
+    }
+
+    fn ensure_alive(&self) -> Result<(), CageAccessError> {
+        if self.inner.alive.get() && self.inner.generation.get() == self.generation {
+            Ok(())
+        } else {
+            Err(CageAccessError::Stale)
+        }
+    }
+
     fn track_read(&self) {
         let this = *self;
         TRACKING_STACK.with(|tracking_items| {
@@ -114,17 +131,19 @@ where
         self.try_get().expect("Cage::get: source is already mutably borrowed")
     }
 
-    pub fn try_get(&self) -> Result<Ref<'_, T>, BorrowError> {
+    pub fn try_get(&self) -> Result<Ref<'_, T>, CageAccessError> {
+        self.ensure_alive()?;
         self.track_read();
-        self.inner.source.try_borrow()
+        self.inner.source.try_borrow().map_err(CageAccessError::Borrow)
     }
 
     pub fn get_untracked(&self) -> Ref<'_, T> {
         self.try_get_untracked().expect("Cage::get_untracked: source is already mutably borrowed")
     }
 
-    pub fn try_get_untracked(&self) -> Result<Ref<'_, T>, BorrowError> {
-        self.inner.source.try_borrow()
+    pub fn try_get_untracked(&self) -> Result<Ref<'_, T>, CageAccessError> {
+        self.ensure_alive()?;
+        self.inner.source.try_borrow().map_err(CageAccessError::Borrow)
     }
 
     pub fn revise<F, R>(&self, opt: F) -> R
@@ -134,11 +153,12 @@ where
         self.try_revise(opt).expect("Cage::revise: source is already borrowed")
     }
 
-    pub fn try_revise<F, R>(&self, opt: F) -> Result<R, BorrowMutError>
+    pub fn try_revise<F, R>(&self, opt: F) -> Result<R, CageMutateError>
     where
         F: FnOnce(RefMut<'_, T>) -> R,
     {
-        let result = (opt)(self.inner.source.try_borrow_mut()?);
+        self.ensure_alive().map_err(CageMutateError::Access)?;
+        let result = (opt)(self.inner.source.try_borrow_mut().map_err(CageMutateError::Borrow)?);
         self.inner.version.set(self.inner.version.get() + 1);
         self.signal();
         Ok(result)
@@ -151,11 +171,12 @@ where
         self.try_revise_silent(opt).expect("Cage::revise_silent: source is already borrowed")
     }
 
-    pub fn try_revise_silent<F, R>(&self, opt: F) -> Result<R, BorrowMutError>
+    pub fn try_revise_silent<F, R>(&self, opt: F) -> Result<R, CageMutateError>
     where
         F: FnOnce(RefMut<'_, T>) -> R,
     {
-        let result = (opt)(self.inner.source.try_borrow_mut()?);
+        self.ensure_alive().map_err(CageMutateError::Access)?;
+        let result = (opt)(self.inner.source.try_borrow_mut().map_err(CageMutateError::Borrow)?);
         self.inner.version.set(self.inner.version.get() + 1);
         Ok(result)
     }
@@ -249,11 +270,13 @@ where
     pub fn new(source: T) -> Self {
         let inner = Box::leak(Box::new(CageInner {
             id: RevisableId::next(),
+            generation: Cell::new(0),
+            alive: Cell::new(true),
             version: Cell::new(1),
             source: RefCell::new(source),
             view_ids: Default::default(),
         }));
-        Cage { inner }
+        Cage { inner, generation: 0 }
     }
 }
 
@@ -276,6 +299,40 @@ where
 }
 
 impl<T> Copy for Cage<T> where T: fmt::Debug + 'static {}
+
+#[derive(Debug)]
+pub enum CageAccessError {
+    Stale,
+    Borrow(BorrowError),
+}
+
+impl fmt::Display for CageAccessError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CageAccessError::Stale => f.write_str("cage handle is stale"),
+            CageAccessError::Borrow(err) => err.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for CageAccessError {}
+
+#[derive(Debug)]
+pub enum CageMutateError {
+    Access(CageAccessError),
+    Borrow(BorrowMutError),
+}
+
+impl fmt::Display for CageMutateError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            CageMutateError::Access(err) => err.fmt(f),
+            CageMutateError::Borrow(err) => err.fmt(f),
+        }
+    }
+}
+
+impl std::error::Error for CageMutateError {}
 
 impl<T> From<T> for Cage<T>
 where

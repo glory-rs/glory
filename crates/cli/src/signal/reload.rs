@@ -1,4 +1,4 @@
-use glory_hot_reload::diff::Patches;
+use glory_hot_reload::{FunctionReplacementBatch, diff::Patches};
 use once_cell::sync::Lazy;
 use tokio::sync::broadcast;
 
@@ -9,6 +9,7 @@ pub enum ReloadType {
     Full,
     Style,
     ViewPatches(String),
+    FunctionReplacements(String),
 }
 
 pub struct ReloadSignal {}
@@ -33,6 +34,17 @@ impl ReloadSignal {
                 }
             }
             Err(e) => log::error!(r#"Error could not send reload "View Patches" due to: {e}"#),
+        }
+    }
+
+    pub fn send_function_replacements(replacements: &FunctionReplacementBatch) {
+        match serde_json::to_string(replacements) {
+            Ok(data) => {
+                if let Err(e) = RELOAD_CHANNEL.send(ReloadType::FunctionReplacements(data)) {
+                    log::error!(r#"Error could not send reload "Function Replacements" due to: {e}"#);
+                }
+            }
+            Err(e) => log::error!(r#"Error could not send reload "Function Replacements" due to: {e}"#),
         }
     }
 

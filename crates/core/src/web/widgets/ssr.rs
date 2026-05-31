@@ -8,6 +8,7 @@ use wasm_bindgen::UnwrapThrowExt;
 
 use crate::node::{Node, NodeRef};
 use crate::reflow::{Bond, Lotus};
+use crate::renderer::{InsertPosition, Renderer, SsrRenderer};
 use crate::view::{ViewId, ViewPosition};
 use crate::web::events::EventDescriptor;
 use crate::web::{AttrValue, ClassPart, Classes, PropValue};
@@ -29,6 +30,7 @@ pub struct Element {
     pub fillers: Vec<Filler>,
 
     pub(crate) node: Node,
+    pub(crate) renderer: SsrRenderer,
 }
 
 impl Widget for Element {
@@ -59,13 +61,13 @@ impl Widget for Element {
     fn flood(&mut self, ctx: &mut Scope) {
         let parent_node = ctx.parent_node.as_ref().unwrap();
         match &ctx.position {
-            ViewPosition::Head => parent_node.prepend_with_node(&self.node),
-            ViewPosition::Prev(prev_node) => parent_node.insert_after(prev_node, &self.node),
-            ViewPosition::Next(next_node) => parent_node.insert_before(next_node, &self.node),
-            ViewPosition::Tail => parent_node.append_with_node(&self.node),
+            ViewPosition::Head => self.renderer.insert_child(parent_node, &self.node, InsertPosition::Head),
+            ViewPosition::Prev(prev_node) => self.renderer.insert_child(parent_node, &self.node, InsertPosition::After(prev_node)),
+            ViewPosition::Next(next_node) => self.renderer.insert_child(parent_node, &self.node, InsertPosition::Before(next_node)),
+            ViewPosition::Tail => self.renderer.insert_child(parent_node, &self.node, InsertPosition::Tail),
             ViewPosition::Unset => {
                 crate::warn!("node position is unset. {:#?}", &self.node);
-                parent_node.append_with_node(&self.node);
+                self.renderer.insert_child(parent_node, &self.node, InsertPosition::Tail);
             }
         }
 
@@ -76,7 +78,7 @@ impl Widget for Element {
     }
     fn detach(&mut self, ctx: &mut Scope) {
         if let Some(parent_node) = ctx.parent_node.as_ref() {
-            parent_node.remove_child(&self.node);
+            self.renderer.remove_child(parent_node, &self.node);
         }
         let ids: Vec<ViewId> = ctx.child_views.keys().cloned().collect();
         for id in ids {
@@ -104,7 +106,8 @@ impl Element {
             attrs: Default::default(),
             props: Default::default(),
             fillers: vec![],
-            node: Node::new(name, is_void),
+            node: SsrRenderer.create_element(name, is_void),
+            renderer: SsrRenderer,
         }
     }
 

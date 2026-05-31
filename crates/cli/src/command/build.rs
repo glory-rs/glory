@@ -33,7 +33,7 @@ pub async fn build_proj(proj: &Arc<Project>) -> Result<bool> {
     }
     let changes = ChangeSet::all_changes();
 
-    if !compile::front(proj, &changes).await.await??.is_success() {
+    if proj.builds_front() && !compile::front(proj, &changes).await.await??.is_success() {
         return Ok(false);
     }
     if !compile::assets(proj, &changes, true).await.await??.is_success() {
@@ -42,7 +42,7 @@ pub async fn build_proj(proj: &Arc<Project>) -> Result<bool> {
     if !compile::style(proj, &changes).await.await??.is_success() {
         return Ok(false);
     }
-    if !compile::server(proj, &changes).await.await??.is_success() {
+    if proj.builds_server() && !compile::server(proj, &changes).await.await??.is_success() {
         return Ok(false);
     }
     Ok(true)

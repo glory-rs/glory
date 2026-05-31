@@ -26,10 +26,12 @@
 //!   `REVISING_ITEMS`, calls `Widget::patch` for each bound view.
 
 mod cage;
-pub(crate) mod storage;
+pub mod storage;
 pub use cage::Cage;
 mod bond;
 pub use bond::{Bond, selector};
+mod owner;
+pub use owner::Owner;
 mod lotus;
 pub use lotus::Lotus;
 mod effect;

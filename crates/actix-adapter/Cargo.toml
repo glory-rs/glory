@@ -1,0 +1,20 @@
+[package]
+name = "glory-actix"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+description = "Actix Web adapter for Glory SSR."
+homepage = { workspace = true }
+repository = { workspace = true }
+documentation = "https://docs.rs/glory-actix/"
+readme = { workspace = true }
+keywords = { workspace = true }
+license = { workspace = true }
+categories = { workspace = true }
+
+[dependencies]
+actix-web = { workspace = true }
+glory-core = { workspace = true, features = ["web-ssr"] }
+
+[lints]
+workspace = true

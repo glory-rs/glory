@@ -1,0 +1,20 @@
+[package]
+name = "glory-native"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+description = "Native renderer scaffold for Glory."
+homepage = { workspace = true }
+repository = { workspace = true }
+documentation = "https://docs.rs/glory-native/"
+readme = { workspace = true }
+keywords = { workspace = true }
+license = { workspace = true }
+categories = { workspace = true }
+
+[dependencies]
+glory-core = { workspace = true }
+glory-desktop = { path = "../desktop" }
+
+[lints]
+workspace = true

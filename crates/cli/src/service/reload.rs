@@ -75,6 +75,9 @@ async fn handle_socket(mut stream: WebSocket) {
                         Ok(ReloadType::ViewPatches(data)) => {
                             send(&mut stream, BrowserMessage::view(data)).await;
                         }
+                        Ok(ReloadType::FunctionReplacements(data)) => {
+                            send(&mut stream, BrowserMessage::functions(data)).await;
+                        }
                         Err(e) => log::debug!("Reload recive error {e}")
                     }
                 }
@@ -114,6 +117,7 @@ async fn send_and_close(mut stream: WebSocket, msg: BrowserMessage) {
 struct BrowserMessage {
     css: Option<String>,
     view: Option<String>,
+    functions: Option<String>,
     all: bool,
 }
 
@@ -126,6 +130,7 @@ impl BrowserMessage {
         Self {
             css: Some(link),
             view: None,
+            functions: None,
             all: false,
         }
     }
@@ -134,6 +139,16 @@ impl BrowserMessage {
         Self {
             css: None,
             view: Some(data),
+            functions: None,
+            all: false,
+        }
+    }
+
+    fn functions(data: String) -> Self {
+        Self {
+            css: None,
+            view: None,
+            functions: Some(data),
             all: false,
         }
     }
@@ -142,6 +157,7 @@ impl BrowserMessage {
         Self {
             css: None,
             view: None,
+            functions: None,
             all: true,
         }
     }

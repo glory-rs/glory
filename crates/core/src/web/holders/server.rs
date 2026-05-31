@@ -20,6 +20,43 @@ pub struct ServerHolder {
     next_root_view_id: AtomicU64,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum HtmlChunk {
+    DocumentStart(String),
+    BodyOpen(String),
+    App(String),
+    Placeholder { id: String, fallback_html: String },
+    PlaceholderPatch { id: String, html: String },
+    DocumentEnd(&'static str),
+}
+
+impl HtmlChunk {
+    pub fn into_string(self) -> String {
+        match self {
+            HtmlChunk::DocumentStart(value) | HtmlChunk::BodyOpen(value) | HtmlChunk::App(value) => value,
+            HtmlChunk::Placeholder { id, fallback_html } => {
+                format!(r#"<template data-glory-placeholder="{}">{}</template>"#, escape_html_attr(&id), fallback_html)
+            }
+            HtmlChunk::PlaceholderPatch { id, html } => {
+                let id_attr = escape_html_attr(&id);
+                let id_json = serde_json::to_string(&id).expect("placeholder id can always be encoded as JSON");
+                format!(
+                    r#"<template data-glory-placeholder-patch="{id_attr}">{html}</template><script>window.__gloryStreamHydrate&&window.__gloryStreamHydrate.patchFromTemplate({id_json});</script>"#
+                )
+            }
+            HtmlChunk::DocumentEnd(value) => value.to_owned(),
+        }
+    }
+}
+
+fn escape_html_attr(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('"', "&quot;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+}
+
 impl ServerHolder {
     pub fn new(config: impl Into<Arc<GloryConfig>>, url: impl Into<String>) -> Self {
         let mut truck = Truck::new();
@@ -31,6 +68,24 @@ impl ServerHolder {
             host_node: crate::web::widgets::div(),
             next_root_view_id: AtomicU64::new(0),
         }
+    }
+
+    pub fn html_chunks(&self) -> Vec<HtmlChunk> {
+        let (head, mid, tail) = crate::web::utils::html_parts_separated(&self.config, &*self.truck.borrow());
+        vec![
+            HtmlChunk::DocumentStart(head),
+            HtmlChunk::BodyOpen(mid),
+            HtmlChunk::App(self.host_node.node().inner_html()),
+            HtmlChunk::DocumentEnd(tail),
+        ]
+    }
+
+    pub fn render_stream(&self) -> futures::stream::Iter<std::vec::IntoIter<HtmlChunk>> {
+        futures::stream::iter(self.html_chunks())
+    }
+
+    pub fn render_string(&self) -> String {
+        self.html_chunks().into_iter().map(HtmlChunk::into_string).collect()
     }
 }
 
@@ -84,15 +139,15 @@ cfg_feature! {
     use std::convert::Infallible;
 
     use educe::Educe;
-    use salvo::prelude::{Request, Response, Depot, FlowCtrl, Scribe, StatusCode};
+    use futures::StreamExt;
+    use salvo::prelude::{Depot, FlowCtrl, Request, Response, Scribe, StatusCode};
     use salvo::{async_trait};
 
     impl Scribe for ServerHolder {
         fn render(self, res: &mut Response) {
-            let (head, mid, tail) = crate::web::utils::html_parts_separated(&self.config, &*self.truck.borrow());
             res.add_header("content-type", "text/html", true).ok();
             res.status_code(StatusCode::OK);
-            res.stream(futures::stream::iter([head, mid, self.host_node.node().inner_html(), tail.to_owned()].map(Result::<_, Infallible>::Ok)));
+            res.stream(self.render_stream().map(|chunk| Result::<_, Infallible>::Ok(chunk.into_string())));
         }
     }
 
@@ -128,5 +183,53 @@ cfg_feature! {
             let holder = (self.holder_factory)(self.config.clone(), req.uri().to_string());
             res.render(holder);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::web::widgets::div;
+    use crate::{Holder, Scope, Widget};
+
+    use super::*;
+
+    #[derive(Debug)]
+    struct StreamWidget;
+
+    impl Widget for StreamWidget {
+        fn build(&mut self, ctx: &mut Scope) {
+            div().text("streamed").show_in(ctx);
+        }
+    }
+
+    #[test]
+    fn holder_renders_named_html_chunks() {
+        let holder = ServerHolder::new(GloryConfig::default(), "/").mount(StreamWidget);
+        let chunks = holder.html_chunks();
+
+        assert!(matches!(chunks[0], HtmlChunk::DocumentStart(_)));
+        assert!(matches!(chunks[1], HtmlChunk::BodyOpen(_)));
+        assert_eq!(chunks[2], HtmlChunk::App("<div gly-id=\"0-0\">streamed</div>".to_string()));
+        assert!(matches!(chunks[3], HtmlChunk::DocumentEnd(_)));
+        assert!(holder.render_string().contains("streamed"));
+    }
+
+    #[test]
+    fn placeholder_chunks_render_marker_and_patch_script() {
+        let marker = HtmlChunk::Placeholder {
+            id: "user:1".to_string(),
+            fallback_html: "<span>Loading</span>".to_string(),
+        }
+        .into_string();
+        let patch = HtmlChunk::PlaceholderPatch {
+            id: "user:1".to_string(),
+            html: "<strong>Chris</strong>".to_string(),
+        }
+        .into_string();
+
+        assert_eq!(marker, r#"<template data-glory-placeholder="user:1"><span>Loading</span></template>"#);
+        assert!(patch.contains(r#"data-glory-placeholder-patch="user:1""#));
+        assert!(patch.contains(r#"patchFromTemplate("user:1")"#));
+        assert!(patch.contains("<strong>Chris</strong>"));
     }
 }

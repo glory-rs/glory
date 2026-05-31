@@ -10,6 +10,14 @@ pub enum Log {
     Server,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum, Default)]
+pub enum BuildTarget {
+    #[default]
+    Web,
+    Desktop,
+    Native,
+}
+
 #[derive(Debug, Clone, Parser, PartialEq, Default)]
 pub struct Opts {
     /// Build artifacts in release mode, with optimizations.
@@ -39,6 +47,10 @@ pub struct Opts {
     /// Verbosity (none: info, errors & warnings, -v: verbose, --vv: very verbose).
     #[arg(short, action = clap::ArgAction::Count)]
     pub verbose: u8,
+
+    /// Platform build matrix to execute.
+    #[arg(long, value_enum, default_value_t = BuildTarget::Web)]
+    pub target: BuildTarget,
 }
 
 #[derive(Debug, Parser)]

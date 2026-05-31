@@ -15,7 +15,7 @@ use crate::{
 use super::{
     assets::AssetsConfig,
     bin_package::BinPackage,
-    cli::Opts,
+    cli::{BuildTarget, Opts},
     dotenvs::{load_dotenvs, overlay_env},
     end2end::End2EndConfig,
     style::StyleConfig,
@@ -35,6 +35,7 @@ pub struct Project {
     pub end2end: Option<End2EndConfig>,
     pub assets: Option<AssetsConfig>,
     pub js_dir: Utf8PathBuf,
+    pub target: BuildTarget,
 }
 
 impl Debug for Project {
@@ -50,6 +51,7 @@ impl Debug for Project {
             .field("site", &self.site)
             .field("end2end", &self.end2end)
             .field("assets", &self.assets)
+            .field("target", &self.target)
             .finish_non_exhaustive()
     }
 }
@@ -81,6 +83,7 @@ impl Project {
                 end2end: End2EndConfig::resolve(&config),
                 assets: AssetsConfig::resolve(&config),
                 js_dir,
+                target: cli.target,
             };
             resolved.push(Arc::new(proj));
         }
@@ -107,11 +110,22 @@ impl Project {
             ("GLORY_RELOAD_PORT", self.site.reload.port().to_string()),
             ("GLORY_LIB_DIR", self.lib.rel_dir.to_string()),
             ("GLORY_BIN_DIR", self.bin.rel_dir.to_string()),
+            ("GLORY_TARGET", format!("{:?}", self.target).to_lowercase()),
         ];
         if self.watch {
             vec.push(("GLORY_WATCH", "ON".to_string()))
         }
         vec
+    }
+}
+
+impl Project {
+    pub fn builds_front(&self) -> bool {
+        self.target == BuildTarget::Web
+    }
+
+    pub fn builds_server(&self) -> bool {
+        matches!(self.target, BuildTarget::Web | BuildTarget::Desktop | BuildTarget::Native)
     }
 }
 

@@ -60,6 +60,7 @@ pub struct Scope {
     next_child_view_id: AtomicU64,
 
     pub truck: Rc<RefCell<Truck>>,
+    owner: reflow::Owner,
 }
 impl Scope {
     pub fn new(view_id: ViewId, truck: Rc<RefCell<Truck>>) -> Self {
@@ -81,6 +82,7 @@ impl Scope {
 
             next_child_view_id: AtomicU64::new(0),
             truck,
+            owner: reflow::Owner::new(),
         }
     }
     pub fn new_root(view_id: ViewId, truck: Rc<RefCell<Truck>>) -> Self {
@@ -102,6 +104,7 @@ impl Scope {
 
             next_child_view_id: AtomicU64::new(0),
             truck,
+            owner: reflow::Owner::new(),
         }
     }
     pub fn is_root(&self) -> bool {
@@ -136,6 +139,17 @@ impl Scope {
     pub fn beget(&self) -> Self {
         Scope::new(self.next_child_view_id(), self.truck.clone())
     }
+    pub fn owner(&self) -> &reflow::Owner {
+        &self.owner
+    }
+
+    pub fn cage<T>(&self, value: T) -> reflow::Cage<T>
+    where
+        T: std::fmt::Debug + 'static,
+    {
+        self.owner.cage(value)
+    }
+
     pub fn graff(&self) -> Option<&Node> {
         self.graff_node.as_ref()
     }
@@ -334,4 +348,29 @@ impl Scope {
     //         None
     //     }
     // }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    use crate::{Scope, Truck, ViewId};
+
+    #[test]
+    fn scope_drop_invalidates_owned_cage() {
+        let cage = {
+            let scope = Scope::new(
+                ViewId::new(
+                    #[cfg(not(feature = "single-app"))]
+                    crate::HolderId::null(),
+                    "scope".to_string(),
+                ),
+                Rc::new(RefCell::new(Truck::new())),
+            );
+            scope.cage(1_i32)
+        };
+
+        assert!(cage.try_get_untracked().is_err());
+    }
 }

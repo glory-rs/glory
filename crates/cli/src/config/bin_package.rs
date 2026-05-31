@@ -9,7 +9,7 @@ use crate::{
     },
 };
 
-use super::{Profile, ProjectConfig, project::ProjectDefinition};
+use super::{Profile, ProjectConfig, cli::BuildTarget, project::ProjectDefinition};
 
 pub struct BinPackage {
     pub name: String,
@@ -39,6 +39,13 @@ impl BinPackage {
 
         features.extend(config.features.clone());
         features.extend(cli.features.clone());
+        if features.is_empty() {
+            match cli.target {
+                BuildTarget::Web => features.push("web-ssr".to_string()),
+                BuildTarget::Desktop => features.push("desktop".to_string()),
+                BuildTarget::Native => features.push("native".to_string()),
+            }
+        }
 
         let name = project.bin_package.clone();
         let packages = metadata.workspace_packages();

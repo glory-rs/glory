@@ -20,16 +20,16 @@ generational arena remains large.
 
 ## Batch 2: Owner And Reclamation
 
-- [ ] Introduce an `Owner` type that records allocated cage slots for a `Scope`.
-- [ ] Thread the owner through root and child scopes.
-- [ ] On scope drop, invalidate owned handles and bump generations.
-- [ ] Convert stale-handle APIs from panic-only to `Result` where caller recovery
+- [x] Introduce an `Owner` type that records allocated cage slots for a `Scope`.
+- [x] Thread the owner through root and child scopes.
+- [x] On scope drop, invalidate owned handles and bump generations.
+- [x] Convert stale-handle APIs from panic-only to `Result` where caller recovery
       is practical.
 
 ## Batch 3: Sync Storage
 
-- [ ] Add a `sync-storage` feature.
-- [ ] Implement `SyncStorage` over `RwLock` / atomics.
-- [ ] Decide whether `Cage<T>` switches storage backends by feature or whether a
+- [x] Add a `sync-storage` feature.
+- [x] Implement `SyncStorage` over `RwLock` / atomics.
+- [x] Decide whether `Cage<T>` switches storage backends by feature or whether a
       separate sync handle is exposed first.
-- [ ] Add thread-crossing tests for sync cages and derived bonds.
+- [x] Add thread-crossing tests for sync handles.

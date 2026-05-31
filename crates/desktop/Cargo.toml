@@ -1,0 +1,22 @@
+[package]
+name = "glory-desktop"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+description = "Desktop webview renderer scaffold for Glory."
+homepage = { workspace = true }
+repository = { workspace = true }
+documentation = "https://docs.rs/glory-desktop/"
+readme = { workspace = true }
+keywords = { workspace = true }
+license = { workspace = true }
+categories = { workspace = true }
+
+[dependencies]
+glory-core = { workspace = true }
+parking_lot = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+
+[lints]
+workspace = true
