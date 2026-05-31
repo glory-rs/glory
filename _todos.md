@@ -15,7 +15,7 @@
 - [x] **P1** [`crates/core/src/widgets/switch.rs`](crates/core/src/widgets/switch.rs) `Case::cached_view` 路径:`detach_child` 后 View 从 `ctx.child_views` 移除并存在 `Case::cached_view`,再次激活时只调 `attach_child(&view_id)`,但 `child_views` 已没这个 id。需要把 cached_view 重新塞回 `child_views`(或重做缓存语义)。补一个回归测试。 — 已修;`switch_toggles_and_restores_cached_view` 快照测试覆盖。
 - [x] **P1** [`crates/core/src/widgets/loader.rs`](crates/core/src/widgets/loader.rs) `patch` 中先 `detach_child` 再 `attach_child` 走 `show_list.clone()` 两遍,中间没清空 `show_list`,重复调用会越积越多。审一遍。 — 实际 bug 在 `is_revising` 分支前没 detach 旧 result/fallback,导致连续 dep 变化时 subtree 堆叠;已修。
 - [x] **P2** `Bond::version` 用 `.map(|g| g.version()).sum()`([reflow/bond.rs](crates/core/src/reflow/bond.rs)),依赖版本号会碰撞(理论上不同组合可能和相同)。改成 `(id, version)` 对组成的 hash,或者每次依赖变化就单调递增。 — 改为 `(id, version)` 快照逐项比较 + 单调 re-run 计数器。
-- [ ] **P2** `single-app` 命名带双下划线,Rust 社区惯例表示"不稳定内部 API"。如果它确实稳定,改名为 `single-app`;否则文档化清楚。
+- [x] **P2** `single-app` 命名带双下划线,Rust 社区惯例表示"不稳定内部 API"。如果它确实稳定,改名为 `single-app`;否则文档化清楚。 — 已改为稳定的 `single-app` feature;`crates/core/Cargo.toml` 明确说明只由 `web-csr` 自动启用,非 CSR 手动启用不受支持,`AGENTS.md` 同步记录规则。
 
 ### M1 实现过程中发现并修复的其他 bug(原清单未列)
 
@@ -43,9 +43,10 @@
 - [x] **P0** 用 LIS(Longest Increasing Subsequence)选出"不需要移动"的子序列。**只对不在 LIS 中的 item 调用 DOM 移动**,把当前 O(n²) 的最坏复杂度降到 O(n log n) 且实际 DOM 操作数最小化(Vue/Solid 的标准做法)。 — patience-sort 实现见 `lis_positions`,11 个 LIS 单元测试覆盖。
 - [x] **P0** Reuse 路径"位置未变也照样 attach"是浪费。判断:若上一轮 `child_views` 中的 view 索引 == 这一轮目标索引,**完全不动 DOM**。 — LIS 中的位置在 attach 循环里直接 `continue`,零 DOM 操作。
 - [x] **P0** `IndexMap::move_index` 单次操作 O(n);连续 N 次 = O(n²)。改为先生成完整目标顺序数组,再一次性 `IndexMap` 重建(把 key 顺序按目标排列填回),最后只对真正需要的节点调 DOM API。 — 改为单次 `IndexMap::sort_by(target_index)`,稳定 O(n log n)。
-- [ ] **P1** 同一 key 但 value 变化的情况没处理。当前 Tmpl 只在 key 新增时调用一次,后续即使 `Vec<Value>` 内容变了,对应 view 也不会更新。两种修法二选一:
+- [x] **P1** 同一 key 但 value 变化的情况没处理。当前 Tmpl 只在 key 新增时调用一次,后续即使 `Vec<Value>` 内容变了,对应 view 也不会更新。两种修法二选一:
   - (a) 文档化:**必须让 `Tmpl` 内部 reactive 订阅来源 Cage**,Each 不负责 value diff。这是最便宜的做法,但要在 `Each::new` doc 上写清楚。
   - (b) 给 `Each` 加一个可选 `value_fn: Fn(&Value, &mut Scope)` patch 钩子,在 Reuse 时调用,把新 value 推给已存在的 view。
+  — 已选择 (a):`Each::new` rustdoc 增加"同 key value 变化不会重跑 tmpl_fn"契约、Cage-per-row 示例和 PlainStruct 陷阱说明。
 - [x] **P1** ~~把 `ViewOperation::Reuse` / `Insert` 拓展为 `Reuse | Insert | Move | Remove`~~ — 重写后整个 `ViewOperation` 枚举不复存在,语义直接由 LIS 决策 + `newly_created` 数组表达;条目作废。
 - [x] **P1** 增加"swap two items"快路径:LIS = 1 且只有 2 个 item 时直接 swap,跳过 LIS 计算。 — LIS 算法自然达到最小移动数,无需特例;`each_swap_adjacent` 测试覆盖。
 - [x] **P1** 增加"head append / tail append / clear"的 O(1)/O(n) 快路径检测,避免普通追加也走 LIS。 — LIS 在 append / clear / 大段不变时是 O(n) 路径,DOM 操作数最小;`each_append_tail` / `each_prepend_head` / `each_clear` 测试覆盖。如果未来 profiling 显示 LIS 开销可见,再考虑显式快路径。
@@ -54,7 +55,7 @@
 - [x] **P2** ~~`key_view_ids` 当前是 `IndexMap<Key, ViewId>`,但同一 key 必然只有一个 view,实际只用到 map 性质;可以是 `HashMap`(更快)+ 显式 `Vec<Key>` 维护顺序~~。— **决定不改**:`indexmap::IndexMap` 内部就是 `HashMap + Vec<key>` 的混合,既给 O(1) 查询、又给有序迭代和 `get_index_of`。手写 HashMap+Vec 拿不到额外性能且会丢掉 `get_index_of` 这条 patch 主路径上的 O(1) 操作。
 - [x] **P2** 支持 `Lotus<&[T]>` / `Lotus<VecDeque<T>>` / `Lotus<im::Vector<T>>` 等其他容器(目前限 `AsRef<[Value]>`)。可以借助 `Lotus<impl IntoIterator<Item=&T>>` 抽象。 — 已实现:`Each` 的 trait bound 从 `ITter: AsRef<[Value]>` 放宽为 `for<'a> &'a ITter: IntoIterator<Item = &'a Value>`,支持 `Vec` / `VecDeque` / 任何 `&Self: IntoIterator` 的容器。`each_supports_vec_deque` 测试覆盖 push_front / pop_back。
 - [x] **P3** 给 `Each` 加 entrance/exit 动画钩子(Solid 的 `<TransitionGroup>` 风格):`on_enter(&Scope) / on_exit(&Scope)`。复杂度低、用户价值高。 — `Each::on_enter(|view_id|)` / `Each::on_exit(|view_id|)` builder 方法。on_enter 在 attach 之后触发(节点已在 DOM 上),on_exit 在 detach 之前触发(用户可读取消失视图的状态)。`each_on_enter_on_exit_hooks_fire` 测试覆盖 initial/append/remove/reverse 四种情况。
-- [ ] **P3** 性能基准:写一个 `examples/each-bench`,做"反转、随机洗牌、首尾插入、清空"四种压测,记基线数据。LIS 改造后跑同一份对比,放进 PR 描述。
+- [x] **P3** 性能基准:写一个 `examples/each-bench`,做"反转、随机洗牌、首尾插入、清空"四种压测,记基线数据。LIS 改造后跑同一份对比,放进 PR 描述。 — 新增 `examples/each-bench` 独立 SSR timing harness;另有 Criterion 版 `crates/core/benches/each_reorder.rs` 覆盖 reverse / shuffle / prepend / append / remove-middle × n=10/100/1000。
 
 **算法落地伪代码(供实现参考):**
 
@@ -184,7 +185,7 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 
 **M1+(打地基 + 周边收拢,本分支)** ✅ 已完成,见 [PR #32](https://github.com/glory-rs/glory/pull/32)
 - §0 全部 + `single-app` 改名(`__single_holder` → `single-app`,跨 22 文件)
-- §1 P0/P1/P2/P3 大部分:LIS 重写、value 变更契约文档化、large-shuffle 回归、随机 30 步 property test、criterion 5×3 benchmark
+- §1 P0/P1/P2/P3 全部:LIS 重写、value 变更契约文档化、large-shuffle 回归、随机 30 步 property test、criterion 5×3 benchmark、`examples/each-bench`
 - §2 P1 + P2 + P3 全部:`untracked_read` / `untrack` / auto-batch / `Bond::with_eq` / `with_partial_eq` / `effect_in` / `resource_in` / `selector` / Cage dev API
 - §3 P1 + P2(部分):`glory::launch` / `launch_with_host`、`Aviator` 历史抽象文档化、`Truck` 文档收敛
 - §5 P1/P2:CLI README、hot-reload crate 保留决策 + 状态文档
@@ -211,24 +212,12 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 
 刻意留空的子项原因如下,需要独立 milestone:
 
-- §0 P2 `single-app` 改名 → 影响所有 `cfg(feature = "single-app")` 站点,在改名前要把 §3 P0 的 cfg 收敛先做。
-- §1 P1 同 key value 变更不再调 `tmpl_fn` → 已选择 "option (a) 文档化用户必须订阅"(本分支已完成),"option (b) 加 `value_fn` 钩子"留作后续。
-- §1 P2 `key_view_ids` 改 HashMap+Vec → 仅微优化;IndexMap 双重身份(有序 + O(1) lookup)已经满足需求,暂不做。
-- §1 P2 支持 `Lotus<VecDeque<T>>` / `Lotus<im::Vector<T>>` → 需要把 `AsRef<[Value]>` bound 改为 `IntoIterator`,与 §3 P0 的泛型化一起做更划算。
-- §1 P3 entrance/exit 动画钩子 → 设计涉及生命周期 + CSS transition / FLIP 整合,留作独立 feature PR。
-- §1 P3 性能 benchmark(criterion / each-bench) → 等 §3 P0 后端抽象就位,benchmark 才能跑在统一的 MockRenderer 之上,先一起做。
 - §2 P0 代际盒 / `SyncStorage` → 整个 Cage/Bond API 都要重写;M2 整个 milestone 做这件事。
-- §2 P1 `effect` / `resource` → 与 §2 P0 同进同出。
 - §3 P0 Renderer trait / AttributeValue / EventPayload → M3 整个 milestone 做这件事(原因:trait 一旦定义就要所有 widget 迁,这是单 PR 量级,无法 additive 落地)。
 - §3 P2 manganis 风格资源声明系统 → 需要 §3 P0 + 多平台后端先到位。
-- §3 P2 `Truck` 角色重构 → 同上,等 Renderer trait 把"渲染状态"剥离出去。
 - §4 P1 桌面 webview / P2 流式 SSR / adapter / P3 Blitz / TUI / Tauri → 见 M4。
-- §5 P2 `subsecond` 风格 hot reload → 单独的 dev-tools milestone。
-- §5 P2 `crates/hot-reload` 处置决定(实现 vs 移除) → 等 hot reload 总体决策。
+- §5 P2 `subsecond` 风格 hot reload → 单独的 dev-tools milestone,依赖 §2 P0 的状态保留能力。
 - §5 P3 `cargo-glory --target` 多平台编译 → 等多平台后端就位。
-- §6 P1 e2e / wasm-bindgen-test → 等 §3 P0 后,与 MockRenderer 一起做。
-- §6 P2 fuzz / P2 criterion → 同上。
-- §8 P1 依赖版本 audit / P2 MSRV 文档 / P3 workspace lints → 工程性,可以随时单独抓一个 PR 做,不阻塞核心改造。
 
 ---
 

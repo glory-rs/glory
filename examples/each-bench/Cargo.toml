@@ -1,0 +1,7 @@
+[package]
+name = "each-bench"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+glory-core = { path = "../../crates/core", default-features = false, features = ["web-ssr"] }

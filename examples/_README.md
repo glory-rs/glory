@@ -13,6 +13,7 @@ feature they care about.
 |---|---|---|---|
 | [`counter`](counter/) | wasm32 / CSR | `glory/web-csr` | Smallest possible app. Single `Cage<i32>`, `+1` / `-1` / clear, `input` two-way binding, `Bond` derived text. |
 | [`counters`](counters/) | wasm32 / CSR | `glory/web-csr` | List of counters demonstrating `Each` keyed reordering (add / remove / update entries). |
+| [`each-bench`](each-bench/) | native / SSR | `glory-core/web-ssr` | Standalone timing harness for `Each` reorder workloads (reverse, shuffle, head/tail insert, clear). |
 | [`todomvc`](todomvc/) | wasm32 / CSR | `glory/web-csr`, `web-sys/Storage` | Full TodoMVC clone. `Each` over `Cage<Vec<TodoItem>>`, derived counts via `Bond`, `Switch` for active/completed filter views, `localStorage` persistence. |
 | [`router-basic`](router-basic/) | wasm32 / CSR | `glory/routing`, `glory/web-csr` | Client-side routing only (no server). History API navigation, path params, nested routes. |
 | [`ssr-simple-salvo`](ssr-simple-salvo/) | server + wasm32 | `glory/salvo` (server) + `glory/web-csr` (client) | Minimum SSR + hydration. Same component compiled twice, served by Salvo and hydrated in the browser. |
