@@ -7,7 +7,7 @@
 
 ## 0. TL;DR
 
-- Glory 的响应式系统(`Cage` / `Bond` / `Lotus`)是一套**显式追踪 + 版本号 + 视图绑定**的细粒度信号模型,**思想上更接近 SolidJS / Leptos**,实际实现用 `Rc<RefCell<…>>` 包了一层,API 稳定但每个状态都伴随 3–4 个引用计数对象。
+- Glory 的响应式系统(`Cage` / `Bond` / `Lotus`)是一套**显式追踪 + 版本号 + 视图绑定**的细粒度信号模型,**思想上更接近 SolidJS / Leptos**。当前 `Cage<T>` 已是 copyable handle,内部指向 owner-invalidated 的 per-cage state;默认后端仍是单线程 `RefCell` 语义。
 - Dioxus 的状态层是**信号 + 代际盒(generational-box)**,所有 `Signal<T>` 是 `Copy` 的;真正的数据放在一块共享 arena 里,通过"代际号"做悬空检查。这让信号既能跨闭包共享又免去 `Rc::clone()`。
 - Glory 的渲染层是**直接绑定到 `web_sys::Element`**,通过 `cfg` 在 CSR / SSR 间切换 `Node` 的类型。**没有"渲染器 trait"**,因此移植到新平台等于在 `web/` 旁边再写一份完整组件库。
 - Dioxus 的渲染层把组件树 diff 成一串 `WriteMutations` 指令,每个平台只要实现这个 trait(Web / Desktop / Native / SSR / LiveView 全部共用一份 `VirtualDom` 内核)。
@@ -21,7 +21,7 @@
 
 核心位于 [crates/core/src/reflow/](crates/core/src/reflow/mod.rs)。
 
-- **`Cage<T>`**:可写状态容器。内部 `Rc<RefCell<T>>` + `Rc<Cell<usize>>`(版本号)+ `Rc<RefCell<IndexSet<ViewId>>>`(绑定的视图)。
+- **`Cage<T>`**:可写状态容器。外部是 `Copy` handle,内部状态包含 `RefCell<T>`、版本号、存活代际和绑定的 `ViewId` 集合;scope-owned cages 由 `Owner` 在 drop 时置为 stale。
 - **`Bond<T>`**:派生/计算值。记录构造时通过 `gather()` 收集到的依赖快照,读取时把依赖版本号求和与上次比,变了就重跑 mapper。
 - **`Lotus<T>`**:把 `Bare` / `Cage` / `Bond` 统一为同一个枚举,便于到处接受"任意只读响应值"。
 - **`TRACKING_STACK`**:thread-local 的 `Vec<IndexMap<RevisableId, Box<dyn Revisable>>>`。每进入一次 `gather(|| …)` 推一层,内部任何 `.get()` 都把自己 `track(item.clone_boxed())` 进当前层。
@@ -77,7 +77,7 @@ pub struct SignalData<T> {
 
 - **`Copy` 信号**:`Signal<T>` 本体只是一个"句柄"(指针 + 代际号),所以可以 `Copy`、可以直接放进闭包,**用法接近 React hooks**。
 - **`generational-box` arena**:真正的 `T` 存在 arena 里;`Owner`(通常是 `ScopeId`)负责销毁。销毁后代际号失配,之后访问就返回 borrow error,不会 UAF,也不会拖延释放。
-- **`UnsyncStorage` / `SyncStorage`**:同一份 API,选不同的存储后端。`Sync` 用 `parking_lot::Mutex` + 原子代际,适合服务端 / fullstack / 多线程渲染。
+- **存储后端**:Dioxus 保留 `UnsyncStorage` / `SyncStorage` 两套后端。Glory 本仓库曾有未接入的 storage scaffold,已在 §9 数据结构审计中删除;后续如果加 sync 后端,需要直接接入 `Cage` / `Owner` 主路径。
 - **`ReactiveContext`**:当前订阅者(通常是某个 scope 或某个 effect)。`Signal::read` 时把自己加入 `subscribers`,`Signal::write` 时遍历 `subscribers` 通知它们标脏。
 - **`Memo` / `Effect` / `use_resource`**:都通过 `ReactiveContext` + `Runtime` 调度;副作用是一等公民。
 
@@ -86,8 +86,8 @@ pub struct SignalData<T> {
 | 维度 | Glory(Cage/Bond/Lotus) | Dioxus(Signal/Memo) |
 |---|---|---|
 | 句柄 `Copy` | 否(必须 `.clone()`) | **是** |
-| 后端存储 | `Rc<RefCell<T>>` per 状态 | 全局 arena + 代际号 |
-| 线程支持 | 单线程(`Rc`) | `UnsyncStorage` / `SyncStorage` 二选一 |
+| 后端存储 | Copy handle + owner-invalidated per-cage state | 全局 arena + 代际号 |
+| 线程支持 | 默认单线程(`RefCell`) | `UnsyncStorage` / `SyncStorage` 二选一 |
 | 依赖追踪 | thread-local `TRACKING_STACK` + 版本号求和 | thread-local `ReactiveContext` + 订阅集合 |
 | 副作用原语 | 无 `Effect`、无 `Resource` | `use_effect` / `use_resource` / `use_future` 一等公民 |
 | 派生值更新策略 | 拉(读时 `version != new_version` 才重算) | 推(订阅链路通知,标脏) |
@@ -99,9 +99,9 @@ pub struct SignalData<T> {
 
 按收益从高到低:
 
-1. **引入"作用域 + 代际盒"语义**。即便不引入 dioxus 的 generational-box crate 本身,也可以用一个 `slab::Slab<Box<dyn Any>>` + `Generation: u64` 自己实现。这一步是后续所有改进的地基。
-   - 让 `Cage` 内部的 `Rc<RefCell<T>>` 替换为 `Handle<T> = (slab_key, generation)`,使 `Cage<T>: Copy`。
-   - 副产品:同一份 API 可以加 `SyncCage`(用 `RwLock` + atomic),为 SSR 多线程做铺垫。
+1. **继续收紧"作用域 + 代际句柄"语义**。`Cage<T>: Copy` 和 `Owner` invalidation 已落地,但数据仍是 per-cage leaked state。后续如果要真正回收 slot 或支持 sync 后端,必须接入主 `Cage` 存储路径,不要再保留独立未使用 scaffold。
+   - 明确 stale-handle 错误面,让 `try_get*` / `try_revise*` 覆盖所有 owner drop 场景。
+   - 若加 `SyncCage`,用 `RwLock` + atomic 直接作为可选主后端,为 SSR 多线程做铺垫。
 
 2. **添加 `Effect` / `Resource` 原语**。当前所有副作用都得塞进 `Widget::build`,既无法和 async 任务配合,也不能在视图外驱动状态(比如 WebSocket / interval)。建议在 `reflow/` 下加:
    - `effect(|| { … })`:订阅依赖、自动重跑,scope drop 时停止。
@@ -120,7 +120,7 @@ pub struct SignalData<T> {
 ### 2.1 Glory 现状
 
 - **`Widget` trait**([widget.rs](crates/core/src/widget.rs))提供 `build / attach / patch / detach / flood`。一个 `Widget` 通过 `show_in(&mut parent_scope)` 落到树里。
-- **`Scope`** 是组件本地状态 + 子视图集合,持有 `parent_node / graff_node`(挂载点)和 `Truck`(共享上下文)。
+- **`Scope`** 是组件本地状态 + 子视图集合,持有 `parent_node / render_node`(挂载点)和 `Truck`(共享上下文)。
 - **`Node`** 是渲染层抽象:
   - `cfg(target_arch = "wasm32", feature = "web-csr")` 下 `Node = web_sys::Element`(直接绑死)。
   - 其余情况(SSR)下 `Node` 是一个自定义结构(name + attrs + classes + props + children + Rc<RefCell<…>>)。

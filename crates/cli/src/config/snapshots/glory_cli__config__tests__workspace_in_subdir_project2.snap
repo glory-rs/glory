@@ -1,0 +1,83 @@
+---
+source: crates/cli/src/config/tests.rs
+assertion_line: 60
+expression: conf
+---
+Config {
+    projects: [
+        Project {
+            name: "project2",
+            lib: LibPackage {
+                name: "project2",
+                rel_dir: "project2",
+                wasm_file: SourcedSiteFile {
+                    source: "target/front/wasm32-unknown-unknown/debug/project2.wasm",
+                    dest: "target/site/pkg/project2.wasm",
+                    site: "pkg/project2.wasm",
+                },
+                js_file: SiteFile {
+                    dest: "target/site/pkg/project2.js",
+                    site: "pkg/project2.js",
+                },
+                features: [
+                    "web-csr",
+                    "web-ssr",
+                ],
+                default_features: false,
+                output_name: "project2",
+                src_paths: "project2/src",
+                profile: Debug,
+                ..
+            },
+            bin: BinPackage {
+                name: "project2",
+                rel_dir: "project2",
+                exe_file: "target/server/debug/project2",
+                target: "project2",
+                features: [
+                    "web-ssr",
+                ],
+                default_features: false,
+                src_paths: "project2/src",
+                profile: Debug,
+                ..
+            },
+            style: StyleConfig {
+                file: None,
+                browser_query: "defaults",
+                tailwind: None,
+                site_file: SiteFile {
+                    dest: "target/site/pkg/project2.css",
+                    site: "pkg/project2.css",
+                },
+            },
+            watch: true,
+            release: false,
+            hot_reload: false,
+            site: Site {
+                addr: 127.0.0.1:8000,
+                reload: 127.0.0.1:3001,
+                root_dir: "target\\site",
+                pkg_dir: "pkg",
+                file_reg: {},
+                ext_file_reg: {},
+            },
+            end2end: None,
+            assets: None,
+            target: Web,
+            ..
+        },
+    ],
+    cli: Opts {
+        release: false,
+        hot_reload: false,
+        project: None,
+        features: [],
+        lib_features: [],
+        bin_features: [],
+        verbose: 0,
+        target: Web,
+    },
+    watch: true,
+    ..
+}

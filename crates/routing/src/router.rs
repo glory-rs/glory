@@ -110,13 +110,13 @@ impl Router {
                 }
             }
         }
-        if let Some(goal) = self.goal.clone() {
-            if path_state.is_ended() {
-                return Some(DetectMatched {
-                    hoops: self.hoops.clone(),
-                    goal,
-                });
-            }
+        if let Some(goal) = self.goal.clone()
+            && path_state.is_ended()
+        {
+            return Some(DetectMatched {
+                hoops: self.hoops.clone(),
+                goal,
+            });
         }
         None
     }

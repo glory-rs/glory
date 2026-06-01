@@ -6,7 +6,7 @@ use crate::{
     logger::GRAY,
 };
 use camino::Utf8PathBuf;
-use glory_hot_reload::{HotFunctions, ViewMacros};
+use glory_hot_reload::HotReloadFunctions;
 use itertools::Itertools;
 use notify::{Config, Event, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::HashSet;
@@ -16,8 +16,7 @@ use tokio::task::JoinHandle;
 
 use super::notify::Watched;
 
-pub async fn spawn(proj: &Arc<Project>, view_macros: &ViewMacros, hot_functions: &HotFunctions) -> Result<JoinHandle<()>> {
-    let view_macros = view_macros.to_owned();
+pub async fn spawn(proj: &Arc<Project>, hot_functions: &HotReloadFunctions) -> Result<JoinHandle<()>> {
     let hot_functions = hot_functions.to_owned();
     let mut set: HashSet<Utf8PathBuf> = HashSet::from_iter(vec![]);
 
@@ -28,10 +27,10 @@ pub async fn spawn(proj: &Arc<Project>, view_macros: &ViewMacros, hot_functions:
     log::info!("Patch watching folders {}", GRAY.paint(paths.iter().join(", ")));
     let proj = proj.clone();
 
-    Ok(tokio::spawn(async move { run(&paths, proj, view_macros, hot_functions).await }))
+    Ok(tokio::spawn(async move { run(&paths, proj, hot_functions).await }))
 }
 
-async fn run(paths: &[Utf8PathBuf], proj: Arc<Project>, view_macros: ViewMacros, hot_functions: HotFunctions) {
+async fn run(paths: &[Utf8PathBuf], proj: Arc<Project>, hot_functions: HotReloadFunctions) {
     let (sync_tx, sync_rx) = std::sync::mpsc::channel::<Result<Event, notify::Error>>();
 
     let proj = proj.clone();
@@ -39,7 +38,7 @@ async fn run(paths: &[Utf8PathBuf], proj: Arc<Project>, view_macros: ViewMacros,
         while let Ok(event_result) = sync_rx.recv() {
             match event_result {
                 Ok(event) => match Watched::try_new(&event, &proj) {
-                    Ok(Some(watched)) => handle(watched, proj.clone(), view_macros.clone(), hot_functions.clone()),
+                    Ok(Some(watched)) => handle(watched, proj.clone(), hot_functions.clone()),
                     Err(e) => log::error!("Notify error {e}"),
                     _ => log::trace!("Notify not handled {}", GRAY.paint(format!("{:?}", event))),
                 },
@@ -63,7 +62,7 @@ async fn run(paths: &[Utf8PathBuf], proj: Arc<Project>, view_macros: ViewMacros,
     }
 }
 
-fn handle(watched: Watched, proj: Arc<Project>, view_macros: ViewMacros, hot_functions: HotFunctions) {
+fn handle(watched: Watched, proj: Arc<Project>, hot_functions: HotReloadFunctions) {
     log::trace!("Notify handle {}", GRAY.paint(format!("{:?}", watched.path())));
 
     let Some(path) = watched.path() else {
@@ -72,17 +71,10 @@ fn handle(watched: Watched, proj: Arc<Project>, view_macros: ViewMacros, hot_fun
     };
 
     if path.starts_with_any(&proj.lib.src_paths) && path.is_ext_any(&["rs"]) {
-        // Check if it's possible to patch
-        let patches = view_macros.patch(path);
-        if let Ok(Some(patch)) = patches {
-            log::debug!("Patching view.");
-            ReloadSignal::send_view_patches(&patch);
-        }
-
-        let replacements = hot_functions.patch(path);
-        if let Ok(Some(replacements)) = replacements {
+        let reloads = hot_functions.patch(path);
+        if let Ok(Some(reloads)) = reloads {
             log::debug!("Patching reloadable functions.");
-            ReloadSignal::send_function_replacements(&replacements);
+            ReloadSignal::send_function_reloads(&reloads);
         }
     }
 }

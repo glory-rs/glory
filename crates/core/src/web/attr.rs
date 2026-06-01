@@ -101,10 +101,12 @@ macro_rules! attr_type {
             fn inject_to(&self, _view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
                 if first_time {
                     let value = ToString::to_string(self);
-                    if name == "inner_html" || name == "inner_text" {
+                    if name == "inner_html" {
                         if node.inner_html() != value {
                             node.set_inner_html(&value);
                         }
+                    } else if name == "inner_text" {
+                        node.set_text_content(Some(&value));
                     } else if node.get_attribute(name).as_ref() != Some(&value) {
                         node.set_attribute(name, &value).unwrap_throw();
                     }

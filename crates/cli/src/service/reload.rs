@@ -66,17 +66,14 @@ async fn handle_socket(mut stream: WebSocket) {
                 res = rx.recv() =>{
                     match res {
                         Ok(ReloadType::Full) => {
-                            send_and_close(stream, BrowserMessage::all()).await;
+                            send_and_close(stream, BrowserReloadMessage::Full).await;
                             return
                         }
                         Ok(ReloadType::Style) => {
-                            send(&mut stream, BrowserMessage::css().await).await;
+                            send(&mut stream, BrowserReloadMessage::style().await).await;
                         },
-                        Ok(ReloadType::ViewPatches(data)) => {
-                            send(&mut stream, BrowserMessage::view(data)).await;
-                        }
-                        Ok(ReloadType::FunctionReplacements(data)) => {
-                            send(&mut stream, BrowserMessage::functions(data)).await;
+                        Ok(ReloadType::FunctionReloads(data)) => {
+                            send(&mut stream, BrowserReloadMessage::functions(data)).await;
                         }
                         Err(e) => log::debug!("Reload recive error {e}")
                     }
@@ -90,7 +87,7 @@ async fn handle_socket(mut stream: WebSocket) {
     });
 }
 
-async fn send(stream: &mut WebSocket, msg: BrowserMessage) {
+async fn send(stream: &mut WebSocket, msg: BrowserReloadMessage) {
     let site_addr = *SITE_ADDR.read().await;
     if !wait_for_socket("Reload", site_addr).await {
         log::warn!(r#"Reload could not send "{msg}" to websocket"#);
@@ -107,68 +104,40 @@ async fn send(stream: &mut WebSocket, msg: BrowserMessage) {
     }
 }
 
-async fn send_and_close(mut stream: WebSocket, msg: BrowserMessage) {
+async fn send_and_close(mut stream: WebSocket, msg: BrowserReloadMessage) {
     send(&mut stream, msg).await;
     let _ = stream.close().await;
     log::trace!("Reload websocket closed");
 }
 
 #[derive(Serialize)]
-struct BrowserMessage {
-    css: Option<String>,
-    view: Option<String>,
-    functions: Option<String>,
-    all: bool,
+#[serde(tag = "type", rename_all = "snake_case")]
+enum BrowserReloadMessage {
+    Full,
+    Style { css_path: String },
+    Functions { payload: String },
 }
 
-impl BrowserMessage {
-    async fn css() -> Self {
+impl BrowserReloadMessage {
+    async fn style() -> Self {
         let link = CSS_LINK.read().await.clone();
         if link.is_empty() {
             log::error!("Reload internal error: sending css reload but no css file is set.");
         }
-        Self {
-            css: Some(link),
-            view: None,
-            functions: None,
-            all: false,
-        }
-    }
-
-    fn view(data: String) -> Self {
-        Self {
-            css: None,
-            view: Some(data),
-            functions: None,
-            all: false,
-        }
+        Self::Style { css_path: link }
     }
 
     fn functions(data: String) -> Self {
-        Self {
-            css: None,
-            view: None,
-            functions: Some(data),
-            all: false,
-        }
-    }
-
-    fn all() -> Self {
-        Self {
-            css: None,
-            view: None,
-            functions: None,
-            all: true,
-        }
+        Self::Functions { payload: data }
     }
 }
 
-impl Display for BrowserMessage {
+impl Display for BrowserReloadMessage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(css) = &self.css {
-            write!(f, "reload {}", css)
-        } else {
-            write!(f, "reload all")
+        match self {
+            Self::Full => write!(f, "reload all"),
+            Self::Style { css_path } => write!(f, "reload {css_path}"),
+            Self::Functions { .. } => write!(f, "reload functions"),
         }
     }
 }

@@ -18,7 +18,7 @@
 //!                                                        ▼
 //!                                                   ┌──────────┐
 //!                                                   │  Scope   │ ──► child_views,
-//!                                                   │          │     show_list,
+//!                                                   │          │     visible_views,
 //!                                                   │          │     parent_node,
 //!                                                   │          │     truck (ctx)
 //!                                                   └──────────┘
@@ -39,7 +39,7 @@
 //!   `detach` for lifecycle hooks. Created in [`Widget::build`] by
 //!   chaining HTML element factories like `div().class("..").show_in(ctx)`.
 //! - [`Scope`] — the local context passed to every `build` / `patch`.
-//!   Holds the component's `child_views`, current `show_list`, the
+//!   Holds the component's `child_views`, current `visible_views`, the
 //!   parent DOM node, and a shared [`Truck`] for app-wide state.
 //! - [`Truck`] — typed key-value bag for app-level context (URL,
 //!   config, anything you'd put in a React context). Cloned by `Rc<RefCell<_>>`
@@ -65,7 +65,7 @@ pub mod view;
 pub mod web;
 mod widget;
 pub use scope::Scope;
-pub use view::{View, ViewFactory, ViewId, ViewMap};
+pub use view::{View, ViewFactory, ViewId};
 pub use widget::{Filler, IntoFiller, Widget};
 pub mod node;
 pub use node::{Node, NodeRef};
@@ -93,9 +93,9 @@ use indexmap::IndexMap;
 
 thread_local! {
     #[cfg(feature = "single-app")]
-    pub(crate) static ROOT_VIEWS: RefCell<ViewMap> = RefCell::default();
+    pub(crate) static ROOT_VIEWS: RefCell<view::ViewTree> = RefCell::default();
     #[cfg(not(feature = "single-app"))]
-    pub(crate) static ROOT_VIEWS: RefCell<IndexMap<HolderId, ViewMap>> = RefCell::default();
+    pub(crate) static ROOT_VIEWS: RefCell<IndexMap<HolderId, view::ViewTree>> = RefCell::default();
 }
 
 /// Returns true if running on the server (SSR).

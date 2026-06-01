@@ -35,14 +35,14 @@ pub struct OrElse<T, F> {
 impl<T, F> Filter for OrElse<T, F>
 where
     T: Filter,
-    F: Fn(&Truck, &mut PathState) -> bool + 'static,
+    F: Fn(&Url, &Truck, &mut PathState) -> bool + 'static,
 {
     #[inline]
     fn filter(&self, url: &Url, truck: &Truck, state: &mut PathState) -> bool {
         if self.filter.filter(url, truck, state) {
             true
         } else {
-            (self.callback)(truck, state)
+            (self.callback)(url, truck, state)
         }
     }
 }
@@ -83,14 +83,14 @@ pub struct AndThen<T, F> {
 impl<T, F> Filter for AndThen<T, F>
 where
     T: Filter,
-    F: Fn(&Truck, &mut PathState) -> bool + 'static,
+    F: Fn(&Url, &Truck, &mut PathState) -> bool + 'static,
 {
     #[inline]
     fn filter(&self, url: &Url, truck: &Truck, state: &mut PathState) -> bool {
         if !self.filter.filter(url, truck, state) {
             false
         } else {
-            (self.callback)(truck, state)
+            (self.callback)(url, truck, state)
         }
     }
 }

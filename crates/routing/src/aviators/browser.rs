@@ -9,7 +9,7 @@ use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 
 use crate::locator::LocatorModifier;
 use crate::url::Url;
-use crate::{Aviator, Handler, Locator, PathState, Router};
+use crate::{Aviator, Handler, Locator, NavigationError, PathState, Router};
 
 #[derive(Educe, Clone)]
 #[educe(Debug)]
@@ -32,7 +32,7 @@ impl BrowserAviator {
             curr_path: Default::default(),
         }
     }
-    pub(crate) fn locate(&self, raw_url: impl Into<String>) -> Result<(), crate::url::ParseError> {
+    pub(crate) fn locate(&self, raw_url: impl Into<String>) -> Result<(), NavigationError> {
         let raw_url = raw_url.into();
         let locator = {
             let truck = self.truck.borrow();
@@ -64,10 +64,24 @@ impl BrowserAviator {
         }
         Ok(())
     }
-    pub fn goto(&self, modifier: impl Into<LocatorModifier>) {
+    pub fn goto(&self, modifier: impl Into<LocatorModifier>) -> Result<(), NavigationError> {
         let modifier = modifier.into();
         let history = glory_core::web::window().history().unwrap_throw();
-        history.push_state_with_url(&JsValue::NULL, "", Some(&modifier.raw_url)).unwrap_throw();
+        if modifier.replace {
+            history
+                .replace_state_with_url(&JsValue::NULL, "", Some(&modifier.raw_url))
+                .unwrap_throw();
+        } else {
+            history.push_state_with_url(&JsValue::NULL, "", Some(&modifier.raw_url)).unwrap_throw();
+        }
+        let href = glory_core::web::location()
+            .href()
+            .map_err(|_| NavigationError::BrowserLocationUnavailable)?;
+        self.locate(href)?;
+        if modifier.scroll {
+            scroll_after_navigation();
+        }
+        Ok(())
     }
     pub(crate) fn handle_anchor_click(&self, event: web_sys::Event) {
         let event = event.unchecked_into::<web_sys::MouseEvent>();
@@ -139,16 +153,14 @@ impl BrowserAviator {
                 replace,
                 scroll: !a.has_attribute("noscroll"),
             };
-            self.goto(modifier);
-            self.locate(glory_core::web::location().href().expect("Location not found"))
-                .unwrap_throw();
+            self.goto(modifier).unwrap_throw();
         }
     }
 }
 
 impl Aviator for BrowserAviator {
-    fn goto(&self, url: &str) {
-        BrowserAviator::goto(self, url);
+    fn goto(&self, url: &str) -> Result<(), NavigationError> {
+        BrowserAviator::goto(self, url)
     }
 }
 
@@ -171,4 +183,19 @@ impl Enabler for BrowserAviator {
             this.handle_anchor_click(event);
         });
     }
+}
+
+fn scroll_after_navigation() {
+    let location = glory_core::web::location();
+    if let Ok(hash) = location.hash() {
+        if let Some(id) = hash.strip_prefix('#') {
+            if !id.is_empty() {
+                if let Some(element) = glory_core::web::document().get_element_by_id(id) {
+                    element.scroll_into_view();
+                    return;
+                }
+            }
+        }
+    }
+    glory_core::web::window().scroll_to_with_x_and_y(0.0, 0.0);
 }

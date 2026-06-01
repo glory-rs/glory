@@ -1,0 +1,11 @@
+[package]
+name = "server-package"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = []
+
+[[bin]]
+name = "server-package"
+path = "src/main.rs"

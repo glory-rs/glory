@@ -9,7 +9,7 @@ use once_cell::unsync::Lazy;
 
 use crate::regex::Regex;
 use crate::url::Url;
-use crate::{Filter, PathState};
+use crate::{Filter, PathCursor, PathState};
 
 /// PathWisp
 pub trait PathWisp: fmt::Debug + 'static {
@@ -217,7 +217,7 @@ impl WispBuilder for CharsWispBuilder {
     }
 }
 
-/// Chars wisp match chars in url segement.
+/// Chars wisp match chars in a URL segment.
 pub struct CharsWisp {
     name: String,
     checker: Rc<dyn Fn(char) -> bool + 'static>,
@@ -293,37 +293,38 @@ impl CombWisp {
 impl PathWisp for CombWisp {
     #[inline]
     fn detect<'a>(&self, url: &Url, state: &mut PathState) -> bool {
-        let mut offline = if let Some(part) = state.parts.get_mut(state.cursor.0) {
+        let mut offline = if let Some(part) = state.segments.get_mut(state.cursor.segment) {
             part.clone()
         } else {
             return false;
         };
         let mut ostate = state.clone();
-        ostate.parts.get_mut(state.cursor.0).unwrap().clear();
+        ostate.segments.get_mut(state.cursor.segment).unwrap().clear();
         let inner_detect = move |state: &mut PathState| {
-            let row = state.cursor.0;
+            let segment = state.cursor.segment;
             for (index, wisp) in self.0.iter().enumerate() {
-                let online_all_matched = if let Some(part) = state.parts.get(state.cursor.0) {
-                    state.cursor.0 > row || state.cursor.1 >= part.len()
+                let online_all_matched = if let Some(part) = state.segments.get(state.cursor.segment) {
+                    state.cursor.segment > segment || state.cursor.offset >= part.len()
                 } else {
                     true
                 };
-                // Child wisp may changed the state.cursor.0 point to next row if all matched.
-                // The last wisp can change it if it is rest named wisp.
-                if state.cursor.0 > row {
-                    state.cursor = (row, 0);
-                    *(state.parts.get_mut(state.cursor.0).unwrap()) = "".into();
+                // A child wisp may advance into the next segment once it
+                // matches everything in the current one. Combined wisps
+                // always continue matching inside the original segment.
+                if state.cursor.segment > segment {
+                    state.cursor = PathCursor { segment, offset: 0 };
+                    *(state.segments.get_mut(state.cursor.segment).unwrap()) = "".into();
                 }
                 if online_all_matched {
-                    state.cursor.1 = 0;
+                    state.cursor.offset = 0;
                     if let Some((next_const_index, next_const_wisp)) = self.find_const_wisp_from(index) {
                         if next_const_index == self.0.len() - 1 {
                             if offline.ends_with(&next_const_wisp.0) {
                                 if index == next_const_index {
-                                    *(state.parts.get_mut(state.cursor.0).unwrap()) = offline;
+                                    *(state.segments.get_mut(state.cursor.segment).unwrap()) = offline;
                                     offline = "".into();
                                 } else {
-                                    *(state.parts.get_mut(state.cursor.0).unwrap()) = offline.trim_end_matches(&next_const_wisp.0).into();
+                                    *(state.segments.get_mut(state.cursor.segment).unwrap()) = offline.trim_end_matches(&next_const_wisp.0).into();
                                     offline = next_const_wisp.0.clone();
                                 }
                             } else {
@@ -331,17 +332,17 @@ impl PathWisp for CombWisp {
                             }
                         } else if let Some((new_online, new_offline)) = offline.split_once(&next_const_wisp.0) {
                             if next_const_index == index {
-                                *(state.parts.get_mut(state.cursor.0).unwrap()) = next_const_wisp.0.clone();
+                                *(state.segments.get_mut(state.cursor.segment).unwrap()) = next_const_wisp.0.clone();
                                 offline = new_offline.into();
                             } else {
-                                *(state.parts.get_mut(state.cursor.0).unwrap()) = new_online.into();
+                                *(state.segments.get_mut(state.cursor.segment).unwrap()) = new_online.into();
                                 offline = format!("{}{}", next_const_wisp.0, new_offline);
                             }
                         } else {
                             return false;
                         }
                     } else if !offline.is_empty() {
-                        *(state.parts.get_mut(state.cursor.0).unwrap()) = offline;
+                        *(state.segments.get_mut(state.cursor.segment).unwrap()) = offline;
                         offline = "".into();
                     }
                 }
@@ -386,7 +387,7 @@ impl PathWisp for NamedWisp {
             if !rest.is_empty() || !self.0.starts_with("*+") {
                 let rest = rest.to_string();
                 state.params.insert(self.0.clone(), rest);
-                state.cursor.0 = state.parts.len();
+                state.cursor.segment = state.segments.len();
                 true
             } else {
                 false
@@ -491,10 +492,10 @@ struct PathParser {
 }
 impl PathParser {
     #[inline]
-    fn new(raw_value: &str) -> PathParser {
+    fn new(pattern: &str) -> PathParser {
         PathParser {
             offset: 0,
-            path: raw_value.trim_start_matches('/').chars().collect(),
+            path: pattern.trim_start_matches('/').chars().collect(),
         }
     }
     #[inline]
@@ -538,7 +539,7 @@ impl PathParser {
     #[inline]
     fn scan_ident(&mut self) -> Result<String, String> {
         let mut ident = "".to_owned();
-        let mut ch = self.curr().ok_or_else(|| "current postion is out of index when scan ident".to_owned())?;
+        let mut ch = self.curr().ok_or_else(|| "current position is out of index when scan ident".to_owned())?;
         while !['/', ':', '<', '>', '[', ']', '(', ')'].contains(&ch) {
             ident.push(ch);
             if let Some(c) = self.next(false) {
@@ -556,7 +557,7 @@ impl PathParser {
     #[inline]
     fn scan_regex(&mut self) -> Result<String, String> {
         let mut regex = "".to_owned();
-        let mut ch = self.curr().ok_or_else(|| "current postion is out of index when scan regex".to_owned())?;
+        let mut ch = self.curr().ok_or_else(|| "current position is out of index when scan regex".to_owned())?;
         loop {
             regex.push(ch);
             if let Some(c) = self.next(false) {
@@ -583,7 +584,7 @@ impl PathParser {
     #[inline]
     fn scan_const(&mut self) -> Result<String, String> {
         let mut cnst = "".to_owned();
-        let mut ch = self.curr().ok_or_else(|| "current postion is out of index when scan const".to_owned())?;
+        let mut ch = self.curr().ok_or_else(|| "current position is out of index when scan const".to_owned())?;
         while !['/', ':', '<', '>', '[', ']', '(', ')'].contains(&ch) {
             cnst.push(ch);
             if let Some(c) = self.next(false) {
@@ -624,7 +625,7 @@ impl PathParser {
         }
     }
     fn scan_wisps(&mut self) -> Result<Vec<WispKind>, String> {
-        let mut ch = self.curr().ok_or_else(|| "current postion is out of index when scan part".to_owned())?;
+        let mut ch = self.curr().ok_or_else(|| "current position is out of index when scan part".to_owned())?;
         let mut wisps: Vec<WispKind> = vec![];
         while ch != '/' {
             if ch == '<' {
@@ -734,11 +735,11 @@ impl PathParser {
             if self.curr().map(|c| c == '/').unwrap_or(false) {
                 return Err(format!("'/' is not allowed after '/' at offset `{}`", self.offset));
             }
-            let mut scaned = self.scan_wisps()?;
-            if scaned.len() > 1 {
-                wisps.push(CombWisp(scaned).into());
-            } else if !scaned.is_empty() {
-                wisps.push(scaned.pop().unwrap());
+            let mut scanned = self.scan_wisps()?;
+            if scanned.len() > 1 {
+                wisps.push(CombWisp(scanned).into());
+            } else if !scanned.is_empty() {
+                wisps.push(scanned.pop().unwrap());
             } else {
                 return Err("scan parts is empty".to_owned());
             }
@@ -802,28 +803,28 @@ impl PathParser {
                 wild_names.join(", "),
                 self.path.iter().collect::<String>()
             ));
-        } else if let Some(wild_name) = wild_names.first() {
-            if wild_name != all_names.last().unwrap() {
-                return Err(format!(
-                    "wildcard name: `{}` should be the last one in url: `{}`",
-                    wild_name,
-                    self.path.iter().collect::<String>()
-                ));
-            }
+        } else if let Some(wild_name) = wild_names.first()
+            && wild_name != all_names.last().unwrap()
+        {
+            return Err(format!(
+                "wildcard name: `{}` should be the last one in url: `{}`",
+                wild_name,
+                self.path.iter().collect::<String>()
+            ));
         }
         Ok(())
     }
 }
 
-/// Filter request by it's path information.
+/// Filter request by its path information.
 pub struct PathFilter {
-    raw_value: String,
-    path_wisps: Vec<WispKind>,
+    pattern: String,
+    wisps: Vec<WispKind>,
 }
 
 impl fmt::Debug for PathFilter {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "path:{}", &self.raw_value)
+        write!(f, "path:{}", &self.pattern)
     }
 }
 impl Filter for PathFilter {
@@ -836,20 +837,20 @@ impl PathFilter {
     /// Create new `PathFilter`.
     #[inline]
     pub fn new(value: impl Into<String>) -> Self {
-        let raw_value = value.into();
-        if raw_value.is_empty() {
+        let pattern = value.into();
+        if pattern.is_empty() {
             tracing::warn!("you should not add empty string as path filter");
-        } else if raw_value == "/" {
+        } else if pattern == "/" {
             tracing::warn!("you should not add '/' as path filter");
         }
-        let mut parser = PathParser::new(&raw_value);
-        let path_wisps = match parser.parse() {
-            Ok(path_wisps) => path_wisps,
+        let mut parser = PathParser::new(&pattern);
+        let wisps = match parser.parse() {
+            Ok(wisps) => wisps,
             Err(e) => {
-                panic!("{}, raw_value: {}", e, raw_value);
+                panic!("{}, pattern: {}", e, pattern);
             }
         };
-        PathFilter { raw_value, path_wisps }
+        PathFilter { pattern, wisps }
     }
     /// Register new path wisp builder.
     #[inline]
@@ -871,10 +872,10 @@ impl PathFilter {
     /// Detect is that path is match.
     pub fn detect(&self, url: &Url, state: &mut PathState) -> bool {
         let original_cursor = state.cursor;
-        for ps in &self.path_wisps {
-            let row = state.cursor.0;
+        for ps in &self.wisps {
+            let segment = state.cursor.segment;
             if ps.detect(url, state) {
-                if row == state.cursor.0 && row != state.parts.len() {
+                if segment == state.cursor.segment && segment != state.segments.len() {
                     state.cursor = original_cursor;
                     return false;
                 }
@@ -890,7 +891,12 @@ impl PathFilter {
 #[cfg(test)]
 mod tests {
     use super::PathParser;
-    use crate::routing::{PathFilter, PathState};
+    use crate::url::Url;
+    use crate::{PathFilter, PathState};
+
+    fn test_url() -> Url {
+        Url::parse("http://localhost/").unwrap()
+    }
 
     #[test]
     fn test_parse_empty() {
@@ -1069,21 +1075,21 @@ mod tests {
     fn test_parse_comb_1() {
         let filter = PathFilter::new("/first<id>world<**rest>");
         let mut state = PathState::new("first123world.ext");
-        assert!(filter.detect(&mut state));
+        assert!(filter.detect(&test_url(), &mut state));
     }
 
     #[test]
     fn test_parse_comb_2() {
         let filter = PathFilter::new("/abc/hello<id>world<**rest>");
         let mut state = PathState::new("abc/hello123world.ext");
-        assert!(filter.detect(&mut state));
+        assert!(filter.detect(&test_url(), &mut state));
     }
 
     #[test]
     fn test_parse_comb_3() {
         let filter = PathFilter::new("/<id>/<name>!hello.bu");
         let mut state = PathState::new("123/gold!hello.bu");
-        assert!(filter.detect(&mut state));
+        assert!(filter.detect(&test_url(), &mut state));
     }
 
     #[test]
@@ -1109,82 +1115,82 @@ mod tests {
     fn test_detect_consts() {
         let filter = PathFilter::new("/hello/world");
         let mut state = PathState::new("hello/world");
-        assert!(filter.detect(&mut state));
+        assert!(filter.detect(&test_url(), &mut state));
     }
     #[test]
     fn test_detect_consts0() {
         let filter = PathFilter::new("/hello/world/");
         let mut state = PathState::new("hello/world");
-        assert!(filter.detect(&mut state));
+        assert!(filter.detect(&test_url(), &mut state));
     }
     #[test]
     fn test_detect_consts1() {
         let filter = PathFilter::new("/hello/world");
         let mut state = PathState::new("hello/world/");
-        assert!(filter.detect(&mut state));
+        assert!(filter.detect(&test_url(), &mut state));
     }
     #[test]
     fn test_detect_consts2() {
         let filter = PathFilter::new("/hello/world2");
         let mut state = PathState::new("hello/world");
-        assert!(!filter.detect(&mut state));
+        assert!(!filter.detect(&test_url(), &mut state));
     }
 
     #[test]
     fn test_detect_const_and_named() {
         let filter = PathFilter::new("/hello/world<id>");
         let mut state = PathState::new("hello/worldabc");
-        filter.detect(&mut state);
+        filter.detect(&test_url(), &mut state);
     }
 
     #[test]
     fn test_detect_many() {
         let filter = PathFilter::new("/users/<id>/emails");
         let mut state = PathState::new("/users/29/emails");
-        assert!(filter.detect(&mut state));
+        assert!(filter.detect(&test_url(), &mut state));
     }
     #[test]
     fn test_detect_many_slashes() {
         let filter = PathFilter::new("/users/<id>/emails");
         let mut state = PathState::new("/users///29//emails");
-        assert!(filter.detect(&mut state));
+        assert!(filter.detect(&test_url(), &mut state));
     }
     #[test]
     fn test_detect_named_regex() {
         PathFilter::register_wisp_regex("guid", regex::Regex::new("[0-9a-fA-F]{8}-([0-9a-fA-F]{4}-){3}[0-9a-fA-F]{12}").unwrap());
         let filter = PathFilter::new("/users/<id:guid>");
         let mut state = PathState::new("/users/123e4567-h89b-12d3-a456-9AC7CBDCEE52");
-        assert!(!filter.detect(&mut state));
+        assert!(!filter.detect(&test_url(), &mut state));
 
         let mut state = PathState::new("/users/123e4567-e89b-12d3-a456-9AC7CBDCEE52");
-        assert!(filter.detect(&mut state));
+        assert!(filter.detect(&test_url(), &mut state));
     }
     #[test]
     fn test_detect_wildcard() {
         let filter = PathFilter::new("/users/<id>/<**rest>");
         let mut state = PathState::new("/users/12/facebook/insights/23");
-        assert!(filter.detect(&mut state));
+        assert!(filter.detect(&test_url(), &mut state));
         let mut state = PathState::new("/users/12/");
-        assert!(filter.detect(&mut state));
+        assert!(filter.detect(&test_url(), &mut state));
         let mut state = PathState::new("/users/12");
-        assert!(filter.detect(&mut state));
+        assert!(filter.detect(&test_url(), &mut state));
 
         let filter = PathFilter::new("/users/<id>/<*+rest>");
         let mut state = PathState::new("/users/12/facebook/insights/23");
-        assert!(filter.detect(&mut state));
+        assert!(filter.detect(&test_url(), &mut state));
         let mut state = PathState::new("/users/12/");
-        assert!(!filter.detect(&mut state));
+        assert!(!filter.detect(&test_url(), &mut state));
         let mut state = PathState::new("/users/12");
-        assert!(!filter.detect(&mut state));
+        assert!(!filter.detect(&test_url(), &mut state));
 
         let filter = PathFilter::new("/users/<id>/<*?rest>");
         let mut state = PathState::new("/users/12/facebook/insights/23");
-        assert!(!filter.detect(&mut state));
+        assert!(!filter.detect(&test_url(), &mut state));
         let mut state = PathState::new("/users/12/");
-        assert!(filter.detect(&mut state));
+        assert!(filter.detect(&test_url(), &mut state));
         let mut state = PathState::new("/users/12");
-        assert!(filter.detect(&mut state));
+        assert!(filter.detect(&test_url(), &mut state));
         let mut state = PathState::new("/users/12/abc");
-        assert!(filter.detect(&mut state));
+        assert!(filter.detect(&test_url(), &mut state));
     }
 }

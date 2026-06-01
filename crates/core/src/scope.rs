@@ -7,7 +7,7 @@ use indexmap::{IndexMap, IndexSet};
 #[cfg(not(feature = "single-app"))]
 use crate::HolderId;
 use crate::node::Node;
-use crate::view::{VIEW_ID_DELIMITER, View, ViewId, ViewPosition};
+use crate::view::{VIEW_ID_DELIMITER, View, ViewId, ViewPlacement};
 use crate::{Truck, reflow};
 
 /// Per-view runtime state.
@@ -19,18 +19,18 @@ use crate::{Truck, reflow};
 /// - **`child_views`** — `IndexMap<ViewId, View>` whose iteration
 ///   order mirrors sibling rendering order in the DOM. Never use
 ///   `.remove`; always `shift_remove` to preserve order.
-/// - **`show_list`** — visible children (`IndexSet<ViewId>`). A
+/// - **`visible_views`** — visible children (`IndexSet<ViewId>`). A
 ///   stored-but-not-shown child does not appear in the DOM.
-/// - **`parent_node` / `graff_node`** — where this widget's nodes
+/// - **`parent_node` / `render_node`** — where this widget's nodes
 ///   live in the DOM tree. `parent_node` is the enclosing element,
-///   `graff_node` is the element under which this widget renders
+///   `render_node` is the element under which this widget renders
 ///   (usually the same; differs for fragment-like widgets that don't
 ///   create their own DOM node).
 /// - **`first_child_node` / `last_child_node`** — anchors used by
 ///   sibling positioning logic in [`attach_child`][Scope::attach_child].
 ///   Element widgets set both to their own node in `build`.
-/// - **`position`** — the [`ViewPosition`] this view is about to be
-///   placed at (`Tail`, `Head`, `Prev(node)`, `Next(node)`). Set by
+/// - **`placement`** — the [`ViewPlacement`] this view is about to be
+///   placed at (`Tail`, `Head`, `Before(node)`, `After(node)`). Set by
 ///   the parent during `attach_child`, reset to `Unset` at the end
 ///   so subsequent re-attaches go through fresh neighbour search.
 /// - **`truck`** — shared `Rc<RefCell<Truck>>` for app-wide context.
@@ -49,11 +49,11 @@ pub struct Scope {
     pub(crate) is_built: bool,
     pub(crate) is_attached: bool,
     pub(crate) child_views: IndexMap<ViewId, View>,
-    pub(crate) show_list: IndexSet<ViewId>,
-    pub(crate) position: ViewPosition,
+    pub(crate) visible_views: IndexSet<ViewId>,
+    pub(crate) placement: ViewPlacement,
 
     pub(crate) parent_node: Option<Node>,
-    pub(crate) graff_node: Option<Node>,
+    pub(crate) render_node: Option<Node>,
     pub(crate) first_child_node: Option<Node>,
     pub(crate) last_child_node: Option<Node>,
 
@@ -72,11 +72,11 @@ impl Scope {
             is_built: false,
             is_attached: false,
             child_views: IndexMap::new(),
-            show_list: IndexSet::new(),
-            position: ViewPosition::Tail,
+            visible_views: IndexSet::new(),
+            placement: ViewPlacement::Tail,
 
             parent_node: None,
-            graff_node: None,
+            render_node: None,
             first_child_node: None,
             last_child_node: None,
 
@@ -94,11 +94,11 @@ impl Scope {
             is_built: false,
             is_attached: false,
             child_views: IndexMap::new(),
-            show_list: IndexSet::new(),
-            position: ViewPosition::Tail,
+            visible_views: IndexSet::new(),
+            placement: ViewPlacement::Tail,
 
             parent_node: None,
-            graff_node: None,
+            render_node: None,
             first_child_node: None,
             last_child_node: None,
 
@@ -150,8 +150,8 @@ impl Scope {
         self.owner.cage(value)
     }
 
-    pub fn graff(&self) -> Option<&Node> {
-        self.graff_node.as_ref()
+    pub fn render_node(&self) -> Option<&Node> {
+        self.render_node.as_ref()
     }
 
     pub fn truck(&self) -> Ref<'_, Truck> {
@@ -160,13 +160,6 @@ impl Scope {
     pub fn truck_mut(&self) -> RefMut<'_, Truck> {
         self.truck.borrow_mut()
     }
-
-    // pub fn spawn_local<F>(&mut self, fut: F)
-    // where
-    //     F: Future<Output = ()> + 'static,
-    // {
-    //     crate::reflow::spawn_task(task);
-    // }
 
     pub fn child_views(&self) -> &IndexMap<ViewId, View> {
         &self.child_views
@@ -193,65 +186,61 @@ impl Scope {
     {
         crate::reflow::resource_in(self, future_fn)
     }
-    // pub fn child_views_mut(&mut self) -> &mut IndexMap<ViewId, View> {
-    //     &mut self.child_views
-    // }
-
     pub fn attach_child(&mut self, view_id: &ViewId) {
         let Some(view) = self.child_views.get(view_id) else {
-            crate::warn!("attched child view not found in current scope: {}", view_id);
+            crate::warn!("attached child view not found in current scope: {}", view_id);
             return;
         };
-        self.show_list.insert(view_id.clone());
+        self.visible_views.insert(view_id.clone());
         if view.is_attached() {
             return;
         }
 
-        let mut position = ViewPosition::Unset;
-        if view.scope.position == ViewPosition::Unset {
+        let mut placement = ViewPlacement::Unset;
+        if view.scope.placement == ViewPlacement::Unset {
             let index = self.child_views.get_index_of(view_id).unwrap();
             if index > 0 {
                 for i in (0..index).rev() {
                     let (_, prev_view) = self.child_views.get_index(i).unwrap();
-                    if prev_view.scope.is_attached() {
-                        if let Some(prev_node) = prev_view.last_child_node() {
-                            position = ViewPosition::Prev(prev_node.clone());
-                            break;
-                        }
+                    if prev_view.scope.is_attached()
+                        && let Some(prev_node) = prev_view.last_child_node()
+                    {
+                        placement = ViewPlacement::After(prev_node.clone());
+                        break;
                     }
                 }
             }
-            if position == ViewPosition::Unset {
+            if placement == ViewPlacement::Unset {
                 for i in (index + 1)..self.child_views.len() {
                     let (_, next_view) = self.child_views.get_index(i).unwrap();
-                    if next_view.scope.is_attached() {
-                        if let Some(next_node) = next_view.last_child_node() {
-                            position = ViewPosition::Next(next_node.clone());
-                            break;
-                        }
+                    if next_view.scope.is_attached()
+                        && let Some(next_node) = next_view.last_child_node()
+                    {
+                        placement = ViewPlacement::Before(next_node.clone());
+                        break;
                     }
                 }
             }
         }
-        if position == ViewPosition::Unset {
+        if placement == ViewPlacement::Unset {
             if self.parent_node == view.scope.parent_node {
-                position = self.position.clone();
+                placement = self.placement.clone();
             } else {
-                position = ViewPosition::Tail;
+                placement = ViewPlacement::Tail;
             }
         }
 
         let view = self.child_views.get_mut(view_id).unwrap();
-        if position != ViewPosition::Unset {
-            view.scope.position = position;
+        if placement != ViewPlacement::Unset {
+            view.scope.placement = placement;
         }
 
-        view.scope.parent_node = self.graff_node.clone();
+        view.scope.parent_node = self.render_node.clone();
         debug_assert!(view.scope.parent_node.is_some(), "view.scope.parent_node should not None");
-        if view.scope.graff_node.is_none() {
-            view.scope.graff_node = self.graff_node.clone();
+        if view.scope.render_node.is_none() {
+            view.scope.render_node = self.render_node.clone();
         }
-        debug_assert!(view.scope.graff_node.is_some(), "view.scope.parent_node should not None");
+        debug_assert!(view.scope.render_node.is_some(), "view.scope.render_node should not None");
 
         cfg_if! {
             if #[cfg(feature = "single-app")] {
@@ -264,15 +253,13 @@ impl Scope {
                 });
             }
         }
-        view.scope.position = ViewPosition::Unset;
+        view.scope.placement = ViewPlacement::Unset;
     }
 
     pub fn detach_child(&mut self, view_id: &ViewId) -> Option<View> {
-        self.show_list.shift_remove(view_id);
+        self.visible_views.shift_remove(view_id);
 
-        let Some(view) = self.child_views.get_mut(view_id) else {
-            return None;
-        };
+        let view = self.child_views.get_mut(view_id)?;
         if !view.scope.is_attached() {
             return None;
         }
@@ -281,9 +268,7 @@ impl Scope {
         // widgets like `Each` depend on. The deprecated `remove` aliases
         // to `swap_remove`, which would relocate the last view into the
         // gap and silently corrupt sibling order.
-        let Some(mut view) = self.child_views.shift_remove(view_id) else {
-            return None;
-        };
+        let mut view = self.child_views.shift_remove(view_id)?;
 
         cfg_if! {
             if #[cfg(feature = "single-app")] {
@@ -312,42 +297,6 @@ impl Scope {
         }
         nodes
     }
-    // #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
-    // pub fn nodes(&self) -> Vec<Node> {
-    //     if let (Some(first_node), Some(last_node)) = (&self.first_node, &self.last_node) {
-    //         return crate::web::nodes_between(first_node, last_node);
-    //     }
-    //     let mut nodes = vec![];
-    //     for view in self.child_views.values() {
-    //         if let (Some(first_node), Some(last_node)) = (&view.scope.first_node, &view.scope.last_node) {
-    //             nodes.extend(crate::web::nodes_between(first_node, last_node));
-    //         }
-    //     }
-    //     nodes
-    // }
-
-    // pub fn wreck_child(&mut self, view_id: &ViewId) -> Option<View> {
-    //     let mut view_ids = vec![];
-    //     let mut views: Vec<&mut View> = self.scope.child_views.values_mut().collect();
-    //     for view in views.iter_mut() {
-    //         view.detach();
-    //     }
-    //     let mut views: Vec<&View> = self.scope.child_views.values().collect();
-    //     while !views.is_empty() {
-    //         let view = views.pop().unwrap();
-    //         view_ids.push(view.id);
-    //         for child_view in view.scope.child_views.values() {
-    //             views.push(child_view);
-    //         }
-    //     }
-
-    //     if let Some(mut child) = self.child_views.remove(view_id) {
-    //         child.wreck();
-    //         Some(child)
-    //     } else {
-    //         None
-    //     }
-    // }
 }
 
 #[cfg(test)]

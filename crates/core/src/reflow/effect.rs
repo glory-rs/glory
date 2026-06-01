@@ -140,11 +140,11 @@ where
     Fut: std::future::Future<Output = T> + 'static,
 {
     let cell = super::Cage::new(None::<T>);
-    let cell_for_effect = cell.clone();
+    let cell_for_effect = cell;
     let future_fn = Rc::new(future_fn);
     effect_in(parent, move || {
         let future = (future_fn)();
-        let cell = cell_for_effect.clone();
+        let cell = cell_for_effect;
         crate::spawn::spawn_local(async move {
             let val = future.await;
             cell.revise(|mut v| *v = Some(val));

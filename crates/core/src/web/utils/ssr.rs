@@ -1,4 +1,4 @@
-use crate::config::{GloryConfig, ReloadWSProtocol};
+use crate::config::{GloryConfig, ReloadWebSocketProtocol};
 use crate::web::widgets::{DEPOT_BODY_META_KEY, DEPOT_HEAD_MIXIN_KEY, DEPOT_HTML_META_KEY};
 use crate::{Node, Truck};
 
@@ -7,9 +7,9 @@ fn auto_reload(nonce_str: &str, options: &GloryConfig) -> String {
         Some(val) => val,
         None => options.reload_port,
     };
-    let protocol = match options.reload_ws_protocol {
-        ReloadWSProtocol::WS => "'ws://'",
-        ReloadWSProtocol::WSS => "'wss://'",
+    let protocol = match options.reload_protocol {
+        ReloadWebSocketProtocol::Ws => "'ws://'",
+        ReloadWebSocketProtocol::Wss => "'wss://'",
     };
     if std::env::var("GLORY_WATCH").is_ok() {
         format!(
@@ -19,23 +19,20 @@ fn auto_reload(nonce_str: &str, options: &GloryConfig) -> String {
     let ws = new WebSocket({protocol} + host + ':{reload_port}/live_reload');
     ws.onmessage = (ev) => {{
         let msg = JSON.parse(ev.data);
-        if (msg.all) window.location.reload();
-        if (msg.css) {{
+        if (msg.type === 'full') window.location.reload();
+        if (msg.type === 'style') {{
             let found = false;
             document.querySelectorAll("link").forEach((link) => {{
-                if (link.getAttribute('href').includes(msg.css)) {{
-                    let newHref = '/' + msg.css + '?version=' + new Date().getMilliseconds();
+                if (link.getAttribute('href').includes(msg.css_path)) {{
+                    let newHref = '/' + msg.css_path + '?version=' + new Date().getMilliseconds();
                     link.setAttribute('href', newHref);
                     found = true;
                 }}
             }});
-            if (!found) console.warn(`CSS hot-reload: Could not find a <link href=/\"${{msg.css}}\"> element`);
+            if (!found) console.warn(`CSS hot-reload: Could not find a <link href=/\"${{msg.css_path}}\"> element`);
         }};
-        if(msg.view) {{
-            patch(msg.view);
-        }}
-        if(msg.functions) {{
-            window.dispatchEvent(new CustomEvent('glory:function-reload', {{ detail: JSON.parse(msg.functions) }}));
+        if(msg.type === 'functions') {{
+            window.dispatchEvent(new CustomEvent('glory:function-reload', {{ detail: JSON.parse(msg.payload) }}));
         }}
     }};
     ws.onclose = () => console.warn('Live-reload stopped. Manual reload necessary.');
@@ -46,6 +43,22 @@ fn auto_reload(nonce_str: &str, options: &GloryConfig) -> String {
     } else {
         "".into()
     }
+}
+
+fn nonce_attr(config: &GloryConfig) -> String {
+    config
+        .csp_nonce
+        .as_deref()
+        .map(|nonce| format!(r#" nonce="{}""#, escape_html_attr(nonce)))
+        .unwrap_or_default()
+}
+
+fn escape_html_attr(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 const STREAM_HYDRATE_JS: &str = r#"(function () {
@@ -102,15 +115,14 @@ pub fn html_parts_separated(config: &GloryConfig, truck: &Truck) -> (String, Str
     let pkg_path = &config.site_pkg_dir;
     let output_name = &config.output_name;
 
-    // Because wasm-pack adds _bg to the end of the WASM filename, and we want to maintain compatibility with it's default options
-    // we add _bg to the wasm files if glory-cli doesn't set the env var GLORY_OUTPUT_NAME at compile time
-    // Otherwise we need to add _bg because wasm_pack always does.
+    // wasm-bindgen emits the wasm artifact with an `_bg` suffix when the
+    // CLI has not pinned GLORY_OUTPUT_NAME at compile time.
     let mut wasm_output_name = output_name.clone();
     if std::option_env!("GLORY_OUTPUT_NAME").is_none() {
         wasm_output_name.push_str("_bg");
     }
 
-    let nonce = "";
+    let nonce = nonce_attr(config);
     let glory_auto_reload = auto_reload(&nonce, config);
 
     let html_open = if let Ok(node) = truck.get::<Node>(DEPOT_HTML_META_KEY) {
@@ -140,7 +152,7 @@ pub fn html_parts_separated(config: &GloryConfig, truck: &Truck) -> (String, Str
         {head_mixin}
         <link rel="modulepreload" href="/{pkg_path}/{output_name}.js"{nonce}>
         <link rel="preload" href="/{pkg_path}/{wasm_output_name}.wasm" as="fetch" type="application/wasm" crossorigin=""{nonce}>
-        <script>{STREAM_HYDRATE_JS}</script>
+        <script{nonce}>{STREAM_HYDRATE_JS}</script>
         <script type="module"{nonce}>
         function idle(c) {{
             if ("requestIdleCallback" in window) {{window.requestIdleCallback(c);}} else {{c();}}
@@ -168,5 +180,17 @@ mod tests {
         assert!(head.contains("window.__gloryStreamHydrate"));
         assert!(head.contains("patchFromTemplate"));
         assert!(head.contains("template[data-glory-placeholder-patch]"));
+    }
+
+    #[test]
+    fn ssr_head_applies_escaped_csp_nonce() {
+        let config = GloryConfig {
+            csp_nonce: Some(r#""<&>""#.to_string()),
+            ..GloryConfig::default()
+        };
+        let truck = Truck::new();
+        let (head, _, _) = html_parts_separated(&config, &truck);
+
+        assert!(head.contains(r#"nonce="&quot;&lt;&amp;&gt;&quot;""#));
     }
 }

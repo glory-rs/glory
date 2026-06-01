@@ -8,7 +8,7 @@ use crate::{
     signal::{Interrupt, Outcome, Product, ProductSet, ReloadSignal, ServerRestart},
 };
 use anyhow::Result;
-use glory_hot_reload::{HotFunctions, ViewMacros};
+use glory_hot_reload::HotReloadFunctions;
 use tokio::try_join;
 
 use super::build::build_proj;
@@ -23,13 +23,10 @@ pub async fn watch(proj: &Arc<Project>) -> Result<()> {
     }
 
     let hot_reload_sources = if proj.hot_reload {
-        // build initial set of view macros for patching
         if proj.builds_front() {
-            let view_macros = ViewMacros::new();
-            view_macros.update_from_paths(&proj.lib.src_paths)?;
-            let hot_functions = HotFunctions::new();
+            let hot_functions = HotReloadFunctions::new();
             hot_functions.update_from_paths(&proj.lib.src_paths)?;
-            Some((view_macros, hot_functions))
+            Some(hot_functions)
         } else {
             None
         }
@@ -38,8 +35,8 @@ pub async fn watch(proj: &Arc<Project>) -> Result<()> {
     };
 
     let _watch = service::notify::spawn(proj).await?;
-    if let Some((view_macros, hot_functions)) = hot_reload_sources {
-        let _patch = service::patch::spawn(proj, &view_macros, &hot_functions).await?;
+    if let Some(hot_functions) = hot_reload_sources {
+        let _patch = service::patch::spawn(proj, &hot_functions).await?;
     }
 
     service::serve::spawn(proj).await;
@@ -112,8 +109,8 @@ pub async fn run_loop(proj: &Arc<Project>) -> Result<()> {
 
         let outcomes = vec![serve, front, assets];
 
-        let failed = outcomes.iter().any(|outcome| *outcome == Outcome::Failed);
-        let interrupted = outcomes.iter().any(|outcome| *outcome == Outcome::Stopped);
+        let failed = outcomes.contains(&Outcome::Failed);
+        let interrupted = outcomes.contains(&Outcome::Stopped);
 
         if failed {
             log::warn!("Build failed");

@@ -1,6 +1,8 @@
 use super::Config;
 
 fn opts(project: Option<&str>) -> crate::config::Opts {
+    use crate::config::BuildTarget;
+
     crate::config::Opts {
         release: false,
         hot_reload: false,
@@ -9,6 +11,7 @@ fn opts(project: Option<&str>) -> crate::config::Opts {
         features: Vec::new(),
         bin_features: Vec::new(),
         lib_features: Vec::new(),
+        target: BuildTarget::Web,
     }
 }
 

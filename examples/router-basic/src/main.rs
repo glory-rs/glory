@@ -1,10 +1,10 @@
 use glory::routing::aviators::*;
-use glory::web::holders::BrowerHolder;
+use glory::web::holders::BrowserHolder;
 use glory::*;
 
 mod app;
 use app::*;
 
 pub fn main() {
-    BrowerHolder::new().enable(BrowserAviator::new(route(), catch())).mount(App::new());
+    BrowserHolder::new().enable(BrowserAviator::new(route(), catch())).mount(App::new());
 }

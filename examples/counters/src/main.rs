@@ -4,7 +4,7 @@ use glory::reflow::Lotus;
 use glory::web::events;
 use glory::web::helpers::event_target_value;
 use glory::web::widgets::*;
-use glory::web::holders::BrowerHolder;
+use glory::web::holders::BrowserHolder;
 use glory::widgets::*;
 use glory::*;
 
@@ -16,7 +16,7 @@ pub fn next_id() -> usize {
 }
 
 pub fn main() {
-    BrowerHolder::new().mount(Counters::new());
+    BrowserHolder::new().mount(Counters::new());
 }
 #[derive(Debug)]
 struct Counters {

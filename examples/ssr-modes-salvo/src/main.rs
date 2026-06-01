@@ -63,7 +63,7 @@ async fn main() {
 fn main() {
     use app::*;
 
-    BrowerHolder::new().enable(BrowserAviator::new(route(), catch())).mount(App::new());
+    BrowserHolder::new().enable(BrowserAviator::new(route(), catch())).mount(App::new());
 }
 
 #[cfg(all(not(feature = "web-ssr"), not(feature = "web-csr")))]

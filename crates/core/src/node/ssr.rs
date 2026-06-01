@@ -104,11 +104,13 @@ impl Node {
 
     pub fn html_tag(&self) -> (String, String) {
         let name = self.name.borrow();
+        let name = if is_valid_html_name(&name) { name.as_ref() } else { "div" };
         let class = if !self.classes.borrow().is_empty() {
             format!(
                 " class=\"{}\"",
                 self.classes.borrow().deref().iter().fold("".to_string(), |mut acc, k| {
-                    acc.push_str(&format!(" {k}"));
+                    acc.push(' ');
+                    acc.push_str(&escape_html_attr(k));
                     acc
                 })
             )
@@ -118,9 +120,9 @@ impl Node {
 
         let properties = if !self.properties.borrow().is_empty() {
             self.properties.borrow().iter().fold("".to_string(), |mut acc, (k, v)| {
-                if k != "text" {
+                if k != "text" && is_valid_html_name(k) {
                     if let Some(v) = v {
-                        acc.push_str(&format!(" {k}=\"{v}\""));
+                        acc.push_str(&format!(" {k}=\"{}\"", escape_html_attr(v)));
                     } else {
                         acc.push_str(&format!(" {k}"));
                     }
@@ -134,8 +136,8 @@ impl Node {
         let attributes = if !self.attributes.borrow().is_empty() {
             let mut value = "".to_string();
             for (k, v) in self.attributes.borrow().iter() {
-                if k != "inner_html" && k != "inner_text" {
-                    write!(&mut value, " {k}=\"{v}\"").unwrap();
+                if k != "inner_html" && k != "inner_text" && is_valid_html_name(k) {
+                    write!(&mut value, " {k}=\"{}\"", escape_html_attr(v)).unwrap();
                 }
             }
             value
@@ -170,13 +172,61 @@ impl Node {
             let inner_html = attributes.get("inner_html");
             let inner_text = attributes.get("inner_text");
             if let Some(Some(text)) = properties.get("text") {
-                write!(&mut html, "{}", &*text).unwrap();
+                write!(&mut html, "{}", escape_html_text(text)).unwrap();
             } else if let Some(inner_html) = inner_html {
                 write!(&mut html, "{}", inner_html).unwrap();
             } else if let Some(inner_text) = inner_text {
-                write!(&mut html, "{}", inner_text).unwrap();
+                write!(&mut html, "{}", escape_html_text(inner_text)).unwrap();
             }
         }
         html
+    }
+}
+
+fn escape_html_text(value: &str) -> String {
+    value.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+}
+
+fn escape_html_attr(value: &str) -> String {
+    escape_html_text(value).replace('"', "&quot;")
+}
+
+fn is_valid_html_name(value: &str) -> bool {
+    let mut chars = value.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    (first.is_ascii_alphabetic() || first == '_')
+        && chars.all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | ':' | '.'))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn outer_html_escapes_text_and_attribute_values() {
+        let node = Node::new("p", false);
+        node.set_attribute("title", "\"<&>");
+        node.set_attribute("inner_text", "<b>&</b>");
+
+        assert_eq!(node.outer_html(), r#"<p title="&quot;&lt;&amp;&gt;">&lt;b&gt;&amp;&lt;/b&gt;</p>"#);
+    }
+
+    #[test]
+    fn outer_html_keeps_explicit_inner_html_raw() {
+        let node = Node::new("p", false);
+        node.set_attribute("inner_html", "<strong>raw</strong>");
+
+        assert_eq!(node.outer_html(), "<p><strong>raw</strong></p>");
+    }
+
+    #[test]
+    fn outer_html_skips_invalid_names() {
+        let node = Node::new("script onclick=alert(1)", false);
+        node.set_attribute("bad name", "x");
+        node.set_attribute("data-ok", "y");
+
+        assert_eq!(node.outer_html(), r#"<div data-ok="y"></div>"#);
     }
 }

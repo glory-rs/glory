@@ -26,7 +26,6 @@
 //!   `REVISING_ITEMS`, calls `Widget::patch` for each bound view.
 
 mod cage;
-pub mod storage;
 pub use cage::Cage;
 mod bond;
 pub use bond::{Bond, selector};
@@ -169,7 +168,7 @@ where
     O: FnOnce() -> R,
 {
     scheduler::UNTRACKING.with(|untracking| {
-        if !untracking.borrow().get(&holder_id).map(|v| *v).unwrap_or(false) {
+        if !untracking.borrow().get(&holder_id).copied().unwrap_or(false) {
             untracking.borrow_mut().insert(holder_id, true);
             let out = opt();
             untracking.borrow_mut().insert(holder_id, false);

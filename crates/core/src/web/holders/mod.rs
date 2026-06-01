@@ -1,7 +1,7 @@
 cfg_feature! {
     #![all(target_arch = "wasm32", feature = "web-csr")]
     mod browser;
-    pub use browser::BrowerHolder;
+    pub use browser::BrowserHolder;
 }
 
 cfg_feature! {

@@ -112,11 +112,11 @@ pub trait ResolveExt {
 
 impl ResolveExt for Resolve {
     fn deps_for(&self, id: &PackageId, set: &mut HashSet<PackageId>) {
-        if let Some(node) = self.nodes.iter().find(|n| n.id == *id) {
-            if set.insert(node.id.clone()) {
-                for dep in &node.deps {
-                    self.deps_for(&dep.pkg, set);
-                }
+        if let Some(node) = self.nodes.iter().find(|n| n.id == *id)
+            && set.insert(node.id.clone())
+        {
+            for dep in &node.deps {
+                self.deps_for(&dep.pkg, set);
             }
         }
     }

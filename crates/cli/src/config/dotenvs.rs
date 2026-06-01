@@ -7,16 +7,16 @@ use std::{env, fs};
 pub fn load_dotenvs(directory: &Utf8Path) -> Result<Option<Vec<(String, String)>>> {
     let candidate = directory.join(".env");
 
-    if let Ok(metadata) = fs::metadata(&candidate) {
-        if metadata.is_file() {
-            let mut dotenvs = vec![];
-            for entry in dotenvy::from_path_iter(&candidate)? {
-                let (key, val) = entry?;
-                dotenvs.push((key, val));
-            }
-
-            return Ok(Some(dotenvs));
+    if let Ok(metadata) = fs::metadata(&candidate)
+        && metadata.is_file()
+    {
+        let mut dotenvs = vec![];
+        for entry in dotenvy::from_path_iter(&candidate)? {
+            let (key, val) = entry?;
+            dotenvs.push((key, val));
         }
+
+        return Ok(Some(dotenvs));
     }
 
     if let Some(parent) = directory.parent() {

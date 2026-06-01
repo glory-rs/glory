@@ -64,7 +64,7 @@ pub trait Widget: fmt::Debug + 'static {
         Self: Sized,
     {
         let view_id = self.store_in(parent);
-        parent.show_list.insert(view_id.clone());
+        parent.visible_views.insert(view_id.clone());
         if parent.is_attached() {
             parent.attach_child(&view_id);
         }
@@ -78,8 +78,8 @@ pub trait Widget: fmt::Debug + 'static {
         let mut view = View::new(ctx, self);
 
         view.scope.parent_node = Some(parent_node.clone());
-        view.scope.graff_node = Some(parent_node.clone());
-        view.scope.show_list.insert(view.id.clone());
+        view.scope.render_node = Some(parent_node.clone());
+        view.scope.visible_views.insert(view.id.clone());
 
         let view_id = view.id.clone();
         cfg_if! {
@@ -111,13 +111,6 @@ pub trait Widget: fmt::Debug + 'static {
         view_id
     }
 
-    // fn mount_to(self, parent: impl AsRef<web_sys::Element>, truck: Rc<RefCell<Truck>>)
-    // where
-    //     Self: Sized,
-    // {
-    //     self.into_view(truck).mount_to(parent)
-    // }
-
     fn attach(&mut self, _ctx: &mut Scope) {}
     #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
     fn hydrate(&mut self, _ctx: &mut Scope) {}
@@ -127,8 +120,8 @@ pub trait Widget: fmt::Debug + 'static {
     ///
     /// The default implementation simply walks any children that were
     /// inserted via `store_in` during `build` and attaches them.  It must
-    /// NOT pre-set their `scope.position` — already-attached children have
-    /// `position == Unset` (reset by the end of `attach_child`), and
+    /// NOT pre-set their `scope.placement` — already-attached children have
+    /// `placement == Unset` (reset by the end of `attach_child`), and
     /// forcing it back to `Tail` here would survive `attach_child`'s
     /// early-return on `is_attached` and break neighbour-relative
     /// re-positioning during later patches (e.g. `Each` reordering).
@@ -163,12 +156,6 @@ pub trait Widget: fmt::Debug + 'static {
             }
         }
     }
-    // fn wreck(mut self, ctx: &mut Scope) {
-    //     let child_views = std::mem::replace(&mut ctx.child_views, vec![]);
-    //     for (_, view) in child_views {
-    //         self.wreck_child(view);
-    //     }
-    // }
 }
 
 pub struct Filler(Box<dyn FnOnce(&mut Scope)>);

@@ -78,8 +78,8 @@ impl Config {
     pub fn test_load(cli: Opts, cwd: &str, manifest_path: &str, watch: bool) -> Self {
         use crate::ext::PathBufExt;
 
-        let manifest_path = Utf8PathBuf::from(manifest_path).canonicalize_utf8().unwrap();
-        let mut cwd = Utf8PathBuf::from(cwd).canonicalize_utf8().unwrap();
+        let manifest_path = resolve_test_path(manifest_path);
+        let mut cwd = resolve_test_path(cwd);
         cwd.clean_windows_path();
         Self::load(cli, &cwd, &manifest_path, watch).unwrap()
     }
@@ -94,6 +94,24 @@ impl Config {
             );
         }
     }
+}
+
+#[cfg(test)]
+fn resolve_test_path(path: &str) -> Utf8PathBuf {
+    let path = Utf8PathBuf::from(path);
+    if path.is_absolute() {
+        return path.canonicalize_utf8().unwrap();
+    }
+    if let Ok(path) = path.canonicalize_utf8() {
+        return path;
+    }
+
+    let manifest_dir = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let workspace_root = manifest_dir
+        .parent()
+        .and_then(|path| path.parent())
+        .expect("glory-cli crate should live under crates/cli");
+    workspace_root.join(path).canonicalize_utf8().unwrap()
 }
 
 fn names(projects: &[Arc<Project>]) -> String {

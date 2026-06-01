@@ -22,7 +22,7 @@ codecov = { repository = "glory-rs/glory", branch = "main", service = "github" }
 path = "src/lib.rs"
 
 [features]
-default = ["web-csr"]
+default = []
 web-csr = ["single-app", "glory-core/web-csr", "dep:wasm-bindgen"]
 web-ssr = ["glory-core/web-ssr"]
 salvo = ["dep:salvo", "glory-core/salvo"]

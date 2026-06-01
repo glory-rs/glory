@@ -33,7 +33,7 @@ struct EachListWidget {
 
 impl Widget for EachListWidget {
     fn build(&mut self, ctx: &mut Scope) {
-        ul().fill(Each::from_vec(self.items.clone(), |s| s.clone(), |s| li().text(s.clone())))
+        ul().fill(Each::from_vec(self.items, |s| s.clone(), |s| li().text(s.clone())))
             .show_in(ctx);
     }
 }
@@ -57,14 +57,14 @@ fn each_html_items(holder: &ServerHolder) -> Vec<String> {
 #[test]
 fn each_initial_render() {
     let items = Cage::new(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
-    let holder = make_holder().mount(EachListWidget { items: items.clone() });
+    let holder = make_holder().mount(EachListWidget { items });
     assert_eq!(each_html_items(&holder), vec!["a", "b", "c"]);
 }
 
 #[test]
 fn each_append_tail() {
     let items = Cage::new(vec!["a".to_string(), "b".to_string()]);
-    let holder = make_holder().mount(EachListWidget { items: items.clone() });
+    let holder = make_holder().mount(EachListWidget { items });
 
     items.revise(|mut v| v.push("c".to_string()));
     assert_eq!(each_html_items(&holder), vec!["a", "b", "c"]);
@@ -76,7 +76,7 @@ fn each_append_tail() {
 #[test]
 fn each_prepend_head() {
     let items = Cage::new(vec!["b".to_string(), "c".to_string()]);
-    let holder = make_holder().mount(EachListWidget { items: items.clone() });
+    let holder = make_holder().mount(EachListWidget { items });
 
     items.revise(|mut v| v.insert(0, "a".to_string()));
     assert_eq!(each_html_items(&holder), vec!["a", "b", "c"]);
@@ -85,7 +85,7 @@ fn each_prepend_head() {
 #[test]
 fn each_reverse() {
     let items = Cage::new(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
-    let holder = make_holder().mount(EachListWidget { items: items.clone() });
+    let holder = make_holder().mount(EachListWidget { items });
 
     items.revise(|mut v| v.reverse());
     assert_eq!(each_html_items(&holder), vec!["c", "b", "a"]);
@@ -94,7 +94,7 @@ fn each_reverse() {
 #[test]
 fn each_swap_adjacent() {
     let items = Cage::new(vec!["a".to_string(), "b".to_string(), "c".to_string(), "d".to_string()]);
-    let holder = make_holder().mount(EachListWidget { items: items.clone() });
+    let holder = make_holder().mount(EachListWidget { items });
 
     items.revise(|mut v| v.swap(1, 2));
     assert_eq!(each_html_items(&holder), vec!["a", "c", "b", "d"]);
@@ -103,7 +103,7 @@ fn each_swap_adjacent() {
 #[test]
 fn each_remove_middle() {
     let items = Cage::new(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
-    let holder = make_holder().mount(EachListWidget { items: items.clone() });
+    let holder = make_holder().mount(EachListWidget { items });
 
     items.revise(|mut v| {
         v.remove(1);
@@ -114,7 +114,7 @@ fn each_remove_middle() {
 #[test]
 fn each_clear() {
     let items = Cage::new(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
-    let holder = make_holder().mount(EachListWidget { items: items.clone() });
+    let holder = make_holder().mount(EachListWidget { items });
 
     items.revise(|mut v| v.clear());
     assert!(each_html_items(&holder).is_empty());
@@ -123,7 +123,7 @@ fn each_clear() {
 #[test]
 fn each_remove_then_readd_same_key() {
     let items = Cage::new(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
-    let holder = make_holder().mount(EachListWidget { items: items.clone() });
+    let holder = make_holder().mount(EachListWidget { items });
 
     items.revise(|mut v| {
         v.remove(1);
@@ -135,7 +135,7 @@ fn each_remove_then_readd_same_key() {
 #[test]
 fn each_full_replacement_distinct_keys() {
     let items = Cage::new(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
-    let holder = make_holder().mount(EachListWidget { items: items.clone() });
+    let holder = make_holder().mount(EachListWidget { items });
 
     items.revise(|mut v| {
         *v = vec!["x".to_string(), "y".to_string(), "z".to_string()];
@@ -146,7 +146,7 @@ fn each_full_replacement_distinct_keys() {
 #[test]
 fn each_shuffle_keeps_all_keys() {
     let items = Cage::new(vec!["a".to_string(), "b".to_string(), "c".to_string(), "d".to_string(), "e".to_string()]);
-    let holder = make_holder().mount(EachListWidget { items: items.clone() });
+    let holder = make_holder().mount(EachListWidget { items });
 
     items.revise(|mut v| {
         *v = vec!["c".to_string(), "e".to_string(), "a".to_string(), "d".to_string(), "b".to_string()];
@@ -161,7 +161,7 @@ fn each_large_reverse() {
     let n: usize = 200;
     let initial: Vec<String> = (0..n).map(|i| format!("k{i}")).collect();
     let items = Cage::new(initial.clone());
-    let holder = make_holder().mount(EachListWidget { items: items.clone() });
+    let holder = make_holder().mount(EachListWidget { items });
 
     items.revise(|mut v| v.reverse());
 
@@ -175,7 +175,7 @@ fn each_large_random_shuffle() {
     let n: usize = 100;
     let initial: Vec<String> = (0..n).map(|i| format!("k{i}")).collect();
     let items = Cage::new(initial.clone());
-    let holder = make_holder().mount(EachListWidget { items: items.clone() });
+    let holder = make_holder().mount(EachListWidget { items });
 
     // Cycle by step 7 (coprime to 100): produces an even spread.
     let shuffled: Vec<String> = (0..n).map(|i| initial[(i * 7) % n].clone()).collect();
@@ -195,7 +195,7 @@ fn each_property_random_reorders_match_target() {
     let n: usize = 50;
     let initial: Vec<String> = (0..n).map(|i| format!("k{i}")).collect();
     let items = Cage::new(initial.clone());
-    let holder = make_holder().mount(EachListWidget { items: items.clone() });
+    let holder = make_holder().mount(EachListWidget { items });
 
     // LCG: x_{n+1} = (a * x_n + c) mod m with values from Numerical Recipes
     let mut seed: u64 = 0xdead_beef_cafe;
@@ -260,7 +260,7 @@ fn each_on_enter_on_exit_hooks_fire() {
             let enter_count = self.enter_count.clone();
             let exit_count = self.exit_count.clone();
             ul().fill(
-                Each::from_vec(self.items.clone(), |s| s.clone(), |s| li().text(s.clone()))
+                Each::from_vec(self.items, |s| s.clone(), |s| li().text(s.clone()))
                     .on_enter(move |_vid| enter_count.set(enter_count.get() + 1))
                     .on_exit(move |_vid| exit_count.set(exit_count.get() + 1)),
             )
@@ -272,7 +272,7 @@ fn each_on_enter_on_exit_hooks_fire() {
     let exit_count = Rc::new(Cell::new(0_usize));
     let items = Cage::new(vec!["a".to_string(), "b".to_string()]);
     let _holder = make_holder().mount(EachWithHooks {
-        items: items.clone(),
+        items,
         enter_count: enter_count.clone(),
         exit_count: exit_count.clone(),
     });
@@ -311,7 +311,7 @@ fn each_supports_vec_deque() {
             // `impl Into<Lotus<_>>` ambiguous on bare collection
             // containers other than the `from_vec` shortcut.
             let each: Each<String, VecDeque<String>, _, String, _, crate::web::widgets::HtmlLi> =
-                Each::new(self.items.clone(), |s: &String| s.clone(), |s: &String| li().text(s.clone()));
+                Each::new(self.items, |s: &String| s.clone(), |s: &String| li().text(s.clone()));
             ul().fill(each).show_in(ctx);
         }
     }
@@ -321,7 +321,7 @@ fn each_supports_vec_deque() {
     initial.push_back("b".to_string());
     initial.push_back("c".to_string());
     let items = Cage::new(initial);
-    let holder = make_holder().mount(VecDequeListWidget { items: items.clone() });
+    let holder = make_holder().mount(VecDequeListWidget { items });
 
     assert_eq!(each_html_items(&holder), vec!["a", "b", "c"]);
 
@@ -338,7 +338,7 @@ fn each_supports_vec_deque() {
 #[test]
 fn each_repeated_revisions_stay_consistent() {
     let items = Cage::new(vec!["a".to_string(), "b".to_string(), "c".to_string()]);
-    let holder = make_holder().mount(EachListWidget { items: items.clone() });
+    let holder = make_holder().mount(EachListWidget { items });
 
     items.revise(|mut v| v.push("d".to_string()));
     items.revise(|mut v| v.reverse());
@@ -363,7 +363,7 @@ struct SwitchHostWidget {
 
 impl Widget for SwitchHostWidget {
     fn build(&mut self, ctx: &mut Scope) {
-        let show_left = self.show_left.clone();
+        let show_left = self.show_left;
         let show_right = self.show_left.map(|b| !*b);
         div()
             .fill(
@@ -388,7 +388,7 @@ struct EffectHostWidget {
 
 impl Widget for EffectHostWidget {
     fn build(&mut self, ctx: &mut Scope) {
-        let count = self.count.clone();
+        let count = self.count;
         let runs = self.runs.clone();
         let seen = self.seen.clone();
         effect_in(ctx, move || {
@@ -413,7 +413,7 @@ struct ResourceHostWidget {
 
 impl Widget for ResourceHostWidget {
     fn build(&mut self, ctx: &mut Scope) {
-        let seed = self.seed.clone();
+        let seed = self.seed;
         let cell = resource_in(ctx, move || {
             let v = *seed.get();
             async move { v * 10 }
@@ -428,11 +428,11 @@ fn resource_resolves_initial_and_after_dep_change() {
     let seed = Cage::new(2_i32);
     let handle: Rc<std::cell::RefCell<Option<Cage<Option<i32>>>>> = Rc::new(std::cell::RefCell::new(None));
     let _holder = make_holder().mount(ResourceHostWidget {
-        seed: seed.clone(),
+        seed,
         result_handle: handle.clone(),
     });
 
-    let cell = handle.borrow().clone().expect("resource cell was published");
+    let cell = (*handle.borrow()).expect("resource cell was published");
     assert_eq!(*cell.get(), Some(20));
 
     seed.revise(|mut v| *v = 7);
@@ -445,7 +445,7 @@ fn effect_runs_once_on_mount_then_per_revision() {
     let runs = Rc::new(Cell::new(0));
     let seen = Rc::new(Cell::new(-1));
     let _holder = make_holder().mount(EffectHostWidget {
-        count: count.clone(),
+        count,
         runs: runs.clone(),
         seen: seen.clone(),
     });
@@ -469,9 +469,7 @@ fn effect_runs_once_on_mount_then_per_revision() {
 #[test]
 fn switch_toggles_and_restores_cached_view() {
     let show_left = Cage::new(true);
-    let holder = make_holder().mount(SwitchHostWidget {
-        show_left: show_left.clone(),
-    });
+    let holder = make_holder().mount(SwitchHostWidget { show_left });
 
     let initial = render_html(&holder);
     assert!(initial.contains("LEFT"));

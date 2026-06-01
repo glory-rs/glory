@@ -7,12 +7,12 @@ use wasm_bindgen::{UnwrapThrowExt, JsCast};
 
 use crate::{Holder, Scope, Truck, ViewId, Widget};
 
-pub struct BrowerHolder {
+pub struct BrowserHolder {
     pub truck: Rc<RefCell<Truck>>,
     pub host_node: web_sys::Element,
     next_root_view_id: AtomicU64,
 }
-impl BrowerHolder {
+impl BrowserHolder {
     pub fn new() -> Self {
         Self::with_host_node(crate::web::document().body().expect("body not found"))
     }
@@ -25,13 +25,13 @@ impl BrowerHolder {
     }
 }
 
-impl Debug for BrowerHolder {
+impl Debug for BrowserHolder {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("BrowerHolder").finish()
+        f.debug_struct("BrowserHolder").finish()
     }
 }
 
-impl Holder for BrowerHolder {
+impl Holder for BrowserHolder {
     fn mount(self, widget: impl Widget) -> Self {
         crate::web::HYDRATING.store(true, Ordering::Relaxed);
         if let Ok(list) = crate::web::document().query_selector_all("[gly-id]") {
@@ -60,10 +60,4 @@ impl Holder for BrowerHolder {
     fn truck(&self) -> Rc<RefCell<Truck>> {
         self.truck.clone()
     }
-    // fn clone_boxed(&self) -> Box<dyn Holder> {
-    //     Box::new(Self {
-    //         truck: self.truck.clone(),
-    //         host_node: self.host_node.clone(),
-    //     })
-    // }
 }

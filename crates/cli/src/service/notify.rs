@@ -85,11 +85,11 @@ fn handle(watched: Watched, proj: Arc<Project>) {
 
     let mut changes = Vec::new();
 
-    if let Some(assets) = &proj.assets {
-        if path.starts_with(&assets.dir) {
-            log::debug!("Notify asset change {}", GRAY.paint(watched.to_string()));
-            changes.push(Change::Asset(watched.clone()));
-        }
+    if let Some(assets) = &proj.assets
+        && path.starts_with(&assets.dir)
+    {
+        log::debug!("Notify asset change {}", GRAY.paint(watched.to_string()));
+        changes.push(Change::Asset(watched.clone()));
     }
 
     let lib_rs = path.starts_with_any(&proj.lib.src_paths) && path.is_ext_any(&["rs"]);
@@ -113,11 +113,11 @@ fn handle(watched: Watched, proj: Arc<Project>) {
         }
     }
 
-    if let Some(tailwind) = &proj.style.tailwind {
-        if path.as_path() == tailwind.config_file.as_path() || path.as_path() == tailwind.input_file.as_path() {
-            log::debug!("Notify style change {}", GRAY.paint(watched.to_string()));
-            changes.push(Change::Style)
-        }
+    if let Some(tailwind) = &proj.style.tailwind
+        && (path.as_path() == tailwind.config_file.as_path() || path.as_path() == tailwind.input_file.as_path())
+    {
+        log::debug!("Notify style change {}", GRAY.paint(watched.to_string()));
+        changes.push(Change::Style)
     }
 
     if !changes.is_empty() {

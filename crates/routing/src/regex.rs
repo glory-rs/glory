@@ -31,7 +31,7 @@ impl Regex {
     }
 }
 
-pub struct Captures(js_sys::Array);
+pub struct Captures(js_sys::Array<js_sys::JsString>);
 
 impl Captures {
     pub fn get(&self, index: usize) -> Option<String> {

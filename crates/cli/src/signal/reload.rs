@@ -1,4 +1,4 @@
-use glory_hot_reload::{FunctionReplacementBatch, diff::Patches};
+use glory_hot_reload::FunctionReloadBatch;
 use once_cell::sync::Lazy;
 use tokio::sync::broadcast;
 
@@ -8,8 +8,7 @@ static RELOAD_CHANNEL: Lazy<broadcast::Sender<ReloadType>> = Lazy::new(|| broadc
 pub enum ReloadType {
     Full,
     Style,
-    ViewPatches(String),
-    FunctionReplacements(String),
+    FunctionReloads(String),
 }
 
 pub struct ReloadSignal {}
@@ -26,25 +25,14 @@ impl ReloadSignal {
         }
     }
 
-    pub fn send_view_patches(view_patches: &Patches) {
-        match serde_json::to_string(view_patches) {
+    pub fn send_function_reloads(reloads: &FunctionReloadBatch) {
+        match serde_json::to_string(reloads) {
             Ok(data) => {
-                if let Err(e) = RELOAD_CHANNEL.send(ReloadType::ViewPatches(data)) {
-                    log::error!(r#"Error could not send reload "View Patches" due to: {e}"#);
+                if let Err(e) = RELOAD_CHANNEL.send(ReloadType::FunctionReloads(data)) {
+                    log::error!(r#"Error could not send reload "Function Reloads" due to: {e}"#);
                 }
             }
-            Err(e) => log::error!(r#"Error could not send reload "View Patches" due to: {e}"#),
-        }
-    }
-
-    pub fn send_function_replacements(replacements: &FunctionReplacementBatch) {
-        match serde_json::to_string(replacements) {
-            Ok(data) => {
-                if let Err(e) = RELOAD_CHANNEL.send(ReloadType::FunctionReplacements(data)) {
-                    log::error!(r#"Error could not send reload "Function Replacements" due to: {e}"#);
-                }
-            }
-            Err(e) => log::error!(r#"Error could not send reload "Function Replacements" due to: {e}"#),
+            Err(e) => log::error!(r#"Error could not send reload "Function Reloads" due to: {e}"#),
         }
     }
 

@@ -42,10 +42,11 @@ exclusion — see `[package.metadata.cargo-all-features].skip_feature_sets`.
 
 ## Reactivity rules
 
-- `Cage<T>` is a smart pointer (`!Copy`, `!Send`, `!Sync`). Cross-closure
-  sharing means `.clone()` per closure today. The roadmap is to make this
-  `Copy` via a generational-box arena (`_todos.md` §2 P0); until then, accept
-  the clones rather than reinventing a wrapper.
+- `Cage<T>` is a copyable reactive handle (`Copy`, `!Send`, `!Sync`).
+  Cross-closure sharing no longer needs `.clone()`, though existing clones
+  are harmless handle copies. Scope-owned cages are invalidated by `Owner`
+  on scope drop; use `try_get*` / `try_revise*` when stale-handle recovery
+  matters.
 - `Bond<T>` re-runs its mapper when any dependency's `(id, version)` changes.
   Output is not value-compared by default — chain `.with_eq(|a, b| ...)`
   or `.with_partial_eq()` (for `T: PartialEq`) when you specifically want
@@ -69,8 +70,8 @@ children) → later `Widget::patch` when a bound signal revises → eventually
 - `show_in(parent)` stores + attaches; `store_in(parent)` only stores.
 - `Scope::attach_child` early-returns when the child is already attached.
   If a widget needs to reposition a child in DOM order (e.g. `Each` reorder),
-  set `view.scope.is_attached = false` AND `view.scope.position =
-  ViewPosition::Unset` first, then call `attach_child`. See `Each::patch`.
+  set `view.scope.is_attached = false` AND `view.scope.placement =
+  ViewPlacement::Unset` first, then call `attach_child`. See `Each::patch`.
 - `Element::build` in both CSR and SSR sets `scope.first_child_node =
   scope.last_child_node = Some(self.node.clone())`. That value is the anchor
   Sibling-positioning uses; do not change it to `last_element_child()` —
@@ -81,7 +82,7 @@ children) → later `Widget::patch` when a bound signal revises → eventually
 - `Scope::child_views: IndexMap<ViewId, View>` — order mirrors DOM order.
   Never call `.remove(...)` (deprecated, aliases `swap_remove`); use
   `shift_remove` to preserve order.
-- `Scope::show_list: IndexSet<ViewId>` — same rule.
+- `Scope::visible_views: IndexSet<ViewId>` — same rule.
 - `Cage::view_ids`, `Bond::view_ids` — set membership; order irrelevant, but
   use `shift_remove` for consistency and to silence the deprecation warning.
 

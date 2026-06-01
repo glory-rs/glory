@@ -36,7 +36,7 @@ pub fn is_running() -> bool {
 }
 #[cfg(not(feature = "single-app"))]
 pub fn is_running(holder_id: HolderId) -> bool {
-    RUNNING.with_borrow(|running| running.get(&holder_id).map(|v| *v).unwrap_or(false))
+    RUNNING.with_borrow(|running| running.get(&holder_id).copied().unwrap_or(false))
 }
 
 #[cfg(feature = "single-app")]
@@ -45,7 +45,7 @@ pub fn is_untracking() -> bool {
 }
 #[cfg(not(feature = "single-app"))]
 pub fn is_untracking(holder_id: HolderId) -> bool {
-    UNTRACKING.with_borrow(|untracking| untracking.get(&holder_id).map(|v| *v).unwrap_or(false))
+    UNTRACKING.with_borrow(|untracking| untracking.get(&holder_id).copied().unwrap_or(false))
 }
 
 #[cfg(feature = "single-app")]
@@ -54,7 +54,7 @@ pub fn is_batching() -> bool {
 }
 #[cfg(not(feature = "single-app"))]
 pub fn is_batching(holder_id: HolderId) -> bool {
-    BATCHING.with_borrow(|batching| batching.get(&holder_id).map(|v| *v).unwrap_or(false))
+    BATCHING.with_borrow(|batching| batching.get(&holder_id).copied().unwrap_or(false))
 }
 
 #[cfg(feature = "single-app")]
@@ -80,7 +80,7 @@ where
     O: FnOnce() -> R,
 {
     BATCHING.with(|batching| {
-        if !batching.borrow().get(&holder_id).map(|v| *v).unwrap_or(false) {
+        if !batching.borrow().get(&holder_id).copied().unwrap_or(false) {
             batching.borrow_mut().insert(holder_id, true);
             let out = opt();
             batching.borrow_mut().insert(holder_id, false);

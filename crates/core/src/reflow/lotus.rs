@@ -84,7 +84,7 @@ where
                 data: data.clone(),
                 holder_id: holder_id.clone(),
             },
-            Self::Cage(cage) => Self::Cage(cage.clone()),
+            Self::Cage(cage) => Self::Cage(*cage),
             Self::Bond(bond) => Self::Bond(bond.clone()),
         }
     }
@@ -107,7 +107,7 @@ where
     #[cfg(not(feature = "single-app"))]
     fn holder_id(&self) -> Option<HolderId> {
         match self {
-            Self::Bare { holder_id, .. } => (&*holder_id.clone()).clone().into_inner(),
+            Self::Bare { holder_id, .. } => holder_id.get(),
             Self::Cage(cage) => cage.holder_id(),
             Self::Bond(bond) => bond.holder_id(),
         }
@@ -183,7 +183,7 @@ where
                 data: data.clone(),
                 holder_id: holder_id.clone(),
             }),
-            Self::Cage(cage) => Box::new(Self::Cage(cage.clone())),
+            Self::Cage(cage) => Box::new(Self::Cage(*cage)),
             Self::Bond(bond) => Box::new(Self::Bond(bond.clone())),
         }
     }

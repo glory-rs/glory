@@ -103,7 +103,7 @@ async fn process_css(proj: &Project, css: String) -> Result<Product> {
 
     let prod = match proj.site.updated_with(&proj.style.site_file, bytes).await? {
         true => {
-            log::trace!("Style finished with changes {}", GRAY.paint(&proj.style.site_file.to_string()));
+            log::trace!("Style finished with changes {}", GRAY.paint(proj.style.site_file.to_string()));
             Product::Style("".to_string()) //TODO
         }
         false => {

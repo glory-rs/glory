@@ -9,7 +9,7 @@ use wasm_bindgen::{JsCast, UnwrapThrowExt};
 
 use crate::reflow::{Bond, Lotus};
 use crate::renderer::{InsertPosition, Renderer, WebRenderer};
-use crate::view::{ViewId, ViewPosition};
+use crate::view::{ViewId, ViewPlacement};
 use crate::web::events::EventDescriptor;
 use crate::web::{AttrValue, ClassPart, Classes, PropValue};
 use crate::widget::{Filler, IntoFiller};
@@ -49,13 +49,13 @@ where
         if crate::web::is_hydrating() && node.has_attribute("gly-hydrating") {
             node.remove_attribute("gly-hydrating").unwrap_throw();
         } else {
-            match &ctx.position {
-                ViewPosition::Head => self.renderer.insert_child(parent_node, node, InsertPosition::Head),
-                ViewPosition::Prev(prev_node) => self.renderer.insert_child(parent_node, node, InsertPosition::After(prev_node)),
-                ViewPosition::Next(next_node) => self.renderer.insert_child(parent_node, node, InsertPosition::Before(next_node)),
-                ViewPosition::Tail => self.renderer.insert_child(parent_node, node, InsertPosition::Tail),
-                ViewPosition::Unset => {
-                    crate::warn!("node position is unset. {:#?}", node);
+            match &ctx.placement {
+                ViewPlacement::Head => self.renderer.insert_child(parent_node, node, InsertPosition::Head),
+                ViewPlacement::Before(next_node) => self.renderer.insert_child(parent_node, node, InsertPosition::Before(next_node)),
+                ViewPlacement::After(prev_node) => self.renderer.insert_child(parent_node, node, InsertPosition::After(prev_node)),
+                ViewPlacement::Tail => self.renderer.insert_child(parent_node, node, InsertPosition::Tail),
+                ViewPlacement::Unset => {
+                    crate::warn!("node placement is unset. {:#?}", node);
                     self.renderer.insert_child(parent_node, node, InsertPosition::Tail);
                 }
             }
@@ -90,7 +90,7 @@ where
     fn build(&mut self, ctx: &mut Scope) {
         let node = <T as AsRef<web_sys::Element>>::as_ref(&self.node);
 
-        ctx.graff_node = Some(node.clone());
+        ctx.render_node = Some(node.clone());
         // The element itself is the outermost DOM anchor of this view's
         // subtree, so sibling-positioning logic in `Scope::attach_child`
         // can rely on it (`last_element_child()` returns None for leaf
@@ -341,10 +341,8 @@ where
     /// Sets the inner Text of this element from the provided
     /// string slice.
     ///
-    /// # Security
-    /// Be very careful when using this method. Always remember to
-    /// sanitize the input to avoid a cross-site scripting (XSS)
-    /// vulnerability.
+    /// Text content is assigned through `textContent`. Use
+    /// [`Element::html`] only when the value is trusted markup.
     pub fn set_text<V>(&mut self, text: V)
     where
         V: AttrValue + 'static,
@@ -354,10 +352,8 @@ where
     /// Sets the inner Text of this element from the provided
     /// string slice.
     ///
-    /// # Security
-    /// Be very careful when using this method. Always remember to
-    /// sanitize the input to avoid a cross-site scripting (XSS)
-    /// vulnerability.
+    /// Text content is assigned through `textContent`. Use
+    /// [`Element::html`] only when the value is trusted markup.
     pub fn text<V>(mut self, text: V) -> Self
     where
         V: AttrValue + 'static,

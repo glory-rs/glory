@@ -20,7 +20,7 @@ pub struct HeadMixin {
 
 impl Widget for HeadMixin {
     fn build(&mut self, ctx: &mut Scope) {
-        ctx.graff_node = Some(self.head_node.clone());
+        ctx.render_node = Some(self.head_node.clone());
 
         let fillers = std::mem::take(&mut self.fillers);
         for filler in fillers {

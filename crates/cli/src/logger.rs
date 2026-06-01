@@ -19,7 +19,7 @@ static TRACE_VIOLET: Lazy<ansi_term::Color> = Lazy::new(|| Fixed(98));
 
 pub static GRAY: Lazy<ansi_term::Color> = Lazy::new(|| Fixed(241));
 // pub static BOLD: Lazy<ansi_term::Style> = Lazy::new(|| Style::new().bold());
-static LOG_SELECT: Lazy<OnceLock<LogFlag>> = Lazy::new(|| OnceLock::new());
+static LOG_SELECT: Lazy<OnceLock<LogFlag>> = Lazy::new(OnceLock::new);
 
 pub fn setup(verbose: u8, logs: &[Log]) {
     let log_level = match verbose {
@@ -93,7 +93,7 @@ fn format(write: &mut dyn Write, _now: &mut DeferredNow, record: &Record<'_>) ->
     }
 }
 
-fn split(args: &String) -> (&str, &str) {
+fn split(args: &str) -> (&str, &str) {
     match args.find(' ') {
         Some(i) => (&args[..i], &args[i + 1..]),
         None => ("", args),
@@ -102,10 +102,10 @@ fn split(args: &String) -> (&str, &str) {
 fn dependency<'a>(record: &'a Record<'_>) -> Option<&'a str> {
     let target = record.target();
 
-    if !target.starts_with("glory_cli") {
-        if let Some((ent, _)) = target.split_once("::") {
-            return Some(ent);
-        }
+    if !target.starts_with("glory_cli")
+        && let Some((ent, _)) = target.split_once("::")
+    {
+        return Some(ent);
     }
     None
 }

@@ -25,7 +25,7 @@ cfg_feature! {
 /// holder.
 ///
 /// This is the convenience entry point that replaces the explicit
-/// `BrowerHolder::new().mount(widget)` boilerplate. Only available
+/// `BrowserHolder::new().mount(widget)` boilerplate. Only available
 /// when building for `wasm32` with the `web-csr` feature.
 ///
 /// ```ignore
@@ -37,12 +37,12 @@ cfg_feature! {
 /// Use [`launch_with_host`] when you need to mount under a specific
 /// element instead of `<body>`.
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
-pub fn launch<W>(widget: W) -> glory_core::web::holders::BrowerHolder
+pub fn launch<W>(widget: W) -> glory_core::web::holders::BrowserHolder
 where
     W: glory_core::Widget,
 {
     use glory_core::Holder;
-    glory_core::web::holders::BrowerHolder::new().mount(widget)
+    glory_core::web::holders::BrowserHolder::new().mount(widget)
 }
 
 /// Mount a root widget under a specific host element.
@@ -54,12 +54,12 @@ where
 /// `host` is anything that `AsRef`s into the CSR `Node` (which is
 /// re-exported from `glory_core` as the WASM/`web-sys` element type).
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
-pub fn launch_with_host<W>(host: impl AsRef<glory_core::Node>, widget: W) -> glory_core::web::holders::BrowerHolder
+pub fn launch_with_host<W>(host: impl AsRef<glory_core::Node>, widget: W) -> glory_core::web::holders::BrowserHolder
 where
     W: glory_core::Widget,
 {
     use glory_core::Holder;
-    glory_core::web::holders::BrowerHolder::with_host_node(host).mount(widget)
+    glory_core::web::holders::BrowserHolder::with_host_node(host).mount(widget)
 }
 
 /// Server-side launch is intentionally not a single function: the

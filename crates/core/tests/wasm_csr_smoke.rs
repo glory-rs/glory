@@ -6,7 +6,7 @@
 //! tests inside `crates/core/src/widgets/snapshot_tests.rs`, which
 //! runs on the host toolchain. The wasm tests here exist to verify
 //! that the CSR path *compiles and links*, that the entry-point types
-//! (`BrowerHolder`, `glory::launch`-equivalents) are reachable from a
+//! (`BrowserHolder`, `glory::launch`-equivalents) are reachable from a
 //! wasm32 target, and to provide a stub for future end-to-end work.
 //!
 //! Run with:

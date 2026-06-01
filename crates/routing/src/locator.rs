@@ -60,19 +60,19 @@ impl Locator {
     }
 
     pub fn raw_url(&self) -> Lotus<String> {
-        Lotus::Cage(self.raw_url.clone())
+        Lotus::Cage(self.raw_url)
     }
 
     pub fn path(&self) -> Lotus<String> {
-        Lotus::Cage(self.path.clone())
+        Lotus::Cage(self.path)
     }
 
     pub fn params(&self) -> Lotus<BTreeMap<String, String>> {
-        Lotus::Cage(self.params.clone())
+        Lotus::Cage(self.params)
     }
 
     pub fn queries(&self) -> Lotus<MultiMap<String, String>> {
-        Lotus::Cage(self.queries.clone())
+        Lotus::Cage(self.queries)
     }
 
     pub fn receive(&self, raw_url: impl Into<String>, raw_params: Option<BTreeMap<String, String>>) -> Result<(), crate::url::ParseError> {
@@ -102,10 +102,10 @@ impl Locator {
             if (*me.fragment.borrow()).as_deref() != new_url.fragment().as_deref() {
                 me.fragment.revise(|mut fragment| *fragment = new_url.fragment().map(|v| v.to_owned()));
             }
-            if let Some(raw_params) = raw_params {
-                if *me.params.borrow() != raw_params {
-                    me.params.revise(|mut params| *params = raw_params);
-                }
+            if let Some(raw_params) = raw_params
+                && *me.params.borrow() != raw_params
+            {
+                me.params.revise(|mut params| *params = raw_params);
             }
             let new_queries: MultiMap<String, String> = form_urlencoded::parse(new_url.query().unwrap_or_default().as_bytes())
                 .into_owned()

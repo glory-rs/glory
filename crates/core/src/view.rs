@@ -1,6 +1,6 @@
 use std::fmt::{self, Display};
 use std::hash::Hash;
-use std::ops::{Deref, DerefMut};
+use std::ops::Deref;
 
 use indexmap::IndexMap;
 
@@ -13,29 +13,29 @@ pub const VIEW_ID_DELIMITER: char = '-';
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct ViewId {
-    pub(crate) raw_value: String,
+    pub(crate) path: String,
     #[cfg(not(feature = "single-app"))]
     holder_id: HolderId,
 }
 impl ViewId {
     #[cfg(feature = "single-app")]
-    pub fn new(raw_value: String) -> Self {
-        Self { raw_value }
+    pub fn new(path: String) -> Self {
+        Self { path }
     }
     #[cfg(not(feature = "single-app"))]
-    pub fn new(holder_id: HolderId, raw_value: String) -> Self {
-        Self { raw_value, holder_id }
+    pub fn new(holder_id: HolderId, path: String) -> Self {
+        Self { path, holder_id }
     }
     #[cfg(not(feature = "single-app"))]
     pub fn holder_id(&self) -> HolderId {
         self.holder_id
     }
     pub fn into_inner(self) -> String {
-        self.raw_value
+        self.path
     }
 
-    pub fn rise_to_root(&self) -> Vec<ViewId> {
-        let mut segs = self.raw_value.split('-').rev().collect::<Vec<_>>();
+    fn path_from_root(&self) -> Vec<ViewId> {
+        let mut segs = self.path.split(VIEW_ID_DELIMITER).rev().collect::<Vec<_>>();
         let mut cval = segs.pop().unwrap().to_owned();
         let mut list = Vec::with_capacity(segs.len());
         cfg_if! {
@@ -62,7 +62,7 @@ impl ViewId {
 }
 impl Display for ViewId {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.raw_value.fmt(f)
+        self.path.fmt(f)
     }
 }
 impl AsRef<ViewId> for ViewId {
@@ -73,61 +73,36 @@ impl AsRef<ViewId> for ViewId {
 impl Deref for ViewId {
     type Target = str;
     fn deref(&self) -> &Self::Target {
-        &self.raw_value
+        &self.path
     }
 }
 
 #[derive(Default, PartialEq, Clone, Debug)]
-pub enum ViewPosition {
+pub enum ViewPlacement {
     #[default]
     Unset,
     Head,
-    Prev(Node),
-    Next(Node),
+    Before(Node),
+    After(Node),
     Tail,
 }
 
 #[derive(Default, Debug)]
-pub struct ViewMap(pub IndexMap<ViewId, View>);
-impl ViewMap {
-    pub fn new() -> Self {
-        Self(IndexMap::new())
-    }
-    pub fn detach(&mut self, view_id: &ViewId) {
-        if let Some(view) = self.0.get_mut(view_id) {
-            view.detach();
-        } else if let Some(view) = self.get_mut(view_id) {
-            view.detach();
-        }
-    }
-    pub fn get(&self, view_id: &ViewId) -> Option<&View> {
-        let mut ids = view_id.rise_to_root();
-        let mut view = self.0.get(&ids.pop()?)?;
-        while !ids.is_empty() {
-            view = view.child(&ids.pop()?)?;
-        }
-        Some(view)
-    }
+pub(crate) struct ViewTree {
+    roots: IndexMap<ViewId, View>,
+}
+impl ViewTree {
     pub fn get_mut(&mut self, view_id: &ViewId) -> Option<&mut View> {
-        let mut ids = view_id.rise_to_root();
-        let mut view = self.0.get_mut(&ids.pop()?)?;
+        let mut ids = view_id.path_from_root();
+        let mut view = self.roots.get_mut(&ids.pop()?)?;
         while !ids.is_empty() {
             view = view.child_mut(&ids.pop()?)?;
         }
         Some(view)
     }
-}
 
-impl Deref for ViewMap {
-    type Target = IndexMap<ViewId, View>;
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for ViewMap {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+    pub fn insert(&mut self, view_id: ViewId, view: View) -> Option<View> {
+        self.roots.insert(view_id, view)
     }
 }
 #[derive(Debug)]

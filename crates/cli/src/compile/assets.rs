@@ -44,11 +44,11 @@ pub async fn assets(proj: &Arc<Project>, changes: &ChangeSet, first_sync: bool) 
 }
 
 async fn update_asset(proj: &Project, watched: Watched, src_root: &Utf8Path, dest_root: &Utf8Path, reserved: &[Utf8PathBuf]) -> Result<bool> {
-    if let Some(path) = watched.path() {
-        if reserved.contains(path) {
-            log::warn!("Assets reserved filename for Glory. Please remove {path:?}");
-            return Ok(false);
-        }
+    if let Some(path) = watched.path()
+        && reserved.contains(path)
+    {
+        log::warn!("Assets reserved filename for Glory. Please remove {path:?}");
+        return Ok(false);
     }
     Ok(match watched {
         Watched::Create(f) => {

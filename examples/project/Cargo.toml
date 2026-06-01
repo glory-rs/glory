@@ -1,0 +1,23 @@
+[package]
+name = "example"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = []
+web-csr = []
+web-ssr = []
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "example"
+path = "src/main.rs"
+
+[package.metadata.glory]
+features = ["web-ssr"]
+lib_features = ["web-csr"]
+lib_default_features = false
+bin_default_features = false

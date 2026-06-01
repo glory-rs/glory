@@ -1,8 +1,8 @@
 use crate::{
     compile::front::build_cargo_front_cmd,
-    config::{Config, Opts},
+    config::{BuildTarget, Config, Opts},
 };
-use insta::assert_display_snapshot;
+use insta::assert_snapshot;
 use tokio::process::Command;
 
 use super::server::build_cargo_server_cmd;
@@ -16,6 +16,7 @@ fn release_opts() -> Opts {
         features: Vec::new(),
         bin_features: Vec::new(),
         lib_features: Vec::new(),
+        target: BuildTarget::Web,
     }
 }
 fn dev_opts() -> Opts {
@@ -27,6 +28,7 @@ fn dev_opts() -> Opts {
         features: Vec::new(),
         bin_features: Vec::new(),
         lib_features: Vec::new(),
+        target: BuildTarget::Web,
     }
 }
 
@@ -38,7 +40,19 @@ fn test_project_dev() {
     let mut command = Command::new("cargo");
     let (envs, cargo) = build_cargo_server_cmd("build", &conf.projects[0], &mut command);
 
-    const ENV_REF: &str = "\
+    const ENV_REF: &str = if cfg!(windows) {
+        "\
+    GLORY_OUTPUT_NAME=example \
+    GLORY_SITE_ROOT=target\\site \
+    GLORY_SITE_PKG_DIR=pkg \
+    GLORY_SITE_ADDR=127.0.0.1:8000 \
+    GLORY_RELOAD_PORT=3001 \
+    GLORY_LIB_DIR=. \
+    GLORY_BIN_DIR=. \
+    GLORY_TARGET=web \
+    GLORY_WATCH=ON"
+    } else {
+        "\
     GLORY_OUTPUT_NAME=example \
     GLORY_SITE_ROOT=target/site \
     GLORY_SITE_PKG_DIR=pkg \
@@ -46,15 +60,17 @@ fn test_project_dev() {
     GLORY_RELOAD_PORT=3001 \
     GLORY_LIB_DIR=. \
     GLORY_BIN_DIR=. \
-    GLORY_WATCH=ON";
+    GLORY_TARGET=web \
+    GLORY_WATCH=ON"
+    };
     assert_eq!(ENV_REF, envs);
 
-    assert_display_snapshot!(cargo, @"cargo build --package=example --bin=example --target-dir=target/server --no-default-features --features=ssr");
+    assert_snapshot!(cargo, @"cargo build --package=example --bin=example --target-dir=target/server --no-default-features --features=web-ssr");
 
     let mut command = Command::new("cargo");
     let (_, cargo) = build_cargo_front_cmd("build", true, &conf.projects[0], &mut command);
 
-    assert_display_snapshot!(cargo, @"cargo build --package=example --lib --target-dir=target/front --target=wasm32-unknown-unknown --no-default-features --features=web-csr --features=web-ssr");
+    assert_snapshot!(cargo, @"cargo build --package=example --target-dir=target/front --target=wasm32-unknown-unknown --no-default-features --features=web-csr,web-ssr");
 }
 
 #[test]
@@ -65,12 +81,12 @@ fn test_project_release() {
     let mut command = Command::new("cargo");
     let (_, cargo) = build_cargo_server_cmd("build", &conf.projects[0], &mut command);
 
-    assert_display_snapshot!(cargo, @"cargo build --package=example --bin=example --target-dir=target/server --no-default-features --features=web-ssr --release");
+    assert_snapshot!(cargo, @"cargo build --package=example --bin=example --target-dir=target/server --no-default-features --features=web-ssr --release");
 
     let mut command = Command::new("cargo");
     let (_, cargo) = build_cargo_front_cmd("build", true, &conf.projects[0], &mut command);
 
-    assert_display_snapshot!(cargo, @"cargo build --package=example --lib --target-dir=target/front --target=wasm32-unknown-unknown --no-default-features --features=web-csr --features=web-ssr --release");
+    assert_snapshot!(cargo, @"cargo build --package=example --target-dir=target/front --target=wasm32-unknown-unknown --no-default-features --features=web-csr,web-ssr --release");
 }
 
 #[test]
@@ -84,6 +100,7 @@ fn test_workspace_project1() {
     GLORY_RELOAD_PORT=3001 \
     GLORY_LIB_DIR=project1\\front \
     GLORY_BIN_DIR=project1\\server \
+    GLORY_TARGET=web \
     GLORY_WATCH=ON"
     } else {
         "\
@@ -94,6 +111,7 @@ fn test_workspace_project1() {
     GLORY_RELOAD_PORT=3001 \
     GLORY_LIB_DIR=project1/front \
     GLORY_BIN_DIR=project1/server \
+    GLORY_TARGET=web \
     GLORY_WATCH=ON"
     };
 
@@ -105,14 +123,14 @@ fn test_workspace_project1() {
 
     assert_eq!(ENV_REF, envs);
 
-    assert_display_snapshot!(cargo, @"cargo build --package=server-package --bin=server-package --target-dir=target/server --no-default-features");
+    assert_snapshot!(cargo, @"cargo build --package=server-package --bin=server-package --target-dir=target/server --no-default-features --features=web-ssr");
 
     let mut command = Command::new("cargo");
     let (envs, cargo) = build_cargo_front_cmd("build", true, &conf.projects[0], &mut command);
 
     assert_eq!(ENV_REF, envs);
 
-    assert_display_snapshot!(cargo, @"cargo build --package=front-package --lib --target-dir=target/front --target=wasm32-unknown-unknown --no-default-features");
+    assert_snapshot!(cargo, @"cargo build --package=front-package --target-dir=target/front --target=wasm32-unknown-unknown --no-default-features --features=web-csr");
 }
 
 #[test]
@@ -123,10 +141,10 @@ fn test_workspace_project2() {
     let mut command = Command::new("cargo");
     let (_, cargo) = build_cargo_server_cmd("build", &conf.projects[1], &mut command);
 
-    assert_display_snapshot!(cargo, @"cargo build --package=project2 --bin=project2 --target-dir=target/server --no-default-features --features=web-ssr");
+    assert_snapshot!(cargo, @"cargo build --package=project2 --bin=project2 --target-dir=target/server --no-default-features --features=web-ssr");
 
     let mut command = Command::new("cargo");
     let (_, cargo) = build_cargo_front_cmd("build", true, &conf.projects[1], &mut command);
 
-    assert_display_snapshot!(cargo, @"cargo build --package=project2 --lib --target-dir=target/front --target=wasm32-unknown-unknown --no-default-features --features=web-ssr --features=web-csr");
+    assert_snapshot!(cargo, @"cargo build --package=project2 --target-dir=target/front --target=wasm32-unknown-unknown --no-default-features --features=web-csr,web-ssr");
 }

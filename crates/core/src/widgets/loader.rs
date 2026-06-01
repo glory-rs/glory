@@ -103,7 +103,7 @@ where
                     // Create fallback and remove it for server and client can create same view id.
                     if let Some(fallback) = &self.fallback {
                         (fallback)(ctx);
-                        for view_id in ctx.show_list.clone() {
+                        for view_id in ctx.visible_views.clone() {
                             ctx.detach_child(&view_id);
                         }
                     }
@@ -123,7 +123,7 @@ where
                 (fallback)(ctx);
             }
 
-            let state = self.state.clone();
+            let state = self.state;
             let (gathers, fut) = reflow::gather(|| (self.fut_maker.as_ref().unwrap())());
             state.revise_silent(|mut state| {
                 *state = LoadState::<T>::Loading;
@@ -168,7 +168,7 @@ where
             // Tear down the previous cycle's children (loaded result or stale
             // fallback) before re-rendering the fallback, otherwise repeated
             // dep-change cycles stack child views on top of each other.
-            for view_id in ctx.show_list.clone() {
+            for view_id in ctx.visible_views.clone() {
                 ctx.detach_child(&view_id);
             }
 
@@ -180,7 +180,7 @@ where
                 gather.unbind_view(ctx.view_id());
             }
 
-            let state = self.state.clone();
+            let state = self.state;
             let (gathers, fut) = reflow::gather(|| (self.fut_maker.as_ref().unwrap())());
             crate::spawn::spawn_local(async move {
                 let result = fut.await;
@@ -193,13 +193,13 @@ where
                 gather.bind_view(ctx.view_id());
             }
         } else if let LoadState::Loaded(result) = &*self.state.get() {
-            for view_id in ctx.show_list.clone() {
+            for view_id in ctx.visible_views.clone() {
                 ctx.detach_child(&view_id);
             }
 
             (self.callback)(result, ctx);
 
-            for view_id in ctx.show_list.clone() {
+            for view_id in ctx.visible_views.clone() {
                 ctx.attach_child(&view_id);
             }
         }
@@ -296,7 +296,7 @@ where
                     // Create fallback and remove it for server and client can create same view id.
                     if let Some(fallback) = &self.fallback {
                         (fallback)(ctx);
-                        for view_id in ctx.show_list.clone() {
+                        for view_id in ctx.visible_views.clone() {
                             ctx.detach_child(&view_id);
                         }
                     }
@@ -313,7 +313,7 @@ where
                 (fallback)(ctx);
             }
 
-            let state = self.state.clone();
+            let state = self.state;
             let fut = (self.fut_maker.take().unwrap())();
             state.revise_silent(|mut state| {
                 *state = LoadState::<T>::Loading;
@@ -331,13 +331,13 @@ where
 
     fn patch(&mut self, ctx: &mut Scope) {
         if let LoadState::Loaded(result) = &*self.state.get() {
-            for view_id in ctx.show_list.clone() {
+            for view_id in ctx.visible_views.clone() {
                 ctx.detach_child(&view_id);
             }
 
             (self.callback)(result, ctx);
 
-            for view_id in ctx.show_list.clone() {
+            for view_id in ctx.visible_views.clone() {
                 ctx.attach_child(&view_id);
             }
         }

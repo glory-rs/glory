@@ -266,7 +266,7 @@ where
         // Two kinds of views need re-attachment: reused-but-moving views
         // (already attached at the wrong index) and freshly created views
         // (never attached). Both must hit `attach_child`'s neighbour
-        // search path with `position == Unset`, otherwise `attach_child`
+        // search path with `placement == Unset`, otherwise `attach_child`
         // falls through to the `Tail` fallback and we lose ordering.
         //
         // The pre-mark also clears `is_attached` on moving reused views
@@ -280,7 +280,7 @@ where
             }
             if let Some(view) = ctx.child_views.get_mut(view_id) {
                 view.scope.is_attached = false;
-                view.scope.position = crate::view::ViewPosition::Unset;
+                view.scope.placement = crate::view::ViewPlacement::Unset;
             }
         }
 

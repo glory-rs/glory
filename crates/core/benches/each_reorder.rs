@@ -5,7 +5,9 @@
 //! middle-removal. Run via `cargo bench -p glory-core --features web-ssr
 //! --bench each_reorder`.
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use std::hint::black_box;
+
+use criterion::{Criterion, criterion_group, criterion_main};
 use glory_core::config::GloryConfig;
 use glory_core::reflow::Cage;
 use glory_core::web::holders::ServerHolder;
@@ -20,7 +22,7 @@ struct ListWidget {
 
 impl Widget for ListWidget {
     fn build(&mut self, ctx: &mut Scope) {
-        ul().fill(Each::from_vec(self.items.clone(), |s| s.clone(), |s| li().text(s.clone())))
+        ul().fill(Each::from_vec(self.items, |s| s.clone(), |s| li().text(s.clone())))
             .show_in(ctx);
     }
 }
@@ -41,7 +43,7 @@ fn bench_reverse(c: &mut Criterion) {
                 || {
                     let initial = make_initial(n);
                     let items = Cage::new(initial.clone());
-                    let holder = make_holder().mount(ListWidget { items: items.clone() });
+                    let holder = make_holder().mount(ListWidget { items });
                     (items, holder)
                 },
                 |(items, _holder)| {
@@ -65,7 +67,7 @@ fn bench_shuffle(c: &mut Criterion) {
                     let stride = if n % 7 == 0 { 11 } else { 7 };
                     let shuffled: Vec<String> = (0..n).map(|i| initial[(i * stride) % n].clone()).collect();
                     let items = Cage::new(initial);
-                    let holder = make_holder().mount(ListWidget { items: items.clone() });
+                    let holder = make_holder().mount(ListWidget { items });
                     (items, shuffled, holder)
                 },
                 |(items, shuffled, _holder)| {
@@ -85,7 +87,7 @@ fn bench_prepend_one(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let items = Cage::new(make_initial(n));
-                    let holder = make_holder().mount(ListWidget { items: items.clone() });
+                    let holder = make_holder().mount(ListWidget { items });
                     (items, holder)
                 },
                 |(items, _holder)| {
@@ -105,7 +107,7 @@ fn bench_append_one(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let items = Cage::new(make_initial(n));
-                    let holder = make_holder().mount(ListWidget { items: items.clone() });
+                    let holder = make_holder().mount(ListWidget { items });
                     (items, holder)
                 },
                 |(items, _holder)| {
@@ -125,7 +127,7 @@ fn bench_remove_middle(c: &mut Criterion) {
             b.iter_with_setup(
                 || {
                     let items = Cage::new(make_initial(n));
-                    let holder = make_holder().mount(ListWidget { items: items.clone() });
+                    let holder = make_holder().mount(ListWidget { items });
                     let mid = n / 2;
                     (items, mid, holder)
                 },

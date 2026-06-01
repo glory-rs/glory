@@ -40,10 +40,8 @@ impl PropValue for String {
 }
 impl PropValue for Option<String> {
     fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
-        if first_time {
-            if let Some(value) = self {
-                PropValue::inject_to(value, view_id, node, name, first_time);
-            }
+        if first_time && let Some(value) = self {
+            PropValue::inject_to(value, view_id, node, name, first_time);
         }
     }
 }
@@ -115,10 +113,8 @@ impl PropValue for bool {
 
 impl PropValue for Option<bool> {
     fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
-        if first_time {
-            if let Some(value) = self {
-                PropValue::inject_to(value, view_id, node, name, first_time);
-            }
+        if first_time && let Some(value) = self {
+            PropValue::inject_to(value, view_id, node, name, first_time);
         }
     }
 }

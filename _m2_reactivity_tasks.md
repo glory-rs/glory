@@ -15,7 +15,7 @@ generational arena remains large.
 - [x] Preserve current subscription, serialization, equality, and scheduler
       semantics under the new storage layout.
 - [x] Update `_todos.md` to record the completed sub-slice and the later
-      owner / sync-storage completion.
+      owner completion.
 - [x] Run targeted tests for `glory-core` with `web-ssr`.
 
 ## Batch 2: Owner And Reclamation
@@ -26,10 +26,9 @@ generational arena remains large.
 - [x] Convert stale-handle APIs from panic-only to `Result` where caller recovery
       is practical.
 
-## Batch 3: Sync Storage
+## Batch 3: Removed Unused Sync Scaffold
 
-- [x] Add a `sync-storage` feature.
-- [x] Implement `SyncStorage` over `RwLock` / atomics.
-- [x] Decide whether `Cage<T>` switches storage backends by feature or whether a
-      separate sync handle is exposed first.
-- [x] Add thread-crossing tests for sync handles.
+- [x] Delete the unconnected sync-storage feature and standalone storage module.
+- [x] Keep the current `Cage<T>` implementation on the owner-invalidated handle
+      path until a sync backend is wired directly into the public reactive
+      primitives.

@@ -30,10 +30,14 @@ pub struct GloryConfig {
     /// Defaults to match reload_port
     #[serde(default)]
     pub reload_external_port: Option<u32>,
-    /// The protocol the Websocket watcher uses on the client: `ws` in most cases, `wss` when behind a reverse https proxy.
+    /// The protocol the WebSocket watcher uses on the client: `ws` in most cases, `wss` when behind a reverse https proxy.
     /// Defaults to `ws`
     #[serde(default)]
-    pub reload_ws_protocol: ReloadWSProtocol,
+    pub reload_protocol: ReloadWebSocketProtocol,
+    /// Optional nonce attached to Glory-managed SSR scripts and preload links.
+    /// Set with `GLORY_CSP_NONCE` when serving under a strict CSP.
+    #[serde(default)]
+    pub csp_nonce: Option<String>,
     /// The path of a custom 404 Not Found page to display when statically serving content, defaults to `site_root/404.html`
     #[serde(default = "default_not_found_path")]
     pub not_found_path: String,
@@ -48,7 +52,8 @@ impl Default for GloryConfig {
             site_addr: default_site_addr(),
             reload_port: default_reload_port(),
             reload_external_port: None,
-            reload_ws_protocol: ReloadWSProtocol::default(),
+            reload_protocol: ReloadWebSocketProtocol::default(),
+            csp_nonce: None,
             not_found_path: default_not_found_path(),
         }
     }
@@ -107,7 +112,8 @@ impl GloryConfig {
                 Some(val) => Some(val.parse()?),
                 None => None,
             },
-            reload_ws_protocol: ws_from_str(env_with_default("GLORY_RELOAD_WS_PROTOCOL", "ws")?.as_str())?,
+            reload_protocol: reload_protocol_from_str(env_with_default("GLORY_RELOAD_PROTOCOL", "ws")?.as_str())?,
+            csp_nonce: env_without_default("GLORY_CSP_NONCE")?,
             not_found_path: env_with_default("GLORY_NOT_FOUND_PATH", "/404")?,
         })
     }
@@ -151,59 +157,45 @@ impl GloryConfig {
     }
 }
 
-/// An enum that can be used to define the websocket protocol Glory uses for hotreloading
+/// Defines the WebSocket protocol Glory uses for hot reloading.
 /// Defaults to `ws`.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
-pub enum ReloadWSProtocol {
-    WS,
-    WSS,
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ReloadWebSocketProtocol {
+    #[default]
+    Ws,
+    Wss,
 }
 
-impl Default for ReloadWSProtocol {
-    fn default() -> Self {
-        Self::WS
-    }
-}
-
-fn ws_from_str(input: &str) -> Result<ReloadWSProtocol, GloryConfigError> {
-    let sanitized = input.to_lowercase();
-    match sanitized.as_ref() {
-        "ws" | "WS" => Ok(ReloadWSProtocol::WS),
-        "wss" | "WSS" => Ok(ReloadWSProtocol::WSS),
+fn reload_protocol_from_str(input: &str) -> Result<ReloadWebSocketProtocol, GloryConfigError> {
+    match input.to_lowercase().as_str() {
+        "ws" => Ok(ReloadWebSocketProtocol::Ws),
+        "wss" => Ok(ReloadWebSocketProtocol::Wss),
         _ => Err(GloryConfigError::EnvVarError(format!(
-            "{input} is not a supported websocket protocol. Use only `ws` or \
+            "{input} is not a supported WebSocket protocol. Use only `ws` or \
              `wss`.",
         ))),
     }
 }
 
-impl FromStr for ReloadWSProtocol {
-    type Err = ();
+impl FromStr for ReloadWebSocketProtocol {
+    type Err = GloryConfigError;
     fn from_str(input: &str) -> Result<Self, Self::Err> {
-        ws_from_str(input).or_else(|_| Ok(Self::default()))
+        reload_protocol_from_str(input)
     }
 }
 
-impl From<&str> for ReloadWSProtocol {
+impl From<&str> for ReloadWebSocketProtocol {
     fn from(str: &str) -> Self {
-        ws_from_str(str).unwrap_or_else(|err| panic!("{}", err))
+        reload_protocol_from_str(str).unwrap_or_else(|err| panic!("{}", err))
     }
 }
 
-impl From<&Result<String, VarError>> for ReloadWSProtocol {
-    fn from(input: &Result<String, VarError>) -> Self {
-        match input {
-            Ok(str) => ws_from_str(str).unwrap_or_else(|err| panic!("{}", err)),
-            Err(_) => Self::default(),
-        }
-    }
-}
-
-impl TryFrom<String> for ReloadWSProtocol {
+impl TryFrom<String> for ReloadWebSocketProtocol {
     type Error = GloryConfigError;
 
     fn try_from(s: String) -> Result<Self, Self::Error> {
-        ws_from_str(s.as_str())
+        reload_protocol_from_str(s.as_str())
     }
 }
 
@@ -213,8 +205,6 @@ pub enum GloryConfigError {
     ConfigNotFound,
     #[error("package.metadata.glory section missing from Cargo.toml")]
     ConfigSectionNotFound,
-    #[error("Failed to get Glory Environment. Did you set GLORY_ENV?")]
-    EnvError,
     #[error("Config Error: {0}")]
     ConfigError(String),
     #[error("Config Error: {0}")]

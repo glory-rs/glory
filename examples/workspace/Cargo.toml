@@ -1,0 +1,21 @@
+[workspace]
+members = ["project1/front", "project1/server", "project2"]
+resolver = "2"
+
+[[workspace.metadata.glory]]
+name = "project1"
+bin-package = "server-package"
+lib-package = "front-package"
+output_name = "project1"
+site_root = "target/site/project1"
+lib_default_features = false
+bin_default_features = false
+
+[[workspace.metadata.glory]]
+name = "project2"
+bin-package = "project2"
+lib-package = "project2"
+features = ["web-ssr"]
+lib_features = ["web-csr"]
+lib_default_features = false
+bin_default_features = false

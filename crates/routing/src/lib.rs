@@ -9,9 +9,9 @@
 //!
 //! - [`aviators::BrowserAviator`] — wraps `window.history` and
 //!   listens for `popstate` + delegated anchor clicks.
-//! - [`aviators::ServerAviator`] — used during SSR; resolves the
-//!   request URL once and panics on programmatic `goto` (there is
-//!   no browser history to push to on the server).
+//! - [`aviators::ServerAviator`] — used during SSR; resolves request
+//!   URLs through the same fallible navigation trait without touching
+//!   browser history.
 //!
 //! To navigate from app code, obtain the active `Aviator` from the
 //! `Truck` and call `goto`. The `<a>` element's default click is
@@ -32,13 +32,13 @@ extern crate cfg_if;
 mod aviator;
 pub mod aviators;
 pub mod filters;
-pub use aviator::Aviator;
+pub use aviator::{Aviator, NavigationError};
 mod graff;
 mod locator;
 mod router;
 pub use filters::*;
 pub use graff::Graff;
-pub use locator::Locator;
+pub use locator::{Locator, LocatorModifier};
 pub use router::Router;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -82,42 +82,48 @@ pub type PathParams = BTreeMap<String, String>;
 #[doc(hidden)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PathState {
-    pub(crate) parts: Vec<String>,
-    /// (row, col), row is the index of parts, col is the index of char in the part.
-    pub(crate) cursor: (usize, usize),
+    pub(crate) segments: Vec<String>,
+    pub(crate) cursor: PathCursor,
     pub(crate) params: PathParams,
-    pub(crate) end_slash: bool, // For rest match, we want include the last slash.
+    pub(crate) has_trailing_slash: bool,
+}
+
+#[doc(hidden)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) struct PathCursor {
+    pub segment: usize,
+    pub offset: usize,
 }
 impl PathState {
     /// Create new `PathState`.
     #[inline]
     pub fn new(url_path: impl AsRef<str>) -> Self {
         let url_path = url_path.as_ref();
-        let end_slash = url_path.ends_with('/');
-        let parts = url_path
+        let has_trailing_slash = url_path.ends_with('/');
+        let segments = url_path
             .trim_start_matches('/')
             .trim_end_matches('/')
             .split('/')
             .filter_map(|p| if !p.is_empty() { Some(decode_url_path_safely(p)) } else { None })
             .collect::<Vec<_>>();
         PathState {
-            parts,
-            cursor: (0, 0),
+            segments,
+            cursor: PathCursor::default(),
             params: PathParams::new(),
-            end_slash,
+            has_trailing_slash,
         }
     }
 
     #[inline]
     pub fn pick(&self) -> Option<&str> {
-        match self.parts.get(self.cursor.0) {
+        match self.segments.get(self.cursor.segment) {
             None => None,
             Some(part) => {
-                if self.cursor.1 >= part.len() {
-                    let row = self.cursor.0 + 1;
-                    self.parts.get(row).map(|s| &**s)
+                if self.cursor.offset >= part.len() {
+                    let segment = self.cursor.segment + 1;
+                    self.segments.get(segment).map(|s| &**s)
                 } else {
-                    Some(&part[self.cursor.1..])
+                    Some(&part[self.cursor.offset..])
                 }
             }
         }
@@ -126,15 +132,15 @@ impl PathState {
     #[inline]
     pub fn all_rest(&self) -> Option<Cow<'_, str>> {
         if let Some(picked) = self.pick() {
-            if self.cursor.0 >= self.parts.len() - 1 {
-                if self.end_slash {
+            if self.cursor.segment >= self.segments.len() - 1 {
+                if self.has_trailing_slash {
                     Some(Cow::Owned(format!("{picked}/")))
                 } else {
                     Some(Cow::Borrowed(picked))
                 }
             } else {
-                let last = self.parts[self.cursor.0 + 1..].join("/");
-                if self.end_slash {
+                let last = self.segments[self.cursor.segment + 1..].join("/");
+                if self.has_trailing_slash {
                     Some(Cow::Owned(format!("{picked}/{last}/")))
                 } else {
                     Some(Cow::Owned(format!("{picked}/{last}")))
@@ -147,21 +153,24 @@ impl PathState {
 
     #[inline]
     pub fn forward(&mut self, steps: usize) {
-        let mut steps = steps + self.cursor.1;
-        while let Some(part) = self.parts.get(self.cursor.0) {
+        let mut steps = steps + self.cursor.offset;
+        while let Some(part) = self.segments.get(self.cursor.segment) {
             if part.len() > steps {
-                self.cursor.1 = steps;
+                self.cursor.offset = steps;
                 return;
             } else {
                 steps -= part.len();
-                self.cursor = (self.cursor.0 + 1, 0);
+                self.cursor = PathCursor {
+                    segment: self.cursor.segment + 1,
+                    offset: 0,
+                };
             }
         }
     }
 
     #[inline]
     pub fn is_ended(&self) -> bool {
-        self.cursor.0 >= self.parts.len()
+        self.cursor.segment >= self.segments.len()
     }
 }
 
@@ -188,7 +197,7 @@ impl TruckExt for Rc<RefCell<Truck>> {
     fn insert_stuff(&self, graff_and_key: impl Into<String>, widget: impl Widget) {
         let graff_and_key = graff_and_key.into();
         let graff = if let Some((graff, key)) = graff_and_key.split_once('@') {
-            if self.contains_stuff_key(&graff, &key) {
+            if self.contains_stuff_key(graff, key) {
                 return;
             }
             self.insert_stuff_key(graff, key);
@@ -230,7 +239,7 @@ impl TruckExt for Rc<RefCell<Truck>> {
             let stuffs: Cage<IndexMap<String, Stuff>> = Default::default();
             (*self).deref().borrow_mut().insert(KEY.to_owned(), stuffs);
         }
-        self.deref().borrow().get::<Cage<IndexMap<String, Stuff>>>(KEY).unwrap().clone()
+        *self.deref().borrow().get::<Cage<IndexMap<String, Stuff>>>(KEY).unwrap()
     }
     fn stuff_keys(&self) -> Rc<RefCell<IndexMap<String, String>>> {
         const KEY: &str = "glory::routing::stuff_keys";

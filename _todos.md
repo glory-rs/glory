@@ -13,7 +13,7 @@
 
 - [x] **P0** [`crates/core/src/widgets/each.rs:103`](crates/core/src/widgets/each.rs) 留着 `crate::warn!("key_view_ids: {:?}", key_view_ids);` 调试日志,生产构建噪声且暗示算法没收尾。先移除,然后做下面的 §1 重排算法。 — 已在 M1 移除([commit 30f6701](https://github.com/glory-rs/glory/pull/32))。
 - [x] **P1** [`crates/core/src/widgets/switch.rs`](crates/core/src/widgets/switch.rs) `Case::cached_view` 路径:`detach_child` 后 View 从 `ctx.child_views` 移除并存在 `Case::cached_view`,再次激活时只调 `attach_child(&view_id)`,但 `child_views` 已没这个 id。需要把 cached_view 重新塞回 `child_views`(或重做缓存语义)。补一个回归测试。 — 已修;`switch_toggles_and_restores_cached_view` 快照测试覆盖。
-- [x] **P1** [`crates/core/src/widgets/loader.rs`](crates/core/src/widgets/loader.rs) `patch` 中先 `detach_child` 再 `attach_child` 走 `show_list.clone()` 两遍,中间没清空 `show_list`,重复调用会越积越多。审一遍。 — 实际 bug 在 `is_revising` 分支前没 detach 旧 result/fallback,导致连续 dep 变化时 subtree 堆叠;已修。
+- [x] **P1** [`crates/core/src/widgets/loader.rs`](crates/core/src/widgets/loader.rs) `patch` 中先 `detach_child` 再 `attach_child` 走 `visible_views.clone()` 两遍,中间没清空 visible set,重复调用会越积越多。审一遍。 — 实际 bug 在 `is_revising` 分支前没 detach 旧 result/fallback,导致连续 dep 变化时 subtree 堆叠;已修。
 - [x] **P2** `Bond::version` 用 `.map(|g| g.version()).sum()`([reflow/bond.rs](crates/core/src/reflow/bond.rs)),依赖版本号会碰撞(理论上不同组合可能和相同)。改成 `(id, version)` 对组成的 hash,或者每次依赖变化就单调递增。 — 改为 `(id, version)` 快照逐项比较 + 单调 re-run 计数器。
 - [x] **P2** `single-app` 命名带双下划线,Rust 社区惯例表示"不稳定内部 API"。如果它确实稳定,改名为 `single-app`;否则文档化清楚。 — 已改为稳定的 `single-app` feature;`crates/core/Cargo.toml` 明确说明只由 `web-csr` 自动启用,非 CSR 手动启用不受支持,`AGENTS.md` 同步记录规则。
 
@@ -21,13 +21,40 @@
 
 - [x] **P0** SSR `Node::before_with_node` / `after_with_node` 语义完全坏掉:在 `self.children` 里找新节点的位置,然后把同一个新节点插到那里——等价空操作。所有非默认 reorder 路径在 SSR 下都是坏的。已替换为 parent 视角的 `Node::insert_before` / `Node::insert_after`(配合恒等去重),并加 `Node::ptr_eq`(基于 `Rc::ptr_eq`)。
 - [x] **P0** Element(CSR + SSR)`build` 把 `scope.first_child_node` / `last_child_node` 设成 `node.last_element_child()`,对叶节点(如 `<li>text</li>`)返回 `None`,导致 `Scope::attach_child` 的邻居查找全部回退到 `Tail`,reorder 不工作。改为 `Some(self.node.clone())`(元素自身就是子树外层锚点)。CSR 也修了(浏览器 DOM 之前隐式地"移动而非追加"掩盖了这条 bug)。
-- [x] **P0** 默认 `Widget::flood` 实现统一把所有子视图的 `scope.position = Tail`。结合 `attach_child` 在 `is_attached=true` 时早退(不会执行末尾的 `position = Unset` 重置),Tail 永远留下,后续 patch 时邻居搜索被跳过。删掉这行预设。
+- [x] **P0** 默认 `Widget::flood` 实现统一把所有子视图的 `scope.placement = Tail`。结合 `attach_child` 在 `is_attached=true` 时早退(不会执行末尾的 `placement = Unset` 重置),Tail 永远留下,后续 patch 时邻居搜索被跳过。删掉这行预设。
 - [x] **P1** `Scope::attach_child` 反向 sibling 查找用 `for i in (index - 1)..=0`,当 `index > 0` 时是空 range。改为 `(0..index).rev()`。
-- [x] **P1** `IndexMap::remove` / `IndexSet::remove` 在新版 indexmap 已 deprecated 并别名到 `swap_remove`(把最后一项搬到删除位)。`Scope::child_views` / `show_list` 依赖顺序,这等于静默数据破坏。全部 core 调用点改为 `shift_remove`(`Scope::detach_child` / `Cage::unbind_view` / `Bond::unbind_view` / `scheduler::run` / `ServerHolder::drop`)。
+- [x] **P1** `IndexMap::remove` / `IndexSet::remove` 在新版 indexmap 已 deprecated 并别名到 `swap_remove`(把最后一项搬到删除位)。`Scope::child_views` / `visible_views` 依赖顺序,这等于静默数据破坏。全部 core 调用点改为 `shift_remove`(`Scope::detach_child` / `Cage::unbind_view` / `Bond::unbind_view` / `scheduler::run` / `ServerHolder::drop`)。
 - [x] **P2** `GloryConfig::default` ↔ `GloryConfig::new` 互相递归调用,首次调用即 stack overflow。改为直接通过现有 `default_*` 函数构造。
 - [x] **P2** [`crates/core/src/truck.rs`](crates/core/src/truck.rs) 的测试 mod 引用了不存在的 `crate::prelude` / `crate::test` / `transfer` 方法,从来无法编译。清理掉,保留有意义的那个断言。
 - [x] **P2** [`crates/core/src/spawn.rs`](crates/core/src/spawn.rs) `spawn_local` 的 `cfg(any(test, doctest))` 分支调用 `tokio_test::block_on`,但 `tokio_test` 不是依赖,导致 `cargo test` 编译失败。改为让 test 走 `futures::executor` 分支。
 - [x] **P2** `crates/glory` 默认启用 `web-csr`,导致 `cargo check -p glory --features web-ssr` 同时打开 CSR+SSR 并触发互斥 Node 定义。改为 `default = []`,CSR / SSR 必须显式选 feature。
+
+---
+
+## 10. 数据结构激进审计第二轮(2026-06-01)
+
+第二轮覆盖上一轮未完整触达的 `hot-reload` / CLI reload transport。原则同 §9:不保留旧 view macro / DSL 兼容路径,wire payload 用显式 tagged enum,字段名描述业务含义而不是临时实现细节。
+
+- [x] **P0** 删除 `glory-hot-reload` 里历史 `view!` macro 模板 diff 数据结构:`ViewMacros` / `MacroInvocation` / `ViewMacroVisitor` / `LNode` / `LAttributeValue` / `Patches` / `PatchAction` / `ReplacementNode`,以及 `diff.rs` / `node.rs` / `parsing.rs` 和 `rstml` / `quote` / `indexmap` 依赖。
+- [x] **P0** 删除浏览器端旧模板 patch runtime:`patch.js` 不再定义 `patch(msg.view)`,SSR live-reload 注入脚本删除 `msg.view` 分支,只保留 full reload / css reload / function reload。
+- [x] **P1** 函数热重载数据结构改成明确领域名:`HotFunctions` -> `HotReloadFunctions`,`FunctionInvocation` -> `ReloadableFunctionMarker`,`FunctionReplacement` -> `FunctionReload`,`FunctionReplacementBatch` -> `FunctionReloadBatch`;字段改为 `function_id` / `source_path` / `line_number` / `reloads`。
+- [x] **P1** CLI reload websocket payload 从 `BrowserMessage { css: Option<_>, functions: Option<_>, all: bool }` 改成 `#[serde(tag = "type")] BrowserReloadMessage::{Full, Style { css_path }, Functions { payload }}`,消除互斥字段组合。
+- [x] **P2** 更新 `glory-hot-reload` README 和 `_todos.md` §5 中关于保留 view macro legacy internals 的历史说明。
+
+---
+
+## 9. 数据结构激进审计(2026-06-01)
+
+本轮只处理源码中实际承担运行时状态或跨 crate API 的数据结构。原则:字段名必须表达真实语义;未接入、只为兼容旧名或未来迁移预留的结构直接删除;不保留 alias / deprecated shim。
+
+- [x] **P0** `Scope` / `View` 运行时字段统一命名:`show_list` 改成 `visible_views`,`graff_node` 改成 `render_node`,`position` 改成 `placement`;`ViewPosition::Prev/Next` 改成与 renderer 一致的 `ViewPlacement::After/Before`。
+- [x] **P0** `ViewMap` 不是普通 map,而是按 `ViewId` 路径查找根视图和后代视图的树索引。改名为 crate 内部 `ViewTree`,移除公开 re-export、tuple field 和无用 `detach/get` API。
+- [x] **P0** `BrowerHolder` 拼写错误已经进入公开 API。激进改名为 `BrowserHolder`,同步 CSR examples、rustdoc 和 wasm smoke 注释,不保留旧类型别名。
+- [x] **P1** `ReloadWSProtocol` / `reload_ws_protocol` 命名不符合 Rust acronym 规则且暴露了实现缩写。改成 `ReloadWebSocketProtocol` / `reload_protocol`,variants 改为 `Ws/Wss`;环境变量改为 `GLORY_RELOAD_PROTOCOL`,删除旧变量兼容。
+- [x] **P1** 删除未接入的 `reflow::storage` / `sync-storage` feature / `slab` 依赖。当前 `Cage` 实现已经走 owned leaked cell + `Owner` invalidation,该 storage 模块只是历史迁移残留。
+- [x] **P1** routing 数据结构去弱类型/弱命名:`PathState.parts` 改 `segments`,`cursor: (row, col)` 改 `PathCursor { segment, offset }`,`end_slash` 改 `has_trailing_slash`,`PathFilter.raw_value/path_wisps` 改 `pattern/wisps`,wasm `Captures` 改成强类型 `Array<JsString>`。
+- [x] **P2** 删除 `Scope` / `Widget` / holders 中已注释掉的历史兼容代码块,只保留当前实际生命周期路径。
+- [x] **P2** 更新 AGENTS / crate docs 中涉及上述结构字段的说明,避免未来 agent 继续按旧字段名工作。
 
 ---
 
@@ -86,7 +113,7 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
     - [x] 设计 `Owner` 类型,绑定到 `Scope` 生命周期;scope drop → owner drop → 该作用域分配的所有信号失效。
     - [x] 现存 `Cage::clone()` 调用面巨大,先做 internal type alias,保持外部 API 不变,再灰度切换。— `Cage<T>: Copy`;`.clone()` 仍可用,语义退化为复制句柄。
     - [x] 准备 `Cage::try_get / try_revise → Result<_, BorrowError>`,处理代际失配。— 已提供 borrow-conflict 级 `Result`;代际失配等 Owner 回收落地后接入同一 API。
-- [x] **P0** 同时设计 `SyncStorage`(`RwLock` + atomic),让同一份 `Cage`/`Bond` 在 SSR / 多线程 runtime 下也能跑。Feature gate:`sync-storage`。— 新增 `sync-storage` feature 与 `reflow::storage::SyncStorage` / `SyncHandle<T>`;先作为同步后端基础设施落地,线程跨越测试覆盖。默认 `Cage` 仍走 unsync fast path,后续 Owner 回收时再统一切换。
+- [x] **P0** 同时设计同步存储后端(`RwLock` + atomic),让同一份 `Cage`/`Bond` 在 SSR / 多线程 runtime 下也能跑。— 本轮 §9 审计确认旧独立 storage scaffold 没有接入主 `Cage` 路径,已删除;后续同步后端必须直接接入 public reactive primitives。
 - [x] **P1** 增加 `effect(|| { … })` 原语:订阅依赖、自动重跑;返回一个 handle,scope drop 时停止。 — `reflow::Effect` widget + `reflow::effect_in(parent, fn)` 函数;Detach 时清理订阅,有 1 个单测。
 - [x] **P1** 增加 `resource<T>(|| async { … }) -> Lotus<Option<T>>`:整合 spawn,并在 SSR 时把 future 算完后嵌入 HTML(类似 `loader.rs` 的 `save_state`,但作为框架级一等公民)。 — `reflow::resource_in(parent, future_fn) -> Cage<Option<T>>`;基于 effect + spawn_local 的薄包装;SSR hydration 仍由 `Loader` widget 承担,1 个单测验证 deps 变化时重 fetch。
 - [x] **P1** 把 `untrack` 提升为公开稳定 API(目前内部使用)。文档示例补上。 — 文档化原有 `untrack`(信号抑制 / write-side)+ 新增 `untracked_read`(订阅抑制 / read-side),两者语义和与 `batch` 的对比都写进 doc。
@@ -141,7 +168,7 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 
 - [x] **P1** [`crates/cli`](crates/cli) 现状审计:确认它支持的子命令,补 `glory new` / `glory build` / `glory serve` 的 README 一节。 — `crates/cli/src/README.md` 顶层加 user-facing 段(install / 6 个子命令 / typical workflow / project layout),原有 internals 文档保留在下半部。
 - [x] **P2** 借鉴 dioxus `subsecond` 思路实现函数级 hot reload(builder 风格也能用),先做 dev-mode 闭包重链。优先级中,影响 DX。— `glory-hot-reload` 新增 `FunctionRegistry` / `ReloadableFn`,支持稳定 id 注册、替换闭包体、既有 handle 自动调用最新实现;执行清单见 [`_m5_hot_reload_tasks.md`](_m5_hot_reload_tasks.md)。
-- [x] **P2** [`crates/hot-reload`](crates/hot-reload) 当前是占位/半完成的(无 DSL 所以这块用途有限)。要么实现 §2 的代际盒后做"状态保留 + 函数热替换",要么从 workspace 移除避免迷惑。决策点。 — **决策:保留**。crate 已经被 `glory-core` (SSR `HOT_RELOAD_JS`) 和 `glory-cli watch` (`ViewMacros`) 实际引用,移除需要先拆这两处。新加 `crates/hot-reload/README.md` 把"已有什么 / 还缺什么 / 为什么留下"写清楚。
+- [x] **P2** [`crates/hot-reload`](crates/hot-reload) 当前是占位/半完成的(无 DSL 所以这块用途有限)。要么实现 §2 的代际盒后做"状态保留 + 函数热替换",要么从 workspace 移除避免迷惑。决策点。 — **决策:保留函数热替换,删除模板 diff**。crate 仍被 `glory-core` (SSR `HOT_RELOAD_JS`) 和 `glory-cli watch` (`HotReloadFunctions`) 实际引用;历史 `view!` macro / virtual-node diff 路径已在 §10 删除。
 - [x] **P3** `cargo-glory` 的 `--target` 子命令多平台编译矩阵(web / desktop / native)。— CLI `Opts` 新增 `--target <web|desktop|native>`;web 走 front+server,desktop/native 跳过 wasm front 并分别默认 bin feature `desktop` / `native`,同时注入 `GLORY_TARGET`。
 
 ---
@@ -196,7 +223,7 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 - 额外:发现并修复 SSR Node / Element 锚点 / 默认 flood / `shift_remove` 等 7 处隐藏 bug
 
 **M2(响应式现代化)** ✅ 已完成
-- §2 P0 代际盒 / Owner / `SyncStorage` 地基完成,`Cage<T>` 已是 copyable generation handle。
+- §2 P0 copyable handle / Owner 地基完成,`Cage<T>` 已是 copyable owner-invalidated handle。
 - §5 P2 builder 风格函数级 hot reload 地基完成,并接入 CLI function replacement event。
 
 **M3(渲染层抽象)** ✅ 已完成

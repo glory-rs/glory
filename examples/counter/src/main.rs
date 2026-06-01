@@ -1,11 +1,11 @@
 use glory::web::events;
 use glory::web::helpers::event_target_value;
 use glory::web::widgets::*;
-use glory::web::holders::BrowerHolder;
+use glory::web::holders::BrowserHolder;
 use glory::*;
 
 pub fn main() {
-    BrowerHolder::new().mount(Counter::new());
+    BrowserHolder::new().mount(Counter::new());
 }
 
 #[derive(Debug)]

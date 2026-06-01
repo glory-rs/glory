@@ -1,0 +1,17 @@
+[package]
+name = "project2"
+version = "0.1.0"
+edition = "2024"
+
+[features]
+default = []
+web-csr = []
+web-ssr = []
+
+[lib]
+path = "src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "project2"
+path = "src/main.rs"

@@ -274,7 +274,7 @@ mod tests {
     #[test]
     fn bond_recomputes_when_dep_revises() {
         let cage = Cage::new(1_i32);
-        let cage_for_bond = cage.clone();
+        let cage_for_bond = cage;
         let bond = Bond::new(move || *cage_for_bond.get() * 10);
         assert_eq!(*bond.get(), 10);
         let v0 = bond.version();
@@ -305,7 +305,7 @@ mod tests {
     #[test]
     fn bond_with_partial_eq_skips_version_bump_when_value_unchanged() {
         let cage = Cage::new(1_i32);
-        let cage_for_bond = cage.clone();
+        let cage_for_bond = cage;
         // Map any non-zero input to the same constant; PartialEq gate
         // should prevent version churn when the cage flips between
         // values that map to the same output.

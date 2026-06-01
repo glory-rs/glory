@@ -71,7 +71,7 @@ impl ServerHolder {
     }
 
     pub fn html_chunks(&self) -> Vec<HtmlChunk> {
-        let (head, mid, tail) = crate::web::utils::html_parts_separated(&self.config, &*self.truck.borrow());
+        let (head, mid, tail) = crate::web::utils::html_parts_separated(&self.config, &self.truck.borrow());
         vec![
             HtmlChunk::DocumentStart(head),
             HtmlChunk::BodyOpen(mid),
@@ -126,12 +126,6 @@ impl Holder for ServerHolder {
     fn truck(&self) -> Rc<RefCell<Truck>> {
         self.truck.clone()
     }
-    // fn clone_boxed(&self) -> Box<dyn Holder> {
-    //     Box::new(Self {
-    //         truck: self.truck.clone(),
-    //         host_node: self.host_node.clone(),
-    //     })
-    // }
 }
 
 cfg_feature! {
@@ -158,14 +152,6 @@ cfg_feature! {
         #[educe(Debug(ignore))]
         pub holder_factory: Box<Arc<dyn Fn(Arc<GloryConfig>, String) -> ServerHolder +  Sync +Send + 'static>>,
     }
-
-    // impl Clone for SalvoHandler {
-    //     fn clone(&self) -> Self {
-    //         Self {
-    //             holder_factory: self.holder_factory.clone(),
-    //         }
-    //     }
-    // }
 
     impl SalvoHandler {
         pub async fn new<H>(holder_factory: H ) -> Self where H: Fn(Arc<GloryConfig>, String) -> ServerHolder + Sync + Send + 'static{

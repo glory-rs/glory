@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 use glory::reflow::*;
-use glory::web::holders::BrowerHolder;
+use glory::web::holders::BrowserHolder;
 use glory::web::widgets::*;
 use glory::web::{events, window, event_target_checked, event_target_value, location_hash, request_animation_frame, window_event_listener};
 use glory::node::NodeRef;
@@ -24,7 +24,7 @@ pub fn todos() -> Todos {
 }
 
 pub fn main() {
-    BrowerHolder::new().mount(TodoMvc::new());
+    BrowserHolder::new().mount(TodoMvc::new());
 }
 
 #[derive(Debug, Clone, Default)]

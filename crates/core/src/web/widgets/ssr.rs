@@ -9,7 +9,7 @@ use wasm_bindgen::UnwrapThrowExt;
 use crate::node::{Node, NodeRef};
 use crate::reflow::{Bond, Lotus};
 use crate::renderer::{InsertPosition, Renderer, SsrRenderer};
-use crate::view::{ViewId, ViewPosition};
+use crate::view::{ViewId, ViewPlacement};
 use crate::web::events::EventDescriptor;
 use crate::web::{AttrValue, ClassPart, Classes, PropValue};
 use crate::widget::{Filler, IntoFiller};
@@ -35,7 +35,7 @@ pub struct Element {
 
 impl Widget for Element {
     fn build(&mut self, ctx: &mut Scope) {
-        ctx.graff_node = Some(self.node.clone());
+        ctx.render_node = Some(self.node.clone());
         // For an Element view, the entire subtree is anchored on this
         // element's node. Expose it as both the first- and last-child
         // anchor so sibling-positioning logic in `Scope::attach_child`
@@ -60,13 +60,13 @@ impl Widget for Element {
 
     fn flood(&mut self, ctx: &mut Scope) {
         let parent_node = ctx.parent_node.as_ref().unwrap();
-        match &ctx.position {
-            ViewPosition::Head => self.renderer.insert_child(parent_node, &self.node, InsertPosition::Head),
-            ViewPosition::Prev(prev_node) => self.renderer.insert_child(parent_node, &self.node, InsertPosition::After(prev_node)),
-            ViewPosition::Next(next_node) => self.renderer.insert_child(parent_node, &self.node, InsertPosition::Before(next_node)),
-            ViewPosition::Tail => self.renderer.insert_child(parent_node, &self.node, InsertPosition::Tail),
-            ViewPosition::Unset => {
-                crate::warn!("node position is unset. {:#?}", &self.node);
+        match &ctx.placement {
+            ViewPlacement::Head => self.renderer.insert_child(parent_node, &self.node, InsertPosition::Head),
+            ViewPlacement::Before(next_node) => self.renderer.insert_child(parent_node, &self.node, InsertPosition::Before(next_node)),
+            ViewPlacement::After(prev_node) => self.renderer.insert_child(parent_node, &self.node, InsertPosition::After(prev_node)),
+            ViewPlacement::Tail => self.renderer.insert_child(parent_node, &self.node, InsertPosition::Tail),
+            ViewPlacement::Unset => {
+                crate::warn!("node placement is unset. {:#?}", &self.node);
                 self.renderer.insert_child(parent_node, &self.node, InsertPosition::Tail);
             }
         }
@@ -251,10 +251,8 @@ impl Element {
     /// Sets the inner Text of this element from the provided
     /// string slice.
     ///
-    /// # Security
-    /// Be very careful when using this method. Always remember to
-    /// sanitize the input to avoid a cross-site scripting (XSS)
-    /// vulnerability.
+    /// Text content is escaped during SSR. Use [`Element::html`] only
+    /// when the value is trusted markup.
     pub fn set_text<V>(&mut self, text: V)
     where
         V: AttrValue + 'static,
@@ -264,10 +262,8 @@ impl Element {
     /// Sets the inner Text of this element from the provided
     /// string slice.
     ///
-    /// # Security
-    /// Be very careful when using this method. Always remember to
-    /// sanitize the input to avoid a cross-site scripting (XSS)
-    /// vulnerability.
+    /// Text content is escaped during SSR. Use [`Element::html`] only
+    /// when the value is trusted markup.
     pub fn text<V>(mut self, text: V) -> Self
     where
         V: AttrValue + 'static,

@@ -9,13 +9,21 @@ impl Url {
     /// Parse an absolute URL from a string.
     #[inline]
     pub fn parse(input: &str) -> Result<Url, ParseError> {
-        url::Url::parse(input).map(Url)
+        url::Url::parse(input)
+            .or_else(|err| {
+                if input.starts_with('/') {
+                    url::Url::parse(&format!("http://localhost{input}"))
+                } else {
+                    Err(err)
+                }
+            })
+            .map(Url)
     }
 
     /// Return the serialization of this URL.
     #[inline]
     pub fn as_str(&self) -> &str {
-        &self.0.as_str()
+        self.0.as_str()
     }
 
     /// Return the origin of this URL (<https://url.spec.whatwg.org/#origin>)
@@ -105,7 +113,7 @@ impl Url {
     /// # fn run() -> Result<(), ParseError> {
     /// let mut url = Url::parse("https://example.com/data.csv")?;
     /// assert_eq!(url.as_str(), "https://example.com/data.csv");
-
+    ///
     /// url.set_fragment(Some("cell=4,1-6,2"));
     /// assert_eq!(url.as_str(), "https://example.com/data.csv#cell=4,1-6,2");
     /// assert_eq!(url.fragment(), Some("cell=4,1-6,2"));

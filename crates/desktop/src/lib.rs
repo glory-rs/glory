@@ -262,4 +262,123 @@ mod tests {
             ]
         );
     }
+
+    #[test]
+    fn renderer_serializes_full_command_surface() {
+        let sink = Arc::new(RecordingSink::default());
+        let renderer = WryRenderer::new(sink.clone());
+        let root = renderer.create_element("main".into(), false);
+        let first = renderer.create_element("span".into(), false);
+        let second = renderer.create_element("em".into(), false);
+
+        renderer.set_attribute(&first, "data-id".into(), "one".into());
+        renderer.remove_attribute(&first, "data-id");
+        renderer.set_property(&first, "value".into(), "hello".into());
+        renderer.remove_property(&first, "value");
+        renderer.add_class(&first, "active primary".into());
+        renderer.remove_class(&first, "active");
+        renderer.set_html(&first, "<strong>Ready</strong>".into());
+        renderer.insert_child(&root, &first, InsertPosition::Head);
+        renderer.insert_child(&root, &second, InsertPosition::After(&first));
+        renderer.insert_child(&root, &second, InsertPosition::Before(&first));
+        renderer.remove_child(&root, &second);
+        renderer.attach_event(&first, "click".into(), true, Box::new(|_| {}));
+
+        assert_eq!(
+            sink.commands(),
+            vec![
+                WryCommand::Create {
+                    id: 1,
+                    name: "main".to_string(),
+                    is_void: false
+                },
+                WryCommand::Create {
+                    id: 2,
+                    name: "span".to_string(),
+                    is_void: false
+                },
+                WryCommand::Create {
+                    id: 3,
+                    name: "em".to_string(),
+                    is_void: false
+                },
+                WryCommand::SetAttribute {
+                    id: 2,
+                    name: "data-id".to_string(),
+                    value: "one".to_string()
+                },
+                WryCommand::RemoveAttribute {
+                    id: 2,
+                    name: "data-id".to_string()
+                },
+                WryCommand::SetProperty {
+                    id: 2,
+                    name: "value".to_string(),
+                    value: "hello".to_string()
+                },
+                WryCommand::RemoveProperty {
+                    id: 2,
+                    name: "value".to_string()
+                },
+                WryCommand::AddClass {
+                    id: 2,
+                    value: "active primary".to_string()
+                },
+                WryCommand::RemoveClass {
+                    id: 2,
+                    value: "active".to_string()
+                },
+                WryCommand::SetHtml {
+                    id: 2,
+                    value: "<strong>Ready</strong>".to_string()
+                },
+                WryCommand::Insert {
+                    parent: 1,
+                    child: 2,
+                    position: WryInsertPosition::Head
+                },
+                WryCommand::Insert {
+                    parent: 1,
+                    child: 3,
+                    position: WryInsertPosition::After(2)
+                },
+                WryCommand::Insert {
+                    parent: 1,
+                    child: 3,
+                    position: WryInsertPosition::Before(2)
+                },
+                WryCommand::Remove { parent: 1, child: 3 },
+                WryCommand::AttachEvent {
+                    id: 2,
+                    name: "click".to_string(),
+                    bubbles: true
+                }
+            ]
+        );
+    }
+
+    #[test]
+    fn interpreter_consumes_renderer_command_surface() {
+        for command in [
+            "Create",
+            "SetAttribute",
+            "RemoveAttribute",
+            "SetProperty",
+            "RemoveProperty",
+            "AddClass",
+            "RemoveClass",
+            "SetText",
+            "SetHtml",
+            "Insert",
+            "Remove",
+            "AttachEvent",
+        ] {
+            assert!(
+                WRY_INTERPRETER_JS.contains(&format!("\"{command}\"")),
+                "{command} missing from interpreter"
+            );
+        }
+        assert!(WRY_INTERPRETER_JS.contains("__gloryApplyWryCommand"));
+        assert!(WRY_INTERPRETER_JS.contains("GloryWryEvent"));
+    }
 }

@@ -6,7 +6,7 @@ use glory_core::holder::Enabler;
 use glory_core::Truck;
 
 use crate::url::Url;
-use crate::{Aviator, Handler, Locator, PathState, Router};
+use crate::{Aviator, Handler, Locator, NavigationError, PathState, Router};
 
 #[derive(Educe, Clone)]
 #[educe(Debug)]
@@ -27,11 +27,15 @@ impl ServerAviator {
             base_path: Default::default(),
         }
     }
-    pub(crate) fn locate(&self, raw_url: impl Into<String>) -> Result<(), url::ParseError> {
+    pub(crate) fn locate(&self, raw_url: impl Into<String>) -> Result<(), NavigationError> {
         let raw_url = raw_url.into();
         let url = Url::parse(&raw_url)?;
         glory_core::info!("[locate]: {:?}", url);
-        let locator = self.truck.borrow_mut().scrape::<Locator>().expect("locator not found");
+        let locator = self
+            .truck
+            .borrow_mut()
+            .scrape::<Locator>()
+            .map_err(|_| NavigationError::NotEnabled("locator not found"))?;
         let mut detect_state = PathState::new(url.path());
         let matched = self.router.detect(&url, &self.truck.borrow(), &mut detect_state);
         if let Some(dm) = matched {
@@ -43,13 +47,14 @@ impl ServerAviator {
             self.catcher.handle(self.truck.clone());
         }
         self.truck.borrow_mut().inject(locator.clone());
-        locator.receive(raw_url, Some(detect_state.params))
+        locator.receive(raw_url, Some(detect_state.params))?;
+        Ok(())
     }
 }
 
 impl Aviator for ServerAviator {
-    fn goto(&self, _url: &str) {
-        panic!("ServerAviator::goto() is not implemented");
+    fn goto(&self, url: &str) -> Result<(), NavigationError> {
+        self.locate(url)
     }
 }
 
@@ -61,6 +66,8 @@ impl Enabler for ServerAviator {
         };
         truck.borrow_mut().inject(Locator::new());
         self.truck = truck.clone();
-        self.locate(url).unwrap();
+        if let Err(err) = self.locate(url) {
+            glory_core::warn!("ServerAviator failed to locate initial URL: {err}");
+        }
     }
 }
