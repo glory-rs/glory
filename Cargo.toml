@@ -88,7 +88,7 @@ lightningcss = { version = "1.0.0-alpha.71", features = ["browserslist"] }
 log = "0.4"
 notify = "8"
 reqwest = { version = "0.13", features = ["blocking", "native-tls", "json"], default-features = false }
-ratatui = "0.29"
+ratatui = "0.30"
 seahash = "4.1"
 semver = "1.0.28"
 tar = "0.4"
