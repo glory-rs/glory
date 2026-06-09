@@ -24,6 +24,10 @@ use crate::{
     logger::GRAY,
 };
 
+/// Target directory used for the wasm/front cargo build. Shared so commands
+/// like `clean` remove exactly what the front build produces.
+pub const FRONT_TARGET_DIR: &str = "target/front";
+
 pub async fn front(proj: &Arc<Project>, changes: &ChangeSet) -> JoinHandle<Result<Outcome<Product>>> {
     let proj = proj.clone();
     let changes = changes.clone();
@@ -60,7 +64,7 @@ pub fn build_cargo_front_cmd(cmd: &str, wasm: bool, proj: &Project, command: &mu
         cmd.to_string(),
         format!("--package={}", proj.lib.name.as_str()),
         // "--lib".to_string(),
-        "--target-dir=target/front".to_string(),
+        format!("--target-dir={FRONT_TARGET_DIR}"),
     ];
     if wasm {
         args.push("--target=wasm32-unknown-unknown".to_string());

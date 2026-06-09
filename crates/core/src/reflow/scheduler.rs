@@ -142,7 +142,10 @@ fn run(#[cfg(not(feature = "single-app"))] holder_id: HolderId) {
                     if let Some(view) = root_views.get_mut(&view_id) {
                         view.widget.patch(&mut view.scope);
                     } else {
-                        crate::info!("view not found: {:?}", view_id);
+                        // Expected during large keyed-list replace/clear: a
+                        // revised cage whose view was already detached. The
+                        // block below prunes it; only surface it in debug.
+                        crate::debug_warn!("view not found: {:?}", view_id);
                         not_found_view_ids.push(view_id);
                     }
                 }

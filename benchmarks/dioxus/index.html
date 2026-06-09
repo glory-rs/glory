@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>dioxus</title>
+    <!-- wasm-opt disabled: the bundled binaryen rejects some wasm features in
+         dioxus's output under -Oz. rust opt-level=3 + lto still apply. -->
+    <link data-trunk rel="rust" data-wasm-opt="0" data-weak-refs />
+    <link data-trunk rel="copy-file" href="../bench-harness.js" />
+    <style>
+      body { font-family: sans-serif; }
+      .danger { background: #d9534f; color: #fff; }
+      table.test-data td { padding: 2px 8px; }
+      button { margin: 2px; }
+    </style>
+  </head>
+  <body>
+    <div id="main"></div>
+    <script type="module" src="/bench-harness.js"></script>
+  </body>
+</html>

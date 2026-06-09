@@ -18,6 +18,7 @@ use super::{
     cli::{BuildTarget, Opts},
     dotenvs::{load_dotenvs, overlay_env},
     end2end::End2EndConfig,
+    overrides::Overrides,
     style::StyleConfig,
 };
 
@@ -57,11 +58,30 @@ impl Debug for Project {
 }
 
 impl Project {
-    pub fn resolve(cli: &Opts, cwd: &Utf8Path, metadata: &Metadata, watch: bool) -> Result<Vec<Arc<Project>>> {
-        let projects = ProjectDefinition::parse(metadata)?;
+    pub fn resolve(
+        cli: &Opts,
+        cwd: &Utf8Path,
+        metadata: &Metadata,
+        watch: bool,
+        overrides: &Overrides,
+    ) -> Result<Vec<Arc<Project>>> {
+        let mut projects = ProjectDefinition::parse(metadata)?;
+
+        // No `[package.metadata.glory]` / `[[workspace.metadata.glory]]` was
+        // found. Synthesize a single project from the builder overrides so a
+        // metadata-free project can still be driven by the embedded CLI.
+        if projects.is_empty()
+            && let Some(project) = ProjectDefinition::from_overrides(metadata, overrides)?
+        {
+            let mut config: ProjectConfig = serde_json::from_value(serde_json::json!({}))?;
+            config.config_dir = metadata.workspace_root.clone();
+            projects.push((project, config));
+        }
 
         let mut resolved = Vec::new();
-        for (project, mut config) in projects {
+        for (mut project, mut config) in projects {
+            overrides.apply_definition(&mut project);
+            overrides.apply_config(&mut config);
             if config.output_name.is_empty() {
                 config.output_name = project.name.to_string();
             }
@@ -206,7 +226,7 @@ impl ProjectConfig {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct ProjectDefinition {
-    name: String,
+    pub name: String,
     pub bin_package: String,
     pub lib_package: String,
 }
@@ -245,6 +265,29 @@ impl ProjectDefinition {
             },
             conf,
         ))
+    }
+
+    /// Build a project definition purely from builder overrides, for the case
+    /// where the manifest carries no glory metadata. `bin_package`/`lib_package`
+    /// are mandatory in that mode; `name` defaults to the bin package.
+    fn from_overrides(metadata: &Metadata, overrides: &Overrides) -> Result<Option<Self>> {
+        match (&overrides.bin_package, &overrides.lib_package) {
+            (Some(bin_package), Some(lib_package)) => Ok(Some(ProjectDefinition {
+                name: overrides
+                    .name
+                    .clone()
+                    .unwrap_or_else(|| bin_package.clone()),
+                bin_package: bin_package.clone(),
+                lib_package: lib_package.clone(),
+            })),
+            (None, None) => Ok(None),
+            _ => {
+                let _ = metadata;
+                bail!(
+                    "When no glory metadata is present, both bin_package() and lib_package() must be supplied to the Glory builder."
+                )
+            }
+        }
     }
 
     fn parse(metadata: &Metadata) -> Result<Vec<(Self, ProjectConfig)>> {

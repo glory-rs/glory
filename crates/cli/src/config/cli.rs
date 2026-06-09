@@ -70,25 +70,70 @@ pub struct Cli {
 
 impl Cli {
     pub fn opts(&self) -> Option<Opts> {
-        use Commands::{Build, EndToEnd, New, Serve, Test, Watch};
+        use Commands::{Build, Bundle, Check, Clean, EndToEnd, Fmt, New, Serve, Test, Watch};
         match &self.command {
-            New(_) => None,
-            Build(opts) | Serve(opts) | Test(opts) | EndToEnd(opts) | Watch(opts) => Some(opts.clone()),
+            New(_) | Fmt(_) => None,
+            Build(opts) | Bundle(opts) | Check(opts) | Test(opts) | EndToEnd(opts) | Watch(opts) => Some(opts.clone()),
+            Serve(opts) => Some(opts.opts.clone()),
+            Clean(opts) => Some(opts.opts.clone()),
         }
     }
 }
 
+/// Extra flags for `serve`.
+#[derive(Debug, Clone, Parser, PartialEq, Default)]
+pub struct ServeOpts {
+    #[command(flatten)]
+    pub opts: Opts,
+
+    /// Build and serve once without watching files or live-reloading.
+    #[arg(long)]
+    pub no_reload: bool,
+}
+
+/// Extra flags for `clean`.
+#[derive(Debug, Clone, Parser, PartialEq, Default)]
+pub struct CleanOpts {
+    #[command(flatten)]
+    pub opts: Opts,
+
+    /// Also run `cargo clean` at the workspace root.
+    #[arg(long)]
+    pub cargo: bool,
+}
+
+/// Flags for `fmt` (a thin passthrough over `cargo fmt`).
+#[derive(Debug, Clone, Parser, PartialEq, Default)]
+pub struct FmtOpts {
+    /// Run in check mode (errors if formatting is needed); maps to `cargo fmt --check`.
+    #[arg(long)]
+    pub check: bool,
+
+    /// Extra arguments forwarded to `cargo fmt` after a `--` separator.
+    #[arg(last = true)]
+    pub args: Vec<String>,
+}
+
 #[derive(Debug, Subcommand, PartialEq)]
 pub enum Commands {
+    /// Start a hot-reloading dev server (build, serve and live-reload on change).
+    Serve(ServeOpts),
     /// Build the server (feature ssr) and the client (wasm with feature csr).
     Build(Opts),
+    /// Build in release mode and collect the artifacts into a distributable `dist/` folder.
+    Bundle(Opts),
+    /// Remove build artifacts (front/server target dirs and the site root).
+    Clean(CleanOpts),
+    /// Type-check the client (wasm) and server without producing artifacts.
+    Check(Opts),
+    /// Format the project sources (passthrough to `cargo fmt`).
+    Fmt(FmtOpts),
     /// Run the cargo tests for app, client and server.
     Test(Opts),
     /// Start the server and end-2-end tests.
     EndToEnd(Opts),
-    /// Serve. Defaults to web-ssr and web-csr mode.
-    Serve(Opts),
-    /// Serve and automatically reload when files change.
+    /// Deprecated alias for `serve`; serve and automatically reload when files change.
+    #[command(hide = true)]
     Watch(Opts),
     /// WIP: Start wizard for creating a new project (using cargo-generate). Ask at Glory discord before using.
     New(NewCommand),

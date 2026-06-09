@@ -1,0 +1,26 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "bench-glory",
+      "runtimeExecutable": "trunk",
+      "runtimeArgs": ["serve", "--release", "--port", "8810", "--address", "127.0.0.1", "--no-autoreload"],
+      "port": 8810,
+      "cwd": "benchmarks/glory"
+    },
+    {
+      "name": "bench-leptos",
+      "runtimeExecutable": "trunk",
+      "runtimeArgs": ["serve", "--release", "--port", "8811", "--address", "127.0.0.1", "--no-autoreload"],
+      "port": 8811,
+      "cwd": "benchmarks/leptos"
+    },
+    {
+      "name": "bench-dioxus",
+      "runtimeExecutable": "trunk",
+      "runtimeArgs": ["serve", "--release", "--port", "8812", "--address", "127.0.0.1", "--no-autoreload"],
+      "port": 8812,
+      "cwd": "benchmarks/dioxus"
+    }
+  ]
+}

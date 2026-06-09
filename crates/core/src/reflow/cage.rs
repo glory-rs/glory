@@ -1,4 +1,6 @@
+use std::any::{Any, TypeId};
 use std::cell::{BorrowError, BorrowMutError, Cell, Ref, RefCell, RefMut};
+use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
 
@@ -9,23 +11,48 @@ use super::{Bond, PENDING_ITEMS, REVISING_ITEMS, Revisable, RevisableId, TRACKIN
 use crate::ViewId;
 use crate::reflow::{self, Lotus, scheduler};
 
+thread_local! {
+    /// Recycled, invalidated [`Slot`]s keyed by `TypeId::of::<Slot<T>>()`.
+    ///
+    /// A `Cage` handle is `Copy`, so we can never learn when the last handle
+    /// drops — `Copy` and `Drop` are mutually exclusive. Reclamation is
+    /// therefore explicit (via [`Cage::invalidate`], driven by [`Owner`] drop):
+    /// invalidating a cage drops its value `T` (freeing the bulk of the
+    /// memory), clears its subscriptions, bumps its generation so stale handles
+    /// can't touch it, and parks the leaked slot here for reuse. The next
+    /// `Cage::new` of the same type reuses a parked slot instead of leaking a
+    /// fresh one, so the live slot count stays bounded by the peak number of
+    /// concurrent cages rather than growing without limit.
+    ///
+    /// [`Owner`]: crate::reflow::Owner
+    static CAGE_FREE_LIST: RefCell<HashMap<TypeId, Vec<&'static dyn Any>>> =
+        RefCell::new(HashMap::new());
+}
+
 pub struct Cage<T>
 where
     T: fmt::Debug + 'static,
 {
-    inner: &'static CageInner<T>,
+    inner: &'static Slot<T>,
+    // Identity + liveness token snapshotted at creation. The handle is valid
+    // only while `inner.alive` is set and `inner.generation == self.generation`
+    // (i.e. the slot still holds *this* cage and hasn't been recycled).
+    id: RevisableId,
     generation: u64,
 }
 
-struct CageInner<T>
+/// Heap cell backing a `Cage`. Leaked once, then recycled forever (see
+/// [`CAGE_FREE_LIST`]). `source` is `Option<T>` so the value can be dropped on
+/// invalidation while the slot's `'static` address stays valid for stale
+/// handles to safely test their generation against.
+struct Slot<T>
 where
     T: fmt::Debug + 'static,
 {
-    id: RevisableId,
     generation: Cell<u64>,
     alive: Cell<bool>,
     version: Cell<usize>,
-    source: RefCell<T>,
+    source: RefCell<Option<T>>,
     view_ids: Rc<RefCell<IndexSet<ViewId>>>,
 }
 
@@ -35,8 +62,9 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Cage")
-            .field("id", &self.inner.id)
+            .field("id", &self.id)
             .field("generation", &self.generation)
+            .field("alive", &self.is_current())
             .field("version", &self.inner.version.get())
             .field("subscriber_count", &self.inner.view_ids.borrow().len())
             .finish_non_exhaustive()
@@ -48,26 +76,37 @@ where
     T: fmt::Debug + 'static,
 {
     fn id(&self) -> RevisableId {
-        self.inner.id
+        self.id
     }
     #[cfg(not(feature = "single-app"))]
     fn holder_id(&self) -> Option<crate::HolderId> {
         self.view_ids().borrow().first().map(|view_id| view_id.holder_id())
     }
     fn version(&self) -> usize {
-        self.inner.version.get()
+        if self.is_current() { self.inner.version.get() } else { 0 }
     }
     fn view_ids(&self) -> Rc<RefCell<IndexSet<ViewId>>> {
-        self.inner.view_ids.clone()
+        // A stale handle (slot recycled into a different cage) must never hand
+        // out the live cage's subscriber set, or the scheduler would re-render
+        // an unrelated view. Return an empty, throwaway set instead.
+        if self.is_current() {
+            self.inner.view_ids.clone()
+        } else {
+            Rc::new(RefCell::new(IndexSet::new()))
+        }
     }
     fn bind_view(&self, view_id: &ViewId) {
-        self.inner.view_ids.borrow_mut().insert(view_id.clone());
+        if self.is_current() {
+            self.inner.view_ids.borrow_mut().insert(view_id.clone());
+        }
     }
     fn unbind_view(&self, view_id: &ViewId) {
-        self.inner.view_ids.borrow_mut().shift_remove(view_id);
+        if self.is_current() {
+            self.inner.view_ids.borrow_mut().shift_remove(view_id);
+        }
     }
     fn unlace_view(&self, view_id: &ViewId, loose: usize) {
-        if loose > 0 {
+        if loose > 0 && self.is_current() {
             self.inner.view_ids.borrow_mut().shift_remove(view_id);
         }
     }
@@ -96,7 +135,10 @@ where
     where
         S: Serializer,
     {
-        T::serialize(&*self.inner.source.borrow(), serializer)
+        match &*self.inner.source.borrow() {
+            Some(value) => T::serialize(value, serializer),
+            None => Err(serde::ser::Error::custom("cage handle is stale")),
+        }
     }
 }
 
@@ -104,13 +146,34 @@ impl<T> Cage<T>
 where
     T: fmt::Debug + 'static,
 {
+    /// True while this handle still owns its slot (alive and not yet recycled
+    /// into a different cage).
+    fn is_current(&self) -> bool {
+        self.inner.alive.get() && self.inner.generation.get() == self.generation
+    }
+
+    /// Mark this cage dead and reclaim its memory: drop the value `T`, clear
+    /// subscriptions, bump the generation so existing `Copy` handles go stale,
+    /// and park the leaked slot for reuse by a future `Cage::new` of the same
+    /// type. Idempotent and safe to call from multiple owning handles — the
+    /// generation guard makes every call after the first a no-op.
     pub(crate) fn invalidate(&self) {
+        if !self.is_current() {
+            return;
+        }
         self.inner.alive.set(false);
         self.inner.generation.set(self.inner.generation.get().wrapping_add(1));
+        // Drop the value (the bulk of the memory) and the subscriber set.
+        *self.inner.source.borrow_mut() = None;
+        self.inner.view_ids.borrow_mut().clear();
+        let slot: &'static Slot<T> = self.inner;
+        CAGE_FREE_LIST.with_borrow_mut(|free| {
+            free.entry(TypeId::of::<Slot<T>>()).or_default().push(slot as &'static dyn Any);
+        });
     }
 
     fn ensure_alive(&self) -> Result<(), CageAccessError> {
-        if self.inner.alive.get() && self.inner.generation.get() == self.generation {
+        if self.is_current() {
             Ok(())
         } else {
             Err(CageAccessError::Stale)
@@ -134,7 +197,8 @@ where
     pub fn try_get(&self) -> Result<Ref<'_, T>, CageAccessError> {
         self.ensure_alive()?;
         self.track_read();
-        self.inner.source.try_borrow().map_err(CageAccessError::Borrow)
+        let borrowed = self.inner.source.try_borrow().map_err(CageAccessError::Borrow)?;
+        Ref::filter_map(borrowed, |slot| slot.as_ref()).map_err(|_| CageAccessError::Stale)
     }
 
     pub fn get_untracked(&self) -> Ref<'_, T> {
@@ -143,7 +207,8 @@ where
 
     pub fn try_get_untracked(&self) -> Result<Ref<'_, T>, CageAccessError> {
         self.ensure_alive()?;
-        self.inner.source.try_borrow().map_err(CageAccessError::Borrow)
+        let borrowed = self.inner.source.try_borrow().map_err(CageAccessError::Borrow)?;
+        Ref::filter_map(borrowed, |slot| slot.as_ref()).map_err(|_| CageAccessError::Stale)
     }
 
     pub fn revise<F, R>(&self, opt: F) -> R
@@ -158,7 +223,10 @@ where
         F: FnOnce(RefMut<'_, T>) -> R,
     {
         self.ensure_alive().map_err(CageMutateError::Access)?;
-        let result = (opt)(self.inner.source.try_borrow_mut().map_err(CageMutateError::Borrow)?);
+        let borrowed = self.inner.source.try_borrow_mut().map_err(CageMutateError::Borrow)?;
+        let projected = RefMut::filter_map(borrowed, |slot| slot.as_mut())
+            .map_err(|_| CageMutateError::Access(CageAccessError::Stale))?;
+        let result = (opt)(projected);
         self.inner.version.set(self.inner.version.get() + 1);
         self.signal();
         Ok(result)
@@ -176,7 +244,10 @@ where
         F: FnOnce(RefMut<'_, T>) -> R,
     {
         self.ensure_alive().map_err(CageMutateError::Access)?;
-        let result = (opt)(self.inner.source.try_borrow_mut().map_err(CageMutateError::Borrow)?);
+        let borrowed = self.inner.source.try_borrow_mut().map_err(CageMutateError::Borrow)?;
+        let projected = RefMut::filter_map(borrowed, |slot| slot.as_mut())
+            .map_err(|_| CageMutateError::Access(CageAccessError::Stale))?;
+        let result = (opt)(projected);
         self.inner.version.set(self.inner.version.get() + 1);
         Ok(result)
     }
@@ -202,7 +273,8 @@ where
     //     self.source.borrow()
     // }
     pub fn borrow(&self) -> Ref<'_, T> {
-        self.inner.source.borrow()
+        Ref::filter_map(self.inner.source.borrow(), |slot| slot.as_ref())
+            .expect("Cage::borrow: cage handle is stale")
     }
 
     pub fn map<M, G>(&self, mapper: M) -> Bond<G>
@@ -218,6 +290,10 @@ where
         Lotus::Cage(*self)
     }
     fn signal(&self) {
+        // A stale handle has no live subscribers and must not enqueue work.
+        if !self.is_current() {
+            return;
+        }
         #[cfg(not(feature = "single-app"))]
         let Some(holder_id) = self.holder_id() else {
             tracing::debug!("Cage::signal: holder_id is None");
@@ -268,15 +344,35 @@ where
     T: fmt::Debug + 'static,
 {
     pub fn new(source: T) -> Self {
-        let inner = Box::leak(Box::new(CageInner {
-            id: RevisableId::next(),
-            generation: Cell::new(0),
-            alive: Cell::new(true),
-            version: Cell::new(1),
-            source: RefCell::new(source),
-            view_ids: Default::default(),
-        }));
-        Cage { inner, generation: 0 }
+        // Reuse a parked slot of the same type if one is available, otherwise
+        // leak a fresh one. Either way the slot lives at a stable `'static`
+        // address for as long as the program runs.
+        let recycled: Option<&'static Slot<T>> = CAGE_FREE_LIST.with_borrow_mut(|free| {
+            free.get_mut(&TypeId::of::<Slot<T>>())
+                .and_then(|slots| slots.pop())
+                .and_then(|any| any.downcast_ref::<Slot<T>>())
+        });
+
+        let inner: &'static Slot<T> = match recycled {
+            Some(slot) => {
+                // A recycled slot is dead (alive == false) with a bumped
+                // generation; reinitialise it for this new cage.
+                *slot.source.borrow_mut() = Some(source);
+                slot.version.set(1);
+                slot.view_ids.borrow_mut().clear();
+                slot.alive.set(true);
+                slot
+            }
+            None => Box::leak(Box::new(Slot {
+                generation: Cell::new(0),
+                alive: Cell::new(true),
+                version: Cell::new(1),
+                source: RefCell::new(Some(source)),
+                view_ids: Rc::new(RefCell::new(IndexSet::new())),
+            })),
+        };
+
+        Cage { inner, id: RevisableId::next(), generation: inner.generation.get() }
     }
 }
 
@@ -349,7 +445,9 @@ where
 {
     #[inline]
     fn eq(&self, other: &Cage<T>) -> bool {
-        std::ptr::eq(self.inner, other.inner)
+        // Identity by unique id + generation, not slot address: a recycled slot
+        // is shared between a dead cage and the new cage that took its place.
+        self.id == other.id && self.generation == other.generation
     }
 }
 
@@ -402,5 +500,63 @@ mod tests {
         let _write = cage.inner.source.borrow_mut();
 
         assert!(cage.try_get_untracked().is_err());
+    }
+
+    #[test]
+    fn invalidate_frees_value_and_marks_handle_stale() {
+        let cage = Cage::new(String::from("hello"));
+        assert!(cage.try_get_untracked().is_ok());
+
+        cage.invalidate();
+
+        // The value `T` is dropped (memory reclaimed) and the handle is stale.
+        assert!(cage.inner.source.borrow().is_none());
+        assert!(matches!(cage.try_get_untracked(), Err(CageAccessError::Stale)));
+        assert!(matches!(cage.try_revise(|mut v| *v = String::new()), Err(CageMutateError::Access(_))));
+        // A stale handle exposes no subscribers, so it can't schedule re-renders.
+        assert!(cage.view_ids().borrow().is_empty());
+        assert_eq!(cage.version(), 0);
+    }
+
+    #[test]
+    fn invalidated_slot_is_recycled_not_leaked() {
+        // A type unique to this test so its free-list bucket can't be touched
+        // by other cages running on the same harness thread.
+        #[derive(Debug)]
+        struct Uniq(u32);
+
+        let dead = Cage::new(Uniq(1));
+        let dead_slot: &'static Slot<Uniq> = dead.inner;
+        dead.invalidate();
+
+        // The next cage of the same type reuses the parked slot rather than
+        // leaking a fresh allocation.
+        let live = Cage::new(Uniq(2));
+        assert!(std::ptr::eq(dead_slot, live.inner), "slot should be recycled");
+
+        // The recycled handle is stale; the new handle is the live occupant
+        // with a distinct identity.
+        assert!(live.is_current());
+        assert!(!dead.is_current());
+        assert_ne!(dead.id(), live.id());
+        assert_eq!(live.get_untracked().0, 2);
+    }
+
+    #[test]
+    fn double_invalidate_is_a_noop() {
+        let cage = Cage::new(7_i32);
+        cage.invalidate();
+        // A second invalidate (e.g. from a second owning scope) must not park
+        // the slot twice, or it could be handed to two live cages at once.
+        cage.invalidate();
+        let before =
+            CAGE_FREE_LIST.with_borrow(|free| free.get(&TypeId::of::<Slot<i32>>()).map(Vec::len).unwrap_or(0));
+        // Reusing one i32 slot should leave exactly one fewer parked slot; if a
+        // double-park had happened the count bookkeeping below would be off.
+        let reused = Cage::new(0_i32);
+        let after =
+            CAGE_FREE_LIST.with_borrow(|free| free.get(&TypeId::of::<Slot<i32>>()).map(Vec::len).unwrap_or(0));
+        assert_eq!(before.saturating_sub(after), 1);
+        assert!(reused.is_current());
     }
 }

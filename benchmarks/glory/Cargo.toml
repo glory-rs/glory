@@ -1,0 +1,16 @@
+[package]
+name = "bench-glory"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+glory = { path = "../../crates/glory", default-features = false, features = ["web-csr"] }
+wasm-bindgen = { version = "0.2", features = ["enable-interning"] }
+wasm-bindgen-futures = "0.4.71"
+web-sys = "0.3"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

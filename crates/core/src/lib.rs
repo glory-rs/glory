@@ -173,3 +173,28 @@ macro_rules! warn {
 macro_rules! error {
     ($($t:tt)*) => ($crate::console::error(&format_args!($($t)*).to_string()))
 }
+
+/// Debug-only diagnostic warning. In a release build this expands to nothing —
+/// no log call and no formatting cost — so hot paths that want to surface a
+/// "this shouldn't normally happen" note (e.g. the scheduler visiting a
+/// detached view during a large list replace) don't pay for it in production
+/// or flood the browser console during benchmarks.
+#[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+#[macro_export]
+macro_rules! debug_warn {
+    ($($t:tt)*) => {{
+        #[cfg(debug_assertions)]
+        $crate::console::debug_warn(&format_args!($($t)*).to_string());
+    }};
+}
+
+/// Off-browser (SSR / native) build: no-op. `format_args!` keeps the arguments
+/// "used" so callers don't trip unused-variable lints, and is fully optimised
+/// away (no allocation, no output).
+#[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
+#[macro_export]
+macro_rules! debug_warn {
+    ($($t:tt)*) => {{
+        let _ = format_args!($($t)*);
+    }};
+}

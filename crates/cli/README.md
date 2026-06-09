@@ -21,6 +21,75 @@ Build tool for [Glory](https://crates.io/crates/glory):
 
 <br/>
 
+# Embeddable dev tool (recommended)
+
+A globally-installed `glory` binary can drift from the `glory` version your
+project actually depends on (the classic `dx` problem). To avoid that, `glory-cli`
+also ships an embeddable [`Glory`] launcher type that you instantiate from a tiny
+binary **inside your own project**, so the tool is always compiled against the
+`glory-cli` version pinned in your `Cargo.lock` — they can never disagree.
+
+The command surface mirrors `dx`: `serve` (hot-reloading dev server), `build`,
+`bundle`, `clean`, `check`, `fmt`, `test`, `end2end`, `new`.
+
+## Option A — a `[[bin]]` in your app crate (single crate)
+
+```toml
+# Cargo.toml
+[features]
+glory-tool = ["dep:glory-cli"]
+
+[dependencies]
+# optional + feature-gated so a normal app build doesn't pull the CLI's heavy deps
+glory-cli = { version = "0.3", optional = true }
+anyhow = "1"
+
+[[bin]]
+name = "glory"
+path = "src/bin/glory.rs"
+required-features = ["glory-tool"]
+
+[package.metadata.glory]
+# the package now has two bin targets, so name the server bin explicitly
+bin_target = "my-app"
+```
+
+```rust
+// src/bin/glory.rs
+fn main() -> anyhow::Result<()> {
+    glory_cli::Glory::new()
+        .bin_package("my-app")
+        .lib_package("my-app")
+        .launch()
+}
+```
+
+## Option B — a dedicated `xtask` member crate (keeps the app graph clean)
+
+Add an `xtask` workspace member that depends on `glory-cli`; your app crate never
+does. The version is still pinned via the workspace `Cargo.lock`.
+
+## Driving it
+
+```sh
+cargo run --bin glory --features glory-tool -- serve
+```
+
+Add a cargo alias for the familiar `cargo glory ...` ergonomics:
+
+```toml
+# .cargo/config.toml
+[alias]
+glory = "run --bin glory --features glory-tool --"   # or: run -p xtask --
+```
+
+Builder setters mirror the `[package.metadata.glory]` keys below; anything you set
+on the builder overrides the manifest metadata, anything left unset falls back to
+it. A project with **no** glory metadata works too, as long as you supply at least
+`.bin_package(...)` and `.lib_package(...)`.
+
+<br/>
+
 # Features
 
 - Parallel build of server and client in watch mode for fast developer feedback.

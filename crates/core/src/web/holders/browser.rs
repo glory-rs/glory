@@ -48,7 +48,7 @@ impl Holder for BrowserHolder {
             for i in 0..list.length() {
                 let ele = list.item(i).unwrap().unchecked_into::<web_sys::HtmlElement>();
                 if ele.has_attribute("gly-hydrating") {
-                    crate::info!("[hydrating]: remove element: {}", ele.outer_html());
+                    crate::debug_warn!("[hydrating]: remove element: {}", ele.outer_html());
                     ele.remove();
                 } else {
                     ele.remove_attribute("gly-id").ok();

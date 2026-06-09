@@ -1,12 +1,20 @@
 mod build;
+mod bundle;
+mod check;
+mod clean;
 mod end2end;
+mod fmt;
 mod new;
 mod serve;
 mod test;
 pub mod watch;
 
 pub use build::build_all;
+pub use bundle::bundle_all;
+pub use check::check_all;
+pub use clean::clean_all;
 pub use end2end::end2end_all;
+pub use fmt::fmt;
 pub use new::NewCommand;
 pub use serve::serve;
 pub use test::test_all;

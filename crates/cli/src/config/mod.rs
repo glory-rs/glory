@@ -7,6 +7,7 @@ mod cli;
 mod dotenvs;
 mod end2end;
 mod lib_package;
+mod overrides;
 mod profile;
 mod project;
 mod style;
@@ -15,6 +16,7 @@ mod tailwind;
 use std::{fmt::Debug, sync::Arc};
 
 pub use self::cli::{BuildTarget, Cli, Commands, Log, Opts};
+pub use self::overrides::Overrides;
 use crate::ext::{
     MetadataExt,
     anyhow::{Context, Result},
@@ -47,15 +49,30 @@ impl Debug for Config {
 
 impl Config {
     pub fn load(cli: Opts, cwd: &Utf8Path, manifest_path: &Utf8Path, watch: bool) -> Result<Self> {
+        Self::load_with(cli, cwd, manifest_path, watch, &Overrides::default())
+    }
+
+    /// Like [`Config::load`] but additionally overlays the programmatic
+    /// [`Overrides`] supplied by the embeddable [`crate::Glory`] builder.
+    pub fn load_with(
+        cli: Opts,
+        cwd: &Utf8Path,
+        manifest_path: &Utf8Path,
+        watch: bool,
+        overrides: &Overrides,
+    ) -> Result<Self> {
         let metadata = Metadata::load_cleaned(manifest_path)?;
 
-        let mut projects = Project::resolve(&cli, cwd, &metadata, watch).dot()?;
+        let mut projects = Project::resolve(&cli, cwd, &metadata, watch, overrides).dot()?;
 
         if projects.is_empty() {
-            bail!("Please define glory projects in the workspace Cargo.toml sections [[workspace.metadata.glory]]")
+            bail!(
+                "Please define glory projects in the workspace Cargo.toml sections [[workspace.metadata.glory]], or supply bin_package()/lib_package() to the Glory builder."
+            )
         }
 
-        if let Some(proj_name) = &cli.project {
+        // A builder-supplied project name takes precedence over `--project`.
+        if let Some(proj_name) = overrides.project.as_ref().or(cli.project.as_ref()) {
             if let Some(proj) = projects.iter().find(|p| p.name == *proj_name) {
                 projects = vec![proj.clone()];
             } else {

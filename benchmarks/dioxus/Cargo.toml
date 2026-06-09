@@ -1,0 +1,19 @@
+[package]
+name = "bench-dioxus"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+# default-features off to drop `devtools`/`logger` (they try to reach the `dx`
+# dev-server runtime and prevent mounting under a plain trunk build) and
+# `document` (pulls history/router needing web-sys Location). We only need the
+# rsx/signals/hooks stack plus the web renderer and launch entrypoint.
+dioxus = { version = "0.7", default-features = false, features = [
+  "web", "launch", "macro", "html", "signals", "hooks",
+] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

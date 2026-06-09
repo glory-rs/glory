@@ -1,7 +1,7 @@
 [workspace]
 members = ["crates/*"]
 # members = ["crates/core", "crates/glory", "examples/counter", "examples/counters", "examples/todo"]
-exclude = ["examples"]
+exclude = ["examples", "benchmarks"]
 resolver = "2"
 
 [workspace.package]
