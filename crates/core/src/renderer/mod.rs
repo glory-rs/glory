@@ -8,14 +8,22 @@
 
 use std::any::Any;
 use std::borrow::Cow;
-use std::cell::RefCell;
 use std::fmt;
-use std::marker::PhantomData;
-use std::rc::Rc;
 use std::sync::Arc;
 
+pub mod command;
+pub mod command_dom;
+pub mod ssr_dom;
+pub use command::{
+    Command, CommandInsertPosition, CommandNode, CommandQueue, CommandRenderer, CurrentQueueGuard, EventData, KeyboardData, NodeQuery, PointerData,
+    QueryError, QueryResponse, QueryValue, TargetData, coalesce,
+};
+
+/// The renderer the shared (non-wasm) `Element` widget instantiates.
+/// Every non-browser target speaks the command stream; what a batch means
+/// is decided by the consumer (SSR replay, webview IPC, native, ...).
 #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
-use crate::node::Node;
+pub type BackendRenderer = CommandRenderer;
 
 /// Relative child placement used by [`Renderer::insert_child`].
 #[derive(Clone, Copy, Debug)]
@@ -161,283 +169,14 @@ impl<R: Renderer> RenderedElement<R> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum MockCommand {
-    Create { id: u64, name: String, is_void: bool },
-    SetAttribute { id: u64, name: String, value: String },
-    RemoveAttribute { id: u64, name: String },
-    SetProperty { id: u64, name: String, value: String },
-    RemoveProperty { id: u64, name: String },
-    AddClass { id: u64, value: String },
-    RemoveClass { id: u64, value: String },
-    SetText { id: u64, value: String },
-    SetHtml { id: u64, value: String },
-    Insert { parent: u64, child: u64, position: MockInsertPosition },
-    Remove { parent: u64, child: u64 },
-    AttachEvent { id: u64, name: String, bubbles: bool },
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum MockInsertPosition {
-    Head,
-    Tail,
-    Before(u64),
-    After(u64),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MockNode {
-    id: u64,
-}
-
-#[derive(Clone, Default)]
-pub struct MockRenderer {
-    state: Rc<MockState>,
-}
-
-#[derive(Default)]
-struct MockState {
-    next_id: RefCell<u64>,
-    commands: RefCell<Vec<MockCommand>>,
-}
-
-impl MockRenderer {
-    pub fn commands(&self) -> Vec<MockCommand> {
-        self.state.commands.borrow().clone()
-    }
-
-    fn push(&self, command: MockCommand) {
-        self.state.commands.borrow_mut().push(command);
-    }
-
-    fn next_id(&self) -> u64 {
-        let mut next_id = self.state.next_id.borrow_mut();
-        *next_id += 1;
-        *next_id
-    }
-}
-
-impl fmt::Debug for MockRenderer {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("MockRenderer")
-            .field("commands", &self.state.commands.borrow().len())
-            .finish()
-    }
-}
-
-#[derive(Clone, Debug)]
-pub struct MockEventPayload {
-    name: Cow<'static, str>,
-    _pd: PhantomData<()>,
-}
-
-impl EventPayload for MockEventPayload {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn name(&self) -> Cow<'_, str> {
-        Cow::Borrowed(&self.name)
-    }
-}
-
-impl Renderer for MockRenderer {
-    type Event = MockEventPayload;
-    type Node = MockNode;
-
-    fn create_element(&self, name: Cow<'static, str>, is_void: bool) -> Self::Node {
-        let id = self.next_id();
-        self.push(MockCommand::Create {
-            id,
-            name: name.into_owned(),
-            is_void,
-        });
-        MockNode { id }
-    }
-
-    fn set_attribute(&self, node: &Self::Node, name: Cow<'static, str>, value: Cow<'static, str>) {
-        self.push(MockCommand::SetAttribute {
-            id: node.id,
-            name: name.into_owned(),
-            value: value.into_owned(),
-        });
-    }
-
-    fn remove_attribute(&self, node: &Self::Node, name: &str) {
-        self.push(MockCommand::RemoveAttribute {
-            id: node.id,
-            name: name.to_string(),
-        });
-    }
-
-    fn set_property(&self, node: &Self::Node, name: Cow<'static, str>, value: Cow<'static, str>) {
-        self.push(MockCommand::SetProperty {
-            id: node.id,
-            name: name.into_owned(),
-            value: value.into_owned(),
-        });
-    }
-
-    fn remove_property(&self, node: &Self::Node, name: &str) {
-        self.push(MockCommand::RemoveProperty {
-            id: node.id,
-            name: name.to_string(),
-        });
-    }
-
-    fn add_class(&self, node: &Self::Node, value: Cow<'static, str>) {
-        self.push(MockCommand::AddClass {
-            id: node.id,
-            value: value.into_owned(),
-        });
-    }
-
-    fn remove_class(&self, node: &Self::Node, value: &str) {
-        self.push(MockCommand::RemoveClass {
-            id: node.id,
-            value: value.to_string(),
-        });
-    }
-
-    fn set_text(&self, node: &Self::Node, value: Cow<'static, str>) {
-        self.push(MockCommand::SetText {
-            id: node.id,
-            value: value.into_owned(),
-        });
-    }
-
-    fn set_html(&self, node: &Self::Node, value: Cow<'static, str>) {
-        self.push(MockCommand::SetHtml {
-            id: node.id,
-            value: value.into_owned(),
-        });
-    }
-
-    fn insert_child(&self, parent: &Self::Node, child: &Self::Node, position: InsertPosition<'_, Self::Node>) {
-        let position = match position {
-            InsertPosition::Head => MockInsertPosition::Head,
-            InsertPosition::Tail => MockInsertPosition::Tail,
-            InsertPosition::Before(anchor) => MockInsertPosition::Before(anchor.id),
-            InsertPosition::After(anchor) => MockInsertPosition::After(anchor.id),
-        };
-        self.push(MockCommand::Insert {
-            parent: parent.id,
-            child: child.id,
-            position,
-        });
-    }
-
-    fn remove_child(&self, parent: &Self::Node, child: &Self::Node) {
-        self.push(MockCommand::Remove {
-            parent: parent.id,
-            child: child.id,
-        });
-    }
-
-    fn node_identity_eq(&self, left: &Self::Node, right: &Self::Node) -> bool {
-        left.id == right.id
-    }
-
-    fn attach_event(&self, node: &Self::Node, name: Cow<'static, str>, bubbles: bool, _handler: Box<dyn FnMut(Self::Event)>) {
-        self.push(MockCommand::AttachEvent {
-            id: node.id,
-            name: name.into_owned(),
-            bubbles,
-        });
-    }
-}
-
-/// SSR event placeholder. Server rendering records no live event
-/// listeners, but the renderer trait needs a concrete payload type.
-#[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
-#[derive(Clone, Debug)]
-pub struct SsrEventPayload {
-    name: Cow<'static, str>,
-}
-
-#[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
-impl SsrEventPayload {
-    pub fn new(name: impl Into<Cow<'static, str>>) -> Self {
-        Self { name: name.into() }
-    }
-}
-
-#[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
-impl EventPayload for SsrEventPayload {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn name(&self) -> Cow<'_, str> {
-        Cow::Borrowed(&self.name)
-    }
-}
-
-/// Renderer backed by Glory's in-memory SSR node tree.
-#[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
-#[derive(Clone, Copy, Debug, Default)]
-pub struct SsrRenderer;
-
-#[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
-impl Renderer for SsrRenderer {
-    type Event = SsrEventPayload;
-    type Node = Node;
-
-    fn create_element(&self, name: Cow<'static, str>, is_void: bool) -> Self::Node {
-        Node::new(name, is_void)
-    }
-
-    fn set_attribute(&self, node: &Self::Node, name: Cow<'static, str>, value: Cow<'static, str>) {
-        node.set_attribute(name, value);
-    }
-
-    fn remove_attribute(&self, node: &Self::Node, name: &str) {
-        node.remove_attribute(name);
-    }
-
-    fn set_property(&self, node: &Self::Node, name: Cow<'static, str>, value: Cow<'static, str>) {
-        node.set_property(name, Some(value));
-    }
-
-    fn remove_property(&self, node: &Self::Node, name: &str) {
-        node.remove_property(name);
-    }
-
-    fn add_class(&self, node: &Self::Node, value: Cow<'static, str>) {
-        node.add_class(value);
-    }
-
-    fn remove_class(&self, node: &Self::Node, value: &str) {
-        node.remove_class(value);
-    }
-
-    fn set_text(&self, node: &Self::Node, value: Cow<'static, str>) {
-        node.set_attribute("inner_text", value);
-    }
-
-    fn set_html(&self, node: &Self::Node, value: Cow<'static, str>) {
-        node.set_attribute("inner_html", value);
-    }
-
-    fn insert_child(&self, parent: &Self::Node, child: &Self::Node, position: InsertPosition<'_, Self::Node>) {
-        match position {
-            InsertPosition::Head => parent.prepend_with_node(child),
-            InsertPosition::Tail => parent.append_with_node(child),
-            InsertPosition::Before(anchor) => parent.insert_before(anchor, child),
-            InsertPosition::After(anchor) => parent.insert_after(anchor, child),
-        }
-    }
-
-    fn remove_child(&self, parent: &Self::Node, child: &Self::Node) {
-        parent.remove_child(child);
-    }
-
-    fn node_identity_eq(&self, left: &Self::Node, right: &Self::Node) -> bool {
-        left.ptr_eq(right)
-    }
-
-    fn attach_event(&self, _node: &Self::Node, _name: Cow<'static, str>, _bubbles: bool, _handler: Box<dyn FnMut(Self::Event)>) {}
-}
+/// Historical aliases. `MockRenderer` was the original test-only command
+/// recorder; it is now the canonical [`CommandRenderer`] from
+/// [`command`](self::command), which buffers identically but is also the
+/// production renderer for command-stream backends.
+pub type MockRenderer = CommandRenderer;
+pub type MockCommand = Command;
+pub type MockInsertPosition = CommandInsertPosition;
+pub type MockNode = CommandNode;
 
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
 #[derive(Clone, Debug)]
@@ -560,9 +299,12 @@ impl Renderer for WebRenderer {
 mod tests {
     use super::*;
 
+    /// Former `ssr_renderer_mutates_node_tree`: the same operation sequence
+    /// through the command renderer + SSR replay must produce the exact
+    /// legacy HTML.
     #[test]
-    fn ssr_renderer_mutates_node_tree() {
-        let renderer = SsrRenderer;
+    fn command_stream_replay_matches_legacy_ssr_html() {
+        let renderer = CommandRenderer::new();
         let parent = renderer.create_element("ul".into(), false);
         let first = renderer.create_element("li".into(), false);
         let second = renderer.create_element("li".into(), false);
@@ -579,8 +321,10 @@ mod tests {
 
         assert!(renderer.node_identity_eq(&first, &first.clone()));
         assert!(!renderer.node_identity_eq(&first, &second));
+
+        let doc = ssr_dom::SsrDocument::replay(&renderer.commands());
         assert_eq!(
-            parent.inner_html(),
+            doc.inner_html(parent.id()),
             "<li></li><li></li><li value=\"1\" data-id=\"a\" class=\" selected\">A</li>"
         );
 
@@ -589,7 +333,8 @@ mod tests {
         renderer.remove_attribute(&first, "data-id");
         renderer.remove_child(&parent, &third);
 
-        assert_eq!(parent.inner_html(), "<li></li><li>A</li>");
+        let doc = ssr_dom::SsrDocument::replay(&renderer.commands());
+        assert_eq!(doc.inner_html(parent.id()), "<li></li><li>A</li>");
     }
 
     #[test]

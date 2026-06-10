@@ -18,6 +18,13 @@ web-csr = ["single-app", "dep:wasm-bindgen"]
 web-ssr = ["dep:tokio", "dep:tokio-util", "dep:futures-channel", "dep:base64"]
 salvo = ["dep:salvo", "web-ssr"]
 
+# Command-stream extras for headless hosts (desktop webview / native /
+# TUI): `CommandHolder`, real event listeners with `EventData` typing.
+# Since the SSR convergence every non-browser target already uses the
+# CommandNode backend, so this combines freely with `web-ssr`; it cannot
+# be combined with `web-csr` on wasm32 or with `single-app`.
+backend-command = []
+
 # Optimisation flag, automatically enabled by `web-csr`. When on, the
 # framework assumes there is at most one application instance per
 # process (true for browser/WASM) and skips the `HolderId`-keyed thread
@@ -71,6 +78,10 @@ wasm-bindgen-test = { workspace = true }
 name = "each_reorder"
 harness = false
 required-features = ["web-ssr"]
+
+[[bench]]
+name = "command_wire"
+harness = false
 
 [package.metadata.cargo-all-features]
 denylist = ["stable"]

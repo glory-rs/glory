@@ -16,6 +16,17 @@ pub enum BuildTarget {
     Web,
     Desktop,
     Native,
+    /// Android library build (`cdylib` via cargo-ndk). See
+    /// `crates/cli/templates/mobile/README.md` for the host-project wiring.
+    Android,
+    /// iOS static library build (`staticlib`, macOS host required).
+    Ios,
+}
+
+impl BuildTarget {
+    pub fn is_mobile(&self) -> bool {
+        matches!(self, BuildTarget::Android | BuildTarget::Ios)
+    }
 }
 
 #[derive(Debug, Clone, Parser, PartialEq, Default)]

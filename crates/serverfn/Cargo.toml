@@ -1,0 +1,57 @@
+[package]
+name = "glory-serverfn"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+description = "Server functions runtime for Glory: registry, JSON codec, HTTP client stubs and adapter mounts."
+homepage = { workspace = true }
+repository = { workspace = true }
+documentation = "https://docs.rs/glory-serverfn/"
+readme = { workspace = true }
+keywords = { workspace = true }
+license = { workspace = true }
+categories = { workspace = true }
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+inventory = { workspace = true }
+tokio = { workspace = true, features = ["rt"] }
+reqwest = { workspace = true, optional = true, features = ["json"] }
+salvo = { workspace = true, optional = true }
+axum = { workspace = true, optional = true }
+actix-web = { workspace = true, optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys = { workspace = true }
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+web-sys = { workspace = true, features = [
+  "Headers",
+  "Request",
+  "RequestInit",
+  "RequestMode",
+  "Response",
+  "Window",
+  "WorkerGlobalScope",
+] }
+
+[dev-dependencies]
+glory-macros = { workspace = true }
+futures = { workspace = true }
+
+[features]
+default = []
+# Server-side adapter mounts.
+salvo = ["dep:salvo"]
+axum = ["dep:axum"]
+actix = ["dep:actix-web"]
+# Non-wasm HTTP client (desktop apps calling a remote server).
+reqwest-client = ["dep:reqwest"]
+
+[lints]
+workspace = true

@@ -18,7 +18,8 @@ feature they care about.
 | [`router-basic`](router-basic/) | wasm32 / CSR | `glory/routing`, `glory/web-csr` | Client-side routing only (no server). History API navigation, path params, nested routes. |
 | [`ssr-simple-salvo`](ssr-simple-salvo/) | server + wasm32 | `glory/salvo` (server) + `glory/web-csr` (client) | Minimum SSR + hydration. Same component compiled twice, served by Salvo and hydrated in the browser. |
 | [`ssr-modes-salvo`](ssr-modes-salvo/) | server + wasm32 | `glory/salvo` + `glory/web-csr`, `dep:gloo-net` | Different SSR strategies (in-order / async / streaming-ish) sharing one component tree. |
-| [`hackernews-salvo`](hackernews-salvo/) | server + wasm32 | `glory/salvo` + `glory/web-csr` | Realistic SSR app: HN clone with routing, server-side data fetch, hydrated nav. |
+| [`hackernews-salvo`](hackernews-salvo/) | server + wasm32 | `glory/salvo` + `glory/server-fn` + `glory/web-csr` | Realistic fullstack app: HN clone with routing, `#[glory::server]` data functions (no hand-written API routes), hydrated nav. |
+| [`desktop-counter`](desktop-counter/) | native window | `glory-core/backend-command` + `glory-desktop/runtime` | The web counter widget code running in a wry desktop window via the command stream; IPC events round-trip into the reactive layer. |
 | [`tailwind-salvo`](tailwind-salvo/) | server + wasm32 | `glory/salvo` + `glory/web-csr`, Tailwind CDN/build | SSR + Tailwind CSS integration. |
 | [`_test-size`](_test-size/) | wasm32 / CSR | minimal | Tiny program kept around for tracking bundle size. Not interesting as a tutorial. |
 
@@ -28,7 +29,8 @@ feature they care about.
 - **List rendering / `Each`** → `counters`, then `todomvc`.
 - **Routing without a server** → `router-basic`.
 - **SSR + hydration from scratch** → `ssr-simple-salvo`.
-- **Real-world SSR template** → `hackernews-salvo`.
+- **Real-world fullstack template (SSR + server functions)** → `hackernews-salvo`.
+- **Desktop app from the same widget code** → `desktop-counter`.
 - **Two-way input / form patterns** → `counter` (input binding), `todomvc`
   (add / edit / commit).
 

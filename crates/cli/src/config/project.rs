@@ -58,13 +58,7 @@ impl Debug for Project {
 }
 
 impl Project {
-    pub fn resolve(
-        cli: &Opts,
-        cwd: &Utf8Path,
-        metadata: &Metadata,
-        watch: bool,
-        overrides: &Overrides,
-    ) -> Result<Vec<Arc<Project>>> {
+    pub fn resolve(cli: &Opts, cwd: &Utf8Path, metadata: &Metadata, watch: bool, overrides: &Overrides) -> Result<Vec<Arc<Project>>> {
         let mut projects = ProjectDefinition::parse(metadata)?;
 
         // No `[package.metadata.glory]` / `[[workspace.metadata.glory]]` was
@@ -146,6 +140,21 @@ impl Project {
 
     pub fn builds_server(&self) -> bool {
         matches!(self.target, BuildTarget::Web | BuildTarget::Desktop | BuildTarget::Native)
+    }
+
+    /// Android / iOS targets compile the lib package as a `cdylib` /
+    /// `staticlib` for a host mobile project instead of a server binary.
+    pub fn builds_mobile(&self) -> bool {
+        self.target.is_mobile()
+    }
+
+    /// Rust target triple for the mobile build.
+    pub fn mobile_target_triple(&self) -> Option<&'static str> {
+        match self.target {
+            BuildTarget::Android => Some("aarch64-linux-android"),
+            BuildTarget::Ios => Some("aarch64-apple-ios"),
+            _ => None,
+        }
     }
 }
 
@@ -273,19 +282,14 @@ impl ProjectDefinition {
     fn from_overrides(metadata: &Metadata, overrides: &Overrides) -> Result<Option<Self>> {
         match (&overrides.bin_package, &overrides.lib_package) {
             (Some(bin_package), Some(lib_package)) => Ok(Some(ProjectDefinition {
-                name: overrides
-                    .name
-                    .clone()
-                    .unwrap_or_else(|| bin_package.clone()),
+                name: overrides.name.clone().unwrap_or_else(|| bin_package.clone()),
                 bin_package: bin_package.clone(),
                 lib_package: lib_package.clone(),
             })),
             (None, None) => Ok(None),
             _ => {
                 let _ = metadata;
-                bail!(
-                    "When no glory metadata is present, both bin_package() and lib_package() must be supplied to the Glory builder."
-                )
+                bail!("When no glory metadata is present, both bin_package() and lib_package() must be supplied to the Glory builder.")
             }
         }
     }

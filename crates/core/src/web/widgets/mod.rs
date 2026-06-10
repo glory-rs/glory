@@ -172,10 +172,24 @@ macro_rules! generate_tags {
                     }
 
                     /// Adds an event listener to this element.
+                    #[cfg(not(feature = "backend-command"))]
                     #[track_caller]
                     pub fn on<E, H>(#[allow(unused_mut)]mut self, event: E, handler: H) -> Self
                     where
                         E: EventDescriptor + 'static,
+                        H: FnMut(E::EventType) + 'static, {
+                        self.0.add_event_listener(event, handler);
+                        self
+                    }
+
+                    /// Adds an event listener to this element. Under the
+                    /// command-stream backend handlers receive the
+                    /// serializable [`EventData`]($crate::renderer::EventData).
+                    #[cfg(feature = "backend-command")]
+                    #[track_caller]
+                    pub fn on<E, H>(self, event: E, handler: H) -> Self
+                    where
+                        E: EventDescriptor<EventType = $crate::renderer::EventData> + 'static,
                         H: FnMut(E::EventType) + 'static, {
                         self.0.add_event_listener(event, handler);
                         self

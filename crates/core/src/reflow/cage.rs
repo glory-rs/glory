@@ -173,11 +173,7 @@ where
     }
 
     fn ensure_alive(&self) -> Result<(), CageAccessError> {
-        if self.is_current() {
-            Ok(())
-        } else {
-            Err(CageAccessError::Stale)
-        }
+        if self.is_current() { Ok(()) } else { Err(CageAccessError::Stale) }
     }
 
     fn track_read(&self) {
@@ -224,8 +220,7 @@ where
     {
         self.ensure_alive().map_err(CageMutateError::Access)?;
         let borrowed = self.inner.source.try_borrow_mut().map_err(CageMutateError::Borrow)?;
-        let projected = RefMut::filter_map(borrowed, |slot| slot.as_mut())
-            .map_err(|_| CageMutateError::Access(CageAccessError::Stale))?;
+        let projected = RefMut::filter_map(borrowed, |slot| slot.as_mut()).map_err(|_| CageMutateError::Access(CageAccessError::Stale))?;
         let result = (opt)(projected);
         self.inner.version.set(self.inner.version.get() + 1);
         self.signal();
@@ -245,8 +240,7 @@ where
     {
         self.ensure_alive().map_err(CageMutateError::Access)?;
         let borrowed = self.inner.source.try_borrow_mut().map_err(CageMutateError::Borrow)?;
-        let projected = RefMut::filter_map(borrowed, |slot| slot.as_mut())
-            .map_err(|_| CageMutateError::Access(CageAccessError::Stale))?;
+        let projected = RefMut::filter_map(borrowed, |slot| slot.as_mut()).map_err(|_| CageMutateError::Access(CageAccessError::Stale))?;
         let result = (opt)(projected);
         self.inner.version.set(self.inner.version.get() + 1);
         Ok(result)
@@ -273,8 +267,7 @@ where
     //     self.source.borrow()
     // }
     pub fn borrow(&self) -> Ref<'_, T> {
-        Ref::filter_map(self.inner.source.borrow(), |slot| slot.as_ref())
-            .expect("Cage::borrow: cage handle is stale")
+        Ref::filter_map(self.inner.source.borrow(), |slot| slot.as_ref()).expect("Cage::borrow: cage handle is stale")
     }
 
     pub fn map<M, G>(&self, mapper: M) -> Bond<G>
@@ -372,7 +365,11 @@ where
             })),
         };
 
-        Cage { inner, id: RevisableId::next(), generation: inner.generation.get() }
+        Cage {
+            inner,
+            id: RevisableId::next(),
+            generation: inner.generation.get(),
+        }
     }
 }
 
@@ -549,13 +546,11 @@ mod tests {
         // A second invalidate (e.g. from a second owning scope) must not park
         // the slot twice, or it could be handed to two live cages at once.
         cage.invalidate();
-        let before =
-            CAGE_FREE_LIST.with_borrow(|free| free.get(&TypeId::of::<Slot<i32>>()).map(Vec::len).unwrap_or(0));
+        let before = CAGE_FREE_LIST.with_borrow(|free| free.get(&TypeId::of::<Slot<i32>>()).map(Vec::len).unwrap_or(0));
         // Reusing one i32 slot should leave exactly one fewer parked slot; if a
         // double-park had happened the count bookkeeping below would be off.
         let reused = Cage::new(0_i32);
-        let after =
-            CAGE_FREE_LIST.with_borrow(|free| free.get(&TypeId::of::<Slot<i32>>()).map(Vec::len).unwrap_or(0));
+        let after = CAGE_FREE_LIST.with_borrow(|free| free.get(&TypeId::of::<Slot<i32>>()).map(Vec::len).unwrap_or(0));
         assert_eq!(before.saturating_sub(after), 1);
         assert!(reused.is_current());
     }

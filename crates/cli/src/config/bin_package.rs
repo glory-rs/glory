@@ -44,6 +44,7 @@ impl BinPackage {
                 BuildTarget::Web => features.push("web-ssr".to_string()),
                 BuildTarget::Desktop => features.push("desktop".to_string()),
                 BuildTarget::Native => features.push("native".to_string()),
+                BuildTarget::Android | BuildTarget::Ios => features.push("mobile".to_string()),
             }
         }
 

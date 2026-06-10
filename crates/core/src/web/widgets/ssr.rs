@@ -8,7 +8,7 @@ use wasm_bindgen::UnwrapThrowExt;
 
 use crate::node::{Node, NodeRef};
 use crate::reflow::{Bond, Lotus};
-use crate::renderer::{InsertPosition, Renderer, SsrRenderer};
+use crate::renderer::{BackendRenderer, InsertPosition, Renderer};
 use crate::view::{ViewId, ViewPlacement};
 use crate::web::events::EventDescriptor;
 use crate::web::{AttrValue, ClassPart, Classes, PropValue};
@@ -30,7 +30,22 @@ pub struct Element {
     pub fillers: Vec<Filler>,
 
     pub(crate) node: Node,
-    pub(crate) renderer: SsrRenderer,
+    pub(crate) renderer: BackendRenderer,
+    /// Event names attached via the command backend; used by `Drop` to
+    /// release the queue's handler registrations when the widget (not just
+    /// its view attachment — cached views re-attach) goes away.
+    #[cfg(feature = "backend-command")]
+    #[educe(Debug(ignore))]
+    pub(crate) listener_names: std::cell::RefCell<Vec<Cow<'static, str>>>,
+}
+
+#[cfg(feature = "backend-command")]
+impl Drop for Element {
+    fn drop(&mut self) {
+        for name in self.listener_names.borrow().iter() {
+            self.node.detach_event(name);
+        }
+    }
 }
 
 impl Widget for Element {
@@ -99,6 +114,7 @@ impl Widget for Element {
 impl Element {
     pub fn new(name: impl Into<Cow<'static, str>>, is_void: bool) -> Self {
         let name = name.into();
+        let renderer = BackendRenderer::default();
         Self {
             name: name.clone(),
             is_void,
@@ -106,8 +122,10 @@ impl Element {
             attrs: Default::default(),
             props: Default::default(),
             fillers: vec![],
-            node: SsrRenderer.create_element(name, is_void),
-            renderer: SsrRenderer,
+            node: renderer.create_element(name, is_void),
+            renderer,
+            #[cfg(feature = "backend-command")]
+            listener_names: Default::default(),
         }
     }
 
@@ -228,6 +246,9 @@ impl Element {
     }
 
     /// Adds an event listener to this element.
+    ///
+    /// Server rendering records no live listeners; this is a no-op.
+    #[cfg(not(feature = "backend-command"))]
     #[track_caller]
     pub fn add_event_listener<E: EventDescriptor>(
         &self,
@@ -238,6 +259,24 @@ impl Element {
     }
 
     /// Adds an event listener to this element.
+    ///
+    /// Under the command-stream backend the handler is registered in the
+    /// queue's event registry and an `AttachEvent` command is emitted; the
+    /// host delivers deserialized [`EventData`](crate::renderer::EventData)
+    /// back through `CommandRenderer::dispatch_event`.
+    #[cfg(feature = "backend-command")]
+    #[track_caller]
+    pub fn add_event_listener<E>(&self, event: E, event_handler: impl FnMut(E::EventType) + 'static)
+    where
+        E: EventDescriptor<EventType = crate::renderer::EventData>,
+    {
+        self.listener_names.borrow_mut().push(event.name());
+        self.renderer
+            .attach_event(&self.node, event.name(), event.bubbles(), Box::new(event_handler));
+    }
+
+    /// Adds an event listener to this element.
+    #[cfg(not(feature = "backend-command"))]
     #[track_caller]
     pub fn on<E: EventDescriptor>(
         self,
@@ -245,6 +284,17 @@ impl Element {
         #[allow(unused_mut)] // used for tracing in debug
         mut _event_handler: impl FnMut(E::EventType) + 'static,
     ) -> Self {
+        self
+    }
+
+    /// Adds an event listener to this element.
+    #[cfg(feature = "backend-command")]
+    #[track_caller]
+    pub fn on<E>(self, event: E, event_handler: impl FnMut(E::EventType) + 'static) -> Self
+    where
+        E: EventDescriptor<EventType = crate::renderer::EventData>,
+    {
+        self.add_event_listener(event, event_handler);
         self
     }
 

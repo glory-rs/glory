@@ -13,8 +13,13 @@ license = { workspace = true }
 categories = { workspace = true }
 
 [dependencies]
+blitz-dom = { version = "0.2.4", optional = true }
 glory-core = { workspace = true }
-glory-desktop = { path = "../desktop" }
 
 [lints]
 workspace = true
+
+[features]
+# Experimental Blitz consumer: applies Command batches to a blitz-dom
+# BaseDocument (the spike for a native non-webview renderer).
+blitz = ["dep:blitz-dom", "glory-core/backend-command"]

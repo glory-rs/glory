@@ -15,7 +15,7 @@ use crate::widgets::{Each, Switch};
 use crate::{Holder, Scope, Widget};
 
 fn render_html(holder: &ServerHolder) -> String {
-    holder.host_node.node().inner_html()
+    holder.app_html()
 }
 
 fn make_holder() -> ServerHolder {

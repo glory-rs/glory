@@ -45,5 +45,8 @@ pub async fn build_proj(proj: &Arc<Project>) -> Result<bool> {
     if proj.builds_server() && !compile::server(proj, &changes).await.await??.is_success() {
         return Ok(false);
     }
+    if proj.builds_mobile() && !compile::mobile(proj, &changes).await.await??.is_success() {
+        return Ok(false);
+    }
     Ok(true)
 }

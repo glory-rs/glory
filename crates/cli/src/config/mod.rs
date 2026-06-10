@@ -54,13 +54,7 @@ impl Config {
 
     /// Like [`Config::load`] but additionally overlays the programmatic
     /// [`Overrides`] supplied by the embeddable [`crate::Glory`] builder.
-    pub fn load_with(
-        cli: Opts,
-        cwd: &Utf8Path,
-        manifest_path: &Utf8Path,
-        watch: bool,
-        overrides: &Overrides,
-    ) -> Result<Self> {
+    pub fn load_with(cli: Opts, cwd: &Utf8Path, manifest_path: &Utf8Path, watch: bool, overrides: &Overrides) -> Result<Self> {
         let metadata = Metadata::load_cleaned(manifest_path)?;
 
         let mut projects = Project::resolve(&cli, cwd, &metadata, watch, overrides).dot()?;

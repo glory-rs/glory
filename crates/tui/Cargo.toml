@@ -14,7 +14,6 @@ categories = { workspace = true }
 
 [dependencies]
 glory-core = { workspace = true }
-glory-desktop = { path = "../desktop" }
 ratatui = { workspace = true }
 
 [lints]

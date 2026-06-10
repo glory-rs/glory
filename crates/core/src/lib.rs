@@ -55,6 +55,17 @@ mod cfg;
 #[macro_use]
 extern crate cfg_if;
 
+// Since the SSR convergence (`web-ssr` renders by replaying the command
+// stream) every non-browser target shares the CommandNode backend, so
+// `backend-command` + `web-ssr` may coexist in one build (a fullstack
+// desktop binary, or a workspace-wide build). The remaining exclusions:
+// on wasm the browser DOM owns the Node type, and the command backend
+// needs the multi-holder scheduler.
+#[cfg(all(feature = "backend-command", feature = "web-csr", target_arch = "wasm32"))]
+compile_error!("feature `backend-command` cannot be combined with `web-csr` on wasm32: the browser DOM owns the Node type there");
+#[cfg(all(feature = "backend-command", feature = "single-app"))]
+compile_error!("feature `backend-command` requires the multi-holder scheduler; do not combine it with `single-app`");
+
 pub mod assets;
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
 pub mod console;

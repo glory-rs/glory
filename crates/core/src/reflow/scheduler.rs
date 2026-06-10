@@ -106,6 +106,11 @@ pub fn schedule(holder_id: HolderId) {
 }
 
 fn run(#[cfg(not(feature = "single-app"))] holder_id: HolderId) {
+    // Patches may create widgets (e.g. keyed-list rows); on command-stream
+    // backends their nodes must allocate from the owning holder's queue.
+    #[cfg(all(not(feature = "single-app"), not(all(target_arch = "wasm32", feature = "web-csr"))))]
+    let _queue_guard = crate::renderer::command::make_holder_queue_current(holder_id);
+
     cfg_if! {
         if #[cfg(feature = "single-app")] {
             RUNNING.with(|running| running.set(true));

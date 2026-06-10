@@ -4,5 +4,5 @@ version = "0.0.1"
 edition = "2024"
 
 [dependencies]
-glory-core = { path = "../../crates/core" }
-glory-desktop = { path = "../../crates/desktop" }
+glory-core = { path = "../../crates/core", features = ["backend-command"] }
+glory-desktop = { path = "../../crates/desktop", features = ["runtime"] }

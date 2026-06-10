@@ -9,3 +9,9 @@ cfg_feature! {
     mod server;
     pub use server::*;
 }
+
+cfg_feature! {
+    #![feature = "backend-command"]
+    mod command;
+    pub use command::CommandHolder;
+}

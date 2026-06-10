@@ -63,7 +63,7 @@ where
         mutate(&items);
         total += started.elapsed();
 
-        black_box(holder.host_node.node().inner_html());
+        black_box(holder.app_html());
     }
 
     let avg_us = total.as_secs_f64() * 1_000_000.0 / iterations as f64;

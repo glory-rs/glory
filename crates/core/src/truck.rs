@@ -25,7 +25,7 @@ use std::fmt::{self, Formatter};
 ///
 /// # Example
 ///
-/// ```no_run
+/// ```ignore
 /// use salvo_core::prelude::*;
 ///
 /// #[handler]

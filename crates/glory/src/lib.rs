@@ -21,6 +21,18 @@ cfg_feature! {
     pub use glory_routing as routing;
 }
 
+cfg_feature! {
+    #![feature = "server-fn"]
+    /// The `#[server]` attribute: write a function once, run its body on
+    /// the server, call it from any client transparently. App crates must
+    /// also depend on `glory-serverfn` directly (the macro expands to
+    /// `glory_serverfn::` paths).
+    #[doc(no_inline)]
+    pub use glory_macros::server;
+    #[doc(no_inline)]
+    pub use glory_serverfn as serverfn;
+}
+
 /// Mount a root widget into the browser body and return the running
 /// holder.
 ///

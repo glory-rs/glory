@@ -22,8 +22,24 @@ macro_rules! generate_event_types {
           #[allow(non_camel_case_types)]
           pub struct $event;
 
+          #[cfg(not(feature = "backend-command"))]
           impl EventDescriptor for $event {
             type EventType = web_sys::$web_sys_event;
+
+            fn name(&self) -> Cow<'static, str> {
+              stringify!($event).into()
+            }
+
+            $(
+              generate_event_types!($does_not_bubble);
+            )?
+          }
+
+          // Command-stream backends deliver every event as the serializable
+          // cross-platform `EventData` payload instead of a `web_sys` type.
+          #[cfg(feature = "backend-command")]
+          impl EventDescriptor for $event {
+            type EventType = $crate::renderer::EventData;
 
             fn name(&self) -> Cow<'static, str> {
               stringify!($event).into()

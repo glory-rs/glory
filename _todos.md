@@ -242,6 +242,243 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 - 响应式细节:见 [`_m2_reactivity_tasks.md`](_m2_reactivity_tasks.md)。
 - 渲染层细节:见 [`_m3_renderer_tasks.md`](_m3_renderer_tasks.md)。
 - 函数级热重载细节:见 [`_m5_hot_reload_tasks.md`](_m5_hot_reload_tasks.md)。
+- **跨平台演进(M6–M10):见下方 §11–§16,2026-06-10 立项。**
+
+---
+
+# 跨平台演进任务板(2026-06-10)
+
+> 目标:让 Glory 达到 Dioxus 量级的跨平台能力(web CSR/SSR/fullstack、desktop、mobile、native)。
+> 本板块为 M6–M10 五个里程碑,按依赖顺序排列;每个里程碑都有"验收标准"。
+
+## 11. 战略定调(所有后续任务的前提共识)
+
+**S1. UI 词汇表 = HTML/CSS 规范,不做抽象 widget → 原生控件映射。**
+原理:适配器抽象(一个接口对 N 个语义各异的外来实现)语义只能取交集、样式被各平台 HIG 锁死、长尾控件由框架作者无限负担,是 AWT/Xamarin.Forms 的死法;规范抽象(一份 spec,每个平台带一个完整实现该 spec 的引擎)语义是全集、可由用户用原语组合长尾。webview 平台免费获得现成引擎,native 平台未来接 Blitz(同一规范的 Rust 实现),不自研渲染引擎。
+
+**S2. 双路径渲染架构:wasm CSR 保持直调,其余一切后端收敛到"指令流(Command Stream)"。**
+
+```text
+                         ┌── wasm32 + web-csr ──────► WebRenderer(直调 web_sys,零开销,保 benchmark)
+ widget 树 / 响应式 ─────┤
+                         └── 其他所有目标 ───────────► CommandRenderer(u64 节点 ID + 可序列化 Command)
+                                                          │  flush 批量 + 可选去重 pass
+                                                          ├─► SSR consumer(内存树 → HTML 字符串)
+                                                          ├─► Wry consumer(IPC → webview,desktop/mobile)
+                                                          ├─► Blitz consumer(未来,native wgpu)
+                                                          └─► TUI consumer(演示用,不投入)
+```
+
+原理:`crates/core/src/scope.rs:55` 的 `Node` 是编译期全局唯一类型(cfg 切换 `web_sys::Element` / SSR 内存节点),这是当前 widget 树无法驱动 `WryRenderer` 的根因——`examples/desktop-counter` 只能手工调 renderer 绕过 widget 体系。修法不是把 `Scope`/`Widget` 全部泛型化(泛型病毒会感染用户代码签名),而是沿用现有"互斥 feature 选 Node 后端"惯例(参考 §0 中 CSR/SSR 互斥的决策),新增第三种 Node 后端:`CommandNode { id: u64 }`。
+
+**S3. 指令流只有一份权威定义。** 现在 `MockCommand`(core)/`WryCommand`(desktop)是两份几乎相同的 enum,协议分叉隐患。升格为 `glory_core::renderer::Command`,Mock/Wry 变薄别名。
+
+**S4. 同步读取规则一次定死。** 业务层永远不同步读平台状态;布局测量等走显式 async query 或业务侧镜像值。趁 desktop 第一个吃螃蟹时在 core 定成正式 API,禁止每个控件自己打洞(React Native 旧 bridge 的教训)。
+
+**S5. TUI 降级为"指令流演示",不作为产品目标**(Dioxus 的 Rink 已弃坑,前车之鉴)。
+
+里程碑依赖关系:M6(指令流运行时)→ M7(desktop 真窗口)→ M8(fullstack)与 M9(mobile)可并行 → M10(native/Blitz)。
+
+---
+
+## 12. M6 — 统一指令流运行时(跨平台咽喉,P0 地基)
+
+全部任务在 `crates/core` 内完成,不依赖任何窗口库。
+
+- [x] **P0** **`Command` 协议升格进 core** — 已落地 `renderer/command.rs`;`MockRenderer` 等成为别名;desktop 改为 re-export core 类型。:新建 `crates/core/src/renderer/command.rs`:
+  ```rust
+  pub struct CommandNode { pub id: u64 }   // Clone + Debug + Eq(按 id)
+
+  #[derive(Serialize, Deserialize, ...)]
+  pub enum Command {
+      Create { id: u64, name: SmolStr, is_void: bool },
+      SetAttribute { id: u64, name: SmolStr, value: String },
+      RemoveAttribute { id: u64, name: SmolStr },
+      SetProperty { id: u64, name: SmolStr, value: String },
+      RemoveProperty { id: u64, name: SmolStr },
+      AddClass { id: u64, value: String },
+      RemoveClass { id: u64, value: String },
+      SetText { id: u64, value: String },
+      SetHtml { id: u64, value: String },
+      Insert { parent: u64, child: u64, position: CommandInsertPosition },
+      Remove { parent: u64, child: u64 },
+      AttachEvent { id: u64, name: SmolStr, bubbles: bool },
+      DetachEvent { id: u64, name: SmolStr },
+  }
+
+  pub trait CommandSink: 'static {
+      fn flush(&self, batch: Vec<Command>);          // 批量送出,不是逐条
+  }
+
+  pub struct CommandRenderer { /* next_id, RefCell<Vec<Command>> 缓冲, Rc<dyn CommandSink>, EventRegistry */ }
+  impl Renderer for CommandRenderer { type Node = CommandNode; ... }
+  ```
+  实施要点:
+  - `MockRenderer`(`renderer/mod.rs:164-348`)改为 `CommandRenderer` + 内存 sink 的别名,现有 `mock_renderer_records_command_sequence` 等测试全部保留并迁移断言类型。
+  - `glory-desktop` 的 `WryCommand`/`WryNode`(`crates/desktop/src/lib.rs:17-46`)删除自有定义,re-export core 类型;serde 序列化格式保持与 `wry_interpreter.js` 的 `decode()` 兼容(externally-tagged enum),用现有 `interpreter_consumes_renderer_command_surface` 测试锁住。
+  - 序列化字段名是 wire 协议,**写进 doc 注释声明为半稳定**,变更需要同步 JS interpreter。
+- [x] **P0** **指令缓冲 + flush 时机挂 scheduler** — 实现为"宿主在事务后 take_batch"(mount / dispatch_event / update 为事务边界);coalesce pass 含结构屏障,单测覆盖。(这就是"actionpool"的落地):
+  - `CommandRenderer` 的所有 `Renderer` 方法只 push 进缓冲,不直接调 sink。
+  - flush 触发点:`reflow/scheduler.rs` 的 `schedule()` 跑完一轮 PENDING_ITEMS 之后(即一次响应式落位的事务边界),通知当前 Holder 的 renderer flush。初版给 `CommandRenderer` 一个公开 `flush()`,由 Holder 在 scheduler 回调里调。
+  - **去重 pass 做成 flush 前的可选函数** `coalesce(Vec<Command>) -> Vec<Command>`,默认关闭:仅合并"同 (id, 同名属性/文本) 的连续多次写保留最后一次";**任何 `Insert`/`Remove`/`Create` 之间不跨越合并**(结构操作是合并屏障,防止 id 复用串台)。原理:细粒度响应式下冗余本来就少,去重只在 IPC/远程后端收益为正,所以按 sink 声明 opt-in。
+  - 单测:同一帧 `set_text(n, "a"); set_text(n, "b")` → flush 后只剩 `SetText{b}`;`set_text(n, "a"); remove_child(p, n); set_text(n2, ...)` 不被错并。
+- [x] **P0** **新增 `backend-command` feature,第三种 Node 后端** — `Node = CommandNode`(与 SSR Node 同形方法面,attr/class/prop 层零改动);compile_error 守卫互斥组合。:
+  - `crates/core/src/node/mod.rs` 增加 cfg 分支:`backend-command` 下 `pub type Node = CommandNode`(与 `web-csr`/`web-ssr` 互斥,互斥检查用 compile_error!,惯例同 `single-app` 的文档化规则,AGENTS.md 同步)。
+  - `Scope` 的 `parent_node`/`render_node`/`first_child_node`/`last_child_node` 不改类型签名,自动随 Node 切换。
+  - `Scope::nodes()` 等 `web_sys` 特化方法确认已有 cfg 包裹。
+- [x] **P0** **Element widget 第三实现** — `web/widgets/ssr.rs` 经 `BackendRenderer` 别名同时服务 SSR 与 command 后端;hydrate 仍为 CSR 专属。:`web/widgets/ssr.rs` 的 `Element` 几乎全部逻辑(fillers/attrs/props/classes 落位)与 renderer 无关,把它改成 `Element<R: Renderer<Node = Node>>` 内部泛型(对用户 API 不可见),`web-ssr` 下实例化 `SsrRenderer`,`backend-command` 下实例化 `CommandRenderer`。csr.rs 保持 wasm 专用不动。
+  - 验收:generated tag API(`div()`/`button()` 等)在 `backend-command` 下编译可用。
+  - hydrate 路径(`gly-id` 选择器)是 CSR 专属,command 后端 cfg 掉。
+- [x] **P0** **事件回程** — `EventData`(pointer/keyboard/target/extra)+ queue 内 handler 注册表 + `dispatch_event`;Element Drop 时 DetachEvent 释放 handler(防长会话泄漏);事件 handler 经 holder 自动包 batch。:
+  - core 新增 `renderer/event_registry.rs`:`EventRegistry { handlers: RefCell<HashMap<(u64, SmolStr), Box<dyn FnMut(CommandEventPayload)>>> }`,挂在 `CommandRenderer` 内。
+  - `CommandRenderer::attach_event` 当前像 `WryRenderer`(`crates/desktop/src/lib.rs:217`)一样**把 handler 丢掉**——改为:注册进 registry + emit `AttachEvent` 指令。
+  - 定义可序列化事件数据模型(mobile/liveview 将来复用同一模型):
+    ```rust
+    #[derive(Serialize, Deserialize)]
+    pub struct EventData {
+        pub name: SmolStr,            // "click" / "input" / ...
+        pub node_id: u64,
+        pub pointer: Option<PointerData>,   // client_x/y, button, buttons
+        pub keyboard: Option<KeyboardData>, // key, code, alt/ctrl/shift/meta
+        pub target: Option<TargetData>,     // value, checked — input/change 的关键回传
+        pub extra: Option<serde_json::Value>,
+    }
+    ```
+  - 入口 `CommandRenderer::dispatch_event(data: EventData)`:查 registry 调 handler,handler 体自动包 `reflow::batch`(对齐 CSR 在 `Element::add_event_listener` 的 auto-batch 行为,§2 P1 已做的那条)。
+  - `wry_interpreter.js` 的 `emitEvent`(第 44-61 行)目前只回传 type/bubbles/cancelable 四个布尔——按 `EventData` 扩展:`input`/`change` 带 `target.value`/`target.checked`,鼠标事件带坐标,键盘事件带 key/code/修饰键。
+  - 单测:RecordingSink + 手工 `dispatch_event` 验证 handler 收到 value 并触发 Cage 更新 → 第二轮 flush 产生预期 `SetText`。
+- [x] **P1** **同步读取规则落 API(S4)** — `NodeQuery`/`QueryValue`/`QueryResponse` + `CommandQueue::query`(token 化 oneshot future)/`resolve_query`;文档写明禁止阻塞宿主线程等待。:
+  - `Renderer` trait 增加(或旁路 trait)`fn query(&self, node: &Self::Node, q: NodeQuery) -> QueryFuture`;`NodeQuery` 初版只要 `BoundingRect` / `Value` / `ScrollOffset` 三种。
+  - SSR/Mock 后端同步立即 resolve(树在进程内);command 后端返回 pending,由宿主回填(M7 接 IPC)。
+  - 同时在 rustdoc 写明白纪律:**控件代码禁止假设 query 同步完成**;CSR 直调路径虽然能同步,也走同一 API 以保跨端语义一致。
+- [x] **P1** **跨后端 conformance 测试套件** — `command_dom.rs` 参考解释器(语义注释与 JS interpreter 同步)+ `tests/command_backend.rs`(counter 闭环 / Each 重排 / handler 释放 / query 回程)。:把 §6 的 11 个快照场景(reverse/shuffle/头尾增删/switch 等)参数化:同一 widget 操作序列分别跑 `SsrRenderer`(断言 HTML)与 `CommandRenderer`(断言指令回放到内存 DOM 模拟器后的树形态)。新建 `crates/core/src/renderer/command_dom.rs` 测试辅助:一个 ~100 行的内存指令解释器(等价 `wry_interpreter.js` 语义),它同时就是未来任何新 consumer 的参考实现。
+- [ ] **P2** **SSR 收敛为指令消费者(消灭第三套 cfg,可延后)** — 维持延后决策;conformance 套件已就位可兜底。:`SsrRenderer` 改为 `CommandRenderer + SsrDocumentSink`(指令回放成内存树再 `render_string()`)。风险:hydration 标记(`gly-id`)、流式 SSR 的 `HtmlChunk::Placeholder` 路径都要等价迁移,必须先有上面的 conformance 套件兜底。**收益是非 wasm 只剩一种 Node;在 M7 验证指令流稳定之前不动。**
+
+**M6 验收标准**:`cargo test -p glory-core --features backend-command` 全绿;counter 级 widget 树在 `CommandRenderer` + 内存解释器下完成"渲染 → 模拟点击 dispatch → 响应式更新 → 第二批指令"全闭环,全程不碰浏览器。
+
+---
+
+## 13. M7 — Desktop 从 scaffold 变真产品
+
+依赖 M6。`crates/desktop` 从 384 行序列化器变成真应用宿主。
+
+- [x] **P0** **tao + wry 窗口宿主** — `glory-desktop` feature `runtime`(tao 0.35 + wry 0.55);`GloryWryReady` 后挂载,批量 `__gloryApplyWryBatch` flush;ipc 经 EventLoopProxy 回主线程。:`glory-desktop` 加 `wry`/`tao` 依赖(放可选 feature `runtime` 后面,保持纯协议用途不拖依赖):
+  ```rust
+  pub fn launch(widget: impl Fn() -> W + 'static) { launch_with_config(DesktopConfig::default(), widget) }
+  // 内部流程:
+  // 1. tao EventLoop + Window;wry WebViewBuilder
+  //    .with_html(BOOTSTRAP_HTML)                  // 空壳 <html><body> + WRY_INTERPRETER_JS 作 init script
+  //    .with_ipc_handler(proxy 转回 event loop)
+  // 2. body 注册为 CommandNode id=0 的根(interpreter 里 nodes.set(0, document.body))
+  // 3. DesktopHolder(实现 Holder trait,对齐 BrowserHolder 形态)mount widget
+  // 4. sink = WebviewSink:flush(batch) → webview.evaluate_script("__gloryApplyWryBatch(<json>)")
+  // 5. ipc 消息 GloryWryEvent → 反序列化 EventData → renderer.dispatch_event → scheduler 跑完自动二轮 flush
+  ```
+  实施要点:
+  - `wry_interpreter.js` 增加 `__gloryApplyWryBatch(commands)`(循环调现有 `__gloryApplyWryCommand`),并预注册 `nodes.set(0, document.body)`。
+  - 事件循环线程模型:Glory 响应式是 thread-local(`reflow/scheduler.rs` 的 thread_local 设计),**widget 树和 renderer 必须全程活在 tao 主线程**;ipc handler 用 `EventLoopProxy::send_event` 把 `EventData` 弹回主线程再 dispatch,文档里写死这条规则。
+- [x] **P0** **`examples/desktop-counter` 重写成真 widget 应用** — 真窗口验证通过(CDP 实测:点击 ++/−/clear、input 值回传全部正确)。:用 `glory::launch` 风格 + `Cage<i64>` + button click,开真窗口可点。这是 M6+M7 的端到端验收物。
+- [x] **P1** **query 回程接 IPC** — interpreter `Query` 指令(BoundingRect/Value/ScrollOffset)→ `GloryWryQuery` 回包 → `holder.resolve_query`。:`NodeQuery` 序列化进一条 `Query { id, token, kind }` 指令,JS 端算出结果(`getBoundingClientRect` 等)经 ipc 带 token 送回,resolve 对应 `QueryFuture`。超时(节点已删)resolve 成 `Err(NodeGone)`。
+- [x] **P1** **路由:`MemoryAviator`** — 内存历史栈 + back/forward;与 ServerAviator 共享 `run_route`。:`crates/routing` 按 crate doc 里"如何加新 backend"的说明实现内存历史栈(`Vec<String> + cursor`),desktop/未来测试共用。(§3 P1 当年留的口子,现在用例到了。)
+- [ ] **P1** **热重载接通 desktop** — 未做;依赖 CLI watch 管道改造,见"遗留项"。:`glory-cli watch` 的 `BrowserReloadMessage::Functions` 通道现在走浏览器 websocket;desktop 下改走 wry ipc 或本地 websocket 连同一个 CLI server,`FunctionRegistry` 替换闭包后触发整树 re-patch。验收:改一个 handler 的字面量,不重启窗口生效。
+- [ ] **P2** **资源与自定义协议**:wry `with_custom_protocol("glory")`,`asset!` 宏产出的 public URL path 在 desktop 下解析为 `glory://` URL,从 bundle 目录读文件。图片/CSS 可用。
+- [ ] **P2** **窗口 API 面**:`DesktopConfig { title, inner_size, resizable, devtools }`;多窗口 = 多 Holder(非 `single-app` 模式本来就支持多 HolderId,验证 + 文档)。
+- [ ] **P2** **指令编码升级评估(先测后做)**:JSON 批量 → `evaluate_script` 路径先用 desktop 版 js-framework-benchmark 子集压一轮取基线;只有 profiling 显示序列化/解析占比可见时,才上 sledgehammer 风格的紧凑二进制(Dioxus 的演进顺序同样是先 JSON 后优化)。**不要凭直觉提前优化。**
+- [ ] **P3** Tauri 模板从 README 升级为可 `glory new --template tauri` 的真模板(配合 memory 里 dx-aligned 的 embeddable CLI 设计)。
+
+**M7 验收标准**:desktop-counter 真窗口可交互;TodoMVC 跑在 desktop 下(复用 `examples/todomvc` 的 widget 代码,只换 launch 入口——**同一份业务代码双平台,这是跨平台叙事的第一个可演示证据**);热重载工作。
+
+---
+
+## 14. M8 — Fullstack:server functions(与 M9 可并行)
+
+不碰渲染层,纯增量。Dioxus/Leptos 的用户黏性核心特性。
+
+- [x] **P0** **`#[server]` 宏设计与实现** — `glory-macros` proc-macro;拆分规则改为按编译目标(非 wasm = server 本体 + inventory 注册,wasm = fetch stub),不依赖用户 crate feature,可测试性更好;`endpoint = "..."` 防撞名。(新 proc-macro crate `glory-macros` 或并入现有):
+  ```rust
+  #[server]                                  // 用户写:
+  async fn list_todos(filter: Filter) -> Result<Vec<Todo>, ServerFnError> { /* 数据库访问 */ }
+  // server 编译(web-ssr):保留函数体,注册到全局 inventory:(path="/__glory/fn/list_todos", handler)
+  // client 编译(web-csr / backend-command):函数体替换为
+  //   fetch POST {path},body = serde_json::to_vec(&(filter,)),resp → serde_json::from_slice
+  ```
+  实施要点:
+  - 注册机制用 `inventory` 或显式 `register_server_fns!(router)`(desktop/wasm 两种 client 都要能指到 server 地址,`DesktopConfig`/build 时配 base_url)。
+  - 错误模型:`ServerFnError { Request, Deserialize, Server(String) }`,服务端 panic/Err 统一 500 + JSON body。
+  - codec 初版 JSON;trait 化留 binary 口子。
+- [x] **P0** **三个 adapter 挂载 server fn 路由** — 挂载实现收在 `glory-serverfn` 自身(`salvo_mount::router()` / `axum_mount::router()` / `actix_mount::configure`),adapter crate 不引新依赖。:`glory-salvo`/`glory-axum`/`glory-actix` 各加一行式 API(`.mount_server_fns()`),路由前缀 `/__glory/fn/` 可配置。
+- [~] **P1** **与 `resource_in`/`Loader` 整合** — server 侧直调本体已验证(不走 HTTP 自环);hackernews 例子改造未做。:`resource_in(parent, || list_todos(filter.get()))` 在 SSR 下直接调用本体(不走 HTTP 自环),CSR hydrate 复用 `Loader::save_state` 已有的状态嵌入,避免首屏双取。验收:hackernews-salvo 例子改造为 server fn 版,行为不变。
+- [ ] **P1** **server 侧上下文提取** — 未做。:server fn 体内拿请求上下文(headers/cookies/Truck)。机制:adapter 在调用前把请求上下文塞 task-local,提供 `use_request_context() -> Option<...>`。
+- [x] **P2** desktop 客户端也能调 server fn — `reqwest-client` feature + `set_server_url`。(走配置的远端 base_url)——desktop+云端数据的 fullstack 桌面应用故事。
+
+**M8 验收标准**:todomvc-fullstack 新例子:同一份代码 `cargo glory serve` 出 SSR+hydrate+server fn 全栈应用;断网刷新→ SSR 出首屏,交互→ fetch 调 server fn。
+
+---
+
+## 15. M9 — Mobile(运行时免费,工程在 CLI)
+
+依赖 M7(同一 webview 运行时)。90% 是 `crates/cli` 工作,对齐 memory 中 dx-aligned 的 embeddable `glory_cli::Glory` builder 设计。
+
+- [~] **P1** **Android 通路** — CLI `--target android`(cargo-ndk 编排、工具链检测、`mobile` 默认 bin feature)+ `templates/mobile/README.md` 接线文档;Gradle 完整模板与真机验证未做。:`glory build --target android`:cargo-ndk 编排 `aarch64-linux-android` 编译 cdylib + Gradle 模板工程(wry 0.4x 支持 Android,需要 `android_binding!` 胶水)+ `glory serve --target android` 推到模拟器。模板进 `crates/cli/templates/android/`。
+- [~] **P1** **iOS 通路** — CLI `--target ios`(staticlib,非 macOS 报错引导);XcodeGen 模板与模拟器验证未做。:`--target ios`:`aarch64-apple-ios` staticlib + XcodeGen 模板 + simulator 部署。CI 仅 macOS runner 跑编译冒烟。
+- [x] **P1** **touch 事件进 `EventData`** — interpreter 把 touch 主点映射为 PointerData,多点经 `extra.touches`。:`PointerData` 已覆盖大部分;补 `touches: Vec<TouchPoint>` 与 pointer events 映射,interpreter 端 `touchstart/move/end` 透传。
+- [ ] **P2** **移动端宿主细节**:safe-area inset(注入 CSS env() 即可,规范抽象的红利)、虚拟键盘 resize 策略、生命周期(进后台暂停 scheduler flush)。
+- [ ] **P2** **`asset!` 接 bundle 流程**:Android assets/ 与 iOS bundle resources 的路径解析分支。
+- [ ] **P3** `glory bundle`:desktop(msi/dmg/AppImage)与 mobile(apk/ipa)打包子命令。
+
+**M9 验收标准**:todomvc 在 Android 模拟器跑通,与 web/desktop 同一份 widget 代码。
+
+---
+
+## 16. M10 — Native(Blitz)与 TUI 定位
+
+- [x] **P2** **Blitz spike(验证性,不承诺产品化)**:起 `crates/native` 真实现:`blitz-dom` 的 `Document` API 作为 `CommandSink` 消费端(create/set_attr/insert 形状与 `Command` 高度同构),`blitz-shell`/vello 出窗口。目标仅是 counter 渲染出来 + 一次点击回程,产出可行性报告:覆盖的 CSS 子集、文本输入/IME 现状、a11y 缺口。**结论写进 docs 再决定是否立 M11。**
+- [x] **P2** **`crates/native`/`crates/tui` 当前的假 re-export 清理** — native 标 experimental scaffold(协议 re-export);tui 定位为 CommandDom 只读演示。:两个 crate 现在是 `WryRenderer` 的 5 行别名(`crates/native/src/lib.rs`),对外发布会造成能力误导。native 改为 spike 实现或显式 `#[doc = "experimental scaffold"]`;tui 在 README/rustdoc 明确"指令流演示,非产品目标"(S5)。
+- [x] **P3** TUI 若保留 — `glory_tui::render_outline(CommandDom)` 只读渲染,有单测。:用 §12 的 `command_dom.rs` 内存树 + ratatui 画一个只读渲染 demo,作为"指令流通用性"的展示品,不实现交互。
+
+---
+
+## 跨平台演进:落地状态(2026-06-10 第一轮)
+
+M6 全部 P0/P1、M7 P0+P1(除热重载)、M8 P0+P2、M9 CLI 编排与事件模型、M10 清理项已完成;
+全 workspace `cargo test` 30 套件全绿,desktop-counter 真窗口经 CDP 实测交互正确。
+
+**实现中确立的新纪律:`backend-command` 不进 workspace 默认构建。**
+cargo feature 合一会把 desktop/native/tui 的 `backend-command` 与 adapter 的 `web-ssr`
+并进同一份 glory-core,触发互斥 compile_error。因此 `glory-desktop` 的 holder/runtime
+收进 `backend`/`runtime` feature(默认关),由【应用 crate】(workspace 之外)开启;
+`backend-command` 的测试用显式 `cargo test -p glory-core --features backend-command` 跑。
+
+**第二轮(2026-06-11)完成:**
+- [x] desktop 热重载接通(M7 P1):reload wire 消息上移为共享 `glory_hot_reload::ReloadMessage`(CLI/浏览器/desktop 三端同一类型,消除协议分叉);desktop runtime 在 `GLORY_WATCH=ON` 下起 tungstenite 线程连 `/live_reload`,style 消息走与浏览器相同的 link-swap,functions 批次经 `DesktopConfig::on_function_reload` 回调(在 holder.update 事务内,自动 flush)。
+- [x] server fn 上下文提取(M8 P1):`RequestContext`(method/uri/headers)+ tokio task-local `with_request_context`/`request_context()`;三个 adapter mount 全部填充;直调(SSR/测试)时返回 None 为约定语义。
+- [x] desktop 资源自定义协议 `glory://`(M7 P2):`with_custom_protocol` + 路径越界防护 + MIME 表;root 解析顺序 config.assets_root → `GLORY_SITE_ROOT` → exe 目录;`asset_url()` helper 屏蔽 Windows `http://glory.localhost` 重写差异。
+
+**第三轮(2026-06-11)完成:**
+- [x] hackernews 例子 server-fn 化(M8 P1):删除手写 `/api` salvo 路由、cfg 的 URL builder、gloo-net/reqwest 双 fetch 实现,换成 3 个 `#[glory::server]` 函数 + 一行 `salvo_mount::router()`;gloo-net 依赖整个移除。**活体 e2e 验证**:`POST /__glory/fn/fetch_stories ["news",1]` 返回 200 + 真实 HN 数据(上游 API 仍存活),未知端点 404;wasm-csr / web-ssr / 无 feature 三种编译全过。
+- [x] 二进制协议压测评估(M7 P2)——**决策:JSON 留任,不做二进制编码**。基线(`benches/command_wire.rs`,criterion):单条事件 patch serialize 141ns / deserialize 160ns;100 行挂载批(400 指令,23.5KB)57µs/59µs;1000 行极端挂载批(4000 指令,241KB)566µs/595µs。千行挂载的序列化开销 ≈ 帧预算(16.6ms)的 3.4%,事件路径在百纳秒级——瓶颈不在序列化。重新评估条件:profiling 显示 IPC 串行化占比 >10%,或 liveview(网络往返)落地时。
+
+**第四轮(2026-06-11)完成——遗留项清零:**
+- [x] **SSR 收敛为指令消费者(M6 P2)**:非 wasm `Node` 统一为 `CommandNode`(node/mod.rs 只剩两分支);旧 SSR Node 原样迁移为 `renderer/ssr_dom.rs::SsrNode`,`SsrDocument::replay` 把指令流回放成树再渲染——转义/排序/伪属性逻辑零移植,字节级一致;`SsrRenderer` 删除。关键发现并修复:**mount 后的 revise 触发 patch 时新建节点会落入孤立队列导致 id 碰撞**(症状为回放树成环、栈溢出),修法是 holder 在 thread-local 注册表登记自己的 queue,`scheduler::run(holder_id)` 跑 patch 前自动安装。`backend-command`×`web-ssr` 互斥解除(全栈桌面二进制可行)。验证:66 个 web-ssr lib 测试(含全部字节级快照)全绿;hackernews 活体首页 43KB HTML(doctype/gly-id/故事列表)经回放路径渲染正确。
+- [x] **desktop 多窗口 + menu(M7 P2)**:`Desktop` builder(`.window(config, widget).run()`),每窗口独立 CommandHolder/queue/webview,IPC 事件带窗口索引路由;muda 原生菜单(`MenuSpec`/`on_menu` 回调,Windows attach-to-hwnd / macOS nsapp)。**活体验证**:双窗口 CDP 实测,A 窗口点击 3 次 B 窗口不受影响,双向隔离正确。
+- [x] **mobile 完整模板 + 交叉编译冒烟(M9)**:新增 `examples/mobile-counter`(共享 Counter widget + 迷你 webview 宿主循环 + tao/wry `android_binding!` JNI 接线 + iOS `start_app` 导出);**真实产出 arm64 ELF `.so`**(cargo-ndk + NDK r28,Android 21);Gradle 宿主模板(cargoNdk 任务驱动 wry 的 Kotlin 胶水生成)+ XcodeGen spec + Swift 入口进 `crates/cli/templates/mobile/`。真机/CI 运行仍待 CI 环境。
+- [x] **Blitz spike(M10 P2)——结论:可行**。blitz-dom 0.2.4 仅 38s/233 依赖编译(远轻于预期);`glory-native` feature `blitz` 落地 `BlitzConsumer`:Command 批次经 `DocumentMutator` 进真实 blitz 文档(id 翻译表、textContent 语义、class 集合调和);**测试验证 counter widget 树挂载 + 响应式更新("42")端到端**。下一阶段:blitz-shell/vello 窗口绘制 + EventDriver 事件回程。
+- [x] **js-framework-benchmark 基线(横切纪律)**:当前代码重建 wasm 后 headless Chrome 跑仓库自带 harness(12 样本中位数,ms):create_1k=50 / replace_1k=67 / update_10th=33 / select=33 / swap=33 / remove=33 / append_1k=51 / create_10k=443 / clear_1k=34。~33ms 项贴近 2×rAF 计时下限,数字健康;后续改动以此为对照。
+
+**真正剩余(需要本机之外的环境):**
+- [ ] mobile 真机/模拟器运行 + CI 编译冒烟矩阵。
+- [ ] Blitz spike 下一阶段(vello 绘制 + 事件回程)。
+- [ ] `glory bundle` 打包子命令(M9 P3)。
+- [ ] 与官方 js-framework-benchmark(Chrome tracing 法)的对照跑分。
+
+---
+
+## 跨平台演进:横切纪律
+
+- 每个里程碑合并前跑全量 conformance 套件(§12 P1),新增 consumer 必须先过 `command_dom.rs` 参考语义。
+- wasm CSR 直调路径是性能基线,**任何 M6 改动后 js-framework-benchmark 数字不得倒退**(benchmarks/ 已有 glory 实现,改动前后各跑一轮记录在 PR)。
+- wire 协议(`Command` serde 格式、`EventData`、server fn codec)的变更必须同步:JS interpreter、`_todos.md` 本节、AGENTS.md。
+- feature 矩阵新增 `backend-command` 后,CI 增加 `cargo check -p glory-core --features backend-command` 与互斥组合的 compile_error 测试。
 
 ---
 
@@ -254,3 +491,6 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 - 路由:[crates/routing](crates/routing)
 - CLI:[crates/cli](crates/cli)
 - 热重载:[crates/hot-reload](crates/hot-reload)
+- 渲染抽象/指令流:[renderer/mod.rs](crates/core/src/renderer/mod.rs)(`Renderer` trait / `MockCommand` → 待升格 `Command`)
+- 桌面后端:[crates/desktop](crates/desktop)(`WryCommand` 协议 + [wry_interpreter.js](crates/desktop/src/wry_interpreter.js))· [examples/desktop-counter](examples/desktop-counter)
+- native/tui 占位:[crates/native](crates/native) · [crates/tui](crates/tui)(M10 前为 5 行 re-export scaffold)

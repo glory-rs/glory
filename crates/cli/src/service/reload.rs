@@ -1,10 +1,9 @@
+use std::net::SocketAddr;
 use std::sync::Arc;
-use std::{fmt::Display, net::SocketAddr};
 
 use once_cell::sync::Lazy;
 use salvo::prelude::*;
 use salvo::websocket::{Message, WebSocket};
-use serde::Serialize;
 use tokio::{net::TcpStream, select, sync::RwLock, task::JoinHandle};
 
 use crate::config::Project;
@@ -70,10 +69,10 @@ async fn handle_socket(mut stream: WebSocket) {
                             return
                         }
                         Ok(ReloadType::Style) => {
-                            send(&mut stream, BrowserReloadMessage::style().await).await;
+                            send(&mut stream, style_message().await).await;
                         },
                         Ok(ReloadType::FunctionReloads(data)) => {
-                            send(&mut stream, BrowserReloadMessage::functions(data)).await;
+                            send(&mut stream, BrowserReloadMessage::Functions { payload: data }).await;
                         }
                         Err(e) => log::debug!("Reload recive error {e}")
                     }
@@ -110,34 +109,14 @@ async fn send_and_close(mut stream: WebSocket, msg: BrowserReloadMessage) {
     log::trace!("Reload websocket closed");
 }
 
-#[derive(Serialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-enum BrowserReloadMessage {
-    Full,
-    Style { css_path: String },
-    Functions { payload: String },
-}
+/// Wire type shared with reload clients (browser script, desktop host)
+/// via `glory_hot_reload::ReloadMessage`.
+type BrowserReloadMessage = glory_hot_reload::ReloadMessage;
 
-impl BrowserReloadMessage {
-    async fn style() -> Self {
-        let link = CSS_LINK.read().await.clone();
-        if link.is_empty() {
-            log::error!("Reload internal error: sending css reload but no css file is set.");
-        }
-        Self::Style { css_path: link }
+async fn style_message() -> BrowserReloadMessage {
+    let link = CSS_LINK.read().await.clone();
+    if link.is_empty() {
+        log::error!("Reload internal error: sending css reload but no css file is set.");
     }
-
-    fn functions(data: String) -> Self {
-        Self::Functions { payload: data }
-    }
-}
-
-impl Display for BrowserReloadMessage {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Full => write!(f, "reload all"),
-            Self::Style { css_path } => write!(f, "reload {css_path}"),
-            Self::Functions { .. } => write!(f, "reload functions"),
-        }
-    }
+    BrowserReloadMessage::Style { css_path: link }
 }
