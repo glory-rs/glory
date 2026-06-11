@@ -151,10 +151,10 @@ impl Widget for Bench {
         }).show_in(ctx);
 
         // ---- the data table ----
-        // Each row is its own `RowWidget` so it gets its own `Scope` (and
-        // `Owner`). The widget's `build` ties the row's `label` cage to that
-        // scope, so when the row is detached (clear / remove / replace) the
-        // owner drops and the label cage is reclaimed instead of leaking.
+        // Each row is still one Glory view, but the static row skeleton is a
+        // native DOM subtree managed through `dom_subtree` instead of five
+        // nested element views. The row scope owns the label cage, so detach
+        // still reclaims per-row reactive state.
         let rows = self.rows.clone();
         let selected = self.selected.clone();
 
@@ -163,91 +163,59 @@ impl Widget for Bench {
             .fill(tbody().fill(Each::from_vec(
                 rows.clone(),
                 |row: &Row| row.id,
-                move |row| RowWidget {
-                    id: row.id,
-                    label: row.label,
-                    selected,
-                    rows,
-                    row_node: None,
-                    label_node: None,
-                },
+                move |row| row_widget(row.id, row.label, selected, rows),
             )))
             .show_in(ctx);
     }
 }
 
-/// One table row. Owning its own `Scope` is what lets glory reclaim the
-/// per-row `label` cage on detach.
-struct RowWidget {
+struct RowState {
     id: usize,
     label: Cage<String>,
     selected: Cage<Option<usize>>,
-    rows: Cage<Vec<Row>>,
-    row_node: Option<web_sys::Element>,
-    label_node: Option<web_sys::Element>,
+    label_node: web_sys::Element,
 }
 
-impl std::fmt::Debug for RowWidget {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RowWidget").field("id", &self.id).finish_non_exhaustive()
-    }
-}
-
-impl Widget for RowWidget {
-    fn build(&mut self, ctx: &mut Scope) {
-        let id = self.id;
-        let label = self.label;
-
+fn row_widget(id: usize, label: Cage<String>, selected: Cage<Option<usize>>, rows: Cage<Vec<Row>>) -> DomSubtree<RowState> {
+    dom_subtree(move |ctx| {
         ctx.owner().own_cage(label);
         label.bind_view(ctx.view_id());
-        self.selected.bind_view(ctx.view_id());
+        selected.bind_view(ctx.view_id());
 
-        let row_dom = build_row_dom(id, &label.get_untracked(), *self.selected.get_untracked() == Some(id));
+        let row_dom = build_row_dom(id, &label.get_untracked(), *selected.get_untracked() == Some(id));
         let row = row_dom.row;
 
-        let selected = self.selected;
+        let label_node = row_dom.label_anchor.clone();
         let select_anchor = row_dom.label_anchor;
         glory::web::add_event_listener::<web_sys::MouseEvent>(&select_anchor, "click".into(), move |_| {
             glory::reflow::batch(|| selected.revise(|mut s| *s = Some(id)));
         });
 
-        let rows = self.rows;
         let remove_anchor = row_dom.remove_anchor;
         glory::web::add_event_listener::<web_sys::MouseEvent>(&remove_anchor, "click".into(), move |_| {
             glory::reflow::batch(|| rows.revise(|mut v| v.retain(|r| r.id != id)));
         });
 
-        ctx.set_single_node_bounds(row.clone());
-        self.label_node = Some(select_anchor);
-        self.row_node = Some(row);
-    }
-
-    fn flood(&mut self, ctx: &mut Scope) {
-        if let Some(row) = self.row_node.as_ref() {
-            ctx.insert_node_at_placement(row);
-        }
-    }
-
-    fn patch(&mut self, _ctx: &mut Scope) {
-        if self.label.is_revising()
-            && let Some(label_node) = self.label_node.as_ref()
-        {
-            let label = self.label.get_untracked();
-            label_node.set_text_content(Some(label.as_str()));
+        (
+            row,
+            RowState {
+                id,
+                label,
+                selected,
+                label_node,
+            },
+        )
+    })
+    .on_patch(|row, state, _ctx| {
+        if state.label.is_revising() {
+            let label = state.label.get_untracked();
+            state.label_node.set_text_content(Some(label.as_str()));
         }
 
-        if self.selected.is_revising()
-            && let Some(row) = self.row_node.as_ref()
-        {
-            set_selected_class(row, *self.selected.get_untracked() == Some(self.id));
+        if state.selected.is_revising() {
+            set_selected_class(row, *state.selected.get_untracked() == Some(state.id));
         }
-    }
-
-    fn detach(&mut self, ctx: &mut Scope) {
-        if let Some(row) = self.row_node.as_ref() {
-            ctx.remove_node_from_parent(row);
-        }
-    }
+    })
 }
 
 struct RowDom {

@@ -293,7 +293,7 @@ desktop interpreter and command protocol tests.
   collected `render_stream()` chunks, with local results in
   `docs/performance.md`. SSR app output now chunks at DOM boundaries instead
   of one giant app subtree chunk, with stream poll-order coverage.
-- [~] **E8 P0** Add a CSR bulk DOM/template creation path for large keyed lists.
+- [x] **E8 P0** Add a CSR bulk DOM/template creation path for large keyed lists.
   Official `js-framework-benchmark` tracing against Glory/Dioxus/Leptos shows
   Glory's bulk-create gap is dominated by script time, especially
   `07_create10k` (`~617 ms` total, `~366 ms` script in the latest local
@@ -303,27 +303,34 @@ desktop interpreter and command protocol tests.
   `template.content.cloneNode(true)` or `DocumentFragment`, then bind dynamic
   text/classes/events after clone. This is the main route to reducing
   wasm-to-DOM call count for `run1k`, `replace1k`, `create10k`, and append.
-  Status: first validation prototype keeps one Glory `View` per row but renders
+  Status: first validation prototype kept one Glory `View` per row but rendered
   the row's static DOM directly through CSR `Scope` node-placement helpers.
   Latest `Count=1` official run improved Glory aggregate `823.5 ms -> 558.4 ms`
   and `07_create10k` script `366.5 ms -> 167.7 ms`; next step is extracting
   this from the benchmark into a reusable template/bulk API. Follow-up
   template-clone prototype plus bulk `Each` detach improved the same 9-case
   aggregate to `437.8 ms` versus Dioxus `446.0 ms` and Leptos `563.5 ms`;
-  `07_create10k` is now `313.5 ms` total / `83.8 ms` script.
+  `07_create10k` is now `313.5 ms` total / `83.8 ms` script. Landed the
+  reusable CSR `DomSubtree` / `dom_subtree` widget in `glory-core`, migrated
+  the benchmark row off its private `Widget` lifecycle implementation, and
+  re-hid the raw `Scope` DOM-placement helpers as crate-internal API. Latest
+  `Count=1` official rerun after extraction: Glory `442.4 ms`, Dioxus
+  `455.9 ms`, Leptos `589.1 ms`; `07_create10k` Glory `305.6 ms` total /
+  `78.3 ms` script versus Dioxus `296.9 ms` total / `64.5 ms` script.
 - [~] **E9 P0** Compress per-view allocation on CSR hot paths. Each benchmark
   row currently creates a `RowWidget` view plus nested element views/scopes,
   `ViewId` path strings, owner state, maps, and boxed widget/attr/class values.
   Explore an internal "element child arena" or compact `Scope` mode for
   element-only subtrees so repeated rows do not allocate a full independent
   scope for every static `<td>/<span>`. Keep the public builder API; break
-  internal layout compatibility if measurements justify it. Status: benchmark
-  prototype collapses each row from a `RowWidget + tr/td/a/span` view tree to
-  one row view with direct DOM children, validating this as a high-impact
-  architecture branch. `Each` also gained a bulk detach path to remove many
-  children without repeated `IndexMap::shift_remove`, improving `replace1k`
-  `42.4 ms -> 32.0 ms` and `clear1k_x8` `8.3 ms -> 5.6 ms` in the latest
-  exploratory official run.
+  internal layout compatibility if measurements justify it. Status:
+  `DomSubtree` collapses benchmark rows from a `RowWidget + tr/td/a/span`
+  view tree to one row view with native DOM children, validating this as a
+  high-impact architecture branch. Remaining work is automatic/internal
+  compaction for ordinary builder element subtrees. `Each` also gained a bulk
+  detach path to remove many children without repeated `IndexMap::shift_remove`,
+  improving `replace1k` `42.4 ms -> 32.0 ms` and `clear1k_x8` `8.3 ms -> 5.6 ms`
+  in the latest exploratory official run.
 - [ ] **E10 P1** Add stable multi-sample benchmark comparison output. The
   exploratory runs here used official Chrome tracing with `-Count 1`, which is
   enough to identify bottleneck classes but too noisy for accepting/rejecting

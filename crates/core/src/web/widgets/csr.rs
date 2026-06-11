@@ -141,6 +141,122 @@ where
         self.classes.inject_to(&ctx.view_id, &mut node.clone(), "class", false);
     }
 }
+
+type DomSubtreeBuild<State> = Box<dyn FnOnce(&mut Scope) -> (web_sys::Element, State)>;
+type DomSubtreeHook<State> = Box<dyn FnMut(&web_sys::Element, &mut State, &mut Scope)>;
+
+/// A CSR-only widget that lets one Glory view own a native DOM subtree.
+///
+/// This is the low-level path for hot rendering loops that already know their
+/// static DOM shape. The build closure may create nodes manually, clone a
+/// `<template>` skeleton, bind reactive handles to `ctx.view_id()`, and return
+/// the subtree root plus any app-specific state needed for patching.
+pub struct DomSubtree<State>
+where
+    State: 'static,
+{
+    build: Option<DomSubtreeBuild<State>>,
+    patch: DomSubtreeHook<State>,
+    detach: DomSubtreeHook<State>,
+    root: Option<web_sys::Element>,
+    state: Option<State>,
+}
+
+impl<State> fmt::Debug for DomSubtree<State>
+where
+    State: 'static,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DomSubtree")
+            .field("has_root", &self.root.is_some())
+            .field("has_state", &self.state.is_some())
+            .finish_non_exhaustive()
+    }
+}
+
+/// Construct a [`DomSubtree`] from a native DOM builder closure.
+pub fn dom_subtree<State>(build: impl FnOnce(&mut Scope) -> (web_sys::Element, State) + 'static) -> DomSubtree<State>
+where
+    State: 'static,
+{
+    DomSubtree::new(build)
+}
+
+impl<State> DomSubtree<State>
+where
+    State: 'static,
+{
+    pub fn new(build: impl FnOnce(&mut Scope) -> (web_sys::Element, State) + 'static) -> Self {
+        Self {
+            build: Some(Box::new(build)),
+            patch: Box::new(|_, _, _| {}),
+            detach: Box::new(|_, _, _| {}),
+            root: None,
+            state: None,
+        }
+    }
+
+    pub fn on_patch(mut self, patch: impl FnMut(&web_sys::Element, &mut State, &mut Scope) + 'static) -> Self {
+        self.patch = Box::new(patch);
+        self
+    }
+
+    pub fn on_detach(mut self, detach: impl FnMut(&web_sys::Element, &mut State, &mut Scope) + 'static) -> Self {
+        self.detach = Box::new(detach);
+        self
+    }
+}
+
+impl<State> Widget for DomSubtree<State>
+where
+    State: 'static,
+{
+    fn build(&mut self, ctx: &mut Scope) {
+        let build = self.build.take().expect("DomSubtree::build called more than once");
+        let (root, state) = build(ctx);
+        ctx.set_single_node_bounds(root.clone());
+        self.root = Some(root);
+        self.state = Some(state);
+    }
+
+    fn flood(&mut self, ctx: &mut Scope) {
+        if let Some(root) = self.root.as_ref() {
+            ctx.insert_node_at_placement(root);
+        }
+
+        let ids: Vec<ViewId> = ctx.child_views.keys().cloned().collect();
+        for id in ids {
+            ctx.attach_child(&id);
+        }
+    }
+
+    fn patch(&mut self, ctx: &mut Scope) {
+        if let Some(root) = self.root.as_ref() {
+            if root.parent_element().is_none() && ctx.parent_node().is_some() {
+                ctx.insert_node_at_placement(root);
+            }
+            if let Some(state) = self.state.as_mut() {
+                (self.patch)(root, state, ctx);
+            }
+        }
+    }
+
+    fn detach(&mut self, ctx: &mut Scope) {
+        if let Some(root) = self.root.as_ref() {
+            if let Some(state) = self.state.as_mut() {
+                (self.detach)(root, state, ctx);
+            }
+            ctx.remove_node_from_parent(root);
+        }
+        ctx.mark_descendants_dom_detached();
+
+        let ids: Vec<ViewId> = ctx.child_views.keys().cloned().collect();
+        for id in ids {
+            ctx.detach_child(&id);
+        }
+    }
+}
+
 impl<T> Deref for Element<T>
 where
     T: AsRef<web_sys::Element> + JsCast + fmt::Debug + Clone,

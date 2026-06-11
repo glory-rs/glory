@@ -172,14 +172,14 @@ impl Scope {
     }
 
     #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
-    pub fn set_single_node_bounds(&mut self, node: Node) {
+    pub(crate) fn set_single_node_bounds(&mut self, node: Node) {
         self.render_node = Some(node.clone());
         self.first_child_node = Some(node.clone());
         self.last_child_node = Some(node);
     }
 
     #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
-    pub fn insert_node_at_placement(&self, node: &Node) {
+    pub(crate) fn insert_node_at_placement(&self, node: &Node) {
         use wasm_bindgen::UnwrapThrowExt;
 
         let parent = self.parent_node.as_ref().unwrap_throw();
@@ -192,7 +192,7 @@ impl Scope {
     }
 
     #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
-    pub fn remove_node_from_parent(&self, node: &Node) {
+    pub(crate) fn remove_node_from_parent(&self, node: &Node) {
         if let Some(parent) = self.parent_node.as_ref() {
             let _ = parent.remove_child(node);
         }
