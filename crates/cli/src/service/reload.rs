@@ -20,11 +20,9 @@ pub async fn spawn(proj: &Arc<Project>) -> JoinHandle<()> {
 
     let mut site_addr = SITE_ADDR.write().await;
     *site_addr = proj.site.addr;
-    if let Some(file) = &proj.style.file {
-        let mut css_link = CSS_LINK.write().await;
-        // Always use `/` as separator in links
-        *css_link = file.site.components().map(|c| c.as_str()).collect::<Vec<_>>().join("/");
-    }
+    let mut css_link = CSS_LINK.write().await;
+    // Always use `/` as separator in links.
+    *css_link = proj.style.site_file.site.components().map(|c| c.as_str()).collect::<Vec<_>>().join("/");
 
     tokio::spawn(async move {
         let _change = ReloadSignal::subscribe();

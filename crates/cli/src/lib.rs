@@ -20,8 +20,12 @@ use camino::Utf8PathBuf;
 use config::{Cli, Config};
 #[allow(unused_imports)]
 use ext::fs;
+use once_cell::sync::Lazy;
 use signal::Interrupt;
-use std::env;
+use std::{env, path::PathBuf};
+use tokio::sync::Mutex;
+
+static RUN_CWD_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
 /// Run with arguments parsed from the standalone binary (no programmatic
 /// overrides). Kept for the legacy `glory` binary and external callers.
@@ -37,6 +41,8 @@ pub async fn run_with(args: Cli, overrides: Overrides) -> Result<()> {
     let verbose = args.opts().map(|o| o.verbose).unwrap_or(0);
     logger::setup(verbose, &args.log);
 
+    let _cwd_lock = RUN_CWD_LOCK.lock().await;
+
     // Commands that don't need the project metadata loaded.
     match &args.command {
         New(new) => return new.run().await,
@@ -46,24 +52,29 @@ pub async fn run_with(args: Cli, overrides: Overrides) -> Result<()> {
         _ => {}
     }
 
-    let manifest_path = args
+    let mut cwd = Utf8PathBuf::from_path_buf(env::current_dir().unwrap()).unwrap();
+    cwd.clean_windows_path();
+
+    let mut manifest_path = args
         .manifest_path
         .to_owned()
         .unwrap_or_else(|| Utf8PathBuf::from("Cargo.toml"))
         .resolve_home_dir()
         .context(format!("manifest_path: {:?}", &args.manifest_path))?;
-    let mut cwd = Utf8PathBuf::from_path_buf(env::current_dir().unwrap()).unwrap();
-    cwd.clean_windows_path();
+    if manifest_path.is_relative() {
+        manifest_path = cwd.join(manifest_path);
+    }
+    manifest_path.clean_windows_path();
 
     let opts = args.opts().unwrap();
 
     let watch = matches!(&args.command, Serve(serve) if !serve.no_reload);
     let config = Config::load_with(opts, &cwd, &manifest_path, watch, &overrides).dot()?;
-    env::set_current_dir(&config.working_dir).dot()?;
+    let _cwd_guard = CurrentDirGuard::enter(&config.working_dir)?;
     log::debug!("Path working dir {}", GRAY.paint(config.working_dir.as_str()));
 
     let _monitor = Interrupt::run_ctrl_c_monitor();
-    match args.command {
+    let result = match args.command {
         New(_) | Fmt(_) | Doctor(_) => unreachable!("handled before metadata load"),
         Serve(serve) if serve.no_reload => command::serve(&config.current_project()?).await,
         Serve(_) => command::watch(&config.current_project()?).await,
@@ -74,5 +85,57 @@ pub async fn run_with(args: Cli, overrides: Overrides) -> Result<()> {
         ConfigCommand(opts) => command::config_validate(&config, opts.json).await,
         Test(_) => command::test_all(&config).await,
         EndToEnd(_) => command::end2end_all(&config).await,
+    };
+
+    result
+}
+
+struct CurrentDirGuard {
+    original: PathBuf,
+}
+
+impl CurrentDirGuard {
+    fn enter(path: &camino::Utf8Path) -> Result<Self> {
+        let original = env::current_dir().dot()?;
+        env::set_current_dir(path).dot()?;
+        Ok(Self { original })
+    }
+}
+
+impl Drop for CurrentDirGuard {
+    fn drop(&mut self) {
+        if let Err(error) = env::set_current_dir(&self.original) {
+            log::error!("Failed to restore current working directory to {:?}: {error}", self.original);
+        }
+    }
+}
+
+#[cfg(test)]
+mod cwd_tests {
+    use super::*;
+    use crate::config::{ConfigOpts, Opts};
+
+    #[tokio::test]
+    async fn run_restores_current_dir_after_project_command() {
+        let before = env::current_dir().unwrap();
+        let workspace_root = Utf8PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .and_then(|path| path.parent())
+            .expect("glory-cli crate should live under crates/cli")
+            .to_path_buf();
+
+        run(Cli {
+            manifest_path: Some(workspace_root.join("examples/project/Cargo.toml")),
+            log: Vec::new(),
+            command: Commands::Config(ConfigOpts {
+                opts: Opts::default(),
+                json: true,
+                schema: false,
+            }),
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(env::current_dir().unwrap(), before);
     }
 }

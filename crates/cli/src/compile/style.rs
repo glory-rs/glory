@@ -104,7 +104,7 @@ async fn process_css(proj: &Project, css: String) -> Result<Product> {
     let prod = match proj.site.updated_with(&proj.style.site_file, bytes).await? {
         true => {
             log::trace!("Style finished with changes {}", GRAY.paint(proj.style.site_file.to_string()));
-            Product::Style("".to_string()) //TODO
+            Product::Style(site_path(&proj.style.site_file.site))
         }
         false => {
             log::trace!("Style finished without changes");
@@ -112,4 +112,8 @@ async fn process_css(proj: &Project, css: String) -> Result<Product> {
         }
     };
     Ok(prod)
+}
+
+fn site_path(path: &camino::Utf8Path) -> String {
+    path.components().map(|component| component.as_str()).collect::<Vec<_>>().join("/")
 }

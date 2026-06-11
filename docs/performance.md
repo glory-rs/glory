@@ -61,11 +61,41 @@ The script clones or reuses `JS_FRAMEWORK_BENCHMARK_REPO`, generates
 local benchmark apps, builds them with `trunk build --release`, runs
 `npm run bench -- --framework keyed/glory-rs keyed/dioxus-rs`, then writes
 status and copied result artifacts under
-`target/benchmark-report/official-js-framework/`.
+`target/benchmark-report/official-js-framework/`. It also writes
+`official-js-framework-summary.md` and `.json` with median/range tables for the
+official `total`, `script`, and `paint` metrics.
 
 Use `-SkipBench` for adapter/build validation only, or `-ChromeBinary` when
 Chrome/Edge is not discoverable. On this Windows machine Chrome exists at
 `C:\Program Files\Google\Chrome\Application\chrome.exe`.
+
+Use `-BaselineName name` to preserve a named baseline under
+`target/benchmark-report/official-js-framework/baselines/name/`; pass
+`-CompareBaseline name` on a later run to add baseline deltas to the summary.
+For optimization A/B work that should isolate Glory from other framework
+builds, pass `-GloryOnly`. Baselines are not replaced unless
+`-OverwriteBaseline` is set.
+
+Stable local A/B example:
+
+```powershell
+./benchmarks/official-js-framework-benchmark.ps1 `
+  -GloryOnly `
+  -Benchmarks 01_,02_,03_,04_,05_,06_,07_,08_,09_ `
+  -Count 5 `
+  -Headless `
+  -NoThrottling `
+  -BaselineName before-e9
+
+./benchmarks/official-js-framework-benchmark.ps1 `
+  -GloryOnly `
+  -Benchmarks 01_,02_,03_,04_,05_,06_,07_,08_,09_ `
+  -Count 5 `
+  -Headless `
+  -NoThrottling `
+  -CompareBaseline before-e9 `
+  -BaselineName after-e9
+```
 
 Local official CPU smoke, 2026-06-11:
 

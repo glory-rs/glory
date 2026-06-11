@@ -3,10 +3,9 @@
 > Scope: current Glory repo at `D:\Works\glory-rs\glory` compared with local
 > Dioxus checkout at `E:\Repos\dioxus` on 2026-06-11.
 >
-> This is a fresh task board. `_todos.md` is still useful as a historical
-> implementation log, but it contains older unchecked entries that are later
-> marked complete in the same file. Treat this file as the current maturity
-> board.
+> This board is preserved as the 2026-06-11 baseline. The current maturity
+> board is `_todos.md`, which supersedes and continues the remaining work
+> from this file.
 
 ## Status Legend
 

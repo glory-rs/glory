@@ -22,7 +22,7 @@ use reqwest::ClientBuilder;
 use std::os::unix::prelude::PermissionsExt;
 use std::time::{Duration, SystemTime};
 
-use semver::Version;
+use semver::{Version, VersionReq};
 
 #[derive(Debug)]
 pub struct ExeMeta {
@@ -725,28 +725,24 @@ trait Command {
             Some(latest) => {
                 let norm_latest = normalize_version(latest.as_str());
                 let norm_version = normalize_version(&version);
-                if norm_latest.is_some() && norm_version.is_some() {
-                    // TODO use the VersionReq for semantic matching
-                    match norm_version.cmp(&norm_latest) {
-                        core::cmp::Ordering::Greater | core::cmp::Ordering::Equal => {
-                            log::debug!(
-                                "Command [{}] requested version {} is already same or newer than available version {}",
-                                self.name(),
-                                version,
-                                &latest
-                            )
-                        }
-                        core::cmp::Ordering::Less => {
-                            log::info!(
-                                "Command [{}] requested version {}, but a newer version {} is available, you can try it out by \
-                                            setting the {}={} env var and re-running the command",
-                                self.name(),
-                                version,
-                                &latest,
-                                self.env_var_version_name(),
-                                &latest
-                            )
-                        }
+                if let (Some(norm_latest), Some(norm_version)) = (norm_latest, norm_version) {
+                    if is_newer_compatible_version(&norm_version, &norm_latest) {
+                        log::info!(
+                            "Command [{}] requested version {}, but a newer compatible version {} is available, you can try it out by \
+                                        setting the {}={} env var and re-running the command",
+                            self.name(),
+                            version,
+                            &latest,
+                            self.env_var_version_name(),
+                            &latest
+                        )
+                    } else {
+                        log::debug!(
+                            "Command [{}] requested version {} is already same or newer than available compatible version {}",
+                            self.name(),
+                            version,
+                            &latest
+                        )
                     }
                 }
             }
@@ -757,10 +753,17 @@ trait Command {
     }
 }
 
+fn is_newer_compatible_version(requested: &Version, latest: &Version) -> bool {
+    latest > requested && compatible_version_req(requested).is_some_and(|req| req.matches(latest))
+}
+
+fn compatible_version_req(version: &Version) -> Option<VersionReq> {
+    VersionReq::parse(&format!("^{version}")).ok()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use cargo_metadata::semver::Version;
 
     #[test]
     fn test_sanitize_version_prefix() {
@@ -797,5 +800,25 @@ mod tests {
     fn test_invalid_versions() {
         let version = normalize_version("1a-test");
         assert_eq!(version, None);
+    }
+
+    #[test]
+    fn newer_compatible_version_honors_semver_caret_ranges() {
+        assert!(is_newer_compatible_version(
+            &Version::parse("1.2.3").unwrap(),
+            &Version::parse("1.4.0").unwrap()
+        ));
+        assert!(!is_newer_compatible_version(
+            &Version::parse("1.2.3").unwrap(),
+            &Version::parse("2.0.0").unwrap()
+        ));
+        assert!(is_newer_compatible_version(
+            &Version::parse("0.2.3").unwrap(),
+            &Version::parse("0.2.9").unwrap()
+        ));
+        assert!(!is_newer_compatible_version(
+            &Version::parse("0.2.3").unwrap(),
+            &Version::parse("0.3.0").unwrap()
+        ));
     }
 }

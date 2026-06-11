@@ -51,40 +51,34 @@ pub(crate) fn add_delegated_event_listener(event_name: Cow<'static, str>) {
             // create global handler
             let key = JsValue::from_str(&event_delegation_key(&event_name));
             let handler = move |ev: web_sys::Event| {
-                let target = ev.target();
-                let node = ev.composed_path().get(0);
-                let mut node = if node.is_undefined() || node.is_null() {
-                    JsValue::from(target)
-                } else {
-                    node
-                };
+                let path = ev.composed_path();
+                let path_len = path.length();
 
-                // TODO reverse Shadow DOM retargetting
-
-                // TODO simulate currentTarget
-
-                while !node.is_null() {
-                    let node_is_disabled = js_sys::Reflect::get(&node, &JsValue::from_str("disabled")).unwrap_throw().is_truthy();
-                    if !node_is_disabled {
-                        let maybe_handler = js_sys::Reflect::get(&node, &key).unwrap_throw();
-                        if !maybe_handler.is_undefined() {
-                            let f = maybe_handler.unchecked_ref::<js_sys::Function>();
-                            let _ = f.call1(&node, &ev);
-
-                            if ev.cancel_bubble() {
-                                return;
-                            }
-                        }
+                for index in 0..path_len {
+                    let node = path.get(index);
+                    if node.is_undefined() || node.is_null() {
+                        continue;
                     }
 
-                    // navigate up tree
-                    let host = js_sys::Reflect::get(&node, &JsValue::from_str("host")).unwrap_throw();
-                    if host.is_truthy() && host != node && host.dyn_ref::<web_sys::Element>().is_some() {
-                        node = host;
-                    } else if let Some(parent) = node.unchecked_into::<web_sys::Element>().parent_node() {
-                        node = parent.into()
-                    } else {
-                        node = JsValue::null()
+                    if node.dyn_ref::<web_sys::Element>().is_none() {
+                        continue;
+                    }
+
+                    let node_is_disabled = js_sys::Reflect::get(&node, &JsValue::from_str("disabled")).unwrap_throw().is_truthy();
+                    if node_is_disabled {
+                        continue;
+                    }
+
+                    let maybe_handler = js_sys::Reflect::get(&node, &key).unwrap_throw();
+                    if !maybe_handler.is_undefined() {
+                        let f = maybe_handler.unchecked_ref::<js_sys::Function>();
+                        with_current_target(&ev, &node, || {
+                            let _ = f.call1(&node, &ev);
+                        });
+
+                        if ev.cancel_bubble() {
+                            return;
+                        }
                     }
                 }
             };
@@ -115,4 +109,25 @@ pub(crate) fn event_delegation_key(event_name: &str) -> String {
     let mut n = String::from("$$$");
     n.push_str(event_name);
     n
+}
+
+#[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+fn with_current_target(event: &web_sys::Event, current_target: &JsValue, action: impl FnOnce()) {
+    let key = JsValue::from_str("currentTarget");
+    let previous = js_sys::Reflect::get(event.as_ref(), &key).ok();
+
+    define_event_property(event, &key, current_target);
+    action();
+
+    if let Some(previous) = previous {
+        define_event_property(event, &key, &previous);
+    }
+}
+
+#[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+fn define_event_property(event: &web_sys::Event, key: &JsValue, value: &JsValue) {
+    let descriptor = js_sys::Object::new();
+    let _ = js_sys::Reflect::set(&descriptor, &JsValue::from_str("configurable"), &JsValue::from_bool(true));
+    let _ = js_sys::Reflect::set(&descriptor, &JsValue::from_str("value"), value);
+    let _ = js_sys::Reflect::define_property(event.as_ref(), key, descriptor.as_ref());
 }

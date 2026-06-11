@@ -20,6 +20,14 @@ fn todo_events() -> glory_serverfn::StreamingResponse {
 Salvo:
 
 ```rust
+fn events_response() -> Result<salvo::prelude::Response, glory_serverfn::ServerFnError> {
+    glory_serverfn::salvo_mount::streaming_response(todo_events())
+}
+```
+
+When a Salvo handler already receives `&mut Response`, write into it directly:
+
+```rust
 #[salvo::handler]
 async fn events(res: &mut salvo::prelude::Response) {
     glory_serverfn::salvo_mount::write_streaming_response(res, todo_events()).unwrap();

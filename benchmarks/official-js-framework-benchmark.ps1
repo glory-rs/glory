@@ -9,6 +9,10 @@ param(
   [switch]$SkipBuild,
   [switch]$SkipBench,
   [switch]$SkipResults,
+  [switch]$GloryOnly,
+  [string]$BaselineName = '',
+  [string]$CompareBaseline = '',
+  [switch]$OverwriteBaseline,
   [string]$ChromeBinary = '',
   [string[]]$Benchmarks = @(),
   [int]$Count = 0,
@@ -24,8 +28,14 @@ if (-not $BenchmarkRepo) {
 }
 $ReportDir = Join-Path $Root $OutDir
 New-Item -ItemType Directory -Force -Path $ReportDir | Out-Null
+if ($GloryOnly) {
+  $Apps = @('glory')
+}
 
 $steps = New-Object System.Collections.Generic.List[object]
+$script:summaryJsonPath = $null
+$script:summaryMarkdownPath = $null
+$script:savedBaselinePath = $null
 
 function Add-Step([string]$name, [string]$status, [string]$detail) {
   $steps.Add([PSCustomObject]@{
@@ -222,9 +232,296 @@ function Write-Status {
     Count = $Count
     Headless = [bool]$Headless
     NoThrottling = [bool]$NoThrottling
+    GloryOnly = [bool]$GloryOnly
+    BaselineName = $BaselineName
+    CompareBaseline = $CompareBaseline
+    SummaryJson = $script:summaryJsonPath
+    SummaryMarkdown = $script:summaryMarkdownPath
+    SavedBaseline = $script:savedBaselinePath
     Steps = $steps
   } | ConvertTo-Json -Depth 6 | Set-Content -Path $statusPath -Encoding utf8
   return $statusPath
+}
+
+function Format-Number([object]$value) {
+  if ($null -eq $value) {
+    return ''
+  }
+  return ([double]$value).ToString('0.##', [Globalization.CultureInfo]::InvariantCulture)
+}
+
+function Format-Delta([object]$value) {
+  if ($null -eq $value) {
+    return ''
+  }
+  $number = [double]$value
+  if ($number -gt 0) {
+    return "+$($number.ToString('0.##', [Globalization.CultureInfo]::InvariantCulture))"
+  }
+  return $number.ToString('0.##', [Globalization.CultureInfo]::InvariantCulture)
+}
+
+function Format-Percent([object]$value) {
+  if ($null -eq $value) {
+    return ''
+  }
+  $number = [double]$value
+  if ($number -gt 0) {
+    return "+$($number.ToString('0.##', [Globalization.CultureInfo]::InvariantCulture))%"
+  }
+  return "$($number.ToString('0.##', [Globalization.CultureInfo]::InvariantCulture))%"
+}
+
+function Sanitize-BaselineName([string]$name) {
+  if (-not $name) {
+    return ''
+  }
+  $safe = $name -replace '[^A-Za-z0-9._-]', '-'
+  if (-not $safe) {
+    throw "BaselineName '$name' does not contain any usable path characters."
+  }
+  return $safe
+}
+
+function Resolve-BaselineResultsDir([string]$baseline) {
+  if (-not $baseline) {
+    return $null
+  }
+
+  $candidate = if ([IO.Path]::IsPathRooted($baseline)) {
+    $baseline
+  } else {
+    Join-Path (Join-Path $ReportDir 'baselines') (Sanitize-BaselineName $baseline)
+  }
+
+  if (Test-Path (Join-Path $candidate 'results')) {
+    return Join-Path $candidate 'results'
+  }
+  if (Test-Path $candidate) {
+    return $candidate
+  }
+
+  throw "Baseline '$baseline' was not found. Expected a named baseline under $ReportDir\baselines or a results directory path."
+}
+
+function Read-OfficialResultRows([string]$resultsPath) {
+  if (-not (Test-Path $resultsPath)) {
+    return @()
+  }
+
+  $rows = New-Object System.Collections.Generic.List[object]
+  foreach ($file in Get-ChildItem -Path $resultsPath -File -Filter '*.json') {
+    $result = Get-Content -Path $file.FullName -Raw | ConvertFrom-Json
+    if (-not ($result.PSObject.Properties.Name -contains 'framework') -or
+        -not ($result.PSObject.Properties.Name -contains 'benchmark') -or
+        -not ($result.PSObject.Properties.Name -contains 'values')) {
+      continue
+    }
+    foreach ($metric in @('total', 'script', 'paint')) {
+      if (-not ($result.values.PSObject.Properties.Name -contains $metric)) {
+        continue
+      }
+      $stats = $result.values.$metric
+      $values = @($stats.values)
+      $sampleCount = $values.Count
+      if ($sampleCount -eq 0 -and $null -ne $stats.median) {
+        $sampleCount = 1
+      }
+      $min = if ($null -ne $stats.min) { [double]$stats.min } else { $null }
+      $max = if ($null -ne $stats.max) { [double]$stats.max } else { $null }
+      $range = if ($null -ne $min -and $null -ne $max) { $max - $min } else { $null }
+      $framework = [string]$result.framework
+      $benchmark = [string]$result.benchmark
+      $rows.Add([PSCustomObject]@{
+        Key = "$framework|$benchmark|$metric"
+        Framework = $framework
+        Benchmark = $benchmark
+        Type = [string]$result.type
+        Metric = $metric
+        Samples = $sampleCount
+        Median = if ($null -ne $stats.median) { [double]$stats.median } else { $null }
+        Mean = if ($null -ne $stats.mean) { [double]$stats.mean } else { $null }
+        Min = $min
+        Max = $max
+        Range = $range
+        Values = $values
+        Source = $file.Name
+      }) | Out-Null
+    }
+  }
+
+  return @($rows | Sort-Object Benchmark, Framework, Metric)
+}
+
+function Get-OfficialMetric($rows, [string]$framework, [string]$benchmark, [string]$metric) {
+  return $rows | Where-Object {
+    $_.Framework -eq $framework -and $_.Benchmark -eq $benchmark -and $_.Metric -eq $metric
+  } | Select-Object -First 1
+}
+
+function New-ComparisonRows($currentRows, $baselineRows) {
+  if (-not $baselineRows -or $baselineRows.Count -eq 0) {
+    return @()
+  }
+
+  $baselineByKey = @{}
+  foreach ($row in $baselineRows) {
+    $baselineByKey[$row.Key] = $row
+  }
+
+  $rows = New-Object System.Collections.Generic.List[object]
+  foreach ($row in $currentRows) {
+    if (-not $baselineByKey.ContainsKey($row.Key)) {
+      continue
+    }
+    $baseline = $baselineByKey[$row.Key]
+    $delta = if ($null -ne $row.Median -and $null -ne $baseline.Median) {
+      $row.Median - $baseline.Median
+    } else {
+      $null
+    }
+    $deltaPercent = if ($null -ne $delta -and [double]$baseline.Median -ne 0) {
+      ($delta / [double]$baseline.Median) * 100.0
+    } else {
+      $null
+    }
+    $rows.Add([PSCustomObject]@{
+      Framework = $row.Framework
+      Benchmark = $row.Benchmark
+      Metric = $row.Metric
+      BaselineMedian = $baseline.Median
+      CurrentMedian = $row.Median
+      Delta = $delta
+      DeltaPercent = $deltaPercent
+      BaselineSamples = $baseline.Samples
+      CurrentSamples = $row.Samples
+    }) | Out-Null
+  }
+
+  return @($rows | Sort-Object Benchmark, Framework, Metric)
+}
+
+function Write-OfficialSummary {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$ResultsPath,
+    [string]$BaselineResultsPath
+  )
+
+  $currentRows = Read-OfficialResultRows $ResultsPath
+  if ($currentRows.Count -eq 0) {
+    Add-Step 'summary' 'skipped' "no JSON result files under $ResultsPath"
+    return
+  }
+
+  $baselineRows = @()
+  if ($BaselineResultsPath) {
+    $baselineRows = Read-OfficialResultRows $BaselineResultsPath
+  }
+  $comparisonRows = New-ComparisonRows $currentRows $baselineRows
+
+  $script:summaryJsonPath = Join-Path $ReportDir 'official-js-framework-summary.json'
+  $script:summaryMarkdownPath = Join-Path $ReportDir 'official-js-framework-summary.md'
+  [PSCustomObject]@{
+    Generated = (Get-Date -Format s)
+    Results = $ResultsPath
+    BaselineResults = $BaselineResultsPath
+    Apps = $Apps
+    Count = $Count
+    Headless = [bool]$Headless
+    NoThrottling = [bool]$NoThrottling
+    Rows = $currentRows
+    Comparison = $comparisonRows
+  } | ConvertTo-Json -Depth 8 | Set-Content -Path $script:summaryJsonPath -Encoding utf8
+
+  $lines = @(
+    '# Official JS Framework Benchmark Summary',
+    '',
+    "Generated: $(Get-Date -Format s)",
+    '',
+    "Results: $ResultsPath",
+    "Apps: $($Apps -join ', ')",
+    "Requested count: $Count"
+  )
+  if ($BaselineResultsPath) {
+    $lines += "Compared baseline: $BaselineResultsPath"
+  }
+  if ($Count -gt 0 -and $Count -lt 5) {
+    $lines += ''
+    $lines += '> This is a smoke run. Use `-Count 5` or higher for stable median/range comparisons.'
+  }
+
+  $lines += ''
+  $lines += '## Median And Range'
+  $lines += ''
+  $lines += '| Benchmark | Framework | Samples | Total median | Total range | Script median | Script range | Paint median | Paint range |'
+  $lines += '| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |'
+  $groups = $currentRows | Group-Object Benchmark, Framework | Sort-Object Name
+  foreach ($group in $groups) {
+    $first = $group.Group | Select-Object -First 1
+    $benchmark = $first.Benchmark
+    $framework = $first.Framework
+    $total = Get-OfficialMetric $currentRows $framework $benchmark 'total'
+    $script = Get-OfficialMetric $currentRows $framework $benchmark 'script'
+    $paint = Get-OfficialMetric $currentRows $framework $benchmark 'paint'
+    $samples = if ($total) { $total.Samples } elseif ($script) { $script.Samples } elseif ($paint) { $paint.Samples } else { 0 }
+    $lines += "| $benchmark | $framework | $samples | $(Format-Number $total.Median) | $(Format-Number $total.Range) | $(Format-Number $script.Median) | $(Format-Number $script.Range) | $(Format-Number $paint.Median) | $(Format-Number $paint.Range) |"
+  }
+
+  if ($comparisonRows.Count -gt 0) {
+    $lines += ''
+    $lines += '## Baseline Delta'
+    $lines += ''
+    $lines += 'Negative delta is faster than the baseline.'
+    $lines += ''
+    $lines += '| Benchmark | Framework | Metric | Baseline median | Current median | Delta | Delta % |'
+    $lines += '| --- | --- | --- | ---: | ---: | ---: | ---: |'
+    foreach ($row in $comparisonRows) {
+      $lines += "| $($row.Benchmark) | $($row.Framework) | $($row.Metric) | $(Format-Number $row.BaselineMedian) | $(Format-Number $row.CurrentMedian) | $(Format-Delta $row.Delta) | $(Format-Percent $row.DeltaPercent) |"
+    }
+  } elseif ($BaselineResultsPath) {
+    $lines += ''
+    $lines += 'No matching baseline rows were found for this run.'
+  }
+
+  $lines | Set-Content -Path $script:summaryMarkdownPath -Encoding utf8
+  Add-Step 'summary' 'completed' "$script:summaryMarkdownPath; $script:summaryJsonPath"
+}
+
+function Save-OfficialBaseline([string]$name, [string]$resultsPath) {
+  if (-not $name) {
+    return
+  }
+  $safeName = Sanitize-BaselineName $name
+  $baselineRoot = Join-Path (Join-Path $ReportDir 'baselines') $safeName
+  if (Test-Path $baselineRoot) {
+    if (-not $OverwriteBaseline) {
+      throw "Baseline '$name' already exists at $baselineRoot. Pass -OverwriteBaseline to replace it."
+    }
+    Remove-Item -LiteralPath $baselineRoot -Recurse -Force
+  }
+
+  New-Item -ItemType Directory -Force -Path $baselineRoot | Out-Null
+  Copy-Item -Path $resultsPath -Destination (Join-Path $baselineRoot 'results') -Recurse -Force
+  if ($script:summaryJsonPath -and (Test-Path $script:summaryJsonPath)) {
+    Copy-Item -Path $script:summaryJsonPath -Destination (Join-Path $baselineRoot 'official-js-framework-summary.json') -Force
+  }
+  if ($script:summaryMarkdownPath -and (Test-Path $script:summaryMarkdownPath)) {
+    Copy-Item -Path $script:summaryMarkdownPath -Destination (Join-Path $baselineRoot 'official-js-framework-summary.md') -Force
+  }
+  $baselineMeta = [PSCustomObject]@{
+    Name = $name
+    Saved = (Get-Date -Format s)
+    Apps = $Apps
+    Count = $Count
+    Benchmarks = $Benchmarks
+    Headless = [bool]$Headless
+    NoThrottling = [bool]$NoThrottling
+    SourceResults = $resultsPath
+  }
+  $baselineMeta | ConvertTo-Json -Depth 5 | Set-Content -Path (Join-Path $baselineRoot 'baseline.json') -Encoding utf8
+  $script:savedBaselinePath = $baselineRoot
+  Add-Step 'baseline' 'saved' $baselineRoot
 }
 
 if (-not (Test-Path $BenchmarkRepo)) {
@@ -375,6 +672,18 @@ if (Test-Path $distDir) {
   }
   Copy-Item -Path $distDir -Destination $dest -Recurse -Force
   Add-Step 'copy-results-dist' 'completed' $dest
+}
+
+$currentResultsPath = Join-Path $ReportDir 'results'
+$baselineResultsPath = $null
+if ($CompareBaseline) {
+  $baselineResultsPath = Resolve-BaselineResultsDir $CompareBaseline
+}
+if (Test-Path $currentResultsPath) {
+  Write-OfficialSummary -ResultsPath $currentResultsPath -BaselineResultsPath $baselineResultsPath
+  Save-OfficialBaseline $BaselineName $currentResultsPath
+} else {
+  Add-Step 'summary' 'skipped' "no copied results under $currentResultsPath"
 }
 
 $statusPath = Write-Status 'completed'

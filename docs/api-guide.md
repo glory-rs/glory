@@ -41,6 +41,41 @@ cargo check --manifest-path examples/counter/Cargo.toml --target wasm32-unknown-
 cargo check --manifest-path examples/todomvc/Cargo.toml --target wasm32-unknown-unknown
 ```
 
+### App-Wide Reactive Context
+
+`Truck` is app-wide typed context, not a signal. Reading a plain value from
+`Truck` does not subscribe the current view, and mutating `Truck` does not
+schedule patches. Store a `Cage` handle in `Truck` when context also needs to be
+reactive:
+
+```rust
+use glory::{Cage, Scope, Widget};
+
+#[derive(Clone, Copy)]
+struct ThemeContext {
+    theme: Cage<&'static str>,
+}
+
+#[derive(Debug)]
+struct App;
+
+impl Widget for App {
+    fn build(&mut self, ctx: &mut Scope) {
+        ctx.truck_mut().inject(ThemeContext {
+            theme: Cage::new("light"),
+        });
+
+        // Children can copy the Cage handle out of Truck. Later `.get()` or
+        // `.map(...)` calls on the Cage use normal reactive subscriptions.
+    }
+}
+```
+
+Use this for app-wide state such as theme, locale, auth/session summary, or a
+router handle. Keep per-component state in the component owner instead of in
+`Truck`, and avoid global statics unless a measured app genuinely needs process
+global state.
+
 ## Widgets
 
 HTML tags are generated builder types:

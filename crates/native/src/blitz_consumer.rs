@@ -15,7 +15,7 @@
 //!   feature, `GloryBlitzDocument` forwards matching Blitz DOM events back
 //!   into the held Glory `CommandHolder`.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 #[cfg(feature = "shell")]
 use std::{
     any::Any,
@@ -27,7 +27,7 @@ use std::{
 use blitz_dom::{Attribute, BaseDocument, DocumentConfig, QualName};
 use glory_core::renderer::{Command, CommandInsertPosition};
 #[cfg(feature = "shell")]
-use glory_core::renderer::{EventData, PointerData, TargetData};
+use glory_core::renderer::{EventData, KeyboardData, PointerData, TargetData};
 #[cfg(feature = "shell")]
 use glory_core::web::holders::CommandHolder;
 #[cfg(feature = "shell")]
@@ -41,6 +41,8 @@ pub struct BlitzConsumer {
     blitz_to_glory: HashMap<usize, u64>,
     /// Class sets per glory id (blitz exposes only whole attributes).
     classes: HashMap<u64, BTreeSet<String>>,
+    /// DOM properties per glory id, separate from attributes.
+    properties: HashMap<u64, BTreeMap<String, String>>,
     /// (glory id, event name) listeners — recorded for the event stage.
     listeners: BTreeSet<(u64, String)>,
 }
@@ -82,6 +84,7 @@ impl BlitzConsumer {
             ids,
             blitz_to_glory,
             classes: HashMap::new(),
+            properties: HashMap::new(),
             listeners: BTreeSet::new(),
         }
     }
@@ -125,17 +128,18 @@ impl BlitzConsumer {
                     self.doc.mutate().clear_attribute(node, qual(name));
                 }
             }
-            // blitz has no property bag distinct from attributes; treat
-            // properties as attributes for the spike.
             Command::SetProperty { id, name, value } => {
-                if let Some(node) = self.blitz_id(*id) {
-                    self.doc.mutate().set_attribute(node, qual(name), value);
-                }
+                self.properties.entry(*id).or_default().insert(name.clone(), value.clone());
+                self.sync_reflected_property(*id, name, Some(value));
             }
             Command::RemoveProperty { id, name } => {
-                if let Some(node) = self.blitz_id(*id) {
-                    self.doc.mutate().clear_attribute(node, qual(name));
+                if let Some(properties) = self.properties.get_mut(id) {
+                    properties.remove(name);
+                    if properties.is_empty() {
+                        self.properties.remove(id);
+                    }
                 }
+                self.sync_reflected_property(*id, name, None);
             }
             Command::AddClass { id, value } => {
                 let classes = self.classes.entry(*id).or_default();
@@ -198,6 +202,8 @@ impl BlitzConsumer {
                     self.doc.mutate().remove_node(blitz_child);
                     self.ids.remove(child);
                     self.blitz_to_glory.remove(&blitz_child);
+                    self.classes.remove(child);
+                    self.properties.remove(child);
                 }
             }
             Command::AttachEvent { id, name, .. } => {
@@ -220,6 +226,19 @@ impl BlitzConsumer {
             .unwrap_or_default();
         if let Some(node) = self.blitz_id(glory_id) {
             self.doc.mutate().set_attribute(node, qual("class"), &value);
+        }
+    }
+
+    fn sync_reflected_property(&mut self, glory_id: u64, name: &str, value: Option<&String>) {
+        if !is_reflected_blitz_property(name) {
+            return;
+        }
+
+        if let Some(node) = self.blitz_id(glory_id) {
+            match value {
+                Some(value) => self.doc.mutate().set_attribute(node, qual(name), value),
+                None => self.doc.mutate().clear_attribute(node, qual(name)),
+            }
         }
     }
 
@@ -246,8 +265,17 @@ impl BlitzConsumer {
             .map(|attr| attr.value.clone())
     }
 
+    /// Property value lookup by glory id (test/inspection aid).
+    pub fn property(&self, glory_id: u64, name: &str) -> Option<String> {
+        self.properties.get(&glory_id)?.get(name).cloned()
+    }
+
     #[allow(dead_code)]
     fn unused(_: Attribute) {}
+}
+
+fn is_reflected_blitz_property(name: &str) -> bool {
+    matches!(name, "value" | "checked")
 }
 
 #[cfg(feature = "shell")]
@@ -361,9 +389,59 @@ impl blitz_dom::EventHandler for GloryEventBridge {
                     checked: None,
                 });
             }
-            _ => {}
+            blitz_traits::events::DomEventData::KeyPress(key)
+            | blitz_traits::events::DomEventData::KeyDown(key)
+            | blitz_traits::events::DomEventData::KeyUp(key) => {
+                data.keyboard = Some(keyboard_data(key));
+                data.extra = Some(serde_json::json!({
+                    "repeat": key.is_auto_repeating,
+                    "composing": key.is_composing,
+                    "location": format!("{:?}", key.location),
+                    "text": key.text.as_ref().map(ToString::to_string),
+                }));
+            }
+            blitz_traits::events::DomEventData::Ime(ime) => {
+                data.extra = Some(ime_event_extra(ime));
+            }
         }
         self.events.borrow_mut().push(data);
+    }
+}
+
+#[cfg(feature = "shell")]
+fn keyboard_data(key: &blitz_traits::events::BlitzKeyEvent) -> KeyboardData {
+    KeyboardData {
+        key: key.key.to_string(),
+        code: key.code.to_string(),
+        alt: key.modifiers.alt(),
+        ctrl: key.modifiers.ctrl(),
+        shift: key.modifiers.shift(),
+        meta: key.modifiers.meta(),
+    }
+}
+
+#[cfg(feature = "shell")]
+fn ime_event_extra(ime: &blitz_traits::events::BlitzImeEvent) -> serde_json::Value {
+    match ime {
+        blitz_traits::events::BlitzImeEvent::Enabled => serde_json::json!({
+            "ime": { "state": "enabled" }
+        }),
+        blitz_traits::events::BlitzImeEvent::Preedit(value, cursor) => serde_json::json!({
+            "ime": {
+                "state": "preedit",
+                "value": value,
+                "cursor": cursor,
+            }
+        }),
+        blitz_traits::events::BlitzImeEvent::Commit(value) => serde_json::json!({
+            "ime": {
+                "state": "commit",
+                "value": value,
+            }
+        }),
+        blitz_traits::events::BlitzImeEvent::Disabled => serde_json::json!({
+            "ime": { "state": "disabled" }
+        }),
     }
 }
 
@@ -418,5 +496,53 @@ mod tests {
         let doc = consumer.document();
         let span_node = doc.get_node(span_blitz_id).unwrap();
         assert_eq!(span_node.text_content(), "42");
+    }
+
+    #[test]
+    fn properties_are_tracked_separately_from_attributes() {
+        let mut consumer = BlitzConsumer::new();
+        consumer.apply_batch(&[
+            Command::Create {
+                id: 1,
+                name: "input".into(),
+                is_void: false,
+            },
+            Command::Insert {
+                parent: 0,
+                child: 1,
+                position: CommandInsertPosition::Tail,
+            },
+            Command::SetAttribute {
+                id: 1,
+                name: "data-attr".into(),
+                value: "attribute".into(),
+            },
+            Command::SetProperty {
+                id: 1,
+                name: "data-prop".into(),
+                value: "property".into(),
+            },
+            Command::SetProperty {
+                id: 1,
+                name: "value".into(),
+                value: "typed".into(),
+            },
+        ]);
+
+        assert_eq!(consumer.attribute(1, "data-attr").as_deref(), Some("attribute"));
+        assert_eq!(consumer.property(1, "data-prop").as_deref(), Some("property"));
+        assert_eq!(consumer.attribute(1, "data-prop"), None);
+
+        // Blitz's form state is still driven through attributes, so known
+        // form properties are mirrored while remaining queryable as properties.
+        assert_eq!(consumer.property(1, "value").as_deref(), Some("typed"));
+        assert_eq!(consumer.attribute(1, "value").as_deref(), Some("typed"));
+
+        consumer.apply(&Command::RemoveProperty {
+            id: 1,
+            name: "data-prop".into(),
+        });
+        assert_eq!(consumer.property(1, "data-prop"), None);
+        assert_eq!(consumer.attribute(1, "data-prop"), None);
     }
 }

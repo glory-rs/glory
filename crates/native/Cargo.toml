@@ -18,6 +18,7 @@ blitz-dom = { version = "0.2.4", optional = true }
 blitz-shell = { version = "0.2.3", optional = true, default-features = false }
 blitz-traits = { version = "0.2.0", optional = true, default-features = false }
 glory-core = { workspace = true }
+serde_json = { workspace = true, optional = true }
 
 [lints]
 workspace = true
@@ -26,4 +27,4 @@ workspace = true
 # Experimental Blitz consumer: applies Command batches to a blitz-dom
 # BaseDocument (the spike for a native non-webview renderer).
 blitz = ["dep:blitz-dom", "glory-core/backend-command"]
-shell = ["blitz", "dep:anyrender_vello", "dep:blitz-shell", "dep:blitz-traits"]
+shell = ["blitz", "dep:anyrender_vello", "dep:blitz-shell", "dep:blitz-traits", "dep:serde_json"]

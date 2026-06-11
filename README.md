@@ -39,8 +39,8 @@ For API-oriented docs and runnable example commands, start with
 [`docs/README.md`](docs/README.md). For a deeper architectural comparison
 (especially against Dioxus), see
 [`_report.md`](_report.md). The current maturity gap board lives in
-[`_improve_todos.md`](_improve_todos.md); the historical implementation log is
-[`_todos.md`](_todos.md). Contributor conventions live in
+[`_todos.md`](_todos.md); `_improve_todos.md` is the previous 2026-06-11
+baseline that this board supersedes. Contributor conventions live in
 [`AGENTS.md`](AGENTS.md).
 
 Fullstack server-function notes, including process-local server state/cache

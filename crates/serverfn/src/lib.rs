@@ -1478,6 +1478,7 @@ pub mod salvo_mount {
     /// Use this from custom resource, SSE, or upload routes that need to
     /// flush chunks instead of returning a JSON server-function response.
     pub fn write_streaming_response(res: &mut Response, response: crate::StreamingResponse) -> Result<(), crate::ServerFnError> {
+        res.status_code(StatusCode::OK);
         res.add_header("content-type", response.content_type(), true)
             .map_err(|err| crate::ServerFnError::http(500, format!("invalid content-type header: {err}")))?;
         for (name, value) in response.headers() {
@@ -1489,6 +1490,17 @@ pub mod salvo_mount {
         }
         res.stream(response.into_body().map(|chunk| chunk.map_err(std::io::Error::other)));
         Ok(())
+    }
+
+    /// Converts a [`crate::StreamingResponse`] into a Salvo streaming response.
+    ///
+    /// This matches the Axum/Actix return-style helper while
+    /// [`write_streaming_response`] remains available for handlers that already
+    /// receive `&mut Response`.
+    pub fn streaming_response(response: crate::StreamingResponse) -> Result<Response, crate::ServerFnError> {
+        let mut res = Response::new();
+        write_streaming_response(&mut res, response)?;
+        Ok(res)
     }
 }
 

@@ -1,4 +1,4 @@
-use std::{fs, path::PathBuf};
+use std::{fs, path::Path};
 
 use crate::ext::anyhow::{Context, Result, bail, ensure};
 use clap::{Args, ValueEnum};
@@ -94,6 +94,10 @@ impl NewCommand {
     }
 
     fn write_builtin_template(&self) -> Result<()> {
+        self.write_builtin_template_in(Path::new("."))
+    }
+
+    fn write_builtin_template_in(&self, base_dir: &Path) -> Result<()> {
         let raw_name = self
             .name
             .as_deref()
@@ -105,7 +109,11 @@ impl NewCommand {
             "template name `{package_name}` is not a valid Cargo package name"
         );
         let crate_name = package_name.replace('-', "_");
-        let root = if self.init { PathBuf::from(".") } else { PathBuf::from(&package_name) };
+        let root = if self.init {
+            base_dir.to_path_buf()
+        } else {
+            base_dir.join(&package_name)
+        };
         if root.exists() && !self.init && !self.force {
             bail!(
                 "refusing to overwrite existing directory `{}`; pass --force to overwrite template files",
@@ -837,8 +845,6 @@ mod tests {
     #[test]
     fn builtin_template_defaults_to_web_and_writes_project() {
         let dir = temp_dir::TempDir::new().unwrap();
-        let cwd = std::env::current_dir().unwrap();
-        std::env::set_current_dir(dir.path()).unwrap();
         let result = NewCommand {
             template: TemplateKind::Web,
             git: None,
@@ -850,8 +856,7 @@ mod tests {
             verbose: false,
             init: false,
         }
-        .write_builtin_template();
-        std::env::set_current_dir(cwd).unwrap();
+        .write_builtin_template_in(dir.path());
 
         result.unwrap();
         assert!(dir.path().join("my-app/Cargo.toml").exists());

@@ -122,9 +122,17 @@ The script clones or reuses `JS_FRAMEWORK_BENCHMARK_REPO`, generates official
 local apps, builds them with `trunk`, runs
 `npm run bench -- --framework keyed/glory-rs keyed/dioxus-rs`, and copies the
 official result artifacts into
-`target/benchmark-report/official-js-framework/`. Pass `-SkipBench` to validate
-adapter generation/building without launching Chrome, or `-ChromeBinary` to
-pin the browser used by the webdriver runner.
+`target/benchmark-report/official-js-framework/`. It also writes
+`official-js-framework-summary.md` and `.json` with median/range tables for
+`total`, `script`, and `paint` timings.
+
+Pass `-SkipBench` to validate adapter generation/building without launching
+Chrome, or `-ChromeBinary` to pin the browser used by the webdriver runner.
+Use `-BaselineName name` to preserve the current result set under
+`target/benchmark-report/official-js-framework/baselines/name/`, and
+`-CompareBaseline name` to add a delta table against that baseline. Baseline
+names are not overwritten unless `-OverwriteBaseline` is set. For Glory-only
+optimization A/B runs, pass `-GloryOnly`.
 
 For a shorter CPU-suite smoke run:
 
@@ -135,6 +143,25 @@ For a shorter CPU-suite smoke run:
   -Count 1 `
   -Headless `
   -NoThrottling
+```
+
+For a stable local comparison before and after a Glory-only optimization:
+
+```powershell
+./benchmarks/official-js-framework-benchmark.ps1 `
+  -GloryOnly `
+  -Count 5 `
+  -Headless `
+  -NoThrottling `
+  -BaselineName before-e9
+
+./benchmarks/official-js-framework-benchmark.ps1 `
+  -GloryOnly `
+  -Count 5 `
+  -Headless `
+  -NoThrottling `
+  -CompareBaseline before-e9 `
+  -BaselineName after-e9
 ```
 
 ## Bundle size (measured)

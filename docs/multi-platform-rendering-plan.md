@@ -63,8 +63,8 @@ Glory 现在不再是单纯的 Web/SSR 框架。当前主线已经具备:
    - 增加 feature-combination compile checks,覆盖 `web-csr`/`web-ssr`/`backend-command`/`single-app` 规则。
 
 2. **当前任务板与文档收敛**
-   - `_improve_todos.md` 是当前成熟度任务板。
-   - `_todos.md` 保留为历史实现日志。
+   - `_todos.md` 是当前成熟度任务板。
+   - `_improve_todos.md` 保留为 2026-06-11 基线档案,由 `_todos.md` 接续。
    - 本文档只记录当前架构状态和下一阶段计划。
 
 3. **官方性能基线**
@@ -132,7 +132,8 @@ Glory 的现实策略:
 
 ## 4. 当前任务入口
 
-以 [`../_improve_todos.md`](../_improve_todos.md) 为当前任务板:
+以 [`../_todos.md`](../_todos.md) 为当前任务板;[`../_improve_todos.md`](../_improve_todos.md)
+保留为 2026-06-11 基线档案:
 
 - Lane A:release governance + docs。
 - Lane B:CLI, bundle, templates, platform serve。
@@ -168,4 +169,4 @@ Glory 的现实策略:
 | Mobile compile path | `crates/cli/src/compile/mobile.rs` |
 | Mobile templates | `crates/cli/templates/mobile` |
 | Blitz consumer | `crates/native/src/blitz_consumer.rs` |
-| Current maturity board | `_improve_todos.md` |
+| Current maturity board | `_todos.md` |

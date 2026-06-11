@@ -15,7 +15,7 @@ mod tailwind;
 
 use std::{fmt::Debug, sync::Arc};
 
-pub use self::cli::{BuildTarget, Cli, Commands, Log, Opts};
+pub use self::cli::{BuildTarget, CleanOpts, Cli, Commands, ConfigOpts, Log, Opts, ServeOpts};
 pub use self::overrides::Overrides;
 use crate::ext::{
     MetadataExt,

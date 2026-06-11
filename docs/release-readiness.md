@@ -47,7 +47,8 @@ should be fixed in dedicated PRs.
 ## Documentation
 
 - [ ] README feature matrix matches the current code.
-- [ ] `_improve_todos.md` completed items are checked.
+- [ ] `_todos.md` completed items are checked; `_improve_todos.md` remains the
+  2026-06-11 baseline archive.
 - [ ] `docs/multi-platform-rendering-plan.md` does not describe completed work as future work.
 - [ ] AGENTS.md mentions any changed feature constraints or wire protocol rules.
 

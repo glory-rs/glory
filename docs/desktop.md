@@ -85,6 +85,10 @@ let config = DesktopConfig {
 Menu callbacks run on the event-loop thread. Signal writes settle and flush back
 to the webview automatically.
 
+For native file dialogs, keep the dialog crate in the app and open it from a
+host callback such as `on_menu`; see [Platform APIs](platform-apis.md#file-dialogs)
+for the `rfd` integration pattern.
+
 ## Assets
 
 Declare assets once:

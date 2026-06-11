@@ -9,7 +9,7 @@
 //! `Widget` of that scope, so the host component dropping cancels
 //! the effect automatically. No global lifetime, no leaks.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use educe::Educe;
@@ -116,11 +116,9 @@ where
 /// re-runs, which builds a fresh future and spawns it; the returned
 /// [`super::Cage`] is updated when that future resolves.
 ///
-/// **Stale-write caveat**: the previous future is NOT cancelled. If a
-/// slow request and a fast request race, the slow one will overwrite
-/// the fast one. For workflows where this matters, wrap the body with
-/// an epoch check or use the `Loader` widget (which serialises and
-/// supports SSR hydration).
+/// The previous future is not cancelled when dependencies change, but
+/// stale completions are ignored. A slow request from an older run will
+/// not overwrite the value produced by the latest run.
 ///
 /// ```ignore
 /// let user = resource_in(ctx, {
@@ -141,14 +139,69 @@ where
 {
     let cell = super::Cage::new(None::<T>);
     let cell_for_effect = cell;
+    let generation = Rc::new(Cell::new(0_u64));
     let future_fn = Rc::new(future_fn);
     effect_in(parent, move || {
         let future = (future_fn)();
         let cell = cell_for_effect;
+        let run = ResourceRun::start(&generation);
         crate::spawn::spawn_local(async move {
             let val = future.await;
-            cell.revise(|mut v| *v = Some(val));
+            run.commit(cell, val);
         });
     });
     cell
+}
+
+#[derive(Clone, Debug)]
+struct ResourceRun {
+    generation: Rc<Cell<u64>>,
+    value: u64,
+}
+
+impl ResourceRun {
+    fn start(generation: &Rc<Cell<u64>>) -> Self {
+        let value = generation.get().wrapping_add(1);
+        generation.set(value);
+        Self {
+            generation: generation.clone(),
+            value,
+        }
+    }
+
+    fn is_current(&self) -> bool {
+        self.generation.get() == self.value
+    }
+
+    fn commit<T>(&self, cell: super::Cage<Option<T>>, value: T) -> bool
+    where
+        T: std::fmt::Debug + 'static,
+    {
+        if !self.is_current() {
+            return false;
+        }
+
+        cell.revise(|mut current| *current = Some(value));
+        true
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resource_run_ignores_stale_completion() {
+        let generation = Rc::new(Cell::new(0_u64));
+        let cell = super::super::Cage::new(None::<i32>);
+
+        let slow_run = ResourceRun::start(&generation);
+        let fast_run = ResourceRun::start(&generation);
+
+        assert!(fast_run.commit(cell, 20));
+        assert_eq!(*cell.get_untracked(), Some(20));
+
+        assert!(!slow_run.commit(cell, 10));
+        assert_eq!(*cell.get_untracked(), Some(20));
+    }
 }
