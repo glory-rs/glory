@@ -10,7 +10,9 @@ use std::rc::Rc;
 use crate::config::GloryConfig;
 use crate::reflow::{Cage, effect_in, resource_in};
 use crate::web::holders::ServerHolder;
-use crate::web::widgets::{div, li, ul};
+use crate::web::widgets::{
+    button, div, form, head_mixin, input, label, li, link, math as math_widgets, meta, option, select, style, svg as svg_widgets, textarea, title, ul,
+};
 use crate::widgets::{Each, Switch};
 use crate::{Holder, Scope, Widget};
 
@@ -20,6 +22,186 @@ fn render_html(holder: &ServerHolder) -> String {
 
 fn make_holder() -> ServerHolder {
     ServerHolder::new(GloryConfig::default(), "/")
+}
+
+// ----------------------------------------------------------------------------
+// Document head
+// ----------------------------------------------------------------------------
+
+#[derive(Debug)]
+struct HeadDocumentWidget;
+
+impl Widget for HeadDocumentWidget {
+    fn build(&mut self, ctx: &mut Scope) {
+        head_mixin()
+            .fill(title().text("Glory App"))
+            .fill(meta().attr("name", "description").attr("content", "Builder UI"))
+            .fill(link().attr("rel", "canonical").attr("href", "https://glory.rs/"))
+            .show_in(ctx);
+        div().text("body").show_in(ctx);
+    }
+}
+
+#[test]
+fn document_head_mixin_renders_into_ssr_head() {
+    let holder = make_holder().mount(HeadDocumentWidget);
+    let html = holder.render_string();
+    assert!(html.contains("<title"), "{html}");
+    assert!(html.contains("Glory App"), "{html}");
+    assert!(html.contains(r#"name="description""#), "{html}");
+    assert!(html.contains(r#"content="Builder UI""#), "{html}");
+    assert!(html.contains(r#"rel="canonical""#), "{html}");
+    assert!(html.contains(r#"href="https://glory.rs/""#), "{html}");
+}
+
+#[derive(Debug)]
+struct ScopedStyleWidget;
+
+impl Widget for ScopedStyleWidget {
+    fn build(&mut self, ctx: &mut Scope) {
+        let scope = crate::web::scoped_css(":scope > button { color: red; }");
+        style().text(scope.css().to_owned()).show_in(ctx);
+        div().class(scope.clone()).fill(button().text("Save")).show_in(ctx);
+    }
+}
+
+#[test]
+fn scoped_style_renders_style_and_scope_class() {
+    let holder = make_holder().mount(ScopedStyleWidget);
+    let html = render_html(&holder);
+    let scope = crate::web::scoped_css(":scope > button { color: red; }");
+    assert!(html.contains(scope.class_name()), "{html}");
+    assert!(html.contains(&format!(".{} &gt; button", scope.class_name())), "{html}");
+    assert!(html.contains(r#"<button gly-id="#), "{html}");
+}
+
+// ----------------------------------------------------------------------------
+// Markup surface
+// ----------------------------------------------------------------------------
+
+#[derive(Debug)]
+struct FormSurfaceWidget;
+
+impl Widget for FormSurfaceWidget {
+    fn build(&mut self, ctx: &mut Scope) {
+        form()
+            .attr("method", "post")
+            .attr("action", "/todos")
+            .fill(label().attr("for", "todo-title").text("Title"))
+            .fill(
+                input()
+                    .id("todo-title")
+                    .attr("name", "title")
+                    .attr("value", "Buy milk")
+                    .attr("required", true),
+            )
+            .fill(input().attr("type", "checkbox").attr("name", "done").attr("checked", true))
+            .fill(
+                select()
+                    .attr("name", "priority")
+                    .fill(option().attr("value", "high").attr("selected", true).text("High")),
+            )
+            .fill(textarea().attr("name", "notes").text("Bring bags"))
+            .fill(button().attr("type", "submit").text("Save"))
+            .show_in(ctx);
+    }
+}
+
+#[derive(Debug)]
+struct SvgMathSurfaceWidget;
+
+impl Widget for SvgMathSurfaceWidget {
+    fn build(&mut self, ctx: &mut Scope) {
+        div()
+            .fill(
+                svg_widgets::svg()
+                    .attr("viewBox", "0 0 10 10")
+                    .attr("role", "img")
+                    .fill(
+                        svg_widgets::defs()
+                            .fill(
+                                svg_widgets::linear_gradient()
+                                    .attr("id", "grad")
+                                    .fill(svg_widgets::stop().attr("offset", "0%")),
+                            )
+                            .fill(svg_widgets::filter().attr("id", "shadow").fill(svg_widgets::fe_drop_shadow()))
+                            .fill(svg_widgets::clip_path().attr("id", "clip").fill(svg_widgets::rect())),
+                    )
+                    .fill(svg_widgets::title().text("Glory badge"))
+                    .fill(
+                        svg_widgets::circle()
+                            .attr("cx", "5")
+                            .attr("cy", "5")
+                            .attr("r", "4")
+                            .attr("fill", "currentColor"),
+                    )
+                    .fill(svg_widgets::path().attr("id", "curve").attr("d", "M1 8 C3 2 7 2 9 8"))
+                    .fill(svg_widgets::text().fill(svg_widgets::text_path().attr("href", "#curve").text("G")))
+                    .fill(svg_widgets::switch_().fill(svg_widgets::use_().attr("href", "#badge")))
+                    .fill(svg_widgets::text().attr("x", "5").attr("y", "6").text("G")),
+            )
+            .fill(
+                math_widgets::math().fill(
+                    math_widgets::mrow()
+                        .fill(math_widgets::mi().text("x"))
+                        .fill(math_widgets::mo().text("="))
+                        .fill(
+                            math_widgets::mfrac()
+                                .fill(math_widgets::mn().text("1"))
+                                .fill(math_widgets::mn().text("2")),
+                        ),
+                ),
+            )
+            .fill(
+                math_widgets::math()
+                    .fill(
+                        math_widgets::mroot()
+                            .fill(math_widgets::mi().text("x"))
+                            .fill(math_widgets::mn().text("3")),
+                    )
+                    .fill(math_widgets::merror().fill(math_widgets::mtext().text("bad")))
+                    .fill(math_widgets::semantics().fill(math_widgets::annotation_xml().attr("encoding", "application/xhtml+xml"))),
+            )
+            .show_in(ctx);
+    }
+}
+
+#[test]
+fn form_controls_render_expected_ssr_markup() {
+    let holder = make_holder().mount(FormSurfaceWidget);
+    let html = render_html(&holder);
+    assert!(html.contains("<form"), "{html}");
+    assert!(html.contains(r#"method="post""#), "{html}");
+    assert!(html.contains(r#"action="/todos""#), "{html}");
+    assert!(html.contains(r#"name="title""#), "{html}");
+    assert!(html.contains(r#"value="Buy milk""#), "{html}");
+    assert!(html.contains(r#"type="checkbox""#), "{html}");
+    assert!(html.contains(r#"<select"#), "{html}");
+    assert!(html.contains(r#"<option"#), "{html}");
+    assert!(html.contains("Bring bags"), "{html}");
+    assert!(html.contains("Save"), "{html}");
+}
+
+#[test]
+fn svg_and_mathml_render_expected_ssr_markup() {
+    let holder = make_holder().mount(SvgMathSurfaceWidget);
+    let html = render_html(&holder);
+    assert!(html.contains("<svg"), "{html}");
+    assert!(html.contains(r#"viewBox="0 0 10 10""#), "{html}");
+    assert!(html.contains("<circle"), "{html}");
+    assert!(html.contains("<linearGradient"), "{html}");
+    assert!(html.contains("<feDropShadow"), "{html}");
+    assert!(html.contains("<clipPath"), "{html}");
+    assert!(html.contains("<textPath"), "{html}");
+    assert!(html.contains("<switch"), "{html}");
+    assert!(html.contains("<use"), "{html}");
+    assert!(html.contains("Glory badge"), "{html}");
+    assert!(html.contains("<math"), "{html}");
+    assert!(html.contains("<mfrac"), "{html}");
+    assert!(html.contains("<mroot"), "{html}");
+    assert!(html.contains("<merror"), "{html}");
+    assert!(html.contains("<annotation-xml"), "{html}");
+    assert!(html.contains("<mn"), "{html}");
 }
 
 // ----------------------------------------------------------------------------

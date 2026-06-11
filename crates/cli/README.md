@@ -30,7 +30,8 @@ binary **inside your own project**, so the tool is always compiled against the
 `glory-cli` version pinned in your `Cargo.lock` — they can never disagree.
 
 The command surface mirrors `dx`: `serve` (hot-reloading dev server), `build`,
-`bundle`, `clean`, `check`, `fmt`, `test`, `end2end`, `new`.
+`bundle`, `clean`, `check`, `config`, `doctor`, `fmt`, `test`, `end2end`,
+`new`.
 
 ## Option A — a `[[bin]]` in your app crate (single crate)
 
@@ -92,7 +93,7 @@ it. A project with **no** glory metadata works too, as long as you supply at lea
 
 # Features
 
-- Parallel build of server and client in watch mode for fast developer feedback.
+- Parallel build of server and client in `serve` mode for fast developer feedback.
 - CSS hot-reload (no page-reload, only CSS updated).
 - Build server and client for hydration (client-side rendering mode not supported).
 - Support for both workspace and single-package setup.
@@ -102,14 +103,21 @@ it. A project with **no** glory metadata works too, as long as you supply at lea
 - Generates JS - Wasm bindings with [wasm-bindgen](https://crates.io/crates/wasm-bindgen)
   - Includes support for [JS Snippets](https://rustwasm.github.io/docs/wasm-bindgen/reference/js-snippets.html#js-snippets) for when you want to call some JS code from your WASM.
 - Optimises the wasm with _wasm-opt_ from [Binaryen](https://github.com/WebAssembly/binaryen)
-- `watch` command for automatic rebuilds with browser live-reload.
+- `serve` command for automatic rebuilds with browser live-reload.
+- `doctor` command for checking local toolchains and platform prerequisites.
+- `config` command for validating Glory Cargo metadata, printing resolved
+  project summaries with `--json`, and printing the metadata schema with
+  `--schema`.
 - `test` command for running tests of the lib and bin packages that makes up the Glory project.
 - `build` build the server and client.
 - `end2end` command for building, running the server and calling a bash shell hook. The hook would typically launch Playwright or similar.
-- `new` command for creating a new project based on templates, using [cargo-generate](https://cargo-generate.github.io/cargo-generate/index.html). Current templates include
-  - [`https://github.com/glory-rs/start`](https://github.com/glory-rs/start): An Actix starter
-  - [`https://github.com/glory-rs/start-salvo`](https://github.com/glory-rs/start-salvo): An salvo starter
-  - [`https://github.com/glory-rs/start-salvo-workspace`](https://github.com/glory-rs/start-salvo-workspace): An salvo starter keeping client and server code in separate crates in a workspace
+- `new` command for creating a new project from built-in templates:
+  `web`, `ssr`, `fullstack`, `desktop`, and `mobile`. Pass `--git` or
+  `--path` when you intentionally want a [cargo-generate](https://cargo-generate.github.io/cargo-generate/index.html)
+  template instead.
+- `bundle --target android|ios` drives the generated Gradle/XcodeGen host
+  projects and collects APKs, `.app` bundles, optional archives, and install/run
+  helper scripts under `dist/<project>/`.
 - 'no_downloads' feature to allow user management of optional dependencies
   <br/>
 
@@ -323,7 +331,7 @@ js_dir = "src"
 # Optional, defaults to 127.0.0.1:8000. Env: GLORY_SITE_ADDR.
 site_addr = "127.0.0.1:8000"
 
-# The port number used by the reload server (only used in watch mode).
+# The port number used by the reload server (only used in serve mode).
 #
 # Optional, defaults 3001. Env: GLORY_RELOAD_PORT
 reload_port = 3001
@@ -374,7 +382,7 @@ would be `npx playwright test`.
 
 What it does is equivalent to running this manually:
 
-- in a terminal, run `cargo glory watch`
+- in a terminal, run `cargo glory serve`
 - in a separate terminal, change to the `end2end-dir` and run the `end2end-cmd`.
 
 When testing the setup, please try the above first. If that works but `cargo glory end-to-end`

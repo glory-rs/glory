@@ -13,7 +13,8 @@ license = { workspace = true }
 categories = { workspace = true }
 
 [package.metadata.docs.rs]
-all-features = true
+no-default-features = true
+features = ["web-ssr", "backend-command", "routing", "server-fn"]
 
 [badges]
 codecov = { repository = "glory-rs/glory", branch = "main", service = "github" }

@@ -352,7 +352,7 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
   - SSR/Mock 后端同步立即 resolve(树在进程内);command 后端返回 pending,由宿主回填(M7 接 IPC)。
   - 同时在 rustdoc 写明白纪律:**控件代码禁止假设 query 同步完成**;CSR 直调路径虽然能同步,也走同一 API 以保跨端语义一致。
 - [x] **P1** **跨后端 conformance 测试套件** — `command_dom.rs` 参考解释器(语义注释与 JS interpreter 同步)+ `tests/command_backend.rs`(counter 闭环 / Each 重排 / handler 释放 / query 回程)。:把 §6 的 11 个快照场景(reverse/shuffle/头尾增删/switch 等)参数化:同一 widget 操作序列分别跑 `SsrRenderer`(断言 HTML)与 `CommandRenderer`(断言指令回放到内存 DOM 模拟器后的树形态)。新建 `crates/core/src/renderer/command_dom.rs` 测试辅助:一个 ~100 行的内存指令解释器(等价 `wry_interpreter.js` 语义),它同时就是未来任何新 consumer 的参考实现。
-- [ ] **P2** **SSR 收敛为指令消费者(消灭第三套 cfg,可延后)** — 维持延后决策;conformance 套件已就位可兜底。:`SsrRenderer` 改为 `CommandRenderer + SsrDocumentSink`(指令回放成内存树再 `render_string()`)。风险:hydration 标记(`gly-id`)、流式 SSR 的 `HtmlChunk::Placeholder` 路径都要等价迁移,必须先有上面的 conformance 套件兜底。**收益是非 wasm 只剩一种 Node;在 M7 验证指令流稳定之前不动。**
+- [x] **P2** **SSR 收敛为指令消费者(消灭第三套 cfg)** — 已在第四轮完成,见本文件后文"SSR 收敛为指令消费者(M6 P2)"。非 wasm `Node` 统一为 `CommandNode`,`SsrDocument::replay` 回放指令流生成 HTML,`backend-command` 与 `web-ssr` 可组合。
 
 **M6 验收标准**:`cargo test -p glory-core --features backend-command` 全绿;counter 级 widget 树在 `CommandRenderer` + 内存解释器下完成"渲染 → 模拟点击 dispatch → 响应式更新 → 第二批指令"全闭环,全程不碰浏览器。
 
@@ -380,10 +380,10 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 - [x] **P0** **`examples/desktop-counter` 重写成真 widget 应用** — 真窗口验证通过(CDP 实测:点击 ++/−/clear、input 值回传全部正确)。:用 `glory::launch` 风格 + `Cage<i64>` + button click,开真窗口可点。这是 M6+M7 的端到端验收物。
 - [x] **P1** **query 回程接 IPC** — interpreter `Query` 指令(BoundingRect/Value/ScrollOffset)→ `GloryWryQuery` 回包 → `holder.resolve_query`。:`NodeQuery` 序列化进一条 `Query { id, token, kind }` 指令,JS 端算出结果(`getBoundingClientRect` 等)经 ipc 带 token 送回,resolve 对应 `QueryFuture`。超时(节点已删)resolve 成 `Err(NodeGone)`。
 - [x] **P1** **路由:`MemoryAviator`** — 内存历史栈 + back/forward;与 ServerAviator 共享 `run_route`。:`crates/routing` 按 crate doc 里"如何加新 backend"的说明实现内存历史栈(`Vec<String> + cursor`),desktop/未来测试共用。(§3 P1 当年留的口子,现在用例到了。)
-- [ ] **P1** **热重载接通 desktop** — 未做;依赖 CLI watch 管道改造,见"遗留项"。:`glory-cli watch` 的 `BrowserReloadMessage::Functions` 通道现在走浏览器 websocket;desktop 下改走 wry ipc 或本地 websocket 连同一个 CLI server,`FunctionRegistry` 替换闭包后触发整树 re-patch。验收:改一个 handler 的字面量,不重启窗口生效。
-- [ ] **P2** **资源与自定义协议**:wry `with_custom_protocol("glory")`,`asset!` 宏产出的 public URL path 在 desktop 下解析为 `glory://` URL,从 bundle 目录读文件。图片/CSS 可用。
-- [ ] **P2** **窗口 API 面**:`DesktopConfig { title, inner_size, resizable, devtools }`;多窗口 = 多 Holder(非 `single-app` 模式本来就支持多 HolderId,验证 + 文档)。
-- [ ] **P2** **指令编码升级评估(先测后做)**:JSON 批量 → `evaluate_script` 路径先用 desktop 版 js-framework-benchmark 子集压一轮取基线;只有 profiling 显示序列化/解析占比可见时,才上 sledgehammer 风格的紧凑二进制(Dioxus 的演进顺序同样是先 JSON 后优化)。**不要凭直觉提前优化。**
+- [x] **P1** **热重载接通 desktop** — 已在第二轮完成,见后文"desktop 热重载接通(M7 P1)"。CLI/浏览器/desktop 三端共享 `glory_hot_reload::ReloadMessage`,desktop runtime 在 `GLORY_WATCH=ON` 下连接 `/live_reload`。
+- [x] **P2** **资源与自定义协议** — 已在第二轮完成,见后文"desktop 资源自定义协议 `glory://`(M7 P2)"。wry custom protocol 具备路径越界防护、MIME 表和 `asset_url()` helper。
+- [x] **P2** **窗口 API 面** — 已在第四轮完成,见后文"desktop 多窗口 + menu(M7 P2)"。`Desktop` builder 支持多窗口,每窗口独立 holder/queue/webview,并接入 `muda` 原生菜单。
+- [x] **P2** **指令编码升级评估(先测后做)** — 已在第三轮完成,结论为 JSON 留任。`command_wire` criterion 基线显示序列化不是当前瓶颈;重新评估条件见后文。
 - [ ] **P3** Tauri 模板从 README 升级为可 `glory new --template tauri` 的真模板(配合 memory 里 dx-aligned 的 embeddable CLI 设计)。
 
 **M7 验收标准**:desktop-counter 真窗口可交互;TodoMVC 跑在 desktop 下(复用 `examples/todomvc` 的 widget 代码,只换 launch 入口——**同一份业务代码双平台,这是跨平台叙事的第一个可演示证据**);热重载工作。
@@ -407,8 +407,8 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
   - 错误模型:`ServerFnError { Request, Deserialize, Server(String) }`,服务端 panic/Err 统一 500 + JSON body。
   - codec 初版 JSON;trait 化留 binary 口子。
 - [x] **P0** **三个 adapter 挂载 server fn 路由** — 挂载实现收在 `glory-serverfn` 自身(`salvo_mount::router()` / `axum_mount::router()` / `actix_mount::configure`),adapter crate 不引新依赖。:`glory-salvo`/`glory-axum`/`glory-actix` 各加一行式 API(`.mount_server_fns()`),路由前缀 `/__glory/fn/` 可配置。
-- [~] **P1** **与 `resource_in`/`Loader` 整合** — server 侧直调本体已验证(不走 HTTP 自环);hackernews 例子改造未做。:`resource_in(parent, || list_todos(filter.get()))` 在 SSR 下直接调用本体(不走 HTTP 自环),CSR hydrate 复用 `Loader::save_state` 已有的状态嵌入,避免首屏双取。验收:hackernews-salvo 例子改造为 server fn 版,行为不变。
-- [ ] **P1** **server 侧上下文提取** — 未做。:server fn 体内拿请求上下文(headers/cookies/Truck)。机制:adapter 在调用前把请求上下文塞 task-local,提供 `use_request_context() -> Option<...>`。
+- [x] **P1** **与 `resource_in`/`Loader` 整合** — server 侧直调本体已验证;hackernews 例子已在第三轮 server-fn 化。更完整的 TodoMVC fullstack 产品例子转入 `_improve_todos.md` 的当前成熟度清单。
+- [x] **P1** **server 侧上下文提取** — 已在第二轮完成,见后文"server fn 上下文提取(M8 P1)"。`RequestContext` 通过 tokio task-local 注入,Salvo/Axum/Actix adapter 全部填充。
 - [x] **P2** desktop 客户端也能调 server fn — `reqwest-client` feature + `set_server_url`。(走配置的远端 base_url)——desktop+云端数据的 fullstack 桌面应用故事。
 
 **M8 验收标准**:todomvc-fullstack 新例子:同一份代码 `cargo glory serve` 出 SSR+hydrate+server fn 全栈应用;断网刷新→ SSR 出首屏,交互→ fetch 调 server fn。
@@ -419,8 +419,8 @@ let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
 
 依赖 M7(同一 webview 运行时)。90% 是 `crates/cli` 工作,对齐 memory 中 dx-aligned 的 embeddable `glory_cli::Glory` builder 设计。
 
-- [~] **P1** **Android 通路** — CLI `--target android`(cargo-ndk 编排、工具链检测、`mobile` 默认 bin feature)+ `templates/mobile/README.md` 接线文档;Gradle 完整模板与真机验证未做。:`glory build --target android`:cargo-ndk 编排 `aarch64-linux-android` 编译 cdylib + Gradle 模板工程(wry 0.4x 支持 Android,需要 `android_binding!` 胶水)+ `glory serve --target android` 推到模拟器。模板进 `crates/cli/templates/android/`。
-- [~] **P1** **iOS 通路** — CLI `--target ios`(staticlib,非 macOS 报错引导);XcodeGen 模板与模拟器验证未做。:`--target ios`:`aarch64-apple-ios` staticlib + XcodeGen 模板 + simulator 部署。CI 仅 macOS runner 跑编译冒烟。
+- [~] **P1** **Android 通路** — CLI `--target android`、cargo-ndk 编排、Gradle 宿主模板和 arm64 `.so` 交叉编译冒烟已完成;真机/模拟器运行与 CI 矩阵仍待做,见后文"真正剩余"。
+- [~] **P1** **iOS 通路** — CLI `--target ios`、XcodeGen spec 与 Swift 入口模板已完成;macOS runner 编译冒烟、模拟器/真机运行仍待做,见后文"真正剩余"。
 - [x] **P1** **touch 事件进 `EventData`** — interpreter 把 touch 主点映射为 PointerData,多点经 `extra.touches`。:`PointerData` 已覆盖大部分;补 `touches: Vec<TouchPoint>` 与 pointer events 映射,interpreter 端 `touchstart/move/end` 透传。
 - [ ] **P2** **移动端宿主细节**:safe-area inset(注入 CSS env() 即可,规范抽象的红利)、虚拟键盘 resize 策略、生命周期(进后台暂停 scheduler flush)。
 - [ ] **P2** **`asset!` 接 bundle 流程**:Android assets/ 与 iOS bundle resources 的路径解析分支。

@@ -3,7 +3,7 @@
 Utility types for dev-mode hot reloading. Glory's primary hot-reload
 surface is builder-style relinking: application code marks stable
 builder closures with `reloadable_fn!` or `reloadable_view!`, and
-`glory-cli watch --hot-reload` emits replacement messages when those
+`glory-cli serve --hot-reload` emits replacement messages when those
 marked closures move or change.
 
 ## What's in here today
@@ -13,7 +13,7 @@ marked closures move or change.
   body after `registry.replace(id, new_fn)`.
 - `reloadable_fn!` / `reloadable_view!` — explicit stable markers for
   builder functions and view builders.
-- `HotReloadFunctions` — scans those markers so `glory-cli watch
+- `HotReloadFunctions` — scans those markers so `glory-cli serve
   --hot-reload` can emit function replacement websocket events.
 - `patch.js` — the client-side reload runtime that dispatches
   `glory:function-reload` events. Embedded into SSR HTML via

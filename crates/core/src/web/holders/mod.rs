@@ -11,7 +11,7 @@ cfg_feature! {
 }
 
 cfg_feature! {
-    #![feature = "backend-command"]
+    #![all(feature = "backend-command", not(feature = "single-app"))]
     mod command;
     pub use command::CommandHolder;
 }

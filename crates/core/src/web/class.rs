@@ -35,6 +35,9 @@ impl Classes {
 impl AttrValue for Classes {
     #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
     fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
+        if self.parts.is_empty() {
+            return;
+        }
         let is_revising = self.parts.iter().any(|part| part.is_revising());
         if is_revising || first_time {
             let value = AttrValue::to_string(self);
@@ -52,6 +55,9 @@ impl AttrValue for Classes {
     }
     #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
     fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
+        if self.parts.is_empty() {
+            return;
+        }
         let is_revising = self.parts.iter().any(|part| part.is_revising());
         if is_revising || first_time {
             let value = AttrValue::to_string(self);
@@ -68,8 +74,13 @@ impl AttrValue for Classes {
         }
     }
     fn to_string(&self) -> Option<String> {
-        let value = self.raw_parts().join(" ");
-        if value.is_empty() { None } else { Some(value) }
+        let mut parts = self.parts.iter().filter_map(|part| part.to_string()).filter(|part| !part.is_empty());
+        let mut value = parts.next()?;
+        for part in parts {
+            value.push(' ');
+            value.push_str(&part);
+        }
+        Some(value)
     }
 }
 

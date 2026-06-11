@@ -65,7 +65,7 @@ pub trait Widget: fmt::Debug + 'static {
     {
         let view_id = self.store_in(parent);
         parent.visible_views.insert(view_id.clone());
-        if parent.is_attached() {
+        if parent.is_attached() && !parent.is_building() {
             parent.attach_child(&view_id);
         }
         view_id

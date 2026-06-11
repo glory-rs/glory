@@ -133,6 +133,7 @@ mod tests {
         assert!(WRY_INTERPRETER_JS.contains("__gloryApplyWryBatch"));
         assert!(WRY_INTERPRETER_JS.contains("GloryWryEvent"));
         assert!(WRY_INTERPRETER_JS.contains("GloryWryReady"));
+        assert!(WRY_INTERPRETER_JS.contains("__gloryWryQuery"));
     }
 
     #[test]

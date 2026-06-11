@@ -49,7 +49,7 @@ end2end_cmd = "npx playwright test"
 end2end_dir = "end2end"
 #  The browserlist query used for optimizing the CSS.
 browser_query = "defaults"
-# Set by glory-cli watch when building with that tool. Controls whether autoreload JS will be included in the head
+# Set by glory-cli serve when building with that tool. Controls whether autoreload JS will be included in the head
 watch = false
 # The features to use when compiling the bin target
 #

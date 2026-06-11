@@ -11,12 +11,13 @@
 use std::cell::Cell;
 use std::rc::Rc;
 
-use glory::reflow::{Bond, Cage};
+use glory::reflow::{Cage, Revisable};
 use glory::web::events;
 use glory::web::holders::BrowserHolder;
 use glory::web::widgets::*;
 use glory::widgets::Each;
 use glory::*;
+use wasm_bindgen::{JsCast, UnwrapThrowExt};
 
 const ADJECTIVES: [&str; 25] = [
     "pretty", "large", "big", "small", "tall", "short", "long", "handsome", "plain", "quaint",
@@ -167,6 +168,8 @@ impl Widget for Bench {
                     label: row.label,
                     selected,
                     rows,
+                    row_node: None,
+                    label_node: None,
                 },
             )))
             .show_in(ctx);
@@ -175,12 +178,19 @@ impl Widget for Bench {
 
 /// One table row. Owning its own `Scope` is what lets glory reclaim the
 /// per-row `label` cage on detach.
-#[derive(Debug)]
 struct RowWidget {
     id: usize,
     label: Cage<String>,
     selected: Cage<Option<usize>>,
     rows: Cage<Vec<Row>>,
+    row_node: Option<web_sys::Element>,
+    label_node: Option<web_sys::Element>,
+}
+
+impl std::fmt::Debug for RowWidget {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RowWidget").field("id", &self.id).finish_non_exhaustive()
+    }
 }
 
 impl Widget for RowWidget {
@@ -188,28 +198,141 @@ impl Widget for RowWidget {
         let id = self.id;
         let label = self.label;
 
-        // Reclaim this cage when the row's scope drops (clear / remove /
-        // replace). This is the idiomatic ownership pattern now that owned
-        // cages are actually freed; see crates/core/src/reflow/cage.rs.
         ctx.owner().own_cage(label);
+        label.bind_view(ctx.view_id());
+        self.selected.bind_view(ctx.view_id());
 
-        let sel = self.selected;
-        let is_selected = Bond::new(move || *sel.get() == Some(id));
-        let select = move |_| sel.revise(|mut s| *s = Some(id));
+        let row_dom = build_row_dom(id, &label.get_untracked(), *self.selected.get_untracked() == Some(id));
+        let row = row_dom.row;
+
+        let selected = self.selected;
+        let select_anchor = row_dom.label_anchor;
+        glory::web::add_event_listener::<web_sys::MouseEvent>(&select_anchor, "click".into(), move |_| {
+            glory::reflow::batch(|| selected.revise(|mut s| *s = Some(id)));
+        });
 
         let rows = self.rows;
-        let remove = move |_| rows.revise(|mut v| v.retain(|r| r.id != id));
+        let remove_anchor = row_dom.remove_anchor;
+        glory::web::add_event_listener::<web_sys::MouseEvent>(&remove_anchor, "click".into(), move |_| {
+            glory::reflow::batch(|| rows.revise(|mut v| v.retain(|r| r.id != id)));
+        });
 
-        tr().toggle_class("danger", is_selected)
-            .fill(td().class("col-md-1").text(id.to_string()))
-            .fill(td().class("col-md-4").fill(a().class("lbl").on(events::click, select).text(label)))
-            .fill(td().class("col-md-1").fill(
-                a().class("remove").on(events::click, remove).fill(
-                    span().class("remove glyphicon glyphicon-remove").attr("aria-hidden", "true"),
-                ),
-            ))
-            .fill(td().class("col-md-6"))
-            .show_in(ctx);
+        ctx.set_single_node_bounds(row.clone());
+        self.label_node = Some(select_anchor);
+        self.row_node = Some(row);
+    }
+
+    fn flood(&mut self, ctx: &mut Scope) {
+        if let Some(row) = self.row_node.as_ref() {
+            ctx.insert_node_at_placement(row);
+        }
+    }
+
+    fn patch(&mut self, _ctx: &mut Scope) {
+        if self.label.is_revising()
+            && let Some(label_node) = self.label_node.as_ref()
+        {
+            let label = self.label.get_untracked();
+            label_node.set_text_content(Some(label.as_str()));
+        }
+
+        if self.selected.is_revising()
+            && let Some(row) = self.row_node.as_ref()
+        {
+            set_selected_class(row, *self.selected.get_untracked() == Some(self.id));
+        }
+    }
+
+    fn detach(&mut self, ctx: &mut Scope) {
+        if let Some(row) = self.row_node.as_ref() {
+            ctx.remove_node_from_parent(row);
+        }
+    }
+}
+
+struct RowDom {
+    row: web_sys::Element,
+    label_anchor: web_sys::Element,
+    remove_anchor: web_sys::Element,
+}
+
+thread_local! {
+    static ROW_TEMPLATE: web_sys::Element = build_row_template();
+}
+
+fn build_row_dom(id: usize, label: &str, selected: bool) -> RowDom {
+    let row = ROW_TEMPLATE.with(|template| {
+        template
+            .clone_node_with_deep(true)
+            .unwrap_throw()
+            .unchecked_into::<web_sys::Element>()
+    });
+
+    let id_cell = row.first_element_child().expect("row template must contain id cell");
+    id_cell.set_text_content(Some(&id.to_string()));
+
+    let label_cell = id_cell.next_element_sibling().expect("row template must contain label cell");
+    let label_anchor = label_cell.first_element_child().expect("row template must contain label anchor");
+    label_anchor.set_text_content(Some(label));
+
+    let remove_cell = label_cell
+        .next_element_sibling()
+        .expect("row template must contain remove cell");
+    let remove_anchor = remove_cell
+        .first_element_child()
+        .expect("row template must contain remove anchor");
+
+    set_selected_class(&row, selected);
+
+    RowDom {
+        row,
+        label_anchor,
+        remove_anchor,
+    }
+}
+
+fn build_row_template() -> web_sys::Element {
+    let row = element("tr");
+
+    let id_cell = element("td");
+    id_cell.set_attribute("class", "col-md-1").unwrap_throw();
+    row.append_child(&id_cell).unwrap_throw();
+
+    let label_cell = element("td");
+    label_cell.set_attribute("class", "col-md-4").unwrap_throw();
+    let label_anchor = element("a");
+    label_anchor.set_attribute("class", "lbl").unwrap_throw();
+    label_cell.append_child(&label_anchor).unwrap_throw();
+    row.append_child(&label_cell).unwrap_throw();
+
+    let remove_cell = element("td");
+    remove_cell.set_attribute("class", "col-md-1").unwrap_throw();
+    let remove_anchor = element("a");
+    remove_anchor.set_attribute("class", "remove").unwrap_throw();
+    let icon = element("span");
+    icon.set_attribute("class", "remove glyphicon glyphicon-remove").unwrap_throw();
+    icon.set_attribute("aria-hidden", "true").unwrap_throw();
+    icon.set_text_content(Some("x"));
+    remove_anchor.append_child(&icon).unwrap_throw();
+    remove_cell.append_child(&remove_anchor).unwrap_throw();
+    row.append_child(&remove_cell).unwrap_throw();
+
+    let trailing = element("td");
+    trailing.set_attribute("class", "col-md-6").unwrap_throw();
+    row.append_child(&trailing).unwrap_throw();
+
+    row
+}
+
+fn element(name: &str) -> web_sys::Element {
+    glory::web::document().create_element(name).unwrap_throw()
+}
+
+fn set_selected_class(row: &web_sys::Element, selected: bool) {
+    if selected {
+        row.set_attribute("class", "danger").unwrap_throw();
+    } else {
+        row.remove_attribute("class").unwrap_throw();
     }
 }
 

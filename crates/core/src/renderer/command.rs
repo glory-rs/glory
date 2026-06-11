@@ -33,7 +33,7 @@
 use std::any::Any;
 use std::borrow::Cow;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::fmt;
 use std::rc::Rc;
 
@@ -151,6 +151,20 @@ pub enum QueryValue {
     ScrollOffset { x: f64, y: f64 },
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct BoundingRect {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
+pub struct ScrollOffset {
+    pub x: f64,
+    pub y: f64,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum QueryError {
     /// The node no longer exists on the consumer side — a normal race.
@@ -197,12 +211,40 @@ pub struct TargetData {
     pub checked: Option<bool>,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct ClipboardData {
+    pub text: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct SelectionData {
+    pub start: Option<u32>,
+    pub end: Option<u32>,
+    pub direction: Option<String>,
+    pub text: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct ResizeData {
+    pub width: f64,
+    pub height: f64,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
+pub struct MediaData {
+    pub current_time: f64,
+    pub duration: Option<f64>,
+    pub paused: Option<bool>,
+    pub volume: Option<f64>,
+}
+
 /// Serializable event payload produced by command-stream backends.
 ///
 /// This is the cross-platform event model: desktop (wry IPC), mobile and
 /// liveview all deliver events as `EventData`. Under the `backend-command`
 /// feature, every [`EventDescriptor`](crate::web::events::EventDescriptor)'s
-/// `EventType` is `EventData`, so user handlers receive it directly.
+/// `EventType` is `EventData`, so user handlers receive it directly. Fields
+/// are optional because different hosts can supply different event families.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct EventData {
     pub name: String,
@@ -213,6 +255,16 @@ pub struct EventData {
     pub keyboard: Option<KeyboardData>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub target: Option<TargetData>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub clipboard: Option<ClipboardData>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selection: Option<SelectionData>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scroll: Option<ScrollOffset>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resize: Option<ResizeData>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub media: Option<MediaData>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extra: Option<serde_json::Value>,
 }
@@ -236,6 +288,15 @@ impl EventData {
     pub fn target_checked(&self) -> bool {
         self.target.as_ref().and_then(|t| t.checked).unwrap_or(false)
     }
+
+    pub fn clipboard_text(&self) -> Option<&str> {
+        self.clipboard.as_ref().and_then(|data| data.text.as_deref())
+    }
+
+    pub fn selection_range(&self) -> Option<(u32, u32)> {
+        let selection = self.selection.as_ref()?;
+        Some((selection.start?, selection.end?))
+    }
 }
 
 impl EventPayload for EventData {
@@ -258,6 +319,7 @@ struct QueueState {
     coalesce: bool,
     next_query_token: u64,
     pending_queries: HashMap<u64, QueryWaiter>,
+    pending_synthetic_events: VecDeque<EventData>,
 }
 
 /// Shared command buffer + event handler registry behind a [`CommandRenderer`].
@@ -285,14 +347,14 @@ thread_local! {
     static HOLDER_QUEUES: RefCell<HashMap<crate::HolderId, CommandQueue>> = RefCell::new(HashMap::new());
 }
 
-#[cfg(not(feature = "single-app"))]
+#[cfg(all(not(feature = "single-app"), any(feature = "web-ssr", feature = "backend-command")))]
 pub(crate) fn register_holder_queue(holder_id: crate::HolderId, queue: CommandQueue) {
     HOLDER_QUEUES.with_borrow_mut(|queues| {
         queues.insert(holder_id, queue);
     });
 }
 
-#[cfg(not(feature = "single-app"))]
+#[cfg(all(not(feature = "single-app"), any(feature = "web-ssr", feature = "backend-command")))]
 pub(crate) fn unregister_holder_queue(holder_id: crate::HolderId) {
     HOLDER_QUEUES.with_borrow_mut(|queues| {
         queues.remove(&holder_id);
@@ -362,14 +424,42 @@ impl CommandQueue {
         self.state.borrow().buffer.clone()
     }
 
+    /// Read-only diagnostic snapshot for devtools.
+    pub fn devtools_snapshot(&self) -> crate::devtools::CommandQueueSnapshot {
+        let state = self.state.borrow();
+        crate::devtools::CommandQueueSnapshot {
+            buffered_command_count: state.buffer.len(),
+            handler_count: self.handlers.borrow().len(),
+            pending_query_count: state.pending_queries.len(),
+            next_node_id: state.next_id,
+            next_query_token: state.next_query_token,
+            coalesce: state.coalesce,
+        }
+    }
+
     /// Drains the buffer, applying the coalescing pass when enabled.
     pub fn take_batch(&self) -> Vec<Command> {
+        self.flush_pending_synthetic_events();
         let (batch, coalesce_enabled) = {
             let mut state = self.state.borrow_mut();
             let coalesce = state.coalesce;
             (std::mem::take(&mut state.buffer), coalesce)
         };
         if coalesce_enabled { coalesce(batch) } else { batch }
+    }
+
+    fn enqueue_synthetic_event(&self, data: EventData) {
+        self.state.borrow_mut().pending_synthetic_events.push_back(data);
+    }
+
+    fn flush_pending_synthetic_events(&self) {
+        loop {
+            let data = { self.state.borrow_mut().pending_synthetic_events.pop_front() };
+            let Some(data) = data else {
+                break;
+            };
+            let _ = self.dispatch(data);
+        }
     }
 
     /// Issues a read request against `node_id`. The returned future
@@ -408,7 +498,11 @@ impl CommandQueue {
     }
 
     pub(crate) fn register_handler(&self, id: u64, name: impl Into<String>, handler: EventHandler) {
-        self.handlers.borrow_mut().insert((id, name.into()), handler);
+        let name = name.into();
+        self.handlers.borrow_mut().insert((id, name.clone()), handler);
+        if name == "mounted" {
+            self.enqueue_synthetic_event(EventData::new("mounted", id));
+        }
     }
 
     pub(crate) fn remove_handler(&self, id: u64, name: &str) {
@@ -707,6 +801,40 @@ impl CommandNode {
             name: name.to_owned(),
         });
     }
+
+    /// Reads the live value of this node through the command-stream query
+    /// channel. Remote hosts answer asynchronously via [`QueryResponse`].
+    pub fn value(&self) -> impl std::future::Future<Output = Result<String, QueryError>> + use<> {
+        let query = self.queue.query(self.id, NodeQuery::Value);
+        async move {
+            match query.await? {
+                QueryValue::Value(value) => Ok(value),
+                _ => Err(QueryError::Unsupported),
+            }
+        }
+    }
+
+    /// Reads the live bounding rectangle of this node.
+    pub fn bounding_rect(&self) -> impl std::future::Future<Output = Result<BoundingRect, QueryError>> + use<> {
+        let query = self.queue.query(self.id, NodeQuery::BoundingRect);
+        async move {
+            match query.await? {
+                QueryValue::Rect { x, y, width, height } => Ok(BoundingRect { x, y, width, height }),
+                _ => Err(QueryError::Unsupported),
+            }
+        }
+    }
+
+    /// Reads the live scroll offset of this node.
+    pub fn scroll_offset(&self) -> impl std::future::Future<Output = Result<ScrollOffset, QueryError>> + use<> {
+        let query = self.queue.query(self.id, NodeQuery::ScrollOffset);
+        async move {
+            match query.await? {
+                QueryValue::ScrollOffset { x, y } => Ok(ScrollOffset { x, y }),
+                _ => Err(QueryError::Unsupported),
+            }
+        }
+    }
 }
 
 /// [`Renderer`] implementation that records [`Command`]s into a shared
@@ -895,6 +1023,21 @@ mod tests {
     }
 
     #[test]
+    fn command_queue_devtools_snapshot_reports_counts() {
+        let renderer = CommandRenderer::new();
+        let node = renderer.create_element("button".into(), false);
+        renderer.attach_event(&node, "click".into(), true, Box::new(|_| {}));
+
+        let snapshot = renderer.queue.devtools_snapshot();
+        assert_eq!(snapshot.buffered_command_count, 2);
+        assert_eq!(snapshot.handler_count, 1);
+        assert_eq!(snapshot.pending_query_count, 0);
+        assert_eq!(snapshot.next_node_id, 1);
+        assert_eq!(snapshot.next_query_token, 0);
+        assert!(!snapshot.coalesce);
+    }
+
+    #[test]
     fn node_translates_ssr_pseudo_attributes() {
         let renderer = CommandRenderer::new();
         let node = renderer.create_element("p".into(), false);
@@ -1035,10 +1178,78 @@ mod tests {
             value: Some("typed".into()),
             checked: None,
         });
+        data.clipboard = Some(ClipboardData { text: Some("copied".into()) });
+        data.selection = Some(SelectionData {
+            start: Some(1),
+            end: Some(4),
+            direction: Some("forward".into()),
+            text: Some("ype".into()),
+        });
+        data.scroll = Some(ScrollOffset { x: 3.0, y: 5.0 });
+        data.resize = Some(ResizeData { width: 640.0, height: 480.0 });
+        data.media = Some(MediaData {
+            current_time: 1.5,
+            duration: Some(30.0),
+            paused: Some(false),
+            volume: Some(0.75),
+        });
         let json = serde_json::to_string(&data).unwrap();
         let back: EventData = serde_json::from_str(&json).unwrap();
         assert_eq!(back, data);
         assert_eq!(back.target_value(), "typed");
+        assert_eq!(back.clipboard_text(), Some("copied"));
+        assert_eq!(back.selection_range(), Some((1, 4)));
+    }
+
+    #[test]
+    fn command_node_value_helper_resolves_query() {
+        let renderer = CommandRenderer::new();
+        let node = renderer.create_element("input".into(), false);
+        renderer.set_property(&node, "value".into(), "typed".into());
+        let value = node.value();
+
+        let mut dom = crate::renderer::command_dom::CommandDom::new();
+        dom.apply_batch(&renderer.take_batch());
+        for response in dom.take_query_responses() {
+            assert!(renderer.resolve_query(response));
+        }
+
+        assert_eq!(futures::executor::block_on(value).unwrap(), "typed");
+    }
+
+    #[test]
+    fn command_node_bounding_rect_helper_maps_response() {
+        let renderer = CommandRenderer::new();
+        let node = renderer.create_element("div".into(), false);
+        let rect = node.bounding_rect();
+        let token = renderer
+            .take_batch()
+            .into_iter()
+            .find_map(|command| match command {
+                Command::Query { token, .. } => Some(token),
+                _ => None,
+            })
+            .expect("query command emitted");
+
+        assert!(renderer.resolve_query(QueryResponse {
+            token,
+            result: Ok(QueryValue::Rect {
+                x: 1.0,
+                y: 2.0,
+                width: 3.0,
+                height: 4.0,
+            }),
+        }));
+
+        assert_eq!(
+            futures::executor::block_on(rect).unwrap(),
+            BoundingRect {
+                x: 1.0,
+                y: 2.0,
+                width: 3.0,
+                height: 4.0
+            }
+        );
     }
 
     #[test]

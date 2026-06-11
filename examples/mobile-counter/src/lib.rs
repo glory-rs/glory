@@ -51,7 +51,7 @@ impl Widget for Counter {
         div()
             .attr(
                 "style",
-                "font-family: sans-serif; padding: 2em; padding-top: env(safe-area-inset-top, 2em); display: flex; gap: .5em; align-items: center;",
+                "font-family: sans-serif; padding: 2em; min-height: calc(var(--glory-viewport-height) - var(--glory-safe-top) - var(--glory-safe-bottom)); display: flex; gap: .5em; align-items: center;",
             )
             .fill(button().text("-").on(events::click, decrease))
             .fill(
@@ -77,8 +77,63 @@ mod host {
     use tao::window::WindowBuilder;
     use wry::WebViewBuilder;
 
-    const BOOTSTRAP_HTML: &str =
-        "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head><body></body></html>";
+    const BOOTSTRAP_HTML: &str = r#"<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>
+:root {
+  --glory-safe-top: env(safe-area-inset-top, 0px);
+  --glory-safe-right: env(safe-area-inset-right, 0px);
+  --glory-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --glory-safe-left: env(safe-area-inset-left, 0px);
+  --glory-viewport-height: 100vh;
+  --glory-keyboard-inset-bottom: 0px;
+}
+html, body {
+  min-height: 100%;
+  margin: 0;
+  overscroll-behavior: none;
+  background: Canvas;
+}
+body {
+  min-height: var(--glory-viewport-height);
+  padding: var(--glory-safe-top) var(--glory-safe-right)
+    calc(var(--glory-safe-bottom) + var(--glory-keyboard-inset-bottom))
+    var(--glory-safe-left);
+  box-sizing: border-box;
+}
+</style>
+</head>
+<body>
+<script>
+(() => {
+  const root = document.documentElement;
+  const dispatch = (name, detail = {}) => window.dispatchEvent(new CustomEvent(name, { detail }));
+  const syncViewport = () => {
+    const vv = window.visualViewport;
+    const height = vv ? vv.height : window.innerHeight;
+    const keyboard = Math.max(0, window.innerHeight - height - (vv ? vv.offsetTop : 0));
+    root.style.setProperty("--glory-viewport-height", `${height}px`);
+    root.style.setProperty("--glory-keyboard-inset-bottom", `${keyboard}px`);
+    dispatch("glory:viewport", { height, keyboardInsetBottom: keyboard });
+  };
+  window.addEventListener("resize", syncViewport, { passive: true });
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", syncViewport, { passive: true });
+    window.visualViewport.addEventListener("scroll", syncViewport, { passive: true });
+  }
+  document.addEventListener("visibilitychange", () => {
+    dispatch(document.hidden ? "glory:background" : "glory:foreground");
+  });
+  window.addEventListener("focus", () => dispatch("glory:foreground"), { passive: true });
+  window.addEventListener("blur", () => dispatch("glory:background"), { passive: true });
+  syncViewport();
+})();
+</script>
+</body>
+</html>"#;
 
     enum HostEvent {
         Ready,

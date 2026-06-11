@@ -81,6 +81,22 @@ pub fn server(attr: TokenStream, item: TokenStream) -> TokenStream {
     let name = &sig.ident;
     let endpoint = endpoint.unwrap_or_else(|| name.to_string());
     let url = format!("/__glory/fn/{endpoint}");
+    let decode_args = if arg_idents.len() == 1 {
+        let arg_ident = &arg_idents[0];
+        let arg_type = &arg_types[0];
+        quote! {
+            if glory_serverfn::is_form_request() {
+                let #arg_ident: #arg_type = glory_serverfn::decode_form(&__body)?;
+                ( #arg_ident, )
+            } else {
+                glory_serverfn::decode_args(&__body)?
+            }
+        }
+    } else {
+        quote! {
+            glory_serverfn::decode_args(&__body)?
+        }
+    };
 
     let expanded = quote! {
         #[cfg(not(target_arch = "wasm32"))]
@@ -91,7 +107,7 @@ pub fn server(attr: TokenStream, item: TokenStream) -> TokenStream {
             glory_serverfn::ServerFnEntry {
                 path: #url,
                 handler: |__body: ::std::vec::Vec<u8>| ::std::boxed::Box::pin(async move {
-                    let ( #(#arg_idents,)* ): ( #(#arg_types,)* ) = glory_serverfn::decode_args(&__body)?;
+                    let ( #(#arg_idents,)* ): ( #(#arg_types,)* ) = #decode_args;
                     let __output = #name( #(#arg_idents),* ).await?;
                     glory_serverfn::encode_ok(&__output)
                 }),

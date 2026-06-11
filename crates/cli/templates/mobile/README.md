@@ -9,17 +9,35 @@ Working pieces:
 - `examples/mobile-counter` — a complete mobile payload crate: shared
   Counter widget + mini webview host loop + the tao/wry `android_binding!`
   JNI wiring and the iOS `start_app` export. Start by copying it.
-- `android/` (this directory) — Gradle host project template. The
+- `android/` - Gradle host project template. The
   `cargoNdk` Gradle task builds the Rust cdylib AND lets wry's build
   script generate the Kotlin glue (WryActivity etc.) with your package
   name substituted; `MainActivity` just subclasses it.
-- `ios/` — XcodeGen spec + Swift entry calling the Rust `start_app`.
+- `ios/` - XcodeGen spec + Swift entry calling the Rust `start_app`.
 
 The runtime story is the same as desktop: the widget tree runs on the
 command-stream backend (`glory-core` feature `backend-command`), a wry
 webview applies `Command` batches via `glory_desktop::WRY_INTERPRETER_JS`,
 and DOM events come back as serialized `EventData` (touch events map to
 `PointerData`; multi-touch points ride in `extra.touches`).
+
+## Mobile viewport and lifecycle defaults
+
+Generated mobile crates use a bootstrap document with:
+
+- `viewport-fit=cover`
+- safe-area CSS variables:
+  `--glory-safe-top`, `--glory-safe-right`, `--glory-safe-bottom`,
+  `--glory-safe-left`
+- keyboard/visual viewport variables:
+  `--glory-viewport-height`, `--glory-keyboard-inset-bottom`
+- browser custom events:
+  `glory:viewport`, `glory:foreground`, `glory:background`
+
+Android sets `windowSoftInputMode="adjustResize"` in the generated manifest so
+the visual viewport can shrink when the soft keyboard opens. The bootstrap
+script mirrors `visualViewport` resize/scroll into CSS variables; app CSS can
+pad fixed footers with `var(--glory-keyboard-inset-bottom)`.
 
 ## Android
 
@@ -35,30 +53,33 @@ Build:
 
 ```sh
 glory build --target android --release
+glory bundle --target android --release
 ```
 
 This produces `target/aarch64-linux-android/release/lib<yourlib>.so` (also
 copied under `<site-root>/android/jniLibs/arm64-v8a/` by cargo-ndk's `-o`).
+`glory bundle` then runs `android/gradlew assembleRelease` (or `assembleDebug`
+without `--release`) and copies APKs to:
 
-Host-project wiring (Gradle):
+```text
+dist/<project>/android/apk/
+```
 
-1. Create a standard Android app project (empty Activity).
-2. Drop the `jniLibs` directory into `app/src/main/`.
-3. Your crate must expose the wry Android entry point — add to the lib:
+The bundle also writes:
 
-   ```rust
-   #[cfg(target_os = "android")]
-   #[unsafe(no_mangle)]
-   fn android_main(app: tao::platform::android::activity::AndroidApp) {
-       wry::android_binding!(com_example, your_app, _start_app, wry);
-       // then glory_desktop::launch(...) on the tao android event loop
-   }
-   ```
+- `dist/<project>/android/install.ps1`
+- `dist/<project>/android/run.ps1`
+- `dist/<project>/android/install.sh`
+- `dist/<project>/android/run.sh`
 
-4. The Activity loads the library via `System.loadLibrary("yourlib")`.
+Useful knobs:
 
-Consult the wry repository's `examples/android` for the authoritative,
-version-matched binding macro invocation — it changes between wry releases.
+- `GLORY_ANDROID_GRADLE_TASK=assembleRelease` overrides the Gradle task list
+  (comma or whitespace separated).
+- `GLORY_ANDROID_INSTALL=1` adds `installRelease` / `installDebug`.
+- `GLORY_ANDROID_RUN=1` launches the detected main activity through `adb`.
+- `GLORY_ANDROID_DEVICE=<serial>` sets `ANDROID_SERIAL` for Gradle and is also
+  used by the generated install/run scripts.
 
 ## iOS
 
@@ -67,12 +88,28 @@ macOS host with Xcode required:
 ```sh
 rustup target add aarch64-apple-ios
 glory build --target ios --release
+glory bundle --target ios --release
 ```
 
 This produces `target/mobile/aarch64-apple-ios/release/lib<yourlib>.a`.
-Link the static library into an Xcode (or XcodeGen) project whose
-`main` calls into your exported `start_app` symbol; wry creates a
-`WKWebView` inside the key window.
+`glory bundle` then runs `xcodegen generate` from `ios/`, runs `xcodebuild`,
+and copies app bundles to:
+
+```text
+dist/<project>/ios/app/
+```
+
+If `GLORY_IOS_ARCHIVE=1` is set, the generated `.xcarchive` is copied to
+`dist/<project>/ios/archive/`.
+
+Useful knobs:
+
+- `GLORY_IOS_SCHEME=<scheme>` overrides the scheme detected from
+  `ios/project.yml`.
+- `GLORY_IOS_SDK=iphonesimulator|iphoneos` selects simulator or device SDK.
+- `GLORY_IOS_DESTINATION='<xcode destination>'` forwards an explicit
+  xcodebuild destination.
+- `GLORY_IOS_ARCHIVE=1` runs an archive step after the app build.
 
 ## Cargo manifest requirements
 
@@ -83,7 +120,7 @@ The lib package needs the mobile crate types alongside the wasm one:
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [features]
-mobile = ["glory/backend-command", "dep:glory-desktop"]
+mobile = []
 ```
 
 `glory build --target android|ios` selects the `mobile` feature by default

@@ -15,8 +15,9 @@ pub mod command;
 pub mod command_dom;
 pub mod ssr_dom;
 pub use command::{
-    Command, CommandInsertPosition, CommandNode, CommandQueue, CommandRenderer, CurrentQueueGuard, EventData, KeyboardData, NodeQuery, PointerData,
-    QueryError, QueryResponse, QueryValue, TargetData, coalesce,
+    BoundingRect, ClipboardData, Command, CommandInsertPosition, CommandNode, CommandQueue, CommandRenderer, CurrentQueueGuard, EventData,
+    KeyboardData, MediaData, NodeQuery, PointerData, QueryError, QueryResponse, QueryValue, ResizeData, ScrollOffset, SelectionData, TargetData,
+    coalesce,
 };
 
 /// The renderer the shared (non-wasm) `Element` widget instantiates.

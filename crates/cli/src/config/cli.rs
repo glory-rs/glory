@@ -81,10 +81,11 @@ pub struct Cli {
 
 impl Cli {
     pub fn opts(&self) -> Option<Opts> {
-        use Commands::{Build, Bundle, Check, Clean, EndToEnd, Fmt, New, Serve, Test, Watch};
+        use Commands::{Build, Bundle, Check, Clean, Config, Doctor, EndToEnd, Fmt, New, Serve, Test};
         match &self.command {
             New(_) | Fmt(_) => None,
-            Build(opts) | Bundle(opts) | Check(opts) | Test(opts) | EndToEnd(opts) | Watch(opts) => Some(opts.clone()),
+            Build(opts) | Bundle(opts) | Check(opts) | Test(opts) | EndToEnd(opts) | Doctor(opts) => Some(opts.clone()),
+            Config(opts) => Some(opts.opts.clone()),
             Serve(opts) => Some(opts.opts.clone()),
             Clean(opts) => Some(opts.opts.clone()),
         }
@@ -113,6 +114,21 @@ pub struct CleanOpts {
     pub cargo: bool,
 }
 
+/// Flags for `config`.
+#[derive(Debug, Clone, Parser, PartialEq, Default)]
+pub struct ConfigOpts {
+    #[command(flatten)]
+    pub opts: Opts,
+
+    /// Print the resolved project summary as JSON.
+    #[arg(long)]
+    pub json: bool,
+
+    /// Print the Glory Cargo metadata schema and exit without loading a project.
+    #[arg(long)]
+    pub schema: bool,
+}
+
 /// Flags for `fmt` (a thin passthrough over `cargo fmt`).
 #[derive(Debug, Clone, Parser, PartialEq, Default)]
 pub struct FmtOpts {
@@ -137,15 +153,16 @@ pub enum Commands {
     Clean(CleanOpts),
     /// Type-check the client (wasm) and server without producing artifacts.
     Check(Opts),
+    /// Validate Glory Cargo metadata or print the metadata schema.
+    Config(ConfigOpts),
+    /// Check local toolchains and platform prerequisites for the selected target.
+    Doctor(Opts),
     /// Format the project sources (passthrough to `cargo fmt`).
     Fmt(FmtOpts),
     /// Run the cargo tests for app, client and server.
     Test(Opts),
     /// Start the server and end-2-end tests.
     EndToEnd(Opts),
-    /// Deprecated alias for `serve`; serve and automatically reload when files change.
-    #[command(hide = true)]
-    Watch(Opts),
-    /// WIP: Start wizard for creating a new project (using cargo-generate). Ask at Glory discord before using.
+    /// Scaffold a new Glory project from a built-in template or cargo-generate source.
     New(NewCommand),
 }

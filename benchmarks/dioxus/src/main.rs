@@ -125,7 +125,7 @@ fn App() -> Element {
                                     a {
                                         class: "remove",
                                         onclick: move |_| { rows.write().retain(|r| r.id != id); },
-                                        span { class: "remove glyphicon glyphicon-remove", "aria-hidden": "true" }
+                                        span { class: "remove glyphicon glyphicon-remove", "aria-hidden": "true", "x" }
                                     }
                                 }
                                 td { class: "col-md-6" }

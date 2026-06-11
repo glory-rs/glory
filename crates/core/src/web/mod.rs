@@ -6,12 +6,14 @@ pub mod widgets;
 mod attr;
 mod class;
 mod prop;
+mod style;
 pub mod utils;
 
 pub use attr::AttrValue;
 pub use class::{ClassPart, Classes};
 pub use helpers::*;
 pub use prop::PropValue;
+pub use style::{ScopedStyle, scoped_css};
 pub use widgets::Element;
 
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]

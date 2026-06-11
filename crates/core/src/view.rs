@@ -147,11 +147,15 @@ impl View {
         cfg_if! {
             if #[cfg(feature = "single-app")] {
                 crate::reflow::batch(|| {
+                    self.scope.is_building = true;
                     self.widget.build(&mut self.scope);
+                    self.scope.is_building = false;
                 });
             } else {
                 crate::reflow::batch(self.holder_id(), || {
+                    self.scope.is_building = true;
                     self.widget.build(&mut self.scope);
+                    self.scope.is_building = false;
                 });
             }
         }

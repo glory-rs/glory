@@ -171,6 +171,28 @@ impl SsrNode {
             format!("{tag_open}{}{tag_close}", self.inner_html())
         }
     }
+
+    pub fn outer_html_chunks(&self, chunks: &mut Vec<String>) {
+        if *self.is_void.borrow() {
+            chunks.push(self.html_tag().0);
+            return;
+        }
+
+        let children = self.children.borrow();
+        if children.is_empty() {
+            let (tag_open, tag_close) = self.html_tag();
+            chunks.push(format!("{tag_open}{}{tag_close}", self.leaf_inner_html()));
+            return;
+        }
+
+        let (tag_open, tag_close) = self.html_tag();
+        chunks.push(tag_open);
+        for child in children.iter() {
+            child.outer_html_chunks(chunks);
+        }
+        chunks.push(tag_close);
+    }
+
     pub fn inner_html(&self) -> String {
         let mut html = "".to_string();
         if !self.children.borrow().is_empty() {
@@ -178,19 +200,25 @@ impl SsrNode {
                 write!(&mut html, "{}", child.outer_html()).unwrap();
             }
         } else {
-            let properties = self.properties.borrow();
-            let attributes = self.attributes.borrow();
-            let inner_html = attributes.get("inner_html");
-            let inner_text = attributes.get("inner_text");
-            if let Some(Some(text)) = properties.get("text") {
-                write!(&mut html, "{}", escape_html_text(text)).unwrap();
-            } else if let Some(inner_html) = inner_html {
-                write!(&mut html, "{}", inner_html).unwrap();
-            } else if let Some(inner_text) = inner_text {
-                write!(&mut html, "{}", escape_html_text(inner_text)).unwrap();
-            }
+            html.push_str(&self.leaf_inner_html());
         }
         html
+    }
+
+    fn leaf_inner_html(&self) -> String {
+        let properties = self.properties.borrow();
+        let attributes = self.attributes.borrow();
+        let inner_html = attributes.get("inner_html");
+        let inner_text = attributes.get("inner_text");
+        if let Some(Some(text)) = properties.get("text") {
+            escape_html_text(text)
+        } else if let Some(inner_html) = inner_html {
+            inner_html.to_string()
+        } else if let Some(inner_text) = inner_text {
+            escape_html_text(inner_text)
+        } else {
+            String::new()
+        }
     }
 }
 
@@ -240,6 +268,17 @@ impl SsrDocument {
     /// Rendered children of `id` (empty string for unknown ids).
     pub fn inner_html(&self, id: u64) -> String {
         self.nodes.get(&id).map(SsrNode::inner_html).unwrap_or_default()
+    }
+
+    pub fn inner_html_chunks(&self, id: u64) -> Vec<String> {
+        let Some(node) = self.nodes.get(&id) else {
+            return Vec::new();
+        };
+        let mut chunks = Vec::new();
+        for child in node.children.borrow().iter() {
+            child.outer_html_chunks(&mut chunks);
+        }
+        chunks
     }
 
     pub fn outer_html(&self, id: u64) -> String {
@@ -378,6 +417,10 @@ mod tests {
 
         let doc = SsrDocument::replay(&renderer.take_batch());
         assert_eq!(doc.inner_html(0), r#"<ul><li>B</li><li data-id="a" class=" selected">A</li></ul>"#);
+        assert_eq!(
+            doc.inner_html_chunks(0).join(""),
+            r#"<ul><li>B</li><li data-id="a" class=" selected">A</li></ul>"#
+        );
         assert_eq!(doc.html_tag(list.id()).unwrap().0, "<ul>");
     }
 }

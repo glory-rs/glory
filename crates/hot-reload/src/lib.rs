@@ -144,7 +144,7 @@ pub struct FunctionReloadBatch {
     pub reloads: Vec<FunctionReload>,
 }
 
-/// Wire message pushed by `glory-cli watch/serve` over the
+/// Wire message pushed by `glory-cli serve` over the
 /// `/live_reload` websocket. Shared by every reload client: the browser
 /// script injected during SSR and the desktop host's reload thread.
 ///

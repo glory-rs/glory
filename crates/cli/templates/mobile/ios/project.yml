@@ -2,7 +2,7 @@
 #
 # Replace `mobile_counter` / `com.example.mobile-counter` with your crate
 # name / bundle id. Build the Rust staticlib first:
-#   cargo build --target aarch64-apple-ios --release --lib
+#   cargo build --target aarch64-apple-ios --target-dir target/mobile --release --lib
 # (or `glory build --target ios --release`)
 name: GloryApp
 options:
@@ -22,7 +22,7 @@ targets:
     settings:
       base:
         LIBRARY_SEARCH_PATHS:
-          - ../../target/aarch64-apple-ios/release
+          - ../target/mobile/aarch64-apple-ios/release
         OTHER_LDFLAGS:
           - -lmobile_counter
           # Frameworks wry/tao link against on iOS:

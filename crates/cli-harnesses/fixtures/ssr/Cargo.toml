@@ -1,0 +1,26 @@
+[package]
+name = "glory-harness-ssr"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[features]
+web-csr = ["glory/web-csr"]
+web-ssr = ["glory/salvo", "dep:salvo", "dep:tokio"]
+
+[dependencies]
+glory = { path = "../../../glory", default-features = false }
+salvo = { version = "0.93", default-features = true, optional = true, features = ["serve-static"] }
+tokio = { version = "1", optional = true, features = ["macros", "rt-multi-thread"] }
+
+[package.metadata.glory]
+output_name = "glory_harness_ssr"
+site_root = "target/site"
+site_pkg_dir = "pkg"
+site_addr = "127.0.0.1:8000"
+bin_features = ["web-ssr"]
+bin_default_features = false
+lib_features = ["web-csr"]
+lib_default_features = false

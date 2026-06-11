@@ -52,7 +52,7 @@ val cargoNdk by tasks.registering(Exec::class) {
         "cargo", "ndk",
         "-t", "arm64-v8a",
         "-o", file("src/main/jniLibs").absolutePath,
-        "build", "--lib", "--release",
+        "build", "--lib", "--release", "--features", "mobile", "--target-dir", "target/mobile",
     )
 }
 

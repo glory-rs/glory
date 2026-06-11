@@ -15,10 +15,12 @@ categories = { workspace = true }
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
+serde_urlencoded = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+futures = { workspace = true }
 inventory = { workspace = true }
 tokio = { workspace = true, features = ["rt"] }
 reqwest = { workspace = true, optional = true, features = ["json"] }
@@ -35,6 +37,7 @@ web-sys = { workspace = true, features = [
   "Request",
   "RequestInit",
   "RequestMode",
+  "RequestRedirect",
   "Response",
   "Window",
   "WorkerGlobalScope",

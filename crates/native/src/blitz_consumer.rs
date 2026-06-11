@@ -11,18 +11,34 @@
 //!   (blitz has no classList API).
 //! - `SetHtml` would need an HTML parser pass (blitz-html); rejected for
 //!   now — widgets on the native backend should compose nodes instead.
-//! - Events (`AttachEvent`/`DetachEvent`) are recorded; wiring them to
-//!   blitz's `EventDriver` is the next spike stage.
+//! - Events (`AttachEvent`/`DetachEvent`) are recorded. With the `shell`
+//!   feature, `GloryBlitzDocument` forwards matching Blitz DOM events back
+//!   into the held Glory `CommandHolder`.
 
 use std::collections::{BTreeSet, HashMap};
+#[cfg(feature = "shell")]
+use std::{
+    any::Any,
+    cell::RefCell,
+    ops::{Deref, DerefMut},
+    rc::Rc,
+};
 
 use blitz_dom::{Attribute, BaseDocument, DocumentConfig, QualName};
 use glory_core::renderer::{Command, CommandInsertPosition};
+#[cfg(feature = "shell")]
+use glory_core::renderer::{EventData, PointerData, TargetData};
+#[cfg(feature = "shell")]
+use glory_core::web::holders::CommandHolder;
+#[cfg(feature = "shell")]
+use glory_core::{Holder, Widget};
 
 pub struct BlitzConsumer {
     doc: BaseDocument,
     /// Glory command-stream id → blitz node id.
     ids: HashMap<u64, usize>,
+    /// Blitz node id → Glory command-stream id.
+    blitz_to_glory: HashMap<usize, u64>,
     /// Class sets per glory id (blitz exposes only whole attributes).
     classes: HashMap<u64, BTreeSet<String>>,
     /// (glory id, event name) listeners — recorded for the event stage.
@@ -59,9 +75,12 @@ impl BlitzConsumer {
         let mut ids = HashMap::new();
         // Reserved host root (glory id 0) → <body>.
         ids.insert(0, body);
+        let mut blitz_to_glory = HashMap::new();
+        blitz_to_glory.insert(body, 0);
         Self {
             doc,
             ids,
+            blitz_to_glory,
             classes: HashMap::new(),
             listeners: BTreeSet::new(),
         }
@@ -73,6 +92,10 @@ impl BlitzConsumer {
 
     pub fn listeners(&self) -> &BTreeSet<(u64, String)> {
         &self.listeners
+    }
+
+    pub fn glory_id_for_blitz(&self, blitz_id: usize) -> Option<u64> {
+        self.blitz_to_glory.get(&blitz_id).copied()
     }
 
     fn blitz_id(&self, glory_id: u64) -> Option<usize> {
@@ -90,6 +113,7 @@ impl BlitzConsumer {
             Command::Create { id, name, .. } => {
                 let node_id = self.doc.mutate().create_element(qual(name), Vec::new());
                 self.ids.insert(*id, node_id);
+                self.blitz_to_glory.insert(node_id, *id);
             }
             Command::SetAttribute { id, name, value } => {
                 if let Some(node) = self.blitz_id(*id) {
@@ -170,8 +194,10 @@ impl BlitzConsumer {
                 }
             }
             Command::Remove { child, .. } => {
-                if let Some(child) = self.blitz_id(*child) {
-                    self.doc.mutate().remove_node(child);
+                if let Some(blitz_child) = self.blitz_id(*child) {
+                    self.doc.mutate().remove_node(blitz_child);
+                    self.ids.remove(child);
+                    self.blitz_to_glory.remove(&blitz_child);
                 }
             }
             Command::AttachEvent { id, name, .. } => {
@@ -222,6 +248,123 @@ impl BlitzConsumer {
 
     #[allow(dead_code)]
     fn unused(_: Attribute) {}
+}
+
+#[cfg(feature = "shell")]
+pub fn launch_blitz_window(widget: impl Widget) {
+    let holder = CommandHolder::new().mount(widget);
+    let mut consumer = BlitzConsumer::new();
+    consumer.apply_batch(&holder.take_batch());
+
+    let event_loop = blitz_shell::create_default_event_loop::<blitz_shell::BlitzShellEvent>();
+    let renderer = anyrender_vello::VelloWindowRenderer::new();
+    let window = blitz_shell::WindowConfig::new(Box::new(GloryBlitzDocument { holder, consumer }), renderer);
+
+    let mut application = blitz_shell::BlitzApplication::new(event_loop.create_proxy());
+    application.add_window(window);
+    event_loop.run_app(&mut application).expect("run Glory Blitz event loop");
+}
+
+#[cfg(feature = "shell")]
+struct GloryBlitzDocument {
+    holder: CommandHolder,
+    consumer: BlitzConsumer,
+}
+
+#[cfg(feature = "shell")]
+impl Deref for GloryBlitzDocument {
+    type Target = BaseDocument;
+
+    fn deref(&self) -> &Self::Target {
+        &self.consumer.doc
+    }
+}
+
+#[cfg(feature = "shell")]
+impl DerefMut for GloryBlitzDocument {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.consumer.doc
+    }
+}
+
+#[cfg(feature = "shell")]
+impl blitz_dom::Document for GloryBlitzDocument {
+    fn handle_ui_event(&mut self, event: blitz_traits::events::UiEvent) {
+        let events = Rc::new(RefCell::new(Vec::new()));
+        let handler = GloryEventBridge {
+            blitz_to_glory: self.consumer.blitz_to_glory.clone(),
+            listeners: self.consumer.listeners.clone(),
+            events: events.clone(),
+        };
+        {
+            let mut driver = blitz_dom::EventDriver::new(self.consumer.doc.mutate(), handler);
+            driver.handle_ui_event(event);
+        }
+
+        let mut changed = false;
+        for event in events.borrow_mut().drain(..) {
+            if self.holder.dispatch_event(event) {
+                self.consumer.apply_batch(&self.holder.take_batch());
+                changed = true;
+            }
+        }
+        if changed {
+            self.consumer.doc.shell_provider.request_redraw();
+        }
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
+}
+
+#[cfg(feature = "shell")]
+struct GloryEventBridge {
+    blitz_to_glory: HashMap<usize, u64>,
+    listeners: BTreeSet<(u64, String)>,
+    events: Rc<RefCell<Vec<EventData>>>,
+}
+
+#[cfg(feature = "shell")]
+impl blitz_dom::EventHandler for GloryEventBridge {
+    fn handle_event(
+        &mut self,
+        chain: &[usize],
+        event: &mut blitz_traits::events::DomEvent,
+        _mutr: &mut blitz_dom::DocumentMutator<'_>,
+        _event_state: &mut blitz_traits::events::EventState,
+    ) {
+        let name = event.name();
+        let Some(glory_id) = chain.iter().find_map(|blitz_id| {
+            let glory_id = self.blitz_to_glory.get(blitz_id).copied()?;
+            self.listeners.contains(&(glory_id, name.to_owned())).then_some(glory_id)
+        }) else {
+            return;
+        };
+
+        let mut data = EventData::new(name, glory_id);
+        match &event.data {
+            blitz_traits::events::DomEventData::MouseMove(mouse)
+            | blitz_traits::events::DomEventData::MouseDown(mouse)
+            | blitz_traits::events::DomEventData::MouseUp(mouse)
+            | blitz_traits::events::DomEventData::Click(mouse) => {
+                data.pointer = Some(PointerData {
+                    client_x: mouse.x as f64,
+                    client_y: mouse.y as f64,
+                    button: mouse.button as i16,
+                    buttons: mouse.buttons.bits() as u16,
+                });
+            }
+            blitz_traits::events::DomEventData::Input(input) => {
+                data.target = Some(TargetData {
+                    value: Some(input.value.clone()),
+                    checked: None,
+                });
+            }
+            _ => {}
+        }
+        self.events.borrow_mut().push(data);
+    }
 }
 
 #[cfg(test)]

@@ -1,0 +1,11 @@
+[package]
+name = "glory-harness-desktop"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+glory-core = { path = "../../../core", default-features = false, features = ["backend-command"] }
+glory-desktop = { path = "../../../desktop", default-features = false, features = ["runtime"] }

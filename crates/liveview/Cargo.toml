@@ -1,0 +1,30 @@
+[package]
+name = "glory-liveview"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+description = "LiveView protocol primitives for Glory command-stream applications."
+homepage = { workspace = true }
+repository = { workspace = true }
+documentation = "https://docs.rs/glory-liveview/"
+readme = { workspace = true }
+keywords = { workspace = true }
+license = { workspace = true }
+categories = { workspace = true }
+
+[dependencies]
+glory-core = { workspace = true, features = ["backend-command"] }
+futures = { workspace = true, optional = true }
+salvo = { workspace = true, optional = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+futures = { workspace = true }
+
+[features]
+default = []
+salvo = ["dep:futures", "dep:salvo", "salvo/websocket"]
+
+[lints]
+workspace = true

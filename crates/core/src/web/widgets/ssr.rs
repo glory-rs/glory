@@ -95,6 +95,7 @@ impl Widget for Element {
         if let Some(parent_node) = ctx.parent_node.as_ref() {
             self.renderer.remove_child(parent_node, &self.node);
         }
+        ctx.mark_descendants_dom_detached();
         let ids: Vec<ViewId> = ctx.child_views.keys().cloned().collect();
         for id in ids {
             ctx.detach_child(&id);

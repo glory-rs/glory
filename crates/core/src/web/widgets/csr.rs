@@ -2,6 +2,8 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::ops::Deref;
+use std::rc::Rc;
+use std::time::Duration;
 
 use educe::Educe;
 // #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
@@ -119,6 +121,7 @@ where
             let node = <T as AsRef<web_sys::Element>>::as_ref(&self.node);
             self.renderer.remove_child(parent_node, node);
         }
+        ctx.mark_descendants_dom_detached();
         let ids: Vec<ViewId> = ctx.child_views.keys().cloned().collect();
         for id in ids {
             ctx.detach_child(&id);
@@ -297,6 +300,7 @@ where
     pub fn add_event_listener<E, H>(&mut self, event: E, handler: H)
     where
         E: EventDescriptor + 'static,
+        E::EventType: JsCast,
         H: FnMut(E::EventType) + 'static,
     {
         cfg_if! {
@@ -318,6 +322,39 @@ where
 
         self.listeners.push(Box::new(move |node| {
             let event_name = event.name();
+            if event_name == "mounted" {
+                let mut wrapped = wrapped;
+                let _ = crate::web::set_timeout(
+                    move || {
+                        let event = web_sys::Event::new("mounted").unwrap_throw();
+                        wrapped(event.unchecked_into::<E::EventType>());
+                    },
+                    Duration::ZERO,
+                );
+                return;
+            }
+
+            if event_name == "visible" {
+                let wrapped = Rc::new(std::cell::RefCell::new(wrapped));
+                let callback = wasm_bindgen::closure::Closure::wrap(Box::new({
+                    let wrapped = wrapped.clone();
+                    move |entries: js_sys::Array, _observer: web_sys::IntersectionObserver| {
+                        for entry in entries.iter() {
+                            let entry = entry.unchecked_into::<web_sys::IntersectionObserverEntry>();
+                            if entry.is_intersecting() {
+                                let event = web_sys::Event::new("visible").unwrap_throw();
+                                wrapped.borrow_mut()(event.unchecked_into::<E::EventType>());
+                            }
+                        }
+                    }
+                })
+                    as Box<dyn FnMut(js_sys::Array, web_sys::IntersectionObserver)>);
+                let observer = web_sys::IntersectionObserver::new(callback.as_ref().unchecked_ref()).unwrap_throw();
+                observer.observe(node.as_ref());
+                let _ = callback.into_js_value();
+                std::mem::forget(observer);
+                return;
+            }
 
             if event.bubbles() {
                 crate::web::add_event_listener(node.as_ref(), event_name, wrapped);
@@ -332,6 +369,7 @@ where
     pub fn on<E, H>(mut self, event: E, handler: H) -> Self
     where
         E: EventDescriptor + 'static,
+        E::EventType: JsCast,
         H: FnMut(E::EventType) + 'static,
     {
         self.add_event_listener(event, handler);

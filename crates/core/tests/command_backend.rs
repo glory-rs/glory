@@ -8,11 +8,11 @@
 #![cfg(feature = "backend-command")]
 
 use glory_core::reflow::Cage;
-use glory_core::renderer::command_dom::CommandDom;
+use glory_core::renderer::command_dom::{CommandDom, ROOT_ID};
 use glory_core::renderer::{Command, EventData, TargetData};
 use glory_core::web::events;
 use glory_core::web::holders::CommandHolder;
-use glory_core::web::widgets::{button, div, input, li, ul};
+use glory_core::web::widgets::{button, div, form, input, label, li, math as math_widgets, option, select, svg as svg_widgets, textarea, ul};
 use glory_core::widgets::Each;
 use glory_core::{Holder, Scope, Widget};
 
@@ -88,6 +88,37 @@ fn counter_full_loop_mount_click_patch() {
 
     // Unknown node: normal in-flight race, must be a no-op.
     assert!(!holder.dispatch_event(EventData::new("click", 9999)));
+}
+
+#[test]
+fn mounted_lifecycle_event_runs_before_initial_batch_is_drained() {
+    #[derive(Debug)]
+    struct MountedWidget {
+        text: Cage<&'static str>,
+    }
+
+    impl Widget for MountedWidget {
+        fn build(&mut self, ctx: &mut Scope) {
+            let text = self.text.clone();
+            div()
+                .on(events::mounted, move |_| text.revise(|mut text| *text = "mounted"))
+                .text(self.text.clone())
+                .show_in(ctx);
+        }
+    }
+
+    let holder = CommandHolder::new().mount(MountedWidget { text: Cage::new("initial") });
+    let batch = holder.take_batch();
+    let mut dom = CommandDom::new();
+    dom.apply_batch(&batch);
+
+    assert!(
+        batch
+            .iter()
+            .any(|command| matches!(command, Command::AttachEvent { name, .. } if name == "mounted")),
+        "mounted listener must be visible to command consumers: {batch:?}"
+    );
+    assert_eq!(dom.texts_of("div"), vec!["mounted"]);
 }
 
 #[derive(Debug)]
@@ -213,4 +244,60 @@ fn node_query_round_trips_through_consumer() {
     let responses = dom.take_query_responses();
     assert!(holder.resolve_query(responses[0].clone()));
     assert_eq!(futures::executor::block_on(future), Err(QueryError::NodeGone));
+}
+
+#[derive(Debug)]
+struct MarkupSurface;
+
+impl Widget for MarkupSurface {
+    fn build(&mut self, ctx: &mut Scope) {
+        div()
+            .fill(
+                form()
+                    .attr("method", "post")
+                    .fill(label().attr("for", "title").text("Title"))
+                    .fill(input().id("title").attr("name", "title").attr("value", "Buy milk"))
+                    .fill(input().attr("type", "checkbox").attr("checked", true))
+                    .fill(select().fill(option().attr("value", "high").text("High")))
+                    .fill(textarea().text("Bring bags"))
+                    .fill(button().attr("type", "submit").text("Save")),
+            )
+            .fill(
+                svg_widgets::svg()
+                    .attr("viewBox", "0 0 10 10")
+                    .fill(svg_widgets::title().text("Badge"))
+                    .fill(svg_widgets::circle().attr("cx", "5").attr("cy", "5").attr("r", "4")),
+            )
+            .fill(
+                math_widgets::math().fill(
+                    math_widgets::mrow()
+                        .fill(math_widgets::mi().text("x"))
+                        .fill(math_widgets::mo().text("="))
+                        .fill(
+                            math_widgets::mfrac()
+                                .fill(math_widgets::mn().text("1"))
+                                .fill(math_widgets::mn().text("2")),
+                        ),
+                ),
+            )
+            .show_in(ctx);
+    }
+}
+
+#[test]
+fn markup_surface_conformance_via_command_stream() {
+    let holder = CommandHolder::new().mount(MarkupSurface);
+    let mut dom = CommandDom::new();
+    dom.apply_batch(&holder.take_batch());
+    let html = dom.inner_html(ROOT_ID);
+
+    assert!(html.contains("<form"), "{html}");
+    assert!(html.contains(r#"method="post""#), "{html}");
+    assert!(html.contains(r#"name="title""#), "{html}");
+    assert!(html.contains("Bring bags"), "{html}");
+    assert!(html.contains("<svg"), "{html}");
+    assert!(html.contains(r#"viewBox="0 0 10 10""#), "{html}");
+    assert!(html.contains("<circle"), "{html}");
+    assert!(html.contains("<math"), "{html}");
+    assert!(html.contains("<mfrac"), "{html}");
 }

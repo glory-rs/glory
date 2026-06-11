@@ -1,196 +1,171 @@
-# Glory 多平台渲染支持规划
+# Glory 多平台渲染状态与下一阶段计划
 
-> 目标:让 Glory 从"Web 框架"演进为"多平台框架"(Web / Desktop / LiveView / TUI / Native GPU)。
-> 参照对象:Dioxus(`E:\Repos\dioxus`)。
-> 本文档为阶段性规划,核心是**阶段 0:统一渲染抽象**。
+> 更新时间:2026-06-11。
+> 参照对象:本地 `E:\Repos\dioxus`。
+> 当前结论:早期"先统一渲染抽象"的地基阶段已经完成;现在的主要差距转向产品化、测试矩阵、打包链路和平台后端成熟度。
 
 ---
 
-## 0. 背景:与 Dioxus 的核心差异
+## 0. 当前状态
+
+Glory 现在不再是单纯的 Web/SSR 框架。当前主线已经具备:
+
+| 能力 | 当前状态 | 主要路径 |
+|---|---|---|
+| 浏览器 CSR | 可用 | `crates/core/src/web/holders/browser.rs`, `web-csr` |
+| SSR | 可用;非 wasm 路径已收敛到 command replay | `crates/core/src/web/holders/server.rs`, `renderer/ssr_dom.rs` |
+| 指令流后端 | 可用;非浏览器目标共享 `CommandNode` | `crates/core/src/renderer/command.rs` |
+| Desktop WebView | 可用;支持 wry/tao、多窗口、菜单、custom protocol、hot reload | `crates/desktop` |
+| Server functions | 可用;Salvo/Axum/Actix adapter + request context | `crates/serverfn`, `crates/macros` |
+| Mobile | 模板、交叉编译路径、CI smoke、设备验证脚本已落地;真机/模拟器实际运行需外部设备 | `crates/cli/src/compile/mobile.rs`, `crates/cli/templates/mobile`, `scripts/mobile-device-smoke.ps1` |
+| Native Blitz | `blitz-dom` consumer、`blitz-shell`/vello 窗口入口、click/input 回程桥已落地 | `crates/native` |
+| TUI | 只读 command DOM 展示定位 | `crates/tui` |
+| LiveView | 协议/session crate、浏览器 reconnect client、Salvo WebSocket route 已落地 | `crates/liveview` |
+
+与 Dioxus 的核心差异仍然成立:
 
 | | Dioxus | Glory |
 |---|---|---|
-| 渲染模型 | 有 VDOM(编译期 Template 剔除静态部分) + diff | 无 VDOM,细粒度订阅,命令式直改节点 |
-| 核心产出 | 平台无关、可序列化的 `Mutation` 流(整数 `ElementId`) | widget 直接持有/操作具体 `Node`,部分走 trait、部分 cfg 硬编码 |
-| 新平台接入点 | 实现 `WriteMutations`(约 18 个方法)+ launch 循环 | 实现 `Renderer`,**但还得先把 widget 层从 web_sys 解耦** |
-| 跨 IPC/网络 | 天然(指令流可序列化) | 需另起命令序列化(desktop 已部分做),但与主路径割裂 |
-
-**Dioxus 能多平台的根本原因**:核心只吐一条平台无关、可序列化的 mutation 指令流,引用整数 `ElementId`,"id ↔ 真实节点"的表由各渲染器维护。
-**Glory 当前瓶颈**:虽有干净的 `Renderer` trait(`crates/core/src/renderer/mod.rs:102-137`),但生产主线(CSR/SSR)仍用 `cfg` + `web_sys` 硬编码绕过它。
-
-### Dioxus 平台矩阵(参考)
-| 平台 crate | 目标 | 落地方式 | 成熟度 |
-|---|---|---|---|
-| dioxus-web | 浏览器 WASM | wasm-bindgen + web-sys,经 dioxus-interpreter-js(sledgehammer)批量打 DOM | 一等公民 |
-| dioxus-desktop | Win/macOS/Linux | WebView(wry + tao),mutation 二进制序列化经 WebSocket 发给 webview JS | 一等公民 |
-| dioxus-mobile | iOS/Android | 同 desktop(共用 wry) | 一等公民 |
-| dioxus-liveview | 服务器驱动 | mutation 经 WebSocket 推到浏览器,依赖 axum/tokio | 一等公民 |
-| dioxus-ssr | HTML 字符串 | 遍历 VNode 输出字符串 | 一等公民 |
-| dioxus-native(Blitz) | 原生 GPU | blitz-dom(Taffy 布局 + CSS) + vello/skia(wgpu),无 webview | 实验性 |
-| TUI/ratatui | 终端 | 官方已移除,需社区自行实现 | 无 |
+| UI 构建表面 | `rsx!` + VDOM | builder-pattern widgets + fine-grained subscriptions |
+| 核心更新产物 | VDOM diff 后的 mutation stream | 视图订阅触发直接 patch,非浏览器路径输出 command stream |
+| 多平台接入 | 每个平台实现 mutation consumer | 非浏览器平台消费 `Command`/`EventData`;CSR 仍走浏览器直连路径 |
+| 当前成熟度差距 | CLI、bundle、docs、测试、平台 API 很完整 | 核心路已通,产品化外壳仍薄 |
 
 ---
 
-## 1. 总体路线图与优先级
+## 1. 已完成的关键架构转折
 
-```
-阶段0 统一渲染抽象(必做地基)
-   └─► 阶段1 Desktop/Wry (ROI 最高,已 60%+)
-          └─► 阶段2 LiveView (增量小,秀细粒度优势)
-   └─► 阶段3 TUI (独立新 Renderer,中等)
-   └─► 阶段4 Native GPU (最大,建议复用 Blitz)
-```
+早期规划里的阶段 0/阶段 1 已经不是待办:
 
-### 阶段 1:Desktop(Wry / WebView)— 约已完成 60-70%
-已有:`WryRenderer`、`WryCommand` 序列化、`wry_interpreter.js`。缺:
-1. 窗口宿主:封装 `wry::WebViewBuilder` + `tao` 事件循环,实现真实的 `WryCommandSink`(目前只有测试用 RecordingSink),命令流经 IPC/`evaluate_script` 注入 webview。
-2. 事件回传:webview JS → IPC → Rust,反序列化成 `WryEventPayload` → 派发到对应 `ViewId` handler。
-3. 接入阶段 0 的统一 widget。
-4. launch 入口 + feature gate(`desktop`)。
+- `Node` 的非浏览器路径已统一为 `CommandNode`。
+- SSR 已从独立内存节点主路径收敛为 command replay。
+- `Command`, `EventData`, `NodeQuery`, `QueryResponse` 已成为跨 desktop/native/liveview 的协议核心。
+- Desktop runtime 已经是真 wry/tao 宿主,不是测试 sink。
+- Desktop IPC 事件回程、query 回程、hot reload、自定义资源协议、多窗口和菜单都已接通。
+- `asset!` 已存在,desktop 通过 `glory://` custom protocol 读取 assets。
+- `#[glory::server]` server functions 已接通三种 adapter,并支持 request context。
+- Mobile 已有 Android/iOS 模板和交叉编译路径。
+- Blitz DOM consumer 已验证 command stream 可以驱动真实 native DOM;`glory-native/shell`
+  进一步提供 `blitz-shell`/vello window entrypoint 和 click/input 回程桥。
+- LiveView 已有 `glory-liveview` crate,复用 command stream over WebSocket。
 
-### 阶段 2:LiveView — 复用 Desktop 指令流,换传输层
-1. 把命令序列化从"IPC 发本地 webview"改成"WebSocket 发远程浏览器"。
-2. 服务器侧持有 Scope 树与响应式状态(细粒度天然适合,只推变化的绑定点,理论比 Dioxus scope 级重渲染更省带宽)。
-3. 复用已有 axum/actix/salvo adapter 做 WS 服务器,客户端复用 `wry_interpreter.js` 同款解释器。
-
-### 阶段 3:TUI(ratatui)— 需要全新 Renderer
-1. 新建 `TuiRenderer`(当前 `glory-tui` 的纯别名要删掉重写),节点为内存树 `TuiNode`(标签/文本/样式/布局约束)。
-2. 布局:HTML 盒模型 → 终端字符网格,接 Taffy 或定义受限子集。
-3. 绘制:patch 后把 TuiNode 树转成 ratatui `Widget`/`Buffer`。
-4. 事件:crossterm 键鼠 → `EventPayload`。
-
-### 阶段 4:Native GPU(对标 Blitz)— 工作量最大
-1. 现实选择:**直接接 Blitz**(blitz-dom + vello/wgpu),让响应式树产出 Blitz 能消费的 DOM,而非自研 GPU 渲染器与布局引擎。
-2. 若自研:Taffy 布局 + wgpu/vello 绘制 + 字体/文本整形 + 命中测试,基本是另一个子项目。
+这意味着后续不应再围绕"是否需要 command stream"争论;真正要做的是把这个基础变成可发布、可测试、可维护的产品面。
 
 ---
 
-## 2. 阶段 0:统一渲染抽象(核心)
+## 2. 下一阶段优先级
 
-### A. 耦合点清单(改造靶点)
+### P0:发布可信度
 
-| # | 位置 | 现状 | 为什么挡住多平台 |
-|---|---|---|---|
-| 1 | `crates/core/src/node/mod.rs:24-31` | `Node` = cfg 别名:`web_sys::Element`(wasm+csr)/ `ssr::Node`(其余) | 二选一编译期分叉,没有第三个平台的位置;是具体类型,不是 `R::Node` |
-| 2 | `crates/core/src/scope.rs:55-58` | `parent_node/render_node/first_child_node/last_child_node: Option<Node>` | Scope 直接持有具体 Node,Scope 又被 `View`/`ROOT_VIEWS`/routing 到处引用 |
-| 3 | `crates/core/src/scope.rs:287-299` | `nodes()` 用 `web_sys::Node` + `nodes_between` | CSR 专属 DOM 区间查询,无平台无关替身 |
-| 4 | `crates/core/src/widget.rs:74` | `mount_to(self, ctx: Scope, parent_node: &Node)` | trait 签名钉死具体 Node |
-| 5 | `crates/core/src/web/widgets/csr.rs:20-44` | `Element<T: AsRef<web_sys::Element> + JsCast>`,字段 `node: T`、`renderer: WebRenderer`、`listeners: Vec<Box<dyn FnOnce(&T)>>` | 整个元素 widget 泛型边界绑死 web_sys;renderer 是具体类型 |
-| 6 | `crates/core/src/web/attr.rs:16` + 各 impl | `AttrValue::inject_to(&self, …, node:&mut Node, …)`,cfg 体内直接 `node.set_attribute()`(web_sys/ssr) | **属性/class 主路径完全绕过 `Renderer` trait** |
-| 7 | `crates/core/src/web/prop.rs` | `PropValue` 同上,CSR 还用 `JsValue` | 同 6,且引入 wasm 专属类型 |
-| 8 | `crates/core/src/web/events/csr.rs:9` | `EventDescriptor::EventType: FromWasmAbi`;`ssr.rs` 另一套 | 事件类型系统绑 wasm ABI;委托逻辑(bubbles→全局委托)是 CSR 私有 |
-| 9 | `crates/core/src/web/widgets/csr.rs:113-115` | `listeners: Vec<Box<dyn FnOnce(&T)>>`,build 时 `(listener)(&self.node)` | 事件挂载直接拿 web_sys 节点,不走 `Renderer::attach_event` |
+1. **CI 主工作流**
+   - 增加 `cargo fmt --all --check`。
+   - 增加 targeted tests:`glory-core` default/web-ssr/backend-command, `glory-serverfn`, `glory-cli`。
+   - 增加 feature-combination compile checks,覆盖 `web-csr`/`web-ssr`/`backend-command`/`single-app` 规则。
 
-**结论**:`Renderer` trait 已定义得很好,但主路径(Element/AttrValue/PropValue/事件)一条都没走它。阶段 0 = 把 #2 #4 #6 #7 #9 全改成只经过 `Renderer`,并解决 #1 这个"只能二选一"的类型别名。
+2. **当前任务板与文档收敛**
+   - `_improve_todos.md` 是当前成熟度任务板。
+   - `_todos.md` 保留为历史实现日志。
+   - 本文档只记录当前架构状态和下一阶段计划。
 
-### B. 架构岔路(开工前必须先选)
+3. **官方性能基线**
+   - 现有 js-framework-benchmark 本地 harness 结果健康。
+   - `benchmarks/official-js-framework-benchmark.ps1` 已能生成官方
+     `frameworks/keyed/glory-rs` / `dioxus-rs` adapters,完成 release build,
+     并跑通官方 Chrome/Puppeteer tracing CPU 01-09。
+   - 后续任何 command/scheduler/hydration 改动都要和基线对比。
 
-**路线 ① 泛型单态化 —— `Scope<R>` / `Widget<R>`,到处用 `R::Node`**
-- 优点:零成本、类型安全,保留 CSR 直连 web_sys 的性能;契合已有 `Renderer{type Node}`。
-- 缺点:泛型病毒式扩散到 `Scope`/`View`/`Widget`/`ROOT_VIEWS`/routing/`Truck`,改动面巨大;**不白送序列化**,desktop/liveview 仍要各自再写命令编码。
+### P1:产品化外壳
 
-**路线 ② 对象安全渲染器 + 不透明节点句柄(Dioxus 风格)✅ 推荐**
-- `Node` 变平台无关轻量句柄(整数 id,如 `Node(u32)`);真实节点表(`id → web_sys::Element`/内存节点)由渲染器自己持有;`Scope` 经 `truck` 拿 `Rc<dyn DynRenderer>`,所有节点操作走它。
-- 优点:几乎不动泛型;命令流天然可序列化 → desktop(IPC)/liveview(WS)几乎白送;最短路径达成多平台目标。
-- 缺点:热路径多一次 slotmap 查表 + 一次 vtable 派发(web 主平台);`Renderer` trait 要改成对象安全(擦除关联类型)。可用"WebRenderer 内部 `SlotMap<u32, Element>` + 单次派发"把代价控住。
+1. **`glory bundle` 平台矩阵**
+   - 当前 `bundle` 只支持 Web。
+   - 下一步拆成 `bundle_web`, `bundle_desktop`, `bundle_android`, `bundle_ios`。
+   - Desktop bundle 至少应包含 exe、assets root、配置元数据和图标。
 
-> **推荐路线 ②**:阶段 0 目标就是让 desktop/tui/native/liveview 顺势而下,而②正好让"记录式/转发式渲染器"白送命令流。下方清单按②写;若选①,差异在每步标注。
+2. **`glory doctor`**
+   - 检查 Rust targets、wasm-bindgen、wasm-opt、cargo-ndk、Android NDK、Xcode/XcodeGen、WebView runtime。
+   - 这是 mobile/desktop 用户体验的最短补强。
 
-### C. 分步迁移(每步可独立编译 + 测试绿)
+3. **一等模板**
+   - Web CSR、SSR、fullstack、desktop、mobile 模板应能从本仓库 CLI 直接生成。
+   - 远程 `cargo-generate` 可以保留,但不应是唯一入口。
 
-**Step 1 — 把 `Renderer` 改成对象安全的 `DynRenderer`**(`crates/core/src/renderer/mod.rs`)
-- 擦除关联类型:`Node` → 统一句柄 `Node(u32)`;`Event` → `Box<dyn EventPayload>`。
-- 方法以句柄收发:`create_element(name,is_void)->Node`、`set_attribute_value(&Node,…)`、`insert_child(parent:&Node,child:&Node,pos:InsertPosition<Node>)`、`attach_event(&Node,name,bubbles,Box<dyn FnMut(Box<dyn EventPayload>)>)`。
-- 提供 `trait DynRenderer` + blanket 使 `dyn` 可用;复用现有默认方法(`set_attribute_value`/`set_property_value`,见 `renderer/mod.rs:110-124`)。
-- 保留 `MockRenderer`/`MockCommand`(`renderer/mod.rs:164+`)作回归基线——已是 id 化命令,正好当样板。
-- *(路线①:保持关联类型,只补齐所有方法;不引入句柄。)*
+4. **Playwright/e2e**
+   - `glory end2end` 已有 hook,但仓库缺少一等 Playwright 项目。
+   - 优先覆盖 CSR counter、SSR hydrate、router、serverfn、hot reload。
 
-**Step 2 — `Node` 句柄化**(`crates/core/src/node/mod.rs`)
-- 删 cfg 别名,改 `#[derive(Clone,Copy,Debug,PartialEq)] pub struct Node(pub u32);`(加生成器)。
-- `web_sys::Element` 与 `ssr::Node` 降级为各渲染器内部存储(`SlotMap<u32,_>`),不再出现在核心签名。
-- `NodeRef<N>`(`node/mod.rs:5-22`)改持有 `Node` 句柄。
+### P1/P2:平台后端成熟
 
-**Step 3 — 渲染器入驻 `Truck`,Scope 经它操作**
-- `Truck` 增加 `renderer: Rc<dyn DynRenderer>`(替代 `Element.renderer: WebRenderer` 那个 ZST 字段,`web/widgets/csr.rs:39`)。
-- `Scope` 提供 `fn renderer(&self) -> Rc<dyn DynRenderer>`;`scope.rs:55-58` 四个 `Option<Node>` 字段类型不变(已是新句柄),语义不变。
-- `scope.rs:287-299` 的 `nodes()`/`nodes_between` 抽成 `DynRenderer::nodes_between(first,last)->Vec<Node>`(CSR 内部仍用 web_sys,其它给等价实现)。
+1. **Mobile**
+   - Android/iOS:模板、Rust host check、safe-area、键盘 resize、前后台 lifecycle events、CI smoke、设备 smoke 脚本已完成。
+   - 剩余缺口是真机/模拟器运行记录和 APK/simulator 产物验证;当前 Windows 机器能找到 `adb`,但没有在线 Android 设备/模拟器,且不能运行 iOS simulator。
 
-**Step 4 — `AttrValue`/`PropValue` 改走渲染器**(`crates/core/src/web/attr.rs`、`web/prop.rs`)
-- 签名:`fn inject_to(&self, renderer:&dyn DynRenderer, node:&Node, name:&str, first_time:bool)`,内部调 `renderer.set_attribute_value(node,name,AttributeValue)`;删掉所有 `#[cfg(...web-csr)]` 直接 `node.set_attribute()` 分叉(`web/attr.rs:53-73` 这类全删)。
-- 标量(bool/i64/f64/String)映射到 `AttributeValue` 枚举(`renderer/mod.rs:31-93` 已备 `From`)。
-- `Cage`/`Bond` 的 `inject_to`(`web/attr.rs:20-51`)逻辑不变(`is_revising()||first_time` + `bind_view`),只是底层落到 renderer。
+2. **Native Blitz**
+   - 已有 `glory-native/shell` 真窗口入口和 click/input 回程桥。
+   - 下一步是人工/截图验证 counter 真实绘制、布局边界、输入法、a11y 和文本布局。
 
-**Step 5 — `Element<T>` 去 web_sys 化**(`crates/core/src/web/widgets/csr.rs` + `ssr.rs` 合一)
-- `Element<T: AsRef<web_sys::Element>>` → `Element { name, is_void, classes, attrs, props, fillers, listeners, node: Node }`,不再泛型于 web_sys。
-- `build`(`csr.rs:90-116`):`renderer.create_element` 拿句柄 → 写 `ctx.render_node/first/last_child_node` → fillers → `value.inject_to(renderer,node,…)` → 事件走 Step 6。
-- `flood`(`csr.rs:46-68`)的 `insert_child` 改成 `ctx.renderer().insert_child(...)`;`ViewPlacement` 分支逻辑原样保留。
-- **CSR/SSR 两份 widget 文件合并成一份**(平台差异已下沉到 renderer),消灭 `web/widgets/{csr,ssr}.rs` 重复。
-
-**Step 6 — 事件统一**(`crates/core/src/web/events/*`、`csr.rs:113-115`)
-- 顶层保留类型化糖 `on(events::click, handler)`;边界 lower 成 `renderer.attach_event(node,"click",bubbles,Box<dyn FnMut(Box<dyn EventPayload>)>)`。
-- `EventDescriptor`(`events/csr.rs:7-22`)去掉 `FromWasmAbi` 约束,上移到 WebRenderer 内部:WebRenderer 在回调里把 `web_sys::Event` 包成 `EventPayload`,handler 再 `downcast`。`bubbles()`→全局委托策略移进 WebRenderer 实现。
-- `listeners: Vec<Box<dyn FnOnce(&T)>>`(`csr.rs:35`)删除,改为 build 时直接 `renderer.attach_event`。
-
-**Step 7 — 落两个参考渲染器,锁死回归**
-- `WebRenderer`:内部 `SlotMap<u32, web_sys::Element>`,实现全部 `DynRenderer`;保留 hydration 钩子(见 D)。
-- `SsrRenderer`:句柄 → `ssr::Node` 内存树,`outer_html()` 输出不变。
-- 跑通 `examples/counter`、SSR 快照、`MockRenderer` 单测(`renderer/mod.rs:604+`)三条线全绿,阶段 0 收口。
-
-### D. 迁移中必须守住的不变量(回归雷区)
-
-1. **Hydration**(`web/widgets/csr.rs:69-89` `hydrate` + `flood` 里 `gly-hydrating`/`gly-id` 判断):句柄化后 WebRenderer 要支持"用现有 DOM 建句柄表"(`query_selector` 命中即登记 id),而非 `create_element`。`is_hydrating()` 跳过插入的逻辑保留在 WebRenderer 内。
-2. **事件委托**:`bubbles()==true → 全局委托,false → 直挂`(`events/csr.rs:19-21`)语义必须由 WebRenderer 完整接管,否则 `undelegated`/`Custom` 行为变样。
-3. **Each 重排锚点**:`first_child_node/last_child_node` 作为兄弟定位锚点(`scope.rs:189-257` `attach_child` 依赖、`widget.rs:119-133` `flood` 注释强调不能预设 placement)。句柄替换 Node 后,`nodes_between` 语义要逐字对齐,否则 `Each` 重排错乱。
-4. **`shift_remove` 顺序**(`scope.rs:259-285`):与渲染无关,别误改。
-5. **`single-app` 双路 cfg**:`batch`/`holder_id` 到处分叉,renderer 注入要在两种 cfg 下都成立。
+3. **LiveView**
+   - `glory-liveview` 已复用 desktop JS interpreter 思路,传输层为 WebSocket。
+   - 服务器持有 `CommandHolder`,浏览器消费 commands 并回传 `EventData`/`QueryResponse`。
+   - 下一步是更多 adapter 和端到端浏览器场景。
 
 ---
 
-## 3. 关键文件速查
+## 3. 与 Dioxus 的成熟度差距
 
-### Glory(`D:\Works\glory-rs\glory`)
+Dioxus 当前领先点主要不是"能不能多平台",而是:
+
+- CLI 平台选择、bundle、doctor、config schema 更完整。
+- Playwright 测试和 CLI harnesses 更成体系。
+- Fullstack 有更多 batteries:streaming、SSE、uploads、forms、middleware、server state。
+- 文档站、教程、examples 和 API reference 更完整。
+- Devtools 与 telemetry/diagnostics 更成产品。
+- Assets 生态更成熟,包括 resolver、manganis、CSS modules、优化流程。
+
+Glory 的现实策略:
+
+- 保持 builder API 和 fine-grained 更新模型作为差异点。
+- 不追 RSX/DSL,也不引入 VDOM。
+- 用 command stream 复用非浏览器平台。
+- 优先补 CLI、CI、docs、bundle、fullstack examples,让已经打通的架构变成用户能稳定使用的东西。
+
+---
+
+## 4. 当前任务入口
+
+以 [`../_improve_todos.md`](../_improve_todos.md) 为当前任务板:
+
+- Lane A:release governance + docs。
+- Lane B:CLI, bundle, templates, platform serve。
+- Lane C:fullstack batteries。
+- Lane D:platform backends。
+- Lane E:performance and size。
+- Lane F:testing and conformance。
+- Lane G:public API and ecosystem ergonomics。
+
+推荐执行顺序:
+
+1. A2/A3/F1/F2:文档和 CI 可信度。
+2. B1/B2/D1/F4:desktop bundle 与 harness。
+3. C1/C2/C3/F3:fullstack 用户体验。
+4. D2/D3/F7:mobile 真机/CI。
+5. E1/E2/E3:正式性能和体积基线。
+6. D4/D5:Blitz 真窗口与 LiveView 并行探索。
+
+---
+
+## 5. 关键路径速查
+
 | 功能 | 路径 |
 |---|---|
-| Renderer trait + Mock | `crates/core/src/renderer/mod.rs` |
-| Node 别名(待句柄化) | `crates/core/src/node/mod.rs` / `node/ssr.rs` |
-| Scope | `crates/core/src/scope.rs` |
-| Widget trait | `crates/core/src/widget.rs` |
-| Element(CSR/SSR) | `crates/core/src/web/widgets/{csr,ssr}.rs` |
-| AttrValue / PropValue | `crates/core/src/web/attr.rs` / `web/prop.rs` |
-| 事件 | `crates/core/src/web/events/{mod,csr,ssr}.rs` |
-| Desktop(Wry,半成品) | `crates/desktop/src/lib.rs` |
-| Native/TUI(纯别名占位) | `crates/{native,tui}/src/lib.rs` |
-| 响应式核心 | `crates/core/src/reflow/{cage,bond,effect,scheduler,owner,mod}.rs` |
-
-### Dioxus 参考(`E:\Repos\dioxus`)
-| 功能 | 路径 |
-|---|---|
-| WriteMutations trait | `packages/core/src/mutations.rs` |
-| Template/VNode | `packages/core/src/nodes.rs` |
-| VirtualDom | `packages/core/src/virtual_dom.rs` |
-| Web 渲染器 | `packages/web/src/mutations.rs` |
-| Desktop(wry+WebSocket) | `packages/desktop/src/edits.rs` |
-| Native(Blitz) | `packages/native/src/dioxus_renderer.rs` |
-| LiveView | `packages/liveview/src/lib.rs` |
-| SSR | `packages/ssr/src/renderer.rs` |
-| 平台选择 launch | `packages/dioxus/src/launch.rs` |
-
----
-
-## 4. 一句话总结
-
-阶段 0 不是"再写渲染器",而是**把 `Node` 从 cfg 别名变成平台无关句柄、让 Element/Attr/Prop/事件四条主路径全部只经过一个对象安全的 `DynRenderer`**。做完后:
-- desktop = 把命令转 IPC 的 DynRenderer
-- liveview = 转 WebSocket 的 DynRenderer
-- TUI = 转 ratatui 绘制的 DynRenderer
-- native = 喂 Blitz 的 DynRenderer
-
-全都只是再实现一遍同一个 trait。
-
----
-
-## 5. 待决策事项(开工前)
-
-- [ ] **架构路线 ① vs ②**(B 节)——推荐 ②,需最终拍板。
-- [ ] 是否需要"路线① vs ②"的硬核取舍对比(性能 / 改动文件数 / 序列化 / 对 hydration·委托的冲击)。
-- [ ] 选定后,先草拟 Step 1 的 `DynRenderer` trait 新签名再开工。
+| Command protocol | `crates/core/src/renderer/command.rs` |
+| Command DOM reference interpreter | `crates/core/src/renderer/command_dom.rs` |
+| SSR replay DOM | `crates/core/src/renderer/ssr_dom.rs` |
+| Server holder | `crates/core/src/web/holders/server.rs` |
+| Command holder | `crates/core/src/web/holders/command.rs` |
+| Desktop runtime | `crates/desktop/src/runtime.rs` |
+| Desktop JS interpreter | `crates/desktop/src/wry_interpreter.js` |
+| Server functions | `crates/serverfn/src/lib.rs`, `crates/macros/src/lib.rs` |
+| Mobile compile path | `crates/cli/src/compile/mobile.rs` |
+| Mobile templates | `crates/cli/templates/mobile` |
+| Blitz consumer | `crates/native/src/blitz_consumer.rs` |
+| Current maturity board | `_improve_todos.md` |

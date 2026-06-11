@@ -83,6 +83,16 @@ required-features = ["web-ssr"]
 name = "command_wire"
 harness = false
 
+[[bench]]
+name = "scheduler"
+harness = false
+required-features = ["web-ssr"]
+
+[[bench]]
+name = "ssr_stream"
+harness = false
+required-features = ["web-ssr"]
+
 [package.metadata.cargo-all-features]
 denylist = ["stable"]
 skip_feature_sets = [["web-ssr", "web-csr"]]

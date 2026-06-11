@@ -98,12 +98,10 @@ impl ServerHolder {
     pub fn html_chunks(&self) -> Vec<HtmlChunk> {
         let document = self.replay();
         let (head, mid, tail) = crate::web::utils::html_parts_separated(&self.config, &self.truck.borrow(), &document);
-        vec![
-            HtmlChunk::DocumentStart(head),
-            HtmlChunk::BodyOpen(mid),
-            HtmlChunk::App(document.inner_html(self.host_node.node().id())),
-            HtmlChunk::DocumentEnd(tail),
-        ]
+        let mut chunks = vec![HtmlChunk::DocumentStart(head), HtmlChunk::BodyOpen(mid)];
+        chunks.extend(document.inner_html_chunks(self.host_node.node().id()).into_iter().map(HtmlChunk::App));
+        chunks.push(HtmlChunk::DocumentEnd(tail));
+        chunks
     }
 
     pub fn render_stream(&self) -> futures::stream::Iter<std::vec::IntoIter<HtmlChunk>> {
@@ -209,7 +207,9 @@ cfg_feature! {
 
 #[cfg(test)]
 mod tests {
-    use crate::web::widgets::div;
+    use futures::StreamExt;
+
+    use crate::web::widgets::{div, li, ul};
     use crate::{Holder, Scope, Widget};
 
     use super::*;
@@ -230,9 +230,41 @@ mod tests {
 
         assert!(matches!(chunks[0], HtmlChunk::DocumentStart(_)));
         assert!(matches!(chunks[1], HtmlChunk::BodyOpen(_)));
-        assert_eq!(chunks[2], HtmlChunk::App("<div gly-id=\"0-0\">streamed</div>".to_string()));
+        let app_html = chunks
+            .iter()
+            .filter_map(|chunk| match chunk {
+                HtmlChunk::App(value) => Some(value.as_str()),
+                _ => None,
+            })
+            .collect::<String>();
+        assert_eq!(app_html, "<div gly-id=\"0-0\">streamed</div>");
         assert!(matches!(chunks[3], HtmlChunk::DocumentEnd(_)));
         assert!(holder.render_string().contains("streamed"));
+    }
+
+    #[derive(Debug)]
+    struct NestedStreamWidget;
+
+    impl Widget for NestedStreamWidget {
+        fn build(&mut self, ctx: &mut Scope) {
+            ul().fill(vec![li().text("a"), li().text("b"), li().text("c")]).show_in(ctx);
+        }
+    }
+
+    #[test]
+    fn render_stream_yields_dom_boundary_chunks() {
+        let holder = ServerHolder::new(GloryConfig::default(), "/").mount(NestedStreamWidget);
+        let expected = holder.render_string();
+        let chunks = holder.html_chunks();
+        let app_chunk_count = chunks.iter().filter(|chunk| matches!(chunk, HtmlChunk::App(_))).count();
+        assert!(app_chunk_count > 1, "{chunks:?}");
+        assert_eq!(chunks.clone().into_iter().map(HtmlChunk::into_string).collect::<String>(), expected);
+
+        let mut stream = holder.render_stream();
+        let first = futures::executor::block_on(stream.next()).unwrap();
+        let second = futures::executor::block_on(stream.next()).unwrap();
+        assert!(matches!(first, HtmlChunk::DocumentStart(_)));
+        assert!(matches!(second, HtmlChunk::BodyOpen(_)));
     }
 
     #[test]

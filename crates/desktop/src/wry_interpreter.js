@@ -151,7 +151,13 @@
       listeners.set(key, handler);
       byId(data.id).addEventListener(data.name, handler);
     } else if (type === "Query") {
-      const respond = (result) => post({ GloryWryQuery: { token: data.token, result } });
+      const respond = (result) => {
+        const payload = { token: data.token, result };
+        if (typeof window.__gloryWryQuery === "function") {
+          window.__gloryWryQuery(payload);
+        }
+        post({ GloryWryQuery: payload });
+      };
       let node;
       try {
         node = byId(data.id);

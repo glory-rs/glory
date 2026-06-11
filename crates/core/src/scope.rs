@@ -47,6 +47,7 @@ pub struct Scope {
     pub view_id: ViewId,
     pub(crate) is_root: bool,
     pub(crate) is_built: bool,
+    pub(crate) is_building: bool,
     pub(crate) is_attached: bool,
     pub(crate) child_views: IndexMap<ViewId, View>,
     pub(crate) visible_views: IndexSet<ViewId>,
@@ -70,6 +71,7 @@ impl Scope {
             view_id,
             is_root: false,
             is_built: false,
+            is_building: false,
             is_attached: false,
             child_views: IndexMap::new(),
             visible_views: IndexSet::new(),
@@ -92,6 +94,7 @@ impl Scope {
             view_id,
             is_root: true,
             is_built: false,
+            is_building: false,
             is_attached: false,
             child_views: IndexMap::new(),
             visible_views: IndexSet::new(),
@@ -115,6 +118,9 @@ impl Scope {
     }
     pub fn is_built(&self) -> bool {
         self.is_built
+    }
+    pub(crate) fn is_building(&self) -> bool {
+        self.is_building
     }
 
     #[cfg(not(feature = "single-app"))]
@@ -163,6 +169,33 @@ impl Scope {
 
     pub fn child_views(&self) -> &IndexMap<ViewId, View> {
         &self.child_views
+    }
+
+    #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+    pub fn set_single_node_bounds(&mut self, node: Node) {
+        self.render_node = Some(node.clone());
+        self.first_child_node = Some(node.clone());
+        self.last_child_node = Some(node);
+    }
+
+    #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+    pub fn insert_node_at_placement(&self, node: &Node) {
+        use wasm_bindgen::UnwrapThrowExt;
+
+        let parent = self.parent_node.as_ref().unwrap_throw();
+        match &self.placement {
+            ViewPlacement::Head => parent.prepend_with_node_1(node).unwrap_throw(),
+            ViewPlacement::Before(next_node) => next_node.before_with_node_1(node).unwrap_throw(),
+            ViewPlacement::After(prev_node) => prev_node.after_with_node_1(node).unwrap_throw(),
+            ViewPlacement::Tail | ViewPlacement::Unset => parent.append_with_node_1(node).unwrap_throw(),
+        }
+    }
+
+    #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+    pub fn remove_node_from_parent(&self, node: &Node) {
+        if let Some(parent) = self.parent_node.as_ref() {
+            let _ = parent.remove_child(node);
+        }
     }
 
     /// Register a reactive side effect on this scope. Convenience wrapper
@@ -282,6 +315,54 @@ impl Scope {
             }
         }
         Some(view)
+    }
+
+    pub(crate) fn detach_children_bulk(&mut self, view_ids: &[ViewId]) -> Vec<View> {
+        if view_ids.is_empty() {
+            return Vec::new();
+        }
+        if view_ids.len() == 1 {
+            return self.detach_child(&view_ids[0]).into_iter().collect();
+        }
+
+        let targets: IndexSet<ViewId> = view_ids.iter().cloned().collect();
+        for view_id in view_ids {
+            self.visible_views.shift_remove(view_id);
+        }
+
+        let mut old_child_views = Some(std::mem::take(&mut self.child_views));
+        let mut kept = IndexMap::new();
+        let mut detached = Vec::with_capacity(targets.len());
+
+        let mut detach_all = || {
+            let old_child_views = old_child_views.take().unwrap_or_default();
+            for (view_id, mut view) in old_child_views {
+                if targets.contains(&view_id) && view.scope.is_attached() {
+                    view.detach();
+                    detached.push(view);
+                } else {
+                    kept.insert(view_id, view);
+                }
+            }
+        };
+
+        cfg_if! {
+            if #[cfg(feature = "single-app")] {
+                reflow::batch(&mut detach_all);
+            } else {
+                reflow::batch(self.holder_id(), &mut detach_all);
+            }
+        }
+
+        self.child_views = kept;
+        detached
+    }
+
+    pub(crate) fn mark_descendants_dom_detached(&mut self) {
+        for view in self.child_views.values_mut() {
+            view.scope.parent_node = None;
+            view.scope.mark_descendants_dom_detached();
+        }
     }
 
     #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]

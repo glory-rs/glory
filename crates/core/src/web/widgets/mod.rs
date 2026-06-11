@@ -10,8 +10,10 @@ pub use ssr::*;
 
 mod head_mixin;
 pub use head_mixin::*;
+pub mod math;
 mod node_meta;
 pub use node_meta::*;
+pub mod svg;
 
 use std::borrow::Cow;
 use std::fmt;
@@ -27,16 +29,16 @@ use crate::{Cage, Node, NodeRef, Scope, Widget};
 macro_rules! generate_tags {
     ($(
         $(#[$meta:meta])*
-        $tag:ident $name:ident $inner:ident [$($prop_fn:ident $($prop_key:expr)?),*] $($void:ident)?
+        $tag:ident $({ tag: $tag_name:literal, ns: $namespace:literal })? $name:ident $inner:ident [$($prop_fn:ident $($prop_key:expr)?),*] $($void:ident)?
     ),* $(,)?) => {
         paste::paste! {
             $(
                 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
                 thread_local! {
                   static [<ELE_ $tag:upper>]: once_cell::unsync::Lazy<web_sys::$inner> = once_cell::unsync::Lazy::new(|| {
-                    wasm_bindgen::JsCast::unchecked_into::<web_sys::$inner>($crate::web::document()
-                      .create_element(stringify!($tag))
-                      .unwrap())
+                    wasm_bindgen::JsCast::unchecked_into::<web_sys::$inner>(
+                        $crate::generate_tags! { @create_web_node $tag $(, $tag_name, $namespace)? }
+                    )
                   });
                 }
                 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
@@ -82,7 +84,7 @@ macro_rules! generate_tags {
                     $(
                         #[doc=concat!("A shortcut to set property `", generate_tags!{ @prop_key $prop_fn, $($prop_key)? }, "`.")]
                         pub fn $prop_fn(mut self, value: impl $crate::web::PropValue + 'static) -> Self {
-                            self.0.props.insert(generate_tags!{ @prop_key $prop_fn, $($prop_key)? }.into(), Box::new(value));
+                            self.0.add_prop(generate_tags!{ @prop_key $prop_fn, $($prop_key)? }, value);
                             self
                         }
                     )*
@@ -90,11 +92,11 @@ macro_rules! generate_tags {
                     #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
                     pub fn new() -> $name {
                         let inner = [<ELE_ $tag:upper>].with(|el| wasm_bindgen::JsCast::unchecked_into(el.clone_node().unwrap()));
-                        $name($crate::web::widgets::Element::with_node(stringify!($tag), generate_tags!{ @void $($void)? }, inner))
+                        $name($crate::web::widgets::Element::with_node($crate::generate_tags!{ @tag_name $tag $(, $tag_name)? }, generate_tags!{ @void $($void)? }, inner))
                     }
                     #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
                     pub fn new() -> $name {
-                        $name($crate::web::widgets::Element::new(stringify!($tag), generate_tags!{ @void $($void)? }))
+                        $name($crate::web::widgets::Element::new($crate::generate_tags!{ @tag_name $tag $(, $tag_name)? }, generate_tags!{ @void $($void)? }))
                     }
 
                     pub fn fill(mut self, filler: impl IntoFiller) -> Self {
@@ -172,7 +174,19 @@ macro_rules! generate_tags {
                     }
 
                     /// Adds an event listener to this element.
-                    #[cfg(not(feature = "backend-command"))]
+                    #[cfg(all(target_arch = "wasm32", feature = "web-csr", not(feature = "backend-command")))]
+                    #[track_caller]
+                    pub fn on<E, H>(#[allow(unused_mut)]mut self, event: E, handler: H) -> Self
+                    where
+                        E: EventDescriptor + 'static,
+                        E::EventType: wasm_bindgen::JsCast,
+                        H: FnMut(E::EventType) + 'static, {
+                        self.0.add_event_listener(event, handler);
+                        self
+                    }
+
+                    /// Adds an event listener to this element.
+                    #[cfg(all(not(all(target_arch = "wasm32", feature = "web-csr")), not(feature = "backend-command")))]
                     #[track_caller]
                     pub fn on<E, H>(#[allow(unused_mut)]mut self, event: E, handler: H) -> Self
                     where
@@ -277,6 +291,18 @@ macro_rules! generate_tags {
                 }
              )*
         }
+    };
+    (@tag_name $tag:ident) => {stringify!($tag)};
+    (@tag_name $tag:ident, $tag_name:literal) => {$tag_name};
+    (@create_web_node $tag:ident) => {
+        $crate::web::document()
+            .create_element(stringify!($tag))
+            .unwrap()
+    };
+    (@create_web_node $tag:ident, $tag_name:literal, $namespace:literal) => {
+        $crate::web::document()
+            .create_element_ns(Some($namespace), $tag_name)
+            .unwrap()
     };
     (@void) => {false};
     (@void void) => {true};
@@ -547,10 +573,10 @@ generate_tags![
   //      SVG and MathML
   // ==========================
   /// The svg element is a container that defines a new coordinate system and viewport. It is used as the outermost element of SVG documents, but it can also be used to embed an SVG fragment inside an SVG or HTML document.
-  svg HtmlSvg SvgElement [nonce, style, tab_index "tabIndex"],
+  svg { tag: "svg", ns: "http://www.w3.org/2000/svg" } HtmlSvg SvgElement [nonce, style, tab_index "tabIndex"],
 
   /// The top-level element in MathML is `<math>.` Every valid MathML instance must be mapped in `<math>` tags. In addition you must not nest a second `<math>` element in another, but you can have an arbitrary number of other child elements in it.
-  math HtmlMath HtmlElement [],
+  math { tag: "math", ns: "http://www.w3.org/1998/Math/MathML" } HtmlMath Element [],
 
   // ==========================
   //         Scripting

@@ -1,0 +1,14 @@
+[package]
+name = "glory-cli-harnesses"
+version = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+publish = false
+
+[dependencies]
+
+[dev-dependencies]
+cargo_metadata = { workspace = true }
+
+[lints]
+workspace = true
