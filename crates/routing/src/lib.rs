@@ -38,7 +38,7 @@ mod locator;
 mod router;
 mod typed;
 pub use filters::*;
-pub use graff::Graff;
+pub use graff::{Graff, Outlet};
 pub use locator::{Locator, LocatorModifier};
 pub use router::Router;
 pub use typed::{

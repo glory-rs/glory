@@ -73,9 +73,12 @@ R5 仅评估,不阻塞任何人。
   2026-06-19 第二阶段:已选择 derive 路线并新增 `#[derive(glory::Routable)]`,
   支持 `#[route]`、`#[redirect]`、`#[not_found]`、typed path 参数和 catch-all;
   复杂 query 结构继续用现有 helper 手写。
-- [ ] **T2 P0** 嵌套布局 / Outlet 等价物。Dioxus 有 `#[nest]`/`#[layout]`/`Outlet`
+- [x] **T2 P0** 嵌套布局 / Outlet 等价物。Dioxus 有 `#[nest]`/`#[layout]`/`Outlet`
   (`packages/router/src/components/outlet.rs`)。Glory `Router` 已有层级 children,
   缺的是"父布局渲染插槽"语义。依赖 T1 的设计结论。
+  2026-06-19 已完成:新增 `Outlet` 语义组件与 `Router::layout` /
+  `layout_keyed` / `outlet` helpers,父 layout 以 widget type key 去重,叶子路由
+  渲染进命名 outlet。
 - [x] **T3 P1** 查询参数与 catch-all 段解析:对照 `FromQuery`/`FromQueryArgument`/
   `FromSegments`(`packages/router/src/routable.rs`),提供 trait 化解析 + 默认值回退。
   可与 T1 并行(trait 层独立于路由定义形态)。

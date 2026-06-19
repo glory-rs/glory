@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 30 |
+| 已完成 `[x]` | 31 |
 | 部分完成 `[~]` | 3 |
-| 未完成 `[ ]` | 27 |
+| 未完成 `[ ]` | 26 |
 
 按能力权重估算:
 
@@ -238,13 +238,15 @@ desktop runtime 已经是真 wry/tao 宿主，不只是测试 sink。
 - 手写 `Routable` trait、typed `goto_route`、`Locator::route::<R>()` 第一阶段已补。
 - `#[derive(glory::Routable)]` 已补,支持 `#[route]`、`#[redirect]`、
   `#[not_found]`、typed path 参数和 catch-all。
+- `Outlet` 与 `Router::layout`/`outlet` 已补,父布局可保留并把叶子页面渲染到
+  命名插槽。
 - 查询字符串可读写,并已有 `RouteQuery`/`FromRouteQuery`/默认值 helper 第一阶段。
 - typed redirect / not-found fallback 第一阶段已补,`Locator::route::<R>()` 会走
   `Routable::resolve_url()`。
 
 缺口:
 
-- 嵌套布局 / Outlet。
+- Lane T 当前任务已清;后续主要是示例迁移和更复杂 query derive 语法糖。
 
 主要路径:
 
@@ -460,7 +462,7 @@ cargo clippy -p glory-cli --lib --no-default-features -- -D warnings
 
 ### P1
 
-1. [x] 设计并实现 typed routing 第一阶段与 derive 自动生成。
+1. [x] 设计并实现 typed routing 第一阶段、derive 自动生成与 Outlet 布局。
 2. [x] 扩展 `glory serve` 参数和基本 DX。
    - 已完成 `--address/--port` 运行时覆盖、默认 auto-open、`--no-open`。
    - 已完成 HTTPS/TLS/proxy 配置校验、打开 URL 与 app-server env 透传。

@@ -194,6 +194,38 @@ The derive macro supports Glory path patterns such as `"/users/<id>"`,
 reads can map legacy paths to typed routes and can return a typed 404 route
 instead of `None`.
 
+Nested layouts use named outlets. Render an `Outlet` in the parent widget, then
+use `Router::layout` for the parent and `Router::outlet` for leaves:
+
+```rust
+use glory::routing::{Outlet, Router};
+
+#[derive(Debug)]
+struct AdminShell;
+
+impl Widget for AdminShell {
+    fn build(&mut self, ctx: &mut Scope) {
+        div()
+            .class("admin-shell")
+            .fill(nav().html("Admin"))
+            .fill(main().fill(Outlet::new("admin-content")))
+            .show_in(ctx);
+    }
+}
+
+fn route() -> Router {
+    Router::new().push(
+        Router::with_path("admin")
+            .layout("section", || AdminShell)
+            .push(Router::with_path("users").outlet("admin-content", || UsersPage)),
+    )
+}
+```
+
+`layout` is keyed by the layout widget type, so sibling child navigation keeps
+the same parent shell mounted. Use `layout_keyed` when the same layout widget
+type needs distinct instances.
+
 `Aviator::back()` and `Aviator::forward()` expose history movement for backends
 that support it. `BrowserAviator` uses `window.history`, while `MemoryAviator`
 keeps an in-memory stack for non-browser hosts. Browser navigation scrolls to a

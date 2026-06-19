@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::fmt::{self, Formatter};
 use std::rc::Rc;
 
@@ -8,7 +9,8 @@ use indexmap::IndexSet;
 
 use super::{Filter, FnFilter, PathFilter, PathState};
 use crate::url::Url;
-use crate::{DetectMatched, Handler, Truck, WhenHoop};
+use crate::{DetectMatched, Handler, Truck, TruckExt, WhenHoop};
+use glory_core::Widget;
 
 #[macro_export]
 macro_rules! join_path {
@@ -170,6 +172,70 @@ impl Router {
     {
         self.hoops.push(Rc::new(WhenHoop { inner: hoop, filter }));
         self
+    }
+
+    /// Create a router whose matching descendants render a layout widget into
+    /// the named outlet.
+    #[inline]
+    pub fn with_layout<W, F>(outlet: impl Into<String>, factory: F) -> Self
+    where
+        W: Widget,
+        F: Fn() -> W + 'static,
+    {
+        Router::new().layout(outlet, factory)
+    }
+
+    /// Render a layout widget into `outlet` whenever this router or one of
+    /// its descendants matches.
+    ///
+    /// The layout is keyed by its widget type so navigating between sibling
+    /// child routes does not remount the same parent layout. Use
+    /// [`Router::layout_keyed`] when one widget type needs multiple distinct
+    /// layout instances.
+    #[inline]
+    pub fn layout<W, F>(self, outlet: impl Into<String>, factory: F) -> Self
+    where
+        W: Widget,
+        F: Fn() -> W + 'static,
+    {
+        self.layout_keyed(outlet, std::any::type_name::<W>(), factory)
+    }
+
+    /// Like [`Router::layout`], but with an explicit layout key.
+    #[inline]
+    pub fn layout_keyed<W, F>(self, outlet: impl Into<String>, key: impl Into<String>, factory: F) -> Self
+    where
+        W: Widget,
+        F: Fn() -> W + 'static,
+    {
+        let outlet = outlet.into();
+        let key = key.into();
+        self.hoop(move |truck: Rc<RefCell<Truck>>| {
+            truck.insert_stuff(format!("{outlet}@{key}"), factory());
+        })
+    }
+
+    /// Create a router whose goal renders into a named outlet.
+    #[inline]
+    pub fn with_outlet<W, F>(outlet: impl Into<String>, factory: F) -> Self
+    where
+        W: Widget,
+        F: Fn() -> W + 'static,
+    {
+        Router::new().outlet(outlet, factory)
+    }
+
+    /// Set this router's goal to render a widget into a named outlet.
+    #[inline]
+    pub fn outlet<W, F>(self, outlet: impl Into<String>, factory: F) -> Self
+    where
+        W: Widget,
+        F: Fn() -> W + 'static,
+    {
+        let outlet = outlet.into();
+        self.goal(move |truck: Rc<RefCell<Truck>>| {
+            truck.insert_stuff(outlet.clone(), factory());
+        })
     }
 
     /// Create a new router and set path filter.
@@ -364,5 +430,54 @@ impl fmt::Debug for Router {
             Ok(())
         }
         print(f, "", true, self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Locator;
+    use crate::aviators::run_route;
+    use glory_core::Scope;
+
+    #[derive(Debug)]
+    struct Shell;
+
+    impl Widget for Shell {
+        fn build(&mut self, _ctx: &mut Scope) {}
+    }
+
+    #[derive(Debug)]
+    struct Settings;
+
+    impl Widget for Settings {
+        fn build(&mut self, _ctx: &mut Scope) {}
+    }
+
+    #[derive(Debug)]
+    struct NotFound;
+
+    impl Widget for NotFound {
+        fn build(&mut self, _ctx: &mut Scope) {}
+    }
+
+    #[test]
+    fn nested_layout_helpers_publish_parent_and_child_outlets() {
+        let router = Rc::new(
+            Router::with_path("app")
+                .layout("shell", || Shell)
+                .push(Router::with_path("settings").outlet("content", || Settings)),
+        );
+        let catcher: Rc<dyn Handler> = Rc::new(|truck: Rc<RefCell<Truck>>| truck.insert_stuff("shell", NotFound));
+        let truck = Rc::new(RefCell::new(Truck::default()));
+        truck.borrow_mut().inject(Locator::new());
+
+        run_route(&truck, &router, &catcher, "/app/settings".to_owned()).unwrap();
+
+        let cage = truck.stuffs();
+        let stuffs = cage.get();
+        assert!(stuffs.contains_key("shell"));
+        assert!(stuffs.contains_key("content"));
+        assert!(truck.contains_stuff_key("shell", std::any::type_name::<Shell>()));
     }
 }
