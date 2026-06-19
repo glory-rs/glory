@@ -4,16 +4,17 @@
 //! the in-memory `Node` backend, so they catch regressions in both the
 //! widget logic and the surrounding scheduler/scope plumbing.
 
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use crate::config::GloryConfig;
 use crate::reflow::{Cage, Revisable, effect_in, resource_in};
+use crate::scope::SuspenseBoundary as SuspenseBoundaryHandle;
 use crate::web::holders::ServerHolder;
 use crate::web::widgets::{
     button, div, form, head_mixin, input, label, li, link, math as math_widgets, meta, option, select, style, svg as svg_widgets, textarea, title, ul,
 };
-use crate::widgets::{Each, ErrorBoundary, Switch};
+use crate::widgets::{Each, ErrorBoundary, Suspense, Switch};
 use crate::{Holder, Scope, Widget};
 
 fn render_html(holder: &ServerHolder) -> String {
@@ -22,6 +23,42 @@ fn render_html(holder: &ServerHolder) -> String {
 
 fn make_holder() -> ServerHolder {
     ServerHolder::new(GloryConfig::default(), "/")
+}
+
+// ----------------------------------------------------------------------------
+// Suspense
+// ----------------------------------------------------------------------------
+
+#[derive(Debug)]
+struct ManualSuspendWidget {
+    boundary: Rc<RefCell<Option<SuspenseBoundaryHandle>>>,
+}
+
+impl Widget for ManualSuspendWidget {
+    fn build(&mut self, ctx: &mut Scope) {
+        let boundary = ctx.suspense_boundary.expect("ManualSuspendWidget must be under Suspense");
+        boundary.start();
+        *self.boundary.borrow_mut() = Some(boundary);
+        div().class("body").text("ready").show_in(ctx);
+    }
+}
+
+#[test]
+fn suspense_shows_fallback_until_pending_boundary_resolves() {
+    let boundary = Rc::new(RefCell::new(None));
+    let holder = make_holder().mount(Suspense::new(ManualSuspendWidget { boundary: boundary.clone() }, |ctx| {
+        div().class("fallback").text("loading").show_in(ctx);
+    }));
+
+    let html = render_html(&holder);
+    assert!(html.contains("loading"), "{html}");
+    assert!(!html.contains("ready"), "{html}");
+
+    boundary.borrow().expect("suspense boundary captured").finish();
+
+    let html = render_html(&holder);
+    assert!(html.contains("ready"), "{html}");
+    assert!(!html.contains("loading"), "{html}");
 }
 
 // ----------------------------------------------------------------------------

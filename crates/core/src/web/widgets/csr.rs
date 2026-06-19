@@ -127,6 +127,13 @@ where
             ctx.detach_child(&id);
         }
     }
+    fn suspend(&mut self, ctx: &mut Scope) {
+        if let Some(parent_node) = ctx.parent_node.as_ref() {
+            let node = <T as AsRef<web_sys::Element>>::as_ref(&self.node);
+            self.renderer.remove_child(parent_node, node);
+        }
+        ctx.mark_descendants_dom_detached();
+    }
     fn patch(&mut self, ctx: &mut Scope) {
         let node = <T as AsRef<web_sys::Element>>::as_ref(&self.node);
         if node.parent_element().is_none() {
@@ -254,6 +261,13 @@ where
         for id in ids {
             ctx.detach_child(&id);
         }
+    }
+
+    fn suspend(&mut self, ctx: &mut Scope) {
+        if let Some(root) = self.root.as_ref() {
+            ctx.remove_node_from_parent(root);
+        }
+        ctx.mark_descendants_dom_detached();
     }
 }
 

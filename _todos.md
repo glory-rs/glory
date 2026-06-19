@@ -19,7 +19,7 @@
 |---|---|---|
 | 路由 | 运行时字符串匹配,无类型化路由/嵌套布局/Outlet/重定向/查询参数解析 | **关键** |
 | 服务器函数 | 仅 POST + JSON;无 HTTP 动词选择、多编码、逐函数中间件、响应式 WebSocket hook | **高** |
-| 异步/错误原语 | Suspense 式自动边界仍缺;ErrorBoundary 与 `resource_in` 竞态修复已补 | **高** |
+| 异步/错误原语 | Suspense 边界协议已部分落地(仍缺 SSR streaming/resume);ErrorBoundary 与 `resource_in` 竞态修复已补 | **高** |
 | CLI/构建 | wasm-split 暂缓;Windows/Linux 原生安装器已有最小路径,macOS/AppImage/签名仍缺 | **中-高** |
 | 资产 | `asset!` / `asset_folder!` 已有编译期清单、bundle hash 映射和可选图片优化;仍缺 CSS Modules | 中 |
 | 桌面 | 协议扎实,窗口控制 API 与异步自定义协议已补;仍缺托盘/全局热键/拖放/打印 | 中 |
@@ -32,11 +32,10 @@
 
 ## Lane R — 响应式与核心原语(crates/core/src/reflow, widgets)
 
-- [ ] **R1 P0** Suspense 式自动异步边界。现状 `Loader` 要求手工分支
-  `LoadState::{Idle,Loading,Loaded}`(`crates/core/src/widgets/loader.rs`),Dioxus 的
-  `Suspense`(`packages/core/src/suspense/component.rs`)自动捕获 `use_resource` 挂起。
-  目标:提供一个 widget 级 Suspense 边界,子树内任意未就绪 resource 自动显示 fallback,
-  SSR 流式输出与 hydration 兼容(与既有 `render_stream()` DOM 边界分块衔接)。
+- [~] **R1 P0** Suspense 式自动异步边界。已新增 `widgets::Suspense`、
+  `Scope` suspense 边界继承、`resource_in` 自动 pending token 登记/完成,并支持
+  mounted tree 在 body/fallback 间切换。剩余:真正 SSR streaming patch/resume 与
+  hydration 数据恢复还未接到 `ServerHolder::render_stream()`。
 - [x] **R2 P0** ErrorBoundary。新增 `BoundaryError` 与
   `widgets::ErrorBoundary`:子树 build/attach panic 与后续 child patch panic 会路由到
   最近边界,清理失败子树并渲染自定义 fallback;SSR 写入错误状态供 hydration 读取。
@@ -56,7 +55,7 @@
   (`crates/core/src/web/helpers/event.rs:62-64`)。委派监听器下读取
   `event.currentTarget` 的处理器会拿到错误节点。
 
-并行性:R1 剩余;R3/R4/R6 完全独立;
+并行性:R1 剩余 SSR streaming/resume 可独立继续;R3/R4/R6 完全独立;
 R5 仅评估,不阻塞任何人。
 
 ## Lane T — 路由类型化(crates/routing)— 对照差距最大的单项

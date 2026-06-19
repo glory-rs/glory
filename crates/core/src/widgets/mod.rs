@@ -1,9 +1,11 @@
 mod each;
 mod error_boundary;
+mod suspense;
 pub mod switch;
 
 pub use each::Each;
 pub use error_boundary::ErrorBoundary;
+pub use suspense::Suspense;
 pub use switch::Switch;
 
 mod loader;

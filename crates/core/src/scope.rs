@@ -8,7 +8,38 @@ use indexmap::{IndexMap, IndexSet};
 use crate::HolderId;
 use crate::node::Node;
 use crate::view::{VIEW_ID_DELIMITER, View, ViewId, ViewPlacement};
-use crate::{Truck, reflow};
+use crate::{Cage, Truck, reflow};
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct SuspenseBoundary {
+    pending: Cage<usize>,
+}
+
+impl SuspenseBoundary {
+    pub(crate) fn new(pending: Cage<usize>) -> Self {
+        Self { pending }
+    }
+
+    pub(crate) fn pending_count(&self) -> usize {
+        *self.pending.get_untracked()
+    }
+
+    pub(crate) fn bind_view(&self, view_id: &ViewId) {
+        use crate::reflow::Revisable;
+
+        self.pending.bind_view(view_id);
+    }
+
+    pub(crate) fn start(&self) {
+        self.pending.revise(|mut pending| *pending += 1);
+    }
+
+    pub(crate) fn finish(&self) {
+        self.pending.revise(|mut pending| {
+            *pending = (*pending).saturating_sub(1);
+        });
+    }
+}
 
 /// Per-view runtime state.
 ///
@@ -58,6 +89,7 @@ pub struct Scope {
     pub(crate) first_child_node: Option<Node>,
     pub(crate) last_child_node: Option<Node>,
     pub(crate) error_boundary: Option<ViewId>,
+    pub(crate) suspense_boundary: Option<SuspenseBoundary>,
 
     next_child_view_id: AtomicU64,
 
@@ -83,6 +115,7 @@ impl Scope {
             first_child_node: None,
             last_child_node: None,
             error_boundary: None,
+            suspense_boundary: None,
 
             next_child_view_id: AtomicU64::new(0),
             truck,
@@ -107,6 +140,7 @@ impl Scope {
             first_child_node: None,
             last_child_node: None,
             error_boundary: None,
+            suspense_boundary: None,
 
             next_child_view_id: AtomicU64::new(0),
             truck,
@@ -148,6 +182,7 @@ impl Scope {
     pub fn beget(&self) -> Self {
         let mut scope = Scope::new(self.next_child_view_id(), self.truck.clone());
         scope.error_boundary = self.error_boundary.clone();
+        scope.suspense_boundary = self.suspense_boundary;
         scope
     }
     pub fn owner(&self) -> &reflow::Owner {
@@ -320,6 +355,33 @@ impl Scope {
             }
         }
         Some(view)
+    }
+
+    pub(crate) fn hide_child(&mut self, view_id: &ViewId) {
+        self.visible_views.shift_remove(view_id);
+
+        #[cfg(not(feature = "single-app"))]
+        let holder_id = self.holder_id();
+        let Some(view) = self.child_views.get_mut(view_id) else {
+            return;
+        };
+        if !view.scope.is_attached() {
+            return;
+        }
+
+        cfg_if! {
+            if #[cfg(feature = "single-app")] {
+                reflow::batch(|| {
+                    view.widget.suspend(&mut view.scope);
+                    view.scope.is_attached = false;
+                });
+            } else {
+                reflow::batch(holder_id, || {
+                    view.widget.suspend(&mut view.scope);
+                    view.scope.is_attached = false;
+                });
+            }
+        }
     }
 
     pub(crate) fn detach_children_bulk(&mut self, view_ids: &[ViewId]) -> Vec<View> {

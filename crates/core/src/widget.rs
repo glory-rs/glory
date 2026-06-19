@@ -174,6 +174,16 @@ pub trait Widget: fmt::Debug + 'static {
     }
     fn patch(&mut self, _ctx: &mut Scope) {}
 
+    fn suspend(&mut self, ctx: &mut Scope) {
+        self.suspend_children(ctx);
+    }
+    fn suspend_children(&mut self, ctx: &mut Scope) {
+        let ids: Vec<ViewId> = ctx.child_views.keys().cloned().collect();
+        for id in ids {
+            ctx.hide_child(&id);
+        }
+    }
+
     fn detach(&mut self, ctx: &mut Scope) {
         self.detach_children(ctx);
     }

@@ -283,6 +283,9 @@ macro_rules! generate_tags {
                     fn detach(&mut self, ctx: &mut Scope) {
                         self.0.detach(ctx);
                     }
+                    fn suspend(&mut self, ctx: &mut Scope) {
+                        self.0.suspend(ctx);
+                    }
                 }
 
                 $(#[$meta])*

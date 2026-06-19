@@ -101,6 +101,12 @@ impl Widget for Element {
             ctx.detach_child(&id);
         }
     }
+    fn suspend(&mut self, ctx: &mut Scope) {
+        if let Some(parent_node) = ctx.parent_node.as_ref() {
+            self.renderer.remove_child(parent_node, &self.node);
+        }
+        ctx.mark_descendants_dom_detached();
+    }
     fn patch(&mut self, ctx: &mut Scope) {
         for (name, value) in &self.props {
             value.inject_to(&ctx.view_id, &mut self.node, name, false);

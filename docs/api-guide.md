@@ -148,6 +148,27 @@ The boundary clears the failed child subtree before rendering the fallback.
 SSR stores the captured error state for hydration, so the client starts from
 the same fallback branch.
 
+## Suspense
+
+Use `Suspense` to show a local fallback while resources created inside the body
+are pending:
+
+```rust
+use glory::widgets::Suspense;
+
+Suspense::new(
+    ProfilePanel,
+    |ctx| {
+        div().class("loading").text("Loading profile...").show_in(ctx);
+    },
+)
+.show_in(ctx);
+```
+
+`resource_in(ctx, ...)` automatically registers with the nearest `Suspense`
+boundary. The current implementation switches between body and fallback in the
+mounted tree; full SSR streaming patch/resume is still tracked separately.
+
 ## Forms
 
 Use event helpers for browser inputs:

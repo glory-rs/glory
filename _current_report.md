@@ -22,8 +22,8 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 | 状态 | 数量 |
 |---|---:|
 | 已完成 `[x]` | 44 |
-| 部分完成 `[~]` | 3 |
-| 未完成 `[ ]` | 13 |
+| 部分完成 `[~]` | 4 |
+| 未完成 `[ ]` | 12 |
 
 按能力权重估算:
 
@@ -127,6 +127,7 @@ smoke 仍未闭环。
 - active borrow 错误。
 - slot recycle。
 - resource stale completion 防护。
+- Suspense pending token 协议与 mounted tree fallback 切换。
 - ErrorBoundary 子树 build/patch panic fallback。
 - `Bond::with_partial_eq`。
 - devtools snapshot。
@@ -151,6 +152,7 @@ SSR feature 测试覆盖较完整:
 - SVG/MathML。
 - streaming boundary chunks。
 - ErrorBoundary fallback 和错误状态序列化。
+- Suspense SSR streaming/resume 仍待接入。
 
 主要路径:
 
