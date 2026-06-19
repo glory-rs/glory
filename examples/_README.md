@@ -22,6 +22,7 @@ feature they care about.
 | [`hackernews-salvo`](hackernews-salvo/) | server + wasm32 | `glory/salvo` + `glory/server-fn` + `glory/web-csr` | Realistic fullstack app: HN clone with routing, `#[glory::server]` data functions (no hand-written API routes), hydrated nav. |
 | [`todomvc-fullstack`](todomvc-fullstack/) | server + wasm32 | `glory/salvo` + `glory/server-fn` + `glory/web-csr` | TodoMVC-style fullstack flow: SSR first render, server functions for list/add/toggle/clear, request-context cookie display. |
 | [`desktop-counter`](desktop-counter/) | native window | `glory-core/backend-command` + `glory-desktop/runtime` | The web counter widget code running in a wry desktop window via the command stream; IPC events round-trip into the reactive layer. |
+| [`liveview-salvo`](liveview-salvo/) | server-held UI | `glory-liveview/salvo` + command stream | Minimal LiveView app: Salvo serves the HTML shell and a WebSocket drives the widget tree from the server. |
 | [`tailwind-salvo`](tailwind-salvo/) | server + wasm32 | `glory/salvo` + `glory/web-csr`, Tailwind CDN/build | SSR + Tailwind CSS integration. |
 | [`_test-size`](_test-size/) | wasm32 / CSR | minimal | Tiny program kept around for tracking bundle size. Not interesting as a tutorial. |
 
@@ -34,6 +35,7 @@ feature they care about.
 - **Real-world fullstack template (SSR + server functions)** → `hackernews-salvo`.
 - **Server mutations / form-ish TodoMVC flow** → `todomvc-fullstack`.
 - **Desktop app from the same widget code** → `desktop-counter`.
+- **Server-held UI over WebSocket** → `liveview-salvo`.
 - **Two-way input / form patterns** → `forms-showcase`, then `counter`
   (minimal input binding) and `todomvc` (add / edit / commit).
 

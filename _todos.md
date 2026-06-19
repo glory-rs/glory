@@ -258,8 +258,11 @@ R5 仅评估,不阻塞任何人。
   route/client JS,HTML shell/head/root 由宿主应用负责;记录当前每 WebSocket
   连接一会话、无 resume/idle TTL 配置,以及客户端 `reconnectMs` /
   `maxReconnectMs` 指数退避语义。
-- [ ] **L5 P2** LiveView 示例项目(examples/ 下,Salvo 起步)。依赖 L2 的 trait 定型
+- [x] **L5 P2** LiveView 示例项目(examples/ 下,Salvo 起步)。依赖 L2 的 trait 定型
   可顺带出 Axum 版。
+  2026-06-19 已完成:新增 `examples/liveview-salvo`,根路由内联 command
+  interpreter + `LIVEVIEW_CLIENT_JS`,并在 `/__glory/liveview` 挂载 Salvo LiveView
+  socket;examples 索引已补入口。
 
 ## Lane M — 移动端(cli templates, examples/mobile-counter)
 

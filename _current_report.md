@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 37 |
+| 已完成 `[x]` | 38 |
 | 部分完成 `[~]` | 3 |
-| 未完成 `[ ]` | 20 |
+| 未完成 `[ ]` | 19 |
 
 按能力权重估算:
 
@@ -345,6 +345,7 @@ serverfn 基础可用，但对比成熟框架还缺:
 - command stream over WebSocket。
 - reconnect client。
 - Salvo/Axum/Actix route adapters。
+- `examples/liveview-salvo` 最小示例。
 - mount/event/ping/query 基础测试。
 
 缺口:
