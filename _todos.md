@@ -19,10 +19,10 @@
 |---|---|---|
 | 路由 | 运行时字符串匹配,无类型化路由/嵌套布局/Outlet/重定向/查询参数解析 | **关键** |
 | 服务器函数 | 仅 POST + JSON;无 HTTP 动词选择、多编码、逐函数中间件、响应式 WebSocket hook | **高** |
-| 异步/错误原语 | 无 Suspense 式自动边界、无 ErrorBoundary;`resource_in` 竞态已修 | **高** |
+| 异步/错误原语 | Suspense 式自动边界仍缺;ErrorBoundary 与 `resource_in` 竞态修复已补 | **高** |
 | CLI/构建 | wasm-split 暂缓;Windows/Linux 原生安装器已有最小路径,macOS/AppImage/签名仍缺 | **中-高** |
 | 资产 | `asset!` / `asset_folder!` 已有编译期清单、bundle hash 映射和可选图片优化;仍缺 CSS Modules | 中 |
-| 桌面 | 协议扎实,窗口控制 API 已补;仍缺托盘/全局热键/异步自定义协议 | 中 |
+| 桌面 | 协议扎实,窗口控制 API 与异步自定义协议已补;仍缺托盘/全局热键/拖放/打印 | 中 |
 | Native(Blitz)/LiveView/移动端 | 分别处于 spike(~20%)/可用但单适配器(~30%)/模板可编译但无真机验证(~30%) | 中-高 |
 
 性能:官方 js-framework-benchmark 9 项聚合 Glory 442ms vs Dioxus 456ms vs Leptos 589ms,
@@ -37,9 +37,9 @@
   `Suspense`(`packages/core/src/suspense/component.rs`)自动捕获 `use_resource` 挂起。
   目标:提供一个 widget 级 Suspense 边界,子树内任意未就绪 resource 自动显示 fallback,
   SSR 流式输出与 hydration 兼容(与既有 `render_stream()` DOM 边界分块衔接)。
-- [ ] **R2 P0** ErrorBoundary。当前 panic/错误直接传播,无捕获渲染机制(Dioxus:
-  `packages/core/src/error_boundary.rs`,含 SSR 预载错误状态)。目标:子树错误捕获 +
-  自定义错误视图 + hydration 状态序列化。
+- [x] **R2 P0** ErrorBoundary。新增 `BoundaryError` 与
+  `widgets::ErrorBoundary`:子树 build/attach panic 与后续 child patch panic 会路由到
+  最近边界,清理失败子树并渲染自定义 fallback;SSR 写入错误状态供 hydration 读取。
 - [x] **R3 P1** 修复 `resource_in()` 过期写竞态(`crates/core/src/reflow/effect.rs:136`
   附近):依赖快速连续变化时旧 future 不取消,旧结果可能覆盖新结果。引入代际计数或
   abort handle,仅最新一代可写回。补回归测试。
@@ -56,7 +56,7 @@
   (`crates/core/src/web/helpers/event.rs:62-64`)。委派监听器下读取
   `event.currentTarget` 的处理器会拿到错误节点。
 
-并行性:R1/R2 可同时开(共享 hydration 序列化决策时对齐一次);R3/R4/R6 完全独立;
+并行性:R1 剩余;R3/R4/R6 完全独立;
 R5 仅评估,不阻塞任何人。
 
 ## Lane T — 路由类型化(crates/routing)— 对照差距最大的单项

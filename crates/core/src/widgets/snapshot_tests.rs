@@ -8,12 +8,12 @@ use std::cell::Cell;
 use std::rc::Rc;
 
 use crate::config::GloryConfig;
-use crate::reflow::{Cage, effect_in, resource_in};
+use crate::reflow::{Cage, Revisable, effect_in, resource_in};
 use crate::web::holders::ServerHolder;
 use crate::web::widgets::{
     button, div, form, head_mixin, input, label, li, link, math as math_widgets, meta, option, select, style, svg as svg_widgets, textarea, title, ul,
 };
-use crate::widgets::{Each, Switch};
+use crate::widgets::{Each, ErrorBoundary, Switch};
 use crate::{Holder, Scope, Widget};
 
 fn render_html(holder: &ServerHolder) -> String {
@@ -22,6 +22,81 @@ fn render_html(holder: &ServerHolder) -> String {
 
 fn make_holder() -> ServerHolder {
     ServerHolder::new(GloryConfig::default(), "/")
+}
+
+// ----------------------------------------------------------------------------
+// Error boundaries
+// ----------------------------------------------------------------------------
+
+#[derive(Debug)]
+struct PanicBuildWidget;
+
+impl Widget for PanicBuildWidget {
+    fn build(&mut self, _ctx: &mut Scope) {
+        panic!("build failed");
+    }
+}
+
+#[test]
+fn error_boundary_renders_fallback_when_child_build_panics() {
+    let holder = make_holder().mount(ErrorBoundary::new(PanicBuildWidget, |error, ctx| {
+        div().class("error").text(error.message().to_owned()).show_in(ctx);
+    }));
+
+    let html = render_html(&holder);
+    assert!(html.contains(r#"class="error""#), "{html}");
+    assert!(html.contains("build failed"), "{html}");
+    let host_html = holder.replay().outer_html(holder.host_node.node().id());
+    assert!(host_html.contains("gly-error-0"), "{host_html}");
+}
+
+#[derive(Debug)]
+struct PanicPatchWidget {
+    trigger: Cage<bool>,
+}
+
+impl Widget for PanicPatchWidget {
+    fn build(&mut self, ctx: &mut Scope) {
+        self.trigger.bind_view(ctx.view_id());
+        div().text("ready").show_in(ctx);
+    }
+
+    fn patch(&mut self, _ctx: &mut Scope) {
+        panic!("patch failed");
+    }
+}
+
+#[derive(Debug)]
+struct PatchBoundaryHost {
+    trigger: Cage<bool>,
+}
+
+impl Widget for PatchBoundaryHost {
+    fn build(&mut self, ctx: &mut Scope) {
+        ErrorBoundary::new(PanicPatchWidget { trigger: self.trigger }, |error, ctx| {
+            div()
+                .class("error")
+                .attr("data-source", error.source().unwrap_or("").to_owned())
+                .text(error.message().to_owned())
+                .show_in(ctx);
+        })
+        .show_in(ctx);
+    }
+}
+
+#[test]
+fn error_boundary_catches_child_patch_panics() {
+    let trigger = Cage::new(false);
+    let holder = make_holder().mount(PatchBoundaryHost { trigger });
+    assert!(render_html(&holder).contains("ready"));
+
+    trigger.revise(|mut value| *value = true);
+
+    let html = render_html(&holder);
+    assert!(html.contains(r#"class="error""#), "{html}");
+    assert!(html.contains("patch failed"), "{html}");
+    assert!(html.contains(r#"data-source="0-0-0""#), "{html}");
+    assert!(!html.contains("ready"), "{html}");
 }
 
 // ----------------------------------------------------------------------------

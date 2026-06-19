@@ -1,6 +1,44 @@
+use std::any::Any;
 use std::fmt;
 
 use crate::{Node, Scope, View, ViewId};
+
+#[derive(Clone, Debug, Eq, PartialEq, serde::Deserialize, serde::Serialize)]
+pub struct BoundaryError {
+    message: String,
+    source: Option<String>,
+}
+
+impl BoundaryError {
+    pub fn new(message: impl Into<String>, source: Option<ViewId>) -> Self {
+        Self {
+            message: message.into(),
+            source: source.map(|view_id| view_id.to_string()),
+        }
+    }
+
+    pub fn message(&self) -> &str {
+        &self.message
+    }
+
+    pub fn source(&self) -> Option<&str> {
+        self.source.as_deref()
+    }
+
+    pub(crate) fn from_panic(payload: Box<dyn Any + Send>, source: Option<ViewId>) -> Self {
+        let message = match payload.downcast::<String>() {
+            Ok(message) => *message,
+            Err(payload) => match payload.downcast::<&'static str>() {
+                Ok(message) => (*message).to_owned(),
+                Err(_) => "non-string panic payload".to_owned(),
+            },
+        };
+        Self {
+            message,
+            source: source.map(|view_id| view_id.to_string()),
+        }
+    }
+}
 
 /// A reactive component.
 ///
@@ -115,6 +153,9 @@ pub trait Widget: fmt::Debug + 'static {
     #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
     fn hydrate(&mut self, _ctx: &mut Scope) {}
     fn build(&mut self, _ctx: &mut Scope);
+    fn capture_error(&mut self, _ctx: &mut Scope, _error: BoundaryError) -> bool {
+        false
+    }
 
     /// Attach children.
     ///

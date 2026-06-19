@@ -21,15 +21,15 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 43 |
+| 已完成 `[x]` | 44 |
 | 部分完成 `[~]` | 3 |
-| 未完成 `[ ]` | 14 |
+| 未完成 `[ ]` | 13 |
 
 按能力权重估算:
 
 | 模块 | 完成度判断 |
 |---|---:|
-| core 响应式 / Widget / SSR 快照 | 75-85% |
+| core 响应式 / Widget / SSR 快照 | 80-88% |
 | command-stream 渲染抽象 | 75-85% |
 | CSR + SSR 基础使用 | 65-75% |
 | server functions | 55-65% |
@@ -127,6 +127,7 @@ smoke 仍未闭环。
 - active borrow 错误。
 - slot recycle。
 - resource stale completion 防护。
+- ErrorBoundary 子树 build/patch panic fallback。
 - `Bond::with_partial_eq`。
 - devtools snapshot。
 
@@ -149,6 +150,7 @@ SSR feature 测试覆盖较完整:
 - form controls。
 - SVG/MathML。
 - streaming boundary chunks。
+- ErrorBoundary fallback 和错误状态序列化。
 
 主要路径:
 
@@ -454,6 +456,7 @@ cargo clippy -p glory-cli --lib --no-default-features -- -D warnings
 
 - [x] 修复 `glory-cli` clippy failure。
 - [x] 更新 `AGENTS.md` / `docs/release-readiness.md` 中与当前 feature matrix 和 workspace test 状态不一致的内容。
+- [x] ErrorBoundary 子树 panic 捕获与 fallback 渲染。
 - [x] 增加主 CI:
    - fmt。
    - core default/web-ssr/backend-command tests。

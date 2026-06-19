@@ -3,6 +3,7 @@ use std::cell::Cell;
 #[cfg(not(feature = "single-app"))]
 use std::cell::RefCell;
 use std::ops::Deref;
+use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
 
 #[cfg(not(feature = "single-app"))]
 use indexmap::IndexMap;
@@ -145,7 +146,22 @@ fn run(#[cfg(not(feature = "single-app"))] holder_id: HolderId) {
 
                 for view_id in revising_view_ids {
                     if let Some(view) = root_views.get_mut(&view_id) {
-                        view.widget.patch(&mut view.scope);
+                        let boundary_id = view.scope.error_boundary.clone();
+                        let patch_result = catch_unwind(AssertUnwindSafe(|| {
+                            view.widget.patch(&mut view.scope);
+                        }));
+                        if let Err(payload) = patch_result {
+                            let Some(boundary_id) = boundary_id else {
+                                resume_unwind(payload);
+                            };
+                            let Some(boundary) = root_views.get_mut(&boundary_id) else {
+                                resume_unwind(payload);
+                            };
+                            let error = crate::BoundaryError::from_panic(payload, Some(view_id));
+                            if !boundary.widget.capture_error(&mut boundary.scope, error) {
+                                panic!("error boundary `{}` rejected captured panic", boundary_id);
+                            }
+                        }
                     } else {
                         // Expected during large keyed-list replace/clear: a
                         // revised cage whose view was already detached. The

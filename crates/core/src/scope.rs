@@ -57,6 +57,7 @@ pub struct Scope {
     pub(crate) render_node: Option<Node>,
     pub(crate) first_child_node: Option<Node>,
     pub(crate) last_child_node: Option<Node>,
+    pub(crate) error_boundary: Option<ViewId>,
 
     next_child_view_id: AtomicU64,
 
@@ -81,6 +82,7 @@ impl Scope {
             render_node: None,
             first_child_node: None,
             last_child_node: None,
+            error_boundary: None,
 
             next_child_view_id: AtomicU64::new(0),
             truck,
@@ -104,6 +106,7 @@ impl Scope {
             render_node: None,
             first_child_node: None,
             last_child_node: None,
+            error_boundary: None,
 
             next_child_view_id: AtomicU64::new(0),
             truck,
@@ -143,7 +146,9 @@ impl Scope {
         }
     }
     pub fn beget(&self) -> Self {
-        Scope::new(self.next_child_view_id(), self.truck.clone())
+        let mut scope = Scope::new(self.next_child_view_id(), self.truck.clone());
+        scope.error_boundary = self.error_boundary.clone();
+        scope
     }
     pub fn owner(&self) -> &reflow::Owner {
         &self.owner

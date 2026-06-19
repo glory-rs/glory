@@ -127,6 +127,27 @@ cargo test -p glory-core --lib --features web-ssr widgets::snapshot_tests::each_
 cargo check --manifest-path examples/counters/Cargo.toml --target wasm32-unknown-unknown
 ```
 
+## Error Boundaries
+
+Wrap risky subtrees in `ErrorBoundary` when a build/patch panic should render a
+local fallback instead of aborting the whole app:
+
+```rust
+use glory::widgets::ErrorBoundary;
+
+ErrorBoundary::new(ProfilePanel, |error, ctx| {
+    div()
+        .class("error")
+        .text(format!("Could not render profile: {}", error.message()))
+        .show_in(ctx);
+})
+.show_in(ctx);
+```
+
+The boundary clears the failed child subtree before rendering the fallback.
+SSR stores the captured error state for hydration, so the client starts from
+the same fallback branch.
+
 ## Forms
 
 Use event helpers for browser inputs:

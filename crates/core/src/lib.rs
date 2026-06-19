@@ -79,7 +79,7 @@ pub mod web;
 mod widget;
 pub use scope::Scope;
 pub use view::{View, ViewFactory, ViewId};
-pub use widget::{Filler, IntoFiller, Widget};
+pub use widget::{BoundaryError, Filler, IntoFiller, Widget};
 pub mod node;
 pub use node::{Node, NodeRef};
 pub mod widgets;
