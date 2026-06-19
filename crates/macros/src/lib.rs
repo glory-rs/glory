@@ -19,7 +19,7 @@ use syn::{FnArg, ItemFn, LitStr, Pat, parse_macro_input};
 /// - **non-wasm builds** keep the original function and register it under
 ///   `/__glory/fn/<name>` in the [`inventory`]-backed registry consumed by
 ///   the adapter mounts (`glory_serverfn::salvo_mount` etc.).
-/// - **wasm builds** replace the body with a `fetch` POST to that endpoint;
+/// - **wasm builds** replace the body with a `fetch` call to that endpoint;
 ///   arguments are serialized as a JSON tuple, the result deserialized from
 ///   the response body.
 ///
@@ -29,19 +29,32 @@ use syn::{FnArg, ItemFn, LitStr, Pat, parse_macro_input};
 ///
 /// `#[server(endpoint = "custom-name")]` overrides the URL segment when two
 /// functions in different modules would otherwise collide on the name.
+/// `#[server(method = "GET")]` sends the JSON tuple through a query string
+/// parameter; the default method is `POST`.
 #[proc_macro_attribute]
 pub fn server(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item_fn = parse_macro_input!(item as ItemFn);
 
     let mut endpoint: Option<String> = None;
+    let mut method = "POST".to_owned();
     if !attr.is_empty() {
         let parser = syn::meta::parser(|meta| {
             if meta.path.is_ident("endpoint") {
                 let value: LitStr = meta.value()?.parse()?;
                 endpoint = Some(value.value());
                 Ok(())
+            } else if meta.path.is_ident("method") {
+                let value: LitStr = meta.value()?.parse()?;
+                let value = value.value().to_ascii_uppercase();
+                match value.as_str() {
+                    "GET" | "POST" => {
+                        method = value;
+                        Ok(())
+                    }
+                    _ => Err(meta.error("unsupported #[server] method; expected `GET` or `POST`")),
+                }
             } else {
-                Err(meta.error("unsupported #[server] option; expected `endpoint = \"...\"`"))
+                Err(meta.error("unsupported #[server] option; expected `endpoint = \"...\"` or `method = \"GET\"`"))
             }
         });
         parse_macro_input!(attr with parser);
@@ -106,6 +119,7 @@ pub fn server(attr: TokenStream, item: TokenStream) -> TokenStream {
         glory_serverfn::inventory::submit! {
             glory_serverfn::ServerFnEntry {
                 path: #url,
+                method: #method,
                 handler: |__body: ::std::vec::Vec<u8>| ::std::boxed::Box::pin(async move {
                     let ( #(#arg_idents,)* ): ( #(#arg_types,)* ) = #decode_args;
                     let __output = #name( #(#arg_idents),* ).await?;
@@ -116,7 +130,7 @@ pub fn server(attr: TokenStream, item: TokenStream) -> TokenStream {
 
         #[cfg(target_arch = "wasm32")]
         #vis #sig {
-            glory_serverfn::call_remote(#url, &( #(#arg_idents,)* )).await
+            glory_serverfn::call_remote_with_method(#method, #url, &( #(#arg_idents,)* )).await
         }
     };
     expanded.into()

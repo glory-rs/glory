@@ -61,12 +61,15 @@ R5 仅评估,不阻塞任何人。
 
 ## Lane T — 路由类型化(crates/routing)— 对照差距最大的单项
 
-- [ ] **T1 P0** 类型化路由定义。现状是运行时字符串 `Router::push/filter`
+- [~] **T1 P0** 类型化路由定义。现状是运行时字符串 `Router::push/filter`
   (`crates/routing/src/router.rs`),Dioxus 有 `#[derive(Routable)]` 枚举路由
   (`packages/router-macro/src/lib.rs`):静态类型、动态段类型推导、编译期检查。
   Glory 哲学是"无 view DSL",但 Routable 派生不是 view 宏 — 需先做一次设计决策:
   derive 宏 vs 类型化 builder(如 `route::<UserRoute>("/user/:id")`)。产出设计文档
   后实现核心:路由枚举 ↔ URL 双向转换 + 类型安全 `goto(Route::X{..})`。
+  2026-06-19 第一阶段:已新增手写 `Routable` trait、`AviatorExt::goto_route`、
+  `Locator::route::<R>()`、`LocatorModifier::from_route` 和 path 参数 encode/parse
+  helpers;剩余是 derive/builder 决策与自动生成。
 - [ ] **T2 P0** 嵌套布局 / Outlet 等价物。Dioxus 有 `#[nest]`/`#[layout]`/`Outlet`
   (`packages/router/src/components/outlet.rs`)。Glory `Router` 已有层级 children,
   缺的是"父布局渲染插槽"语义。依赖 T1 的设计结论。
@@ -82,9 +85,12 @@ R5 仅评估,不阻塞任何人。
 
 ## Lane S — 服务器函数 / 全栈(crates/serverfn, macros, 适配器)
 
-- [ ] **S1 P0** HTTP 动词支持。`#[server]` 目前只生成 POST(`crates/macros/src/lib.rs`),
+- [x] **S1 P0** HTTP 动词支持。`#[server]` 目前只生成 POST(`crates/macros/src/lib.rs`),
   Dioxus 支持 `#[get]`/`#[post]` 等。目标:`#[server(method = "GET")]`(GET 走查询串
   编码,可缓存),三适配器(Salvo/Axum/Actix)同步,wire 协议测试覆盖。
+  2026-06-19 已完成:宏支持 `method = "GET"`,客户端 GET 通过
+  `__glory_args` 查询参数传 JSON tuple,Salvo/Axum/Actix adapter 同时挂 GET/POST,
+  runtime 按 method dispatch 并对方法不匹配返回 405。
 - [ ] **S2 P1** 多编码协商。当前仅 JSON;Dioxus 有 `Encoding` trait + JSON/CBOR/
   MessagePack/Postcard(`packages/fullstack/src/encoding.rs`)。目标:可插拔编码 trait,
   feature-gate CBOR/Postcard,默认 JSON 不变。
@@ -234,6 +240,16 @@ R5 仅评估,不阻塞任何人。
 - [x] **F3 P3** 桌面 IPC `panic!("unexpected message")`(`crates/desktop/src/lib.rs:157`)
   改为带日志的容错降级。生产路径 `runtime.rs` 已对无法解码的 IPC 消息
   `tracing::warn!` 后丢弃;`lib.rs` 里剩余 panic 是测试断言,非宿主运行时路径。
+- [x] **F4 P0** 修复 release checklist 中的 CLI clippy 失败:
+  `cargo clippy -p glory-cli --lib --no-default-features -- -D warnings`
+  之前因 `crates/cli/src/lib.rs` 的 `clippy::let_and_return` 失败,已直接返回
+  `match` 表达式并通过验证。
+- [x] **F5 P0** 同步 feature/test 文档漂移:`AGENTS.md` 已更新
+  `backend-command + web-ssr` 可组合、`backend-command + single-app/web-csr`
+  仍互斥的当前规则;`docs/release-readiness.md` 已移除 workspace 测试历史失败说法。
+- [x] **F6 P0** Rust 主 CI 化:新增 `.github/workflows/ci.yml`,覆盖 fmt、
+  core default/web-ssr/backend-command tests、serverfn tests、CLI tests、
+  public feature-set check、feature guard 负向检查和 release clippy gates。
 
 ---
 

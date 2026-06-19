@@ -208,6 +208,30 @@ pub fn encode_args<T: Serialize>(value: &T) -> Result<Vec<u8>, ServerFnError> {
     serde_json::to_vec(value).map_err(|err| ServerFnError::Serialization(err.to_string()))
 }
 
+pub const GET_ARGS_QUERY_PARAM: &str = "__glory_args";
+
+pub fn encode_get_args<T: Serialize>(value: &T) -> Result<String, ServerFnError> {
+    let body = encode_args(value)?;
+    let body = std::str::from_utf8(&body).map_err(|err| ServerFnError::Serialization(err.to_string()))?;
+    let mut serializer = form_urlencoded::Serializer::new(String::new());
+    serializer.append_pair(GET_ARGS_QUERY_PARAM, body);
+    Ok(serializer.finish())
+}
+
+pub fn append_get_args(path: &str, value: &impl Serialize) -> Result<String, ServerFnError> {
+    let query = encode_get_args(value)?;
+    let separator = if path.contains('?') { '&' } else { '?' };
+    Ok(format!("{path}{separator}{query}"))
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn decode_get_args_from_query(query: Option<&str>) -> Result<Vec<u8>, ServerFnError> {
+    let query = query.unwrap_or_default();
+    form_urlencoded::parse(query.as_bytes())
+        .find_map(|(name, value)| (name == GET_ARGS_QUERY_PARAM).then(|| value.into_owned().into_bytes()))
+        .ok_or_else(|| ServerFnError::http(400, format!("missing `{GET_ARGS_QUERY_PARAM}` query parameter")))
+}
+
 pub fn decode_form<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, ServerFnError> {
     serde_urlencoded::from_bytes(bytes).map_err(|err| ServerFnError::http(400, format!("form decode failed: {err}")))
 }
@@ -850,6 +874,8 @@ pub type BoxedServerFnFuture = std::pin::Pin<Box<dyn std::future::Future<Output 
 pub struct ServerFnEntry {
     /// Full URL path, e.g. `/__glory/fn/list_todos`.
     pub path: &'static str,
+    /// HTTP method used by generated client stubs.
+    pub method: &'static str,
     pub handler: fn(Vec<u8>) -> BoxedServerFnFuture,
 }
 
@@ -866,10 +892,22 @@ pub fn registered_paths() -> Vec<&'static str> {
 /// This is the single entry point every adapter mount goes through.
 #[cfg(not(target_arch = "wasm32"))]
 pub async fn handle(path: &str, body: Vec<u8>) -> Result<Vec<u8>, ServerFnError> {
+    handle_with_method("POST", path, body).await
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub async fn handle_with_method(method: &str, path: &str, body: Vec<u8>) -> Result<Vec<u8>, ServerFnError> {
+    let mut path_exists = false;
     for entry in inventory::iter::<ServerFnEntry> {
         if entry.path == path {
-            return (entry.handler)(body).await;
+            path_exists = true;
+            if entry.method.eq_ignore_ascii_case(method) {
+                return (entry.handler)(body).await;
+            }
         }
+    }
+    if path_exists {
+        return Err(ServerFnError::http(405, format!("server fn `{path}` does not support {method}")));
     }
     Err(ServerFnError::NotFound(path.to_owned()))
 }
@@ -1346,29 +1384,43 @@ where
     Args: Serialize,
     Out: DeserializeOwned,
 {
+    call_remote_with_method("POST", path, args).await
+}
+
+/// Client leg of a server function call using an explicit HTTP method.
+/// Generated stubs use this for `#[server(method = "GET")]`.
+pub async fn call_remote_with_method<Args, Out>(method: &str, path: &str, args: &Args) -> Result<Out, ServerFnError>
+where
+    Args: Serialize,
+    Out: DeserializeOwned,
+{
+    let method = method.to_ascii_uppercase();
     let body = encode_args(args)?;
 
     #[cfg(target_arch = "wasm32")]
     {
-        call_remote_wasm(path, body)
+        call_remote_wasm(&method, path, body)
             .await
             .and_then(|bytes| serde_json::from_slice(&bytes).map_err(|err| ServerFnError::Deserialization(err.to_string())))
     }
 
     #[cfg(all(not(target_arch = "wasm32"), feature = "reqwest-client"))]
     {
-        let url = format!("{}{}", server_url(), path);
+        let url = if method == "GET" {
+            format!("{}{}", server_url(), append_get_args(path, args)?)
+        } else {
+            format!("{}{}", server_url(), path)
+        };
         let client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|err| ServerFnError::Request(err.to_string()))?;
-        let response = client
-            .post(&url)
-            .header("content-type", "application/json")
-            .body(body)
-            .send()
-            .await
-            .map_err(|err| ServerFnError::Request(err.to_string()))?;
+        let request = if method == "GET" {
+            client.get(&url)
+        } else {
+            client.post(&url).header("content-type", "application/json").body(body)
+        };
+        let response = request.send().await.map_err(|err| ServerFnError::Request(err.to_string()))?;
         let status = response.status();
         let bytes = response.bytes().await.map_err(|err| ServerFnError::Request(err.to_string()))?;
         if status.is_success() {
@@ -1380,7 +1432,7 @@ where
 
     #[cfg(all(not(target_arch = "wasm32"), not(feature = "reqwest-client")))]
     {
-        let _ = (path, body);
+        let _ = (method, path, body);
         Err(ServerFnError::Request(
             "no HTTP client available: enable the `reqwest-client` feature of glory-serverfn for non-wasm clients".to_owned(),
         ))
@@ -1388,19 +1440,29 @@ where
 }
 
 #[cfg(target_arch = "wasm32")]
-async fn call_remote_wasm(path: &str, body: Vec<u8>) -> Result<Vec<u8>, ServerFnError> {
+async fn call_remote_wasm(method: &str, path: &str, body: Vec<u8>) -> Result<Vec<u8>, ServerFnError> {
     use wasm_bindgen::JsCast;
     use wasm_bindgen_futures::JsFuture;
 
     let request_err = |err: wasm_bindgen::JsValue| ServerFnError::Request(format!("{err:?}"));
 
     let init = web_sys::RequestInit::new();
-    init.set_method("POST");
+    init.set_method(method);
     init.set_redirect(web_sys::RequestRedirect::Manual);
-    let body_value = js_sys::Uint8Array::from(body.as_slice());
-    init.set_body(&body_value);
-    let request = web_sys::Request::new_with_str_and_init(path, &init).map_err(request_err)?;
-    request.headers().set("content-type", "application/json").map_err(request_err)?;
+    let url = if method == "GET" {
+        append_get_args(
+            path,
+            &serde_json::from_slice::<serde_json::Value>(&body).map_err(|err| ServerFnError::Serialization(err.to_string()))?,
+        )?
+    } else {
+        let body_value = js_sys::Uint8Array::from(body.as_slice());
+        init.set_body(&body_value);
+        path.to_owned()
+    };
+    let request = web_sys::Request::new_with_str_and_init(&url, &init).map_err(request_err)?;
+    if method != "GET" {
+        request.headers().set("content-type", "application/json").map_err(request_err)?;
+    }
 
     let window = web_sys::window().ok_or_else(|| ServerFnError::Request("no window".to_owned()))?;
     let response: web_sys::Response = JsFuture::from(window.fetch_with_request(&request))
@@ -1433,8 +1495,9 @@ pub mod salvo_mount {
     #[handler]
     async fn server_fn_handler(req: &mut Request, res: &mut Response) {
         let path = req.uri().path().to_owned();
+        let method = req.method().to_string();
         let context = crate::RequestContext {
-            method: req.method().to_string(),
+            method: method.clone(),
             uri: req.uri().to_string(),
             headers: req
                 .headers()
@@ -1442,17 +1505,27 @@ pub mod salvo_mount {
                 .map(|(name, value)| (name.as_str().to_ascii_lowercase(), value.to_str().unwrap_or_default().to_owned()))
                 .collect(),
         };
-        let body = match req.payload().await {
-            Ok(bytes) => bytes.to_vec(),
-            Err(err) => {
-                write_http_response(
-                    res,
-                    crate::server_fn_error_response_parts(&crate::ServerFnError::http(400, format!("invalid body: {err}"))),
-                );
-                return;
+        let body = if method.eq_ignore_ascii_case("GET") {
+            match crate::decode_get_args_from_query(req.uri().query()) {
+                Ok(body) => body,
+                Err(err) => {
+                    write_http_response(res, crate::server_fn_error_response_parts(&err));
+                    return;
+                }
+            }
+        } else {
+            match req.payload().await {
+                Ok(bytes) => bytes.to_vec(),
+                Err(err) => {
+                    write_http_response(
+                        res,
+                        crate::server_fn_error_response_parts(&crate::ServerFnError::http(400, format!("invalid body: {err}"))),
+                    );
+                    return;
+                }
             }
         };
-        let response = crate::server_fn_response_parts(crate::with_request_context(context, crate::handle(&path, body)).await);
+        let response = crate::server_fn_response_parts(crate::with_request_context(context, crate::handle_with_method(&method, &path, body)).await);
         write_http_response(res, response);
     }
 
@@ -1470,7 +1543,7 @@ pub mod salvo_mount {
     /// Router serving every registered server function under
     /// [`crate::PREFIX`]. Push it into your app router as-is.
     pub fn router() -> Router {
-        Router::with_path("__glory/fn/{**rest}").post(server_fn_handler)
+        Router::with_path("__glory/fn/{**rest}").get(server_fn_handler).post(server_fn_handler)
     }
 
     /// Writes a [`crate::StreamingResponse`] to a Salvo response.
@@ -1515,8 +1588,10 @@ pub mod axum_mount {
 
     async fn server_fn_handler(request: axum::extract::Request) -> Response {
         let path = request.uri().path().to_owned();
+        let method = request.method().to_string();
+        let query = request.uri().query().map(str::to_owned);
         let context = crate::RequestContext {
-            method: request.method().to_string(),
+            method: method.clone(),
             uri: request.uri().to_string(),
             headers: request
                 .headers()
@@ -1524,17 +1599,24 @@ pub mod axum_mount {
                 .map(|(name, value)| (name.as_str().to_ascii_lowercase(), value.to_str().unwrap_or_default().to_owned()))
                 .collect(),
         };
-        let body = match axum::body::to_bytes(request.into_body(), 16 * 1024 * 1024).await {
-            Ok(bytes) => bytes.to_vec(),
-            Err(err) => {
-                return into_response(crate::server_fn_error_response_parts(&crate::ServerFnError::http(
-                    400,
-                    format!("invalid body: {err}"),
-                )));
+        let body = if method.eq_ignore_ascii_case("GET") {
+            match crate::decode_get_args_from_query(query.as_deref()) {
+                Ok(body) => body,
+                Err(err) => return into_response(crate::server_fn_error_response_parts(&err)),
+            }
+        } else {
+            match axum::body::to_bytes(request.into_body(), 16 * 1024 * 1024).await {
+                Ok(bytes) => bytes.to_vec(),
+                Err(err) => {
+                    return into_response(crate::server_fn_error_response_parts(&crate::ServerFnError::http(
+                        400,
+                        format!("invalid body: {err}"),
+                    )));
+                }
             }
         };
         into_response(crate::server_fn_response_parts(
-            crate::with_request_context(context, crate::handle(&path, body)).await,
+            crate::with_request_context(context, crate::handle_with_method(&method, &path, body)).await,
         ))
     }
 
@@ -1552,7 +1634,10 @@ pub mod axum_mount {
     /// Router serving every registered server function under
     /// [`crate::PREFIX`]. Merge it into your app router.
     pub fn router<S: Clone + Send + Sync + 'static>() -> axum::Router<S> {
-        axum::Router::new().route(&format!("{}/{{*rest}}", crate::PREFIX), axum::routing::post(server_fn_handler))
+        axum::Router::new().route(
+            &format!("{}/{{*rest}}", crate::PREFIX),
+            axum::routing::get(server_fn_handler).post(server_fn_handler),
+        )
     }
 
     /// Converts a [`crate::StreamingResponse`] into an Axum streaming response.
@@ -1582,8 +1667,9 @@ pub mod actix_mount {
 
     async fn server_fn_handler(request: HttpRequest, body: web::Bytes) -> HttpResponse {
         let path = request.uri().path().to_owned();
+        let method = request.method().to_string();
         let context = crate::RequestContext {
-            method: request.method().to_string(),
+            method: method.clone(),
             uri: request.uri().to_string(),
             headers: request
                 .headers()
@@ -1591,8 +1677,16 @@ pub mod actix_mount {
                 .map(|(name, value)| (name.as_str().to_ascii_lowercase(), value.to_str().unwrap_or_default().to_owned()))
                 .collect(),
         };
+        let body = if method.eq_ignore_ascii_case("GET") {
+            match crate::decode_get_args_from_query(Some(request.query_string())) {
+                Ok(body) => body,
+                Err(err) => return into_http_response(crate::server_fn_error_response_parts(&err)),
+            }
+        } else {
+            body.to_vec()
+        };
         into_http_response(crate::server_fn_response_parts(
-            crate::with_request_context(context, crate::handle(&path, body.to_vec())).await,
+            crate::with_request_context(context, crate::handle_with_method(&method, &path, body)).await,
         ))
     }
 
@@ -1609,7 +1703,9 @@ pub mod actix_mount {
 
     /// Registers the server-function dispatch route under [`crate::PREFIX`].
     pub fn configure(config: &mut web::ServiceConfig) {
-        config.route(&format!("{}/{{rest:.*}}", crate::PREFIX), web::post().to(server_fn_handler));
+        config
+            .route(&format!("{}/{{rest:.*}}", crate::PREFIX), web::get().to(server_fn_handler))
+            .route(&format!("{}/{{rest:.*}}", crate::PREFIX), web::post().to(server_fn_handler));
     }
 
     /// Converts a [`crate::StreamingResponse`] into an Actix streaming

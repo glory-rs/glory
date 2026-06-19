@@ -4,7 +4,7 @@
 #![cfg(not(target_arch = "wasm32"))]
 
 use glory_macros::server;
-use glory_serverfn::{ServerFnError, handle, registered_paths};
+use glory_serverfn::{ServerFnError, handle, handle_with_method, registered_paths};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -54,6 +54,14 @@ async fn submit_login(form: LoginForm) -> Result<String, ServerFnError> {
     Ok(format!("{}:{}", form.email, form.remember))
 }
 
+#[server(method = "GET")]
+async fn read_todo(id: u32, prefix: String) -> Result<String, ServerFnError> {
+    let method = glory_serverfn::request_context()
+        .map(|context| context.method)
+        .unwrap_or_else(|| "direct".to_owned());
+    Ok(format!("{method}:{prefix}-{id}"))
+}
+
 #[test]
 fn macro_registers_endpoints() {
     let paths = registered_paths();
@@ -62,6 +70,7 @@ fn macro_registers_endpoints() {
     assert!(paths.contains(&"/__glory/fn/always_fails"), "{paths:?}");
     assert!(paths.contains(&"/__glory/fn/redirects"), "{paths:?}");
     assert!(paths.contains(&"/__glory/fn/submit_login"), "{paths:?}");
+    assert!(paths.contains(&"/__glory/fn/read_todo"), "{paths:?}");
 }
 
 #[test]
@@ -109,6 +118,32 @@ fn errors_cross_the_boundary_typed() {
         // Malformed body → Deserialization error, not a panic.
         let err = handle("/__glory/fn/list_todos", b"not json".to_vec()).await.unwrap_err();
         assert!(matches!(err, ServerFnError::Deserialization(_)));
+    });
+}
+
+#[test]
+fn get_server_fn_decodes_query_args_and_rejects_post() {
+    use glory_serverfn::{RequestContext, decode_get_args_from_query, encode_get_args, with_request_context};
+
+    let runtime = tokio::runtime::Builder::new_current_thread().build().unwrap();
+    runtime.block_on(async {
+        let query = encode_get_args(&(7_u32, "task".to_owned())).unwrap();
+        assert!(query.starts_with("__glory_args="), "{query}");
+        let body = decode_get_args_from_query(Some(&query)).unwrap();
+
+        let context = RequestContext {
+            method: "GET".into(),
+            uri: format!("/__glory/fn/read_todo?{query}"),
+            headers: Vec::new(),
+        };
+        let bytes = with_request_context(context, handle_with_method("GET", "/__glory/fn/read_todo", body))
+            .await
+            .unwrap();
+        assert_eq!(serde_json::from_slice::<String>(&bytes).unwrap(), "GET:task-7");
+
+        let post_body = serde_json::to_vec(&(7_u32, "task".to_owned())).unwrap();
+        let err = handle_with_method("POST", "/__glory/fn/read_todo", post_body).await.unwrap_err();
+        assert_eq!(err.status_code(), 405);
     });
 }
 

@@ -1,0 +1,81 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - '*'
+      - '!release'
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+      - name: Test core default
+        run: cargo test -p glory-core --lib
+
+      - name: Test core SSR
+        run: cargo test -p glory-core --lib --features web-ssr
+
+      - name: Test command backend
+        run: cargo test -p glory-core --features backend-command --test command_backend
+
+      - name: Test server functions
+        run: cargo test -p glory-serverfn
+
+      - name: Test server function adapters
+        run: cargo test -p glory-serverfn --features "salvo axum actix"
+
+      - name: Test CLI
+        run: cargo test -p glory-cli
+
+      - name: Check public feature set
+        run: cargo check -p glory --features "web-ssr backend-command routing server-fn"
+
+      - name: Clippy core SSR
+        run: cargo clippy -p glory-core --lib --features web-ssr -- -D warnings
+
+      - name: Clippy server functions
+        run: cargo clippy -p glory-serverfn --all-targets -- -D warnings
+
+      - name: Clippy CLI
+        run: cargo clippy -p glory-cli --lib --no-default-features -- -D warnings
+
+  feature-guards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: web-csr and web-ssr are mutually exclusive
+        shell: bash
+        run: |
+          set +e
+          cargo check -p glory-core --features "web-csr web-ssr" >output.log 2>&1
+          status=$?
+          set -e
+          test "$status" -ne 0
+          grep -q "features \`web-csr\` and \`web-ssr\` are mutually exclusive" output.log
+
+      - name: backend-command requires multi-holder scheduler
+        shell: bash
+        run: |
+          set +e
+          cargo check -p glory-core --features "backend-command single-app" >output.log 2>&1
+          status=$?
+          set -e
+          test "$status" -ne 0
+          grep -q "feature \`backend-command\` requires the multi-holder scheduler" output.log
+
+      - name: backend-command can combine with web-ssr
+        run: cargo check -p glory-core --features "web-ssr backend-command"

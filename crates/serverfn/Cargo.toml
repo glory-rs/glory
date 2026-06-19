@@ -16,6 +16,7 @@ categories = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 serde_urlencoded = { workspace = true }
+form_urlencoded = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 

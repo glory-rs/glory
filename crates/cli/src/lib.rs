@@ -74,7 +74,7 @@ pub async fn run_with(args: Cli, overrides: Overrides) -> Result<()> {
     log::debug!("Path working dir {}", GRAY.paint(config.working_dir.as_str()));
 
     let _monitor = Interrupt::run_ctrl_c_monitor();
-    let result = match args.command {
+    match args.command {
         New(_) | Fmt(_) | Doctor(_) => unreachable!("handled before metadata load"),
         Serve(serve) if serve.no_reload => command::serve(&config.current_project()?).await,
         Serve(_) => command::watch(&config.current_project()?).await,
@@ -85,9 +85,7 @@ pub async fn run_with(args: Cli, overrides: Overrides) -> Result<()> {
         ConfigCommand(opts) => command::config_validate(&config, opts.json).await,
         Test(_) => command::test_all(&config).await,
         EndToEnd(_) => command::end2end_all(&config).await,
-    };
-
-    result
+    }
 }
 
 struct CurrentDirGuard {

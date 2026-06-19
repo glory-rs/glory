@@ -1,8 +1,9 @@
 # Glory Release Readiness Checklist
 
-Use this before tagging or publishing. Do not substitute `cargo test --workspace`
-for the targeted checks below; some workspace-wide failures are historical and
-should be fixed in dedicated PRs.
+Use this before tagging or publishing. `cargo test --workspace` is a useful
+broad smoke check, but do not substitute it for the targeted checks below: the
+feature matrix and command-backend paths catch failures a default workspace run
+will not exercise.
 
 ## Required Checks
 
@@ -14,7 +15,9 @@ should be fixed in dedicated PRs.
 - [ ] `cargo test -p glory-core --lib --features web-ssr`
 - [ ] `cargo test -p glory-core --features backend-command`
 - [ ] `cargo test -p glory-serverfn`
+- [ ] `cargo test -p glory-serverfn --features "salvo axum actix"`
 - [ ] `cargo test -p glory-cli --lib --no-default-features`
+- [ ] `cargo test --workspace`
 
 ## Feature Matrix
 

@@ -160,6 +160,39 @@ BrowserHolder::new()
     .mount(App::new());
 ```
 
+For type-safe navigation, implement `Routable` on an app route enum and call
+`goto_route` instead of formatting URL strings at each callsite:
+
+```rust
+use glory::routing::{AviatorExt, Routable, encode_route_param, parse_route_param};
+
+enum AppRoute {
+    Home,
+    User { id: u64 },
+}
+
+impl Routable for AppRoute {
+    fn to_url(&self) -> String {
+        match self {
+            Self::Home => "/".to_owned(),
+            Self::User { id } => format!("/users/{}", encode_route_param(id)),
+        }
+    }
+
+    fn from_url(url: &str) -> Option<Self> {
+        let url = glory::routing::url::Url::parse(url).ok()?;
+        let segments = url.path().trim_matches('/').split('/').collect::<Vec<_>>();
+        match segments.as_slice() {
+            ["users", id] => Some(Self::User { id: parse_route_param(id).ok()? }),
+            [""] | [] => Some(Self::Home),
+            _ => None,
+        }
+    }
+}
+
+aviator.goto_route(&AppRoute::User { id: 42 })?;
+```
+
 Runnable example:
 
 ```powershell
@@ -188,6 +221,16 @@ a browser stub:
 #[glory::server]
 async fn list_todos() -> Result<Vec<Todo>, glory::serverfn::ServerFnError> {
     Ok(vec![])
+}
+```
+
+Use `method = "GET"` for cacheable, read-only calls. Arguments are serialized
+into the query string, while the default remains POST:
+
+```rust
+#[glory::server(method = "GET")]
+async fn read_todo(id: u32) -> Result<Todo, glory::serverfn::ServerFnError> {
+    todo_store().read(id).await
 }
 ```
 

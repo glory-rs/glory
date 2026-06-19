@@ -36,10 +36,14 @@ pub use aviator::{Aviator, NavigationError};
 mod graff;
 mod locator;
 mod router;
+mod typed;
 pub use filters::*;
 pub use graff::Graff;
 pub use locator::{Locator, LocatorModifier};
 pub use router::Router;
+pub use typed::{
+    AviatorExt, FromRouteParam, Routable, RouteParamError, decode_route_param, encode_route_param, parse_route_param, required_route_param,
+};
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use regex;
