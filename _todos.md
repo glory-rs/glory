@@ -21,7 +21,7 @@
 | 服务器函数 | 仅 POST + JSON;无 HTTP 动词选择、多编码、逐函数中间件、响应式 WebSocket hook | **高** |
 | 异步/错误原语 | Suspense 边界协议已部分落地(仍缺 SSR streaming/resume);ErrorBoundary 与 `resource_in` 竞态修复已补 | **高** |
 | CLI/构建 | wasm-split 暂缓;Windows/Linux 原生安装器已有最小路径,macOS/AppImage/签名仍缺 | **中-高** |
-| 资产 | `asset!` / `asset_folder!` 已有编译期清单、bundle hash 映射和可选图片优化;仍缺 CSS Modules | 中 |
+| 资产 | `asset!` / `asset_folder!` / `css_module!` 已有编译期清单、bundle hash 映射和可选图片优化 | 中 |
 | 桌面 | 协议扎实,窗口控制 API、异步自定义协议、托盘、全局热键已补;仍缺拖放/打印 | 中 |
 | Native(Blitz)/LiveView/移动端 | 分别处于 spike(~20%)/可用但单适配器(~30%)/模板可编译但无真机验证(~30%) | 中-高 |
 
@@ -193,8 +193,10 @@ R5 仅评估,不阻塞任何人。
 - [x] **A3 P2** folder 资产宏(递归枚举 + 清单),对照 manganis `folder.rs`:
   新增 `AssetFolder` 和 `glory::asset_folder!("dir")`,编译期递归枚举文件并为每个
   文件生成 `include_bytes!` 校验。
-- [ ] **A4 P3** 类型化 CSS Modules(`.module.css` → 类名结构体)。现有运行时
-  `ScopedStyle` 已覆盖主场景,此项仅在用户需求出现后做。
+- [x] **A4 P3** 类型化 CSS Modules(`.module.css` → 类名结构体)。新增
+  `glory::css_module!("*.module.css")`,编译期抽取 class selectors、生成稳定 hashed
+  class 和 typed 方法(如 `.primary-button` → `primary_button()`),并输出重写后的
+  `css()` 文本。
 
 并行性:A1 先行,A2/A3 依赖其清单格式;A4 独立但缓做。
 

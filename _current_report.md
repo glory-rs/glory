@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 46 |
+| 已完成 `[x]` | 47 |
 | 部分完成 `[~]` | 4 |
-| 未完成 `[ ]` | 10 |
+| 未完成 `[ ]` | 9 |
 
 按能力权重估算:
 
@@ -310,10 +310,12 @@ serverfn 基础可用，但对比成熟框架还缺:
 - `glory::asset_folder!("dir")` 会在编译期递归枚举目录并生成 `AssetFolder` 清单。
 - `glory bundle --optimize-images` 默认关闭;开启后 PNG/JPEG 会生成 WebP 副本,
   并通过 `asset_map` 优先映射到 hashed WebP。
+- `glory::css_module!("*.module.css")` 会编译期抽取 class selectors,生成 typed
+  class 方法和重写后的 CSS 文本。
 
 缺口:
 
-- CSS Modules。
+- 暂无当前任务板内资产缺口。
 
 ### 5. Desktop API 不完整
 

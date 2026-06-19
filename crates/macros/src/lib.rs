@@ -14,6 +14,22 @@ struct AssetFolderInput {
     root: LitStr,
 }
 
+struct CssModuleInput {
+    crate_path: syn::Path,
+    _comma: Token![,],
+    path: LitStr,
+}
+
+impl Parse for CssModuleInput {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        Ok(Self {
+            crate_path: input.parse()?,
+            _comma: input.parse()?,
+            path: input.parse()?,
+        })
+    }
+}
+
 impl Parse for AssetFolderInput {
     fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
         Ok(Self {
@@ -29,6 +45,16 @@ impl Parse for AssetFolderInput {
 pub fn __asset_folder(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as AssetFolderInput);
     match expand_asset_folder(input) {
+        Ok(tokens) => tokens.into(),
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+
+#[proc_macro]
+#[doc(hidden)]
+pub fn __css_module(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as CssModuleInput);
+    match expand_css_module(input) {
         Ok(tokens) => tokens.into(),
         Err(err) => err.to_compile_error().into(),
     }
@@ -114,6 +140,224 @@ fn join_logical_asset_path(root: &str, relative: &str) -> String {
     } else {
         format!("{root}/{relative}")
     }
+}
+
+fn expand_css_module(input: CssModuleInput) -> syn::Result<TokenStream2> {
+    let _crate_path = input.crate_path;
+    let path = input.path;
+    let path_value = path.value().replace('\\', "/");
+    if !path_value.ends_with(".module.css") {
+        return Err(syn::Error::new(path.span(), "css_module! expects a `.module.css` file"));
+    }
+
+    let manifest_dir =
+        std::env::var("CARGO_MANIFEST_DIR").map_err(|err| syn::Error::new(path.span(), format!("CARGO_MANIFEST_DIR is unavailable: {err}")))?;
+    let source_path = PathBuf::from(manifest_dir).join(path_value.trim_start_matches('/'));
+    let css = std::fs::read_to_string(&source_path)
+        .map_err(|err| syn::Error::new(path.span(), format!("failed to read CSS module {}: {err}", source_path.display())))?;
+
+    let class_names = extract_css_classes(&css);
+    if class_names.is_empty() {
+        return Err(syn::Error::new(path.span(), "css_module! found no CSS classes"));
+    }
+
+    let mut method_names = std::collections::BTreeMap::<String, String>::new();
+    let mut class_map = std::collections::BTreeMap::<String, String>::new();
+    for class_name in class_names {
+        let method = class_method_name(&class_name);
+        if let Some(previous) = method_names.insert(method.clone(), class_name.clone()) {
+            return Err(syn::Error::new(
+                path.span(),
+                format!("CSS classes `{previous}` and `{class_name}` both map to method `{method}`"),
+            ));
+        }
+        let hash_input = format!("{path_value}\0{class_name}\0{css}");
+        let hash = stable_hash(hash_input.as_bytes());
+        class_map.insert(class_name.clone(), format!("{class_name}__gly_{hash:016x}"));
+    }
+
+    let rewritten_css = rewrite_css_module(&css, &class_map);
+    let rewritten_css = LitStr::new(&rewritten_css, path.span());
+    let include_path = LitStr::new(&path_value, path.span());
+    let mut methods = Vec::new();
+    for (method, original) in method_names {
+        let ident = format_ident!("{}", method);
+        let class_name = LitStr::new(class_map.get(&original).expect("class map contains method class"), path.span());
+        methods.push(quote! {
+            pub const fn #ident(&self) -> &'static str {
+                #class_name
+            }
+        });
+    }
+
+    Ok(quote! {{
+        const _GLORY_CSS_MODULE_SOURCE: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/", #include_path));
+        let _ = _GLORY_CSS_MODULE_SOURCE;
+        #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+        struct GloryCssModule;
+        impl GloryCssModule {
+            pub const fn css(&self) -> &'static str {
+                #rewritten_css
+            }
+            #(#methods)*
+        }
+        GloryCssModule
+    }})
+}
+
+fn extract_css_classes(css: &str) -> Vec<String> {
+    let mut classes = Vec::new();
+    let chars = css.char_indices().collect::<Vec<_>>();
+    let mut index = 0usize;
+    while index < chars.len() {
+        let (_, ch) = chars[index];
+        if ch != '.' {
+            index += 1;
+            continue;
+        }
+        let Some((_, next)) = chars.get(index + 1).copied() else {
+            index += 1;
+            continue;
+        };
+        if !is_css_ident_start(next) {
+            index += 1;
+            continue;
+        }
+        let start = index + 1;
+        let mut end = start + 1;
+        while end < chars.len() && is_css_ident_continue(chars[end].1) {
+            end += 1;
+        }
+        let start_byte = chars[start].0;
+        let end_byte = chars.get(end).map(|(byte, _)| *byte).unwrap_or(css.len());
+        let class_name = css[start_byte..end_byte].to_owned();
+        if !classes.contains(&class_name) {
+            classes.push(class_name);
+        }
+        index = end;
+    }
+    classes.sort();
+    classes
+}
+
+fn rewrite_css_module(css: &str, class_map: &std::collections::BTreeMap<String, String>) -> String {
+    let chars = css.char_indices().collect::<Vec<_>>();
+    let mut out = String::with_capacity(css.len());
+    let mut index = 0usize;
+    while index < chars.len() {
+        let (byte, ch) = chars[index];
+        if ch != '.' {
+            out.push(ch);
+            index += 1;
+            continue;
+        }
+        let Some((_, next)) = chars.get(index + 1).copied() else {
+            out.push(ch);
+            index += 1;
+            continue;
+        };
+        if !is_css_ident_start(next) {
+            out.push(ch);
+            index += 1;
+            continue;
+        }
+        let start = index + 1;
+        let mut end = start + 1;
+        while end < chars.len() && is_css_ident_continue(chars[end].1) {
+            end += 1;
+        }
+        let start_byte = chars[start].0;
+        let end_byte = chars.get(end).map(|(byte, _)| *byte).unwrap_or(css.len());
+        let class_name = &css[start_byte..end_byte];
+        if let Some(rewritten) = class_map.get(class_name) {
+            out.push('.');
+            out.push_str(rewritten);
+        } else {
+            out.push_str(&css[byte..end_byte]);
+        }
+        index = end;
+    }
+    out
+}
+
+fn is_css_ident_start(ch: char) -> bool {
+    ch == '_' || ch == '-' || ch.is_ascii_alphabetic()
+}
+
+fn is_css_ident_continue(ch: char) -> bool {
+    is_css_ident_start(ch) || ch.is_ascii_digit()
+}
+
+fn class_method_name(class_name: &str) -> String {
+    let mut out = String::with_capacity(class_name.len());
+    for ch in class_name.chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch.to_ascii_lowercase());
+        } else {
+            out.push('_');
+        }
+    }
+    while out.contains("__") {
+        out = out.replace("__", "_");
+    }
+    let out = out.trim_matches('_');
+    let mut out = if out.is_empty() { "class".to_owned() } else { out.to_owned() };
+    if out.chars().next().is_some_and(|ch| ch.is_ascii_digit()) {
+        out.insert(0, '_');
+    }
+    if is_rust_keyword(&out) {
+        out.push('_');
+    }
+    out
+}
+
+fn is_rust_keyword(value: &str) -> bool {
+    matches!(
+        value,
+        "as" | "break"
+            | "const"
+            | "continue"
+            | "crate"
+            | "else"
+            | "enum"
+            | "extern"
+            | "false"
+            | "fn"
+            | "for"
+            | "if"
+            | "impl"
+            | "in"
+            | "let"
+            | "loop"
+            | "match"
+            | "mod"
+            | "move"
+            | "mut"
+            | "pub"
+            | "ref"
+            | "return"
+            | "self"
+            | "Self"
+            | "static"
+            | "struct"
+            | "super"
+            | "trait"
+            | "true"
+            | "type"
+            | "unsafe"
+            | "use"
+            | "where"
+            | "while"
+            | "async"
+            | "await"
+            | "dyn"
+    )
+}
+
+fn stable_hash(bytes: &[u8]) -> u64 {
+    const OFFSET: u64 = 0xcbf29ce484222325;
+    const PRIME: u64 = 0x100000001b3;
+    bytes.iter().fold(OFFSET, |hash, byte| (hash ^ u64::from(*byte)).wrapping_mul(PRIME))
 }
 
 /// Turns an `async fn` into a *server function*: the body runs on the

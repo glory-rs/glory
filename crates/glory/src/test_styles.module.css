@@ -1,0 +1,11 @@
+.primary-button {
+  color: red;
+}
+
+.card .primary-button:hover {
+  color: blue;
+}
+
+:global(body) .card {
+  margin: 0;
+}

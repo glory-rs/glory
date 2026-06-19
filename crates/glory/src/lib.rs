@@ -16,11 +16,20 @@ pub use glory_core::asset;
 pub use glory_core::*;
 #[doc(hidden)]
 pub use glory_macros::__asset_folder;
+#[doc(hidden)]
+pub use glory_macros::__css_module;
 
 #[macro_export]
 macro_rules! asset_folder {
     ($path:literal) => {
         $crate::__asset_folder!($crate, $path)
+    };
+}
+
+#[macro_export]
+macro_rules! css_module {
+    ($path:literal) => {
+        $crate::__css_module!($crate, $path)
     };
 }
 
@@ -110,5 +119,16 @@ mod tests {
         assert!(folder.len() >= 2);
         assert!(folder.get("src/lib.rs").is_some());
         assert!(folder.iter().all(|asset| asset.public_path().starts_with("/src/")));
+    }
+
+    #[test]
+    fn css_module_macro_generates_typed_class_methods() {
+        let styles = crate::css_module!("src/test_styles.module.css");
+
+        assert!(styles.primary_button().starts_with("primary-button__gly_"));
+        assert!(styles.card().starts_with("card__gly_"));
+        assert!(styles.css().contains(styles.primary_button()));
+        assert!(styles.css().contains(styles.card()));
+        assert!(!styles.css().contains(".primary-button {"));
     }
 }

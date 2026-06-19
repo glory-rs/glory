@@ -44,5 +44,20 @@ Supported today:
 - nested `@media`, `@supports`, and `@container` blocks
 
 At-rules such as `@keyframes` and `@font-face` are passed through unchanged.
-This is scoped-style support, not a full CSS Modules implementation; class name
-imports and build-time CSS file transforms remain CLI work.
+
+For typed CSS Modules, put classes in a `.module.css` file and use
+`css_module!`:
+
+```rust
+let styles = glory::css_module!("src/profile.module.css");
+
+style().text(styles.css()).show_in(ctx);
+div()
+    .class(styles.card())
+    .fill(button().class(styles.primary_button()).text("Save"))
+    .show_in(ctx);
+```
+
+The macro extracts class selectors, rewrites them to stable content-hashed
+names, and generates one Rust method per class. For example
+`.primary-button` becomes `styles.primary_button()`.
