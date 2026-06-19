@@ -26,10 +26,15 @@ glory serve --no-reload
                      build and serve once without filesystem watching
 glory serve --port 8080 --no-open
                      override the configured site port and skip browser open
+glory run --no-open
+                     build and run once without watching or live reload
 glory doctor         check local toolchains for the selected target
 glory config         validate Glory Cargo metadata
 glory config --schema
                      print the Glory Cargo metadata schema
+glory completions powershell
+                     generate shell completions to stdout
+glory self-update    print update instructions for the installed CLI
 glory check          type-check the configured targets
 glory fmt            run cargo fmt
 glory test           run cargo test for the current project targets

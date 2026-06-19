@@ -66,7 +66,7 @@ pub struct Opts {
 }
 
 #[derive(Debug, Parser)]
-#[clap(version)]
+#[command(name = "glory", version)]
 pub struct Cli {
     /// Path to Cargo.toml.
     #[arg(long)]
@@ -82,12 +82,13 @@ pub struct Cli {
 
 impl Cli {
     pub fn opts(&self) -> Option<Opts> {
-        use Commands::{Build, Bundle, Check, Clean, Config, Doctor, EndToEnd, Fmt, New, Serve, Test};
+        use Commands::{Build, Bundle, Check, Clean, Completions, Config, Doctor, EndToEnd, Fmt, New, Run, SelfUpdate, Serve, Test};
         match &self.command {
-            New(_) | Fmt(_) => None,
+            New(_) | Fmt(_) | Completions(_) | SelfUpdate => None,
             Build(opts) | Bundle(opts) | Check(opts) | Test(opts) | EndToEnd(opts) | Doctor(opts) => Some(opts.clone()),
             Config(opts) => Some(opts.opts.clone()),
             Serve(opts) => Some(opts.opts.clone()),
+            Run(opts) => Some(opts.opts.clone()),
             Clean(opts) => Some(opts.opts.clone()),
         }
     }
@@ -121,6 +122,35 @@ pub struct ServeOpts {
 }
 
 impl ServeOpts {
+    pub fn should_open(&self) -> bool {
+        self.open || !self.no_open
+    }
+}
+
+/// Extra flags for `run`.
+#[derive(Debug, Clone, Parser, PartialEq, Default)]
+pub struct RunOpts {
+    #[command(flatten)]
+    pub opts: Opts,
+
+    /// Override the host address from Cargo metadata for this run.
+    #[arg(long)]
+    pub address: Option<IpAddr>,
+
+    /// Override the site port from Cargo metadata for this run.
+    #[arg(long)]
+    pub port: Option<u16>,
+
+    /// Explicitly open the app in the default browser. This is the default.
+    #[arg(long, action = clap::ArgAction::SetTrue, conflicts_with = "no_open")]
+    pub open: bool,
+
+    /// Do not open the app in the default browser after the build.
+    #[arg(long = "no-open", action = clap::ArgAction::SetTrue)]
+    pub no_open: bool,
+}
+
+impl RunOpts {
     pub fn should_open(&self) -> bool {
         self.open || !self.no_open
     }
@@ -164,10 +194,20 @@ pub struct FmtOpts {
     pub args: Vec<String>,
 }
 
+/// Flags for `completions`.
+#[derive(Debug, Clone, Parser, PartialEq)]
+pub struct CompletionsOpts {
+    /// Shell to generate completions for.
+    #[arg(value_enum)]
+    pub shell: clap_complete::Shell,
+}
+
 #[derive(Debug, Subcommand, PartialEq)]
 pub enum Commands {
     /// Start a hot-reloading dev server (build, serve and live-reload on change).
     Serve(ServeOpts),
+    /// Build and run the app server without watching files or live-reloading.
+    Run(RunOpts),
     /// Build the server (feature ssr) and the client (wasm with feature csr).
     Build(Opts),
     /// Build in release mode and collect the artifacts into a distributable `dist/` folder.
@@ -182,6 +222,10 @@ pub enum Commands {
     Doctor(Opts),
     /// Format the project sources (passthrough to `cargo fmt`).
     Fmt(FmtOpts),
+    /// Generate shell completions to stdout.
+    Completions(CompletionsOpts),
+    /// Print how to update the Glory CLI.
+    SelfUpdate,
     /// Run the cargo tests for app, client and server.
     Test(Opts),
     /// Start the server and end-2-end tests.
@@ -227,5 +271,29 @@ mod tests {
         let result = Cli::try_parse_from(["glory", "serve", "--open", "--no-open"]);
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn run_accepts_network_and_open_flags() {
+        let cli = Cli::parse_from(["glory", "run", "--address", "127.0.0.1", "--port", "8080", "--no-open"]);
+
+        let Commands::Run(run) = cli.command else {
+            panic!("expected run command");
+        };
+
+        assert_eq!(run.address, Some([127, 0, 0, 1].into()));
+        assert_eq!(run.port, Some(8080));
+        assert!(!run.should_open());
+    }
+
+    #[test]
+    fn parses_project_free_utility_commands() {
+        let cli = Cli::parse_from(["glory", "completions", "powershell"]);
+        assert!(matches!(cli.command, Commands::Completions(_)));
+        assert!(cli.opts().is_none());
+
+        let cli = Cli::parse_from(["glory", "self-update"]);
+        assert_eq!(cli.command, Commands::SelfUpdate);
+        assert!(cli.opts().is_none());
     }
 }

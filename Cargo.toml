@@ -82,6 +82,7 @@ bytes = "1.11"
 camino = "1.2"
 cargo_metadata = { version = "0.23", features = ["builder"] }
 clap = { version = "4.6", features = ["derive"] }
+clap_complete = "4.6"
 derive_more = { version = "2", features = ["display"] }
 dirs = "6.0"
 dotenvy = "0.15"

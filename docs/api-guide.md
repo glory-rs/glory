@@ -288,6 +288,9 @@ Important commands:
 cargo run -p glory-cli -- config --schema
 cargo run -p glory-cli -- doctor --target web
 cargo run -p glory-cli -- --manifest-path examples/ssr-simple-salvo/Cargo.toml serve --port 8080 --no-open
+cargo run -p glory-cli -- --manifest-path examples/ssr-simple-salvo/Cargo.toml run --no-open
+cargo run -p glory-cli -- completions powershell
+cargo run -p glory-cli -- self-update
 cargo run -p glory-cli -- --manifest-path examples/ssr-simple-salvo/Cargo.toml check
 cargo run -p glory-cli -- --manifest-path examples/ssr-simple-salvo/Cargo.toml bundle --release
 ```

@@ -131,8 +131,11 @@ R5 仅评估,不阻塞任何人。
 - [ ] **C4 P1** 原生安装器产物:`glory bundle --target desktop` 目前输出裸 exe +
   assets,Dioxus 经 tauri-bundler 出 MSI/DMG/DEB/AppImage。评估直接复用
   tauri-bundler crate,先支持 Windows MSI + Linux deb。
-- [ ] **C5 P2** CLI 小命令补齐:`run`(无热重载直跑)、shell `completions`、
+- [x] **C5 P2** CLI 小命令补齐:`run`(无热重载直跑)、shell `completions`、
   `self-update` 提示。`translate`/`components` 属 RSX 生态,明确不做。
+  2026-06-19 已完成:`glory run` 复用无 watch/live reload 的 serve 路径,
+  `glory completions <shell>` 输出 clap completion script,`glory self-update`
+  输出安装/升级提示。
 - [x] **C6 P1** 修复 CLI 现存 TODO:
   - `crates/cli/src/compile/style.rs:107` Style 产物返回空串占位,样式指纹/缓存失效
     可能不工作;

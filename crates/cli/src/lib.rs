@@ -36,7 +36,7 @@ pub async fn run(args: Cli) -> Result<()> {
 /// Run with parsed arguments plus programmatic [`Overrides`] from the
 /// embeddable [`Glory`] builder.
 pub async fn run_with(args: Cli, overrides: Overrides) -> Result<()> {
-    use Commands::{Build, Bundle, Check, Clean, Config as ConfigCommand, Doctor, EndToEnd, Fmt, New, Serve, Test};
+    use Commands::{Build, Bundle, Check, Clean, Completions, Config as ConfigCommand, Doctor, EndToEnd, Fmt, New, Run, SelfUpdate, Serve, Test};
 
     let verbose = args.opts().map(|o| o.verbose).unwrap_or(0);
     logger::setup(verbose, &args.log);
@@ -47,6 +47,8 @@ pub async fn run_with(args: Cli, overrides: Overrides) -> Result<()> {
     match &args.command {
         New(new) => return new.run().await,
         Fmt(fmt) => return command::fmt(fmt.check, &fmt.args).await,
+        Completions(opts) => return command::completions(opts.shell),
+        SelfUpdate => return command::self_update(),
         Doctor(opts) => return command::doctor(opts).await,
         ConfigCommand(opts) if opts.schema => return command::config_schema().await,
         _ => {}
@@ -68,9 +70,16 @@ pub async fn run_with(args: Cli, overrides: Overrides) -> Result<()> {
 
     let opts = args.opts().unwrap();
     let mut overrides = overrides;
-    if let Serve(serve) = &args.command {
-        overrides.site_address = serve.address;
-        overrides.site_port = serve.port;
+    match &args.command {
+        Serve(serve) => {
+            overrides.site_address = serve.address;
+            overrides.site_port = serve.port;
+        }
+        Run(run) => {
+            overrides.site_address = run.address;
+            overrides.site_port = run.port;
+        }
+        _ => {}
     }
 
     let watch = matches!(&args.command, Serve(serve) if !serve.no_reload);
@@ -80,9 +89,10 @@ pub async fn run_with(args: Cli, overrides: Overrides) -> Result<()> {
 
     let _monitor = Interrupt::run_ctrl_c_monitor();
     match args.command {
-        New(_) | Fmt(_) | Doctor(_) => unreachable!("handled before metadata load"),
+        New(_) | Fmt(_) | Completions(_) | SelfUpdate | Doctor(_) => unreachable!("handled before metadata load"),
         Serve(serve) if serve.no_reload => command::serve(&config.current_project()?, serve.should_open()).await,
         Serve(serve) => command::watch(&config.current_project()?, serve.should_open()).await,
+        Run(run) => command::serve(&config.current_project()?, run.should_open()).await,
         Build(_) => command::build_all(&config).await,
         Bundle(_) => command::bundle_all(&config).await,
         Clean(clean) => command::clean_all(&config, clean.cargo).await,
