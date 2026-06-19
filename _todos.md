@@ -248,7 +248,10 @@ R5 仅评估,不阻塞任何人。
   处理 active WindowId map、resume/suspend、close exit 与 redraw poll。
 - [x] **N4 P2** 属性/property 区分:`blitz_consumer.rs:129` spike 把 property 一律当
   attribute 写,表单控件(value/checked)行为会偏。
-- [ ] **N5 P3** accesskit 无障碍接入。
+- [x] **N5 P3** accesskit 无障碍接入。新增 `glory-native/accessibility`
+  feature,打开 `blitz-shell/accessibility` 与 `blitz-dom/accessibility`,复用
+  upstream `accesskit_winit` adapter 和 Blitz document accessibility tree;已验证
+  `cargo check/test -p glory-native --features "shell accessibility"`。
 
 并行性:N1/N2/N4 互相独立;N3 与其余并行;建议 N1+N4 先行(直接影响表单可用性)。
 

@@ -8,6 +8,9 @@
 //! backend. The `shell` feature adds a small Glory wrapper around
 //! `blitz-shell` + vello lifecycle handling and routes Blitz click/input events
 //! back into Glory's `CommandHolder`.
+//!
+//! Enable the `accessibility` feature to wire Blitz's AccessKit tree through
+//! `accesskit_winit` for native shell windows.
 
 pub use glory_core::renderer::{
     Command as NativeCommand, CommandNode as NativeNode, CommandRenderer as NativeRenderer, EventData as NativeEventPayload,

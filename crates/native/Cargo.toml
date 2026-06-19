@@ -29,3 +29,4 @@ workspace = true
 # BaseDocument (the spike for a native non-webview renderer).
 blitz = ["dep:blitz-dom", "glory-core/backend-command"]
 shell = ["blitz", "dep:anyrender_vello", "dep:blitz-shell", "dep:blitz-traits", "dep:serde_json", "dep:winit"]
+accessibility = ["shell", "blitz-dom/accessibility", "blitz-shell/accessibility"]

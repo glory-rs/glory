@@ -18,7 +18,7 @@ Glory 现在不再是单纯的 Web/SSR 框架。当前主线已经具备:
 | Desktop WebView | 可用;支持 wry/tao、多窗口、菜单、custom protocol、hot reload | `crates/desktop` |
 | Server functions | 可用;Salvo/Axum/Actix adapter + request context | `crates/serverfn`, `crates/macros` |
 | Mobile | 模板、交叉编译路径、CI smoke、设备验证脚本已落地;真机/模拟器实际运行需外部设备 | `crates/cli/src/compile/mobile.rs`, `crates/cli/templates/mobile`, `scripts/mobile-device-smoke.ps1` |
-| Native Blitz | `blitz-dom` consumer、Glory shell wrapper、`blitz-shell`/vello lifecycle、click/input 回程桥已落地 | `crates/native` |
+| Native Blitz | `blitz-dom` consumer、Glory shell wrapper、`blitz-shell`/vello lifecycle、click/input 回程桥、AccessKit feature 已落地 | `crates/native` |
 | TUI | 只读 command DOM 展示定位 | `crates/tui` |
 | LiveView | 协议/session crate、浏览器 reconnect client、Salvo WebSocket route 已落地 | `crates/liveview` |
 
@@ -101,7 +101,7 @@ Glory 现在不再是单纯的 Web/SSR 框架。当前主线已经具备:
 
 2. **Native Blitz**
    - 已有 `glory-native/shell` 真窗口入口和 click/input 回程桥。
-   - 下一步是人工/截图验证 counter 真实绘制、布局边界、输入法、a11y 和文本布局。
+   - 下一步是人工/截图验证 counter 真实绘制、布局边界、输入法、a11y 行为和文本布局。
 
 3. **LiveView**
    - `glory-liveview` 已复用 desktop JS interpreter 思路,传输层为 WebSocket。
