@@ -139,6 +139,29 @@ green baseline: composite `Each` rows were not reattaching their descendant DOM
 nodes during CSR moves, and the benchmark remove icon was not reliably
 clickable in the official headless runner. Both are fixed in this checkout.
 
+### Focused Create10k Rerun
+
+E12 validation reran only `07_create10k` with five samples after optimizing the
+Glory benchmark data generator and CSR delegated click registration:
+
+```powershell
+./benchmarks/official-js-framework-benchmark.ps1 `
+  -SkipInstall `
+  -Benchmarks 07_create10k `
+  -Count 5 `
+  -Headless `
+  -NoThrottling
+```
+
+| Benchmark | Framework | Samples | Total median | Total range | Script median | Script range | Paint median | Paint range |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `07_create10k` | dioxus-rs v0.7 keyed | 5 | 328.9 | 26.5 | 71.7 | 7.8 | 253.9 | 18.1 |
+| `07_create10k` | glory-rs local keyed | 5 | 319.8 | 126.4 | 80.3 | 25.5 | 241.2 | 100.8 |
+
+Glory now matches the official create10k total time and is faster on paint in
+this focused run. The remaining script-only gap is about 8.6 ms and is tied to
+the per-row reactive scope/static-subtree overhead tracked under E9.
+
 ## Local Benchmark Report
 
 Use this wrapper to generate a repeatable local bundle:

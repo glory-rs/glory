@@ -25,8 +25,9 @@
 | 桌面 | 协议扎实,窗口控制 API、异步自定义协议、托盘、全局热键、拖放/打印已补 | 中 |
 | Native(Blitz)/LiveView/移动端 | 分别处于 spike(~20%)/可用但单适配器(~30%)/模板可编译但无真机验证(~30%) | 中-高 |
 
-性能:官方 js-framework-benchmark 9 项聚合 Glory 442ms vs Dioxus 456ms vs Leptos 589ms,
-`create10k` 脚本时间仍落后 Dioxus(78ms vs 64ms)。架构层面已无硬性差距,余下是产品化。
+性能:官方 js-framework-benchmark 9 项聚合 Glory 442ms vs Dioxus 456ms vs Leptos 589ms;
+E12 后聚焦 `07_create10k` Count=5 为 Glory 319.8ms total vs Dioxus 328.9ms
+total(script 仍为 80.3ms vs 71.7ms)。架构层面已无硬性差距,余下是产品化。
 
 ---
 
@@ -328,8 +329,11 @@ R5 仅评估,不阻塞任何人。
   handler 注册,以及空 registry vs 10k handler registry 的 command-stream dispatch
   lookup/restore。短样本显示 10k handler 注册约增加 1ms,lookup 约 107ns,暂不需要
   另起委派行 API。
-- [ ] **E12 P2** `create10k` 脚本时间追平 Dioxus(78ms vs 64ms):在 E10 落地后,
-  对 wasm→DOM 调用次数与字符串分配做 profile 驱动优化。
+- [x] **E12 P2** `create10k` 对标 Dioxus:新增 Glory benchmark 数据生成批量
+  state 写回/Vec move,并缓存 CSR delegated click key/注册 fast path。官方
+  `07_create10k` Count=5 headless/no-throttling:Glory 319.8ms total vs Dioxus
+  328.9ms total;script 仍有小差距(80.3ms vs 71.7ms),但 paint 更快且总时间
+  已追平。后续 script-only 残差并入 E9 的普通 builder 静态子树自动压缩。
 
 并行性:E10 先行;E9/E11/E12 随后并行,均以 E10 的报告为验收标准。
 

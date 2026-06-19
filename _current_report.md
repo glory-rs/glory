@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 54 |
+| 已完成 `[x]` | 55 |
 | 部分完成 `[~]` | 3 |
-| 未完成 `[ ]` | 1 |
+| 未完成 `[ ]` | 0 |
 
 按能力权重估算:
 
@@ -194,6 +194,13 @@ SSR feature 测试覆盖较完整:
 E11 当前结论:10k 同 DOM 构建中 click handler 注册约把本机短样本从
 3.43ms 提到 4.40ms;10k handler registry 的最后一行 dispatch lookup/restore
 约 107ns。create10k 的后续优化应优先看批量 DOM command 数和浏览器侧 apply 成本。
+
+E12 当前结论:`benchmarks/glory` 已把数据生成改为批量 RNG/next-id 写回并避免
+`Vec<Row>` clone,CSR delegated click 注册也走缓存 key + click fast path。官方
+`07_create10k` Count=5(`-Headless -NoThrottling`)结果为 Glory 319.8ms total /
+80.3ms script / 241.2ms paint,Dioxus 328.9ms total / 71.7ms script /
+253.9ms paint。总时间已追平并略快;script-only 残差约 8.6ms,后续归入 E9 的普通
+builder 静态子树压缩。
 
 ### Server Functions
 

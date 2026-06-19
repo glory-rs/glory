@@ -41,17 +41,20 @@ impl Rng {
     fn new() -> Self {
         Self(Rc::new(Cell::new(0x2545_F491_4F6C_DD1D)))
     }
-    fn next_u64(&self) -> u64 {
-        let s = self
-            .0
-            .get()
+
+    fn state(&self) -> u64 {
+        self.0.get()
+    }
+
+    fn set_state(&self, state: u64) {
+        self.0.set(state);
+    }
+
+    fn below(state: &mut u64, n: usize) -> usize {
+        *state = state
             .wrapping_mul(6364136223846793005)
             .wrapping_add(1442695040888963407);
-        self.0.set(s);
-        s >> 33
-    }
-    fn below(&self, n: usize) -> usize {
-        (self.next_u64() as usize) % n
+        ((*state >> 33) as usize) % n
     }
 }
 
@@ -84,22 +87,28 @@ impl Bench {
     }
 
     fn build_rows(&self, count: usize) -> Vec<Row> {
-        (0..count)
-            .map(|_| {
-                let id = self.next_id.get();
-                self.next_id.set(id + 1);
-                let label = format!(
-                    "{} {} {}",
-                    ADJECTIVES[self.rng.below(ADJECTIVES.len())],
-                    COLOURS[self.rng.below(COLOURS.len())],
-                    NOUNS[self.rng.below(NOUNS.len())],
-                );
-                Row {
-                    id,
-                    label: Cage::new(label),
-                }
-            })
-            .collect()
+        let mut next_id = self.next_id.get();
+        let mut rng_state = self.rng.state();
+        let mut rows = Vec::with_capacity(count);
+
+        for _ in 0..count {
+            let id = next_id;
+            next_id += 1;
+            let label = format!(
+                "{} {} {}",
+                ADJECTIVES[Rng::below(&mut rng_state, ADJECTIVES.len())],
+                COLOURS[Rng::below(&mut rng_state, COLOURS.len())],
+                NOUNS[Rng::below(&mut rng_state, NOUNS.len())],
+            );
+            rows.push(Row {
+                id,
+                label: Cage::new(label),
+            });
+        }
+
+        self.next_id.set(next_id);
+        self.rng.set_state(rng_state);
+        rows
     }
 }
 
@@ -111,7 +120,7 @@ impl Widget for Bench {
             let bench = this.clone_handles();
             move |_| {
                 let new_rows = bench.build_rows(count);
-                rows.revise(|mut v| *v = new_rows.clone());
+                rows.revise(move |mut v| *v = new_rows);
             }
         };
 
@@ -121,7 +130,7 @@ impl Widget for Bench {
         let bench = self.clone_handles();
         button().id("add").text("Append 1,000 rows").on(events::click, move |_| {
             let extra = bench.build_rows(1_000);
-            bench.rows.revise(|mut v| v.extend(extra.clone()));
+            bench.rows.revise(move |mut v| v.extend(extra));
         }).show_in(ctx);
 
         let rows = self.rows.clone();
