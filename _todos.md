@@ -241,9 +241,12 @@ R5 仅评估,不阻塞任何人。
   (`crates/liveview/src/lib.rs`),百级并发即吃紧;Dioxus 用
   `LocalPoolHandle` task-per-session(`packages/liveview/src/pool.rs`)。改为
   spawn_local 固定任务 + 有界队列(背压),保住 non-Send 树约束。
-- [ ] **L2 P1** Axum/Actix 适配器:抽 `LiveviewRouter` 式 trait(对照
+- [x] **L2 P1** Axum/Actix 适配器:抽 `LiveviewRouter` 式 trait(对照
   `packages/liveview/src/adapters/mod.rs` 约 30 行),消除 Salvo 硬编码。可与 L1 并行
   (传输 trait 先定)。
+  2026-06-19 已完成:新增 `LiveviewRouter` trait、`axum_mount` 与 `actix_mount`,
+  Salvo/Axum/Actix 共享 `SessionWorker`/`LiveViewSession` 合约;Actix 使用
+  `actix-ws` 无 actor adapter。
 - [x] **L3 P2** Query 应答接通:协议已有 Query 消息,服务端无应答路径;复用桌面解释器
   的 query 答复逻辑。
   2026-06-19 已完成:确认 `LIVEVIEW_CLIENT_JS` 的 `__gloryWryQuery` 会发送

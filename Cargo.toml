@@ -38,6 +38,7 @@ glory-serverfn = { version = "0.3.1", path = "crates/serverfn", default-features
 
 anyhow = "1"
 actix-web = "4"
+actix-ws = "0.4.0"
 async-trait = "0.1.89"
 inventory = "0.3"
 proc-macro2 = "1"

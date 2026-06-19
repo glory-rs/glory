@@ -43,6 +43,43 @@ tree on a dedicated local session thread and forwards WebSocket messages across
 a channel, preserving `CommandHolder`'s single-threaded `Rc`/`RefCell` model
 while satisfying Salvo's `Send` WebSocket task boundary.
 
+## Axum Adapter
+
+With the `axum` feature enabled, mount the same session contract on an Axum
+router:
+
+```rust
+use glory_liveview::axum_mount;
+
+let app = axum_mount::router(|| app());
+```
+
+For an existing router, use the shared `LiveviewRouter` trait:
+
+```rust
+use glory_liveview::LiveviewRouter;
+
+let app = axum::Router::new().with_liveview("/__glory/liveview", || app());
+```
+
+## Actix Adapter
+
+With the `actix` feature enabled, mount either a `Scope` or configure an
+`App`:
+
+```rust
+use glory_liveview::actix_mount;
+
+let app = actix_web::App::new().service(actix_mount::scope(|| app()));
+```
+
+```rust
+actix_web::App::new().configure(|cfg| actix_mount::configure(cfg, || app()));
+```
+
+Salvo, Axum, and Actix all use the same `LiveViewSession` and worker. The
+framework modules only translate WebSocket message types and route builders.
+
 ## HTML Shell Ownership
 
 `glory-liveview` does not own the page template. It only provides the command

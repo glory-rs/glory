@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 36 |
+| 已完成 `[x]` | 37 |
 | 部分完成 `[~]` | 3 |
-| 未完成 `[ ]` | 21 |
+| 未完成 `[ ]` | 20 |
 
 按能力权重估算:
 
@@ -36,7 +36,7 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 | CLI / bundle / dev server | 55-65% |
 | desktop webview | 65-75% |
 | routing | 35-45% |
-| native Blitz / mobile / LiveView | 20-35% |
+| native Blitz / mobile / LiveView | 25-40% |
 | CI / release governance | 35-45% |
 
 ## 初版发现的可复现缺陷与处理状态
@@ -344,13 +344,12 @@ serverfn 基础可用，但对比成熟框架还缺:
 
 - command stream over WebSocket。
 - reconnect client。
-- Salvo route。
+- Salvo/Axum/Actix route adapters。
 - mount/event/ping/query 基础测试。
 
 缺口:
 
 - 当前 Salvo adapter 每 session 一个 `std::thread` + `mpsc`，并发扩展性有限。
-- 缺 Axum/Actix adapter。
 - 缺端到端浏览器场景。
 - query 应答路径已有回归测试覆盖。
 - session TTL/resume 仍缺实现;HTML shell ownership 与重连退避语义已文档化。
@@ -474,7 +473,7 @@ cargo clippy -p glory-cli --lib --no-default-features -- -D warnings
 
 1. serverfn 多编码和 middleware。
 2. asset typed manifest / hash rewrite。
-3. LiveView async session worker 和 Axum/Actix adapter。
+3. LiveView async session worker。
 4. Native query/layout 接通。
 5. Mobile Android emulator smoke。
 

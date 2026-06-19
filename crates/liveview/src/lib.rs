@@ -15,6 +15,7 @@ use glory_core::{Holder, Widget};
 use serde::{Deserialize, Serialize};
 
 pub const LIVEVIEW_PROTOCOL_VERSION: u32 = 1;
+pub const LIVEVIEW_DEFAULT_PATH: &str = "/__glory/liveview";
 pub const LIVEVIEW_CLIENT_JS: &str = include_str!("liveview_client.js");
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -91,27 +92,119 @@ impl LiveViewSession {
     }
 }
 
+/// Router abstraction for frameworks that can mount a Glory LiveView websocket
+/// endpoint.
+pub trait LiveviewRouter {
+    fn create_default_liveview_router() -> Self;
+
+    fn with_liveview<W>(self, path: &str, widget: impl Fn() -> W + Send + Sync + 'static) -> Self
+    where
+        Self: Sized,
+        W: Widget + 'static;
+}
+
+#[cfg(any(feature = "axum", feature = "actix"))]
+fn normalize_liveview_path(path: &str) -> String {
+    let trimmed = path.trim();
+    if trimmed.is_empty() {
+        LIVEVIEW_DEFAULT_PATH.to_owned()
+    } else if trimmed.starts_with('/') {
+        trimmed.to_owned()
+    } else {
+        format!("/{trimmed}")
+    }
+}
+
+#[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
+struct SessionWorker {
+    sender: std::sync::mpsc::Sender<SessionRequest>,
+    thread: Option<std::thread::JoinHandle<()>>,
+}
+
+#[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
+enum SessionRequest {
+    Message {
+        message: LiveViewMessage,
+        reply: futures::channel::oneshot::Sender<Option<LiveViewMessage>>,
+    },
+    Close,
+}
+
+#[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
+impl SessionWorker {
+    fn spawn<W>(factory: std::sync::Arc<dyn Fn() -> W + Send + Sync + 'static>) -> Result<(Self, LiveViewMessage), std::sync::mpsc::RecvError>
+    where
+        W: Widget + 'static,
+    {
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let (mount_sender, mount_receiver) = std::sync::mpsc::channel();
+        let thread = std::thread::spawn(move || {
+            let (session, mount) = LiveViewSession::mount(factory());
+            if mount_sender.send(mount).is_err() {
+                return;
+            }
+            while let Ok(request) = receiver.recv() {
+                match request {
+                    SessionRequest::Message { message, reply } => {
+                        let _ = reply.send(session.handle_message(message));
+                    }
+                    SessionRequest::Close => break,
+                }
+            }
+        });
+        let mount = mount_receiver.recv()?;
+        Ok((
+            Self {
+                sender,
+                thread: Some(thread),
+            },
+            mount,
+        ))
+    }
+
+    async fn handle_message(&self, message: LiveViewMessage) -> Option<LiveViewMessage> {
+        let (reply, receiver) = futures::channel::oneshot::channel();
+        if self.sender.send(SessionRequest::Message { message, reply }).is_err() {
+            return Some(LiveViewMessage::Error {
+                message: "liveview session worker stopped".to_owned(),
+            });
+        }
+        receiver.await.unwrap_or_else(|_| {
+            Some(LiveViewMessage::Error {
+                message: "liveview session worker dropped a response".to_owned(),
+            })
+        })
+    }
+}
+
+#[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
+impl Drop for SessionWorker {
+    fn drop(&mut self) {
+        let _ = self.sender.send(SessionRequest::Close);
+        if let Some(thread) = self.thread.take() {
+            let _ = thread.join();
+        }
+    }
+}
+
 #[cfg(feature = "salvo")]
 pub mod salvo_mount {
     use std::sync::Arc;
-    use std::sync::mpsc::{self, Sender};
-    use std::thread::{self, JoinHandle};
 
     use futures::StreamExt;
-    use futures::channel::oneshot;
     use glory_core::Widget;
     use salvo::prelude::{Depot, FlowCtrl, Request, Response, Router};
     use salvo::websocket::{Message, WebSocket, WebSocketUpgrade};
     use salvo::{Handler, async_trait};
 
-    use crate::{LiveViewMessage, LiveViewSession};
+    use crate::{LIVEVIEW_DEFAULT_PATH, LiveViewMessage, SessionWorker};
 
     pub fn router<W>(widget: impl Fn() -> W + Send + Sync + 'static) -> Router
     where
         W: Widget + 'static,
     {
         let factory: Arc<dyn Fn() -> W + Send + Sync + 'static> = Arc::new(widget);
-        Router::with_path("__glory/liveview").get(LiveViewHandler { factory })
+        Router::with_path(LIVEVIEW_DEFAULT_PATH.trim_start_matches('/')).get(LiveViewHandler { factory })
     }
 
     struct LiveViewHandler<W>
@@ -177,80 +270,222 @@ pub mod salvo_mount {
         }
     }
 
-    struct SessionWorker {
-        sender: Sender<SessionRequest>,
-        thread: Option<JoinHandle<()>>,
-    }
-
-    enum SessionRequest {
-        Message {
-            message: LiveViewMessage,
-            reply: oneshot::Sender<Option<LiveViewMessage>>,
-        },
-        Close,
-    }
-
-    impl SessionWorker {
-        fn spawn<W>(factory: Arc<dyn Fn() -> W + Send + Sync + 'static>) -> Result<(Self, LiveViewMessage), mpsc::RecvError>
-        where
-            W: Widget + 'static,
-        {
-            let (sender, receiver) = mpsc::channel();
-            let (mount_sender, mount_receiver) = mpsc::channel();
-            let thread = thread::spawn(move || {
-                let (session, mount) = LiveViewSession::mount(factory());
-                if mount_sender.send(mount).is_err() {
-                    return;
-                }
-                while let Ok(request) = receiver.recv() {
-                    match request {
-                        SessionRequest::Message { message, reply } => {
-                            let _ = reply.send(session.handle_message(message));
-                        }
-                        SessionRequest::Close => break,
-                    }
-                }
-            });
-            let mount = mount_receiver.recv()?;
-            Ok((
-                Self {
-                    sender,
-                    thread: Some(thread),
-                },
-                mount,
-            ))
-        }
-
-        async fn handle_message(&self, message: LiveViewMessage) -> Option<LiveViewMessage> {
-            let (reply, receiver) = oneshot::channel();
-            if self.sender.send(SessionRequest::Message { message, reply }).is_err() {
-                return Some(LiveViewMessage::Error {
-                    message: "liveview session worker stopped".to_owned(),
-                });
-            }
-            receiver.await.unwrap_or_else(|_| {
-                Some(LiveViewMessage::Error {
-                    message: "liveview session worker dropped a response".to_owned(),
-                })
-            })
-        }
-    }
-
-    impl Drop for SessionWorker {
-        fn drop(&mut self) {
-            let _ = self.sender.send(SessionRequest::Close);
-            if let Some(thread) = self.thread.take() {
-                let _ = thread.join();
-            }
-        }
-    }
-
     async fn send(socket: &mut WebSocket, message: LiveViewMessage) -> Result<(), salvo::Error> {
         socket.send(Message::text(message.to_json().expect("liveview messages serialize"))).await
     }
 
     async fn send_error(socket: &mut WebSocket, message: impl Into<String>) -> Result<(), salvo::Error> {
         send(socket, LiveViewMessage::Error { message: message.into() }).await
+    }
+}
+
+#[cfg(feature = "axum")]
+pub mod axum_mount {
+    use std::sync::Arc;
+
+    use axum::Router;
+    use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
+    use axum::routing::get;
+    use futures::StreamExt;
+    use glory_core::Widget;
+
+    use crate::{LIVEVIEW_DEFAULT_PATH, LiveViewMessage, LiveviewRouter, SessionWorker, normalize_liveview_path};
+
+    pub fn router<W>(widget: impl Fn() -> W + Send + Sync + 'static) -> Router
+    where
+        W: Widget + 'static,
+    {
+        Router::new().with_liveview(LIVEVIEW_DEFAULT_PATH, widget)
+    }
+
+    pub fn route<S, W>(router: Router<S>, path: &str, widget: impl Fn() -> W + Send + Sync + 'static) -> Router<S>
+    where
+        S: Clone + Send + Sync + 'static,
+        W: Widget + 'static,
+    {
+        router.with_liveview(path, widget)
+    }
+
+    impl<S> LiveviewRouter for Router<S>
+    where
+        S: Clone + Send + Sync + 'static,
+    {
+        fn create_default_liveview_router() -> Self {
+            Router::new()
+        }
+
+        fn with_liveview<W>(self, path: &str, widget: impl Fn() -> W + Send + Sync + 'static) -> Self
+        where
+            W: Widget + 'static,
+        {
+            let factory: Arc<dyn Fn() -> W + Send + Sync + 'static> = Arc::new(widget);
+            self.route(
+                &normalize_liveview_path(path),
+                get(move |ws: WebSocketUpgrade| {
+                    let factory = factory.clone();
+                    async move { ws.on_upgrade(move |socket| handle_socket(socket, factory)) }
+                }),
+            )
+        }
+    }
+
+    async fn handle_socket<W>(mut socket: WebSocket, factory: Arc<dyn Fn() -> W + Send + Sync + 'static>)
+    where
+        W: Widget + 'static,
+    {
+        let Ok((worker, mount)) = SessionWorker::spawn(factory) else {
+            let _ = send_error(&mut socket, "liveview session worker failed to mount").await;
+            return;
+        };
+        if send(&mut socket, mount).await.is_err() {
+            return;
+        }
+
+        while let Some(message) = socket.next().await {
+            let Ok(message) = message else {
+                break;
+            };
+            let Message::Text(text) = message else {
+                continue;
+            };
+            match LiveViewMessage::from_json(text.as_str()) {
+                Ok(message) => {
+                    if let Some(reply) = worker.handle_message(message).await
+                        && send(&mut socket, reply).await.is_err()
+                    {
+                        break;
+                    }
+                }
+                Err(err) => {
+                    if send_error(&mut socket, format!("invalid liveview message: {err}")).await.is_err() {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    async fn send(socket: &mut WebSocket, message: LiveViewMessage) -> Result<(), axum::Error> {
+        socket.send(Message::text(message.to_json().expect("liveview messages serialize"))).await
+    }
+
+    async fn send_error(socket: &mut WebSocket, message: impl Into<String>) -> Result<(), axum::Error> {
+        send(socket, LiveViewMessage::Error { message: message.into() }).await
+    }
+}
+
+#[cfg(feature = "actix")]
+pub mod actix_mount {
+    use std::sync::Arc;
+
+    use actix_web::{HttpRequest, HttpResponse, Scope, web};
+    use glory_core::Widget;
+
+    use crate::{LIVEVIEW_DEFAULT_PATH, LiveViewMessage, LiveviewRouter, SessionWorker, normalize_liveview_path};
+
+    pub fn scope<W>(widget: impl Fn() -> W + Send + Sync + 'static) -> Scope
+    where
+        W: Widget + 'static,
+    {
+        web::scope("").with_liveview(LIVEVIEW_DEFAULT_PATH, widget)
+    }
+
+    pub fn configure<W>(cfg: &mut web::ServiceConfig, widget: impl Fn() -> W + Send + Sync + 'static)
+    where
+        W: Widget + 'static,
+    {
+        let factory: Arc<dyn Fn() -> W + Send + Sync + 'static> = Arc::new(widget);
+        cfg.route(
+            LIVEVIEW_DEFAULT_PATH,
+            web::get().to(move |req: HttpRequest, body: web::Payload| {
+                let factory = factory.clone();
+                async move { handler(req, body, factory).await }
+            }),
+        );
+    }
+
+    impl LiveviewRouter for Scope {
+        fn create_default_liveview_router() -> Self {
+            web::scope("")
+        }
+
+        fn with_liveview<W>(self, path: &str, widget: impl Fn() -> W + Send + Sync + 'static) -> Self
+        where
+            W: Widget + 'static,
+        {
+            let factory: Arc<dyn Fn() -> W + Send + Sync + 'static> = Arc::new(widget);
+            self.route(
+                &normalize_liveview_path(path),
+                web::get().to(move |req: HttpRequest, body: web::Payload| {
+                    let factory = factory.clone();
+                    async move { handler(req, body, factory).await }
+                }),
+            )
+        }
+    }
+
+    async fn handler<W>(req: HttpRequest, body: web::Payload, factory: Arc<dyn Fn() -> W + Send + Sync + 'static>) -> actix_web::Result<HttpResponse>
+    where
+        W: Widget + 'static,
+    {
+        let (response, session, stream) = actix_ws::handle(&req, body)?;
+        actix_web::rt::spawn(handle_socket(session, stream, factory));
+        Ok(response)
+    }
+
+    async fn handle_socket<W>(
+        mut session: actix_ws::Session,
+        mut stream: actix_ws::MessageStream,
+        factory: Arc<dyn Fn() -> W + Send + Sync + 'static>,
+    ) where
+        W: Widget + 'static,
+    {
+        let Ok((worker, mount)) = SessionWorker::spawn(factory) else {
+            let _ = send_error(&mut session, "liveview session worker failed to mount").await;
+            return;
+        };
+        if send(&mut session, mount).await.is_err() {
+            return;
+        }
+
+        while let Some(message) = stream.recv().await {
+            let Ok(message) = message else {
+                break;
+            };
+            match message {
+                actix_ws::Message::Text(text) => match LiveViewMessage::from_json(text.as_ref()) {
+                    Ok(message) => {
+                        if let Some(reply) = worker.handle_message(message).await
+                            && send(&mut session, reply).await.is_err()
+                        {
+                            break;
+                        }
+                    }
+                    Err(err) => {
+                        if send_error(&mut session, format!("invalid liveview message: {err}")).await.is_err() {
+                            break;
+                        }
+                    }
+                },
+                actix_ws::Message::Ping(bytes) => {
+                    if session.pong(&bytes).await.is_err() {
+                        break;
+                    }
+                }
+                actix_ws::Message::Close(_) => break,
+                _ => {}
+            }
+        }
+
+        let _ = session.close(None).await;
+    }
+
+    async fn send(session: &mut actix_ws::Session, message: LiveViewMessage) -> Result<(), actix_ws::Closed> {
+        session.text(message.to_json().expect("liveview messages serialize")).await
+    }
+
+    async fn send_error(session: &mut actix_ws::Session, message: impl Into<String>) -> Result<(), actix_ws::Closed> {
+        send(session, LiveViewMessage::Error { message: message.into() }).await
     }
 }
 
