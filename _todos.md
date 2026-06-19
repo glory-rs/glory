@@ -213,8 +213,10 @@ R5 仅评估,不阻塞任何人。
   desktop/platform 文档已覆盖调用方式。
 - [ ] **D2 P2** 托盘图标支持(tray-icon crate;`DesktopConfig` 字段 + 事件回调)。
 - [ ] **D3 P2** 全局热键(global-hotkey crate;注册/注销 API)。
-- [ ] **D4 P1** 异步自定义协议处理器:当前 `glory://` 仅同步;对照 Dioxus
-  `AsyncWryProtocol` + `RequestAsyncResponder`,支持长耗时资源/RPC 端点。
+- [x] **D4 P1** 异步自定义协议处理器:内置 `glory://` 已迁到
+  `with_asynchronous_custom_protocol`;新增 `DesktopProtocol`/`DesktopConfig::with_custom_protocol`
+  与 `desktop_protocol_response`,对照 Dioxus `AsyncWryProtocol` +
+  `RequestAsyncResponder`,支持长耗时资源/RPC 端点。
 - [x] **D5 P2** 原生文件对话框集成指南或 rfd 助手(当前文档定位"应用自理",至少给
   recipes)。`docs/platform-apis.md#file-dialogs` 记录了 app-owned `rfd` 集成模式,
   `docs/desktop.md` 已补入口。

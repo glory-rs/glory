@@ -168,6 +168,31 @@ assets root, the desktop runtime installs it before mounting the widget tree,
 so `logo.public_path()` resolves to the hashed URL while the original file
 remains available for compatibility.
 
+## Custom Protocols
+
+The built-in `glory://` asset protocol is asynchronous internally. Register
+additional long-running resource or RPC protocols with `DesktopProtocol`; the
+handler owns Wry's `RequestAsyncResponder`, so it can reply from a worker
+thread or runtime task:
+
+```rust
+use glory_desktop::{desktop_protocol_response, DesktopConfig, DesktopProtocol};
+
+let config = DesktopConfig::default().with_custom_protocol(DesktopProtocol::new(
+    "app",
+    |_webview_id, request, responder| {
+        std::thread::spawn(move || {
+            let body = format!("path={}", request.uri().path()).into_bytes();
+            responder.respond(desktop_protocol_response(200, "text/plain", body));
+        });
+    },
+));
+```
+
+`glory` is reserved for the built-in static asset protocol. On Windows, custom
+protocol URLs are exposed through Wry's localhost rewrite in the same way as
+`asset_url`.
+
 ## Hot Reload
 
 Run the app through:

@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 42 |
+| 已完成 `[x]` | 43 |
 | 部分完成 `[~]` | 3 |
-| 未完成 `[ ]` | 15 |
+| 未完成 `[ ]` | 14 |
 
 按能力权重估算:
 
@@ -34,7 +34,7 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 | CSR + SSR 基础使用 | 65-75% |
 | server functions | 55-65% |
 | CLI / bundle / dev server | 55-65% |
-| desktop webview | 65-75% |
+| desktop webview | 70-80% |
 | routing | 35-45% |
 | native Blitz / mobile / LiveView | 25-40% |
 | CI / release governance | 35-45% |
@@ -217,6 +217,7 @@ desktop runtime 已经是真 wry/tao 宿主，不只是测试 sink。
 - multi-window。
 - menu。
 - custom `glory://` protocol。
+- async custom protocols via Wry `RequestAsyncResponder`。
 - hot reload message shape。
 - IPC event/query 回程。
 - asset path traversal 防护。
@@ -314,7 +315,6 @@ serverfn 基础可用，但对比成熟框架还缺:
 
 - tray icon。
 - global hotkey。
-- async custom protocol。
 - drag-and-drop file events。
 - print dialog。
 

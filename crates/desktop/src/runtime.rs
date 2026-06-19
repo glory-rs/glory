@@ -11,6 +11,7 @@
 //! reactive scope per `HolderId`), webview and command queue; IPC events
 //! carry a stable [`DesktopWindowId`] so batches never cross windows.
 
+use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -22,7 +23,7 @@ use glory_hot_reload::{FunctionReloadBatch, ReloadMessage};
 use tao::event::{Event, WindowEvent};
 use tao::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy, EventLoopWindowTarget};
 use tao::window::{Fullscreen, Window, WindowBuilder, WindowId};
-use wry::{WebView, WebViewBuilder};
+use wry::{WebView, WebViewBuilder, WebViewId};
 
 use crate::IpcMessage;
 
@@ -238,6 +239,57 @@ impl MenuSpec {
     }
 }
 
+/// Request received by a desktop custom protocol handler.
+pub type DesktopProtocolRequest = wry::http::Request<Vec<u8>>;
+
+/// Response sent from a desktop custom protocol handler.
+pub type DesktopProtocolResponse = wry::http::Response<Cow<'static, [u8]>>;
+
+type DesktopProtocolCallback = Rc<dyn Fn(WebViewId, DesktopProtocolRequest, wry::RequestAsyncResponder)>;
+
+/// Asynchronous custom protocol registered on each desktop webview.
+///
+/// The handler receives Wry's [`RequestAsyncResponder`], so slow work can be
+/// moved to a thread or async runtime before calling `respond`.
+#[derive(Clone)]
+pub struct DesktopProtocol {
+    name: String,
+    handler: DesktopProtocolCallback,
+}
+
+impl DesktopProtocol {
+    pub fn new(name: impl Into<String>, handler: impl Fn(WebViewId, DesktopProtocolRequest, wry::RequestAsyncResponder) + 'static) -> Self {
+        let name = name.into();
+        assert!(
+            !name.eq_ignore_ascii_case("glory"),
+            "`glory` is reserved for the built-in desktop asset protocol"
+        );
+        Self {
+            name,
+            handler: Rc::new(handler),
+        }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+impl std::fmt::Debug for DesktopProtocol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DesktopProtocol").field("name", &self.name).finish()
+    }
+}
+
+/// Builds a response suitable for [`wry::RequestAsyncResponder::respond`].
+pub fn desktop_protocol_response(status: u16, mime: &str, body: impl Into<Cow<'static, [u8]>>) -> DesktopProtocolResponse {
+    wry::http::Response::builder()
+        .status(status)
+        .header("content-type", mime)
+        .body(body.into())
+        .expect("desktop protocol response builds")
+}
+
 /// Window/host options for one window.
 #[derive(Clone)]
 pub struct DesktopConfig {
@@ -258,6 +310,10 @@ pub struct DesktopConfig {
     /// [`asset_url`]). Defaults to `GLORY_SITE_ROOT` (set by glory-cli),
     /// falling back to the executable's directory.
     pub assets_root: Option<std::path::PathBuf>,
+    /// Extra asynchronous custom protocols registered on the webview.
+    ///
+    /// `glory` is reserved for the built-in static asset protocol.
+    pub custom_protocols: Vec<DesktopProtocol>,
     /// Native window menu.
     pub menu: Option<MenuSpec>,
     /// Invoked on the event-loop thread when a [`MenuSpec`] item is
@@ -276,6 +332,7 @@ impl std::fmt::Debug for DesktopConfig {
             .field("coalesce", &self.coalesce)
             .field("on_function_reload", &self.on_function_reload.is_some())
             .field("assets_root", &self.assets_root)
+            .field("custom_protocols", &self.custom_protocols)
             .field("menu", &self.menu)
             .field("on_menu", &self.on_menu.is_some())
             .finish()
@@ -292,9 +349,18 @@ impl Default for DesktopConfig {
             coalesce: true,
             on_function_reload: None,
             assets_root: None,
+            custom_protocols: Vec::new(),
             menu: None,
             on_menu: None,
         }
+    }
+}
+
+impl DesktopConfig {
+    /// Registers an asynchronous custom protocol on this window.
+    pub fn with_custom_protocol(mut self, protocol: DesktopProtocol) -> Self {
+        self.custom_protocols.push(protocol);
+        self
     }
 }
 
@@ -447,24 +513,17 @@ fn mime_for(path: &std::path::Path) -> &'static str {
     }
 }
 
-fn serve_asset(root: &std::path::Path, request: wry::http::Request<Vec<u8>>) -> wry::http::Response<std::borrow::Cow<'static, [u8]>> {
+fn serve_asset(root: &std::path::Path, request: DesktopProtocolRequest) -> DesktopProtocolResponse {
     let path = request.uri().path().to_owned();
-    let response = |status: u16, mime: &str, body: Vec<u8>| {
-        wry::http::Response::builder()
-            .status(status)
-            .header("content-type", mime.to_owned())
-            .body(std::borrow::Cow::Owned(body))
-            .expect("static response builds")
-    };
     match resolve_asset_path(root, &path) {
         Some(file) => match std::fs::read(&file) {
-            Ok(bytes) => response(200, mime_for(&file), bytes),
+            Ok(bytes) => desktop_protocol_response(200, mime_for(&file), bytes),
             Err(err) => {
                 tracing::warn!(%err, %path, "glory-desktop: asset read failed");
-                response(500, "text/plain", b"asset read failed".to_vec())
+                desktop_protocol_response(500, "text/plain", b"asset read failed".to_vec())
             }
         },
-        None => response(404, "text/plain", b"not found".to_vec()),
+        None => desktop_protocol_response(404, "text/plain", b"not found".to_vec()),
     }
 }
 
@@ -737,11 +796,13 @@ fn create_window(
     let handle = DesktopWindowHandle::new(id, proxy.clone(), state.clone(), window_queue, next_window_index);
     let mount = mount(handle);
     let ipc_proxy = proxy.clone();
-    let webview = WebViewBuilder::new()
+    let mut webview = WebViewBuilder::new()
         .with_initialization_script(crate::WRY_INTERPRETER_JS)
         .with_html(BOOTSTRAP_HTML)
         .with_devtools(config.devtools)
-        .with_custom_protocol("glory".into(), move |_webview_id, request| serve_asset(&assets_root_dir, request))
+        .with_asynchronous_custom_protocol("glory".into(), move |_webview_id, request, responder| {
+            responder.respond(serve_asset(&assets_root_dir, request));
+        })
         .with_ipc_handler(
             move |request: wry::http::Request<String>| match serde_json::from_str::<IpcMessage>(request.body()) {
                 Ok(IpcMessage::GloryWryReady(_)) => {
@@ -757,9 +818,17 @@ fn create_window(
                     tracing::warn!(%err, "glory-desktop: undecodable IPC message");
                 }
             },
-        )
-        .build(&window)
-        .expect("glory-desktop: failed to create webview");
+        );
+
+    for protocol in &config.custom_protocols {
+        let name = protocol.name.clone();
+        let handler = protocol.handler.clone();
+        webview = webview.with_asynchronous_custom_protocol(name, move |webview_id, request, responder| {
+            handler.as_ref()(webview_id, request, responder);
+        });
+    }
+
+    let webview = webview.build(&window).expect("glory-desktop: failed to create webview");
 
     let menu = config.menu.as_ref().map(|spec| {
         let menu = build_menu(spec, id, menu_routes);
@@ -958,6 +1027,29 @@ mod tests {
         let url = asset_url("assets/logo.png");
         assert!(url.ends_with("/assets/logo.png"), "{url}");
         assert_eq!(asset_url("/x.css"), asset_url("x.css"));
+    }
+
+    #[test]
+    fn desktop_protocol_response_sets_status_type_and_body() {
+        let response = desktop_protocol_response(202, "application/json", b"{}".to_vec());
+        assert_eq!(response.status(), 202);
+        assert_eq!(response.headers()["content-type"].to_str().unwrap(), "application/json");
+        assert_eq!(response.body().as_ref(), b"{}");
+    }
+
+    #[test]
+    fn desktop_config_records_custom_protocols() {
+        let protocol = DesktopProtocol::new("api", |_webview_id, _request, _responder| {});
+        let config = DesktopConfig::default().with_custom_protocol(protocol);
+
+        assert_eq!(config.custom_protocols[0].name(), "api");
+        assert!(format!("{config:?}").contains("api"));
+    }
+
+    #[test]
+    #[should_panic(expected = "reserved")]
+    fn desktop_protocol_rejects_builtin_glory_scheme() {
+        let _ = DesktopProtocol::new("glory", |_webview_id, _request, _responder| {});
     }
 
     #[test]
