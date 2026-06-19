@@ -66,7 +66,7 @@ impl Widget for Counter {
 }
 
 /// Webview host loop shared by both mobile platforms: a trimmed-down
-/// version of `glory-desktop`'s runtime (no menus, no hot reload).
+/// version of `glory-desktop`'s runtime (no menus, with dev reload client).
 #[cfg(any(target_os = "android", target_os = "ios"))]
 mod host {
     use glory_core::renderer::EventData;
@@ -135,20 +135,91 @@ body {
 </body>
 </html>"#;
 
+    fn bootstrap_html() -> String {
+        let Some(script) = mobile_reload_script() else {
+            return BOOTSTRAP_HTML.to_owned();
+        };
+        BOOTSTRAP_HTML.replace("</body>", &format!("{script}</body>"))
+    }
+
+    fn mobile_reload_script() -> Option<String> {
+        if option_env!("GLORY_WATCH") != Some("ON") {
+            return None;
+        }
+
+        let url = option_env!("GLORY_MOBILE_RELOAD_URL").map(str::to_owned).or_else(|| {
+            let port = option_env!("GLORY_RELOAD_PORT")?;
+            let host = option_env!("GLORY_MOBILE_RELOAD_HOST").unwrap_or("127.0.0.1");
+            Some(format!("ws://{host}:{port}/live_reload"))
+        })?;
+        let url = serde_json::to_string(&url).expect("reload URL serializes");
+
+        Some(format!(
+            r#"<script>
+(() => {{
+  const url = {url};
+  const reconnectMs = 1000;
+  const swapStyle = (cssPath) => {{
+    let found = false;
+    for (const link of document.querySelectorAll("link[rel=stylesheet]")) {{
+      const href = link.getAttribute("href") || "";
+      if (href.includes(cssPath)) {{
+        const next = link.cloneNode();
+        next.href = href.split("?")[0] + "?version=" + Date.now();
+        link.replaceWith(next);
+        found = true;
+      }}
+    }}
+    if (!found) console.warn("glory mobile reload: no stylesheet matching", cssPath);
+  }};
+  const connect = () => {{
+    let ws;
+    try {{
+      ws = new WebSocket(url);
+    }} catch (err) {{
+      console.warn("glory mobile reload: websocket unavailable", err);
+      setTimeout(connect, reconnectMs);
+      return;
+    }}
+    ws.onmessage = (ev) => {{
+      const msg = JSON.parse(ev.data);
+      if (msg.type === "full") {{
+        window.location.reload();
+      }} else if (msg.type === "style") {{
+        swapStyle(msg.css_path);
+      }} else if (msg.type === "functions") {{
+        window.dispatchEvent(new CustomEvent("glory:function-reload", {{ detail: JSON.parse(msg.payload) }}));
+      }}
+    }};
+    ws.onclose = () => setTimeout(connect, reconnectMs);
+    ws.onerror = () => {{
+      try {{ ws.close(); }} catch (_) {{}}
+    }};
+  }};
+  connect();
+}})();
+</script>"#
+        ))
+    }
+
     enum HostEvent {
         Ready,
         Dom(EventData),
         Query(glory_core::renderer::QueryResponse),
     }
 
-    pub fn run<W: Widget + 'static>(widget: impl FnOnce() -> W + 'static) {
+    pub fn run<W, F>(widget: F)
+    where
+        W: Widget + 'static,
+        F: Fn() -> W + 'static,
+    {
         let event_loop = EventLoopBuilder::<HostEvent>::with_user_event().build();
         let window = WindowBuilder::new().build(&event_loop).expect("create window");
 
         let ipc_proxy = event_loop.create_proxy();
         let webview = WebViewBuilder::new()
             .with_initialization_script(glory_desktop::WRY_INTERPRETER_JS)
-            .with_html(BOOTSTRAP_HTML)
+            .with_html(bootstrap_html())
             .with_ipc_handler(move |request: wry::http::Request<String>| {
                 match serde_json::from_str::<glory_desktop::IpcMessage>(request.body()) {
                     Ok(glory_desktop::IpcMessage::GloryWryReady(_)) => {
@@ -166,7 +237,6 @@ body {
             .build(&window)
             .expect("create webview");
 
-        let mut widget_factory = Some(widget);
         let mut holder: Option<CommandHolder> = None;
 
         event_loop.run(move |event, _target, control_flow| {
@@ -177,11 +247,9 @@ body {
                     ..
                 } => *control_flow = ControlFlow::Exit,
                 Event::UserEvent(HostEvent::Ready) => {
-                    if let Some(factory) = widget_factory.take() {
-                        let mounted = CommandHolder::new().mount(factory());
-                        flush(&webview, &mounted);
-                        holder = Some(mounted);
-                    }
+                    let mounted = CommandHolder::new().mount(widget());
+                    flush(&webview, &mounted);
+                    holder = Some(mounted);
                     let _ = &window;
                 }
                 Event::UserEvent(HostEvent::Dom(data)) => {

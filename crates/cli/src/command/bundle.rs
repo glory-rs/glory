@@ -356,9 +356,16 @@ if ($Serial) {{ $adbArgs += @("-s", $Serial) }}
     fs::write(
         dist_android.join("run.ps1"),
         format!(
-            r#"param([string]$Serial = $env:GLORY_ANDROID_DEVICE)
+            r#"param(
+  [string]$Serial = $env:GLORY_ANDROID_DEVICE,
+  [string]$ReloadPort = $env:GLORY_RELOAD_PORT,
+  [bool]$ReverseReload = ($env:GLORY_ANDROID_REVERSE_RELOAD -eq "1")
+)
 $adbArgs = @()
 if ($Serial) {{ $adbArgs += @("-s", $Serial) }}
+if ($ReverseReload -and $ReloadPort) {{
+  & adb @adbArgs reverse "tcp:$ReloadPort" "tcp:$ReloadPort"
+}}
 & adb @adbArgs shell am start -n "{component}"
 "#
         ),
@@ -389,6 +396,10 @@ set -eu
 ADB="${{ADB:-adb}}"
 SERIAL_ARG=""
 if [ -n "${{GLORY_ANDROID_DEVICE:-}}" ]; then SERIAL_ARG="-s $GLORY_ANDROID_DEVICE"; fi
+if [ "${{GLORY_ANDROID_REVERSE_RELOAD:-}}" = "1" ] && [ -n "${{GLORY_RELOAD_PORT:-}}" ]; then
+  # shellcheck disable=SC2086
+  "$ADB" $SERIAL_ARG reverse "tcp:$GLORY_RELOAD_PORT" "tcp:$GLORY_RELOAD_PORT"
+fi
 # shellcheck disable=SC2086
 "$ADB" $SERIAL_ARG shell am start -n "{component}"
 "#
@@ -403,6 +414,7 @@ async fn maybe_run_android_app(android_project: &Utf8Path) -> Result<()> {
     if !env_flag("GLORY_ANDROID_RUN") {
         return Ok(());
     }
+    maybe_reverse_android_reload().await?;
     let app_id = android_application_id(android_project)
         .ok_or_else(|| anyhow!("GLORY_ANDROID_RUN needs an applicationId in android/app/build.gradle(.kts)"))?;
     let activity = android_launcher_activity(android_project, &app_id).unwrap_or_else(|| format!("{app_id}.MainActivity"));
@@ -414,6 +426,30 @@ async fn maybe_run_android_app(android_project: &Utf8Path) -> Result<()> {
     }
     command.args(["shell", "am", "start", "-n", &format!("{app_id}/{activity}")]);
     run_checked("adb (android run)", command).await
+}
+
+async fn maybe_reverse_android_reload() -> Result<()> {
+    if !env_flag("GLORY_ANDROID_REVERSE_RELOAD") {
+        return Ok(());
+    }
+    let Ok(port) = env::var("GLORY_RELOAD_PORT") else {
+        log::warn!("GLORY_ANDROID_REVERSE_RELOAD=1 set but GLORY_RELOAD_PORT is missing");
+        return Ok(());
+    };
+    let port = port.trim();
+    if port.is_empty() {
+        log::warn!("GLORY_ANDROID_REVERSE_RELOAD=1 set but GLORY_RELOAD_PORT is empty");
+        return Ok(());
+    }
+
+    let mut command = Command::new("adb");
+    if let Ok(serial) = env::var("GLORY_ANDROID_DEVICE")
+        && !serial.trim().is_empty()
+    {
+        command.args(["-s", serial.trim()]);
+    }
+    command.args(["reverse", &format!("tcp:{port}"), &format!("tcp:{port}")]);
+    run_checked("adb reverse (android reload)", command).await
 }
 
 fn android_application_id(android_project: &Utf8Path) -> Option<String> {
@@ -1262,6 +1298,46 @@ android {
             android_launcher_activity(&root, "com.example.real").as_deref(),
             Some("com.example.real.MainActivity")
         );
+    }
+
+    #[test]
+    fn android_run_scripts_can_reverse_reload_port() {
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let dir = temp_dir::TempDir::new().unwrap();
+            let root = Utf8PathBuf::from_path_buf(dir.path().join("android")).unwrap();
+            let dist = Utf8PathBuf::from_path_buf(dir.path().join("dist/android")).unwrap();
+            std::fs::create_dir_all(root.join("app/src/main")).unwrap();
+            std::fs::create_dir_all(dist.join("apk")).unwrap();
+            std::fs::write(
+                root.join("app/build.gradle.kts"),
+                r#"
+android {
+    namespace = "com.example.fallback"
+    defaultConfig {
+        applicationId = "com.example.real"
+    }
+}
+"#,
+            )
+            .unwrap();
+            std::fs::write(
+                root.join("app/src/main/AndroidManifest.xml"),
+                r#"<manifest><application><activity android:name=".MainActivity" /></application></manifest>"#,
+            )
+            .unwrap();
+
+            let apk = dist.join("apk/app-debug.apk");
+            write_android_scripts(&[apk], &root, &dist).await.unwrap();
+
+            let ps1 = std::fs::read_to_string(dist.join("run.ps1")).unwrap();
+            assert!(ps1.contains("GLORY_ANDROID_REVERSE_RELOAD"));
+            assert!(ps1.contains(r#"adb @adbArgs reverse "tcp:$ReloadPort" "tcp:$ReloadPort""#));
+
+            let sh = std::fs::read_to_string(dist.join("run.sh")).unwrap();
+            assert!(sh.contains("GLORY_ANDROID_REVERSE_RELOAD"));
+            assert!(sh.contains(r#""$ADB" $SERIAL_ARG reverse "tcp:$GLORY_RELOAD_PORT" "tcp:$GLORY_RELOAD_PORT""#));
+        });
     }
 
     #[test]

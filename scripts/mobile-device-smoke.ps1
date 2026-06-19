@@ -6,6 +6,8 @@ param(
   [string]$AndroidPackage = 'com.example.mobile_counter',
   [string]$AndroidActivity = '.MainActivity',
   [string]$AndroidSerial = $env:GLORY_ANDROID_DEVICE,
+  [switch]$AndroidReverseReload,
+  [string]$ReloadPort = $env:GLORY_RELOAD_PORT,
   [string]$IosApp = '',
   [string]$IosBundleId = 'com.example.MobileCounter',
   [string]$IosDestination = $env:GLORY_IOS_DESTINATION,
@@ -16,6 +18,7 @@ $ErrorActionPreference = 'Stop'
 $Root = Resolve-Path (Join-Path $PSScriptRoot '..')
 $ReportDir = Join-Path $Root $OutDir
 New-Item -ItemType Directory -Force -Path $ReportDir | Out-Null
+$AndroidReverseReloadEnabled = $AndroidReverseReload.IsPresent -or $env:GLORY_ANDROID_REVERSE_RELOAD -eq '1'
 
 $checks = New-Object System.Collections.Generic.List[object]
 
@@ -60,6 +63,8 @@ function Write-Status([string]$status) {
       Activity = $AndroidActivity
       Serial = $AndroidSerial
       Adb = Resolve-Adb
+      ReverseReload = $AndroidReverseReloadEnabled
+      ReloadPort = $ReloadPort
     }
     Ios = [PSCustomObject]@{
       App = $IosApp
@@ -134,6 +139,14 @@ function Run-AndroidSmoke {
     return
   }
   Add-Check 'android-device' 'completed' ($devices -join '; ')
+
+  if ($AndroidReverseReloadEnabled) {
+    if (-not $ReloadPort) {
+      Add-Check 'android-reload-reverse' 'blocked' 'Pass -ReloadPort or set GLORY_RELOAD_PORT before requesting Android reload reverse'
+    } else {
+      Invoke-LoggedProcess -Name 'android-reload-reverse' -Program $adb -ProgramArgs (Android-Args @('reverse', "tcp:$ReloadPort", "tcp:$ReloadPort")) | Out-Null
+    }
+  }
 
   if (-not $AndroidApk) {
     Add-Check 'android-apk' 'blocked' 'Pass -AndroidApk with a built APK from glory bundle --target android'

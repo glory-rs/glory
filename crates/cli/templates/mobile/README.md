@@ -21,6 +21,33 @@ webview applies `Command` batches via `glory_desktop::WRY_INTERPRETER_JS`,
 and DOM events come back as serialized `EventData` (touch events map to
 `PointerData`; multi-touch points ride in `extra.touches`).
 
+## On-device development reload
+
+Generated mobile hosts inject a reload websocket client when the lib is built
+with `GLORY_WATCH=ON` and either:
+
+- `GLORY_MOBILE_RELOAD_URL=ws://<host>:<port>/live_reload`, or
+- `GLORY_RELOAD_PORT=<port>` plus optional `GLORY_MOBILE_RELOAD_HOST=<host>`
+  (defaults to `127.0.0.1`).
+
+The client handles the same messages as the browser/desktop reload path:
+stylesheet link swapping, `glory:function-reload` events, and full webview
+remounts. Rust code changes rebuild the mobile library in watch mode, but a
+running Android/iOS process still needs reinstall/relaunch to load the new
+native library.
+
+Android devices and emulators can reach the host reload server through adb
+reverse:
+
+```sh
+GLORY_WATCH=ON GLORY_RELOAD_PORT=3001 glory build --target android
+adb reverse tcp:3001 tcp:3001
+```
+
+The Android bundle run scripts perform that reverse automatically when
+`GLORY_ANDROID_REVERSE_RELOAD=1` is set. Physical iOS devices cannot use adb
+reverse; set `GLORY_MOBILE_RELOAD_URL` to a LAN-reachable host address.
+
 ## Mobile viewport and lifecycle defaults
 
 Generated mobile crates use a bootstrap document with:
@@ -78,6 +105,9 @@ Useful knobs:
   (comma or whitespace separated).
 - `GLORY_ANDROID_INSTALL=1` adds `installRelease` / `installDebug`.
 - `GLORY_ANDROID_RUN=1` launches the detected main activity through `adb`.
+- `GLORY_ANDROID_REVERSE_RELOAD=1` runs
+  `adb reverse tcp:$GLORY_RELOAD_PORT tcp:$GLORY_RELOAD_PORT` before launch
+  (also supported by `dist/<project>/android/run.ps1` / `run.sh`).
 - `GLORY_ANDROID_DEVICE=<serial>` sets `ANDROID_SERIAL` for Gradle and is also
   used by the generated install/run scripts.
 

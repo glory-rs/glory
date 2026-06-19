@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 52 |
+| 已完成 `[x]` | 53 |
 | 部分完成 `[~]` | 3 |
-| 未完成 `[ ]` | 3 |
+| 未完成 `[ ]` | 2 |
 
 按能力权重估算:
 
@@ -383,13 +383,13 @@ serverfn 基础可用，但对比成熟框架还缺:
 - Android/iOS 模板。
 - host check。
 - safe-area / keyboard resize / foreground-background JS bootstrap。
+- watch-mode reload websocket client with Android adb reverse / LAN URL knobs。
 - device smoke script。
 
 缺口:
 
 - Android emulator/device 实际安装启动记录。
 - iOS simulator/device 验证。
-- 设备上 hot reload，Android 需 `adb reverse` 或局域网注入。
 - mobile CI 夜间 smoke。
 
 主要路径:

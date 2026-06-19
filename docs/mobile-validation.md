@@ -35,6 +35,31 @@ Then install and launch the APK:
 Set `GLORY_ANDROID_DEVICE` or pass `-AndroidSerial` when more than one device is
 connected.
 
+To verify the on-device reload websocket path, run the CLI in watch mode with a
+known reload port, then let the smoke script configure adb reverse before it
+launches the app:
+
+```powershell
+$env:GLORY_WATCH = "ON"
+$env:GLORY_RELOAD_PORT = "3001"
+$env:GLORY_ANDROID_REVERSE_RELOAD = "1"
+..\scripts\mobile-device-smoke.ps1 `
+  -Target android `
+  -AndroidReverseReload `
+  -ReloadPort 3001 `
+  -AndroidApk dist\mobile-smoke\android\apk\app-debug.apk `
+  -AndroidPackage com.example.mobile_smoke `
+  -AndroidActivity .MainActivity
+```
+
+The generated Android bundle `run.ps1` / `run.sh` scripts also honor
+`GLORY_ANDROID_REVERSE_RELOAD=1`. The mobile webview connects to
+`ws://127.0.0.1:$GLORY_RELOAD_PORT/live_reload` by default; set
+`GLORY_MOBILE_RELOAD_HOST` or `GLORY_MOBILE_RELOAD_URL` when the device must
+reach the host over LAN instead. Rust code changes rebuild the mobile library
+in watch mode, but still require reinstall/relaunch to load the new native
+library in the running app.
+
 ## iOS
 
 Prerequisites:
@@ -63,6 +88,11 @@ Then install and launch:
 
 The script writes `target/mobile-device-smoke/mobile-device-smoke.json` with
 `completed`, `blocked`, or `failed` status and per-step logs.
+
+iOS simulator reload can usually use
+`GLORY_MOBILE_RELOAD_URL=ws://127.0.0.1:3001/live_reload`. For physical iOS
+devices, use a LAN-reachable host address such as
+`ws://192.168.1.10:3001/live_reload`.
 
 Current Windows host result, 2026-06-11: `examples/mobile-counter` host check
 passes and `adb` is discovered at

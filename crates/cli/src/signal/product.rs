@@ -23,6 +23,7 @@ impl<T> Outcome<T> {
 pub enum Product {
     Server,
     Front,
+    Mobile,
     Style(String),
     Assets,
     None,

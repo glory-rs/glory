@@ -152,6 +152,11 @@ pub async fn run_loop(proj: &Arc<Project>) -> Result<()> {
         } else {
             None
         };
+        let mobile_hdl = if proj.builds_mobile() {
+            Some(compile::mobile(proj, &changes).await)
+        } else {
+            None
+        };
         let assets_hdl = compile::assets(proj, &changes, false).await;
 
         let (serve, front, assets) = match (server_hdl, front_hdl) {
@@ -173,7 +178,12 @@ pub async fn run_loop(proj: &Arc<Project>) -> Result<()> {
             }
         };
 
-        let outcomes = vec![serve, front, assets];
+        let mobile = match mobile_hdl {
+            Some(mobile_hdl) => mobile_hdl.await??,
+            None => Outcome::Success(Product::None),
+        };
+
+        let outcomes = vec![serve, front, assets, mobile];
 
         let failed = outcomes.contains(&Outcome::Failed);
         let interrupted = outcomes.contains(&Outcome::Stopped);
@@ -199,6 +209,15 @@ pub async fn run_loop(proj: &Arc<Project>) -> Result<()> {
                 // send product change, then the server will send the reload once it has restarted
                 ServerRestart::send();
                 log::info!("Watch updated {set}. Server restarting")
+            } else if set.contains(&Product::Mobile) {
+                if set.contains_any(&[Product::Front, Product::Assets]) {
+                    ReloadSignal::send_full();
+                    log::info!(
+                        "Watch rebuilt {set}. Connected mobile webviews reloaded static assets; reinstall/relaunch the app to load Rust code changes"
+                    )
+                } else {
+                    log::info!("Watch rebuilt {set}. Reinstall/relaunch the mobile app to load Rust code changes")
+                }
             } else if set.contains_any(&[Product::Front, Product::Assets]) {
                 ReloadSignal::send_full();
                 log::info!("Watch updated {set}")

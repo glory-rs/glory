@@ -23,7 +23,7 @@ pub async fn mobile(proj: &Arc<Project>, changes: &ChangeSet) -> JoinHandle<Resu
     let changes = changes.clone();
 
     tokio::spawn(async move {
-        if !changes.need_server_build() {
+        if !changes.need_front_build() {
             return Ok(Outcome::Success(Product::None));
         }
         let triple = proj
@@ -76,7 +76,7 @@ pub async fn mobile(proj: &Arc<Project>, changes: &ChangeSet) -> JoinHandle<Resu
         match wait_interruptible("Cargo (mobile)", command.spawn()?, Interrupt::subscribe_any()).await? {
             CommandResult::Success(_) => {
                 log::info!("Mobile lib build finished {}", GRAY.paint(line));
-                Ok(Outcome::Success(Product::None))
+                Ok(Outcome::Success(Product::Mobile))
             }
             CommandResult::Interrupted => Ok(Outcome::Stopped),
             CommandResult::Failure(_) => Ok(Outcome::Failed),

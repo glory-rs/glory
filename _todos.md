@@ -290,8 +290,15 @@ R5 仅评估,不阻塞任何人。
 - [ ] **M1 P0(外部受阻)** 真机/模拟器验证:`scripts/mobile-device-smoke.ps1` 主机
   检查已过,需 Android 模拟器或真机在线 + macOS 跑 iOS。接续 `_improve_todos.md` D2。
   CI 侧:GitHub Actions Android emulator job(API 34, x86_64)夜间跑安装+启动冒烟。
-- [ ] **M2 P1** 设备上热重载:当前 reload client 仅桌面 webview 可达,Android 需
+- [x] **M2 P1** 设备上热重载:此前 reload client 仅桌面 webview 可达,Android 需
   `adb reverse` 或局域网地址注入模板。依赖 M1 有验证环境。
+  2026-06-19 已完成:移动端模板/`examples/mobile-counter` 在 `GLORY_WATCH=ON`
+  时注入 reload websocket client,支持 `GLORY_MOBILE_RELOAD_URL` 或
+  `GLORY_RELOAD_PORT` + `GLORY_MOBILE_RELOAD_HOST`;full reload 会重新 mount
+  webview,style/function reload 复用现有消息形态。`glory serve` watch loop
+  已会重编 mobile lib,Android bundle run 脚本、`GLORY_ANDROID_RUN=1` 路径和
+  `scripts/mobile-device-smoke.ps1` 均支持 `GLORY_ANDROID_REVERSE_RELOAD=1`
+  自动执行 `adb reverse`。真机/模拟器行为仍由 M1 记录。
 - [x] **M3 P2** 权限请求助手与原生桥模式文档(相机/相册/分享等先给 recipes,不急于
   封装 API)。见 `docs/mobile-native-recipes.md`,覆盖 app-owned bridge、权限结果、
   相机/相册 URI、分享 sheet 的平台中立边界。
