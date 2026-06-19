@@ -367,7 +367,15 @@ cargo run -p glory-cli -- --manifest-path examples/ssr-simple-salvo/Cargo.toml b
 
 `glory serve` opens the resolved site URL in the default browser after the first
 build. Use `--no-open` to suppress it, or `--address` / `--port` to override the
-configured `site_addr` for the current run.
+configured `site_addr` for the current run. Use `--https` to advertise and open
+the site as `https://...`; `--tls-cert` and `--tls-key` are passed to the app
+server as `GLORY_TLS_CERT` / `GLORY_TLS_KEY`.
+
+Proxy rules can be forwarded with repeated `--proxy PATH=URL` flags, for
+example `--proxy /api=http://127.0.0.1:9001`. The CLI validates the shape and
+passes the full list to the app server as JSON in `GLORY_PROXY_CONFIG`; the app
+server remains responsible for actually serving TLS and forwarding proxied
+requests.
 
 While `glory serve` is watching, stdin accepts line controls: `r` + Enter forces
 a rebuild, `v` + Enter cycles log verbosity, and `/` + Enter prints the controls.

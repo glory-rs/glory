@@ -112,6 +112,22 @@ pub struct ServeOpts {
     #[arg(long)]
     pub port: Option<u16>,
 
+    /// Open and advertise the dev site as HTTPS.
+    #[arg(long)]
+    pub https: bool,
+
+    /// TLS certificate path passed to the app server as GLORY_TLS_CERT.
+    #[arg(long = "tls-cert", requires = "tls_key")]
+    pub tls_cert: Option<Utf8PathBuf>,
+
+    /// TLS private key path passed to the app server as GLORY_TLS_KEY.
+    #[arg(long = "tls-key", requires = "tls_cert")]
+    pub tls_key: Option<Utf8PathBuf>,
+
+    /// Proxy rule passed to the app server as GLORY_PROXY_CONFIG. Format: PATH=URL.
+    #[arg(long = "proxy", value_name = "PATH=URL")]
+    pub proxy: Vec<String>,
+
     /// Explicitly open the app in the default browser. This is the default.
     #[arg(long, action = clap::ArgAction::SetTrue, conflicts_with = "no_open")]
     pub open: bool,
@@ -271,6 +287,38 @@ mod tests {
         let result = Cli::try_parse_from(["glory", "serve", "--open", "--no-open"]);
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn serve_accepts_https_tls_and_proxy_flags() {
+        let cli = Cli::parse_from([
+            "glory",
+            "serve",
+            "--https",
+            "--tls-cert",
+            "cert.pem",
+            "--tls-key",
+            "key.pem",
+            "--proxy",
+            "/api=http://127.0.0.1:9001",
+            "--proxy",
+            "/ws=ws://127.0.0.1:9002",
+        ]);
+
+        let Commands::Serve(serve) = cli.command else {
+            panic!("expected serve command");
+        };
+
+        assert!(serve.https);
+        assert_eq!(serve.tls_cert, Some(Utf8PathBuf::from("cert.pem")));
+        assert_eq!(serve.tls_key, Some(Utf8PathBuf::from("key.pem")));
+        assert_eq!(serve.proxy, ["/api=http://127.0.0.1:9001", "/ws=ws://127.0.0.1:9002"]);
+    }
+
+    #[test]
+    fn serve_requires_tls_cert_and_key_together() {
+        assert!(Cli::try_parse_from(["glory", "serve", "--tls-cert", "cert.pem"]).is_err());
+        assert!(Cli::try_parse_from(["glory", "serve", "--tls-key", "key.pem"]).is_err());
     }
 
     #[test]

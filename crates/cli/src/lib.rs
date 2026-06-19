@@ -74,6 +74,18 @@ pub async fn run_with(args: Cli, overrides: Overrides) -> Result<()> {
         Serve(serve) => {
             overrides.site_address = serve.address;
             overrides.site_port = serve.port;
+            if serve.https {
+                overrides.site_https = Some(true);
+            }
+            if let Some(cert) = &serve.tls_cert {
+                overrides.tls_cert = Some(cert.clone());
+            }
+            if let Some(key) = &serve.tls_key {
+                overrides.tls_key = Some(key.clone());
+            }
+            if !serve.proxy.is_empty() {
+                overrides.proxy = Some(serve.proxy.clone());
+            }
         }
         Run(run) => {
             overrides.site_address = run.address;

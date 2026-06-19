@@ -77,6 +77,10 @@ impl std::fmt::Debug for SiteFile {
 pub struct Site {
     pub addr: SocketAddr,
     pub reload: SocketAddr,
+    pub https: bool,
+    pub tls_cert: Option<Utf8PathBuf>,
+    pub tls_key: Option<Utf8PathBuf>,
+    pub proxy: Vec<String>,
     pub root_dir: Utf8PathBuf,
     pub pkg_dir: Utf8PathBuf,
     file_reg: RwLock<HashMap<String, u64>>,
@@ -88,6 +92,10 @@ impl fmt::Debug for Site {
         f.debug_struct("Site")
             .field("addr", &self.addr)
             .field("reload", &self.reload)
+            .field("https", &self.https)
+            .field("tls_cert", &self.tls_cert)
+            .field("tls_key", &self.tls_key)
+            .field("proxy", &self.proxy)
             .field("root_dir", &self.root_dir)
             .field("pkg_dir", &self.pkg_dir)
             .field("file_reg", &self.file_reg.blocking_read())
@@ -103,11 +111,23 @@ impl Site {
         Self {
             addr: config.site_addr,
             reload,
+            https: config.site_https,
+            tls_cert: config.tls_cert.clone(),
+            tls_key: config.tls_key.clone(),
+            proxy: config.proxy.clone(),
             root_dir: config.site_root.clone(),
             pkg_dir: config.site_pkg_dir.clone(),
             file_reg: Default::default(),
             ext_file_reg: Default::default(),
         }
+    }
+
+    pub fn scheme(&self) -> &'static str {
+        if self.https { "https" } else { "http" }
+    }
+
+    pub fn url(&self) -> String {
+        format!("{}://{}", self.scheme(), self.addr)
     }
 
     pub fn root_relative_pkg_dir(&self) -> Utf8PathBuf {

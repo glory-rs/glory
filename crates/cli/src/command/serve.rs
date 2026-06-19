@@ -19,7 +19,7 @@ pub(super) fn open_site(proj: &Project, should_open: bool) {
         return;
     }
 
-    let url = format!("http://{}", proj.site.addr);
+    let url = proj.site.url();
     if let Err(error) = open_browser(&url) {
         log::warn!("Failed to open {url} in the default browser: {error}");
     }

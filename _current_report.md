@@ -21,8 +21,8 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 28 |
-| 部分完成 `[~]` | 5 |
+| 已完成 `[x]` | 29 |
+| 部分完成 `[~]` | 4 |
 | 未完成 `[ ]` | 27 |
 
 按能力权重估算:
@@ -269,14 +269,15 @@ serverfn 基础可用，但对比成熟框架还缺:
 
 现状:
 
-- `ServeOpts` 已有 `--no-reload`、`--address`、`--port`、`--open`、`--no-open`。
+- `ServeOpts` 已有 `--no-reload`、`--address`、`--port`、`--open`、`--no-open`、
+  `--https`、`--tls-cert/--tls-key`、重复 `--proxy PATH=URL`。
 - `serve` 命令只是 build 后 spawn server。
 - `Bundle` 已有 manifest 和压缩资产处理，但平台矩阵和 installer 仍不足。
 
 缺口:
 
-- HTTPS。
-- proxy。
+- CLI 已支持 HTTPS/TLS/proxy 配置透传；实际 TLS 监听和 proxy forwarding 仍由应用
+  server 实现。
 - desktop installer，例如 MSI/DMG/DEB/AppImage。
 
 主要路径:
@@ -459,9 +460,9 @@ cargo clippy -p glory-cli --lib --no-default-features -- -D warnings
 ### P1
 
 1. [x] 设计并实现 typed routing 第一阶段。
-2. [~] 扩展 `glory serve` 参数和基本 DX。
+2. [x] 扩展 `glory serve` 参数和基本 DX。
    - 已完成 `--address/--port` 运行时覆盖、默认 auto-open、`--no-open`。
-   - 未完成 HTTPS 与 proxy 配置。
+   - 已完成 HTTPS/TLS/proxy 配置校验、打开 URL 与 app-server env 透传。
 3. [x] serverfn 支持 method 选择，至少 `#[server(method = "GET")]`。
 4. Playwright CI 跑 CSR counter + SSR hydration 两个最小场景。
 5. Desktop 补窗口控制 API 包。

@@ -27,6 +27,10 @@ pub struct Overrides {
     pub site_addr: Option<SocketAddr>,
     pub site_address: Option<IpAddr>,
     pub site_port: Option<u16>,
+    pub site_https: Option<bool>,
+    pub tls_cert: Option<Utf8PathBuf>,
+    pub tls_key: Option<Utf8PathBuf>,
+    pub proxy: Option<Vec<String>>,
     pub site_root: Option<Utf8PathBuf>,
     pub site_pkg_dir: Option<Utf8PathBuf>,
     pub reload_port: Option<u16>,
@@ -72,6 +76,10 @@ impl Overrides {
             && self.site_addr.is_none()
             && self.site_address.is_none()
             && self.site_port.is_none()
+            && self.site_https.is_none()
+            && self.tls_cert.is_none()
+            && self.tls_key.is_none()
+            && self.proxy.is_none()
             && self.site_root.is_none()
             && self.site_pkg_dir.is_none()
             && self.reload_port.is_none()
@@ -127,6 +135,18 @@ impl Overrides {
         }
         if let Some(v) = self.site_port {
             config.site_addr.set_port(v);
+        }
+        if let Some(v) = self.site_https {
+            config.site_https = v;
+        }
+        if let Some(v) = &self.tls_cert {
+            config.tls_cert = Some(v.clone());
+        }
+        if let Some(v) = &self.tls_key {
+            config.tls_key = Some(v.clone());
+        }
+        if let Some(v) = &self.proxy {
+            config.proxy = v.clone();
         }
         if let Some(v) = &self.site_root {
             config.site_root = v.clone();

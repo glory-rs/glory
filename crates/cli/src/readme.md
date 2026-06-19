@@ -26,6 +26,10 @@ glory serve --no-reload
                      build and serve once without filesystem watching
 glory serve --port 8080 --no-open
                      override the configured site port and skip browser open
+glory serve --https --tls-cert cert.pem --tls-key key.pem
+                     advertise/open https and pass TLS paths to the app server
+glory serve --proxy /api=http://127.0.0.1:9001
+                     pass dev proxy rules to the app server
 glory run --no-open
                      build and run once without watching or live reload
 glory doctor         check local toolchains for the selected target
@@ -50,6 +54,10 @@ template instead.
 In `glory serve` watch mode, line controls are available on stdin: `r` + Enter
 forces a rebuild, `v` + Enter cycles the log level, and `/` + Enter prints the
 control help.
+
+`glory serve --https` switches the advertised/opened site URL to `https://`.
+TLS paths and repeated `--proxy PATH=URL` rules are exposed to the launched app
+server through `GLORY_TLS_CERT`, `GLORY_TLS_KEY`, and `GLORY_PROXY_CONFIG`.
 
 ## Typical workflow
 
