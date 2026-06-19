@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 50 |
+| 已完成 `[x]` | 51 |
 | 部分完成 `[~]` | 3 |
-| 未完成 `[ ]` | 5 |
+| 未完成 `[ ]` | 4 |
 
 按能力权重估算:
 
@@ -341,11 +341,12 @@ serverfn 基础可用，但对比成熟框架还缺:
 - property/attribute 分离已有测试。
 - `Command::Query` 已接通 Value、BoundingRect、ScrollOffset;Blitz shell 会回灌
   `QueryResponse` 到 `CommandHolder`。
+- `GloryBlitzApplication`/`GloryBlitzWindowConfig` 提供 Glory 侧 shell wrapper,
+  并复用 `blitz_shell::BlitzApplication` 的 WindowId map、resume/suspend、redraw poll。
 
 缺口:
 
 - scroll/focus/touch 等事件桥接不足。
-- 窗口生命周期很薄。
 - 真实渲染截图/人工验证缺失。
 - a11y 未接入。
 
@@ -433,6 +434,7 @@ cargo check -p glory-desktop --features runtime
 cargo test -p glory-desktop --features runtime
 cargo check -p glory-native --features shell
 cargo test -p glory-native --features shell
+cargo clippy -p glory-native --features shell -- -D warnings
 cargo check -p glory --features "web-ssr backend-command routing server-fn"
 cargo check -p glory-salvo
 cargo check -p glory-axum

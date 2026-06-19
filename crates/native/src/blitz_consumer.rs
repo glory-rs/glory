@@ -33,6 +33,9 @@ use glory_core::web::holders::CommandHolder;
 #[cfg(feature = "shell")]
 use glory_core::{Holder, Widget};
 
+#[cfg(feature = "shell")]
+pub type GloryBlitzWindowId = winit::window::WindowId;
+
 pub struct BlitzConsumer {
     doc: BaseDocument,
     /// Glory command-stream id → blitz node id.
@@ -323,18 +326,122 @@ fn is_reflected_blitz_property(name: &str) -> bool {
 }
 
 #[cfg(feature = "shell")]
-pub fn launch_blitz_window(widget: impl Widget) {
+#[derive(Clone, Debug, PartialEq)]
+pub struct GloryBlitzWindowConfig {
+    pub title: String,
+    pub inner_size: Option<(f64, f64)>,
+}
+
+#[cfg(feature = "shell")]
+impl Default for GloryBlitzWindowConfig {
+    fn default() -> Self {
+        Self {
+            title: "Glory Native".to_owned(),
+            inner_size: None,
+        }
+    }
+}
+
+#[cfg(feature = "shell")]
+impl GloryBlitzWindowConfig {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.title = title.into();
+        self
+    }
+
+    pub fn inner_size(mut self, width: f64, height: f64) -> Self {
+        self.inner_size = Some((width, height));
+        self
+    }
+}
+
+#[cfg(feature = "shell")]
+pub struct GloryBlitzApplication {
+    pending_windows: Vec<blitz_shell::WindowConfig<anyrender_vello::VelloWindowRenderer>>,
+}
+
+#[cfg(feature = "shell")]
+impl Default for GloryBlitzApplication {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(feature = "shell")]
+impl GloryBlitzApplication {
+    pub fn new() -> Self {
+        Self { pending_windows: Vec::new() }
+    }
+
+    pub fn window<W>(mut self, config: GloryBlitzWindowConfig, widget: W) -> Self
+    where
+        W: Widget + 'static,
+    {
+        self.add_window(config, widget);
+        self
+    }
+
+    pub fn add_window<W>(&mut self, config: GloryBlitzWindowConfig, widget: W)
+    where
+        W: Widget + 'static,
+    {
+        self.pending_windows.push(create_blitz_window_config(config, widget));
+    }
+
+    pub fn pending_window_count(&self) -> usize {
+        self.pending_windows.len()
+    }
+
+    pub fn into_blitz_application(
+        self,
+        proxy: blitz_shell::EventLoopProxy<blitz_shell::BlitzShellEvent>,
+    ) -> blitz_shell::BlitzApplication<anyrender_vello::VelloWindowRenderer> {
+        let mut application = blitz_shell::BlitzApplication::new(proxy);
+        for window in self.pending_windows {
+            application.add_window(window);
+        }
+        application
+    }
+
+    pub fn run(self) -> Result<(), winit::error::EventLoopError> {
+        let event_loop = blitz_shell::create_default_event_loop::<blitz_shell::BlitzShellEvent>();
+        let mut application = self.into_blitz_application(event_loop.create_proxy());
+        event_loop.run_app(&mut application)
+    }
+}
+
+#[cfg(feature = "shell")]
+fn create_blitz_window_config(
+    config: GloryBlitzWindowConfig,
+    widget: impl Widget + 'static,
+) -> blitz_shell::WindowConfig<anyrender_vello::VelloWindowRenderer> {
     let holder = CommandHolder::new().mount(widget);
     let mut consumer = BlitzConsumer::new();
     flush_holder_into_consumer(&holder, &mut consumer);
 
-    let event_loop = blitz_shell::create_default_event_loop::<blitz_shell::BlitzShellEvent>();
     let renderer = anyrender_vello::VelloWindowRenderer::new();
-    let window = blitz_shell::WindowConfig::new(Box::new(GloryBlitzDocument { holder, consumer }), renderer);
+    let mut attributes = blitz_shell::Window::default_attributes().with_title(config.title);
+    if let Some((width, height)) = config.inner_size {
+        attributes = attributes.with_inner_size(winit::dpi::LogicalSize::new(width, height));
+    }
+    blitz_shell::WindowConfig::with_attributes(Box::new(GloryBlitzDocument { holder, consumer }), renderer, attributes)
+}
 
-    let mut application = blitz_shell::BlitzApplication::new(event_loop.create_proxy());
-    application.add_window(window);
-    event_loop.run_app(&mut application).expect("run Glory Blitz event loop");
+#[cfg(feature = "shell")]
+pub fn launch_blitz_window(widget: impl Widget + 'static) {
+    launch_blitz_window_with_config(GloryBlitzWindowConfig::default(), widget);
+}
+
+#[cfg(feature = "shell")]
+pub fn launch_blitz_window_with_config(config: GloryBlitzWindowConfig, widget: impl Widget + 'static) {
+    GloryBlitzApplication::new()
+        .window(config, widget)
+        .run()
+        .expect("run Glory Blitz event loop");
 }
 
 #[cfg(feature = "shell")]
@@ -722,5 +829,21 @@ mod tests {
                 result: Ok(QueryValue::ScrollOffset { x: 12.0, y: 34.0 })
             }]
         );
+    }
+
+    #[test]
+    #[cfg(feature = "shell")]
+    fn blitz_shell_application_tracks_pending_windows() {
+        let config = GloryBlitzWindowConfig::new().title("Native Counter").inner_size(640.0, 480.0);
+        let app = GloryBlitzApplication::new().window(config, Counter { value: Cage::new(0) });
+
+        assert_eq!(app.pending_window_count(), 1);
+    }
+
+    #[test]
+    #[cfg(feature = "shell")]
+    fn blitz_window_config_builds_initial_document() {
+        let config = GloryBlitzWindowConfig::default();
+        let _window = create_blitz_window_config(config, Counter { value: Cage::new(0) });
     }
 }

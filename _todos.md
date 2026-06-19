@@ -241,8 +241,11 @@ R5 仅评估,不阻塞任何人。
 - [x] **N2 P1** 布局查询接通:`BlitzConsumer` 现在为 `NodeQuery::Value`、
   `BoundingRect`、`ScrollOffset` 产出 `QueryResponse`,shell flush 会把应答 resolve
   回 `CommandHolder`;`cargo test -p glory-native --features blitz` 已覆盖。
-- [ ] **N3 P2** 窗口生命周期:`launch_blitz_window` 单窗口 shell(13 行),需
+- [x] **N3 P2** 窗口生命周期:`launch_blitz_window` 单窗口 shell(13 行),需
   WindowId 跟踪、resume/pause、重绘调度,对照 `packages/native/src/dioxus_application.rs`。
+  已新增 `GloryBlitzApplication`/`GloryBlitzWindowConfig`/`GloryBlitzWindowId`,
+  Glory 侧管理 pending windows 与配置,启动时交给 `blitz_shell::BlitzApplication`
+  处理 active WindowId map、resume/suspend、close exit 与 redraw poll。
 - [x] **N4 P2** 属性/property 区分:`blitz_consumer.rs:129` spike 把 property 一律当
   attribute 写,表单控件(value/checked)行为会偏。
 - [ ] **N5 P3** accesskit 无障碍接入。

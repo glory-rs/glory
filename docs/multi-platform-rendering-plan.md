@@ -18,7 +18,7 @@ Glory 现在不再是单纯的 Web/SSR 框架。当前主线已经具备:
 | Desktop WebView | 可用;支持 wry/tao、多窗口、菜单、custom protocol、hot reload | `crates/desktop` |
 | Server functions | 可用;Salvo/Axum/Actix adapter + request context | `crates/serverfn`, `crates/macros` |
 | Mobile | 模板、交叉编译路径、CI smoke、设备验证脚本已落地;真机/模拟器实际运行需外部设备 | `crates/cli/src/compile/mobile.rs`, `crates/cli/templates/mobile`, `scripts/mobile-device-smoke.ps1` |
-| Native Blitz | `blitz-dom` consumer、`blitz-shell`/vello 窗口入口、click/input 回程桥已落地 | `crates/native` |
+| Native Blitz | `blitz-dom` consumer、Glory shell wrapper、`blitz-shell`/vello lifecycle、click/input 回程桥已落地 | `crates/native` |
 | TUI | 只读 command DOM 展示定位 | `crates/tui` |
 | LiveView | 协议/session crate、浏览器 reconnect client、Salvo WebSocket route 已落地 | `crates/liveview` |
 
@@ -46,7 +46,7 @@ Glory 现在不再是单纯的 Web/SSR 框架。当前主线已经具备:
 - `#[glory::server]` server functions 已接通三种 adapter,并支持 request context。
 - Mobile 已有 Android/iOS 模板和交叉编译路径。
 - Blitz DOM consumer 已验证 command stream 可以驱动真实 native DOM;`glory-native/shell`
-  进一步提供 `blitz-shell`/vello window entrypoint 和 click/input 回程桥。
+  进一步提供 Glory shell wrapper、`blitz-shell`/vello lifecycle 和 click/input 回程桥。
 - LiveView 已有 `glory-liveview` crate,复用 command stream over WebSocket。
 
 这意味着后续不应再围绕"是否需要 command stream"争论;真正要做的是把这个基础变成可发布、可测试、可维护的产品面。
