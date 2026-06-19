@@ -3,8 +3,38 @@ name = "counter"
 version = "0.0.1"
 edition = "2024"
 
+[features]
+default = ["web-csr"]
+web-csr = ["glory/web-csr", "dep:wasm-bindgen", "dep:wasm-bindgen-futures", "dep:web-sys"]
+web-ssr = ["dep:salvo", "dep:tokio", "dep:tracing-subscriber"]
+
+[[bin]]
+name = "counter"
+path = "src/main.rs"
+required-features = ["web-csr"]
+
+[[bin]]
+name = "counter-server"
+path = "src/server.rs"
+required-features = ["web-ssr"]
+
 [dependencies]
-glory = { path = "../../crates/glory", default-features = false, features = ["web-csr"] }
-wasm-bindgen = { version = "0.2", features = ["enable-interning"] }
-wasm-bindgen-futures = "0.4.71"
-web-sys = "0.3"
+glory = { path = "../../crates/glory", default-features = false }
+wasm-bindgen = { version = "=0.2.121", optional = true, features = ["enable-interning"] }
+wasm-bindgen-futures = { version = "=0.4.71", optional = true }
+web-sys = { version = "=0.3.98", optional = true }
+salvo = { version = "0.93", default-features = true, optional = true, features = ["serve-static"] }
+tokio = { version = "1", optional = true }
+tracing-subscriber = { version = "0.3", optional = true }
+
+[package.metadata.glory]
+output_name = "counter"
+site_root = "target/site"
+site_pkg_dir = "pkg"
+site_addr = "0.0.0.0:8000"
+reload_port = 8001
+bin_target = "counter-server"
+bin_features = ["web-ssr"]
+bin_default_features = false
+lib_features = ["web-csr"]
+lib_default_features = false

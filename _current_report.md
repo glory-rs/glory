@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 31 |
+| 已完成 `[x]` | 32 |
 | 部分完成 `[~]` | 3 |
-| 未完成 `[ ]` | 26 |
+| 未完成 `[ ]` | 25 |
 
 按能力权重估算:
 
@@ -110,7 +110,8 @@ workspace test 状态。
 - 后续改动可能破坏 command protocol、SSR replay 或 CLI 行为而不被 PR 检出。
 
 当前状态:已新增主 Rust CI,覆盖 fmt、targeted tests、feature guard 与 clippy gates。
-Playwright 真浏览器、mobile/device smoke 仍未闭环。
+Playwright 已在 CI 中跑 CSR counter + SSR hydration 两个真浏览器 smoke；mobile/device
+smoke 仍未闭环。
 
 ## 已完成度较高的部分
 
@@ -383,14 +384,15 @@ serverfn 基础可用，但对比成熟框架还缺:
 - `scripts/mobile-device-smoke.ps1`
 - `docs/mobile-validation.md`
 
-### 9. Browser E2E 没有 CI 闭环
+### 9. [~] Browser E2E CI 已覆盖核心 smoke
 
-Playwright 项目已存在，但测试依赖环境变量，缺失时会 skip。
+Playwright 项目已存在，测试依赖环境变量，缺失时会 skip。当前 CI 已启动 CSR counter
+和 SSR hydration 示例，并设置 URL 后实际跑 Chromium。
 
 缺口:
 
-- CI 启动 CSR counter、router、SSR hydrate、fullstack、hot reload 示例。
-- CI 设置 `GLORY_*_URL` 并实际跑 Chromium。
+- router、fullstack、hot reload 示例尚未进入常规 CI。
+- mobile/device smoke 仍是独立缺口。
 
 主要路径:
 
@@ -439,7 +441,7 @@ cargo clippy -p glory-cli --lib --no-default-features -- -D warnings
 未验证:
 
 - wasm32 CSR browser test。
-- Playwright 真浏览器 e2e。
+- Playwright router/fullstack/hot-reload 真浏览器 e2e。
 - examples 全量 build/run。
 - mobile device/emulator。
 - desktop runtime 人工窗口启动。
@@ -467,7 +469,7 @@ cargo clippy -p glory-cli --lib --no-default-features -- -D warnings
    - 已完成 `--address/--port` 运行时覆盖、默认 auto-open、`--no-open`。
    - 已完成 HTTPS/TLS/proxy 配置校验、打开 URL 与 app-server env 透传。
 3. [x] serverfn 支持 method 选择，至少 `#[server(method = "GET")]`。
-4. Playwright CI 跑 CSR counter + SSR hydration 两个最小场景。
+4. [x] Playwright CI 跑 CSR counter + SSR hydration 两个最小场景。
 5. Desktop 补窗口控制 API 包。
 
 ### P2

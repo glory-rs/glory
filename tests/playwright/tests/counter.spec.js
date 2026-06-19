@@ -5,6 +5,9 @@ test.skip(!process.env.GLORY_COUNTER_URL, "Set GLORY_COUNTER_URL to run this pro
 
 test("counter CSR updates from buttons and input", async ({ page }) => {
   const baseUrl = requiredUrl("GLORY_COUNTER_URL");
+  const pageErrors = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+
   await page.goto(baseUrl);
 
   const counter = page.locator(".counter");
@@ -18,4 +21,5 @@ test("counter CSR updates from buttons and input", async ({ page }) => {
 
   await counter.getByRole("button", { name: "Clear" }).click();
   await expect(counter).toContainText("Value: 0");
+  expect(pageErrors).toEqual([]);
 });

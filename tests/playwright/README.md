@@ -1,8 +1,8 @@
 # Glory Playwright E2E
 
 This directory contains first-party browser tests for the scenarios tracked in
-`_improve_todos.md` F3. Tests are URL-driven so they can run against locally
-started examples, CI-managed servers, or `glory end2end`.
+`_todos.md` F2/F3. Tests are URL-driven so they can run against locally started
+examples, CI-managed servers, or `glory end2end`.
 
 Install once:
 
@@ -23,6 +23,9 @@ Run a project by pointing it at a running app:
 $env:GLORY_COUNTER_URL = "http://127.0.0.1:8080"
 npm --prefix tests/playwright run test:counter
 ```
+
+CI currently starts the CSR counter example and the SSR hydration example, then
+runs the `web-csr-counter` and `ssr-hydration` projects in Chromium.
 
 Environment variables:
 

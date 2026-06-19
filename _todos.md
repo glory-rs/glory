@@ -276,8 +276,12 @@ R5 仅评估,不阻塞任何人。
 
 - [x] **F1 P2** README 与文档引用更新:README 仍把 `_todos.md` 描述为"历史实现日志",
   本次重写后需同步措辞;`_improve_todos.md` 标注"由本板接续"。
-- [ ] **F2 P2** Playwright 全量浏览器 CI 化:F3 已建项目但 CI 只跑 install/list/skip
+- [x] **F2 P2** Playwright 全量浏览器 CI 化:F3 已建项目但 CI 只跑 install/list/skip
   冒烟,补真实浏览器执行(至少 CSR counter + SSR hydration 两项)。
+  2026-06-19 已完成:新增 CI `browser-e2e` job,安装 Chromium,通过 `glory serve`
+  启动 CSR counter 与 SSR hydration 示例,设置 `GLORY_COUNTER_URL`/`GLORY_SSR_URL`
+  后实际运行对应 Playwright 项目;同时让 counter 示例具备 SSR 静态服务 bin,并修复
+  CLI `bin_target` 与 package name 不一致时的可执行文件路径。
 - [x] **F3 P3** 桌面 IPC `panic!("unexpected message")`(`crates/desktop/src/lib.rs:157`)
   改为带日志的容错降级。生产路径 `runtime.rs` 已对无法解码的 IPC 消息
   `tracing::warn!` 后丢弃;`lib.rs` 里剩余 panic 是测试断言,非宿主运行时路径。

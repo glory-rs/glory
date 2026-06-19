@@ -79,3 +79,63 @@ jobs:
 
       - name: backend-command can combine with web-ssr
         run: cargo check -p glory-core --features "web-ssr backend-command"
+
+  browser-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Playwright
+        run: |
+          npm --prefix tests/playwright install --package-lock=false
+          npm --prefix tests/playwright exec -- playwright install --with-deps chromium
+
+      - name: Start counter example
+        shell: bash
+        run: |
+          cargo run -p glory-cli -- --manifest-path examples/counter/Cargo.toml serve --address 127.0.0.1 --port 4101 --no-open --no-reload > counter.log 2>&1 &
+          echo $! > counter.pid
+          for i in {1..120}; do
+            if curl -fsS http://127.0.0.1:4101 >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat counter.log
+          exit 1
+
+      - name: Start SSR hydration example
+        shell: bash
+        run: |
+          cargo run -p glory-cli -- --manifest-path examples/ssr-simple-salvo/Cargo.toml serve --address 127.0.0.1 --port 4102 --no-open --no-reload > ssr.log 2>&1 &
+          echo $! > ssr.pid
+          for i in {1..120}; do
+            if curl -fsS http://127.0.0.1:4102 >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat ssr.log
+          exit 1
+
+      - name: Run browser smoke tests
+        env:
+          GLORY_COUNTER_URL: http://127.0.0.1:4101
+          GLORY_SSR_URL: http://127.0.0.1:4102
+        run: npm --prefix tests/playwright run test -- --project=web-csr-counter --project=ssr-hydration
+
+      - name: Dump server logs
+        if: always()
+        shell: bash
+        run: |
+          cat counter.log || true
+          cat ssr.log || true
