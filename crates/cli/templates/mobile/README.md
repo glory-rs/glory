@@ -101,6 +101,9 @@ The bundle also writes:
 
 Useful knobs:
 
+- `GLORY_ANDROID_ABI=arm64-v8a|armeabi-v7a|x86|x86_64` selects the
+  `cargo ndk -t` ABI (default: `arm64-v8a`). Use `x86_64` for GitHub
+  Actions / local x86_64 emulator smoke runs.
 - `GLORY_ANDROID_GRADLE_TASK=assembleRelease` overrides the Gradle task list
   (comma or whitespace separated).
 - `GLORY_ANDROID_INSTALL=1` adds `installRelease` / `installDebug`.

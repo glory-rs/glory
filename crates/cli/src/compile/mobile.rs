@@ -26,12 +26,11 @@ pub async fn mobile(proj: &Arc<Project>, changes: &ChangeSet) -> JoinHandle<Resu
         if !changes.need_front_build() {
             return Ok(Outcome::Success(Product::None));
         }
-        let triple = proj
-            .mobile_target_triple()
-            .ok_or_else(|| anyhow!("mobile compile invoked for non-mobile target"))?;
-
         let mut command = match proj.target {
             BuildTarget::Android => {
+                let abi = android_abi();
+                let triple = android_target_triple(&abi)
+                    .ok_or_else(|| anyhow!("Unsupported GLORY_ANDROID_ABI={abi:?}; expected one of arm64-v8a, armeabi-v7a, x86, x86_64"))?;
                 if which_cargo_subcommand("ndk").await.is_err() {
                     return Err(anyhow!(
                         "Android builds need cargo-ndk and an NDK toolchain.\n  install: cargo install cargo-ndk && rustup target add {triple}\n  (set ANDROID_NDK_HOME to your NDK root)"
@@ -41,7 +40,7 @@ pub async fn mobile(proj: &Arc<Project>, changes: &ChangeSet) -> JoinHandle<Resu
                 command.args([
                     "ndk",
                     "-t",
-                    "arm64-v8a",
+                    abi.as_str(),
                     "-o",
                     proj.site.root_dir.join("android/jniLibs").as_str(),
                     "build",
@@ -49,6 +48,9 @@ pub async fn mobile(proj: &Arc<Project>, changes: &ChangeSet) -> JoinHandle<Resu
                 command
             }
             BuildTarget::Ios => {
+                let triple = proj
+                    .mobile_target_triple()
+                    .ok_or_else(|| anyhow!("mobile compile invoked for non-mobile target"))?;
                 if !cfg!(target_os = "macos") {
                     return Err(anyhow!("iOS builds require a macOS host with Xcode (rustup target add {triple})"));
                 }
@@ -84,6 +86,23 @@ pub async fn mobile(proj: &Arc<Project>, changes: &ChangeSet) -> JoinHandle<Resu
     })
 }
 
+fn android_abi() -> String {
+    std::env::var("GLORY_ANDROID_ABI")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| "arm64-v8a".to_owned())
+}
+
+fn android_target_triple(abi: &str) -> Option<&'static str> {
+    match abi {
+        "arm64-v8a" => Some("aarch64-linux-android"),
+        "armeabi-v7a" => Some("armv7-linux-androideabi"),
+        "x86" => Some("i686-linux-android"),
+        "x86_64" => Some("x86_64-linux-android"),
+        _ => None,
+    }
+}
+
 /// Checks that `cargo <sub>` exists by asking cargo to run it with
 /// `--version` (cheap, no build).
 async fn which_cargo_subcommand(sub: &str) -> Result<()> {
@@ -92,5 +111,19 @@ async fn which_cargo_subcommand(sub: &str) -> Result<()> {
         Ok(())
     } else {
         Err(anyhow!("cargo {sub} unavailable"))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::android_target_triple;
+
+    #[test]
+    fn maps_android_abis_to_rust_targets() {
+        assert_eq!(android_target_triple("arm64-v8a"), Some("aarch64-linux-android"));
+        assert_eq!(android_target_triple("armeabi-v7a"), Some("armv7-linux-androideabi"));
+        assert_eq!(android_target_triple("x86"), Some("i686-linux-android"));
+        assert_eq!(android_target_triple("x86_64"), Some("x86_64-linux-android"));
+        assert_eq!(android_target_triple("mips"), None);
     }
 }

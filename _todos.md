@@ -287,9 +287,15 @@ R5 仅评估,不阻塞任何人。
 
 ## Lane M — 移动端(cli templates, examples/mobile-counter)
 
-- [ ] **M1 P0(外部受阻)** 真机/模拟器验证:`scripts/mobile-device-smoke.ps1` 主机
+- [~] **M1 P0(外部受阻)** 真机/模拟器验证:`scripts/mobile-device-smoke.ps1` 主机
   检查已过,需 Android 模拟器或真机在线 + macOS 跑 iOS。接续 `_improve_todos.md` D2。
   CI 侧:GitHub Actions Android emulator job(API 34, x86_64)夜间跑安装+启动冒烟。
+  2026-06-19 已完成 CI 侧闭环配置:新增 nightly/manual
+  `.github/workflows/mobile-device-smoke.yml`,用 `GLORY_ANDROID_ABI=x86_64`
+  生成 mobile 模板、build/bundle APK,再在 API 34 x86_64 emulator 上调用
+  `scripts/mobile-device-smoke.ps1` 安装+启动并上传 smoke logs。剩余受阻项:
+  等待 GitHub Actions 或本机设备实际运行结果;Windows 当前仍无在线 Android
+  device/emulator,iOS 仍需 macOS。
 - [x] **M2 P1** 设备上热重载:此前 reload client 仅桌面 webview 可达,Android 需
   `adb reverse` 或局域网地址注入模板。依赖 M1 有验证环境。
   2026-06-19 已完成:移动端模板/`examples/mobile-counter` 在 `GLORY_WATCH=ON`

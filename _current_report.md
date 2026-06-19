@@ -22,8 +22,8 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 | 状态 | 数量 |
 |---|---:|
 | 已完成 `[x]` | 53 |
-| 部分完成 `[~]` | 3 |
-| 未完成 `[ ]` | 2 |
+| 部分完成 `[~]` | 4 |
+| 未完成 `[ ]` | 1 |
 
 按能力权重估算:
 
@@ -385,12 +385,13 @@ serverfn 基础可用，但对比成熟框架还缺:
 - safe-area / keyboard resize / foreground-background JS bootstrap。
 - watch-mode reload websocket client with Android adb reverse / LAN URL knobs。
 - device smoke script。
+- nightly/manual Android API 34 x86_64 emulator workflow scaffold。
 
 缺口:
 
-- Android emulator/device 实际安装启动记录。
+- Android emulator/device 实际安装启动记录仍需等待 CI 或本机设备运行结果。
 - iOS simulator/device 验证。
-- mobile CI 夜间 smoke。
+- mobile CI 夜间 smoke 首次绿色结果。
 
 主要路径:
 

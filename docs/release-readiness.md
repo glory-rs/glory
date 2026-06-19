@@ -39,6 +39,8 @@ will not exercise.
 - [ ] `examples/hackernews-salvo` server function endpoint smoke.
 - [ ] `examples/desktop-counter` desktop launch smoke on a machine with WebView runtime.
 - [ ] `examples/mobile-counter` Android/iOS compile smoke on the appropriate host.
+- [ ] Manual run of `.github/workflows/mobile-device-smoke.yml` succeeds on the
+  Android API 34 x86_64 emulator.
 
 ## Release Artifacts
 

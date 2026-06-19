@@ -4,6 +4,10 @@ This page records the runtime smoke path for Glory mobile artifacts. Compile
 smoke runs in CI; real device validation still needs a local Android device,
 Android emulator, iOS simulator, or iOS device.
 
+Android emulator smoke is also wired as a manual/nightly GitHub Actions workflow
+at `.github/workflows/mobile-device-smoke.yml`. It uses an API 34 x86_64
+emulator and `GLORY_ANDROID_ABI=x86_64`.
+
 ## Android
 
 Prerequisites:
@@ -12,6 +16,8 @@ Prerequisites:
   `ANDROID_HOME` / `ANDROID_SDK_ROOT`.
 - A booted emulator or attached device visible in `adb devices`.
 - `cargo-ndk`, Android NDK, and the `aarch64-linux-android` Rust target.
+  Set `GLORY_ANDROID_ABI=x86_64` and install `x86_64-linux-android` when
+  validating on an x86_64 emulator.
 
 Build and bundle a generated mobile app:
 
