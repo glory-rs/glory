@@ -62,6 +62,27 @@ async fn read_todo(id: u32, prefix: String) -> Result<String, ServerFnError> {
     Ok(format!("{method}:{prefix}-{id}"))
 }
 
+fn require_x_user(ctx: glory_serverfn::ServerFnMiddlewareContext) -> glory_serverfn::BoxedServerFnMiddlewareFuture {
+    Box::pin(async move {
+        if ctx.request.and_then(|request| request.header("x-user").map(str::to_owned)).is_some() {
+            Ok(())
+        } else {
+            Err(ServerFnError::http(401, "missing x-user"))
+        }
+    })
+}
+
+#[server(endpoint = "guarded", middleware = require_x_user)]
+async fn guarded() -> Result<String, ServerFnError> {
+    Ok("allowed".to_owned())
+}
+
+#[server(endpoint = "guarded_attr")]
+#[middleware(require_x_user)]
+async fn guarded_attr() -> Result<String, ServerFnError> {
+    Ok("allowed-attr".to_owned())
+}
+
 #[test]
 fn macro_registers_endpoints() {
     let paths = registered_paths();
@@ -71,6 +92,8 @@ fn macro_registers_endpoints() {
     assert!(paths.contains(&"/__glory/fn/redirects"), "{paths:?}");
     assert!(paths.contains(&"/__glory/fn/submit_login"), "{paths:?}");
     assert!(paths.contains(&"/__glory/fn/read_todo"), "{paths:?}");
+    assert!(paths.contains(&"/__glory/fn/guarded"), "{paths:?}");
+    assert!(paths.contains(&"/__glory/fn/guarded_attr"), "{paths:?}");
 }
 
 #[test]
@@ -144,6 +167,34 @@ fn get_server_fn_decodes_query_args_and_rejects_post() {
         let post_body = serde_json::to_vec(&(7_u32, "task".to_owned())).unwrap();
         let err = handle_with_method("POST", "/__glory/fn/read_todo", post_body).await.unwrap_err();
         assert_eq!(err.status_code(), 405);
+    });
+}
+
+#[test]
+fn per_function_middleware_short_circuits_and_allows_requests() {
+    use glory_serverfn::{RequestContext, with_request_context};
+
+    let runtime = tokio::runtime::Builder::new_current_thread().build().unwrap();
+    runtime.block_on(async {
+        let body = serde_json::to_vec(&()).unwrap();
+        let err = handle("/__glory/fn/guarded", body.clone()).await.unwrap_err();
+        assert_eq!(err.status_code(), 401);
+
+        let context = RequestContext {
+            method: "POST".into(),
+            uri: "/__glory/fn/guarded".into(),
+            headers: vec![("x-user".into(), "chris".into())],
+        };
+        let bytes = with_request_context(context, handle("/__glory/fn/guarded", body.clone())).await.unwrap();
+        assert_eq!(serde_json::from_slice::<String>(&bytes).unwrap(), "allowed");
+
+        let context = RequestContext {
+            method: "POST".into(),
+            uri: "/__glory/fn/guarded_attr".into(),
+            headers: vec![("x-user".into(), "chris".into())],
+        };
+        let bytes = with_request_context(context, handle("/__glory/fn/guarded_attr", body)).await.unwrap();
+        assert_eq!(serde_json::from_slice::<String>(&bytes).unwrap(), "allowed-attr");
     });
 }
 

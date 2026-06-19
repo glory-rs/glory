@@ -107,9 +107,12 @@ R5 仅评估,不阻塞任何人。
   三适配器按 `Content-Type` 解码 POST、按 `Accept` 编码响应;新增
   `glory-serverfn/cbor` 与 `glory-serverfn/postcard` features,宏支持
   `#[server(encoding = "cbor" | "postcard")]`,默认 JSON 和 GET 查询参数不变。
-- [ ] **S3 P1** 逐函数中间件。Dioxus 支持 `#[middleware(tower_layer)]`。Glory 三适配器
+- [x] **S3 P1** 逐函数中间件。Dioxus 支持 `#[middleware(tower_layer)]`。Glory 三适配器
   不共享 tower,需设计适配器中立的 hook 点(如 `#[server(hoops = ...)]` 映射到各框架
   原生中间件)。先设计后动宏。
+  2026-06-19 已完成:新增 adapter-neutral `ServerFnMiddlewareContext` 与
+  `ServerFnMiddleware` hook,dispatch 在函数体前顺序执行并可用 `ServerFnError`
+  短路;宏支持 `#[server(middleware = path)]` 与 sibling `#[middleware(path)]`。
 - [ ] **S4 P1** 客户端响应式 WebSocket。已有 `TransportMessage<T>`/`WebSocketFrame`
   帧助手(`crates/serverfn/src/lib.rs`),缺 Dioxus `use_websocket()` 式 hook
   (`packages/fullstack/src/payloads/websocket.rs`):自动重连 + 类型化双向通道 +

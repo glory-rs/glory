@@ -295,6 +295,11 @@ with `#[glory::server(encoding = "cbor")]` or
 `#[glory::server(encoding = "postcard")]`. GET endpoints keep JSON query
 arguments.
 
+Per-function middleware can short-circuit a generated endpoint without tying it
+to a specific HTTP adapter: use `#[glory::server(middleware = require_auth)]`
+or `#[middleware(require_auth)]`, where the middleware receives
+`ServerFnMiddlewareContext` and returns `ServerFnError` on rejection.
+
 Mount the adapter router on the server side:
 
 ```rust

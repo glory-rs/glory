@@ -1032,6 +1032,23 @@ fn parse_header_params(value: &str) -> Vec<(String, String)> {
 pub type BoxedServerFnFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<u8>, ServerFnError>> + Send>>;
 
 #[cfg(not(target_arch = "wasm32"))]
+pub type BoxedServerFnMiddlewareFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), ServerFnError>> + Send>>;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub type ServerFnMiddleware = fn(ServerFnMiddlewareContext) -> BoxedServerFnMiddlewareFuture;
+
+/// Adapter-neutral request metadata passed to per-server-function middleware.
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ServerFnMiddlewareContext {
+    pub path: String,
+    pub method: String,
+    pub request: Option<RequestContext>,
+    pub input_encoding: ServerFnEncoding,
+    pub output_encoding: ServerFnEncoding,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ServerFnDispatchResult {
     pub result: Result<Vec<u8>, ServerFnError>,
@@ -1053,6 +1070,8 @@ pub struct ServerFnEntry {
     pub path: &'static str,
     /// HTTP method used by generated client stubs.
     pub method: &'static str,
+    /// Adapter-neutral middleware run before this function body.
+    pub middlewares: &'static [ServerFnMiddleware],
     pub handler: fn(Vec<u8>, ServerFnEncoding, ServerFnEncoding) -> BoxedServerFnFuture,
 }
 
@@ -1092,6 +1111,21 @@ pub async fn dispatch_with_method(
         if entry.path == path {
             path_exists = true;
             if entry.method.eq_ignore_ascii_case(method) {
+                let middleware_context = ServerFnMiddlewareContext {
+                    path: path.to_owned(),
+                    method: method.to_owned(),
+                    request: request_context(),
+                    input_encoding,
+                    output_encoding,
+                };
+                for middleware in entry.middlewares {
+                    if let Err(err) = middleware(middleware_context.clone()).await {
+                        return ServerFnDispatchResult {
+                            result: Err(err),
+                            encoding: output_encoding,
+                        };
+                    }
+                }
                 return ServerFnDispatchResult {
                     result: (entry.handler)(body, input_encoding, output_encoding).await,
                     encoding: output_encoding,
@@ -1119,7 +1153,7 @@ pub async fn dispatch_with_method(
 /// by the adapter mounts before dispatch; absent when a server function is
 /// called directly (SSR rendering, tests).
 #[cfg(not(target_arch = "wasm32"))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct RequestContext {
     pub method: String,
     pub uri: String,

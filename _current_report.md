@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 26 |
+| 已完成 `[x]` | 27 |
 | 部分完成 `[~]` | 5 |
-| 未完成 `[ ]` | 29 |
+| 未完成 `[ ]` | 28 |
 
 按能力权重估算:
 
@@ -258,9 +258,10 @@ serverfn 基础可用，但对比成熟框架还缺:
 - 多 HTTP method 已补第一阶段:`#[server(method = "GET")]` 可用。
 - 多编码协商已补第一阶段:默认 JSON,可选 CBOR/Postcard feature,三适配器按
   `Content-Type` / `Accept` 协商 POST 请求与响应。
+- 逐函数 middleware 已补 adapter-neutral hook:宏支持 `middleware = ...` 与
+  `#[middleware(...)]`,dispatch 前置执行并可短路。
 - 原生 framework extractor 直通设计决策已补:核心 `#[server]` 暂保持
   adapter-neutral,原生 extractor 放在自定义框架 route 或未来显式 adapter 扩展。
-- 逐函数 middleware。
 - 响应式 WebSocket hook。
 
 ### 3. CLI / Serve / Bundle 产品面偏薄

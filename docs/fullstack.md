@@ -63,6 +63,44 @@ async fn save_todo(todo: Todo) -> Result<Todo, glory_serverfn::ServerFnError> {
 GET server functions keep JSON query arguments. Binary encodings are intended
 for POST bodies and responses.
 
+## Per-Function Middleware
+
+Use adapter-neutral middleware when one server function needs request checks
+without coupling the endpoint to Salvo, Axum, or Actix:
+
+```rust
+fn require_session(
+    ctx: glory_serverfn::ServerFnMiddlewareContext,
+) -> glory_serverfn::BoxedServerFnMiddlewareFuture {
+    Box::pin(async move {
+        if ctx.request.and_then(|request| request.cookie("glory_session")).is_some() {
+            Ok(())
+        } else {
+            Err(glory_serverfn::ServerFnError::http(401, "missing session"))
+        }
+    })
+}
+
+#[glory::server(middleware = require_session)]
+async fn save_todo(todo: Todo) -> Result<Todo, glory_serverfn::ServerFnError> {
+    Ok(todo)
+}
+```
+
+The equivalent sibling attribute form is also supported:
+
+```rust
+#[glory::server]
+#[middleware(require_session)]
+async fn clear_done() -> Result<(), glory_serverfn::ServerFnError> {
+    Ok(())
+}
+```
+
+Middleware functions run in declaration order before argument decoding reaches
+the server body. Returning `ServerFnError` short-circuits the response through
+the same adapter mount and encoding negotiation path.
+
 ## Streaming, SSE, And Uploads
 
 `glory-serverfn` has adapter-agnostic helpers for custom resource routes:

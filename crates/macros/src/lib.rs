@@ -3,7 +3,7 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::spanned::Spanned;
-use syn::{FnArg, ItemFn, LitStr, Pat, parse_macro_input};
+use syn::{Expr, FnArg, ItemFn, LitStr, Pat, parse_macro_input};
 
 /// Turns an `async fn` into a *server function*: the body runs on the
 /// server, and clients call it transparently over HTTP.
@@ -35,13 +35,17 @@ use syn::{FnArg, ItemFn, LitStr, Pat, parse_macro_input};
 /// requests that encoding for the generated client stub when the matching
 /// `glory-serverfn` feature is enabled. GET server functions currently use
 /// JSON query arguments and therefore only support the default JSON encoding.
+/// `#[server(middleware = require_auth)]` or a sibling
+/// `#[middleware(require_auth)]` attribute registers an adapter-neutral
+/// server-side middleware function for this endpoint.
 #[proc_macro_attribute]
 pub fn server(attr: TokenStream, item: TokenStream) -> TokenStream {
-    let item_fn = parse_macro_input!(item as ItemFn);
+    let mut item_fn = parse_macro_input!(item as ItemFn);
 
     let mut endpoint: Option<String> = None;
     let mut method = "POST".to_owned();
     let mut encoding = "json".to_owned();
+    let mut middlewares = Vec::<Expr>::new();
     if !attr.is_empty() {
         let parser = syn::meta::parser(|meta| {
             if meta.path.is_ident("endpoint") {
@@ -68,8 +72,14 @@ pub fn server(attr: TokenStream, item: TokenStream) -> TokenStream {
                     }
                     _ => Err(meta.error("unsupported #[server] encoding; expected `json`, `cbor`, or `postcard`")),
                 }
+            } else if meta.path.is_ident("middleware") {
+                let value: Expr = meta.value()?.parse()?;
+                middlewares.push(value);
+                Ok(())
             } else {
-                Err(meta.error("unsupported #[server] option; expected `endpoint = \"...\"`, `method = \"GET\"`, or `encoding = \"cbor\"`"))
+                Err(meta.error(
+                    "unsupported #[server] option; expected `endpoint = \"...\"`, `method = \"GET\"`, `encoding = \"cbor\"`, `encoding = \"postcard\"`, or `middleware = path`",
+                ))
             }
         });
         parse_macro_input!(attr with parser);
@@ -82,6 +92,19 @@ pub fn server(attr: TokenStream, item: TokenStream) -> TokenStream {
         .to_compile_error()
         .into();
     }
+
+    let mut retained_attrs = Vec::new();
+    for attr in std::mem::take(&mut item_fn.attrs) {
+        if attr.path().is_ident("middleware") {
+            match attr.parse_args::<Expr>() {
+                Ok(middleware) => middlewares.push(middleware),
+                Err(err) => return err.to_compile_error().into(),
+            }
+        } else {
+            retained_attrs.push(attr);
+        }
+    }
+    item_fn.attrs = retained_attrs;
 
     if item_fn.sig.asyncness.is_none() {
         return syn::Error::new(item_fn.sig.span(), "#[server] functions must be `async fn`")
@@ -149,6 +172,7 @@ pub fn server(attr: TokenStream, item: TokenStream) -> TokenStream {
             glory_serverfn::ServerFnEntry {
                 path: #url,
                 method: #method,
+                middlewares: &[ #(#middlewares),* ],
                 handler: |__body: ::std::vec::Vec<u8>, __input_encoding: glory_serverfn::ServerFnEncoding, __output_encoding: glory_serverfn::ServerFnEncoding| ::std::boxed::Box::pin(async move {
                     let ( #(#arg_idents,)* ): ( #(#arg_types,)* ) = #decode_args;
                     let __output = #name( #(#arg_idents),* ).await?;
