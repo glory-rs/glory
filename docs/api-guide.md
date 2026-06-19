@@ -167,7 +167,7 @@ For type-safe navigation, implement `Routable` on an app route enum and call
 use glory::routing::{
     AviatorExt, Routable, append_route_query_param, encode_catch_all,
     encode_route_param, parse_route_param, parse_route_query, query_param_or,
-    required_query_param, split_catch_all,
+    redirect_url, required_query_param, split_catch_all,
 };
 
 enum AppRoute {
@@ -175,6 +175,7 @@ enum AppRoute {
     User { id: u64 },
     Search { q: String, page: u32 },
     Files { path: Vec<String> },
+    NotFound { raw_url: String },
 }
 
 impl Routable for AppRoute {
@@ -189,6 +190,11 @@ impl Routable for AppRoute {
                 url
             }
             Self::Files { path } => format!("/files/{}", encode_catch_all(path)),
+            Self::NotFound { raw_url } => {
+                let mut url = "/404".to_owned();
+                append_route_query_param(&mut url, "url", raw_url);
+                url
+            }
         }
     }
 
@@ -211,10 +217,29 @@ impl Routable for AppRoute {
             _ => None,
         }
     }
+
+    fn redirect(url: &str) -> Option<Self> {
+        redirect_url(url, "/u/<id>", |matched| {
+            Some(Self::User {
+                id: matched.param("id").ok()?,
+            })
+        })
+    }
+
+    fn not_found(url: &str) -> Option<Self> {
+        Some(Self::NotFound {
+            raw_url: url.to_owned(),
+        })
+    }
 }
 
 aviator.goto_route(&AppRoute::User { id: 42 })?;
 ```
+
+`Routable::resolve_url()` checks `redirect()`, then `from_url()`, then
+`not_found()`. `Locator::route::<R>()` uses that resolution path, so current URL
+reads can map legacy paths to typed routes and can return a typed 404 route
+instead of `None`.
 
 `Aviator::back()` and `Aviator::forward()` expose history movement for backends
 that support it. `BrowserAviator` uses `window.history`, while `MemoryAviator`

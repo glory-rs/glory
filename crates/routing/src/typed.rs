@@ -2,7 +2,8 @@ use std::fmt;
 use std::str::FromStr;
 use std::{borrow::Cow, collections::BTreeMap};
 
-use crate::{Aviator, NavigationError};
+use crate::url::Url;
+use crate::{Aviator, NavigationError, PathFilter, PathState};
 
 /// A typed route that can round-trip to and from the URL form used by
 /// [`Aviator::goto`].
@@ -16,6 +17,26 @@ pub trait Routable: Sized {
 
     /// Parse a URL back into this route type.
     fn from_url(url: &str) -> Option<Self>;
+
+    /// Parse a legacy URL and return the typed route it redirects to.
+    ///
+    /// Redirects are checked before normal route parsing by
+    /// [`Routable::resolve_url`], matching Dioxus' `#[redirect(...)]`
+    /// behavior for redirects that are declared before a concrete route.
+    fn redirect(_url: &str) -> Option<Self> {
+        None
+    }
+
+    /// Return a typed fallback for URLs that do not match any route.
+    fn not_found(_url: &str) -> Option<Self> {
+        None
+    }
+
+    /// Resolve a URL into a typed route, applying redirects and then the
+    /// optional not-found fallback.
+    fn resolve_url(url: &str) -> Option<Self> {
+        Self::redirect(url).or_else(|| Self::from_url(url)).or_else(|| Self::not_found(url))
+    }
 }
 
 /// Convenience methods for navigating with a [`Routable`] value.
@@ -44,6 +65,105 @@ pub fn decode_route_param(value: &str) -> String {
 
 /// Parsed query parameters for typed route helpers.
 pub type RouteQuery = BTreeMap<String, Vec<String>>;
+
+/// Data captured by [`match_route_pattern`] for redirect/fallback helpers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RouteMatch {
+    path: String,
+    params: BTreeMap<String, String>,
+    query: RouteQuery,
+    fragment: Option<String>,
+}
+
+impl RouteMatch {
+    /// Matched URL path.
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    /// Path parameters captured from the route pattern.
+    pub fn params(&self) -> &BTreeMap<String, String> {
+        &self.params
+    }
+
+    /// Parsed query parameters from the URL.
+    pub fn query(&self) -> &RouteQuery {
+        &self.query
+    }
+
+    /// Fragment identifier without the leading `#`, when present.
+    pub fn fragment(&self) -> Option<&str> {
+        self.fragment.as_deref()
+    }
+
+    /// Read and parse a named path parameter.
+    pub fn param<T>(&self, name: &str) -> Result<T, RouteParamError>
+    where
+        T: FromRouteParam,
+    {
+        required_route_param(&self.params, name)
+    }
+
+    /// Read and parse a required query parameter.
+    pub fn required_query<T>(&self, name: &str) -> Result<T, RouteParamError>
+    where
+        T: FromRouteParam,
+    {
+        required_query_param(&self.query, name)
+    }
+
+    /// Read and parse an optional query parameter.
+    pub fn optional_query<T>(&self, name: &str) -> Result<Option<T>, RouteParamError>
+    where
+        T: FromRouteParam,
+    {
+        optional_query_param(&self.query, name)
+    }
+
+    /// Read and parse a query parameter, falling back to `default`.
+    pub fn query_or<T>(&self, name: &str, default: T) -> Result<T, RouteParamError>
+    where
+        T: FromRouteParam,
+    {
+        query_param_or(&self.query, name, default)
+    }
+
+    /// Read and parse every value for a repeated query parameter.
+    pub fn repeated_query<T>(&self, name: &str) -> Result<Vec<T>, RouteParamError>
+    where
+        T: FromRouteParam,
+    {
+        repeated_query_param(&self.query, name)
+    }
+}
+
+/// Match a URL against the same path pattern syntax used by [`PathFilter`].
+///
+/// The match must consume the full path. This is mainly intended for
+/// hand-written [`Routable::redirect`] implementations until a derive/builder
+/// layer can generate the same code.
+pub fn match_route_pattern(url: &str, pattern: &str) -> Option<RouteMatch> {
+    let url = Url::parse(url).ok()?;
+    let mut state = PathState::new(url.path());
+    let filter = PathFilter::new(pattern);
+    if !filter.detect(&url, &mut state) || !state.is_ended() {
+        return None;
+    }
+    Some(RouteMatch {
+        path: url.path(),
+        params: state.params,
+        query: parse_route_query(url.query().as_deref()),
+        fragment: url.fragment(),
+    })
+}
+
+/// Apply a typed redirect when `url` matches `pattern`.
+pub fn redirect_url<R, F>(url: &str, pattern: &str, redirect: F) -> Option<R>
+where
+    F: FnOnce(RouteMatch) -> Option<R>,
+{
+    match_route_pattern(url, pattern).and_then(redirect)
+}
 
 /// Parse a raw URL query string into a stable map of decoded values.
 pub fn parse_route_query(query: Option<&str>) -> RouteQuery {
@@ -287,6 +407,7 @@ mod tests {
         User { id: u64 },
         Search { query: SearchQuery },
         Files { path: Vec<String> },
+        NotFound { raw_url: String },
     }
 
     #[derive(Debug, Clone, PartialEq, Eq)]
@@ -321,6 +442,11 @@ mod tests {
                     url
                 }
                 Self::Files { path } => format!("/files/{}", encode_catch_all(path)),
+                Self::NotFound { raw_url } => {
+                    let mut url = "/404".to_owned();
+                    append_route_query_param(&mut url, "url", raw_url);
+                    url
+                }
             }
         }
 
@@ -344,6 +470,18 @@ mod tests {
                 [prefix, rest @ ..] if prefix == "files" => Some(Self::Files { path: rest.to_vec() }),
                 _ => None,
             }
+        }
+
+        fn redirect(url: &str) -> Option<Self> {
+            redirect_url(url, "/u/<id>", |matched| {
+                Some(Self::User {
+                    id: matched.param("id").ok()?,
+                })
+            })
+        }
+
+        fn not_found(url: &str) -> Option<Self> {
+            Some(Self::NotFound { raw_url: url.to_owned() })
         }
     }
 
@@ -415,6 +553,31 @@ mod tests {
         let route = AppRoute::Files { path };
         assert_eq!(route.to_url(), "/files/docs/hello%2Fworld/42");
         assert_eq!(AppRoute::from_url("/files/docs/hello%2Fworld/42"), Some(route));
+    }
+
+    #[test]
+    fn redirect_helpers_parse_typed_targets() {
+        assert_eq!(AppRoute::redirect("/u/42?from=legacy#profile"), Some(AppRoute::User { id: 42 }));
+
+        let matched = match_route_pattern("/u/42?from=legacy&tag=rust&tag=ui#profile", "/u/<id>").unwrap();
+        assert_eq!(matched.path(), "/u/42");
+        assert_eq!(matched.param::<u64>("id").unwrap(), 42);
+        assert_eq!(matched.required_query::<String>("from").unwrap(), "legacy");
+        assert_eq!(matched.repeated_query::<String>("tag").unwrap(), vec!["rust".to_owned(), "ui".to_owned()]);
+        assert_eq!(matched.fragment(), Some("profile"));
+        assert!(match_route_pattern("/u/42/extra", "/u/<id>").is_none());
+    }
+
+    #[test]
+    fn resolve_url_applies_redirects_and_not_found_fallback() {
+        assert_eq!(AppRoute::resolve_url("/u/7"), Some(AppRoute::User { id: 7 }));
+        assert_eq!(
+            AppRoute::resolve_url("/missing"),
+            Some(AppRoute::NotFound {
+                raw_url: "/missing".to_owned(),
+            })
+        );
+        assert_eq!(AppRoute::from_url("/missing"), None);
     }
 
     #[test]

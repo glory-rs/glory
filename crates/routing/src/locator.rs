@@ -92,7 +92,7 @@ impl Locator {
     where
         R: Routable,
     {
-        R::from_url(&self.raw_url.get())
+        R::resolve_url(&self.raw_url.get())
     }
 
     pub fn receive(&self, raw_url: impl Into<String>, raw_params: Option<BTreeMap<String, String>>) -> Result<(), crate::url::ParseError> {

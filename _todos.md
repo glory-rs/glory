@@ -79,7 +79,10 @@ R5 仅评估,不阻塞任何人。
   2026-06-19 已完成:新增 `RouteQuery`/`FromRouteQuery`、required/optional/
   repeated/default query helpers、query 编码 helper,以及 catch-all encode/split/parse
   helpers;未来 derive/builder 可直接复用。
-- [ ] **T4 P1** 声明式重定向(Dioxus `#[redirect(...)]`)与 404 默认处理。依赖 T1。
+- [x] **T4 P1** 声明式重定向(Dioxus `#[redirect(...)]`)与 404 默认处理。依赖 T1。
+  2026-06-19 已完成: `Routable` 新增 `redirect()`/`not_found()`/`resolve_url()`,
+  并提供 `match_route_pattern()`/`redirect_url()` helpers;`Locator::route::<R>()`
+  现在会解析 redirect 与 typed 404 fallback。
 - [x] **T5 P2** 导航增强:滚动恢复、`GoBack/GoForward` 等价 API。另核查
   `crates/routing/src/aviators/browser.rs:105` 的 TODO(history state 以 prop 而非
   attribute 存储,部分导航模式可能丢 state)。
