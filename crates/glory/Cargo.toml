@@ -32,7 +32,7 @@ web-ssr = ["glory-core/web-ssr", "glory-routing?/web-ssr"]
 # EventData-typed listeners). Combines with web-ssr; not with web-csr on wasm.
 backend-command = ["glory-core/backend-command"]
 salvo = ["web-ssr", "glory-core/salvo", "routing", "glory-routing?/salvo"]
-routing = ["dep:glory-routing"]
+routing = ["dep:glory-routing", "dep:glory-macros"]
 # `#[server]` functions. NOTE: the macro expands to `glory_serverfn::...`
 # paths, so app crates must also list `glory-serverfn` as a direct
 # dependency (same pattern as serde + serde_json).

@@ -8,8 +8,8 @@ use crate::{Aviator, NavigationError, PathFilter, PathState};
 /// A typed route that can round-trip to and from the URL form used by
 /// [`Aviator::goto`].
 ///
-/// This trait is intentionally small: applications can implement it for an
-/// enum today, while a future derive macro can generate the same contract.
+/// This trait is intentionally small: applications can implement it manually
+/// for query-heavy routes or derive it with `#[derive(glory::Routable)]`.
 pub trait Routable: Sized {
     /// Serialize this route to a browser/server navigation URL, usually a
     /// root-relative path such as `/users/42?page=1`.

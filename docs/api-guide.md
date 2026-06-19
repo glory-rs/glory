@@ -160,81 +160,34 @@ BrowserHolder::new()
     .mount(App::new());
 ```
 
-For type-safe navigation, implement `Routable` on an app route enum and call
+For type-safe navigation, derive `Routable` on an app route enum and call
 `goto_route` instead of formatting URL strings at each callsite:
 
 ```rust
-use glory::routing::{
-    AviatorExt, Routable, append_route_query_param, encode_catch_all,
-    encode_route_param, parse_route_param, parse_route_query, query_param_or,
-    redirect_url, required_query_param, split_catch_all,
-};
+use glory::routing::{AviatorExt, Routable};
 
+#[derive(glory::Routable)]
 enum AppRoute {
+    #[route("/")]
     Home,
+    #[route("/users/<id>")]
+    #[redirect("/u/<id>")]
     User { id: u64 },
-    Search { q: String, page: u32 },
+    #[route("/files/<**path>")]
     Files { path: Vec<String> },
+    #[not_found]
     NotFound { raw_url: String },
-}
-
-impl Routable for AppRoute {
-    fn to_url(&self) -> String {
-        match self {
-            Self::Home => "/".to_owned(),
-            Self::User { id } => format!("/users/{}", encode_route_param(id)),
-            Self::Search { q, page } => {
-                let mut url = "/search".to_owned();
-                append_route_query_param(&mut url, "q", q);
-                append_route_query_param(&mut url, "page", page);
-                url
-            }
-            Self::Files { path } => format!("/files/{}", encode_catch_all(path)),
-            Self::NotFound { raw_url } => {
-                let mut url = "/404".to_owned();
-                append_route_query_param(&mut url, "url", raw_url);
-                url
-            }
-        }
-    }
-
-    fn from_url(url: &str) -> Option<Self> {
-        let url = glory::routing::url::Url::parse(url).ok()?;
-        let segments = url.path().trim_matches('/').split('/').collect::<Vec<_>>();
-        match segments.as_slice() {
-            ["users", id] => Some(Self::User { id: parse_route_param(id).ok()? }),
-            ["search"] => {
-                let query = parse_route_query(url.query().as_deref());
-                Some(Self::Search {
-                    q: required_query_param(&query, "q").ok()?,
-                    page: query_param_or(&query, "page", 1).ok()?,
-                })
-            }
-            ["files", rest @ ..] => Some(Self::Files {
-                path: split_catch_all(&rest.join("/")),
-            }),
-            [""] | [] => Some(Self::Home),
-            _ => None,
-        }
-    }
-
-    fn redirect(url: &str) -> Option<Self> {
-        redirect_url(url, "/u/<id>", |matched| {
-            Some(Self::User {
-                id: matched.param("id").ok()?,
-            })
-        })
-    }
-
-    fn not_found(url: &str) -> Option<Self> {
-        Some(Self::NotFound {
-            raw_url: url.to_owned(),
-        })
-    }
 }
 
 aviator.goto_route(&AppRoute::User { id: 42 })?;
 ```
+
+The derive macro supports Glory path patterns such as `"/users/<id>"`,
+`"/posts/<id:num>"`, tuple variants in path-parameter order, catch-all
+`"/files/<**path>"`, repeated `#[redirect("...")]` attributes, and one
+`#[not_found]` fallback variant. For query-heavy routes, use the
+`RouteQuery` helpers (`parse_route_query`, `required_query_param`,
+`query_param_or`, `append_route_query_param`) in a manual `Routable` impl.
 
 `Routable::resolve_url()` checks `redirect()`, then `from_url()`, then
 `not_found()`. `Locator::route::<R>()` uses that resolution path, so current URL

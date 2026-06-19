@@ -17,6 +17,10 @@ pub use glory_core::*;
 
 cfg_feature! {
     #![feature ="routing"]
+    /// The `#[derive(Routable)]` macro for enum-backed typed routes. The
+    /// generated impl targets [`glory::routing::Routable`].
+    #[doc(no_inline)]
+    pub use glory_macros::Routable;
     #[doc(no_inline)]
     pub use glory_routing as routing;
 }

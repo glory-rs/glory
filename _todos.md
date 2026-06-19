@@ -61,7 +61,7 @@ R5 仅评估,不阻塞任何人。
 
 ## Lane T — 路由类型化(crates/routing)— 对照差距最大的单项
 
-- [~] **T1 P0** 类型化路由定义。现状是运行时字符串 `Router::push/filter`
+- [x] **T1 P0** 类型化路由定义。现状是运行时字符串 `Router::push/filter`
   (`crates/routing/src/router.rs`),Dioxus 有 `#[derive(Routable)]` 枚举路由
   (`packages/router-macro/src/lib.rs`):静态类型、动态段类型推导、编译期检查。
   Glory 哲学是"无 view DSL",但 Routable 派生不是 view 宏 — 需先做一次设计决策:
@@ -70,6 +70,9 @@ R5 仅评估,不阻塞任何人。
   2026-06-19 第一阶段:已新增手写 `Routable` trait、`AviatorExt::goto_route`、
   `Locator::route::<R>()`、`LocatorModifier::from_route` 和 path 参数 encode/parse
   helpers;剩余是 derive/builder 决策与自动生成。
+  2026-06-19 第二阶段:已选择 derive 路线并新增 `#[derive(glory::Routable)]`,
+  支持 `#[route]`、`#[redirect]`、`#[not_found]`、typed path 参数和 catch-all;
+  复杂 query 结构继续用现有 helper 手写。
 - [ ] **T2 P0** 嵌套布局 / Outlet 等价物。Dioxus 有 `#[nest]`/`#[layout]`/`Outlet`
   (`packages/router/src/components/outlet.rs`)。Glory `Router` 已有层级 children,
   缺的是"父布局渲染插槽"语义。依赖 T1 的设计结论。
