@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 49 |
-| 部分完成 `[~]` | 4 |
-| 未完成 `[ ]` | 7 |
+| 已完成 `[x]` | 50 |
+| 部分完成 `[~]` | 3 |
+| 未完成 `[ ]` | 5 |
 
 按能力权重估算:
 
@@ -360,12 +360,12 @@ serverfn 基础可用，但对比成熟框架还缺:
 - command stream over WebSocket。
 - reconnect client。
 - Salvo/Axum/Actix route adapters。
+- shared local worker pool with bounded per-session queues。
 - `examples/liveview-salvo` 最小示例。
 - mount/event/ping/query 基础测试。
 
 缺口:
 
-- 当前 Salvo adapter 每 session 一个 `std::thread` + `mpsc`，并发扩展性有限。
 - 缺端到端浏览器场景。
 - query 应答路径已有回归测试覆盖。
 - session TTL/resume 仍缺实现;HTML shell ownership 与重连退避语义已文档化。
@@ -425,6 +425,7 @@ cargo test -p glory-routing --lib --features web-ssr
 cargo test -p glory-serverfn
 cargo test -p glory-serverfn --features "salvo axum actix"
 cargo test -p glory-liveview
+cargo test -p glory-liveview --features "salvo axum actix"
 cargo test -p glory-cli
 cargo test -p glory-cli-harnesses
 cargo test -p glory-hot-reload

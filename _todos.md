@@ -251,10 +251,11 @@ R5 仅评估,不阻塞任何人。
 
 ## Lane L — LiveView(crates/liveview)
 
-- [ ] **L1 P1** 异步化重构:当前每会话一个 `std::thread` + mpsc
+- [x] **L1 P1** 异步化重构:当前每会话一个 `std::thread` + mpsc
   (`crates/liveview/src/lib.rs`),百级并发即吃紧;Dioxus 用
-  `LocalPoolHandle` task-per-session(`packages/liveview/src/pool.rs`)。改为
-  spawn_local 固定任务 + 有界队列(背压),保住 non-Send 树约束。
+  `LocalPoolHandle` task-per-session(`packages/liveview/src/pool.rs`)。已改为
+  全局共享 local worker pool,每 session 是 `spawn_local` task,adapter 通过容量 32
+  的 bounded channel 施加背压,并保住 non-Send 树约束。
 - [x] **L2 P1** Axum/Actix 适配器:抽 `LiveviewRouter` 式 trait(对照
   `packages/liveview/src/adapters/mod.rs` 约 30 行),消除 Salvo 硬编码。可与 L1 并行
   (传输 trait 先定)。

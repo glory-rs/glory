@@ -117,8 +117,7 @@ fn normalize_liveview_path(path: &str) -> String {
 
 #[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
 struct SessionWorker {
-    sender: std::sync::mpsc::Sender<SessionRequest>,
-    thread: Option<std::thread::JoinHandle<()>>,
+    sender: futures::channel::mpsc::Sender<SessionRequest>,
 }
 
 #[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
@@ -131,40 +130,97 @@ enum SessionRequest {
 }
 
 #[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
+type LocalTask = Box<dyn FnOnce(futures::executor::LocalSpawner) + Send + 'static>;
+
+#[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
+struct LocalWorkerPool {
+    senders: Vec<futures::channel::mpsc::UnboundedSender<LocalTask>>,
+    next: std::sync::atomic::AtomicUsize,
+}
+
+#[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
+impl LocalWorkerPool {
+    fn new() -> Self {
+        let count = liveview_worker_count();
+        let mut senders = Vec::with_capacity(count);
+        for index in 0..count {
+            let (sender, receiver) = futures::channel::mpsc::unbounded::<LocalTask>();
+            std::thread::Builder::new()
+                .name(format!("glory-liveview-local-{index}"))
+                .spawn(move || run_local_worker(receiver))
+                .expect("glory-liveview: failed to spawn local worker");
+            senders.push(sender);
+        }
+        Self {
+            senders,
+            next: std::sync::atomic::AtomicUsize::new(0),
+        }
+    }
+
+    fn spawn(&self, task: LocalTask) -> Result<(), ()> {
+        let index = self.next.fetch_add(1, std::sync::atomic::Ordering::Relaxed) % self.senders.len();
+        self.senders[index].unbounded_send(task).map_err(|_| ())
+    }
+}
+
+#[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
+fn liveview_worker_pool() -> &'static LocalWorkerPool {
+    static POOL: std::sync::OnceLock<LocalWorkerPool> = std::sync::OnceLock::new();
+    POOL.get_or_init(LocalWorkerPool::new)
+}
+
+#[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
+fn liveview_worker_count() -> usize {
+    std::env::var("GLORY_LIVEVIEW_WORKERS")
+        .ok()
+        .and_then(|value| value.parse::<usize>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or_else(|| std::thread::available_parallelism().map(|value| value.get()).unwrap_or(1).min(4))
+}
+
+#[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
+fn run_local_worker(mut receiver: futures::channel::mpsc::UnboundedReceiver<LocalTask>) {
+    use futures::StreamExt;
+    use futures::task::LocalSpawnExt;
+
+    let mut pool = futures::executor::LocalPool::new();
+    let spawner = pool.spawner();
+    let dispatch_spawner = spawner.clone();
+    spawner
+        .spawn_local(async move {
+            while let Some(task) = receiver.next().await {
+                task(dispatch_spawner.clone());
+            }
+        })
+        .expect("glory-liveview: failed to spawn local dispatcher");
+    pool.run();
+}
+
+#[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
 impl SessionWorker {
-    fn spawn<W>(factory: std::sync::Arc<dyn Fn() -> W + Send + Sync + 'static>) -> Result<(Self, LiveViewMessage), std::sync::mpsc::RecvError>
+    async fn spawn<W>(factory: std::sync::Arc<dyn Fn() -> W + Send + Sync + 'static>) -> Result<(Self, LiveViewMessage), ()>
     where
         W: Widget + 'static,
     {
-        let (sender, receiver) = std::sync::mpsc::channel();
-        let (mount_sender, mount_receiver) = std::sync::mpsc::channel();
-        let thread = std::thread::spawn(move || {
-            let (session, mount) = LiveViewSession::mount(factory());
-            if mount_sender.send(mount).is_err() {
-                return;
-            }
-            while let Ok(request) = receiver.recv() {
-                match request {
-                    SessionRequest::Message { message, reply } => {
-                        let _ = reply.send(session.handle_message(message));
-                    }
-                    SessionRequest::Close => break,
-                }
-            }
-        });
-        let mount = mount_receiver.recv()?;
-        Ok((
-            Self {
-                sender,
-                thread: Some(thread),
-            },
-            mount,
-        ))
+        let (sender, receiver) = futures::channel::mpsc::channel(32);
+        let (mount_sender, mount_receiver) = futures::channel::oneshot::channel();
+        liveview_worker_pool().spawn(Box::new(move |spawner| {
+            use futures::task::LocalSpawnExt;
+
+            spawner
+                .spawn_local(run_session(factory, receiver, mount_sender))
+                .expect("glory-liveview: failed to spawn session task");
+        }))?;
+        let mount = mount_receiver.await.map_err(|_| ())?;
+        Ok((Self { sender }, mount))
     }
 
     async fn handle_message(&self, message: LiveViewMessage) -> Option<LiveViewMessage> {
+        use futures::SinkExt;
+
         let (reply, receiver) = futures::channel::oneshot::channel();
-        if self.sender.send(SessionRequest::Message { message, reply }).is_err() {
+        let mut sender = self.sender.clone();
+        if sender.send(SessionRequest::Message { message, reply }).await.is_err() {
             return Some(LiveViewMessage::Error {
                 message: "liveview session worker stopped".to_owned(),
             });
@@ -178,12 +234,33 @@ impl SessionWorker {
 }
 
 #[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
+async fn run_session<W>(
+    factory: std::sync::Arc<dyn Fn() -> W + Send + Sync + 'static>,
+    mut receiver: futures::channel::mpsc::Receiver<SessionRequest>,
+    mount_sender: futures::channel::oneshot::Sender<LiveViewMessage>,
+) where
+    W: Widget + 'static,
+{
+    use futures::StreamExt;
+
+    let (session, mount) = LiveViewSession::mount(factory());
+    if mount_sender.send(mount).is_err() {
+        return;
+    }
+    while let Some(request) = receiver.next().await {
+        match request {
+            SessionRequest::Message { message, reply } => {
+                let _ = reply.send(session.handle_message(message));
+            }
+            SessionRequest::Close => break,
+        }
+    }
+}
+
+#[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
 impl Drop for SessionWorker {
     fn drop(&mut self) {
-        let _ = self.sender.send(SessionRequest::Close);
-        if let Some(thread) = self.thread.take() {
-            let _ = thread.join();
-        }
+        let _ = self.sender.try_send(SessionRequest::Close);
     }
 }
 
@@ -234,7 +311,7 @@ pub mod salvo_mount {
     where
         W: Widget + 'static,
     {
-        let Ok((worker, mount)) = SessionWorker::spawn(factory) else {
+        let Ok((worker, mount)) = SessionWorker::spawn(factory).await else {
             let _ = send_error(&mut socket, "liveview session worker failed to mount").await;
             return;
         };
@@ -333,7 +410,7 @@ pub mod axum_mount {
     where
         W: Widget + 'static,
     {
-        let Ok((worker, mount)) = SessionWorker::spawn(factory) else {
+        let Ok((worker, mount)) = SessionWorker::spawn(factory).await else {
             let _ = send_error(&mut socket, "liveview session worker failed to mount").await;
             return;
         };
@@ -440,7 +517,7 @@ pub mod actix_mount {
     ) where
         W: Widget + 'static,
     {
-        let Ok((worker, mount)) = SessionWorker::spawn(factory) else {
+        let Ok((worker, mount)) = SessionWorker::spawn(factory).await else {
             let _ = send_error(&mut session, "liveview session worker failed to mount").await;
             return;
         };
@@ -591,5 +668,37 @@ mod tests {
         })));
         assert_eq!(reply, Some(LiveViewMessage::Patch { commands: Vec::new() }));
         assert_eq!(futures::executor::block_on(query).unwrap(), QueryValue::Value("live".to_owned()));
+    }
+
+    #[test]
+    #[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
+    fn session_worker_runs_on_local_pool() {
+        let (worker, mount) = futures::executor::block_on(SessionWorker::spawn(std::sync::Arc::new(|| Counter { value: Cage::new(0) })))
+            .expect("session worker mounts");
+        let LiveViewMessage::Mount { commands } = mount else {
+            panic!("expected mount message");
+        };
+        let button_id = commands
+            .iter()
+            .find_map(|command| match command {
+                Command::Create { id, name, .. } if name == "button" => Some(*id),
+                _ => None,
+            })
+            .expect("button command");
+
+        assert_eq!(
+            futures::executor::block_on(worker.handle_message(LiveViewMessage::Ping)),
+            Some(LiveViewMessage::Pong)
+        );
+
+        let reply = futures::executor::block_on(worker.handle_message(LiveViewMessage::Event(Box::new(EventData::new("click", button_id)))));
+        let Some(LiveViewMessage::Patch { commands }) = reply else {
+            panic!("expected patch message");
+        };
+        assert!(
+            commands
+                .iter()
+                .any(|command| matches!(command, Command::SetText { value, .. } if value == "1"))
+        );
     }
 }

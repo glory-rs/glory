@@ -39,9 +39,9 @@ let router = Router::new().push(salvo_mount::router(|| app()));
 ```
 
 The route is mounted at `/__glory/liveview`. The adapter keeps the Glory widget
-tree on a dedicated local session thread and forwards WebSocket messages across
-a channel, preserving `CommandHolder`'s single-threaded `Rc`/`RefCell` model
-while satisfying Salvo's `Send` WebSocket task boundary.
+tree on a shared local worker pool and forwards WebSocket messages across a
+bounded channel, preserving `CommandHolder`'s single-threaded `Rc`/`RefCell`
+model while satisfying Salvo's `Send` WebSocket task boundary.
 
 ## Axum Adapter
 
@@ -77,7 +77,7 @@ let app = actix_web::App::new().service(actix_mount::scope(|| app()));
 actix_web::App::new().configure(|cfg| actix_mount::configure(cfg, || app()));
 ```
 
-Salvo, Axum, and Actix all use the same `LiveViewSession` and worker. The
+Salvo, Axum, and Actix all use the same `LiveViewSession` and worker pool. The
 framework modules only translate WebSocket message types and route builders.
 
 ## HTML Shell Ownership
@@ -113,10 +113,15 @@ but user code owns the rendered shell.
 
 ## Session Lifetime
 
-Today, one accepted WebSocket connection owns one `LiveViewSession` and one
-adapter worker. The session is created after the socket upgrade succeeds,
-mounts the widget, sends the initial command batch, and is dropped when the
-socket loop exits or the worker is otherwise closed.
+Today, one accepted WebSocket connection owns one `LiveViewSession` running as a
+local task on the shared worker pool. The session is created after the socket
+upgrade succeeds, mounts the widget, sends the initial command batch, and is
+dropped when the socket loop exits or the worker is otherwise closed.
+
+The adapter-to-session channel is bounded at 32 pending messages, so slow
+server-side widget work applies backpressure instead of growing an unbounded
+queue. The worker pool defaults to `min(available_parallelism, 4)` OS threads
+and can be overridden with `GLORY_LIVEVIEW_WORKERS`.
 
 There is no protocol-level resume token, idle timeout, or session TTL setting
 yet. Connection age, authentication expiry, load balancer idle limits, and
