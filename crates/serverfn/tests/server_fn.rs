@@ -639,6 +639,30 @@ fn websocket_transport_helpers_round_trip_typed_messages() {
 }
 
 #[test]
+fn reactive_websocket_reports_unsupported_on_non_wasm() {
+    let socket = glory_serverfn::use_websocket::<Todo>("ws://localhost/socket");
+    assert!(matches!(
+        &*socket.state().get_untracked(),
+        glory_serverfn::WebSocketConnectionState::Failed(message) if message.contains("not available")
+    ));
+    assert!(socket.error().get_untracked().as_deref().unwrap_or_default().contains("wasm32"));
+    assert!(
+        socket
+            .send(Todo {
+                id: 1,
+                title: "x".into(),
+                done: false,
+            })
+            .is_err()
+    );
+    socket.close().unwrap();
+    assert!(matches!(
+        &*socket.state().get_untracked(),
+        glory_serverfn::WebSocketConnectionState::Closed
+    ));
+}
+
+#[test]
 fn server_state_versions_and_updates_values() {
     let state = glory_serverfn::ServerState::new(vec![1, 2]);
     let initial_version = state.version();

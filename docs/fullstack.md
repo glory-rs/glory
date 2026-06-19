@@ -132,6 +132,25 @@ let decoded: glory_serverfn::TransportMessage<&str> = frame.decode_json()?;
 assert_eq!(decoded, msg);
 ```
 
+Browser clients can use a reactive WebSocket handle around those same
+envelopes:
+
+```rust
+let socket = glory_serverfn::use_websocket::<Notice>("ws://localhost:3000/ws");
+let state = socket.state();
+let latest = socket.latest();
+
+socket.send(Notice {
+    title: "created".into(),
+})?;
+```
+
+`state()` returns a `Cage<WebSocketConnectionState>`, `latest()` returns a
+`Cage<Option<TransportMessage<T>>>`, and `error()` returns the latest decode or
+connection error. The browser handle reconnects by default; configure it with
+`use_websocket_with_options`. Non-wasm targets return a handle whose state is
+`Failed`, so shared code can branch without panicking.
+
 Multipart uploads can be decoded with explicit limits:
 
 ```rust

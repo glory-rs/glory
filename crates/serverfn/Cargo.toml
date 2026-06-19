@@ -13,6 +13,7 @@ license = { workspace = true }
 categories = { workspace = true }
 
 [dependencies]
+glory-core = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 serde_urlencoded = { workspace = true }
@@ -36,12 +37,16 @@ js-sys = { workspace = true }
 wasm-bindgen = { workspace = true }
 wasm-bindgen-futures = { workspace = true }
 web-sys = { workspace = true, features = [
+  "CloseEvent",
+  "ErrorEvent",
   "Headers",
+  "MessageEvent",
   "Request",
   "RequestInit",
   "RequestMode",
   "RequestRedirect",
   "Response",
+  "WebSocket",
   "Window",
   "WorkerGlobalScope",
 ] }

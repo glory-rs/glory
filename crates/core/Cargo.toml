@@ -61,12 +61,10 @@ glory-hot-reload = { workspace = true }
 futures = { workspace = true }
 regex = { workspace = true }
 futures-channel = { workspace = true, optional = true }
+percent-encoding = { workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = { workspace = true }
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-percent-encoding = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }

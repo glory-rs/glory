@@ -300,6 +300,10 @@ to a specific HTTP adapter: use `#[glory::server(middleware = require_auth)]`
 or `#[middleware(require_auth)]`, where the middleware receives
 `ServerFnMiddlewareContext` and returns `ServerFnError` on rejection.
 
+For browser WebSocket clients, `glory::serverfn::use_websocket::<T>(url)`
+returns a reactive handle with `state()`, `latest()`, `error()`, `send()`, and
+`reconnect()` around `TransportMessage<T>`.
+
 Mount the adapter router on the server side:
 
 ```rust

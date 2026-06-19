@@ -655,6 +655,314 @@ pub fn decode_transport_json<T: DeserializeOwned>(input: &str) -> Result<Transpo
     serde_json::from_str(input).map_err(|err| ServerFnError::Deserialization(err.to_string()))
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub enum WebSocketConnectionState {
+    Connecting,
+    Open,
+    Closing,
+    #[default]
+    Closed,
+    Failed(String),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct WebSocketClientOptions {
+    pub reconnect: bool,
+    pub reconnect_delay_ms: u32,
+}
+
+impl Default for WebSocketClientOptions {
+    fn default() -> Self {
+        Self {
+            reconnect: true,
+            reconnect_delay_ms: 1_000,
+        }
+    }
+}
+
+pub struct ReactiveWebSocket<T>
+where
+    T: std::fmt::Debug + 'static,
+{
+    state: glory_core::Cage<WebSocketConnectionState>,
+    latest: glory_core::Cage<Option<TransportMessage<T>>>,
+    error: glory_core::Cage<Option<String>>,
+    #[cfg(target_arch = "wasm32")]
+    inner: std::rc::Rc<ReactiveWebSocketInner>,
+    _marker: std::marker::PhantomData<T>,
+}
+
+impl<T> Clone for ReactiveWebSocket<T>
+where
+    T: std::fmt::Debug + 'static,
+{
+    fn clone(&self) -> Self {
+        Self {
+            state: self.state,
+            latest: self.latest,
+            error: self.error,
+            #[cfg(target_arch = "wasm32")]
+            inner: self.inner.clone(),
+            _marker: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<T> ReactiveWebSocket<T>
+where
+    T: std::fmt::Debug + 'static,
+{
+    pub fn state(&self) -> glory_core::Cage<WebSocketConnectionState> {
+        self.state
+    }
+
+    pub fn latest(&self) -> glory_core::Cage<Option<TransportMessage<T>>> {
+        self.latest
+    }
+
+    pub fn error(&self) -> glory_core::Cage<Option<String>> {
+        self.error
+    }
+}
+
+pub fn use_websocket<T>(url: impl Into<String>) -> ReactiveWebSocket<T>
+where
+    T: Serialize + DeserializeOwned + std::fmt::Debug + 'static,
+{
+    use_websocket_with_options(url, WebSocketClientOptions::default())
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn use_websocket_with_options<T>(url: impl Into<String>, options: WebSocketClientOptions) -> ReactiveWebSocket<T>
+where
+    T: Serialize + DeserializeOwned + std::fmt::Debug + 'static,
+{
+    let socket = ReactiveWebSocket {
+        state: glory_core::Cage::new(WebSocketConnectionState::Connecting),
+        latest: glory_core::Cage::new(None),
+        error: glory_core::Cage::new(None),
+        inner: std::rc::Rc::new(ReactiveWebSocketInner {
+            url: url.into(),
+            options,
+            socket: std::cell::RefCell::new(None),
+            callbacks: std::cell::RefCell::new(Vec::new()),
+            manual_close: std::cell::Cell::new(false),
+        }),
+        _marker: std::marker::PhantomData,
+    };
+    connect_reactive_websocket::<T>(&socket.inner, socket.state, socket.latest, socket.error);
+    socket
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn use_websocket_with_options<T>(url: impl Into<String>, _options: WebSocketClientOptions) -> ReactiveWebSocket<T>
+where
+    T: Serialize + DeserializeOwned + std::fmt::Debug + 'static,
+{
+    let url = url.into();
+    ReactiveWebSocket {
+        state: glory_core::Cage::new(WebSocketConnectionState::Failed(format!(
+            "browser WebSocket client is not available on this target: {url}"
+        ))),
+        latest: glory_core::Cage::new(None),
+        error: glory_core::Cage::new(Some("browser WebSocket client is only available on wasm32".to_owned())),
+        _marker: std::marker::PhantomData,
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+struct ReactiveWebSocketInner {
+    url: String,
+    options: WebSocketClientOptions,
+    socket: std::cell::RefCell<Option<web_sys::WebSocket>>,
+    callbacks: std::cell::RefCell<Vec<wasm_bindgen::JsValue>>,
+    manual_close: std::cell::Cell<bool>,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl<T> ReactiveWebSocket<T>
+where
+    T: Serialize + DeserializeOwned + std::fmt::Debug + 'static,
+{
+    pub fn send(&self, value: T) -> Result<(), ServerFnError> {
+        self.send_transport(&TransportMessage::Data(value))
+    }
+
+    pub fn send_transport(&self, message: &TransportMessage<T>) -> Result<(), ServerFnError> {
+        let payload = encode_transport_json(message)?;
+        let socket = self
+            .inner
+            .socket
+            .borrow()
+            .clone()
+            .ok_or_else(|| ServerFnError::Request("websocket is not connected".to_owned()))?;
+        socket
+            .send_with_str(&payload)
+            .map_err(|err| ServerFnError::Request(format!("websocket send failed: {err:?}")))
+    }
+
+    pub fn close(&self) -> Result<(), ServerFnError> {
+        self.inner.manual_close.set(true);
+        self.state.revise(|mut state| *state = WebSocketConnectionState::Closing);
+        if let Some(socket) = self.inner.socket.borrow().as_ref() {
+            socket
+                .close()
+                .map_err(|err| ServerFnError::Request(format!("websocket close failed: {err:?}")))?;
+        }
+        Ok(())
+    }
+
+    pub fn reconnect(&self) {
+        self.inner.manual_close.set(false);
+        if let Some(socket) = self.inner.socket.borrow().as_ref() {
+            let _ = socket.close();
+        }
+        connect_reactive_websocket::<T>(&self.inner, self.state, self.latest, self.error);
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl<T> ReactiveWebSocket<T>
+where
+    T: Serialize + DeserializeOwned + std::fmt::Debug + 'static,
+{
+    pub fn send(&self, _value: T) -> Result<(), ServerFnError> {
+        Err(ServerFnError::Request("browser WebSocket client is only available on wasm32".to_owned()))
+    }
+
+    pub fn send_transport(&self, _message: &TransportMessage<T>) -> Result<(), ServerFnError> {
+        Err(ServerFnError::Request("browser WebSocket client is only available on wasm32".to_owned()))
+    }
+
+    pub fn close(&self) -> Result<(), ServerFnError> {
+        self.state.revise(|mut state| *state = WebSocketConnectionState::Closed);
+        Ok(())
+    }
+
+    pub fn reconnect(&self) {
+        self.state.revise(|mut state| {
+            *state = WebSocketConnectionState::Failed("browser WebSocket client is only available on wasm32".to_owned());
+        });
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn connect_reactive_websocket<T>(
+    inner: &std::rc::Rc<ReactiveWebSocketInner>,
+    state: glory_core::Cage<WebSocketConnectionState>,
+    latest: glory_core::Cage<Option<TransportMessage<T>>>,
+    error: glory_core::Cage<Option<String>>,
+) where
+    T: DeserializeOwned + std::fmt::Debug + 'static,
+{
+    use wasm_bindgen::JsCast;
+
+    inner.callbacks.borrow_mut().clear();
+    state.revise(|mut state| *state = WebSocketConnectionState::Connecting);
+    error.revise(|mut error| *error = None);
+
+    let socket = match web_sys::WebSocket::new(&inner.url) {
+        Ok(socket) => socket,
+        Err(err) => {
+            let message = format!("websocket open failed: {err:?}");
+            state.revise(|mut state| *state = WebSocketConnectionState::Failed(message.clone()));
+            error.revise(|mut error| *error = Some(message));
+            return;
+        }
+    };
+
+    let onopen = wasm_bindgen::closure::Closure::wrap(Box::new({
+        let state = state;
+        let error = error;
+        move |_event: web_sys::Event| {
+            state.revise(|mut state| *state = WebSocketConnectionState::Open);
+            error.revise(|mut error| *error = None);
+        }
+    }) as Box<dyn FnMut(_)>);
+    socket.set_onopen(Some(onopen.as_ref().unchecked_ref()));
+    inner.callbacks.borrow_mut().push(onopen.into_js_value());
+
+    let onmessage = wasm_bindgen::closure::Closure::wrap(Box::new({
+        let latest = latest;
+        let error = error;
+        move |event: web_sys::MessageEvent| {
+            if let Some(text) = event.data().as_string() {
+                match decode_transport_json::<T>(&text) {
+                    Ok(message) => latest.revise(|mut latest| *latest = Some(message)),
+                    Err(err) => error.revise(|mut error| *error = Some(err.to_string())),
+                }
+            } else {
+                error.revise(|mut error| *error = Some("websocket message was not text".to_owned()));
+            }
+        }
+    }) as Box<dyn FnMut(_)>);
+    socket.set_onmessage(Some(onmessage.as_ref().unchecked_ref()));
+    inner.callbacks.borrow_mut().push(onmessage.into_js_value());
+
+    let onerror = wasm_bindgen::closure::Closure::wrap(Box::new({
+        let state = state;
+        let error = error;
+        move |event: web_sys::ErrorEvent| {
+            let message = if event.message().is_empty() {
+                "websocket error".to_owned()
+            } else {
+                event.message()
+            };
+            state.revise(|mut state| *state = WebSocketConnectionState::Failed(message.clone()));
+            error.revise(|mut error| *error = Some(message));
+        }
+    }) as Box<dyn FnMut(_)>);
+    socket.set_onerror(Some(onerror.as_ref().unchecked_ref()));
+    inner.callbacks.borrow_mut().push(onerror.into_js_value());
+
+    let onclose = wasm_bindgen::closure::Closure::wrap(Box::new({
+        let inner = inner.clone();
+        let state = state;
+        let latest = latest;
+        let error = error;
+        move |event: web_sys::CloseEvent| {
+            inner.socket.borrow_mut().take();
+            if inner.manual_close.get() || !inner.options.reconnect {
+                state.revise(|mut state| *state = WebSocketConnectionState::Closed);
+                return;
+            }
+            let reason = if event.reason().is_empty() {
+                format!("websocket closed with code {}", event.code())
+            } else {
+                event.reason()
+            };
+            error.revise(|mut error| *error = Some(reason));
+            state.revise(|mut state| *state = WebSocketConnectionState::Connecting);
+            schedule_websocket_reconnect::<T>(&inner, state, latest, error);
+        }
+    }) as Box<dyn FnMut(_)>);
+    socket.set_onclose(Some(onclose.as_ref().unchecked_ref()));
+    inner.callbacks.borrow_mut().push(onclose.into_js_value());
+
+    *inner.socket.borrow_mut() = Some(socket);
+}
+
+#[cfg(target_arch = "wasm32")]
+fn schedule_websocket_reconnect<T>(
+    inner: &std::rc::Rc<ReactiveWebSocketInner>,
+    state: glory_core::Cage<WebSocketConnectionState>,
+    latest: glory_core::Cage<Option<TransportMessage<T>>>,
+    error: glory_core::Cage<Option<String>>,
+) where
+    T: DeserializeOwned + std::fmt::Debug + 'static,
+{
+    use wasm_bindgen::JsCast;
+
+    let callback = wasm_bindgen::closure::Closure::once_into_js({
+        let inner = inner.clone();
+        move || connect_reactive_websocket::<T>(&inner, state, latest, error)
+    });
+    if let Some(window) = web_sys::window() {
+        let _ =
+            window.set_timeout_with_callback_and_timeout_and_arguments_0(callback.as_ref().unchecked_ref(), inner.options.reconnect_delay_ms as i32);
+    }
+}
+
 /// One Server-Sent Event frame.
 #[cfg(not(target_arch = "wasm32"))]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

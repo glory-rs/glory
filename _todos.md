@@ -113,10 +113,14 @@ R5 仅评估,不阻塞任何人。
   2026-06-19 已完成:新增 adapter-neutral `ServerFnMiddlewareContext` 与
   `ServerFnMiddleware` hook,dispatch 在函数体前顺序执行并可用 `ServerFnError`
   短路;宏支持 `#[server(middleware = path)]` 与 sibling `#[middleware(path)]`。
-- [ ] **S4 P1** 客户端响应式 WebSocket。已有 `TransportMessage<T>`/`WebSocketFrame`
+- [x] **S4 P1** 客户端响应式 WebSocket。已有 `TransportMessage<T>`/`WebSocketFrame`
   帧助手(`crates/serverfn/src/lib.rs`),缺 Dioxus `use_websocket()` 式 hook
   (`packages/fullstack/src/payloads/websocket.rs`):自动重连 + 类型化双向通道 +
   连接状态 Cage。
+  2026-06-19 已完成:新增 `use_websocket::<T>()` /
+  `use_websocket_with_options()` browser handle,暴露
+  `Cage<WebSocketConnectionState>`、latest `TransportMessage<T>`、error Cage,
+  支持 typed `send()`、手动 `reconnect()`、默认自动重连;非 wasm 返回 Failed 状态。
 - [x] **S5 P2** 服务端原生 extractor 直通(Dioxus 允许 axum `FromRequest` 直接做参数)。
   Glory 的 `RequestContext` 是统一抽象;评估按适配器 feature-gate 的原生 extractor
   直通是否值得破坏适配器中立性,先写决策记录。
