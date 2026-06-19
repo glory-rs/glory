@@ -244,8 +244,11 @@ R5 仅评估,不阻塞任何人。
 - [ ] **L2 P1** Axum/Actix 适配器:抽 `LiveviewRouter` 式 trait(对照
   `packages/liveview/src/adapters/mod.rs` 约 30 行),消除 Salvo 硬编码。可与 L1 并行
   (传输 trait 先定)。
-- [ ] **L3 P2** Query 应答接通:协议已有 Query 消息,服务端无应答路径;复用桌面解释器
+- [x] **L3 P2** Query 应答接通:协议已有 Query 消息,服务端无应答路径;复用桌面解释器
   的 query 答复逻辑。
+  2026-06-19 已完成:确认 `LIVEVIEW_CLIENT_JS` 的 `__gloryWryQuery` 会发送
+  `LiveViewMessage::Query`,服务端 `handle_message` 通过 `CommandHolder::resolve_query`
+  回填 pending query;新增 `session_resolves_query_message` 回归测试。
 - [x] **L4 P2** HTML 模板配置(head/root div 自定义)、会话空闲超时/TTL、重连退避
   语义文档化。
   2026-06-19 已完成:`docs/liveview.md` 明确 LiveView 只拥有协议/session/

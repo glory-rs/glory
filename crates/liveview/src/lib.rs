@@ -257,7 +257,7 @@ pub mod salvo_mount {
 #[cfg(test)]
 mod tests {
     use glory_core::reflow::Cage;
-    use glory_core::renderer::Command;
+    use glory_core::renderer::{Command, NodeQuery, QueryResponse, QueryValue};
     use glory_core::web::events;
     use glory_core::web::widgets::{button, div};
     use glory_core::{Scope, Widget};
@@ -330,5 +330,31 @@ mod tests {
     fn session_handles_ping() {
         let (session, _) = LiveViewSession::mount(Counter { value: Cage::new(0) });
         assert_eq!(session.handle_message(LiveViewMessage::Ping), Some(LiveViewMessage::Pong));
+    }
+
+    #[test]
+    fn session_resolves_query_message() {
+        let (session, _) = LiveViewSession::mount(Counter { value: Cage::new(0) });
+        let query = session.holder().renderer().query(session.holder().host_node(), NodeQuery::Value);
+        let token = session
+            .holder()
+            .take_batch()
+            .into_iter()
+            .find_map(|command| match command {
+                Command::Query {
+                    token,
+                    kind: NodeQuery::Value,
+                    ..
+                } => Some(token),
+                _ => None,
+            })
+            .expect("query command emitted");
+
+        let reply = session.handle_message(LiveViewMessage::Query(Box::new(QueryResponse {
+            token,
+            result: Ok(QueryValue::Value("live".to_owned())),
+        })));
+        assert_eq!(reply, Some(LiveViewMessage::Patch { commands: Vec::new() }));
+        assert_eq!(futures::executor::block_on(query).unwrap(), QueryValue::Value("live".to_owned()));
     }
 }

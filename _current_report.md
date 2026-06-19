@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 35 |
+| 已完成 `[x]` | 36 |
 | 部分完成 `[~]` | 3 |
-| 未完成 `[ ]` | 22 |
+| 未完成 `[ ]` | 21 |
 
 按能力权重估算:
 
@@ -352,7 +352,7 @@ serverfn 基础可用，但对比成熟框架还缺:
 - 当前 Salvo adapter 每 session 一个 `std::thread` + `mpsc`，并发扩展性有限。
 - 缺 Axum/Actix adapter。
 - 缺端到端浏览器场景。
-- query 应答路径还需要更完整验证。
+- query 应答路径已有回归测试覆盖。
 - session TTL/resume 仍缺实现;HTML shell ownership 与重连退避语义已文档化。
 
 主要路径:
