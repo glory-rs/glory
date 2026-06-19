@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 21 |
+| 已完成 `[x]` | 22 |
 | 部分完成 `[~]` | 5 |
-| 未完成 `[ ]` | 34 |
+| 未完成 `[ ]` | 33 |
 
 按能力权重估算:
 
@@ -236,7 +236,7 @@ desktop runtime 已经是真 wry/tao 宿主，不只是测试 sink。
 - `Router` + runtime string path/filter。
 - 有路径解析和检测测试。
 - 手写 `Routable` trait、typed `goto_route`、`Locator::route::<R>()` 第一阶段已补。
-- 查询字符串可读写，但没有类型化解析体系。
+- 查询字符串可读写,并已有 `RouteQuery`/`FromRouteQuery`/默认值 helper 第一阶段。
 
 缺口:
 
@@ -244,8 +244,6 @@ desktop runtime 已经是真 wry/tao 宿主，不只是测试 sink。
 - 嵌套布局 / Outlet。
 - redirect。
 - 404 默认处理。
-- query 参数 trait 化解析。
-- catch-all 段类型化。
 - scroll restoration / go back / go forward。
 
 主要路径:

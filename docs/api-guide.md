@@ -164,11 +164,17 @@ For type-safe navigation, implement `Routable` on an app route enum and call
 `goto_route` instead of formatting URL strings at each callsite:
 
 ```rust
-use glory::routing::{AviatorExt, Routable, encode_route_param, parse_route_param};
+use glory::routing::{
+    AviatorExt, Routable, append_route_query_param, encode_catch_all,
+    encode_route_param, parse_route_param, parse_route_query, query_param_or,
+    required_query_param, split_catch_all,
+};
 
 enum AppRoute {
     Home,
     User { id: u64 },
+    Search { q: String, page: u32 },
+    Files { path: Vec<String> },
 }
 
 impl Routable for AppRoute {
@@ -176,6 +182,13 @@ impl Routable for AppRoute {
         match self {
             Self::Home => "/".to_owned(),
             Self::User { id } => format!("/users/{}", encode_route_param(id)),
+            Self::Search { q, page } => {
+                let mut url = "/search".to_owned();
+                append_route_query_param(&mut url, "q", q);
+                append_route_query_param(&mut url, "page", page);
+                url
+            }
+            Self::Files { path } => format!("/files/{}", encode_catch_all(path)),
         }
     }
 
@@ -184,6 +197,16 @@ impl Routable for AppRoute {
         let segments = url.path().trim_matches('/').split('/').collect::<Vec<_>>();
         match segments.as_slice() {
             ["users", id] => Some(Self::User { id: parse_route_param(id).ok()? }),
+            ["search"] => {
+                let query = parse_route_query(url.query().as_deref());
+                Some(Self::Search {
+                    q: required_query_param(&query, "q").ok()?,
+                    page: query_param_or(&query, "page", 1).ok()?,
+                })
+            }
+            ["files", rest @ ..] => Some(Self::Files {
+                path: split_catch_all(&rest.join("/")),
+            }),
             [""] | [] => Some(Self::Home),
             _ => None,
         }

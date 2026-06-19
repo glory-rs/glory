@@ -73,9 +73,12 @@ R5 仅评估,不阻塞任何人。
 - [ ] **T2 P0** 嵌套布局 / Outlet 等价物。Dioxus 有 `#[nest]`/`#[layout]`/`Outlet`
   (`packages/router/src/components/outlet.rs`)。Glory `Router` 已有层级 children,
   缺的是"父布局渲染插槽"语义。依赖 T1 的设计结论。
-- [ ] **T3 P1** 查询参数与 catch-all 段解析:对照 `FromQuery`/`FromQueryArgument`/
+- [x] **T3 P1** 查询参数与 catch-all 段解析:对照 `FromQuery`/`FromQueryArgument`/
   `FromSegments`(`packages/router/src/routable.rs`),提供 trait 化解析 + 默认值回退。
   可与 T1 并行(trait 层独立于路由定义形态)。
+  2026-06-19 已完成:新增 `RouteQuery`/`FromRouteQuery`、required/optional/
+  repeated/default query helpers、query 编码 helper,以及 catch-all encode/split/parse
+  helpers;未来 derive/builder 可直接复用。
 - [ ] **T4 P1** 声明式重定向(Dioxus `#[redirect(...)]`)与 404 默认处理。依赖 T1。
 - [ ] **T5 P2** 导航增强:滚动恢复、`GoBack/GoForward` 等价 API。另核查
   `crates/routing/src/aviators/browser.rs:105` 的 TODO(history state 以 prop 而非

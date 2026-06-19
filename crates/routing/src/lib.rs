@@ -42,7 +42,9 @@ pub use graff::Graff;
 pub use locator::{Locator, LocatorModifier};
 pub use router::Router;
 pub use typed::{
-    AviatorExt, FromRouteParam, Routable, RouteParamError, decode_route_param, encode_route_param, parse_route_param, required_route_param,
+    AviatorExt, FromRouteParam, FromRouteQuery, Routable, RouteParamError, RouteQuery, append_route_query_param, decode_route_param,
+    encode_catch_all, encode_route_param, encode_route_query, optional_query_param, parse_catch_all, parse_route_param, parse_route_query,
+    query_param_or, query_suffix, repeated_query_param, required_query_param, required_route_param, split_catch_all,
 };
 
 #[cfg(not(target_arch = "wasm32"))]
