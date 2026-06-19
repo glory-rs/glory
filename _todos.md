@@ -120,8 +120,10 @@ R5 仅评估,不阻塞任何人。
   Glory `crates/cli/src/command/serve.rs` 此前是 14 行薄封装。
   2026-06-19 第一阶段:已新增 `glory serve --address/--port` 对 `site_addr`
   的运行时覆盖,默认打开浏览器并支持 `--no-open`;剩余 HTTPS 和代理转发配置。
-- [ ] **C2 P1** serve 交互能力:运行中按键触发重建(r)、verbose 切换(v)、帮助(/)。
+- [x] **C2 P1** serve 交互能力:运行中按键触发重建(r)、verbose 切换(v)、帮助(/)。
   不必复刻 Dioxus 全屏 TUI,行式交互即可。依赖 C1 的参数结构。
+  2026-06-19 已完成:watch 模式 stdin 支持 `r` + Enter 强制全量 rebuild,
+  `v` + Enter 在 info/debug/trace 间切换日志级别,`/`/`?` + Enter 打印帮助。
 - [x] **C3 P2** wasm-split 评估与原型。Dioxus 有成熟 `#[wasm_split]` 宏 + CLI 切分 +
   Playwright harness(`packages/wasm-split/`),Glory 完全没有。评估见
   `docs/wasm-split-evaluation.md`:当前体积不先做 split,原型等 gzip/路由懒加载阈值

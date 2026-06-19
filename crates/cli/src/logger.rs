@@ -5,7 +5,7 @@ use flexi_logger::{
 };
 use once_cell::sync::Lazy;
 use std::io::Write;
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 
 use crate::ext::anyhow::Context;
 use crate::{config::Log, ext::StrAdditions};
@@ -20,17 +20,12 @@ static TRACE_VIOLET: Lazy<ansi_term::Color> = Lazy::new(|| Fixed(98));
 pub static GRAY: Lazy<ansi_term::Color> = Lazy::new(|| Fixed(241));
 // pub static BOLD: Lazy<ansi_term::Style> = Lazy::new(|| Style::new().bold());
 static LOG_SELECT: Lazy<OnceLock<LogFlag>> = Lazy::new(OnceLock::new);
+static LOGGER_RUNTIME: Lazy<OnceLock<LoggerRuntime>> = Lazy::new(OnceLock::new);
 
 pub fn setup(verbose: u8, logs: &[Log]) {
-    let log_level = match verbose {
-        0 => "info",
-        1 => "debug",
-        _ => "trace",
-    };
-
     // OnceLock::get_or_try_init() is more idiomatic, but unstable at the moment
-    _ = LOG_SELECT.get_or_init(|| {
-        flexi_logger::Logger::try_with_str(log_level)
+    _ = LOGGER_RUNTIME.get_or_init(|| {
+        let handle = flexi_logger::Logger::try_with_str(log_level(verbose))
             .with_context(|| "Logger setup failed")
             .unwrap()
             .filter(Box::new(Filter))
@@ -38,8 +33,50 @@ pub fn setup(verbose: u8, logs: &[Log]) {
             .start()
             .unwrap();
 
-        LogFlag::new(logs)
+        LoggerRuntime {
+            handle,
+            verbose: Mutex::new(normalize_verbose(verbose)),
+        }
     });
+    _ = LOG_SELECT.get_or_init(|| LogFlag::new(logs));
+}
+
+pub fn toggle_verbose() -> &'static str {
+    let Some(runtime) = LOGGER_RUNTIME.get() else {
+        return "info";
+    };
+    let mut verbose = runtime.verbose.lock().expect("logger verbosity lock poisoned");
+    *verbose = next_verbose(*verbose);
+    let level = log_level(*verbose);
+    if let Err(err) = runtime.handle.parse_new_spec(level) {
+        log::warn!("Failed to update log level to {level}: {err}");
+    }
+    level
+}
+
+struct LoggerRuntime {
+    handle: flexi_logger::LoggerHandle,
+    verbose: Mutex<u8>,
+}
+
+fn normalize_verbose(verbose: u8) -> u8 {
+    verbose.min(2)
+}
+
+fn next_verbose(verbose: u8) -> u8 {
+    match normalize_verbose(verbose) {
+        0 => 1,
+        1 => 2,
+        _ => 0,
+    }
+}
+
+fn log_level(verbose: u8) -> &'static str {
+    match normalize_verbose(verbose) {
+        0 => "info",
+        1 => "debug",
+        _ => "trace",
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -138,5 +175,22 @@ impl LevelExt for Level {
             Level::Debug => *DBG_BLUE,
             Level::Trace => *TRACE_VIOLET,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn verbose_levels_cycle_through_info_debug_trace() {
+        assert_eq!(log_level(0), "info");
+        assert_eq!(log_level(1), "debug");
+        assert_eq!(log_level(2), "trace");
+        assert_eq!(log_level(9), "trace");
+
+        assert_eq!(next_verbose(0), 1);
+        assert_eq!(next_verbose(1), 2);
+        assert_eq!(next_verbose(2), 0);
     }
 }

@@ -42,6 +42,10 @@ Each subcommand accepts `--help` for its flags. Global flags live on
 uses built-in templates; pass `--git` or `--path` to use a cargo-generate
 template instead.
 
+In `glory serve` watch mode, line controls are available on stdin: `r` + Enter
+forces a rebuild, `v` + Enter cycles the log level, and `/` + Enter prints the
+control help.
+
 ## Typical workflow
 
 ```sh

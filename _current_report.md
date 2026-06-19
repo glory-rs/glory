@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 19 |
+| 已完成 `[x]` | 20 |
 | 部分完成 `[~]` | 5 |
-| 未完成 `[ ]` | 36 |
+| 未完成 `[ ]` | 35 |
 
 按能力权重估算:
 
@@ -276,7 +276,6 @@ serverfn 基础可用，但对比成熟框架还缺:
 
 - HTTPS。
 - proxy。
-- 运行中按键交互，比如 rebuild、verbose、help。
 - desktop installer，例如 MSI/DMG/DEB/AppImage。
 - shell completions / self-update 提示。
 

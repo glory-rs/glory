@@ -296,5 +296,8 @@ cargo run -p glory-cli -- --manifest-path examples/ssr-simple-salvo/Cargo.toml b
 build. Use `--no-open` to suppress it, or `--address` / `--port` to override the
 configured `site_addr` for the current run.
 
+While `glory serve` is watching, stdin accepts line controls: `r` + Enter forces
+a rebuild, `v` + Enter cycles log verbosity, and `/` + Enter prints the controls.
+
 `glory end2end` runs the `package.metadata.glory.end2end_cmd` configured by an
 example or app. The first-party Playwright projects live in `tests/playwright`.

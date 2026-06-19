@@ -4,14 +4,20 @@ use crate::{
     compile::{self},
     config::Project,
     ext::anyhow::Context,
-    service,
+    logger, service,
     signal::{Interrupt, Outcome, Product, ProductSet, ReloadSignal, ServerRestart},
 };
 use anyhow::Result;
 use glory_hot_reload::HotReloadFunctions;
-use tokio::try_join;
+use tokio::{
+    io::{AsyncBufReadExt, BufReader},
+    task::JoinHandle,
+    try_join,
+};
 
 use super::build::build_proj;
+
+const CONTROLS_HELP: &str = "Serve controls: r + Enter rebuild, v + Enter verbose, / + Enter help, Ctrl-C stop";
 
 pub async fn watch(proj: &Arc<Project>, should_open: bool) -> Result<()> {
     // even if the build fails, we continue
@@ -42,12 +48,71 @@ pub async fn watch(proj: &Arc<Project>, should_open: bool) -> Result<()> {
     service::serve::spawn(proj).await;
     service::reload::spawn(proj).await;
     super::serve::open_site(proj, should_open);
+    let _controls = spawn_controls();
 
     let res = run_loop(proj).await;
     if res.is_err() {
         Interrupt::request_shutdown().await;
     }
     res
+}
+
+fn spawn_controls() -> JoinHandle<()> {
+    log::info!("{CONTROLS_HELP}");
+    tokio::spawn(async move {
+        let mut shutdown = Interrupt::subscribe_shutdown();
+        let mut lines = BufReader::new(tokio::io::stdin()).lines();
+        loop {
+            tokio::select! {
+                _ = shutdown.recv() => break,
+                line = lines.next_line() => {
+                    match line {
+                        Ok(Some(line)) => handle_control_line(&line),
+                        Ok(None) => break,
+                        Err(error) => {
+                            log::warn!("Serve controls stopped reading stdin: {error}");
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    })
+}
+
+fn handle_control_line(line: &str) {
+    match ServeControl::parse(line) {
+        ServeControl::Rebuild => {
+            log::info!("Serve manual rebuild requested");
+            Interrupt::send_all_changed();
+        }
+        ServeControl::ToggleVerbose => {
+            let level = logger::toggle_verbose();
+            log::info!("Serve log level set to {level}");
+        }
+        ServeControl::Help => log::info!("{CONTROLS_HELP}"),
+        ServeControl::Ignore => {}
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ServeControl {
+    Rebuild,
+    ToggleVerbose,
+    Help,
+    Ignore,
+}
+
+impl ServeControl {
+    fn parse(line: &str) -> Self {
+        match line.trim().to_ascii_lowercase().as_str() {
+            "r" | "rebuild" => Self::Rebuild,
+            "v" | "verbose" => Self::ToggleVerbose,
+            "/" | "?" | "h" | "help" => Self::Help,
+            "" => Self::Ignore,
+            _ => Self::Ignore,
+        }
+    }
 }
 
 pub async fn run_loop(proj: &Arc<Project>) -> Result<()> {
@@ -140,5 +205,21 @@ pub async fn run_loop(proj: &Arc<Project>) -> Result<()> {
             }
             Interrupt::clear_source_changes().await;
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_serve_control_lines() {
+        assert_eq!(ServeControl::parse("r"), ServeControl::Rebuild);
+        assert_eq!(ServeControl::parse(" rebuild "), ServeControl::Rebuild);
+        assert_eq!(ServeControl::parse("v"), ServeControl::ToggleVerbose);
+        assert_eq!(ServeControl::parse("/"), ServeControl::Help);
+        assert_eq!(ServeControl::parse("?"), ServeControl::Help);
+        assert_eq!(ServeControl::parse(""), ServeControl::Ignore);
+        assert_eq!(ServeControl::parse("unknown"), ServeControl::Ignore);
     }
 }
