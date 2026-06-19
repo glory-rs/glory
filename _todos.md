@@ -104,9 +104,11 @@ R5 仅评估,不阻塞任何人。
 - [ ] **S5 P2** 服务端原生 extractor 直通(Dioxus 允许 axum `FromRequest` 直接做参数)。
   Glory 的 `RequestContext` 是统一抽象;评估按适配器 feature-gate 的原生 extractor
   直通是否值得破坏适配器中立性,先写决策记录。
-- [ ] **S6 P1** 提交当前未提交改动:`salvo_mount::streaming_response()` 返回式助手 +
+- [x] **S6 P1** 提交此前未提交改动:`salvo_mount::streaming_response()` 返回式助手 +
   `write_streaming_response` 显式 `StatusCode::OK` + salvo-adapter `into_response()` +
-  recipes 文档(`git diff` 现存 3 文件 29 行)。补一条 Salvo 流式响应状态码测试后提交。
+  recipes 文档。补一条 Salvo 流式响应状态码测试后提交。
+  2026-06-19 已确认实现存在,并新增 Salvo streaming response 200/content-type
+  回归测试。
 
 并行性:S6 立即可做;S1/S2/S4 互相独立;S3/S5 需各自先出小设计决策。
 

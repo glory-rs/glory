@@ -394,6 +394,19 @@ fn streaming_helpers_encode_ndjson_sse_and_body_streams() {
     assert!(String::from_utf8(chunks[0].clone().unwrap()).unwrap().contains("event: todo"));
 }
 
+#[cfg(feature = "salvo")]
+#[test]
+fn salvo_streaming_response_sets_ok_status_and_content_type() {
+    let response = glory_serverfn::StreamingResponse::sse([glory_serverfn::SseEvent::new("ready")]);
+    let response = glory_serverfn::salvo_mount::streaming_response(response).unwrap();
+
+    assert_eq!(response.status_code, Some(salvo::prelude::StatusCode::OK));
+    assert_eq!(
+        response.headers().get("content-type").and_then(|value| value.to_str().ok()),
+        Some(glory_serverfn::SSE_CONTENT_TYPE)
+    );
+}
+
 #[test]
 fn client_stream_decoders_incrementally_decode_ndjson_and_sse() {
     let mut ndjson = glory_serverfn::NdjsonDecoder::<Todo>::new();
