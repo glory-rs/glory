@@ -18,7 +18,6 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 #[cfg(feature = "shell")]
 use std::{
-    any::Any,
     cell::RefCell,
     ops::{Deref, DerefMut},
     rc::Rc,
@@ -398,9 +397,10 @@ impl GloryBlitzApplication {
 
     pub fn into_blitz_application(
         self,
-        proxy: blitz_shell::EventLoopProxy<blitz_shell::BlitzShellEvent>,
+        proxy: blitz_shell::BlitzShellProxy,
+        event_queue: std::sync::mpsc::Receiver<blitz_shell::BlitzShellEvent>,
     ) -> blitz_shell::BlitzApplication<anyrender_vello::VelloWindowRenderer> {
-        let mut application = blitz_shell::BlitzApplication::new(proxy);
+        let mut application = blitz_shell::BlitzApplication::new(proxy, event_queue);
         for window in self.pending_windows {
             application.add_window(window);
         }
@@ -408,9 +408,10 @@ impl GloryBlitzApplication {
     }
 
     pub fn run(self) -> Result<(), winit::error::EventLoopError> {
-        let event_loop = blitz_shell::create_default_event_loop::<blitz_shell::BlitzShellEvent>();
-        let mut application = self.into_blitz_application(event_loop.create_proxy());
-        event_loop.run_app(&mut application)
+        let event_loop = blitz_shell::create_default_event_loop();
+        let (proxy, event_queue) = blitz_shell::BlitzShellProxy::new(event_loop.create_proxy());
+        let application = self.into_blitz_application(proxy, event_queue);
+        event_loop.run_app(application)
     }
 }
 
@@ -424,9 +425,9 @@ fn create_blitz_window_config(
     flush_holder_into_consumer(&holder, &mut consumer);
 
     let renderer = anyrender_vello::VelloWindowRenderer::new();
-    let mut attributes = blitz_shell::Window::default_attributes().with_title(config.title);
+    let mut attributes = winit::window::WindowAttributes::default().with_title(config.title);
     if let Some((width, height)) = config.inner_size {
-        attributes = attributes.with_inner_size(winit::dpi::LogicalSize::new(width, height));
+        attributes = attributes.with_surface_size(winit::dpi::LogicalSize::new(width, height));
     }
     blitz_shell::WindowConfig::with_attributes(Box::new(GloryBlitzDocument { holder, consumer }), renderer, attributes)
 }
@@ -468,6 +469,14 @@ impl DerefMut for GloryBlitzDocument {
 
 #[cfg(feature = "shell")]
 impl blitz_dom::Document for GloryBlitzDocument {
+    fn inner(&self) -> blitz_dom::DocGuard<'_> {
+        blitz_dom::DocGuard::Ref(&self.consumer.doc)
+    }
+
+    fn inner_mut(&mut self) -> blitz_dom::DocGuardMut<'_> {
+        blitz_dom::DocGuardMut::Ref(&mut self.consumer.doc)
+    }
+
     fn handle_ui_event(&mut self, event: blitz_traits::events::UiEvent) {
         let events = Rc::new(RefCell::new(Vec::new()));
         let handler = GloryEventBridge {
@@ -476,7 +485,7 @@ impl blitz_dom::Document for GloryBlitzDocument {
             events: events.clone(),
         };
         {
-            let mut driver = blitz_dom::EventDriver::new(self.consumer.doc.mutate(), handler);
+            let mut driver = blitz_dom::EventDriver::new(self, handler);
             driver.handle_ui_event(event);
         }
 
@@ -489,10 +498,6 @@ impl blitz_dom::Document for GloryBlitzDocument {
         if changed {
             self.consumer.doc.shell_provider.request_redraw();
         }
-    }
-
-    fn as_any_mut(&mut self) -> &mut dyn Any {
-        self
     }
 }
 
@@ -525,7 +530,7 @@ impl blitz_dom::EventHandler for GloryEventBridge {
         &mut self,
         chain: &[usize],
         event: &mut blitz_traits::events::DomEvent,
-        _mutr: &mut blitz_dom::DocumentMutator<'_>,
+        _doc: &mut dyn blitz_dom::Document,
         _event_state: &mut blitz_traits::events::EventState,
     ) {
         let name = event.name();
@@ -538,16 +543,40 @@ impl blitz_dom::EventHandler for GloryEventBridge {
 
         let mut data = EventData::new(name, glory_id);
         match &event.data {
-            blitz_traits::events::DomEventData::MouseMove(mouse)
-            | blitz_traits::events::DomEventData::MouseDown(mouse)
-            | blitz_traits::events::DomEventData::MouseUp(mouse)
-            | blitz_traits::events::DomEventData::Click(mouse) => {
-                data.pointer = Some(PointerData {
-                    client_x: mouse.x as f64,
-                    client_y: mouse.y as f64,
-                    button: mouse.button as i16,
-                    buttons: mouse.buttons.bits() as u16,
-                });
+            blitz_traits::events::DomEventData::PointerMove(pointer)
+            | blitz_traits::events::DomEventData::PointerDown(pointer)
+            | blitz_traits::events::DomEventData::PointerUp(pointer)
+            | blitz_traits::events::DomEventData::PointerEnter(pointer)
+            | blitz_traits::events::DomEventData::PointerLeave(pointer)
+            | blitz_traits::events::DomEventData::PointerOver(pointer)
+            | blitz_traits::events::DomEventData::PointerOut(pointer)
+            | blitz_traits::events::DomEventData::MouseMove(pointer)
+            | blitz_traits::events::DomEventData::MouseDown(pointer)
+            | blitz_traits::events::DomEventData::MouseUp(pointer)
+            | blitz_traits::events::DomEventData::MouseEnter(pointer)
+            | blitz_traits::events::DomEventData::MouseLeave(pointer)
+            | blitz_traits::events::DomEventData::MouseOver(pointer)
+            | blitz_traits::events::DomEventData::MouseOut(pointer)
+            | blitz_traits::events::DomEventData::Click(pointer)
+            | blitz_traits::events::DomEventData::ContextMenu(pointer)
+            | blitz_traits::events::DomEventData::DoubleClick(pointer) => {
+                data.pointer = Some(pointer_data(pointer));
+                data.extra = Some(pointer_event_extra(pointer));
+            }
+            blitz_traits::events::DomEventData::Wheel(wheel) => {
+                data.pointer = Some(wheel_pointer_data(wheel));
+                data.extra = Some(wheel_event_extra(wheel));
+            }
+            blitz_traits::events::DomEventData::Scroll(scroll) => {
+                data.extra = Some(scroll_event_extra(scroll));
+            }
+            blitz_traits::events::DomEventData::Focus(_)
+            | blitz_traits::events::DomEventData::Blur(_)
+            | blitz_traits::events::DomEventData::FocusIn(_)
+            | blitz_traits::events::DomEventData::FocusOut(_) => {
+                data.extra = Some(serde_json::json!({
+                    "focus": { "type": name }
+                }));
             }
             blitz_traits::events::DomEventData::Input(input) => {
                 data.target = Some(TargetData {
@@ -569,9 +598,98 @@ impl blitz_dom::EventHandler for GloryEventBridge {
             blitz_traits::events::DomEventData::Ime(ime) => {
                 data.extra = Some(ime_event_extra(ime));
             }
+            blitz_traits::events::DomEventData::AppleStandardKeybinding(binding) => {
+                data.extra = Some(serde_json::json!({
+                    "apple_standard_keybinding": binding.to_string()
+                }));
+            }
         }
         self.events.borrow_mut().push(data);
     }
+}
+
+#[cfg(feature = "shell")]
+fn pointer_data(pointer: &blitz_traits::events::BlitzPointerEvent) -> PointerData {
+    PointerData {
+        client_x: pointer.client_x() as f64,
+        client_y: pointer.client_y() as f64,
+        button: pointer.button as i16,
+        buttons: pointer.buttons.bits() as u16,
+    }
+}
+
+#[cfg(feature = "shell")]
+fn wheel_pointer_data(wheel: &blitz_traits::events::BlitzWheelEvent) -> PointerData {
+    PointerData {
+        client_x: wheel.client_x() as f64,
+        client_y: wheel.client_y() as f64,
+        button: 0,
+        buttons: wheel.buttons.bits() as u16,
+    }
+}
+
+#[cfg(feature = "shell")]
+fn pointer_event_extra(pointer: &blitz_traits::events::BlitzPointerEvent) -> serde_json::Value {
+    let pointer_type = match pointer.id {
+        blitz_traits::events::BlitzPointerId::Mouse => "mouse".to_owned(),
+        blitz_traits::events::BlitzPointerId::Pen => "pen".to_owned(),
+        blitz_traits::events::BlitzPointerId::Finger(id) => format!("touch:{id}"),
+    };
+    serde_json::json!({
+        "pointer": {
+            "type": pointer_type,
+            "primary": pointer.is_primary,
+            "page_x": pointer.page_x(),
+            "page_y": pointer.page_y(),
+            "screen_x": pointer.screen_x(),
+            "screen_y": pointer.screen_y(),
+            "alt": pointer.mods.alt(),
+            "ctrl": pointer.mods.ctrl(),
+            "shift": pointer.mods.shift(),
+            "meta": pointer.mods.meta(),
+            "pressure": pointer.details.pressure,
+            "tilt_x": pointer.details.tilt_x,
+            "tilt_y": pointer.details.tilt_y,
+            "twist": pointer.details.twist,
+        }
+    })
+}
+
+#[cfg(feature = "shell")]
+fn wheel_event_extra(wheel: &blitz_traits::events::BlitzWheelEvent) -> serde_json::Value {
+    let (delta_x, delta_y, delta_mode) = match wheel.delta {
+        blitz_traits::events::BlitzWheelDelta::Lines(x, y) => (x, y, "line"),
+        blitz_traits::events::BlitzWheelDelta::Pixels(x, y) => (x, y, "pixel"),
+    };
+    serde_json::json!({
+        "wheel": {
+            "delta_x": delta_x,
+            "delta_y": delta_y,
+            "delta_mode": delta_mode,
+            "page_x": wheel.page_x(),
+            "page_y": wheel.page_y(),
+            "screen_x": wheel.screen_x(),
+            "screen_y": wheel.screen_y(),
+            "alt": wheel.mods.alt(),
+            "ctrl": wheel.mods.ctrl(),
+            "shift": wheel.mods.shift(),
+            "meta": wheel.mods.meta(),
+        }
+    })
+}
+
+#[cfg(feature = "shell")]
+fn scroll_event_extra(scroll: &blitz_traits::events::BlitzScrollEvent) -> serde_json::Value {
+    serde_json::json!({
+        "scroll": {
+            "top": scroll.scroll_top,
+            "left": scroll.scroll_left,
+            "width": scroll.scroll_width,
+            "height": scroll.scroll_height,
+            "client_width": scroll.client_width,
+            "client_height": scroll.client_height,
+        }
+    })
 }
 
 #[cfg(feature = "shell")]
@@ -603,6 +721,13 @@ fn ime_event_extra(ime: &blitz_traits::events::BlitzImeEvent) -> serde_json::Val
             "ime": {
                 "state": "commit",
                 "value": value,
+            }
+        }),
+        blitz_traits::events::BlitzImeEvent::DeleteSurrounding { before_bytes, after_bytes } => serde_json::json!({
+            "ime": {
+                "state": "delete_surrounding",
+                "before_bytes": before_bytes,
+                "after_bytes": after_bytes,
             }
         }),
         blitz_traits::events::BlitzImeEvent::Disabled => serde_json::json!({
@@ -845,5 +970,101 @@ mod tests {
     fn blitz_window_config_builds_initial_document() {
         let config = GloryBlitzWindowConfig::default();
         let _window = create_blitz_window_config(config, Counter { value: Cage::new(0) });
+    }
+
+    #[test]
+    #[cfg(feature = "shell")]
+    fn pointer_event_payload_preserves_touch_metadata() {
+        let pointer = sample_pointer_event();
+
+        let data = pointer_data(&pointer);
+        assert_eq!(data.client_x, 33.0);
+        assert_eq!(data.client_y, 44.0);
+        assert_eq!(data.button, blitz_traits::events::MouseEventButton::Secondary as i16);
+        assert_eq!(data.buttons, blitz_traits::events::MouseEventButtons::Primary.bits() as u16);
+
+        let extra = pointer_event_extra(&pointer);
+        assert_eq!(extra["pointer"]["type"], serde_json::json!("touch:42"));
+        assert_eq!(extra["pointer"]["primary"], serde_json::json!(true));
+        assert_eq!(extra["pointer"]["pressure"], serde_json::json!(0.75));
+        assert_eq!(extra["pointer"]["tilt_x"], serde_json::json!(2));
+        assert_eq!(extra["pointer"]["tilt_y"], serde_json::json!(-3));
+        assert_eq!(extra["pointer"]["twist"], serde_json::json!(91));
+    }
+
+    #[test]
+    #[cfg(feature = "shell")]
+    fn wheel_scroll_and_ime_payloads_are_serialized() {
+        let wheel = blitz_traits::events::BlitzWheelEvent {
+            delta: blitz_traits::events::BlitzWheelDelta::Lines(1.5, -2.0),
+            coords: sample_pointer_coords(),
+            buttons: blitz_traits::events::MouseEventButtons::Auxiliary,
+            mods: Default::default(),
+        };
+
+        let data = wheel_pointer_data(&wheel);
+        assert_eq!(data.client_x, 33.0);
+        assert_eq!(data.button, 0);
+        assert_eq!(data.buttons, blitz_traits::events::MouseEventButtons::Auxiliary.bits() as u16);
+
+        let wheel_extra = wheel_event_extra(&wheel);
+        assert_eq!(wheel_extra["wheel"]["delta_x"], serde_json::json!(1.5));
+        assert_eq!(wheel_extra["wheel"]["delta_y"], serde_json::json!(-2.0));
+        assert_eq!(wheel_extra["wheel"]["delta_mode"], serde_json::json!("line"));
+
+        let scroll_extra = scroll_event_extra(&blitz_traits::events::BlitzScrollEvent {
+            scroll_top: 12.0,
+            scroll_left: 34.0,
+            scroll_width: 1200,
+            scroll_height: 900,
+            client_width: 600,
+            client_height: 450,
+        });
+        assert_eq!(scroll_extra["scroll"]["top"], serde_json::json!(12.0));
+        assert_eq!(scroll_extra["scroll"]["client_height"], serde_json::json!(450));
+
+        let ime_extra = ime_event_extra(&blitz_traits::events::BlitzImeEvent::DeleteSurrounding {
+            before_bytes: 3,
+            after_bytes: 5,
+        });
+        assert_eq!(
+            ime_extra["ime"],
+            serde_json::json!({
+                "state": "delete_surrounding",
+                "before_bytes": 3,
+                "after_bytes": 5
+            })
+        );
+    }
+
+    #[cfg(feature = "shell")]
+    fn sample_pointer_coords() -> blitz_traits::events::PointerCoords {
+        blitz_traits::events::PointerCoords {
+            page_x: 11.0,
+            page_y: 22.0,
+            screen_x: 55.0,
+            screen_y: 66.0,
+            client_x: 33.0,
+            client_y: 44.0,
+        }
+    }
+
+    #[cfg(feature = "shell")]
+    fn sample_pointer_event() -> blitz_traits::events::BlitzPointerEvent {
+        blitz_traits::events::BlitzPointerEvent {
+            id: blitz_traits::events::BlitzPointerId::Finger(42),
+            is_primary: true,
+            coords: sample_pointer_coords(),
+            button: blitz_traits::events::MouseEventButton::Secondary,
+            buttons: blitz_traits::events::MouseEventButtons::Primary,
+            mods: Default::default(),
+            details: blitz_traits::events::PointerDetails {
+                pressure: 0.75,
+                tilt_x: 2,
+                tilt_y: -3,
+                twist: 91,
+                ..Default::default()
+            },
+        }
     }
 }

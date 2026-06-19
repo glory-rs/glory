@@ -234,10 +234,12 @@ R5 仅评估,不阻塞任何人。
 
 ## Lane N — Native / Blitz(crates/native)— spike → 可用
 
-- [~] **N1 P1** 完整事件桥接:当前已映射 MouseMove/Down/Up/Click/Input +
-  Keyboard/IME(`crates/native/src/blitz_consumer.rs`),仍缺滚轮/scroll、
-  focus/blur、touch。Blitz 0.2 当前 `DomEventData` 尚未暴露这些数据,需等上游事件
-  数据或扩展 shell 后继续映射。
+- [x] **N1 P1** 完整事件桥接:`glory-native` shell 已升级到 Blitz
+  0.3 alpha.5,并映射 pointer/mouse/touch(`BlitzPointerId::Finger`)、click/
+  contextmenu/dblclick、wheel、scroll、focus/blur/focusin/focusout、input、
+  key、IME、Apple standard keybinding。事件 payload 单测覆盖 touch metadata、
+  wheel/scroll/IME 序列化;已验证 `cargo test -p glory-native --features shell`
+  与 `cargo clippy -p glory-native --features shell -- -D warnings`。
 - [x] **N2 P1** 布局查询接通:`BlitzConsumer` 现在为 `NodeQuery::Value`、
   `BoundingRect`、`ScrollOffset` 产出 `QueryResponse`,shell flush 会把应答 resolve
   回 `CommandHolder`;`cargo test -p glory-native --features blitz` 已覆盖。

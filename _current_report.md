@@ -21,8 +21,8 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 53 |
-| 部分完成 `[~]` | 4 |
+| 已完成 `[x]` | 54 |
+| 部分完成 `[~]` | 3 |
 | 未完成 `[ ]` | 1 |
 
 按能力权重估算:
@@ -36,7 +36,7 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 | CLI / bundle / dev server | 55-65% |
 | desktop webview | 75-85% |
 | routing | 35-45% |
-| native Blitz / mobile / LiveView | 25-40% |
+| native Blitz / mobile / LiveView | 30-45% |
 | CI / release governance | 35-45% |
 
 ## 初版发现的可复现缺陷与处理状态
@@ -335,9 +335,11 @@ serverfn 基础可用，但对比成熟框架还缺:
 
 现状:
 
-- `glory-native/shell` 可编译。
+- `glory-native/shell` 已升级到 Blitz 0.3 alpha.5 并可编译。
 - command stream 能写入 Blitz document。
-- click/input/keyboard/IME 部分事件已映射。
+- pointer/mouse/touch、click/contextmenu/dblclick、wheel/scroll、focus/blur、
+  input、keyboard、IME 与 Apple standard keybinding 已映射到 Glory
+  `EventData`;payload 单测覆盖 touch metadata、wheel/scroll/IME。
 - property/attribute 分离已有测试。
 - `Command::Query` 已接通 Value、BoundingRect、ScrollOffset;Blitz shell 会回灌
   `QueryResponse` 到 `CommandHolder`。
@@ -348,7 +350,6 @@ serverfn 基础可用，但对比成熟框架还缺:
 
 缺口:
 
-- scroll/focus/touch 等事件桥接不足。
 - 真实渲染截图/交互/a11y 人工验证缺失。
 
 主要路径:
