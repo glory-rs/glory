@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 44 |
+| 已完成 `[x]` | 46 |
 | 部分完成 `[~]` | 4 |
-| 未完成 `[ ]` | 12 |
+| 未完成 `[ ]` | 10 |
 
 按能力权重估算:
 
@@ -34,7 +34,7 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 | CSR + SSR 基础使用 | 65-75% |
 | server functions | 55-65% |
 | CLI / bundle / dev server | 55-65% |
-| desktop webview | 70-80% |
+| desktop webview | 75-85% |
 | routing | 35-45% |
 | native Blitz / mobile / LiveView | 25-40% |
 | CI / release governance | 35-45% |
@@ -222,6 +222,8 @@ desktop runtime 已经是真 wry/tao 宿主，不只是测试 sink。
 - menu。
 - custom `glory://` protocol。
 - async custom protocols via Wry `RequestAsyncResponder`。
+- tray icon events。
+- global hotkeys。
 - hot reload message shape。
 - IPC event/query 回程。
 - asset path traversal 防护。
@@ -315,10 +317,8 @@ serverfn 基础可用，但对比成熟框架还缺:
 
 ### 5. Desktop API 不完整
 
-已有 runtime 很扎实，窗口控制 API 已补齐第一批，平台 API 仍缺:
+已有 runtime 很扎实，窗口控制 API、托盘和全局热键已补齐第一批，平台 API 仍缺:
 
-- tray icon。
-- global hotkey。
 - drag-and-drop file events。
 - print dialog。
 
@@ -489,5 +489,5 @@ cargo clippy -p glory-cli --lib --no-default-features -- -D warnings
 1. Native a11y。
 2. CSS Modules。
 3. 图片优化。
-4. Tray/global hotkey/drag-drop/print 等 desktop 扩展。
+4. Drag-drop/print 等 desktop 扩展。
 5. 更完整 devtools/telemetry。

@@ -139,6 +139,43 @@ For native file dialogs, keep the dialog crate in the app and open it from a
 host callback such as `on_menu`; see [Platform APIs](platform-apis.md#file-dialogs)
 for the `rfd` integration pattern.
 
+## Tray And Hotkeys
+
+`DesktopConfig::tray` keeps a system tray icon alive for the window lifetime.
+Tray icon events and global hotkeys are delivered on the event-loop thread, so
+signal writes can be batched and flushed like menu callbacks:
+
+```rust
+use std::rc::Rc;
+
+use glory_desktop::{DesktopConfig, DesktopHotKeySpec, TrayIconSpec};
+
+let config = DesktopConfig {
+    tray: Some(
+        TrayIconSpec::new("main-tray")
+            .tooltip("Glory")
+            .icon_rgba(vec![255, 255, 255, 255], 1, 1),
+    ),
+    on_tray: Some(Rc::new(|holder, event| {
+        holder.update(|| {
+            // react to DesktopTrayEvent
+        });
+    })),
+    hotkeys: vec![DesktopHotKeySpec::new("toggle", "cmdorctrl+KeyK")],
+    on_hotkey: Some(Rc::new(|holder, event| {
+        if event.id == "toggle" {
+            holder.update(|| {
+                // toggle app state
+            });
+        }
+    })),
+    ..Default::default()
+};
+```
+
+Hotkey accelerators use the `global-hotkey` parser (`cmdorctrl+KeyK`,
+`shift+alt+KeyQ`, and the `keyboard-types` `Code::*` names).
+
 ## Assets
 
 Declare assets once:

@@ -22,7 +22,7 @@
 | 异步/错误原语 | Suspense 边界协议已部分落地(仍缺 SSR streaming/resume);ErrorBoundary 与 `resource_in` 竞态修复已补 | **高** |
 | CLI/构建 | wasm-split 暂缓;Windows/Linux 原生安装器已有最小路径,macOS/AppImage/签名仍缺 | **中-高** |
 | 资产 | `asset!` / `asset_folder!` 已有编译期清单、bundle hash 映射和可选图片优化;仍缺 CSS Modules | 中 |
-| 桌面 | 协议扎实,窗口控制 API 与异步自定义协议已补;仍缺托盘/全局热键/拖放/打印 | 中 |
+| 桌面 | 协议扎实,窗口控制 API、异步自定义协议、托盘、全局热键已补;仍缺拖放/打印 | 中 |
 | Native(Blitz)/LiveView/移动端 | 分别处于 spike(~20%)/可用但单适配器(~30%)/模板可编译但无真机验证(~30%) | 中-高 |
 
 性能:官方 js-framework-benchmark 9 项聚合 Glory 442ms vs Dioxus 456ms vs Leptos 589ms,
@@ -210,8 +210,12 @@ R5 仅评估,不阻塞任何人。
   `DesktopWindowState`,支持 `launch_with_handle`、`window_with_handle`、窗口命令
   分发、状态查询缓存、按 id 关闭与运行时 `open_window`;`desktop-counter` 与
   desktop/platform 文档已覆盖调用方式。
-- [ ] **D2 P2** 托盘图标支持(tray-icon crate;`DesktopConfig` 字段 + 事件回调)。
-- [ ] **D3 P2** 全局热键(global-hotkey crate;注册/注销 API)。
+- [x] **D2 P2** 托盘图标支持(tray-icon crate;`DesktopConfig` 字段 + 事件回调)。
+  新增 `TrayIconSpec`/`TrayIconImage`、`DesktopTrayEvent` 与 `on_tray`,tray 对象
+  由 `WindowSlot` 持有并通过 tao user event 转发。
+- [x] **D3 P2** 全局热键(global-hotkey crate;注册/注销 API)。新增
+  `DesktopHotKeySpec`/`DesktopHotKeyEvent`,runtime 创建 `GlobalHotKeyManager`,
+  按窗口注册并在窗口关闭时 unregister。
 - [x] **D4 P1** 异步自定义协议处理器:内置 `glory://` 已迁到
   `with_asynchronous_custom_protocol`;新增 `DesktopProtocol`/`DesktopConfig::with_custom_protocol`
   与 `desktop_protocol_response`,对照 Dioxus `AsyncWryProtocol` +

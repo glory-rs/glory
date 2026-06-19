@@ -203,7 +203,7 @@ impl DesktopWindowHandle {
 }
 
 /// One menu entry. `id` is what your `on_menu` callback receives.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct MenuItemSpec {
     pub id: String,
     pub label: String,
@@ -223,7 +223,7 @@ impl MenuItemSpec {
 /// Platform notes: on Windows the menu attaches to the window; on macOS it
 /// becomes the global application menu (the first window's spec wins);
 /// other platforms currently log a warning.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct MenuSpec {
     pub submenus: Vec<(String, Vec<MenuItemSpec>)>,
 }
@@ -237,6 +237,133 @@ impl MenuSpec {
         self.submenus.push((title.into(), items));
         self
     }
+}
+
+/// RGBA image used for tray icons.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct TrayIconImage {
+    pub rgba: Vec<u8>,
+    pub width: u32,
+    pub height: u32,
+}
+
+impl TrayIconImage {
+    pub fn from_rgba(rgba: Vec<u8>, width: u32, height: u32) -> Self {
+        Self { rgba, width, height }
+    }
+}
+
+/// System tray icon configuration for a desktop window.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub struct TrayIconSpec {
+    pub id: String,
+    pub tooltip: Option<String>,
+    pub title: Option<String>,
+    pub icon: Option<TrayIconImage>,
+    pub icon_is_template: bool,
+    pub menu: Option<MenuSpec>,
+    pub menu_on_left_click: bool,
+    pub menu_on_right_click: bool,
+}
+
+impl TrayIconSpec {
+    pub fn new(id: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            menu_on_left_click: true,
+            menu_on_right_click: true,
+            ..Default::default()
+        }
+    }
+
+    pub fn tooltip(mut self, tooltip: impl Into<String>) -> Self {
+        self.tooltip = Some(tooltip.into());
+        self
+    }
+
+    pub fn title(mut self, title: impl Into<String>) -> Self {
+        self.title = Some(title.into());
+        self
+    }
+
+    pub fn icon_rgba(mut self, rgba: Vec<u8>, width: u32, height: u32) -> Self {
+        self.icon = Some(TrayIconImage::from_rgba(rgba, width, height));
+        self
+    }
+
+    pub fn icon_template(mut self, value: bool) -> Self {
+        self.icon_is_template = value;
+        self
+    }
+
+    pub fn menu(mut self, menu: MenuSpec) -> Self {
+        self.menu = Some(menu);
+        self
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DesktopTrayMouseButton {
+    Left,
+    Right,
+    Middle,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DesktopTrayMouseButtonState {
+    Up,
+    Down,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum DesktopTrayEvent {
+    Click {
+        id: String,
+        button: DesktopTrayMouseButton,
+        button_state: DesktopTrayMouseButtonState,
+    },
+    DoubleClick {
+        id: String,
+        button: DesktopTrayMouseButton,
+    },
+    Enter {
+        id: String,
+    },
+    Move {
+        id: String,
+    },
+    Leave {
+        id: String,
+    },
+}
+
+/// Global hotkey configuration.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DesktopHotKeySpec {
+    pub id: String,
+    pub accelerator: String,
+}
+
+impl DesktopHotKeySpec {
+    pub fn new(id: impl Into<String>, accelerator: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            accelerator: accelerator.into(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DesktopHotKeyState {
+    Pressed,
+    Released,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct DesktopHotKeyEvent {
+    pub id: String,
+    pub accelerator: String,
+    pub state: DesktopHotKeyState,
 }
 
 /// Request received by a desktop custom protocol handler.
@@ -320,6 +447,15 @@ pub struct DesktopConfig {
     /// activated; receives the item id. Signal writes settle and flush
     /// automatically afterwards.
     pub on_menu: Option<Rc<dyn Fn(&CommandHolder, &str)>>,
+    /// Optional system tray icon owned by this window.
+    pub tray: Option<TrayIconSpec>,
+    /// Invoked on the event-loop thread when the tray icon emits an event.
+    pub on_tray: Option<Rc<dyn Fn(&CommandHolder, DesktopTrayEvent)>>,
+    /// Global hotkeys registered while this window is alive.
+    pub hotkeys: Vec<DesktopHotKeySpec>,
+    /// Invoked on the event-loop thread when a registered global hotkey is
+    /// pressed or released.
+    pub on_hotkey: Option<Rc<dyn Fn(&CommandHolder, DesktopHotKeyEvent)>>,
 }
 
 impl std::fmt::Debug for DesktopConfig {
@@ -335,6 +471,10 @@ impl std::fmt::Debug for DesktopConfig {
             .field("custom_protocols", &self.custom_protocols)
             .field("menu", &self.menu)
             .field("on_menu", &self.on_menu.is_some())
+            .field("tray", &self.tray)
+            .field("on_tray", &self.on_tray.is_some())
+            .field("hotkeys", &self.hotkeys)
+            .field("on_hotkey", &self.on_hotkey.is_some())
             .finish()
     }
 }
@@ -352,6 +492,10 @@ impl Default for DesktopConfig {
             custom_protocols: Vec::new(),
             menu: None,
             on_menu: None,
+            tray: None,
+            on_tray: None,
+            hotkeys: Vec::new(),
+            on_hotkey: None,
         }
     }
 }
@@ -360,6 +504,16 @@ impl DesktopConfig {
     /// Registers an asynchronous custom protocol on this window.
     pub fn with_custom_protocol(mut self, protocol: DesktopProtocol) -> Self {
         self.custom_protocols.push(protocol);
+        self
+    }
+
+    pub fn with_tray(mut self, tray: TrayIconSpec) -> Self {
+        self.tray = Some(tray);
+        self
+    }
+
+    pub fn with_hotkey(mut self, hotkey: DesktopHotKeySpec) -> Self {
+        self.hotkeys.push(hotkey);
         self
     }
 }
@@ -372,6 +526,8 @@ enum HostEvent {
     Query(DesktopWindowId, glory_core::renderer::QueryResponse),
     Reload(ReloadMessage),
     Menu(String),
+    Tray(tray_icon::TrayIconEvent),
+    HotKey(global_hotkey::GlobalHotKeyEvent),
     WindowCommand { id: DesktopWindowId, command: WindowCommand },
     OpenQueuedWindows,
 }
@@ -565,6 +721,10 @@ struct WindowSlot {
     /// Keeps the muda menu alive for the window's lifetime.
     #[allow(dead_code)]
     menu: Option<muda::Menu>,
+    /// Keeps the tray icon alive for the window's lifetime.
+    #[allow(dead_code)]
+    tray: Option<tray_icon::TrayIcon>,
+    registered_hotkeys: Vec<global_hotkey::hotkey::HotKey>,
 }
 
 /// Multi-window host builder.
@@ -614,6 +774,10 @@ impl Desktop {
         let event_loop = EventLoopBuilder::<HostEvent>::with_user_event().build();
         let mut slots: Vec<(WindowId, WindowSlot)> = Vec::new();
         let mut menu_routes: HashMap<String, DesktopWindowId> = HashMap::new();
+        let mut tray_routes: HashMap<String, DesktopWindowId> = HashMap::new();
+        let mut hotkey_routes: HashMap<u32, (DesktopWindowId, DesktopHotKeySpec)> = HashMap::new();
+        let needs_hotkey_manager = self.windows.iter().any(|window| !window.config.hotkeys.is_empty());
+        let mut hotkey_manager = needs_hotkey_manager.then(create_hotkey_manager).flatten();
         let proxy = event_loop.create_proxy();
         let window_queue: Rc<RefCell<Vec<PendingWindow>>> = Rc::new(RefCell::new(Vec::new()));
         let next_window_index = Rc::new(Cell::new(self.next_window_index));
@@ -627,12 +791,23 @@ impl Desktop {
                 next_window_index.clone(),
                 &mut slots,
                 &mut menu_routes,
+                &mut tray_routes,
+                hotkey_manager.as_ref(),
+                &mut hotkey_routes,
             );
         }
 
         let menu_proxy = proxy.clone();
         muda::MenuEvent::set_event_handler(Some(move |event: muda::MenuEvent| {
             let _ = menu_proxy.send_event(HostEvent::Menu(event.id().0.clone()));
+        }));
+        let tray_proxy = proxy.clone();
+        tray_icon::TrayIconEvent::set_event_handler(Some(move |event| {
+            let _ = tray_proxy.send_event(HostEvent::Tray(event));
+        }));
+        let hotkey_proxy = proxy.clone();
+        global_hotkey::GlobalHotKeyEvent::set_event_handler(Some(move |event| {
+            let _ = hotkey_proxy.send_event(HostEvent::HotKey(event));
         }));
 
         spawn_reload_client(proxy.clone());
@@ -645,7 +820,7 @@ impl Desktop {
                     window_id,
                     ..
                 } => {
-                    close_slot_by_window_id(&mut slots, window_id);
+                    close_slot_by_window_id(&mut slots, window_id, hotkey_manager.as_ref(), &mut hotkey_routes);
                     if slots.is_empty() {
                         *control_flow = ControlFlow::Exit;
                     }
@@ -710,8 +885,31 @@ impl Desktop {
                         flush(&slot.webview, holder);
                     }
                 }
+                Event::UserEvent(HostEvent::Tray(event)) => {
+                    let Some(id) = tray_routes.get(event.id().as_ref()).copied() else { return };
+                    if let Some(slot) = slot_by_id(&mut slots, id)
+                        && let (Some(callback), Some(holder), Some(event)) = (&slot.config.on_tray, &slot.holder, map_tray_event(event))
+                    {
+                        holder.update(|| callback(holder, event));
+                        flush(&slot.webview, holder);
+                    }
+                }
+                Event::UserEvent(HostEvent::HotKey(event)) => {
+                    let Some((id, spec)) = hotkey_routes.get(&event.id()).cloned() else { return };
+                    if let Some(slot) = slot_by_id(&mut slots, id)
+                        && let (Some(callback), Some(holder)) = (&slot.config.on_hotkey, &slot.holder)
+                    {
+                        let event = DesktopHotKeyEvent {
+                            id: spec.id,
+                            accelerator: spec.accelerator,
+                            state: map_hotkey_state(event.state()),
+                        };
+                        holder.update(|| callback(holder, event));
+                        flush(&slot.webview, holder);
+                    }
+                }
                 Event::UserEvent(HostEvent::WindowCommand { id, command }) => {
-                    apply_window_command(&mut slots, id, command);
+                    apply_window_command(&mut slots, id, command, hotkey_manager.as_ref(), &mut hotkey_routes);
                     if slots.is_empty() {
                         *control_flow = ControlFlow::Exit;
                     }
@@ -719,6 +917,9 @@ impl Desktop {
                 Event::UserEvent(HostEvent::OpenQueuedWindows) => {
                     let pending = window_queue.borrow_mut().drain(..).collect::<Vec<_>>();
                     for window in pending {
+                        if hotkey_manager.is_none() && !window.config.hotkeys.is_empty() {
+                            hotkey_manager = create_hotkey_manager();
+                        }
                         create_window(
                             target,
                             window,
@@ -727,6 +928,9 @@ impl Desktop {
                             next_window_index.clone(),
                             &mut slots,
                             &mut menu_routes,
+                            &mut tray_routes,
+                            hotkey_manager.as_ref(),
+                            &mut hotkey_routes,
                         );
                     }
                 }
@@ -766,6 +970,16 @@ impl Desktop {
     }
 }
 
+fn create_hotkey_manager() -> Option<global_hotkey::GlobalHotKeyManager> {
+    match global_hotkey::GlobalHotKeyManager::new() {
+        Ok(manager) => Some(manager),
+        Err(err) => {
+            tracing::warn!(%err, "glory-desktop: global hotkey manager unavailable");
+            None
+        }
+    }
+}
+
 fn create_window(
     target: &EventLoopWindowTarget<HostEvent>,
     pending: PendingWindow,
@@ -774,6 +988,9 @@ fn create_window(
     next_window_index: Rc<Cell<usize>>,
     slots: &mut Vec<(WindowId, WindowSlot)>,
     menu_routes: &mut HashMap<String, DesktopWindowId>,
+    tray_routes: &mut HashMap<String, DesktopWindowId>,
+    hotkey_manager: Option<&global_hotkey::GlobalHotKeyManager>,
+    hotkey_routes: &mut HashMap<u32, (DesktopWindowId, DesktopHotKeySpec)>,
 ) {
     let PendingWindow { id, config, state, mount } = pending;
     let window = WindowBuilder::new()
@@ -835,6 +1052,17 @@ fn create_window(
         attach_menu(&menu, &window);
         menu
     });
+    let tray = config
+        .tray
+        .as_ref()
+        .and_then(|spec| match build_tray(spec, id, tray_routes, menu_routes) {
+            Ok(tray) => Some(tray),
+            Err(err) => {
+                tracing::warn!(%err, window_id = id.as_usize(), "glory-desktop: tray icon creation failed");
+                None
+            }
+        });
+    let registered_hotkeys = register_hotkeys(&config, id, hotkey_manager, hotkey_routes);
 
     slots.push((
         window.id(),
@@ -847,6 +1075,8 @@ fn create_window(
             config,
             state,
             menu,
+            tray,
+            registered_hotkeys,
         },
     ));
 }
@@ -859,27 +1089,45 @@ fn slot_by_window_id<'s>(slots: &'s mut [(WindowId, WindowSlot)], window_id: Win
     slots.iter_mut().find(|(id, _)| *id == window_id).map(|(_, slot)| slot)
 }
 
-fn close_slot_by_window_id(slots: &mut Vec<(WindowId, WindowSlot)>, window_id: WindowId) -> bool {
+fn close_slot_by_window_id(
+    slots: &mut Vec<(WindowId, WindowSlot)>,
+    window_id: WindowId,
+    hotkey_manager: Option<&global_hotkey::GlobalHotKeyManager>,
+    hotkey_routes: &mut HashMap<u32, (DesktopWindowId, DesktopHotKeySpec)>,
+) -> bool {
     let Some(position) = slots.iter().position(|(id, _)| *id == window_id) else {
         return false;
     };
     let (_, slot) = slots.remove(position);
+    unregister_hotkeys(&slot, hotkey_manager, hotkey_routes);
     slot.state.borrow_mut().closed = true;
     true
 }
 
-fn close_slot_by_id(slots: &mut Vec<(WindowId, WindowSlot)>, id: DesktopWindowId) -> bool {
+fn close_slot_by_id(
+    slots: &mut Vec<(WindowId, WindowSlot)>,
+    id: DesktopWindowId,
+    hotkey_manager: Option<&global_hotkey::GlobalHotKeyManager>,
+    hotkey_routes: &mut HashMap<u32, (DesktopWindowId, DesktopHotKeySpec)>,
+) -> bool {
     let Some(position) = slots.iter().position(|(_, slot)| slot.id == id) else {
         return false;
     };
     let (_, slot) = slots.remove(position);
+    unregister_hotkeys(&slot, hotkey_manager, hotkey_routes);
     slot.state.borrow_mut().closed = true;
     true
 }
 
-fn apply_window_command(slots: &mut Vec<(WindowId, WindowSlot)>, id: DesktopWindowId, command: WindowCommand) {
+fn apply_window_command(
+    slots: &mut Vec<(WindowId, WindowSlot)>,
+    id: DesktopWindowId,
+    command: WindowCommand,
+    hotkey_manager: Option<&global_hotkey::GlobalHotKeyManager>,
+    hotkey_routes: &mut HashMap<u32, (DesktopWindowId, DesktopHotKeySpec)>,
+) {
     if matches!(command, WindowCommand::Close) {
-        close_slot_by_id(slots, id);
+        close_slot_by_id(slots, id, hotkey_manager, hotkey_routes);
         return;
     }
 
@@ -933,6 +1181,123 @@ fn build_menu(spec: &MenuSpec, window_id: DesktopWindowId, routes: &mut HashMap<
         }
     }
     menu
+}
+
+fn build_tray(
+    spec: &TrayIconSpec,
+    window_id: DesktopWindowId,
+    tray_routes: &mut HashMap<String, DesktopWindowId>,
+    menu_routes: &mut HashMap<String, DesktopWindowId>,
+) -> Result<tray_icon::TrayIcon, String> {
+    let mut builder = tray_icon::TrayIconBuilder::new()
+        .with_id(spec.id.clone())
+        .with_menu_on_left_click(spec.menu_on_left_click)
+        .with_menu_on_right_click(spec.menu_on_right_click)
+        .with_icon_as_template(spec.icon_is_template);
+    if let Some(tooltip) = &spec.tooltip {
+        builder = builder.with_tooltip(tooltip);
+    }
+    if let Some(title) = &spec.title {
+        builder = builder.with_title(title);
+    }
+    if let Some(icon) = &spec.icon {
+        let icon = tray_icon::Icon::from_rgba(icon.rgba.clone(), icon.width, icon.height).map_err(|err| err.to_string())?;
+        builder = builder.with_icon(icon);
+    }
+    if let Some(menu) = &spec.menu {
+        builder = builder.with_menu(Box::new(build_menu(menu, window_id, menu_routes)));
+    }
+    tray_routes.insert(spec.id.clone(), window_id);
+    builder.build().map_err(|err| err.to_string())
+}
+
+fn register_hotkeys(
+    config: &DesktopConfig,
+    window_id: DesktopWindowId,
+    manager: Option<&global_hotkey::GlobalHotKeyManager>,
+    routes: &mut HashMap<u32, (DesktopWindowId, DesktopHotKeySpec)>,
+) -> Vec<global_hotkey::hotkey::HotKey> {
+    let Some(manager) = manager else {
+        if !config.hotkeys.is_empty() {
+            tracing::warn!(
+                window_id = window_id.as_usize(),
+                "glory-desktop: skipping hotkeys because manager is unavailable"
+            );
+        }
+        return Vec::new();
+    };
+
+    let mut registered = Vec::new();
+    for spec in &config.hotkeys {
+        match spec.accelerator.parse::<global_hotkey::hotkey::HotKey>() {
+            Ok(hotkey) => match manager.register(hotkey) {
+                Ok(()) => {
+                    routes.insert(hotkey.id(), (window_id, spec.clone()));
+                    registered.push(hotkey);
+                }
+                Err(err) => tracing::warn!(%err, id = %spec.id, accelerator = %spec.accelerator, "glory-desktop: hotkey registration failed"),
+            },
+            Err(err) => tracing::warn!(%err, id = %spec.id, accelerator = %spec.accelerator, "glory-desktop: invalid hotkey accelerator"),
+        }
+    }
+    registered
+}
+
+fn unregister_hotkeys(
+    slot: &WindowSlot,
+    manager: Option<&global_hotkey::GlobalHotKeyManager>,
+    routes: &mut HashMap<u32, (DesktopWindowId, DesktopHotKeySpec)>,
+) {
+    for hotkey in &slot.registered_hotkeys {
+        routes.remove(&hotkey.id());
+        if let Some(manager) = manager
+            && let Err(err) = manager.unregister(*hotkey)
+        {
+            tracing::warn!(%err, window_id = slot.id.as_usize(), hotkey = %hotkey, "glory-desktop: hotkey unregister failed");
+        }
+    }
+}
+
+fn map_tray_event(event: tray_icon::TrayIconEvent) -> Option<DesktopTrayEvent> {
+    match event {
+        tray_icon::TrayIconEvent::Click {
+            id, button, button_state, ..
+        } => Some(DesktopTrayEvent::Click {
+            id: id.as_ref().to_owned(),
+            button: map_tray_button(button),
+            button_state: map_tray_button_state(button_state),
+        }),
+        tray_icon::TrayIconEvent::DoubleClick { id, button, .. } => Some(DesktopTrayEvent::DoubleClick {
+            id: id.as_ref().to_owned(),
+            button: map_tray_button(button),
+        }),
+        tray_icon::TrayIconEvent::Enter { id, .. } => Some(DesktopTrayEvent::Enter { id: id.as_ref().to_owned() }),
+        tray_icon::TrayIconEvent::Move { id, .. } => Some(DesktopTrayEvent::Move { id: id.as_ref().to_owned() }),
+        tray_icon::TrayIconEvent::Leave { id, .. } => Some(DesktopTrayEvent::Leave { id: id.as_ref().to_owned() }),
+        _ => None,
+    }
+}
+
+fn map_tray_button(button: tray_icon::MouseButton) -> DesktopTrayMouseButton {
+    match button {
+        tray_icon::MouseButton::Left => DesktopTrayMouseButton::Left,
+        tray_icon::MouseButton::Right => DesktopTrayMouseButton::Right,
+        tray_icon::MouseButton::Middle => DesktopTrayMouseButton::Middle,
+    }
+}
+
+fn map_tray_button_state(state: tray_icon::MouseButtonState) -> DesktopTrayMouseButtonState {
+    match state {
+        tray_icon::MouseButtonState::Up => DesktopTrayMouseButtonState::Up,
+        tray_icon::MouseButtonState::Down => DesktopTrayMouseButtonState::Down,
+    }
+}
+
+fn map_hotkey_state(state: global_hotkey::HotKeyState) -> DesktopHotKeyState {
+    match state {
+        global_hotkey::HotKeyState::Pressed => DesktopHotKeyState::Pressed,
+        global_hotkey::HotKeyState::Released => DesktopHotKeyState::Released,
+    }
 }
 
 #[allow(unused_variables)]
@@ -1044,6 +1409,34 @@ mod tests {
 
         assert_eq!(config.custom_protocols[0].name(), "api");
         assert!(format!("{config:?}").contains("api"));
+    }
+
+    #[test]
+    fn desktop_config_records_tray_and_hotkeys() {
+        let tray = TrayIconSpec::new("main-tray")
+            .tooltip("Glory")
+            .title("G")
+            .icon_rgba(vec![255, 0, 0, 255], 1, 1)
+            .menu(MenuSpec::new().submenu("App", vec![MenuItemSpec::new("quit", "Quit")]));
+        let config = DesktopConfig::default()
+            .with_tray(tray)
+            .with_hotkey(DesktopHotKeySpec::new("toggle", "cmdorctrl+KeyK"));
+
+        assert_eq!(config.tray.as_ref().unwrap().id, "main-tray");
+        assert_eq!(config.tray.as_ref().unwrap().icon.as_ref().unwrap().width, 1);
+        assert_eq!(config.hotkeys[0].id, "toggle");
+        assert!(config.hotkeys[0].accelerator.parse::<global_hotkey::hotkey::HotKey>().is_ok());
+        assert!(format!("{config:?}").contains("main-tray"));
+    }
+
+    #[test]
+    fn tray_and_hotkey_event_mapping_is_stable() {
+        assert_eq!(map_tray_button(tray_icon::MouseButton::Right), DesktopTrayMouseButton::Right);
+        assert_eq!(
+            map_tray_button_state(tray_icon::MouseButtonState::Down),
+            DesktopTrayMouseButtonState::Down
+        );
+        assert_eq!(map_hotkey_state(global_hotkey::HotKeyState::Released), DesktopHotKeyState::Released);
     }
 
     #[test]
