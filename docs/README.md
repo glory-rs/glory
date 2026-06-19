@@ -8,6 +8,9 @@ Start here when evaluating or extending Glory:
   state/cache, preloaded state, streaming helpers, and multipart helpers.
 - [Server function adapter recipes](serverfn-adapter-recipes.md): Salvo, Axum,
   and Actix routes for streaming, SSE, uploads, and cookie sessions.
+- [Server function native extractor decision](serverfn-extractor-decision.md):
+  why `#[server]` remains adapter-neutral and native extractors stay in custom
+  framework routes for now.
 - [Styling notes](styling.md): scoped styles with `web::scoped_css`.
 - [HTML/event coverage audit](html-event-coverage-audit.md): current parity
   against local Dioxus `packages/html`, including SVG/MathML and event gaps.

@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 24 |
+| 已完成 `[x]` | 25 |
 | 部分完成 `[~]` | 5 |
-| 未完成 `[ ]` | 31 |
+| 未完成 `[ ]` | 30 |
 
 按能力权重估算:
 
@@ -256,10 +256,11 @@ desktop runtime 已经是真 wry/tao 宿主，不只是测试 sink。
 serverfn 基础可用，但对比成熟框架还缺:
 
 - 多 HTTP method 已补第一阶段:`#[server(method = "GET")]` 可用。
+- 原生 framework extractor 直通设计决策已补:核心 `#[server]` 暂保持
+  adapter-neutral,原生 extractor 放在自定义框架 route 或未来显式 adapter 扩展。
 - 多编码协商，例如 CBOR/MessagePack/Postcard。
 - 逐函数 middleware。
 - 响应式 WebSocket hook。
-- 原生 framework extractor 直通设计。
 
 ### 3. CLI / Serve / Bundle 产品面偏薄
 

@@ -90,6 +90,12 @@ See [server function adapter recipes](serverfn-adapter-recipes.md) for concrete
 Salvo, Axum, and Actix route snippets covering SSE/NDJSON streaming, multipart
 uploads, and login/logout cookie redirects.
 
+For the native extractor policy, see
+[server function native extractor decision](serverfn-extractor-decision.md).
+Generated server functions keep an adapter-neutral ABI; framework-native
+extractors belong in custom routes until an explicit adapter extension is
+designed and tested.
+
 ## Runnable Example
 
 See `examples/todomvc-fullstack` for list/add/toggle/clear server functions,

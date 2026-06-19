@@ -110,9 +110,12 @@ R5 仅评估,不阻塞任何人。
   帧助手(`crates/serverfn/src/lib.rs`),缺 Dioxus `use_websocket()` 式 hook
   (`packages/fullstack/src/payloads/websocket.rs`):自动重连 + 类型化双向通道 +
   连接状态 Cage。
-- [ ] **S5 P2** 服务端原生 extractor 直通(Dioxus 允许 axum `FromRequest` 直接做参数)。
+- [x] **S5 P2** 服务端原生 extractor 直通(Dioxus 允许 axum `FromRequest` 直接做参数)。
   Glory 的 `RequestContext` 是统一抽象;评估按适配器 feature-gate 的原生 extractor
   直通是否值得破坏适配器中立性,先写决策记录。
+  2026-06-19 已完成:新增 `docs/serverfn-extractor-decision.md`,决策为核心
+  `#[server]` 暂保持 adapter-neutral,原生 Salvo/Axum/Actix extractor 放在自定义
+  框架 route 或未来显式 feature-gated adapter 扩展。
 - [x] **S6 P1** 提交此前未提交改动:`salvo_mount::streaming_response()` 返回式助手 +
   `write_streaming_response` 显式 `StatusCode::OK` + salvo-adapter `into_response()` +
   recipes 文档。补一条 Salvo 流式响应状态码测试后提交。
