@@ -49,6 +49,7 @@ function Invoke-LoggedProcess {
 $logs = @()
 if (-not $SkipCargoBench) {
   $logs += Invoke-LoggedCargo 'command-wire' @('bench', '-p', 'glory-core', '--bench', 'command_wire', '--', '--save-baseline', 'glory-local')
+  $logs += Invoke-LoggedCargo 'event-handlers' @('bench', '-p', 'glory-core', '--bench', 'event_handlers', '--', '--save-baseline', 'glory-local')
   $logs += Invoke-LoggedCargo 'each-reorder' @('bench', '-p', 'glory-core', '--features', 'web-ssr', '--bench', 'each_reorder', '--', '--save-baseline', 'glory-local')
   $logs += Invoke-LoggedCargo 'scheduler' @('bench', '-p', 'glory-core', '--features', 'web-ssr', '--bench', 'scheduler', '--', '--save-baseline', 'glory-local')
   $logs += Invoke-LoggedCargo 'ssr-stream' @('bench', '-p', 'glory-core', '--features', 'web-ssr', '--bench', 'ssr_stream', '--', '--save-baseline', 'glory-local')

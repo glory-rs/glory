@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 48 |
+| 已完成 `[x]` | 49 |
 | 部分完成 `[~]` | 4 |
-| 未完成 `[ ]` | 8 |
+| 未完成 `[ ]` | 7 |
 
 按能力权重估算:
 
@@ -180,6 +180,7 @@ SSR feature 测试覆盖较完整:
 - event dispatch/reentrancy。
 - query round-trip。
 - handler release。
+- event handler install/dispatch lookup synthetic benchmark。
 - desktop JS interpreter wire shape。
 
 主要路径:
@@ -187,7 +188,12 @@ SSR feature 测试覆盖较完整:
 - `crates/core/src/renderer/command.rs`
 - `crates/core/src/renderer/command_dom.rs`
 - `crates/core/src/renderer/ssr_dom.rs`
+- `crates/core/benches/event_handlers.rs`
 - `crates/desktop/src/wry_interpreter.js`
+
+E11 当前结论:10k 同 DOM 构建中 click handler 注册约把本机短样本从
+3.43ms 提到 4.40ms;10k handler registry 的最后一行 dispatch lookup/restore
+约 107ns。create10k 的后续优化应优先看批量 DOM command 数和浏览器侧 apply 成本。
 
 ### Server Functions
 
@@ -430,6 +436,7 @@ cargo check -p glory --features "web-ssr backend-command routing server-fn"
 cargo check -p glory-salvo
 cargo check -p glory-axum
 cargo check -p glory-actix
+cargo bench -p glory-core --bench event_handlers -- --sample-size 10 --warm-up-time 0.1 --measurement-time 0.1
 cargo fmt --all --check
 cargo clippy -p glory-cli --lib --no-default-features -- -D warnings
 cargo clippy -p glory-core --lib --features web-ssr -- -D warnings

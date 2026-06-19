@@ -150,6 +150,7 @@ Use this wrapper to generate a repeatable local bundle:
 It runs:
 
 - `cargo bench -p glory-core --bench command_wire`
+- `cargo bench -p glory-core --bench event_handlers`
 - `cargo bench -p glory-core --features web-ssr --bench each_reorder`
 - `cargo bench -p glory-core --features web-ssr --bench scheduler`
 - `cargo bench -p glory-core --features web-ssr --bench ssr_stream`
@@ -162,10 +163,41 @@ The report summary, logs, wasm size JSON, and Playwright status JSON are written
 to `target/benchmark-report/`; Criterion HTML remains under
 `target/criterion/`.
 
-The scheduler benchmark covers a shared `Cage` patching 100 and 1000 subscribed
-views plus command queue batch drain with and without coalescing. The SSR stream
-benchmark compares full `render_string()` output with collecting
-`render_stream()` chunks for 100 and 1000 row pages.
+The event-handler benchmark isolates 1k/10k same-DOM construction with and
+without click handlers, plus command-stream dispatch lookup against empty and
+populated handler registries. The scheduler benchmark covers a shared `Cage`
+patching 100 and 1000 subscribed views plus command queue batch drain with and
+without coalescing. The SSR stream benchmark compares full `render_string()`
+output with collecting `render_stream()` chunks for 100 and 1000 row pages.
+
+## Event Handler Baseline
+
+Date: 2026-06-19
+
+Command:
+
+```powershell
+cargo bench -p glory-core --bench event_handlers -- --sample-size 10 --warm-up-time 0.1 --measurement-time 0.1
+```
+
+Representative local results:
+
+| Benchmark | Mean Range |
+| --- | ---: |
+| `event_handler_install/build_1000_rows_no_handlers` | 182.37-184.81 us |
+| `event_handler_install/build_1000_rows_click_handlers` | 454.10-486.80 us |
+| `event_handler_install/build_10000_rows_no_handlers` | 3.0247-3.7970 ms |
+| `event_handler_install/build_10000_rows_click_handlers` | 4.2722-4.5484 ms |
+| `event_dispatch_lookup/missing_click_10000_rows` | 75.931-77.746 ns |
+| `event_dispatch_lookup/registered_click_10000_handlers_last_row` | 106.10-108.67 ns |
+
+Interpretation:
+
+- Command-stream click handler registration adds about 1 ms to a 10k-row
+  synthetic build on this machine.
+- Dispatch lookup/restore remains sub-microsecond even with 10k registered
+  row handlers, so `create10k` tuning should prioritize bulk DOM command count
+  and browser-side apply cost before inventing a separate row-delegation API.
 
 ## Scheduler And SSR Baseline
 

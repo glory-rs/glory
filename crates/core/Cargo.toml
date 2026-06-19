@@ -82,6 +82,10 @@ name = "command_wire"
 harness = false
 
 [[bench]]
+name = "event_handlers"
+harness = false
+
+[[bench]]
 name = "scheduler"
 harness = false
 required-features = ["web-ssr"]

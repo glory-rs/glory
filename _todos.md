@@ -301,8 +301,11 @@ R5 仅评估,不阻塞任何人。
 - [x] **E10 P1** 稳定多样本基准对比:扩展
   `benchmarks/official-js-framework-benchmark.ps1`,保留命名基线、Glory-only A/B、
   `Count>=5` 中位数/极差表。**应先于 E9/E11 的验收**(否则小优化无法接受/拒绝)。
-- [ ] **E11 P1** 事件处理器安装成本隔离:同 DOM 无 handler vs 委派行 id 查找的合成
-  基准,量化 `create10k` 中 closure 安装占比;若显著,出委派行 API 提案。
+- [x] **E11 P1** 事件处理器安装成本隔离:新增
+  `crates/core/benches/event_handlers.rs`,覆盖 1k/10k 同 DOM 无 handler vs click
+  handler 注册,以及空 registry vs 10k handler registry 的 command-stream dispatch
+  lookup/restore。短样本显示 10k handler 注册约增加 1ms,lookup 约 107ns,暂不需要
+  另起委派行 API。
 - [ ] **E12 P2** `create10k` 脚本时间追平 Dioxus(78ms vs 64ms):在 E10 落地后,
   对 wasm→DOM 调用次数与字符串分配做 profile 驱动优化。
 
