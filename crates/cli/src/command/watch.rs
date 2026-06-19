@@ -13,7 +13,7 @@ use tokio::try_join;
 
 use super::build::build_proj;
 
-pub async fn watch(proj: &Arc<Project>) -> Result<()> {
+pub async fn watch(proj: &Arc<Project>, should_open: bool) -> Result<()> {
     // even if the build fails, we continue
     build_proj(proj).await?;
 
@@ -41,6 +41,7 @@ pub async fn watch(proj: &Arc<Project>) -> Result<()> {
 
     service::serve::spawn(proj).await;
     service::reload::spawn(proj).await;
+    super::serve::open_site(proj, should_open);
 
     let res = run_loop(proj).await;
     if res.is_err() {

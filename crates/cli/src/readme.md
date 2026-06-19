@@ -24,6 +24,8 @@ glory bundle         release build and collect distributable artifacts
 glory serve          like `build`, then host the result over HTTP
 glory serve --no-reload
                      build and serve once without filesystem watching
+glory serve --port 8080 --no-open
+                     override the configured site port and skip browser open
 glory doctor         check local toolchains for the selected target
 glory config         validate Glory Cargo metadata
 glory config --schema

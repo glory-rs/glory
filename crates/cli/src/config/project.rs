@@ -76,6 +76,7 @@ impl Project {
         for (mut project, mut config) in projects {
             overrides.apply_definition(&mut project);
             overrides.apply_config(&mut config);
+            config.validate()?;
             if config.output_name.is_empty() {
                 config.output_name = project.name.to_string();
             }
@@ -219,16 +220,21 @@ impl ProjectConfig {
         conf.config_dir = dir.to_path_buf();
         let dotenvs = load_dotenvs(dir)?;
         overlay_env(&mut conf, dotenvs)?;
-        if conf.site_root == "/" || conf.site_root == "." {
+        conf.validate()?;
+        Ok(conf)
+    }
+
+    fn validate(&self) -> Result<()> {
+        if self.site_root == "/" || self.site_root == "." {
             bail!(
                 "site-root cannot be '{}'. All the content is erased when building the site.",
-                conf.site_root
+                self.site_root
             );
         }
-        if conf.site_addr.port() == conf.reload_port {
-            bail!("The site-addr port and reload-port cannot be the same: {}", conf.reload_port);
+        if self.site_addr.port() == self.reload_port {
+            bail!("The site-addr port and reload-port cannot be the same: {}", self.reload_port);
         }
-        Ok(conf)
+        Ok(())
     }
 }
 

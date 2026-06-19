@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 
 use camino::Utf8PathBuf;
 
@@ -25,6 +25,8 @@ pub struct Overrides {
     // ProjectConfig scalars
     pub output_name: Option<String>,
     pub site_addr: Option<SocketAddr>,
+    pub site_address: Option<IpAddr>,
+    pub site_port: Option<u16>,
     pub site_root: Option<Utf8PathBuf>,
     pub site_pkg_dir: Option<Utf8PathBuf>,
     pub reload_port: Option<u16>,
@@ -68,6 +70,8 @@ impl Overrides {
             && self.lib_package.is_none()
             && self.output_name.is_none()
             && self.site_addr.is_none()
+            && self.site_address.is_none()
+            && self.site_port.is_none()
             && self.site_root.is_none()
             && self.site_pkg_dir.is_none()
             && self.reload_port.is_none()
@@ -117,6 +121,12 @@ impl Overrides {
         }
         if let Some(v) = self.site_addr {
             config.site_addr = v;
+        }
+        if let Some(v) = self.site_address {
+            config.site_addr.set_ip(v);
+        }
+        if let Some(v) = self.site_port {
+            config.site_addr.set_port(v);
         }
         if let Some(v) = &self.site_root {
             config.site_root = v.clone();
@@ -190,5 +200,46 @@ impl Overrides {
         if let Some(v) = &self.bin_profile_release {
             config.bin_profile_release = Some(v.clone());
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn config(site_addr: &str) -> ProjectConfig {
+        serde_json::from_value(serde_json::json!({
+            "site_addr": site_addr,
+            "reload_port": 3001
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn partial_site_override_preserves_unspecified_addr_parts() {
+        let mut config = config("127.0.0.1:8000");
+        let overrides = Overrides {
+            site_address: Some([0, 0, 0, 0].into()),
+            site_port: Some(9000),
+            ..Default::default()
+        };
+
+        overrides.apply_config(&mut config);
+
+        assert_eq!(config.site_addr.to_string(), "0.0.0.0:9000");
+    }
+
+    #[test]
+    fn partial_site_override_wins_after_full_site_addr() {
+        let mut config = config("127.0.0.1:8000");
+        let overrides = Overrides {
+            site_addr: Some(([192, 168, 1, 10], 8080).into()),
+            site_port: Some(9000),
+            ..Default::default()
+        };
+
+        overrides.apply_config(&mut config);
+
+        assert_eq!(config.site_addr.to_string(), "192.168.1.10:9000");
     }
 }

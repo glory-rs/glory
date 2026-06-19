@@ -1,6 +1,7 @@
 use crate::command::NewCommand;
 use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand, ValueEnum};
+use std::net::IpAddr;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 pub enum Log {
@@ -101,6 +102,28 @@ pub struct ServeOpts {
     /// Build and serve once without watching files or live-reloading.
     #[arg(long)]
     pub no_reload: bool,
+
+    /// Override the host address from Cargo metadata for this serve run.
+    #[arg(long)]
+    pub address: Option<IpAddr>,
+
+    /// Override the site port from Cargo metadata for this serve run.
+    #[arg(long)]
+    pub port: Option<u16>,
+
+    /// Explicitly open the app in the default browser. This is the default.
+    #[arg(long, action = clap::ArgAction::SetTrue, conflicts_with = "no_open")]
+    pub open: bool,
+
+    /// Do not open the app in the default browser after the first build.
+    #[arg(long = "no-open", action = clap::ArgAction::SetTrue)]
+    pub no_open: bool,
+}
+
+impl ServeOpts {
+    pub fn should_open(&self) -> bool {
+        self.open || !self.no_open
+    }
 }
 
 /// Extra flags for `clean`.
@@ -165,4 +188,44 @@ pub enum Commands {
     EndToEnd(Opts),
     /// Scaffold a new Glory project from a built-in template or cargo-generate source.
     New(NewCommand),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn serve_accepts_network_and_open_flags() {
+        let cli = Cli::parse_from(["glory", "serve", "--address", "0.0.0.0", "--port", "9000", "--no-open"]);
+
+        let Commands::Serve(serve) = cli.command else {
+            panic!("expected serve command");
+        };
+
+        assert_eq!(serve.address, Some([0, 0, 0, 0].into()));
+        assert_eq!(serve.port, Some(9000));
+        assert!(!serve.should_open());
+    }
+
+    #[test]
+    fn serve_opens_by_default_and_accepts_explicit_open() {
+        let cli = Cli::parse_from(["glory", "serve"]);
+        let Commands::Serve(default_serve) = cli.command else {
+            panic!("expected serve command");
+        };
+        assert!(default_serve.should_open());
+
+        let cli = Cli::parse_from(["glory", "serve", "--open"]);
+        let Commands::Serve(explicit_serve) = cli.command else {
+            panic!("expected serve command");
+        };
+        assert!(explicit_serve.should_open());
+    }
+
+    #[test]
+    fn serve_rejects_conflicting_open_flags() {
+        let result = Cli::try_parse_from(["glory", "serve", "--open", "--no-open"]);
+
+        assert!(result.is_err());
+    }
 }

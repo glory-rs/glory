@@ -112,10 +112,12 @@ R5 仅评估,不阻塞任何人。
 
 ## Lane C — CLI / 构建 / 开发体验(crates/cli)
 
-- [ ] **C1 P0** serve 开发体验追平:浏览器 auto-open(默认开)、`--port/--address`
+- [~] **C1 P0** serve 开发体验追平:浏览器 auto-open(默认开)、`--port/--address`
   显式参数、HTTPS 选项、代理转发配置。对照 `packages/cli/src/cli/serve.rs` 的
   `ServeArgs`(open/hot_reload/cross_origin/wsl_file_poll_interval 等 11 个字段),
-  Glory `crates/cli/src/command/serve.rs` 目前是 14 行薄封装。
+  Glory `crates/cli/src/command/serve.rs` 此前是 14 行薄封装。
+  2026-06-19 第一阶段:已新增 `glory serve --address/--port` 对 `site_addr`
+  的运行时覆盖,默认打开浏览器并支持 `--no-open`;剩余 HTTPS 和代理转发配置。
 - [ ] **C2 P1** serve 交互能力:运行中按键触发重建(r)、verbose 切换(v)、帮助(/)。
   不必复刻 Dioxus 全屏 TUI,行式交互即可。依赖 C1 的参数结构。
 - [x] **C3 P2** wasm-split 评估与原型。Dioxus 有成熟 `#[wasm_split]` 宏 + CLI 切分 +

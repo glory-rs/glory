@@ -287,9 +287,14 @@ Important commands:
 ```powershell
 cargo run -p glory-cli -- config --schema
 cargo run -p glory-cli -- doctor --target web
+cargo run -p glory-cli -- --manifest-path examples/ssr-simple-salvo/Cargo.toml serve --port 8080 --no-open
 cargo run -p glory-cli -- --manifest-path examples/ssr-simple-salvo/Cargo.toml check
 cargo run -p glory-cli -- --manifest-path examples/ssr-simple-salvo/Cargo.toml bundle --release
 ```
+
+`glory serve` opens the resolved site URL in the default browser after the first
+build. Use `--no-open` to suppress it, or `--address` / `--port` to override the
+configured `site_addr` for the current run.
 
 `glory end2end` runs the `package.metadata.glory.end2end_cmd` configured by an
 example or app. The first-party Playwright projects live in `tests/playwright`.

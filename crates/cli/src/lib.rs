@@ -67,6 +67,11 @@ pub async fn run_with(args: Cli, overrides: Overrides) -> Result<()> {
     manifest_path.clean_windows_path();
 
     let opts = args.opts().unwrap();
+    let mut overrides = overrides;
+    if let Serve(serve) = &args.command {
+        overrides.site_address = serve.address;
+        overrides.site_port = serve.port;
+    }
 
     let watch = matches!(&args.command, Serve(serve) if !serve.no_reload);
     let config = Config::load_with(opts, &cwd, &manifest_path, watch, &overrides).dot()?;
@@ -76,8 +81,8 @@ pub async fn run_with(args: Cli, overrides: Overrides) -> Result<()> {
     let _monitor = Interrupt::run_ctrl_c_monitor();
     match args.command {
         New(_) | Fmt(_) | Doctor(_) => unreachable!("handled before metadata load"),
-        Serve(serve) if serve.no_reload => command::serve(&config.current_project()?).await,
-        Serve(_) => command::watch(&config.current_project()?).await,
+        Serve(serve) if serve.no_reload => command::serve(&config.current_project()?, serve.should_open()).await,
+        Serve(serve) => command::watch(&config.current_project()?, serve.should_open()).await,
         Build(_) => command::build_all(&config).await,
         Bundle(_) => command::bundle_all(&config).await,
         Clean(clean) => command::clean_all(&config, clean.cargo).await,

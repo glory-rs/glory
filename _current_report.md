@@ -2,8 +2,8 @@
 
 日期: 2026-06-19
 
-评审范围: 当前工作区 `D:\Works\glory-rs\glory`。本报告基于现有文档、源码结构、feature
-组合和本地测试/检查结果。未修改源码。
+评审范围: 当前工作区 `D:\Works\glory-rs\glory`。本报告初版基于现有文档、源码结构、
+feature 组合和本地测试/检查结果；后续条目会随本分支实际完成状态更新。
 
 ## 结论摘要
 
@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 14 |
-| 部分完成 `[~]` | 3 |
-| 未完成 `[ ]` | 40 |
+| 已完成 `[x]` | 18 |
+| 部分完成 `[~]` | 5 |
+| 未完成 `[ ]` | 37 |
 
 按能力权重估算:
 
@@ -39,9 +39,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 | native Blitz / mobile / LiveView | 20-35% |
 | CI / release governance | 35-45% |
 
-## 当前可复现缺陷
+## 初版发现的可复现缺陷与处理状态
 
-### 1. CLI release clippy 门槛失败
+### 1. [x] CLI release clippy 门槛失败
 
 命令:
 
@@ -49,7 +49,7 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 cargo clippy -p glory-cli --lib --no-default-features -- -D warnings
 ```
 
-结果: 失败。
+初版结果: 失败。
 
 位置: `crates/cli/src/lib.rs:77-90`
 
@@ -61,7 +61,10 @@ cargo clippy -p glory-cli --lib --no-default-features -- -D warnings
 - `docs/release-readiness.md` 中列出的 required check 当前不能全部通过。
 - 这是低风险修复，但会阻断严格发布流程。
 
-### 2. 项目文档与当前源码存在漂移
+当前状态:已修复 `clippy::let_and_return`,并通过
+`cargo clippy -p glory-cli --lib --no-default-features -- -D warnings`。
+
+### 2. [x] 项目文档与当前源码存在漂移
 
 `AGENTS.md` 仍声明 `backend-command` 与 `web-ssr` 互斥，但当前源码明确允许它们共存。
 
@@ -86,18 +89,18 @@ cargo check -p glory-core --features "web-ssr backend-command"
 - AI/贡献者会按旧约束判断 feature matrix，容易误判。
 - release readiness 也仍保留“workspace-wide failures 是历史问题”的表述，但当前 `cargo test --workspace` 已通过。
 
-### 3. CI 覆盖不足
+当前状态:`AGENTS.md` 与 `docs/release-readiness.md` 已同步当前 feature matrix 和
+workspace test 状态。
 
-`.github/workflows` 当前主要包含:
+### 3. [~] CI 覆盖不足
+
+`.github/workflows` 初版主要包含:
 
 - `format.yml`
 - `release.yml`
 
-没有常规 CI 跑以下本地已存在的关键检查:
+当前已新增 `ci.yml` 覆盖 Rust 主路径，但还没有常规 CI 跑以下端到端检查:
 
-- targeted Rust tests。
-- feature-combination compile checks。
-- clippy required checks。
 - Playwright 浏览器 e2e。
 - mobile/device smoke。
 
@@ -105,6 +108,9 @@ cargo check -p glory-core --features "web-ssr backend-command"
 
 - 本地质量基线不错，但没有被 CI 强制执行。
 - 后续改动可能破坏 command protocol、SSR replay 或 CLI 行为而不被 PR 检出。
+
+当前状态:已新增主 Rust CI,覆盖 fmt、targeted tests、feature guard 与 clippy gates。
+Playwright 真浏览器、mobile/device smoke 仍未闭环。
 
 ## 已完成度较高的部分
 
@@ -229,12 +235,12 @@ desktop runtime 已经是真 wry/tao 宿主，不只是测试 sink。
 
 - `Router` + runtime string path/filter。
 - 有路径解析和检测测试。
+- 手写 `Routable` trait、typed `goto_route`、`Locator::route::<R>()` 第一阶段已补。
 - 查询字符串可读写，但没有类型化解析体系。
 
 缺口:
 
-- 类型化 route。
-- route enum 或类型安全 builder。
+- 类型化 route 的 derive/builder 自动生成仍未落定。
 - 嵌套布局 / Outlet。
 - redirect。
 - 404 默认处理。
@@ -252,7 +258,7 @@ desktop runtime 已经是真 wry/tao 宿主，不只是测试 sink。
 
 serverfn 基础可用，但对比成熟框架还缺:
 
-- HTTP method 选择，当前 wasm client stub 固定 POST。
+- 多 HTTP method 已补第一阶段:`#[server(method = "GET")]` 可用。
 - 多编码协商，例如 CBOR/MessagePack/Postcard。
 - 逐函数 middleware。
 - 响应式 WebSocket hook。
@@ -262,14 +268,12 @@ serverfn 基础可用，但对比成熟框架还缺:
 
 现状:
 
-- `ServeOpts` 基本只有 `--no_reload`。
+- `ServeOpts` 已有 `--no-reload`、`--address`、`--port`、`--open`、`--no-open`。
 - `serve` 命令只是 build 后 spawn server。
 - `Bundle` 已有 manifest 和压缩资产处理，但平台矩阵和 installer 仍不足。
 
 缺口:
 
-- `serve --open` / 默认 auto-open。
-- `--port` / `--address` 显式参数。
 - HTTPS。
 - proxy。
 - 运行中按键交互，比如 rebuild、verbose、help。
@@ -415,17 +419,19 @@ cargo check -p glory-salvo
 cargo check -p glory-axum
 cargo check -p glory-actix
 cargo fmt --all --check
+cargo clippy -p glory-cli --lib --no-default-features -- -D warnings
 cargo clippy -p glory-core --lib --features web-ssr -- -D warnings
 cargo clippy -p glory-serverfn --all-targets -- -D warnings
+cargo test -p glory-cli --lib --no-default-features
 ```
 
-失败:
+初版失败、当前已修复:
 
 ```powershell
 cargo clippy -p glory-cli --lib --no-default-features -- -D warnings
 ```
 
-失败原因: `crates/cli/src/lib.rs:77-90` 的 `clippy::let_and_return`。
+初版失败原因: `crates/cli/src/lib.rs:77-90` 的 `clippy::let_and_return`。
 
 未验证:
 
@@ -454,7 +460,9 @@ cargo clippy -p glory-cli --lib --no-default-features -- -D warnings
 ### P1
 
 1. [x] 设计并实现 typed routing 第一阶段。
-2. 扩展 `glory serve` 参数和基本 DX。
+2. [~] 扩展 `glory serve` 参数和基本 DX。
+   - 已完成 `--address/--port` 运行时覆盖、默认 auto-open、`--no-open`。
+   - 未完成 HTTPS 与 proxy 配置。
 3. [x] serverfn 支持 method 选择，至少 `#[server(method = "GET")]`。
 4. Playwright CI 跑 CSR counter + SSR hydration 两个最小场景。
 5. Desktop 补窗口控制 API 包。
