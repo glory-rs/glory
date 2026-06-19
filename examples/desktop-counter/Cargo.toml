@@ -3,6 +3,16 @@ name = "desktop-counter"
 version = "0.0.1"
 edition = "2024"
 
+[features]
+desktop = []
+
 [dependencies]
 glory-core = { path = "../../crates/core", features = ["backend-command"] }
 glory-desktop = { path = "../../crates/desktop", features = ["runtime"] }
+
+[package.metadata.glory]
+output_name = "desktop-counter"
+site_root = "target/site"
+site_pkg_dir = "pkg"
+bin_features = ["desktop"]
+bin_default_features = false

@@ -154,7 +154,18 @@ The bundle lands in `dist/<project>/` and contains:
 
 - the desktop executable;
 - mirrored site/assets files beside the executable;
+- platform installer artifacts under `installers/`;
 - `glory-bundle.json` with target and artifact metadata.
 
 The executable-directory asset fallback means `asset_url("/logo.png")` works
 from the bundle root without additional configuration.
+
+On Windows, `glory bundle --target desktop` stages a WiX installer project under
+`installers/windows/`. If `heat.exe`, `candle.exe`, and `light.exe` are on PATH
+or `WIX_BIN` points at the WiX bin directory, the CLI also emits an `.msi`;
+otherwise it leaves `product.wxs`, `staging/`, and `build-msi.ps1` for a later
+installer build.
+
+On Linux, the same command emits a Debian package under `installers/linux/`.
+The `.deb` installs the bundle under `/usr/lib/<package>` and adds a launcher
+symlink plus a freedesktop `.desktop` file.

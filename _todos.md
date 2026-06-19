@@ -20,7 +20,7 @@
 | 路由 | 运行时字符串匹配,无类型化路由/嵌套布局/Outlet/重定向/查询参数解析 | **关键** |
 | 服务器函数 | 仅 POST + JSON;无 HTTP 动词选择、多编码、逐函数中间件、响应式 WebSocket hook | **高** |
 | 异步/错误原语 | 无 Suspense 式自动边界、无 ErrorBoundary;`resource_in` 竞态已修 | **高** |
-| CLI/构建 | 无 wasm-split、无原生安装器(MSI/DMG/DEB)、serve 体验(auto-open/TUI/https/proxy)薄 | **高** |
+| CLI/构建 | wasm-split 暂缓;Windows/Linux 原生安装器已有最小路径,macOS/AppImage/签名仍缺 | **中-高** |
 | 资产 | 无类型化清单、图片优化、CSS Modules、folder 资产宏(对照 manganis) | 中 |
 | 桌面 | 协议扎实,缺托盘/全局热键/窗口状态 API/文件对话框/异步自定义协议 | 中 |
 | Native(Blitz)/LiveView/移动端 | 分别处于 spike(~20%)/可用但单适配器(~30%)/模板可编译但无真机验证(~30%) | 中-高 |
@@ -160,9 +160,14 @@ R5 仅评估,不阻塞任何人。
   Playwright harness(`packages/wasm-split/`),Glory 完全没有。评估见
   `docs/wasm-split-evaluation.md`:当前体积不先做 split,原型等 gzip/路由懒加载阈值
   触发后再做 CLI-owned 次入口方案。
-- [ ] **C4 P1** 原生安装器产物:`glory bundle --target desktop` 目前输出裸 exe +
+- [x] **C4 P1** 原生安装器产物:`glory bundle --target desktop` 目前输出裸 exe +
   assets,Dioxus 经 tauri-bundler 出 MSI/DMG/DEB/AppImage。评估直接复用
   tauri-bundler crate,先支持 Windows MSI + Linux deb。
+  2026-06-19 已完成:未直接引入完整 tauri-bundler/Dioxus bundler 依赖,而是在现有
+  `bundle` 流程中补最小原生安装器路径:Windows 写 WiX `product.wxs`、payload staging
+  和 `build-msi.ps1`,检测到 WiX v3 工具时直接产出 `.msi`;Linux 纯 Rust 组装 `.deb`
+  (ar + control/data tar.gz),并安装到 `/usr/lib/<package>` + `/usr/bin` symlink +
+  `.desktop` 文件。`examples/desktop-counter` 已补 metadata 作为 bundle 验证样例。
 - [x] **C5 P2** CLI 小命令补齐:`run`(无热重载直跑)、shell `completions`、
   `self-update` 提示。`translate`/`components` 属 RSX 生态,明确不做。
   2026-06-19 已完成:`glory run` 复用无 watch/live reload 的 serve 路径,

@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 use std::env;
 use std::fs::File;
-use std::io::Write;
+use std::io::{Cursor, Write};
 use std::sync::Arc;
 
 use brotli::CompressorWriter;
@@ -47,6 +47,9 @@ pub async fn bundle_proj(proj: &Arc<Project>) -> Result<()> {
     }
 
     optimize_static_assets(&dist).await?;
+    if proj.target == BuildTarget::Desktop {
+        bundle_desktop_installers(proj, &dist).await?;
+    }
     write_manifest(proj, &dist).await?;
 
     log::info!("Glory bundled {} into {}", proj.name, GRAY.paint(dist.as_str()));
@@ -71,6 +74,143 @@ async fn bundle_web(proj: &Project, dist: &Utf8Path) -> Result<()> {
 async fn bundle_hosted_binary(proj: &Project, dist: &Utf8Path) -> Result<()> {
     copy_site_if_present(proj, dist).await?;
     copy_server_binary(proj, dist).await?;
+    Ok(())
+}
+
+async fn bundle_desktop_installers(proj: &Project, dist: &Utf8Path) -> Result<()> {
+    if !proj.builds_server() {
+        return Ok(());
+    }
+
+    if cfg!(target_os = "windows") {
+        write_windows_msi_artifacts(proj, dist).await?;
+    }
+    if cfg!(target_os = "linux") {
+        write_linux_deb(proj, dist).await?;
+    }
+
+    Ok(())
+}
+
+async fn write_windows_msi_artifacts(proj: &Project, dist: &Utf8Path) -> Result<()> {
+    let out_dir = dist.join("installers/windows");
+    let staging = out_dir.join("staging");
+    let obj_dir = out_dir.join("obj");
+    if staging.exists() {
+        fs::remove_dir_all(&staging).await.dot()?;
+    }
+    if obj_dir.exists() {
+        fs::remove_dir_all(&obj_dir).await.dot()?;
+    }
+    fs::create_dir_all(&staging).await.dot()?;
+    fs::create_dir_all(&obj_dir).await.dot()?;
+    copy_bundle_payload(dist, &staging).await?;
+
+    let product_name = installer_product_name(&proj.name);
+    let version = msi_version(&proj.bin.version);
+    let manufacturer = xml_escape(&installer_publisher());
+    let upgrade_code = deterministic_guid(&format!("glory:{}:{}", proj.name, proj.bin.name));
+    let product_wxs = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product Id="*" Name="{product_name}" Language="1033" Version="{version}" Manufacturer="{manufacturer}" UpgradeCode="{upgrade_code}">
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of {product_name} is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <Feature Id="DefaultFeature" Title="{product_name}" Level="1">
+      <ComponentGroupRef Id="AppFiles" />
+    </Feature>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="INSTALLFOLDER" Name="{product_name}" />
+      </Directory>
+    </Directory>
+  </Product>
+</Wix>
+"#
+    );
+    fs::write(out_dir.join("product.wxs"), product_wxs).await.dot()?;
+
+    let msi_name = format!("{}_{}_x64.msi", package_file_stem(&proj.name), version);
+    fs::write(
+        out_dir.join("build-msi.ps1"),
+        format!(
+            r#"$ErrorActionPreference = "Stop"
+$Here = Split-Path -Parent $MyInvocation.MyCommand.Path
+$WixBin = $env:WIX_BIN
+if ($WixBin) {{
+  $Heat = Join-Path $WixBin "heat.exe"
+  $Candle = Join-Path $WixBin "candle.exe"
+  $Light = Join-Path $WixBin "light.exe"
+}} else {{
+  $Heat = "heat.exe"
+  $Candle = "candle.exe"
+  $Light = "light.exe"
+}}
+& $Heat dir (Join-Path $Here "staging") -cg AppFiles -dr INSTALLFOLDER -srd -gg -sfrag -out (Join-Path $Here "app-files.wxs")
+& $Candle (Join-Path $Here "product.wxs") (Join-Path $Here "app-files.wxs") -out (Join-Path $Here "obj\")
+& $Light (Join-Path $Here "obj\product.wixobj") (Join-Path $Here "obj\app-files.wixobj") -out (Join-Path $Here "{msi_name}")
+"#
+        ),
+    )
+    .await
+    .dot()?;
+
+    let Some((heat, candle, light)) = wix_tools() else {
+        log::warn!(
+            "WiX toolset not found; wrote MSI sources and build-msi.ps1 under {}",
+            GRAY.paint(out_dir.as_str())
+        );
+        return Ok(());
+    };
+
+    let app_files = out_dir.join("app-files.wxs");
+    let mut heat_cmd = Command::new(heat);
+    heat_cmd
+        .args([
+            "dir",
+            staging.as_str(),
+            "-cg",
+            "AppFiles",
+            "-dr",
+            "INSTALLFOLDER",
+            "-srd",
+            "-gg",
+            "-sfrag",
+            "-out",
+        ])
+        .arg(app_files.as_str());
+    run_checked("WiX heat", heat_cmd).await?;
+
+    let mut candle_cmd = Command::new(candle);
+    candle_cmd
+        .arg(out_dir.join("product.wxs").as_str())
+        .arg(app_files.as_str())
+        .arg("-out")
+        .arg(obj_dir.join("").as_str());
+    run_checked("WiX candle", candle_cmd).await?;
+
+    let mut light_cmd = Command::new(light);
+    light_cmd
+        .arg(obj_dir.join("product.wixobj").as_str())
+        .arg(obj_dir.join("app-files.wixobj").as_str())
+        .arg("-out")
+        .arg(out_dir.join(msi_name).as_str());
+    run_checked("WiX light", light_cmd).await
+}
+
+async fn write_linux_deb(proj: &Project, dist: &Utf8Path) -> Result<()> {
+    let package = debian_package_name(&proj.name);
+    let version = proj.bin.version.clone();
+    let arch = debian_arch();
+    let out_dir = dist.join("installers/linux");
+    fs::create_dir_all(&out_dir).await.dot()?;
+
+    let data_tar = build_deb_data_tar(proj, dist, &package)?;
+    let installed_size = (data_tar.len() as u64).div_ceil(1024).max(1);
+    let control_tar = build_deb_control_tar(proj, &package, &version, arch, installed_size)?;
+    let deb_path = out_dir.join(format!("{package}_{version}_{arch}.deb"));
+    write_deb_archive(&deb_path, &control_tar, &data_tar)?;
     Ok(())
 }
 
@@ -470,6 +610,222 @@ async fn copy_server_binary(proj: &Project, dist: &Utf8Path) -> Result<()> {
     Ok(())
 }
 
+async fn copy_bundle_payload(dist: &Utf8Path, dest: &Utf8Path) -> Result<()> {
+    for file in collect_files(dist)? {
+        let rel = file.strip_prefix(dist)?;
+        if is_installer_path(rel) {
+            continue;
+        }
+        let to = dest.join(rel);
+        if let Some(parent) = to.parent() {
+            fs::create_dir_all(parent).await.dot()?;
+        }
+        fs::copy(&file, &to).await.dot()?;
+    }
+    Ok(())
+}
+
+fn is_installer_path(path: &Utf8Path) -> bool {
+    path.iter().next() == Some("installers")
+}
+
+fn wix_tools() -> Option<(std::path::PathBuf, std::path::PathBuf, std::path::PathBuf)> {
+    if let Ok(bin) = env::var("WIX_BIN") {
+        let dir = std::path::PathBuf::from(bin);
+        let heat = dir.join("heat.exe");
+        let candle = dir.join("candle.exe");
+        let light = dir.join("light.exe");
+        if heat.exists() && candle.exists() && light.exists() {
+            return Some((heat, candle, light));
+        }
+    }
+
+    let heat = which::which("heat.exe").or_else(|_| which::which("heat")).ok()?;
+    let candle = which::which("candle.exe").or_else(|_| which::which("candle")).ok()?;
+    let light = which::which("light.exe").or_else(|_| which::which("light")).ok()?;
+    Some((heat, candle, light))
+}
+
+fn build_deb_data_tar(proj: &Project, dist: &Utf8Path, package: &str) -> Result<Vec<u8>> {
+    let encoder = GzEncoder::new(Vec::new(), flate2::Compression::default());
+    let mut builder = tar::Builder::new(encoder);
+    let exe_name = proj
+        .bin
+        .exe_file
+        .file_name()
+        .ok_or_else(|| anyhow!("desktop executable path has no file name: {}", proj.bin.exe_file))?;
+    let lib_root = format!("usr/lib/{package}");
+
+    for file in collect_files(dist)? {
+        let rel = file.strip_prefix(dist)?;
+        if is_installer_path(rel) {
+            continue;
+        }
+        let path = format!("{lib_root}/{}", rel.as_str().replace('\\', "/"));
+        let mode = if rel.file_name() == Some(exe_name) { 0o755 } else { 0o644 };
+        append_tar_file(&mut builder, &file, &path, mode)?;
+    }
+
+    append_tar_bytes(
+        &mut builder,
+        &format!("usr/share/applications/{package}.desktop"),
+        desktop_entry(proj, package, exe_name).as_bytes(),
+        0o644,
+    )?;
+    append_tar_symlink(&mut builder, &format!("usr/bin/{package}"), &format!("../lib/{package}/{exe_name}"))?;
+
+    let encoder = builder.into_inner()?;
+    Ok(encoder.finish()?)
+}
+
+fn build_deb_control_tar(proj: &Project, package: &str, version: &str, arch: &str, installed_size: u64) -> Result<Vec<u8>> {
+    let encoder = GzEncoder::new(Vec::new(), flate2::Compression::default());
+    let mut builder = tar::Builder::new(encoder);
+    let control = format!(
+        "Package: {package}\nVersion: {version}\nSection: utils\nPriority: optional\nArchitecture: {arch}\nMaintainer: {maintainer}\nInstalled-Size: {installed_size}\nDescription: {description}\n",
+        maintainer = installer_publisher(),
+        description = debian_single_line(&format!("{} desktop application", proj.name)),
+    );
+    append_tar_bytes(&mut builder, "control", control.as_bytes(), 0o644)?;
+    let encoder = builder.into_inner()?;
+    Ok(encoder.finish()?)
+}
+
+fn append_tar_file<W: Write>(builder: &mut tar::Builder<W>, source: &Utf8Path, path: &str, mode: u32) -> Result<()> {
+    let data = std::fs::read(source)?;
+    append_tar_bytes(builder, path, &data, mode)
+}
+
+fn append_tar_bytes<W: Write>(builder: &mut tar::Builder<W>, path: &str, data: &[u8], mode: u32) -> Result<()> {
+    let mut header = tar::Header::new_gnu();
+    header.set_path(path)?;
+    header.set_size(data.len() as u64);
+    header.set_mode(mode);
+    header.set_mtime(0);
+    header.set_uid(0);
+    header.set_gid(0);
+    header.set_cksum();
+    builder.append(&header, Cursor::new(data))?;
+    Ok(())
+}
+
+fn append_tar_symlink<W: Write>(builder: &mut tar::Builder<W>, path: &str, target: &str) -> Result<()> {
+    let mut header = tar::Header::new_gnu();
+    header.set_entry_type(tar::EntryType::Symlink);
+    header.set_path(path)?;
+    header.set_link_name(target)?;
+    header.set_size(0);
+    header.set_mode(0o777);
+    header.set_mtime(0);
+    header.set_uid(0);
+    header.set_gid(0);
+    header.set_cksum();
+    builder.append(&header, Cursor::new(Vec::<u8>::new()))?;
+    Ok(())
+}
+
+fn write_deb_archive(path: &Utf8Path, control_tar: &[u8], data_tar: &[u8]) -> Result<()> {
+    let mut file = File::create(path)?;
+    file.write_all(b"!<arch>\n")?;
+    write_ar_member(&mut file, "debian-binary", b"2.0\n")?;
+    write_ar_member(&mut file, "control.tar.gz", control_tar)?;
+    write_ar_member(&mut file, "data.tar.gz", data_tar)?;
+    Ok(())
+}
+
+fn write_ar_member(writer: &mut impl Write, name: &str, data: &[u8]) -> Result<()> {
+    let name = format!("{name}/");
+    let header = format!("{:<16}{:<12}{:<6}{:<6}{:<8o}{:<10}`\n", name, 0, 0, 0, 0o100644, data.len());
+    writer.write_all(header.as_bytes())?;
+    writer.write_all(data)?;
+    if data.len() % 2 == 1 {
+        writer.write_all(b"\n")?;
+    }
+    Ok(())
+}
+
+fn desktop_entry(proj: &Project, package: &str, exe_name: &str) -> String {
+    format!(
+        "[Desktop Entry]\nType=Application\nName={}\nExec=/usr/lib/{package}/{exe_name}\nTerminal=false\nCategories=Utility;\n",
+        desktop_value(&installer_product_name(&proj.name)),
+    )
+}
+
+fn msi_version(version: &str) -> String {
+    semver::Version::parse(version)
+        .map(|version| format!("{}.{}.{}", version.major, version.minor, version.patch))
+        .unwrap_or_else(|_| "0.0.0".to_owned())
+}
+
+fn debian_arch() -> &'static str {
+    match env::consts::ARCH {
+        "x86_64" => "amd64",
+        "aarch64" => "arm64",
+        "arm" => "armhf",
+        "x86" | "i686" => "i386",
+        _ => "all",
+    }
+}
+
+fn debian_package_name(name: &str) -> String {
+    let mut out = String::new();
+    let mut last_dash = false;
+    for ch in name.chars().flat_map(|ch| ch.to_lowercase()) {
+        if ch.is_ascii_alphanumeric() || matches!(ch, '+' | '.') {
+            out.push(ch);
+            last_dash = false;
+        } else if !last_dash {
+            out.push('-');
+            last_dash = true;
+        }
+    }
+    let out = out.trim_matches('-').to_owned();
+    if out.is_empty() { "glory-app".to_owned() } else { out }
+}
+
+fn package_file_stem(name: &str) -> String {
+    debian_package_name(name).replace(['+', '.'], "-")
+}
+
+fn installer_product_name(name: &str) -> String {
+    let product = pascal_case(name);
+    if product.is_empty() { "GloryApp".to_owned() } else { product }
+}
+
+fn installer_publisher() -> String {
+    env::var("GLORY_BUNDLE_PUBLISHER").unwrap_or_else(|_| "Glory".to_owned())
+}
+
+fn debian_single_line(value: &str) -> String {
+    value.replace(['\r', '\n'], " ")
+}
+
+fn desktop_value(value: &str) -> String {
+    value.replace(['\r', '\n'], " ")
+}
+
+fn xml_escape(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
+}
+
+fn deterministic_guid(input: &str) -> String {
+    let a = seahash::hash(input.as_bytes());
+    let b = seahash::hash(format!("{input}:glory").as_bytes());
+    format!(
+        "{:08x}-{:04x}-{:04x}-{:04x}-{:012x}",
+        (a >> 32) as u32,
+        (a >> 16) as u16,
+        a as u16,
+        (b >> 48) as u16,
+        b & 0x0000_ffff_ffff_ffff
+    )
+}
+
 async fn write_manifest(proj: &Project, dist: &Utf8Path) -> Result<()> {
     let files = bundle_files(dist).await?;
     let manifest = serde_json::json!({
@@ -527,18 +883,24 @@ fn write_brotli(path: &Utf8Path, data: &[u8]) -> Result<()> {
 async fn bundle_files(dist: &Utf8Path) -> Result<Vec<BundleFile>> {
     let mut files = Vec::new();
     for file in collect_files(dist)? {
-        if file.file_name() == Some("glory-bundle.json") {
+        let rel = file.strip_prefix(dist)?;
+        if file.file_name() == Some("glory-bundle.json") || is_manifest_excluded(rel) {
             continue;
         }
         let data = fs::read(&file).await?;
         files.push(BundleFile {
-            path: file.strip_prefix(dist)?.as_str().replace('\\', "/"),
+            path: rel.as_str().replace('\\', "/"),
             bytes: data.len() as u64,
             seahash: format!("{:016x}", seahash::hash(&data)),
         });
     }
     files.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(files)
+}
+
+fn is_manifest_excluded(path: &Utf8Path) -> bool {
+    let parts = path.iter().take(3).collect::<Vec<_>>();
+    matches!(parts.as_slice(), ["installers", "windows", "staging" | "obj"])
 }
 
 fn collect_files(root: &Utf8Path) -> Result<Vec<Utf8PathBuf>> {
@@ -681,6 +1043,25 @@ mod tests {
         for path in ["app.wasm.gz", "app.wasm.br", "image.png", "font.woff2"] {
             assert!(!should_precompress(Utf8Path::new(path)), "{path}");
         }
+    }
+
+    #[test]
+    fn desktop_installer_names_are_platform_friendly() {
+        assert_eq!(debian_package_name("My Desktop_App"), "my-desktop-app");
+        assert_eq!(debian_package_name("Glory++"), "glory++");
+        assert_eq!(package_file_stem("Glory.App++"), "glory-app--");
+        assert_eq!(installer_product_name("my-desktop_app"), "MyDesktopApp");
+        assert_eq!(msi_version("1.2.3-beta.1"), "1.2.3");
+        assert_eq!(msi_version("not-semver"), "0.0.0");
+    }
+
+    #[test]
+    fn ar_member_writer_pads_odd_sized_members() {
+        let mut out = Vec::new();
+        write_ar_member(&mut out, "data.tar.gz", b"abc").unwrap();
+        assert_eq!(out.len(), 64);
+        assert_eq!(&out[0..12], b"data.tar.gz/");
+        assert_eq!(&out[60..], b"abc\n");
     }
 
     #[test]

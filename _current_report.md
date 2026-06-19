@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 32 |
+| 已完成 `[x]` | 33 |
 | 部分完成 `[~]` | 3 |
-| 未完成 `[ ]` | 25 |
+| 未完成 `[ ]` | 24 |
 
 按能力权重估算:
 
@@ -33,7 +33,7 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 | command-stream 渲染抽象 | 75-85% |
 | CSR + SSR 基础使用 | 65-75% |
 | server functions | 55-65% |
-| CLI / bundle / dev server | 45-60% |
+| CLI / bundle / dev server | 55-65% |
 | desktop webview | 60-70% |
 | routing | 35-45% |
 | native Blitz / mobile / LiveView | 20-35% |
@@ -276,13 +276,14 @@ serverfn 基础可用，但对比成熟框架还缺:
 - `ServeOpts` 已有 `--no-reload`、`--address`、`--port`、`--open`、`--no-open`、
   `--https`、`--tls-cert/--tls-key`、重复 `--proxy PATH=URL`。
 - `serve` 命令只是 build 后 spawn server。
-- `Bundle` 已有 manifest 和压缩资产处理，但平台矩阵和 installer 仍不足。
+- `Bundle` 已有 manifest、压缩资产处理、Android/iOS host packaging、Windows WiX
+  MSI staging/optional build,以及 Linux `.deb` 生成。
 
 缺口:
 
 - CLI 已支持 HTTPS/TLS/proxy 配置透传；实际 TLS 监听和 proxy forwarding 仍由应用
   server 实现。
-- desktop installer，例如 MSI/DMG/DEB/AppImage。
+- desktop installer 仍缺 macOS DMG/AppImage、签名、公证和 WiX 自动下载。
 
 主要路径:
 

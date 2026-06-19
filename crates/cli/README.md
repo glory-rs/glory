@@ -118,6 +118,9 @@ it. A project with **no** glory metadata works too, as long as you supply at lea
 - `bundle --target android|ios` drives the generated Gradle/XcodeGen host
   projects and collects APKs, `.app` bundles, optional archives, and install/run
   helper scripts under `dist/<project>/`.
+- `bundle --target desktop` collects the executable/assets and writes native
+  installer artifacts: WiX MSI sources/scripts on Windows, with automatic MSI
+  output when WiX is installed, and `.deb` packages on Linux.
 - 'no_downloads' feature to allow user management of optional dependencies
   <br/>
 

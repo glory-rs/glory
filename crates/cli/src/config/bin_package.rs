@@ -13,6 +13,7 @@ use super::{Profile, ProjectConfig, cli::BuildTarget, project::ProjectDefinition
 
 pub struct BinPackage {
     pub name: String,
+    pub version: String,
     pub abs_dir: Utf8PathBuf,
     pub rel_dir: Utf8PathBuf,
     pub exe_file: Utf8PathBuf,
@@ -99,6 +100,7 @@ impl BinPackage {
         }
         Ok(Self {
             name,
+            version: package.version.to_string(),
             abs_dir,
             rel_dir,
             exe_file,
