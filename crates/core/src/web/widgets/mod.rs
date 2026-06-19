@@ -255,6 +255,15 @@ macro_rules! generate_tags {
                     {
                         self.0.show_in(parent)
                     }
+                    fn fill_in(self, parent: &mut Scope)
+                    where
+                        Self: Sized,
+                    {
+                        self.0.fill_in(parent)
+                    }
+                    fn can_fill_compact(&self) -> bool {
+                        self.0.can_fill_compact()
+                    }
 
                     fn mount_to(self, ctx: Scope, parent_node: &Node) -> ViewId
                     where
@@ -274,7 +283,7 @@ macro_rules! generate_tags {
                         self.0.build(ctx)
                     }
                     fn flood(&mut self, ctx: &mut Scope) {
-                        self.0.build(ctx)
+                        self.0.flood(ctx)
                     }
                     fn patch(&mut self, ctx: &mut Scope) {
                         self.0.patch(ctx)

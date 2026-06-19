@@ -162,6 +162,20 @@ Glory now matches the official create10k total time and is faster on paint in
 this focused run. The remaining script-only gap is about 8.6 ms and is tied to
 the per-row reactive scope/static-subtree overhead tracked under E9.
 
+E9 added automatic CSR compact-fill for ordinary builder element wrappers:
+fresh CSR mounts now keep non-hydrated, self-static elements as native DOM
+instead of allocating a View for each wrapper, while reactive/listener nodes
+remain normal Views and dynamic descendants keep their fixed native parent.
+The same focused command was rerun after that change:
+
+| Benchmark | Framework | Samples | Total median | Total range | Script median | Script range | Paint median | Paint range |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `07_create10k` | dioxus-rs v0.7 keyed | 5 | 326.0 | 26.3 | 69.3 | 5.4 | 252.3 | 20.4 |
+| `07_create10k` | glory-rs local keyed | 5 | 330.4 | 34.1 | 73.8 | 13.7 | 244.0 | 21.2 |
+
+The script gap narrowed to about 4.5 ms in this run; total time remains close
+and is sensitive to paint variance.
+
 ## Local Benchmark Report
 
 Use this wrapper to generate a repeatable local bundle:

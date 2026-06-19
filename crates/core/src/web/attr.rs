@@ -15,6 +15,9 @@ use crate::reflow::{Bond, Cage, Revisable};
 pub trait AttrValue: fmt::Debug {
     fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool);
     fn to_string(&self) -> Option<String>;
+    fn is_static(&self) -> bool {
+        true
+    }
 }
 
 impl<T> AttrValue for Cage<T>
@@ -32,6 +35,9 @@ where
     fn to_string(&self) -> Option<String> {
         (*self.get_untracked()).to_string()
     }
+    fn is_static(&self) -> bool {
+        false
+    }
 }
 impl<T> AttrValue for Bond<T>
 where
@@ -47,6 +53,9 @@ where
     }
     fn to_string(&self) -> Option<String> {
         (*self.get_untracked()).to_string()
+    }
+    fn is_static(&self) -> bool {
+        false
     }
 }
 

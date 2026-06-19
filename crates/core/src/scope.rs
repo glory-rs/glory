@@ -85,11 +85,15 @@ pub struct Scope {
     pub(crate) placement: ViewPlacement,
 
     pub(crate) parent_node: Option<Node>,
+    #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+    pub(crate) fixed_parent_node: Option<Node>,
     pub(crate) render_node: Option<Node>,
     pub(crate) first_child_node: Option<Node>,
     pub(crate) last_child_node: Option<Node>,
     pub(crate) error_boundary: Option<ViewId>,
     pub(crate) suspense_boundary: Option<SuspenseBoundary>,
+    #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+    compact_fill_allowed: bool,
 
     next_child_view_id: AtomicU64,
 
@@ -111,11 +115,15 @@ impl Scope {
             placement: ViewPlacement::Tail,
 
             parent_node: None,
+            #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+            fixed_parent_node: None,
             render_node: None,
             first_child_node: None,
             last_child_node: None,
             error_boundary: None,
             suspense_boundary: None,
+            #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+            compact_fill_allowed: false,
 
             next_child_view_id: AtomicU64::new(0),
             truck,
@@ -136,11 +144,15 @@ impl Scope {
             placement: ViewPlacement::Tail,
 
             parent_node: None,
+            #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+            fixed_parent_node: None,
             render_node: None,
             first_child_node: None,
             last_child_node: None,
             error_boundary: None,
             suspense_boundary: None,
+            #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+            compact_fill_allowed: false,
 
             next_child_view_id: AtomicU64::new(0),
             truck,
@@ -187,6 +199,16 @@ impl Scope {
     }
     pub fn owner(&self) -> &reflow::Owner {
         &self.owner
+    }
+
+    #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+    pub(crate) fn compact_fill_allowed(&self) -> bool {
+        self.compact_fill_allowed
+    }
+
+    #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+    pub(crate) fn set_compact_fill_allowed(&mut self, allowed: bool) -> bool {
+        std::mem::replace(&mut self.compact_fill_allowed, allowed)
     }
 
     pub fn cage<T>(&self, value: T) -> reflow::Cage<T>
@@ -269,13 +291,23 @@ impl Scope {
             return;
         }
 
+        #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+        let target_parent_node = view.scope.fixed_parent_node.clone().or_else(|| self.render_node.clone());
+        #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
+        let target_parent_node = self.render_node.clone();
+
         let mut placement = ViewPlacement::Unset;
         if view.scope.placement == ViewPlacement::Unset {
             let index = self.child_views.get_index_of(view_id).unwrap();
             if index > 0 {
                 for i in (0..index).rev() {
                     let (_, prev_view) = self.child_views.get_index(i).unwrap();
-                    if prev_view.scope.is_attached()
+                    #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+                    let same_parent = prev_view.scope.fixed_parent_node.as_ref().or(self.render_node.as_ref()) == target_parent_node.as_ref();
+                    #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
+                    let same_parent = true;
+                    if same_parent
+                        && prev_view.scope.is_attached()
                         && let Some(prev_node) = prev_view.last_child_node()
                     {
                         placement = ViewPlacement::After(prev_node.clone());
@@ -286,7 +318,12 @@ impl Scope {
             if placement == ViewPlacement::Unset {
                 for i in (index + 1)..self.child_views.len() {
                     let (_, next_view) = self.child_views.get_index(i).unwrap();
-                    if next_view.scope.is_attached()
+                    #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+                    let same_parent = next_view.scope.fixed_parent_node.as_ref().or(self.render_node.as_ref()) == target_parent_node.as_ref();
+                    #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
+                    let same_parent = true;
+                    if same_parent
+                        && next_view.scope.is_attached()
                         && let Some(next_node) = next_view.last_child_node()
                     {
                         placement = ViewPlacement::Before(next_node.clone());
@@ -296,7 +333,11 @@ impl Scope {
             }
         }
         if placement == ViewPlacement::Unset {
-            if self.parent_node == view.scope.parent_node {
+            #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+            let current_parent_node = view.scope.fixed_parent_node.as_ref().or(view.scope.parent_node.as_ref());
+            #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
+            let current_parent_node = view.scope.parent_node.as_ref();
+            if self.parent_node.as_ref() == current_parent_node {
                 placement = self.placement.clone();
             } else {
                 placement = ViewPlacement::Tail;
@@ -308,10 +349,10 @@ impl Scope {
             view.scope.placement = placement;
         }
 
-        view.scope.parent_node = self.render_node.clone();
+        view.scope.parent_node = target_parent_node.clone();
         debug_assert!(view.scope.parent_node.is_some(), "view.scope.parent_node should not None");
         if view.scope.render_node.is_none() {
-            view.scope.render_node = self.render_node.clone();
+            view.scope.render_node = target_parent_node;
         }
         debug_assert!(view.scope.render_node.is_some(), "view.scope.render_node should not None");
 

@@ -27,7 +27,9 @@
 
 性能:官方 js-framework-benchmark 9 项聚合 Glory 442ms vs Dioxus 456ms vs Leptos 589ms;
 E12 后聚焦 `07_create10k` Count=5 为 Glory 319.8ms total vs Dioxus 328.9ms
-total(script 仍为 80.3ms vs 71.7ms)。架构层面已无硬性差距,余下是产品化。
+total。E9 后重跑为 Glory 330.4ms total / 73.8ms script vs Dioxus 326.0ms
+total / 69.3ms script,script 残差收窄到约 4.5ms。架构层面已无硬性差距,
+余下是产品化。
 
 ---
 
@@ -318,9 +320,12 @@ R5 仅评估,不阻塞任何人。
 
 ## Lane E — 性能与基准(接续 _improve_todos.md E9/E10/E11)
 
-- [~] **E9 P0** 普通 builder 元素子树的自动分配压缩。`DomSubtree` 已验证收益
-  (benchmark 行从完整 view 树坍缩为单 view + 原生子节点),余下是让普通
-  `div().child(...)` 静态子树内部自动走紧凑模式,不破坏公开 API。
+- [x] **E9 P0** 普通 builder 元素子树的自动分配压缩。CSR fresh mount 现在
+  会把普通 builder 中自身静态(无 reactive attr/class/prop、无 listener)的元素
+  wrapper 直接挂为原生 DOM,并允许其动态后代通过固定父节点继续作为正常 View
+  挂载;hydration 与 SSR 路径保持 View 语义。`BrowserHolder` 同步修正为仅在
+  页面存在 `[gly-id]` 时进入 hydration,避免纯 CSR 挂载禁用压缩。回归覆盖:
+  wasm CSR smoke 编译 + compact wrapper/dynamic child 父节点与 click 行为测试。
 - [x] **E10 P1** 稳定多样本基准对比:扩展
   `benchmarks/official-js-framework-benchmark.ps1`,保留命名基线、Glory-only A/B、
   `Count>=5` 中位数/极差表。**应先于 E9/E11 的验收**(否则小优化无法接受/拒绝)。
@@ -333,7 +338,9 @@ R5 仅评估,不阻塞任何人。
   state 写回/Vec move,并缓存 CSR delegated click key/注册 fast path。官方
   `07_create10k` Count=5 headless/no-throttling:Glory 319.8ms total vs Dioxus
   328.9ms total;script 仍有小差距(80.3ms vs 71.7ms),但 paint 更快且总时间
-  已追平。后续 script-only 残差并入 E9 的普通 builder 静态子树自动压缩。
+  已追平。E9 后同命令重跑:Glory 330.4ms total / 73.8ms script vs Dioxus
+  326.0ms total / 69.3ms script,script-only 残差收窄但总时间仍受浏览器 paint
+  波动影响。
 
 并行性:E10 先行;E9/E11/E12 随后并行,均以 E10 的报告为验收标准。
 

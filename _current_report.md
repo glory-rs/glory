@@ -21,8 +21,8 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 55 |
-| 部分完成 `[~]` | 3 |
+| 已完成 `[x]` | 56 |
+| 部分完成 `[~]` | 2 |
 | 未完成 `[ ]` | 0 |
 
 按能力权重估算:
@@ -195,12 +195,15 @@ E11 当前结论:10k 同 DOM 构建中 click handler 注册约把本机短样本
 3.43ms 提到 4.40ms;10k handler registry 的最后一行 dispatch lookup/restore
 约 107ns。create10k 的后续优化应优先看批量 DOM command 数和浏览器侧 apply 成本。
 
-E12 当前结论:`benchmarks/glory` 已把数据生成改为批量 RNG/next-id 写回并避免
+E12/E9 当前结论:`benchmarks/glory` 已把数据生成改为批量 RNG/next-id 写回并避免
 `Vec<Row>` clone,CSR delegated click 注册也走缓存 key + click fast path。官方
 `07_create10k` Count=5(`-Headless -NoThrottling`)结果为 Glory 319.8ms total /
 80.3ms script / 241.2ms paint,Dioxus 328.9ms total / 71.7ms script /
-253.9ms paint。总时间已追平并略快;script-only 残差约 8.6ms,后续归入 E9 的普通
-builder 静态子树压缩。
+253.9ms paint。随后 E9 新增 CSR 普通 builder 静态 wrapper 自动压缩:纯 CSR
+fresh mount 不再误进 hydration,自身静态的元素直接挂为原生 DOM;动态后代仍以
+View 形式挂到固定父节点。E9 后同命令重跑为 Glory 330.4ms total / 73.8ms
+script / 244.0ms paint,Dioxus 326.0ms total / 69.3ms script / 252.3ms paint。
+script-only 残差收窄到约 4.5ms,总时间仍在浏览器 paint 波动范围内。
 
 ### Server Functions
 
@@ -470,7 +473,8 @@ cargo clippy -p glory-cli --lib --no-default-features -- -D warnings
 
 未验证:
 
-- wasm32 CSR browser test。
+- wasm32 CSR browser test 实际运行(当前 Windows 未配置 wasm-bindgen test runner;
+  wasm CSR test 已可编译)。
 - Playwright router/fullstack/hot-reload 真浏览器 e2e。
 - examples 全量 build/run。
 - mobile device/emulator。

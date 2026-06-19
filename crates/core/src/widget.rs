@@ -93,6 +93,14 @@ pub trait Widget: fmt::Debug + 'static {
         Self: Sized,
     {
         let view = View::new(parent.beget(), self);
+        #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+        let view = {
+            let mut view = view;
+            if parent.compact_fill_allowed() {
+                view.scope.fixed_parent_node = parent.render_node.clone();
+            }
+            view
+        };
         let view_id = view.id.clone();
         parent.child_views.insert(view.id.clone(), view);
         view_id
@@ -107,6 +115,15 @@ pub trait Widget: fmt::Debug + 'static {
             parent.attach_child(&view_id);
         }
         view_id
+    }
+    fn fill_in(self, parent: &mut Scope)
+    where
+        Self: Sized,
+    {
+        self.show_in(parent);
+    }
+    fn can_fill_compact(&self) -> bool {
+        false
     }
 
     fn mount_to(self, ctx: Scope, parent_node: &Node) -> ViewId
@@ -230,7 +247,7 @@ where
     fn into_filler(self) -> Filler {
         Filler::new(move |ctx: &mut Scope| {
             for w in self {
-                w.show_in(ctx);
+                w.fill_in(ctx);
             }
         })
     }
@@ -241,7 +258,7 @@ where
 {
     fn into_filler(self) -> Filler {
         Filler::new(move |ctx: &mut Scope| {
-            self.show_in(ctx);
+            self.fill_in(ctx);
         })
     }
 }
@@ -253,7 +270,7 @@ where
     fn into_filler(self) -> Filler {
         if let Some(widget) = self {
             Filler::new(move |ctx: &mut Scope| {
-                widget.show_in(ctx);
+                widget.fill_in(ctx);
             })
         } else {
             Filler::new(|_| {})

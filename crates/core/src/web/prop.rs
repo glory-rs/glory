@@ -9,6 +9,9 @@ use crate::reflow::{Bond, Cage, Lotus, Revisable};
 
 pub trait PropValue: fmt::Debug {
     fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool);
+    fn is_static(&self) -> bool {
+        true
+    }
 }
 
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
@@ -58,6 +61,9 @@ where
             self.bind_view(view_id);
         }
     }
+    fn is_static(&self) -> bool {
+        false
+    }
 }
 
 impl<T> PropValue for Bond<T>
@@ -72,6 +78,9 @@ where
             self.bind_view(view_id);
         }
     }
+    fn is_static(&self) -> bool {
+        false
+    }
 }
 
 impl<T> PropValue for Lotus<T>
@@ -85,6 +94,9 @@ where
         if first_time {
             self.bind_view(view_id);
         }
+    }
+    fn is_static(&self) -> bool {
+        false
     }
 }
 

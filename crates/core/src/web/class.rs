@@ -26,6 +26,10 @@ impl Classes {
         self.parts.iter().filter_map(|part| part.to_string()).collect()
     }
 
+    pub fn is_static(&self) -> bool {
+        self.parts.iter().all(|part| part.is_static())
+    }
+
     #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
     pub fn to_array(&self) -> js_sys::Array {
         FromIterator::from_iter(self.raw_parts().iter().map(|v| JsValue::from_str(v)))
@@ -82,12 +86,18 @@ impl AttrValue for Classes {
         }
         Some(value)
     }
+    fn is_static(&self) -> bool {
+        Classes::is_static(self)
+    }
 }
 
 pub trait ClassPart: fmt::Debug {
     fn bind_view(&self, _view_id: &ViewId) {}
     fn is_revising(&self) -> bool {
         false
+    }
+    fn is_static(&self) -> bool {
+        true
     }
     fn to_string(&self) -> Option<String>;
 }
@@ -101,6 +111,9 @@ where
     }
     fn is_revising(&self) -> bool {
         Revisable::is_revising(self)
+    }
+    fn is_static(&self) -> bool {
+        false
     }
     fn to_string(&self) -> Option<String> {
         (*self.get()).to_string()
@@ -116,6 +129,9 @@ where
     fn is_revising(&self) -> bool {
         Revisable::is_revising(self)
     }
+    fn is_static(&self) -> bool {
+        false
+    }
     fn to_string(&self) -> Option<String> {
         (*self.get()).to_string()
     }
@@ -129,6 +145,9 @@ where
     }
     fn is_revising(&self) -> bool {
         Revisable::is_revising(self)
+    }
+    fn is_static(&self) -> bool {
+        false
     }
     fn to_string(&self) -> Option<String> {
         (*self.get()).to_string()

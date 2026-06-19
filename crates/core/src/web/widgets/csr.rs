@@ -101,9 +101,11 @@ where
         ctx.last_child_node = Some(node.clone());
 
         let fillers = std::mem::take(&mut self.fillers);
+        let compact_fill_allowed = ctx.set_compact_fill_allowed(true);
         for filler in fillers {
             filler.fill(ctx);
         }
+        ctx.set_compact_fill_allowed(compact_fill_allowed);
         for (name, value) in &self.props {
             value.inject_to(&ctx.view_id, &mut node.clone(), name, true);
         }
@@ -115,6 +117,19 @@ where
         for listener in std::mem::take(&mut self.listeners) {
             (listener)(&self.node);
         }
+    }
+    fn fill_in(self, parent: &mut Scope)
+    where
+        Self: Sized,
+    {
+        if parent.compact_fill_allowed() && self.can_fill_compact() {
+            self.fill_compact(parent);
+        } else {
+            self.show_in(parent);
+        }
+    }
+    fn can_fill_compact(&self) -> bool {
+        self.can_compact_fill()
     }
     fn detach(&mut self, ctx: &mut Scope) {
         if let Some(parent_node) = ctx.parent_node.as_ref() {
@@ -307,6 +322,37 @@ where
 
     pub fn node(&self) -> &T {
         &self.node
+    }
+
+    fn can_compact_fill(&self) -> bool {
+        !crate::web::is_hydrating()
+            && self.listeners.is_empty()
+            && self.attrs.values().all(|value| value.is_static())
+            && self.props.values().all(|value| value.is_static())
+            && self.classes.is_static()
+    }
+
+    fn fill_compact(mut self, ctx: &mut Scope) {
+        let parent_node = ctx.render_node.as_ref().unwrap_throw().clone();
+        let node = <T as AsRef<web_sys::Element>>::as_ref(&self.node).clone();
+
+        let previous_render_node = ctx.render_node.replace(node.clone());
+        let compact_fill_allowed = ctx.set_compact_fill_allowed(true);
+        for filler in std::mem::take(&mut self.fillers) {
+            filler.fill(ctx);
+        }
+        ctx.set_compact_fill_allowed(compact_fill_allowed);
+        ctx.render_node = previous_render_node;
+
+        for (name, value) in &self.props {
+            value.inject_to(&ctx.view_id, &mut node.clone(), name, true);
+        }
+        for (name, value) in &self.attrs {
+            value.inject_to(&ctx.view_id, &mut node.clone(), name, true);
+        }
+        self.classes.inject_to(&ctx.view_id, &mut node.clone(), "class", true);
+
+        parent_node.append_child(&node).unwrap_throw();
     }
 
     pub fn add_filler(&mut self, filler: impl IntoFiller) {
