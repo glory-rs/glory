@@ -97,6 +97,14 @@ impl Aviator for MemoryAviator {
         self.push(url.to_owned());
         Ok(())
     }
+
+    fn back(&self) -> Result<bool, NavigationError> {
+        Self::back(self)
+    }
+
+    fn forward(&self) -> Result<bool, NavigationError> {
+        Self::forward(self)
+    }
 }
 
 impl Enabler for MemoryAviator {

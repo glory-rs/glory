@@ -80,9 +80,12 @@ R5 仅评估,不阻塞任何人。
   repeated/default query helpers、query 编码 helper,以及 catch-all encode/split/parse
   helpers;未来 derive/builder 可直接复用。
 - [ ] **T4 P1** 声明式重定向(Dioxus `#[redirect(...)]`)与 404 默认处理。依赖 T1。
-- [ ] **T5 P2** 导航增强:滚动恢复、`GoBack/GoForward` 等价 API。另核查
+- [x] **T5 P2** 导航增强:滚动恢复、`GoBack/GoForward` 等价 API。另核查
   `crates/routing/src/aviators/browser.rs:105` 的 TODO(history state 以 prop 而非
   attribute 存储,部分导航模式可能丢 state)。
+  2026-06-19 已完成: `Aviator` 统一暴露 `back()`/`forward()`,Memory/Browser
+  后端实现对应历史移动;浏览器端保留 hash/top scroll 和 `noscroll` 控制,并修正
+  anchor `state`/`replace` 同时读取属性与 property。
 
 并行性:T1 是本 Lane 关键路径;T3/T5 可与 T1 并行;T2/T4 依赖 T1 设计落定。
 

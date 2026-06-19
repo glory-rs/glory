@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 22 |
+| 已完成 `[x]` | 23 |
 | 部分完成 `[~]` | 5 |
-| 未完成 `[ ]` | 33 |
+| 未完成 `[ ]` | 32 |
 
 按能力权重估算:
 
@@ -244,7 +244,6 @@ desktop runtime 已经是真 wry/tao 宿主，不只是测试 sink。
 - 嵌套布局 / Outlet。
 - redirect。
 - 404 默认处理。
-- scroll restoration / go back / go forward。
 
 主要路径:
 

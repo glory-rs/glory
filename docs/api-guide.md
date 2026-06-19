@@ -216,6 +216,12 @@ impl Routable for AppRoute {
 aviator.goto_route(&AppRoute::User { id: 42 })?;
 ```
 
+`Aviator::back()` and `Aviator::forward()` expose history movement for backends
+that support it. `BrowserAviator` uses `window.history`, while `MemoryAviator`
+keeps an in-memory stack for non-browser hosts. Browser navigation scrolls to a
+hash target or the top of the page by default; use `LocatorModifier::with_scroll(false)`
+or a `noscroll` anchor attribute to leave scroll position alone.
+
 Runnable example:
 
 ```powershell
