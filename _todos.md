@@ -21,7 +21,7 @@
 | 服务器函数 | 仅 POST + JSON;无 HTTP 动词选择、多编码、逐函数中间件、响应式 WebSocket hook | **高** |
 | 异步/错误原语 | 无 Suspense 式自动边界、无 ErrorBoundary;`resource_in` 竞态已修 | **高** |
 | CLI/构建 | wasm-split 暂缓;Windows/Linux 原生安装器已有最小路径,macOS/AppImage/签名仍缺 | **中-高** |
-| 资产 | `asset!` 已有编译期存在性校验;仍缺 hash rewrite、图片优化、CSS Modules、folder 资产宏 | 中 |
+| 资产 | `asset!` / `asset_folder!` 已有编译期清单和 bundle hash 映射;仍缺图片优化、CSS Modules | 中 |
 | 桌面 | 协议扎实,窗口控制 API 已补;仍缺托盘/全局热键/异步自定义协议 | 中 |
 | Native(Blitz)/LiveView/移动端 | 分别处于 spike(~20%)/可用但单适配器(~30%)/模板可编译但无真机验证(~30%) | 中-高 |
 
@@ -190,7 +190,9 @@ R5 仅评估,不阻塞任何人。
   `AssetManifest` 可安装运行时映射,Desktop assets root 会自动读取该 manifest。
 - [ ] **A2 P2** 图片优化管线(PNG/JPEG→WebP,按平台格式),对照 manganis
   `images.rs`。保持默认关闭,作为 bundle 显式选项。依赖 A1 的清单结构。
-- [ ] **A3 P2** folder 资产宏(递归枚举 + 清单),对照 manganis `folder.rs`。
+- [x] **A3 P2** folder 资产宏(递归枚举 + 清单),对照 manganis `folder.rs`:
+  新增 `AssetFolder` 和 `glory::asset_folder!("dir")`,编译期递归枚举文件并为每个
+  文件生成 `include_bytes!` 校验。
 - [ ] **A4 P3** 类型化 CSS Modules(`.module.css` → 类名结构体)。现有运行时
   `ScopedStyle` 已覆盖主场景,此项仅在用户需求出现后做。
 

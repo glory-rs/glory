@@ -23,6 +23,13 @@ pub struct Asset {
     absolute_path: &'static str,
 }
 
+/// A statically enumerated folder of assets.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct AssetFolder {
+    logical_path: &'static str,
+    assets: &'static [Asset],
+}
+
 impl Asset {
     #[doc(hidden)]
     pub const fn from_static(logical_path: &'static str, absolute_path: &'static str) -> Self {
@@ -62,6 +69,39 @@ impl Asset {
         } else {
             format!("{base}{path}")
         }
+    }
+}
+
+impl AssetFolder {
+    #[doc(hidden)]
+    pub const fn from_static(logical_path: &'static str, assets: &'static [Asset]) -> Self {
+        Self { logical_path, assets }
+    }
+
+    /// Folder path exactly as written in `asset_folder!`.
+    pub const fn logical_path(self) -> &'static str {
+        self.logical_path
+    }
+
+    /// Statically enumerated files under this folder, in stable path order.
+    pub const fn assets(self) -> &'static [Asset] {
+        self.assets
+    }
+
+    pub const fn len(self) -> usize {
+        self.assets.len()
+    }
+
+    pub const fn is_empty(self) -> bool {
+        self.assets.is_empty()
+    }
+
+    pub fn iter(self) -> std::slice::Iter<'static, Asset> {
+        self.assets.iter()
+    }
+
+    pub fn get(self, logical_path: &str) -> Option<Asset> {
+        self.assets.iter().copied().find(|asset| asset.logical_path() == logical_path)
     }
 }
 
@@ -128,6 +168,15 @@ impl fmt::Debug for Asset {
             .field("logical_path", &self.logical_path)
             .field("absolute_path", &self.absolute_path)
             .field("public_path", &self.public_path())
+            .finish()
+    }
+}
+
+impl fmt::Debug for AssetFolder {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AssetFolder")
+            .field("logical_path", &self.logical_path)
+            .field("assets", &self.assets)
             .finish()
     }
 }
@@ -230,5 +279,17 @@ mod tests {
 
         assert_eq!(manifest.resolve_public_path("/assets/app.css"), Some("/assets/app.abcdef12.css"));
         assert_eq!(manifest.resolve_public_path("/assets/missing.css"), None);
+    }
+
+    #[test]
+    fn asset_folder_exposes_static_assets() {
+        const ASSET: crate::assets::Asset = crate::assets::Asset::from_static("src/assets.rs", "src/assets.rs");
+        const FOLDER: crate::assets::AssetFolder = crate::assets::AssetFolder::from_static("src", &[ASSET]);
+
+        assert_eq!(FOLDER.logical_path(), "src");
+        assert_eq!(FOLDER.len(), 1);
+        assert_eq!(FOLDER.assets()[0].logical_path(), "src/assets.rs");
+        assert_eq!(FOLDER.get("src/assets.rs"), Some(ASSET));
+        assert_eq!(FOLDER.get("src/missing.rs"), None);
     }
 }

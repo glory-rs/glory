@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 40 |
+| 已完成 `[x]` | 41 |
 | 部分完成 `[~]` | 3 |
-| 未完成 `[ ]` | 17 |
+| 未完成 `[ ]` | 16 |
 
 按能力权重估算:
 
@@ -300,11 +300,11 @@ serverfn 基础可用，但对比成熟框架还缺:
   记录 public path 映射。
 - `AssetManifest` 可解析 bundle manifest 并安装运行时映射;Desktop runtime 会从
   assets root 自动读取 `glory-bundle.json`。
+- `glory::asset_folder!("dir")` 会在编译期递归枚举目录并生成 `AssetFolder` 清单。
 
 缺口:
 
 - 图片优化。
-- folder asset macro。
 - CSS Modules。
 
 ### 5. Desktop API 不完整

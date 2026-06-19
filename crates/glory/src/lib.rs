@@ -14,6 +14,15 @@ mod cfg;
 pub use glory_core::asset;
 #[doc(no_inline)]
 pub use glory_core::*;
+#[doc(hidden)]
+pub use glory_macros::__asset_folder;
+
+#[macro_export]
+macro_rules! asset_folder {
+    ($path:literal) => {
+        $crate::__asset_folder!($crate, $path)
+    };
+}
 
 cfg_feature! {
     #![feature ="routing"]
@@ -90,4 +99,16 @@ where
 #[cfg(all(not(target_arch = "wasm32"), feature = "web-ssr"))]
 pub mod ssr {
     pub use glory_core::web::holders::ServerHolder;
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn asset_folder_macro_enumerates_front_door_sources() {
+        let folder = crate::asset_folder!("src");
+
+        assert!(folder.len() >= 2);
+        assert!(folder.get("src/lib.rs").is_some());
+        assert!(folder.iter().all(|asset| asset.public_path().starts_with("/src/")));
+    }
 }

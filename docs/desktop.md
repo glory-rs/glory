@@ -146,6 +146,11 @@ Declare assets once:
 ```rust
 let logo = glory::asset!("assets/logo.png");
 let src = glory_desktop::asset_url(logo.public_path());
+
+let icons = glory::asset_folder!("assets/icons");
+for icon in icons.assets() {
+    let src = glory_desktop::asset_url(icon.public_path());
+}
 ```
 
 The desktop runtime serves `glory://` URLs from:

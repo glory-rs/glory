@@ -3,8 +3,118 @@
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{format_ident, quote};
+use std::path::{Path, PathBuf};
+use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
-use syn::{Attribute, Data, DeriveInput, Expr, Fields, FnArg, GenericArgument, Ident, ItemFn, LitStr, Pat, Type, parse_macro_input};
+use syn::{Attribute, Data, DeriveInput, Expr, Fields, FnArg, GenericArgument, Ident, ItemFn, LitStr, Pat, Token, Type, parse_macro_input};
+
+struct AssetFolderInput {
+    crate_path: syn::Path,
+    _comma: Token![,],
+    root: LitStr,
+}
+
+impl Parse for AssetFolderInput {
+    fn parse(input: ParseStream<'_>) -> syn::Result<Self> {
+        Ok(Self {
+            crate_path: input.parse()?,
+            _comma: input.parse()?,
+            root: input.parse()?,
+        })
+    }
+}
+
+#[proc_macro]
+#[doc(hidden)]
+pub fn __asset_folder(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as AssetFolderInput);
+    match expand_asset_folder(input) {
+        Ok(tokens) => tokens.into(),
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+
+fn expand_asset_folder(input: AssetFolderInput) -> syn::Result<TokenStream2> {
+    let crate_path = input.crate_path;
+    let root = input.root;
+    let root_value = root.value();
+    let manifest_dir =
+        std::env::var("CARGO_MANIFEST_DIR").map_err(|err| syn::Error::new(root.span(), format!("CARGO_MANIFEST_DIR is unavailable: {err}")))?;
+    let source_root = PathBuf::from(manifest_dir).join(root_value.trim_start_matches('/'));
+    if !source_root.is_dir() {
+        return Err(syn::Error::new(
+            root.span(),
+            format!("asset folder does not exist: {}", source_root.display()),
+        ));
+    }
+
+    let files = collect_folder_files(&source_root)
+        .map_err(|err| syn::Error::new(root.span(), format!("failed to read asset folder {}: {err}", source_root.display())))?;
+    let mut asset_literals = Vec::with_capacity(files.len());
+    for file in files {
+        let relative = file.strip_prefix(&source_root).map_err(|err| {
+            syn::Error::new(
+                root.span(),
+                format!("failed to make asset path relative to {}: {err}", source_root.display()),
+            )
+        })?;
+        let relative = path_to_slash(relative).ok_or_else(|| {
+            syn::Error::new(
+                root.span(),
+                format!("asset path is not valid UTF-8 relative to {}: {}", source_root.display(), file.display()),
+            )
+        })?;
+        let logical = join_logical_asset_path(&root_value, &relative);
+        asset_literals.push(LitStr::new(&logical, root.span()));
+    }
+
+    Ok(quote! {{
+        const _GLORY_ASSET_FOLDER_BYTES: &[&[u8]] = &[
+            #(include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/", #asset_literals))),*
+        ];
+        const _GLORY_ASSET_FOLDER_ASSETS: &[#crate_path::assets::Asset] = &[
+            #(#crate_path::assets::Asset::from_static(
+                #asset_literals,
+                concat!(env!("CARGO_MANIFEST_DIR"), "/", #asset_literals),
+            )),*
+        ];
+        #crate_path::assets::AssetFolder::from_static(#root, _GLORY_ASSET_FOLDER_ASSETS)
+    }})
+}
+
+fn collect_folder_files(root: &Path) -> std::io::Result<Vec<PathBuf>> {
+    let mut files = Vec::new();
+    let mut dirs = vec![root.to_path_buf()];
+    while let Some(dir) = dirs.pop() {
+        let mut entries = std::fs::read_dir(&dir)?.collect::<Result<Vec<_>, _>>()?;
+        entries.sort_by_key(|entry| entry.path());
+        for entry in entries.into_iter().rev() {
+            let path = entry.path();
+            let file_type = entry.file_type()?;
+            if file_type.is_dir() {
+                dirs.push(path);
+            } else if file_type.is_file() {
+                files.push(path);
+            }
+        }
+    }
+    files.sort();
+    Ok(files)
+}
+
+fn path_to_slash(path: &Path) -> Option<String> {
+    Some(path.to_str()?.replace('\\', "/"))
+}
+
+fn join_logical_asset_path(root: &str, relative: &str) -> String {
+    let root = root.replace('\\', "/");
+    let root = root.trim_end_matches('/');
+    if root.is_empty() {
+        relative.to_owned()
+    } else {
+        format!("{root}/{relative}")
+    }
+}
 
 /// Turns an `async fn` into a *server function*: the body runs on the
 /// server, and clients call it transparently over HTTP.
