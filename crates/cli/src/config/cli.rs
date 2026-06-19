@@ -85,7 +85,8 @@ impl Cli {
         use Commands::{Build, Bundle, Check, Clean, Completions, Config, Doctor, EndToEnd, Fmt, New, Run, SelfUpdate, Serve, Test};
         match &self.command {
             New(_) | Fmt(_) | Completions(_) | SelfUpdate => None,
-            Build(opts) | Bundle(opts) | Check(opts) | Test(opts) | EndToEnd(opts) | Doctor(opts) => Some(opts.clone()),
+            Build(opts) | Check(opts) | Test(opts) | EndToEnd(opts) | Doctor(opts) => Some(opts.clone()),
+            Bundle(opts) => Some(opts.opts.clone()),
             Config(opts) => Some(opts.opts.clone()),
             Serve(opts) => Some(opts.opts.clone()),
             Run(opts) => Some(opts.opts.clone()),
@@ -183,6 +184,17 @@ pub struct CleanOpts {
     pub cargo: bool,
 }
 
+/// Extra flags for `bundle`.
+#[derive(Debug, Clone, Parser, PartialEq, Default)]
+pub struct BundleOpts {
+    #[command(flatten)]
+    pub opts: Opts,
+
+    /// Generate WebP copies for PNG/JPEG assets and prefer them in the bundle asset map.
+    #[arg(long)]
+    pub optimize_images: bool,
+}
+
 /// Flags for `config`.
 #[derive(Debug, Clone, Parser, PartialEq, Default)]
 pub struct ConfigOpts {
@@ -227,7 +239,7 @@ pub enum Commands {
     /// Build the server (feature ssr) and the client (wasm with feature csr).
     Build(Opts),
     /// Build in release mode and collect the artifacts into a distributable `dist/` folder.
-    Bundle(Opts),
+    Bundle(BundleOpts),
     /// Remove build artifacts (front/server target dirs and the site root).
     Clean(CleanOpts),
     /// Type-check the client (wasm) and server without producing artifacts.
@@ -343,5 +355,16 @@ mod tests {
         let cli = Cli::parse_from(["glory", "self-update"]);
         assert_eq!(cli.command, Commands::SelfUpdate);
         assert!(cli.opts().is_none());
+    }
+
+    #[test]
+    fn bundle_accepts_image_optimization_flag() {
+        let cli = Cli::parse_from(["glory", "bundle", "--optimize-images"]);
+        assert_eq!(cli.opts(), Some(Opts::default()));
+
+        let Commands::Bundle(bundle) = cli.command else {
+            panic!("expected bundle command");
+        };
+        assert!(bundle.optimize_images);
     }
 }

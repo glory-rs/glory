@@ -121,6 +121,8 @@ it. A project with **no** glory metadata works too, as long as you supply at lea
 - `bundle --target desktop` collects the executable/assets and writes native
   installer artifacts: WiX MSI sources/scripts on Windows, with automatic MSI
   output when WiX is installed, and `.deb` packages on Linux.
+- `bundle --optimize-images` keeps originals and adds WebP copies for PNG/JPEG
+  assets, preferring the hashed WebP path in `glory-bundle.json`.
 - 'no_downloads' feature to allow user management of optional dependencies
   <br/>
 

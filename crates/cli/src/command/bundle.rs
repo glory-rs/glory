@@ -20,15 +20,15 @@ use tokio::process::Command;
 /// Output folder collecting the distributable artifacts.
 const DIST_DIR: &str = "dist";
 
-pub async fn bundle_all(conf: &Config) -> Result<()> {
+pub async fn bundle_all(conf: &Config, optimize_images: bool) -> Result<()> {
     for proj in &conf.projects {
-        bundle_proj(proj).await?;
+        bundle_proj(proj, optimize_images).await?;
     }
     Ok(())
 }
 
 /// Build the project and collect the artifacts into `dist/<name>/`.
-pub async fn bundle_proj(proj: &Arc<Project>) -> Result<()> {
+pub async fn bundle_proj(proj: &Arc<Project>, optimize_images: bool) -> Result<()> {
     if !proj.release {
         log::warn!("Bundling a debug build. Pass --release for an optimized distributable.");
     }
@@ -46,7 +46,11 @@ pub async fn bundle_proj(proj: &Arc<Project>) -> Result<()> {
         BuildTarget::Ios => bundle_ios(proj, &dist).await?,
     }
 
-    let asset_map = write_hashed_asset_copies(proj.target, &dist).await?;
+    let mut asset_map = BTreeMap::new();
+    if optimize_images {
+        write_optimized_image_assets(proj.target, &dist, &mut asset_map).await?;
+    }
+    write_hashed_asset_copies(proj.target, &dist, &mut asset_map).await?;
     optimize_static_assets(&dist).await?;
     if proj.target == BuildTarget::Desktop {
         bundle_desktop_installers(proj, &dist).await?;
@@ -843,8 +847,24 @@ async fn write_manifest(proj: &Project, dist: &Utf8Path, asset_map: &BTreeMap<St
         .dot()
 }
 
-async fn write_hashed_asset_copies(target: BuildTarget, dist: &Utf8Path) -> Result<BTreeMap<String, String>> {
-    let mut map = BTreeMap::new();
+async fn write_optimized_image_assets(target: BuildTarget, dist: &Utf8Path, asset_map: &mut BTreeMap<String, String>) -> Result<()> {
+    for file in collect_files(dist)? {
+        let rel = file.strip_prefix(dist)?;
+        if !should_optimize_image(rel) {
+            continue;
+        }
+        let data = fs::read(&file).await?;
+        let webp = encode_webp(&data, rel).context(format!("Optimizing image asset {rel}"))?;
+        let Some(webp_rel) = optimized_image_path(rel) else {
+            continue;
+        };
+        fs::write(dist.join(&webp_rel), webp).await.dot()?;
+        asset_map.insert(asset_public_path(target, rel), asset_public_path(target, &webp_rel));
+    }
+    Ok(())
+}
+
+async fn write_hashed_asset_copies(target: BuildTarget, dist: &Utf8Path, asset_map: &mut BTreeMap<String, String>) -> Result<()> {
     for file in collect_files(dist)? {
         let rel = file.strip_prefix(dist)?;
         if !should_hash_rewrite(rel) {
@@ -857,9 +877,16 @@ async fn write_hashed_asset_copies(target: BuildTarget, dist: &Utf8Path) -> Resu
         };
         let hashed_file = dist.join(&hashed_rel);
         fs::write(&hashed_file, &data).await.dot()?;
-        map.insert(asset_public_path(target, rel), asset_public_path(target, &hashed_rel));
+        let public = asset_public_path(target, rel);
+        let hashed_public = asset_public_path(target, &hashed_rel);
+        for mapped in asset_map.values_mut() {
+            if *mapped == public {
+                *mapped = hashed_public.clone();
+            }
+        }
+        asset_map.entry(public).or_insert(hashed_public);
     }
-    Ok(map)
+    Ok(())
 }
 
 async fn optimize_static_assets(dist: &Utf8Path) -> Result<()> {
@@ -896,6 +923,11 @@ fn should_hash_rewrite(path: &Utf8Path) -> bool {
         .is_some_and(|ext| EXTENSIONS.iter().any(|candidate| ext.eq_ignore_ascii_case(candidate)))
 }
 
+fn should_optimize_image(path: &Utf8Path) -> bool {
+    path.extension()
+        .is_some_and(|ext| matches!(ext.to_ascii_lowercase().as_str(), "jpg" | "jpeg" | "png"))
+}
+
 fn hashed_asset_path(path: &Utf8Path, hash: &str) -> Option<Utf8PathBuf> {
     let stem = path.file_stem()?;
     let hash = hash.get(..16).unwrap_or(hash);
@@ -904,6 +936,23 @@ fn hashed_asset_path(path: &Utf8Path, hash: &str) -> Option<Utf8PathBuf> {
         None => format!("{stem}.{hash}"),
     };
     Some(path.with_file_name(file_name))
+}
+
+fn optimized_image_path(path: &Utf8Path) -> Option<Utf8PathBuf> {
+    let stem = path.file_stem()?;
+    Some(path.with_file_name(format!("{stem}.glory.webp")))
+}
+
+fn encode_webp(data: &[u8], path: &Utf8Path) -> Result<Vec<u8>> {
+    let format = match path.extension().map(str::to_ascii_lowercase).as_deref() {
+        Some("png") => image::ImageFormat::Png,
+        Some("jpg" | "jpeg") => image::ImageFormat::Jpeg,
+        _ => bail!("unsupported image asset format: {path}"),
+    };
+    let image = image::load_from_memory_with_format(data, format)?;
+    let mut output = Cursor::new(Vec::new());
+    image.write_to(&mut output, image::ImageFormat::WebP)?;
+    Ok(output.into_inner())
 }
 
 fn asset_public_path(target: BuildTarget, rel: &Utf8Path) -> String {
@@ -1138,6 +1187,32 @@ mod tests {
             asset_public_path(BuildTarget::Desktop, Utf8Path::new("assets/logo.png")),
             "/assets/logo.png"
         );
+    }
+
+    #[test]
+    fn image_optimization_maps_original_to_hashed_webp() {
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let dir = temp_dir::TempDir::new().unwrap();
+            let root = Utf8PathBuf::from_path_buf(dir.path().join("dist")).unwrap();
+            std::fs::create_dir_all(root.join("assets")).unwrap();
+
+            let image = image::DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(2, 2, image::Rgba([255, 0, 0, 255])));
+            let mut png = Cursor::new(Vec::new());
+            image.write_to(&mut png, image::ImageFormat::Png).unwrap();
+            std::fs::write(root.join("assets/logo.png"), png.into_inner()).unwrap();
+
+            let mut asset_map = BTreeMap::new();
+            write_optimized_image_assets(BuildTarget::Desktop, &root, &mut asset_map).await.unwrap();
+            assert_eq!(asset_map.get("/assets/logo.png").map(String::as_str), Some("/assets/logo.glory.webp"));
+            assert!(root.join("assets/logo.glory.webp").is_file());
+
+            write_hashed_asset_copies(BuildTarget::Desktop, &root, &mut asset_map).await.unwrap();
+            let mapped = asset_map.get("/assets/logo.png").unwrap();
+            assert!(mapped.starts_with("/assets/logo.glory."), "{mapped}");
+            assert!(mapped.ends_with(".webp"), "{mapped}");
+            assert!(root.join(mapped.trim_start_matches('/')).is_file());
+        });
     }
 
     #[test]

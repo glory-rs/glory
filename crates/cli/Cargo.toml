@@ -31,6 +31,7 @@ dunce = { workspace = true }
 flate2 = { workspace = true }
 flexi_logger = { workspace = true }
 glory-hot-reload = { workspace = true }
+image = { workspace = true }
 itertools = { workspace = true }
 lightningcss = { workspace = true }
 log = { workspace = true }

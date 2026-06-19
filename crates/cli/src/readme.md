@@ -75,6 +75,9 @@ glory bundle --release
 # dist/<project>/ contains the deployable artefact
 ```
 
+Use `glory bundle --optimize-images` to keep original PNG/JPEG assets and add
+WebP copies, with `glory-bundle.json` preferring the hashed WebP path.
+
 For mobile projects generated with `glory new --template mobile`, use
 `glory bundle --target android|ios --release`. Android bundles collect APKs
 and install/run scripts under `dist/<project>/android/`; iOS bundles collect

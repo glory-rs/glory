@@ -106,7 +106,7 @@ pub async fn run_with(args: Cli, overrides: Overrides) -> Result<()> {
         Serve(serve) => command::watch(&config.current_project()?, serve.should_open()).await,
         Run(run) => command::serve(&config.current_project()?, run.should_open()).await,
         Build(_) => command::build_all(&config).await,
-        Bundle(_) => command::bundle_all(&config).await,
+        Bundle(bundle) => command::bundle_all(&config, bundle.optimize_images).await,
         Clean(clean) => command::clean_all(&config, clean.cargo).await,
         Check(_) => command::check_all(&config).await,
         ConfigCommand(opts) => command::config_validate(&config, opts.json).await,
