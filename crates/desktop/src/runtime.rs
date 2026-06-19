@@ -395,6 +395,20 @@ fn assets_root(config: &DesktopConfig) -> std::path::PathBuf {
         .unwrap_or_else(|| std::path::PathBuf::from("."))
 }
 
+fn install_bundle_asset_manifest(root: &std::path::Path) {
+    glory_core::assets::clear_asset_manifest();
+    let path = root.join("glory-bundle.json");
+    match std::fs::read_to_string(&path) {
+        Ok(json) => match glory_core::assets::AssetManifest::from_bundle_json(&json) {
+            Ok(manifest) if !manifest.is_empty() => glory_core::assets::install_asset_manifest(manifest),
+            Ok(_) => {}
+            Err(err) => tracing::warn!(%err, path = %path.display(), "glory-desktop: invalid asset manifest"),
+        },
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        Err(err) => tracing::warn!(%err, path = %path.display(), "glory-desktop: asset manifest read failed"),
+    }
+}
+
 /// Resolves a request path under `root`, rejecting traversal outside it.
 fn resolve_asset_path(root: &std::path::Path, request_path: &str) -> Option<std::path::PathBuf> {
     let relative = request_path.trim_start_matches('/');
@@ -717,10 +731,12 @@ fn create_window(
         state.fullscreen = window.fullscreen().is_some();
     }
 
+    let assets_root_dir = assets_root(&config);
+    install_bundle_asset_manifest(&assets_root_dir);
+
     let handle = DesktopWindowHandle::new(id, proxy.clone(), state.clone(), window_queue, next_window_index);
     let mount = mount(handle);
     let ipc_proxy = proxy.clone();
-    let assets_root_dir = assets_root(&config);
     let webview = WebViewBuilder::new()
         .with_initialization_script(crate::WRY_INTERPRETER_JS)
         .with_html(BOOTSTRAP_HTML)
@@ -942,6 +958,48 @@ mod tests {
         let url = asset_url("assets/logo.png");
         assert!(url.ends_with("/assets/logo.png"), "{url}");
         assert_eq!(asset_url("/x.css"), asset_url("x.css"));
+    }
+
+    #[test]
+    fn installs_bundle_asset_manifest_from_assets_root() {
+        glory_core::assets::clear_asset_manifest();
+
+        let root = std::env::temp_dir().join(format!("glory-desktop-manifest-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(
+            root.join("glory-bundle.json"),
+            r#"{
+                "asset_map": {
+                    "/assets/logo.png": "/assets/logo.0123456789abcdef.png"
+                }
+            }"#,
+        )
+        .unwrap();
+
+        install_bundle_asset_manifest(&root);
+        let asset = glory_core::assets::Asset::from_static("assets/logo.png", "assets/logo.png");
+        assert_eq!(asset.public_path(), "/assets/logo.0123456789abcdef.png");
+
+        glory_core::assets::clear_asset_manifest();
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn missing_bundle_asset_manifest_clears_previous_mapping() {
+        glory_core::assets::install_asset_manifest(glory_core::assets::AssetManifest::from_mappings([(
+            "/assets/logo.png",
+            "/assets/logo.hashed.png",
+        )]));
+
+        let root = std::env::temp_dir().join(format!("glory-desktop-missing-manifest-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        install_bundle_asset_manifest(&root);
+
+        let asset = glory_core::assets::Asset::from_static("assets/logo.png", "assets/logo.png");
+        assert_eq!(asset.public_path(), "/assets/logo.png");
+
+        glory_core::assets::clear_asset_manifest();
+        let _ = std::fs::remove_dir_all(&root);
     }
 
     #[test]

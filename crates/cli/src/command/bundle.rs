@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
 use std::env;
 use std::fs::File;
 use std::io::{Cursor, Write};
@@ -46,11 +46,12 @@ pub async fn bundle_proj(proj: &Arc<Project>) -> Result<()> {
         BuildTarget::Ios => bundle_ios(proj, &dist).await?,
     }
 
+    let asset_map = write_hashed_asset_copies(proj.target, &dist).await?;
     optimize_static_assets(&dist).await?;
     if proj.target == BuildTarget::Desktop {
         bundle_desktop_installers(proj, &dist).await?;
     }
-    write_manifest(proj, &dist).await?;
+    write_manifest(proj, &dist, &asset_map).await?;
 
     log::info!("Glory bundled {} into {}", proj.name, GRAY.paint(dist.as_str()));
     Ok(())
@@ -826,7 +827,7 @@ fn deterministic_guid(input: &str) -> String {
     )
 }
 
-async fn write_manifest(proj: &Project, dist: &Utf8Path) -> Result<()> {
+async fn write_manifest(proj: &Project, dist: &Utf8Path, asset_map: &BTreeMap<String, String>) -> Result<()> {
     let files = bundle_files(dist).await?;
     let manifest = serde_json::json!({
         "name": proj.name,
@@ -834,11 +835,31 @@ async fn write_manifest(proj: &Project, dist: &Utf8Path) -> Result<()> {
         "release": proj.release,
         "site_root": proj.site.root_dir.as_str(),
         "executable": if proj.bin.exe_file.exists() { Some(proj.bin.exe_file.as_str()) } else { None },
+        "asset_map": asset_map,
         "files": files,
     });
     fs::write(dist.join("glory-bundle.json"), serde_json::to_vec_pretty(&manifest)?)
         .await
         .dot()
+}
+
+async fn write_hashed_asset_copies(target: BuildTarget, dist: &Utf8Path) -> Result<BTreeMap<String, String>> {
+    let mut map = BTreeMap::new();
+    for file in collect_files(dist)? {
+        let rel = file.strip_prefix(dist)?;
+        if !should_hash_rewrite(rel) {
+            continue;
+        }
+        let data = fs::read(&file).await?;
+        let hash = format!("{:016x}", seahash::hash(&data));
+        let Some(hashed_rel) = hashed_asset_path(rel, &hash) else {
+            continue;
+        };
+        let hashed_file = dist.join(&hashed_rel);
+        fs::write(&hashed_file, &data).await.dot()?;
+        map.insert(asset_public_path(target, rel), asset_public_path(target, &hashed_rel));
+    }
+    Ok(map)
 }
 
 async fn optimize_static_assets(dist: &Utf8Path) -> Result<()> {
@@ -858,6 +879,40 @@ fn should_precompress(path: &Utf8Path) -> bool {
         path.extension(),
         Some("css" | "html" | "js" | "json" | "map" | "mjs" | "svg" | "txt" | "wasm" | "xml")
     )
+}
+
+fn should_hash_rewrite(path: &Utf8Path) -> bool {
+    if is_manifest_excluded(path) {
+        return false;
+    }
+    if matches!(path.file_name(), Some("glory-bundle.json" | "index.html")) {
+        return false;
+    }
+    const EXTENSIONS: &[&str] = &[
+        "avif", "css", "gif", "html", "ico", "jpeg", "jpg", "js", "json", "map", "mjs", "otf", "png", "svg", "ttf", "txt", "wasm", "webp", "woff",
+        "woff2", "xml",
+    ];
+    path.extension()
+        .is_some_and(|ext| EXTENSIONS.iter().any(|candidate| ext.eq_ignore_ascii_case(candidate)))
+}
+
+fn hashed_asset_path(path: &Utf8Path, hash: &str) -> Option<Utf8PathBuf> {
+    let stem = path.file_stem()?;
+    let hash = hash.get(..16).unwrap_or(hash);
+    let file_name = match path.extension() {
+        Some(ext) => format!("{stem}.{hash}.{ext}"),
+        None => format!("{stem}.{hash}"),
+    };
+    Some(path.with_file_name(file_name))
+}
+
+fn asset_public_path(target: BuildTarget, rel: &Utf8Path) -> String {
+    let rel = if target == BuildTarget::Web {
+        rel.strip_prefix("public").unwrap_or(rel)
+    } else {
+        rel
+    };
+    format!("/{}", rel.as_str().trim_start_matches('/').replace('\\', "/"))
 }
 
 fn write_gzip(path: &Utf8Path, data: &[u8]) -> Result<()> {
@@ -1043,6 +1098,46 @@ mod tests {
         for path in ["app.wasm.gz", "app.wasm.br", "image.png", "font.woff2"] {
             assert!(!should_precompress(Utf8Path::new(path)), "{path}");
         }
+    }
+
+    #[test]
+    fn hash_rewrite_targets_static_assets_without_entry_html() {
+        for path in ["assets/logo.png", "pkg/app_bg.wasm", "style.css", "docs/page.html", "fonts/app.woff2"] {
+            assert!(should_hash_rewrite(Utf8Path::new(path)), "{path}");
+        }
+        for path in [
+            "index.html",
+            "server.exe",
+            "glory-bundle.json",
+            "app.wasm.gz",
+            "installers/windows/staging/style.css",
+        ] {
+            assert!(!should_hash_rewrite(Utf8Path::new(path)), "{path}");
+        }
+    }
+
+    #[test]
+    fn hashed_asset_paths_preserve_parent_and_extension() {
+        assert_eq!(
+            hashed_asset_path(Utf8Path::new("assets/logo.png"), "0123456789abcdef").unwrap(),
+            Utf8PathBuf::from("assets/logo.0123456789abcdef.png")
+        );
+        assert_eq!(
+            hashed_asset_path(Utf8Path::new("pkg/app_bg.wasm"), "abcdef").unwrap(),
+            Utf8PathBuf::from("pkg/app_bg.abcdef.wasm")
+        );
+    }
+
+    #[test]
+    fn web_asset_public_paths_strip_bundle_public_root() {
+        assert_eq!(
+            asset_public_path(BuildTarget::Web, Utf8Path::new("public/assets/logo.png")),
+            "/assets/logo.png"
+        );
+        assert_eq!(
+            asset_public_path(BuildTarget::Desktop, Utf8Path::new("assets/logo.png")),
+            "/assets/logo.png"
+        );
     }
 
     #[test]

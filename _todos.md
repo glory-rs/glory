@@ -184,14 +184,10 @@ R5 仅评估,不阻塞任何人。
 
 ## Lane A — 资产管线(crates/core/src/assets.rs, cli)
 
-- [~] **A1 P1** 类型化资产清单:`asset!` 目前只做路径解析,无编译期存在性校验与
-  link-time 哈希文件名(manganis 用 link section + 占位哈希,
-  `packages/manganis/manganis-core/src/asset.rs`)。最小目标:`asset!` 编译期校验
-  文件存在 + bundle 时内容哈希进文件名 + 运行时映射。
-  2026-06-19 部分完成:`asset!` 现在通过 `include_bytes!` 对
-  `CARGO_MANIFEST_DIR` 相对路径做编译期存在性校验,并保留 `Asset`
-  const 构造、`absolute_path()` 与 `public_path()` API。剩余:bundle hash
-  文件名 rewrite 与运行时 manifest 映射。
+- [x] **A1 P1** 类型化资产清单:`asset!` 现在通过 `include_bytes!` 做
+  `CARGO_MANIFEST_DIR` 相对路径编译期存在性校验;bundle 会为静态资源写 hashed
+  副本并在 `glory-bundle.json::asset_map` 中记录 public path 映射;
+  `AssetManifest` 可安装运行时映射,Desktop assets root 会自动读取该 manifest。
 - [ ] **A2 P2** 图片优化管线(PNG/JPEG→WebP,按平台格式),对照 manganis
   `images.rs`。保持默认关闭,作为 bundle 显式选项。依赖 A1 的清单结构。
 - [ ] **A3 P2** folder 资产宏(递归枚举 + 清单),对照 manganis `folder.rs`。

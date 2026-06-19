@@ -157,6 +157,12 @@ The desktop runtime serves `glory://` URLs from:
 
 Traversal outside the assets root is rejected.
 
+`glory bundle` writes `glory-bundle.json` with an `asset_map` from declared
+public paths to content-hashed copies. When that manifest exists under the
+assets root, the desktop runtime installs it before mounting the widget tree,
+so `logo.public_path()` resolves to the hashed URL while the original file
+remains available for compatibility.
+
 ## Hot Reload
 
 Run the app through:
