@@ -229,8 +229,9 @@ R5 仅评估,不阻塞任何人。
   Keyboard/IME(`crates/native/src/blitz_consumer.rs`),仍缺滚轮/scroll、
   focus/blur、touch。Blitz 0.2 当前 `DomEventData` 尚未暴露这些数据,需等上游事件
   数据或扩展 shell 后继续映射。
-- [ ] **N2 P1** 布局查询接通:`blitz_consumer.rs:210` 起 Query(BoundingRect/
-  ScrollOffset)是 no-op,需接 Blitz layout pass 后应答 `NodeQuery`。
+- [x] **N2 P1** 布局查询接通:`BlitzConsumer` 现在为 `NodeQuery::Value`、
+  `BoundingRect`、`ScrollOffset` 产出 `QueryResponse`,shell flush 会把应答 resolve
+  回 `CommandHolder`;`cargo test -p glory-native --features blitz` 已覆盖。
 - [ ] **N3 P2** 窗口生命周期:`launch_blitz_window` 单窗口 shell(13 行),需
   WindowId 跟踪、resume/pause、重绘调度,对照 `packages/native/src/dioxus_application.rs`。
 - [x] **N4 P2** 属性/property 区分:`blitz_consumer.rs:129` spike 把 property 一律当

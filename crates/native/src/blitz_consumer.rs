@@ -25,7 +25,7 @@ use std::{
 };
 
 use blitz_dom::{Attribute, BaseDocument, DocumentConfig, QualName};
-use glory_core::renderer::{Command, CommandInsertPosition};
+use glory_core::renderer::{Command, CommandInsertPosition, NodeQuery, QueryError, QueryResponse, QueryValue};
 #[cfg(feature = "shell")]
 use glory_core::renderer::{EventData, KeyboardData, PointerData, TargetData};
 #[cfg(feature = "shell")]
@@ -45,6 +45,9 @@ pub struct BlitzConsumer {
     properties: HashMap<u64, BTreeMap<String, String>>,
     /// (glory id, event name) listeners — recorded for the event stage.
     listeners: BTreeSet<(u64, String)>,
+    /// Answers produced for `Command::Query`, drained by native hosts and
+    /// fed back into the holder that issued the request.
+    query_responses: Vec<QueryResponse>,
 }
 
 fn qual(name: &str) -> QualName {
@@ -86,6 +89,7 @@ impl BlitzConsumer {
             classes: HashMap::new(),
             properties: HashMap::new(),
             listeners: BTreeSet::new(),
+            query_responses: Vec::new(),
         }
     }
 
@@ -95,6 +99,10 @@ impl BlitzConsumer {
 
     pub fn listeners(&self) -> &BTreeSet<(u64, String)> {
         &self.listeners
+    }
+
+    pub fn take_query_responses(&mut self) -> Vec<QueryResponse> {
+        std::mem::take(&mut self.query_responses)
     }
 
     pub fn glory_id_for_blitz(&self, blitz_id: usize) -> Option<u64> {
@@ -212,8 +220,44 @@ impl BlitzConsumer {
             Command::DetachEvent { id, name } => {
                 self.listeners.remove(&(*id, name.clone()));
             }
-            Command::Query { .. } => {
-                // Layout queries need blitz's layout pass; future stage.
+            Command::Query { id, token, kind } => {
+                let result = self.answer_query(*id, *kind);
+                self.query_responses.push(QueryResponse { token: *token, result });
+            }
+        }
+    }
+
+    fn answer_query(&mut self, glory_id: u64, kind: NodeQuery) -> Result<QueryValue, QueryError> {
+        let blitz_id = self.blitz_id(glory_id).ok_or(QueryError::NodeGone)?;
+        if self.doc.get_node(blitz_id).is_none() {
+            return Err(QueryError::NodeGone);
+        }
+
+        match kind {
+            NodeQuery::Value => Ok(QueryValue::Value(
+                self.properties
+                    .get(&glory_id)
+                    .and_then(|properties| properties.get("value"))
+                    .cloned()
+                    .unwrap_or_default(),
+            )),
+            NodeQuery::BoundingRect => {
+                self.doc.resolve(0.0);
+                let node = self.doc.get_node(blitz_id).ok_or(QueryError::NodeGone)?;
+                let position = node.absolute_position(0.0, 0.0);
+                Ok(QueryValue::Rect {
+                    x: position.x as f64,
+                    y: position.y as f64,
+                    width: node.final_layout.size.width as f64,
+                    height: node.final_layout.size.height as f64,
+                })
+            }
+            NodeQuery::ScrollOffset => {
+                let node = self.doc.get_node(blitz_id).ok_or(QueryError::NodeGone)?;
+                Ok(QueryValue::ScrollOffset {
+                    x: node.scroll_offset.x,
+                    y: node.scroll_offset.y,
+                })
             }
         }
     }
@@ -282,7 +326,7 @@ fn is_reflected_blitz_property(name: &str) -> bool {
 pub fn launch_blitz_window(widget: impl Widget) {
     let holder = CommandHolder::new().mount(widget);
     let mut consumer = BlitzConsumer::new();
-    consumer.apply_batch(&holder.take_batch());
+    flush_holder_into_consumer(&holder, &mut consumer);
 
     let event_loop = blitz_shell::create_default_event_loop::<blitz_shell::BlitzShellEvent>();
     let renderer = anyrender_vello::VelloWindowRenderer::new();
@@ -332,8 +376,7 @@ impl blitz_dom::Document for GloryBlitzDocument {
         let mut changed = false;
         for event in events.borrow_mut().drain(..) {
             if self.holder.dispatch_event(event) {
-                self.consumer.apply_batch(&self.holder.take_batch());
-                changed = true;
+                changed |= flush_holder_into_consumer(&self.holder, &mut self.consumer);
             }
         }
         if changed {
@@ -343,6 +386,22 @@ impl blitz_dom::Document for GloryBlitzDocument {
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
+    }
+}
+
+#[cfg(feature = "shell")]
+fn flush_holder_into_consumer(holder: &CommandHolder, consumer: &mut BlitzConsumer) -> bool {
+    let mut changed = false;
+    loop {
+        let batch = holder.take_batch();
+        if batch.is_empty() {
+            return changed;
+        }
+        consumer.apply_batch(&batch);
+        changed = true;
+        for response in consumer.take_query_responses() {
+            changed |= holder.resolve_query(response);
+        }
     }
 }
 
@@ -450,6 +509,7 @@ mod tests {
     use super::*;
     use glory_core::Holder;
     use glory_core::reflow::Cage;
+    use glory_core::renderer::{NodeQuery, QueryError, QueryResponse, QueryValue};
     use glory_core::web::events;
     use glory_core::web::holders::CommandHolder;
     use glory_core::web::widgets::{button, div, span};
@@ -544,5 +604,123 @@ mod tests {
         });
         assert_eq!(consumer.property(1, "data-prop"), None);
         assert_eq!(consumer.attribute(1, "data-prop"), None);
+    }
+
+    #[test]
+    fn value_queries_answer_from_tracked_properties() {
+        let mut consumer = BlitzConsumer::new();
+        consumer.apply_batch(&[
+            Command::Create {
+                id: 1,
+                name: "input".into(),
+                is_void: false,
+            },
+            Command::SetAttribute {
+                id: 1,
+                name: "value".into(),
+                value: "attribute".into(),
+            },
+            Command::SetProperty {
+                id: 1,
+                name: "value".into(),
+                value: "typed".into(),
+            },
+            Command::Query {
+                id: 1,
+                token: 7,
+                kind: NodeQuery::Value,
+            },
+        ]);
+
+        assert_eq!(
+            consumer.take_query_responses(),
+            vec![QueryResponse {
+                token: 7,
+                result: Ok(QueryValue::Value("typed".into()))
+            }]
+        );
+    }
+
+    #[test]
+    fn queries_report_missing_nodes() {
+        let mut consumer = BlitzConsumer::new();
+        consumer.apply(&Command::Query {
+            id: 99,
+            token: 3,
+            kind: NodeQuery::Value,
+        });
+
+        assert_eq!(
+            consumer.take_query_responses(),
+            vec![QueryResponse {
+                token: 3,
+                result: Err(QueryError::NodeGone)
+            }]
+        );
+    }
+
+    #[test]
+    fn layout_queries_use_blitz_layout_state() {
+        let mut consumer = BlitzConsumer::new();
+        consumer.apply_batch(&[
+            Command::Create {
+                id: 1,
+                name: "div".into(),
+                is_void: false,
+            },
+            Command::SetAttribute {
+                id: 1,
+                name: "style".into(),
+                value: "width: 123px; height: 45px;".into(),
+            },
+            Command::Insert {
+                parent: 0,
+                child: 1,
+                position: CommandInsertPosition::Tail,
+            },
+            Command::Query {
+                id: 1,
+                token: 1,
+                kind: NodeQuery::BoundingRect,
+            },
+        ]);
+
+        let rect = consumer.take_query_responses().remove(0);
+        assert_eq!(rect.token, 1);
+        match rect.result {
+            Ok(QueryValue::Rect { width, height, .. }) => {
+                assert_eq!(width, 123.0);
+                assert_eq!(height, 45.0);
+            }
+            other => panic!("unexpected layout query response: {other:?}"),
+        }
+    }
+
+    #[test]
+    fn scroll_queries_use_blitz_scroll_state() {
+        let mut consumer = BlitzConsumer::new();
+        consumer.apply(&Command::Create {
+            id: 1,
+            name: "div".into(),
+            is_void: false,
+        });
+        let blitz_id = consumer.blitz_id(1).unwrap();
+        let node = consumer.doc.get_node_mut(blitz_id).unwrap();
+        node.scroll_offset.x = 12.0;
+        node.scroll_offset.y = 34.0;
+
+        consumer.apply(&Command::Query {
+            id: 1,
+            token: 2,
+            kind: NodeQuery::ScrollOffset,
+        });
+
+        assert_eq!(
+            consumer.take_query_responses(),
+            vec![QueryResponse {
+                token: 2,
+                result: Ok(QueryValue::ScrollOffset { x: 12.0, y: 34.0 })
+            }]
+        );
     }
 }

@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 38 |
+| 已完成 `[x]` | 39 |
 | 部分完成 `[~]` | 4 |
-| 未完成 `[ ]` | 18 |
+| 未完成 `[ ]` | 17 |
 
 按能力权重估算:
 
@@ -324,10 +324,11 @@ serverfn 基础可用，但对比成熟框架还缺:
 - command stream 能写入 Blitz document。
 - click/input/keyboard/IME 部分事件已映射。
 - property/attribute 分离已有测试。
+- `Command::Query` 已接通 Value、BoundingRect、ScrollOffset;Blitz shell 会回灌
+  `QueryResponse` 到 `CommandHolder`。
 
 缺口:
 
-- `Command::Query` 当前 no-op。
 - scroll/focus/touch 等事件桥接不足。
 - 窗口生命周期很薄。
 - 真实渲染截图/人工验证缺失。
@@ -474,8 +475,7 @@ cargo clippy -p glory-cli --lib --no-default-features -- -D warnings
 1. serverfn 多编码和 middleware。
 2. asset typed manifest / hash rewrite。
 3. LiveView async session worker。
-4. Native query/layout 接通。
-5. Mobile Android emulator smoke。
+4. Mobile Android emulator smoke。
 
 ### P3
 
