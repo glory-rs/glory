@@ -40,8 +40,9 @@ need native window control:
 glory_desktop::launch_with_handle(Default::default(), |window| App { window });
 ```
 
-`DesktopWindowHandle` supports drag, fullscreen, maximized state, focus, zoom,
-closing by `DesktopWindowId`, and opening a new window from the running app:
+`DesktopWindowHandle` supports drag, print, fullscreen, maximized state, focus,
+zoom, closing by `DesktopWindowId`, and opening a new window from the running
+app:
 
 ```rust
 let open_window = {
@@ -61,6 +62,22 @@ let open_window = {
 
 State queries such as `is_fullscreen`, `is_maximized`, and `zoom_level` read the
 runtime cache maintained by the host event loop.
+
+## File Drops And Print
+
+Use `DesktopConfig::with_file_drop_handler` to receive native
+hover/drop/cancel events on the event-loop thread:
+
+```rust
+let config = glory_desktop::DesktopConfig::default().with_file_drop_handler(|holder, event| {
+    holder.update(|| {
+        // react to glory_desktop::DesktopFileDropEvent
+    });
+});
+```
+
+Use `DesktopWindowHandle::print()` from a widget callback or host command to
+open the platform print dialog for the current webview.
 
 ## Menus As Commands
 

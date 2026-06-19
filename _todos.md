@@ -22,7 +22,7 @@
 | 异步/错误原语 | Suspense 边界协议已部分落地(仍缺 SSR streaming/resume);ErrorBoundary 与 `resource_in` 竞态修复已补 | **高** |
 | CLI/构建 | wasm-split 暂缓;Windows/Linux 原生安装器已有最小路径,macOS/AppImage/签名仍缺 | **中-高** |
 | 资产 | `asset!` / `asset_folder!` / `css_module!` 已有编译期清单、bundle hash 映射和可选图片优化 | 中 |
-| 桌面 | 协议扎实,窗口控制 API、异步自定义协议、托盘、全局热键已补;仍缺拖放/打印 | 中 |
+| 桌面 | 协议扎实,窗口控制 API、异步自定义协议、托盘、全局热键、拖放/打印已补 | 中 |
 | Native(Blitz)/LiveView/移动端 | 分别处于 spike(~20%)/可用但单适配器(~30%)/模板可编译但无真机验证(~30%) | 中-高 |
 
 性能:官方 js-framework-benchmark 9 项聚合 Glory 442ms vs Dioxus 456ms vs Leptos 589ms,
@@ -225,7 +225,10 @@ R5 仅评估,不阻塞任何人。
 - [x] **D5 P2** 原生文件对话框集成指南或 rfd 助手(当前文档定位"应用自理",至少给
   recipes)。`docs/platform-apis.md#file-dialogs` 记录了 app-owned `rfd` 集成模式,
   `docs/desktop.md` 已补入口。
-- [ ] **D6 P3** 拖放文件事件桥接、打印对话框。
+- [x] **D6 P3** 拖放文件事件桥接、打印对话框。新增
+  `DesktopFileDropEvent` 与 `DesktopConfig::with_file_drop_handler`,把 Tao
+  `HoveredFile`/`DroppedFile`/`HoveredFileCancelled` 转成 event-loop 线程上的 host
+  callback;`DesktopWindowHandle::print()` 通过窗口命令调用 Wry print dialog。
 
 并行性:D1-D6 全部互相独立,均不动指令流协议(注意 wire 协议三处同步规则)。
 

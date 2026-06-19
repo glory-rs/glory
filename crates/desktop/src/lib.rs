@@ -102,7 +102,7 @@ pub enum IpcMessage {
 mod runtime;
 #[cfg(feature = "runtime")]
 pub use runtime::{
-    Desktop, DesktopConfig, DesktopHotKeyEvent, DesktopHotKeySpec, DesktopHotKeyState, DesktopProtocol, DesktopProtocolRequest,
+    Desktop, DesktopConfig, DesktopFileDropEvent, DesktopHotKeyEvent, DesktopHotKeySpec, DesktopHotKeyState, DesktopProtocol, DesktopProtocolRequest,
     DesktopProtocolResponse, DesktopTrayEvent, DesktopTrayMouseButton, DesktopTrayMouseButtonState, DesktopWindowHandle, DesktopWindowId,
     DesktopWindowState, MenuItemSpec, MenuSpec, TrayIconImage, TrayIconSpec, asset_url, desktop_protocol_response, launch, launch_with_config,
     launch_with_handle,

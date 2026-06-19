@@ -14,6 +14,7 @@
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::rc::Rc;
 
 use glory_core::renderer::EventData;
@@ -143,6 +144,10 @@ impl DesktopWindowHandle {
 
     pub fn drag_window(&self) -> bool {
         self.send(WindowCommand::DragWindow)
+    }
+
+    pub fn print(&self) -> bool {
+        self.send(WindowCommand::Print)
     }
 
     pub fn set_fullscreen(&self, fullscreen: bool) -> bool {
@@ -366,6 +371,13 @@ pub struct DesktopHotKeyEvent {
     pub state: DesktopHotKeyState,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum DesktopFileDropEvent {
+    Hovered { path: PathBuf },
+    Dropped { path: PathBuf },
+    Cancelled,
+}
+
 /// Request received by a desktop custom protocol handler.
 pub type DesktopProtocolRequest = wry::http::Request<Vec<u8>>;
 
@@ -456,6 +468,9 @@ pub struct DesktopConfig {
     /// Invoked on the event-loop thread when a registered global hotkey is
     /// pressed or released.
     pub on_hotkey: Option<Rc<dyn Fn(&CommandHolder, DesktopHotKeyEvent)>>,
+    /// Invoked on the event-loop thread when the native window receives a
+    /// file hover/drop/cancel event.
+    pub on_file_drop: Option<Rc<dyn Fn(&CommandHolder, DesktopFileDropEvent)>>,
 }
 
 impl std::fmt::Debug for DesktopConfig {
@@ -475,6 +490,7 @@ impl std::fmt::Debug for DesktopConfig {
             .field("on_tray", &self.on_tray.is_some())
             .field("hotkeys", &self.hotkeys)
             .field("on_hotkey", &self.on_hotkey.is_some())
+            .field("on_file_drop", &self.on_file_drop.is_some())
             .finish()
     }
 }
@@ -496,6 +512,7 @@ impl Default for DesktopConfig {
             on_tray: None,
             hotkeys: Vec::new(),
             on_hotkey: None,
+            on_file_drop: None,
         }
     }
 }
@@ -514,6 +531,11 @@ impl DesktopConfig {
 
     pub fn with_hotkey(mut self, hotkey: DesktopHotKeySpec) -> Self {
         self.hotkeys.push(hotkey);
+        self
+    }
+
+    pub fn with_file_drop_handler(mut self, handler: impl Fn(&CommandHolder, DesktopFileDropEvent) + 'static) -> Self {
+        self.on_file_drop = Some(Rc::new(handler));
         self
     }
 }
@@ -535,6 +557,7 @@ enum HostEvent {
 #[derive(Clone, Copy, Debug)]
 enum WindowCommand {
     DragWindow,
+    Print,
     SetFullscreen(bool),
     SetMaximized(bool),
     Focus,
@@ -835,6 +858,27 @@ impl Desktop {
                     }
                 }
                 Event::WindowEvent {
+                    event: WindowEvent::HoveredFile(path),
+                    window_id,
+                    ..
+                } => {
+                    dispatch_file_drop_event(&mut slots, window_id, DesktopFileDropEvent::Hovered { path });
+                }
+                Event::WindowEvent {
+                    event: WindowEvent::DroppedFile(path),
+                    window_id,
+                    ..
+                } => {
+                    dispatch_file_drop_event(&mut slots, window_id, DesktopFileDropEvent::Dropped { path });
+                }
+                Event::WindowEvent {
+                    event: WindowEvent::HoveredFileCancelled,
+                    window_id,
+                    ..
+                } => {
+                    dispatch_file_drop_event(&mut slots, window_id, DesktopFileDropEvent::Cancelled);
+                }
+                Event::WindowEvent {
                     event: WindowEvent::Resized(_),
                     window_id,
                     ..
@@ -977,6 +1021,15 @@ fn create_hotkey_manager() -> Option<global_hotkey::GlobalHotKeyManager> {
             tracing::warn!(%err, "glory-desktop: global hotkey manager unavailable");
             None
         }
+    }
+}
+
+fn dispatch_file_drop_event(slots: &mut [(WindowId, WindowSlot)], window_id: WindowId, event: DesktopFileDropEvent) {
+    if let Some(slot) = slot_by_window_id(slots, window_id)
+        && let (Some(callback), Some(holder)) = (&slot.config.on_file_drop, &slot.holder)
+    {
+        holder.update(|| callback(holder, event));
+        flush(&slot.webview, holder);
     }
 }
 
@@ -1140,6 +1193,11 @@ fn apply_window_command(
         WindowCommand::DragWindow => {
             if let Err(err) = slot.window.drag_window() {
                 tracing::warn!(%err, window_id = id.as_usize(), "glory-desktop: drag_window failed");
+            }
+        }
+        WindowCommand::Print => {
+            if let Err(err) = slot.webview.print() {
+                tracing::warn!(%err, window_id = id.as_usize(), "glory-desktop: print failed");
             }
         }
         WindowCommand::SetFullscreen(fullscreen) => {
@@ -1427,6 +1485,14 @@ mod tests {
         assert_eq!(config.hotkeys[0].id, "toggle");
         assert!(config.hotkeys[0].accelerator.parse::<global_hotkey::hotkey::HotKey>().is_ok());
         assert!(format!("{config:?}").contains("main-tray"));
+    }
+
+    #[test]
+    fn desktop_config_records_file_drop_handler() {
+        let config = DesktopConfig::default().with_file_drop_handler(|_, _| {});
+
+        assert!(config.on_file_drop.is_some());
+        assert!(format!("{config:?}").contains("on_file_drop: true"));
     }
 
     #[test]

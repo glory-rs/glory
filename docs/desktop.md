@@ -101,7 +101,7 @@ let open_tools = {
 };
 ```
 
-Available controls include `drag_window`, `set_fullscreen`,
+Available controls include `drag_window`, `print`, `set_fullscreen`,
 `set_maximized`, `toggle_maximized`, `focus`, `set_zoom_level`, `close`,
 `close_window(id)`, and `open_window`. `DesktopWindowId` is process-local and
 stable for the lifetime of the window.
@@ -175,6 +175,30 @@ let config = DesktopConfig {
 
 Hotkey accelerators use the `global-hotkey` parser (`cmdorctrl+KeyK`,
 `shift+alt+KeyQ`, and the `keyboard-types` `Code::*` names).
+
+## File Drops And Print
+
+Native drag/drop file events are delivered through `DesktopConfig::on_file_drop`
+on the event-loop thread. Use `DesktopWindowHandle::print()` to open the
+platform print dialog for the current webview:
+
+```rust
+use glory_desktop::{DesktopConfig, DesktopFileDropEvent};
+
+let config = DesktopConfig::default().with_file_drop_handler(|holder, event| {
+    holder.update(|| match event {
+        DesktopFileDropEvent::Hovered { path } => {
+            // highlight a drop target
+        }
+        DesktopFileDropEvent::Dropped { path } => {
+            // import the dropped file
+        }
+        DesktopFileDropEvent::Cancelled => {
+            // clear hover state
+        }
+    });
+});
+```
 
 ## Assets
 

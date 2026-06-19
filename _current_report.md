@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 47 |
+| 已完成 `[x]` | 48 |
 | 部分完成 `[~]` | 4 |
-| 未完成 `[ ]` | 9 |
+| 未完成 `[ ]` | 8 |
 
 按能力权重估算:
 
@@ -319,10 +319,11 @@ serverfn 基础可用，但对比成熟框架还缺:
 
 ### 5. Desktop API 不完整
 
-已有 runtime 很扎实，窗口控制 API、托盘和全局热键已补齐第一批，平台 API 仍缺:
+已有 runtime 很扎实，窗口控制 API、托盘、全局热键、文件拖放和打印入口已补齐第一批。
 
-- drag-and-drop file events。
-- print dialog。
+缺口:
+
+- 暂无当前任务板内 desktop API 缺口;后续主要是平台行为真机/人工验证。
 
 ### 6. Native Blitz 仍是 spike
 
