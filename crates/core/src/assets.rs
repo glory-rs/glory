@@ -1,9 +1,10 @@
 //! Static asset declarations.
 //!
 //! Use [`asset!`] to declare an asset path once and let each backend ask
-//! for the representation it needs. Web/SSR code typically uses
-//! [`Asset::public_path`], while tooling and native backends can use
-//! [`Asset::absolute_path`].
+//! for the representation it needs. The macro verifies the file exists at
+//! compile time relative to the declaring crate's `CARGO_MANIFEST_DIR`.
+//! Web/SSR code typically uses [`Asset::public_path`], while tooling and
+//! native backends can use [`Asset::absolute_path`].
 
 use std::borrow::Cow;
 use std::fmt;
@@ -91,35 +92,42 @@ fn public_path(path: &'static str) -> Cow<'static, str> {
 /// ```
 #[macro_export]
 macro_rules! asset {
-    ($path:literal) => {
+    ($path:literal) => {{
+        const _GLORY_ASSET_EXISTS: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/", $path));
         $crate::assets::Asset::from_static($path, concat!(env!("CARGO_MANIFEST_DIR"), "/", $path))
-    };
+    }};
 }
 
 #[cfg(test)]
 mod tests {
     #[test]
     fn asset_public_path_normalizes_relative_paths() {
-        let asset = crate::asset!("assets/logo.png");
+        let asset = crate::asset!("src/assets.rs");
 
-        assert_eq!(asset.logical_path(), "assets/logo.png");
-        assert_eq!(asset.public_path(), "/assets/logo.png");
-        assert!(asset.absolute_path().ends_with("/assets/logo.png") || asset.absolute_path().ends_with("\\assets/logo.png"));
+        assert_eq!(asset.logical_path(), "src/assets.rs");
+        assert_eq!(asset.public_path(), "/src/assets.rs");
+        assert!(asset.absolute_path().ends_with("/src/assets.rs") || asset.absolute_path().ends_with("\\src/assets.rs"));
     }
 
     #[test]
     fn asset_public_path_strips_dot_slash() {
-        let asset = crate::asset!("./logo.png");
+        let asset = crate::asset!("./src/assets.rs");
 
-        assert_eq!(asset.public_path(), "/logo.png");
-        assert_eq!(asset.public_path_with_base("/static/"), "/static/logo.png");
+        assert_eq!(asset.public_path(), "/src/assets.rs");
+        assert_eq!(asset.public_path_with_base("/static/"), "/static/src/assets.rs");
     }
 
     #[test]
     fn asset_public_path_keeps_absolute_paths() {
-        let asset = crate::asset!("/favicon.ico");
+        let asset = crate::asset!("/src/assets.rs");
 
-        assert_eq!(asset.public_path(), "/favicon.ico");
-        assert_eq!(asset.public_path_with_base("/static"), "/static/favicon.ico");
+        assert_eq!(asset.public_path(), "/src/assets.rs");
+        assert_eq!(asset.public_path_with_base("/static"), "/static/src/assets.rs");
+    }
+
+    #[test]
+    fn asset_macro_is_const_compatible() {
+        const ASSET: crate::assets::Asset = crate::asset!("src/assets.rs");
+        assert_eq!(ASSET.public_path(), "/src/assets.rs");
     }
 }

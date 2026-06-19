@@ -21,7 +21,7 @@
 | 服务器函数 | 仅 POST + JSON;无 HTTP 动词选择、多编码、逐函数中间件、响应式 WebSocket hook | **高** |
 | 异步/错误原语 | 无 Suspense 式自动边界、无 ErrorBoundary;`resource_in` 竞态已修 | **高** |
 | CLI/构建 | wasm-split 暂缓;Windows/Linux 原生安装器已有最小路径,macOS/AppImage/签名仍缺 | **中-高** |
-| 资产 | 无类型化清单、图片优化、CSS Modules、folder 资产宏(对照 manganis) | 中 |
+| 资产 | `asset!` 已有编译期存在性校验;仍缺 hash rewrite、图片优化、CSS Modules、folder 资产宏 | 中 |
 | 桌面 | 协议扎实,窗口控制 API 已补;仍缺托盘/全局热键/异步自定义协议 | 中 |
 | Native(Blitz)/LiveView/移动端 | 分别处于 spike(~20%)/可用但单适配器(~30%)/模板可编译但无真机验证(~30%) | 中-高 |
 
@@ -184,10 +184,14 @@ R5 仅评估,不阻塞任何人。
 
 ## Lane A — 资产管线(crates/core/src/assets.rs, cli)
 
-- [ ] **A1 P1** 类型化资产清单:`asset!` 目前只做路径解析,无编译期存在性校验与
+- [~] **A1 P1** 类型化资产清单:`asset!` 目前只做路径解析,无编译期存在性校验与
   link-time 哈希文件名(manganis 用 link section + 占位哈希,
   `packages/manganis/manganis-core/src/asset.rs`)。最小目标:`asset!` 编译期校验
   文件存在 + bundle 时内容哈希进文件名 + 运行时映射。
+  2026-06-19 部分完成:`asset!` 现在通过 `include_bytes!` 对
+  `CARGO_MANIFEST_DIR` 相对路径做编译期存在性校验,并保留 `Asset`
+  const 构造、`absolute_path()` 与 `public_path()` API。剩余:bundle hash
+  文件名 rewrite 与运行时 manifest 映射。
 - [ ] **A2 P2** 图片优化管线(PNG/JPEG→WebP,按平台格式),对照 manganis
   `images.rs`。保持默认关闭,作为 bundle 显式选项。依赖 A1 的清单结构。
 - [ ] **A3 P2** folder 资产宏(递归枚举 + 清单),对照 manganis `folder.rs`。

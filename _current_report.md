@@ -22,8 +22,8 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 | 状态 | 数量 |
 |---|---:|
 | 已完成 `[x]` | 38 |
-| 部分完成 `[~]` | 3 |
-| 未完成 `[ ]` | 19 |
+| 部分完成 `[~]` | 4 |
+| 未完成 `[ ]` | 18 |
 
 按能力权重估算:
 
@@ -295,13 +295,12 @@ serverfn 基础可用，但对比成熟框架还缺:
 
 现状:
 
-- `asset!` 可声明路径并生成 public path。
+- `asset!` 可声明路径、编译期校验文件存在并生成 public path。
 - bundle 会生成 `glory-bundle.json`，记录文件 hash/size/compression 等。
 
 缺口:
 
-- 编译期存在性校验。
-- link-time 或 build-time typed manifest。
+- link-time 或 build-time typed manifest/runtime mapping。
 - 内容 hash 文件名 rewrite。
 - 图片优化。
 - folder asset macro。
