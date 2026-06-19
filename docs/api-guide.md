@@ -288,6 +288,13 @@ async fn read_todo(id: u32) -> Result<Todo, glory::serverfn::ServerFnError> {
 }
 ```
 
+JSON is the default server-function encoding. With `glory-serverfn/cbor` or
+`glory-serverfn/postcard` enabled, POST endpoints can negotiate binary wire
+formats through `Content-Type` and `Accept`; generated clients can request one
+with `#[glory::server(encoding = "cbor")]` or
+`#[glory::server(encoding = "postcard")]`. GET endpoints keep JSON query
+arguments.
+
 Mount the adapter router on the server side:
 
 ```rust

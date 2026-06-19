@@ -19,6 +19,8 @@ serde_urlencoded = { workspace = true }
 form_urlencoded = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+ciborium = { workspace = true, optional = true }
+postcard = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 futures = { workspace = true }
@@ -56,6 +58,8 @@ axum = ["dep:axum"]
 actix = ["dep:actix-web"]
 # Non-wasm HTTP client (desktop apps calling a remote server).
 reqwest-client = ["dep:reqwest"]
+cbor = ["dep:ciborium"]
+postcard = ["dep:postcard"]
 
 [lints]
 workspace = true

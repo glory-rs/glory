@@ -2,8 +2,8 @@
 //!
 //! A *server function* is an `async fn` annotated with
 //! `#[glory_macros::server]`: its body compiles into server builds only,
-//! while wasm builds get a stub that POSTs the arguments to
-//! `/__glory/fn/<name>` and deserializes the response. This crate is the
+//! while wasm builds get a stub that calls `/__glory/fn/<name>` and
+//! deserializes the response. This crate is the
 //! runtime both sides share:
 //!
 //! - [`ServerFnEntry`] / [`handle`] — the inventory-backed registry the
@@ -15,18 +15,143 @@
 //!
 //! # Wire format
 //!
-//! Arguments serialize as a JSON tuple (`(a, b, c)`), responses as plain
-//! JSON of the `Ok` value. Errors map to a JSON-encoded [`ServerFnError`]
-//! body: `NotFound` becomes HTTP 404, [`ServerFnError::Http`] carries its
-//! own status and headers, and other errors become HTTP 500. The client leg
-//! decodes the same enum, so `?` propagation works symmetrically on both
-//! sides.
+//! JSON remains the default wire format: arguments serialize as a tuple
+//! (`(a, b, c)`), responses as the `Ok` value, and errors as
+//! [`ServerFnError`]. When the `cbor` feature is enabled, adapter mounts can
+//! decode `Content-Type: application/cbor` / `application/postcard` request
+//! bodies and encode matching `Accept` responses. The client leg decodes the
+//! same enum, so `?` propagation works symmetrically on both sides.
 
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use inventory;
+
+pub const JSON_CONTENT_TYPE: &str = "application/json";
+#[cfg(feature = "cbor")]
+pub const CBOR_CONTENT_TYPE: &str = "application/cbor";
+#[cfg(feature = "postcard")]
+pub const POSTCARD_CONTENT_TYPE: &str = "application/postcard";
+
+/// Wire encoding used by generated server-function requests and responses.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub enum ServerFnEncoding {
+    #[default]
+    Json,
+    #[cfg(feature = "cbor")]
+    Cbor,
+    #[cfg(feature = "postcard")]
+    Postcard,
+}
+
+impl ServerFnEncoding {
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Json => "json",
+            #[cfg(feature = "cbor")]
+            Self::Cbor => "cbor",
+            #[cfg(feature = "postcard")]
+            Self::Postcard => "postcard",
+        }
+    }
+
+    pub fn content_type(self) -> &'static str {
+        match self {
+            Self::Json => JSON_CONTENT_TYPE,
+            #[cfg(feature = "cbor")]
+            Self::Cbor => CBOR_CONTENT_TYPE,
+            #[cfg(feature = "postcard")]
+            Self::Postcard => POSTCARD_CONTENT_TYPE,
+        }
+    }
+
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name.trim().to_ascii_lowercase().as_str() {
+            "json" => Some(Self::Json),
+            #[cfg(feature = "cbor")]
+            "cbor" => Some(Self::Cbor),
+            #[cfg(feature = "postcard")]
+            "postcard" => Some(Self::Postcard),
+            _ => None,
+        }
+    }
+
+    pub fn from_content_type(content_type: &str) -> Option<Self> {
+        let media_type = content_type.split(';').next().unwrap_or_default().trim().to_ascii_lowercase();
+        match media_type.as_str() {
+            JSON_CONTENT_TYPE => Some(Self::Json),
+            #[cfg(feature = "cbor")]
+            CBOR_CONTENT_TYPE => Some(Self::Cbor),
+            #[cfg(feature = "postcard")]
+            POSTCARD_CONTENT_TYPE => Some(Self::Postcard),
+            _ => None,
+        }
+    }
+
+    pub fn decode<T: DeserializeOwned>(self, bytes: &[u8]) -> Result<T, ServerFnError> {
+        match self {
+            Self::Json => serde_json::from_slice(bytes).map_err(|err| ServerFnError::Deserialization(err.to_string())),
+            #[cfg(feature = "cbor")]
+            Self::Cbor => ciborium::from_reader(bytes).map_err(|err| ServerFnError::Deserialization(err.to_string())),
+            #[cfg(feature = "postcard")]
+            Self::Postcard => postcard::from_bytes(bytes).map_err(|err| ServerFnError::Deserialization(err.to_string())),
+        }
+    }
+
+    pub fn encode<T: Serialize>(self, value: &T) -> Result<Vec<u8>, ServerFnError> {
+        match self {
+            Self::Json => serde_json::to_vec(value).map_err(|err| ServerFnError::Serialization(err.to_string())),
+            #[cfg(feature = "cbor")]
+            Self::Cbor => {
+                let mut bytes = Vec::new();
+                ciborium::into_writer(value, &mut bytes).map_err(|err| ServerFnError::Serialization(err.to_string()))?;
+                Ok(bytes)
+            }
+            #[cfg(feature = "postcard")]
+            Self::Postcard => postcard::to_allocvec(value).map_err(|err| ServerFnError::Serialization(err.to_string())),
+        }
+    }
+}
+
+pub fn negotiate_response_encoding(accept: Option<&str>) -> ServerFnEncoding {
+    let Some(accept) = accept else {
+        return ServerFnEncoding::Json;
+    };
+    let mut best = (ServerFnEncoding::Json, -1.0_f32, usize::MAX);
+    for (index, item) in accept.split(',').enumerate() {
+        let (media_type, q) = parse_accept_item(item);
+        if q <= 0.0 {
+            continue;
+        }
+        let encoding = match media_type.as_str() {
+            JSON_CONTENT_TYPE | "application/*" | "*/*" => Some(ServerFnEncoding::Json),
+            #[cfg(feature = "cbor")]
+            CBOR_CONTENT_TYPE => Some(ServerFnEncoding::Cbor),
+            #[cfg(feature = "postcard")]
+            POSTCARD_CONTENT_TYPE => Some(ServerFnEncoding::Postcard),
+            _ => None,
+        };
+        if let Some(encoding) = encoding
+            && (q > best.1 || (q == best.1 && index < best.2))
+        {
+            best = (encoding, q, index);
+        }
+    }
+    best.0
+}
+
+fn parse_accept_item(item: &str) -> (String, f32) {
+    let mut parts = item.split(';');
+    let media_type = parts.next().unwrap_or_default().trim().to_ascii_lowercase();
+    let q = parts
+        .find_map(|part| {
+            let (key, value) = part.trim().split_once('=')?;
+            (key.trim().eq_ignore_ascii_case("q")).then(|| value.trim().parse::<f32>().ok())?
+        })
+        .unwrap_or(1.0);
+    (media_type, q)
+}
 
 /// HTTP-shaped server-function error for handlers that need to control
 /// response status and headers while still crossing the JSON error boundary.
@@ -171,9 +296,13 @@ pub struct ServerFnHttpResponse {
 #[cfg(not(target_arch = "wasm32"))]
 impl ServerFnHttpResponse {
     pub fn new(status: u16, body: Vec<u8>) -> Self {
+        Self::with_content_type(status, body, JSON_CONTENT_TYPE)
+    }
+
+    pub fn with_content_type(status: u16, body: Vec<u8>, content_type: impl Into<String>) -> Self {
         Self {
             status,
-            headers: vec![("content-type".to_owned(), "application/json".to_owned())],
+            headers: vec![("content-type".to_owned(), content_type.into())],
             body,
         }
     }
@@ -183,16 +312,30 @@ impl ServerFnHttpResponse {
 /// response used by Salvo, Axum, Actix, and conformance tests.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn server_fn_response_parts(result: Result<Vec<u8>, ServerFnError>) -> ServerFnHttpResponse {
+    server_fn_response_parts_with_encoding(result, ServerFnEncoding::Json)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn server_fn_response_parts_with_encoding(result: Result<Vec<u8>, ServerFnError>, encoding: ServerFnEncoding) -> ServerFnHttpResponse {
     match result {
-        Ok(bytes) => ServerFnHttpResponse::new(200, bytes),
-        Err(err) => server_fn_error_response_parts(&err),
+        Ok(bytes) => ServerFnHttpResponse::with_content_type(200, bytes, encoding.content_type()),
+        Err(err) => server_fn_error_response_parts_with_encoding(&err, encoding),
     }
 }
 
 /// Converts a typed server-function error into the canonical JSON HTTP error.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn server_fn_error_response_parts(err: &ServerFnError) -> ServerFnHttpResponse {
-    let mut response = ServerFnHttpResponse::new(err.status_code(), serde_json::to_vec(err).expect("ServerFnError serializes"));
+    server_fn_error_response_parts_with_encoding(err, ServerFnEncoding::Json)
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn server_fn_error_response_parts_with_encoding(err: &ServerFnError, encoding: ServerFnEncoding) -> ServerFnHttpResponse {
+    let mut response = ServerFnHttpResponse::with_content_type(
+        err.status_code(),
+        encoding.encode(err).expect("ServerFnError serializes"),
+        encoding.content_type(),
+    );
     response.headers.extend_from_slice(err.response_headers());
     response
 }
@@ -200,12 +343,20 @@ pub fn server_fn_error_response_parts(err: &ServerFnError) -> ServerFnHttpRespon
 /// URL prefix every generated endpoint lives under.
 pub const PREFIX: &str = "/__glory/fn";
 
+pub fn decode_args_with<T: DeserializeOwned>(encoding: ServerFnEncoding, bytes: &[u8]) -> Result<T, ServerFnError> {
+    encoding.decode(bytes)
+}
+
 pub fn decode_args<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, ServerFnError> {
-    serde_json::from_slice(bytes).map_err(|err| ServerFnError::Deserialization(err.to_string()))
+    decode_args_with(ServerFnEncoding::Json, bytes)
+}
+
+pub fn encode_args_with<T: Serialize>(encoding: ServerFnEncoding, value: &T) -> Result<Vec<u8>, ServerFnError> {
+    encoding.encode(value)
 }
 
 pub fn encode_args<T: Serialize>(value: &T) -> Result<Vec<u8>, ServerFnError> {
-    serde_json::to_vec(value).map_err(|err| ServerFnError::Serialization(err.to_string()))
+    encode_args_with(ServerFnEncoding::Json, value)
 }
 
 pub const GET_ARGS_QUERY_PARAM: &str = "__glory_args";
@@ -236,8 +387,20 @@ pub fn decode_form<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, ServerFnError
     serde_urlencoded::from_bytes(bytes).map_err(|err| ServerFnError::http(400, format!("form decode failed: {err}")))
 }
 
+pub fn encode_ok_with<T: Serialize>(encoding: ServerFnEncoding, value: &T) -> Result<Vec<u8>, ServerFnError> {
+    encoding.encode(value)
+}
+
 pub fn encode_ok<T: Serialize>(value: &T) -> Result<Vec<u8>, ServerFnError> {
-    serde_json::to_vec(value).map_err(|err| ServerFnError::Serialization(err.to_string()))
+    encode_ok_with(ServerFnEncoding::Json, value)
+}
+
+pub fn decode_ok_with<T: DeserializeOwned>(encoding: ServerFnEncoding, bytes: &[u8]) -> Result<T, ServerFnError> {
+    encoding.decode(bytes)
+}
+
+pub fn decode_error_with(encoding: ServerFnEncoding, bytes: &[u8]) -> Result<ServerFnError, ServerFnError> {
+    encoding.decode(bytes)
 }
 
 // ---------------------------------------------------------------------------
@@ -868,6 +1031,20 @@ fn parse_header_params(value: &str) -> Vec<(String, String)> {
 #[cfg(not(target_arch = "wasm32"))]
 pub type BoxedServerFnFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Result<Vec<u8>, ServerFnError>> + Send>>;
 
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ServerFnDispatchResult {
+    pub result: Result<Vec<u8>, ServerFnError>,
+    pub encoding: ServerFnEncoding,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl ServerFnDispatchResult {
+    pub fn into_http_response(self) -> ServerFnHttpResponse {
+        server_fn_response_parts_with_encoding(self.result, self.encoding)
+    }
+}
+
 /// One registered server function. The `#[server]` macro submits these
 /// into the global [`inventory`] registry at link time.
 #[cfg(not(target_arch = "wasm32"))]
@@ -876,7 +1053,7 @@ pub struct ServerFnEntry {
     pub path: &'static str,
     /// HTTP method used by generated client stubs.
     pub method: &'static str,
-    pub handler: fn(Vec<u8>) -> BoxedServerFnFuture,
+    pub handler: fn(Vec<u8>, ServerFnEncoding, ServerFnEncoding) -> BoxedServerFnFuture,
 }
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -897,19 +1074,41 @@ pub async fn handle(path: &str, body: Vec<u8>) -> Result<Vec<u8>, ServerFnError>
 
 #[cfg(not(target_arch = "wasm32"))]
 pub async fn handle_with_method(method: &str, path: &str, body: Vec<u8>) -> Result<Vec<u8>, ServerFnError> {
+    dispatch_with_method(method, path, body, ServerFnEncoding::Json, ServerFnEncoding::Json)
+        .await
+        .result
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+pub async fn dispatch_with_method(
+    method: &str,
+    path: &str,
+    body: Vec<u8>,
+    input_encoding: ServerFnEncoding,
+    output_encoding: ServerFnEncoding,
+) -> ServerFnDispatchResult {
     let mut path_exists = false;
     for entry in inventory::iter::<ServerFnEntry> {
         if entry.path == path {
             path_exists = true;
             if entry.method.eq_ignore_ascii_case(method) {
-                return (entry.handler)(body).await;
+                return ServerFnDispatchResult {
+                    result: (entry.handler)(body, input_encoding, output_encoding).await,
+                    encoding: output_encoding,
+                };
             }
         }
     }
     if path_exists {
-        return Err(ServerFnError::http(405, format!("server fn `{path}` does not support {method}")));
+        return ServerFnDispatchResult {
+            result: Err(ServerFnError::http(405, format!("server fn `{path}` does not support {method}"))),
+            encoding: output_encoding,
+        };
     }
-    Err(ServerFnError::NotFound(path.to_owned()))
+    ServerFnDispatchResult {
+        result: Err(ServerFnError::NotFound(path.to_owned())),
+        encoding: output_encoding,
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -948,6 +1147,20 @@ impl RequestContext {
             .and_then(|content_type| content_type.split(';').next())
             .map(str::trim)
             .map(str::to_ascii_lowercase)
+    }
+
+    pub fn request_encoding(&self) -> ServerFnEncoding {
+        if self.method.eq_ignore_ascii_case("GET") {
+            ServerFnEncoding::Json
+        } else {
+            self.header("content-type")
+                .and_then(ServerFnEncoding::from_content_type)
+                .unwrap_or(ServerFnEncoding::Json)
+        }
+    }
+
+    pub fn response_encoding(&self) -> ServerFnEncoding {
+        negotiate_response_encoding(self.header("accept"))
     }
 }
 
@@ -1394,53 +1607,97 @@ where
     Args: Serialize,
     Out: DeserializeOwned,
 {
+    call_remote_with_method_and_encoding(method, path, args, ServerFnEncoding::Json).await
+}
+
+/// Client leg of a server function call using an explicit HTTP method and
+/// preferred response/request encoding.
+pub async fn call_remote_with_method_and_encoding<Args, Out>(
+    method: &str,
+    path: &str,
+    args: &Args,
+    encoding: ServerFnEncoding,
+) -> Result<Out, ServerFnError>
+where
+    Args: Serialize,
+    Out: DeserializeOwned,
+{
     let method = method.to_ascii_uppercase();
-    let body = encode_args(args)?;
+    if method == "GET" && encoding != ServerFnEncoding::Json {
+        return Err(ServerFnError::Serialization(
+            "GET server functions currently require JSON query argument encoding".to_owned(),
+        ));
+    }
+    let body = encode_args_with(encoding, args)?;
 
     #[cfg(target_arch = "wasm32")]
     {
-        call_remote_wasm(&method, path, body)
-            .await
-            .and_then(|bytes| serde_json::from_slice(&bytes).map_err(|err| ServerFnError::Deserialization(err.to_string())))
+        let (bytes, response_encoding) = call_remote_wasm(&method, path, body, encoding).await?;
+        decode_ok_with(response_encoding, &bytes)
     }
 
     #[cfg(all(not(target_arch = "wasm32"), feature = "reqwest-client"))]
     {
-        let url = if method == "GET" {
-            format!("{}{}", server_url(), append_get_args(path, args)?)
-        } else {
-            format!("{}{}", server_url(), path)
-        };
-        let client = reqwest::Client::builder()
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .map_err(|err| ServerFnError::Request(err.to_string()))?;
-        let request = if method == "GET" {
-            client.get(&url)
-        } else {
-            client.post(&url).header("content-type", "application/json").body(body)
-        };
-        let response = request.send().await.map_err(|err| ServerFnError::Request(err.to_string()))?;
-        let status = response.status();
-        let bytes = response.bytes().await.map_err(|err| ServerFnError::Request(err.to_string()))?;
-        if status.is_success() {
-            serde_json::from_slice(&bytes).map_err(|err| ServerFnError::Deserialization(err.to_string()))
-        } else {
-            Err(serde_json::from_slice::<ServerFnError>(&bytes).unwrap_or_else(|_| ServerFnError::Request(format!("HTTP {status}"))))
-        }
+        call_remote_reqwest(&method, path, args, body, encoding).await
     }
 
     #[cfg(all(not(target_arch = "wasm32"), not(feature = "reqwest-client")))]
     {
-        let _ = (method, path, body);
+        let _ = (method, path, body, encoding);
         Err(ServerFnError::Request(
             "no HTTP client available: enable the `reqwest-client` feature of glory-serverfn for non-wasm clients".to_owned(),
         ))
     }
 }
 
+#[cfg(all(not(target_arch = "wasm32"), feature = "reqwest-client"))]
+async fn call_remote_reqwest<Args, Out>(
+    method: &str,
+    path: &str,
+    args: &Args,
+    body: Vec<u8>,
+    encoding: ServerFnEncoding,
+) -> Result<Out, ServerFnError>
+where
+    Args: Serialize,
+    Out: DeserializeOwned,
+{
+    let url = if method == "GET" {
+        format!("{}{}", server_url(), append_get_args(path, args)?)
+    } else {
+        format!("{}{}", server_url(), path)
+    };
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|err| ServerFnError::Request(err.to_string()))?;
+    let request = if method == "GET" {
+        client.get(&url).header("accept", encoding.content_type())
+    } else {
+        client
+            .post(&url)
+            .header("content-type", encoding.content_type())
+            .header("accept", encoding.content_type())
+            .body(body)
+    };
+    let response = request.send().await.map_err(|err| ServerFnError::Request(err.to_string()))?;
+    let status = response.status();
+    let response_encoding = response
+        .headers()
+        .get("content-type")
+        .and_then(|value| value.to_str().ok())
+        .and_then(ServerFnEncoding::from_content_type)
+        .unwrap_or(encoding);
+    let bytes = response.bytes().await.map_err(|err| ServerFnError::Request(err.to_string()))?;
+    if status.is_success() {
+        decode_ok_with(response_encoding, &bytes)
+    } else {
+        Err(decode_error_with(response_encoding, &bytes).unwrap_or_else(|_| ServerFnError::Request(format!("HTTP {status}"))))
+    }
+}
+
 #[cfg(target_arch = "wasm32")]
-async fn call_remote_wasm(method: &str, path: &str, body: Vec<u8>) -> Result<Vec<u8>, ServerFnError> {
+async fn call_remote_wasm(method: &str, path: &str, body: Vec<u8>, encoding: ServerFnEncoding) -> Result<(Vec<u8>, ServerFnEncoding), ServerFnError> {
     use wasm_bindgen::JsCast;
     use wasm_bindgen_futures::JsFuture;
 
@@ -1460,8 +1717,9 @@ async fn call_remote_wasm(method: &str, path: &str, body: Vec<u8>) -> Result<Vec
         path.to_owned()
     };
     let request = web_sys::Request::new_with_str_and_init(&url, &init).map_err(request_err)?;
+    request.headers().set("accept", encoding.content_type()).map_err(request_err)?;
     if method != "GET" {
-        request.headers().set("content-type", "application/json").map_err(request_err)?;
+        request.headers().set("content-type", encoding.content_type()).map_err(request_err)?;
     }
 
     let window = web_sys::window().ok_or_else(|| ServerFnError::Request("no window".to_owned()))?;
@@ -1473,10 +1731,16 @@ async fn call_remote_wasm(method: &str, path: &str, body: Vec<u8>) -> Result<Vec
 
     let buffer = JsFuture::from(response.array_buffer().map_err(request_err)?).await.map_err(request_err)?;
     let bytes = js_sys::Uint8Array::new(&buffer).to_vec();
+    let response_encoding = response
+        .headers()
+        .get("content-type")
+        .map_err(request_err)?
+        .and_then(|value| ServerFnEncoding::from_content_type(&value))
+        .unwrap_or(encoding);
     if response.ok() {
-        Ok(bytes)
+        Ok((bytes, response_encoding))
     } else {
-        Err(serde_json::from_slice::<ServerFnError>(&bytes).unwrap_or_else(|_| ServerFnError::Request(format!("HTTP {}", response.status()))))
+        Err(decode_error_with(response_encoding, &bytes).unwrap_or_else(|_| ServerFnError::Request(format!("HTTP {}", response.status()))))
     }
 }
 
@@ -1505,11 +1769,13 @@ pub mod salvo_mount {
                 .map(|(name, value)| (name.as_str().to_ascii_lowercase(), value.to_str().unwrap_or_default().to_owned()))
                 .collect(),
         };
+        let input_encoding = context.request_encoding();
+        let output_encoding = context.response_encoding();
         let body = if method.eq_ignore_ascii_case("GET") {
             match crate::decode_get_args_from_query(req.uri().query()) {
                 Ok(body) => body,
                 Err(err) => {
-                    write_http_response(res, crate::server_fn_error_response_parts(&err));
+                    write_http_response(res, crate::server_fn_error_response_parts_with_encoding(&err, output_encoding));
                     return;
                 }
             }
@@ -1519,14 +1785,21 @@ pub mod salvo_mount {
                 Err(err) => {
                     write_http_response(
                         res,
-                        crate::server_fn_error_response_parts(&crate::ServerFnError::http(400, format!("invalid body: {err}"))),
+                        crate::server_fn_error_response_parts_with_encoding(
+                            &crate::ServerFnError::http(400, format!("invalid body: {err}")),
+                            output_encoding,
+                        ),
                     );
                     return;
                 }
             }
         };
-        let response = crate::server_fn_response_parts(crate::with_request_context(context, crate::handle_with_method(&method, &path, body)).await);
-        write_http_response(res, response);
+        let dispatch = crate::with_request_context(
+            context,
+            crate::dispatch_with_method(&method, &path, body, input_encoding, output_encoding),
+        )
+        .await;
+        write_http_response(res, dispatch.into_http_response());
     }
 
     fn write_http_response(res: &mut Response, response: crate::ServerFnHttpResponse) {
@@ -1599,25 +1872,32 @@ pub mod axum_mount {
                 .map(|(name, value)| (name.as_str().to_ascii_lowercase(), value.to_str().unwrap_or_default().to_owned()))
                 .collect(),
         };
+        let input_encoding = context.request_encoding();
+        let output_encoding = context.response_encoding();
         let body = if method.eq_ignore_ascii_case("GET") {
             match crate::decode_get_args_from_query(query.as_deref()) {
                 Ok(body) => body,
-                Err(err) => return into_response(crate::server_fn_error_response_parts(&err)),
+                Err(err) => return into_response(crate::server_fn_error_response_parts_with_encoding(&err, output_encoding)),
             }
         } else {
             match axum::body::to_bytes(request.into_body(), 16 * 1024 * 1024).await {
                 Ok(bytes) => bytes.to_vec(),
                 Err(err) => {
-                    return into_response(crate::server_fn_error_response_parts(&crate::ServerFnError::http(
-                        400,
-                        format!("invalid body: {err}"),
-                    )));
+                    return into_response(crate::server_fn_error_response_parts_with_encoding(
+                        &crate::ServerFnError::http(400, format!("invalid body: {err}")),
+                        output_encoding,
+                    ));
                 }
             }
         };
-        into_response(crate::server_fn_response_parts(
-            crate::with_request_context(context, crate::handle_with_method(&method, &path, body)).await,
-        ))
+        into_response(
+            crate::with_request_context(
+                context,
+                crate::dispatch_with_method(&method, &path, body, input_encoding, output_encoding),
+            )
+            .await
+            .into_http_response(),
+        )
     }
 
     fn into_response(parts: crate::ServerFnHttpResponse) -> Response {
@@ -1677,17 +1957,24 @@ pub mod actix_mount {
                 .map(|(name, value)| (name.as_str().to_ascii_lowercase(), value.to_str().unwrap_or_default().to_owned()))
                 .collect(),
         };
+        let input_encoding = context.request_encoding();
+        let output_encoding = context.response_encoding();
         let body = if method.eq_ignore_ascii_case("GET") {
             match crate::decode_get_args_from_query(Some(request.query_string())) {
                 Ok(body) => body,
-                Err(err) => return into_http_response(crate::server_fn_error_response_parts(&err)),
+                Err(err) => return into_http_response(crate::server_fn_error_response_parts_with_encoding(&err, output_encoding)),
             }
         } else {
             body.to_vec()
         };
-        into_http_response(crate::server_fn_response_parts(
-            crate::with_request_context(context, crate::handle_with_method(&method, &path, body)).await,
-        ))
+        into_http_response(
+            crate::with_request_context(
+                context,
+                crate::dispatch_with_method(&method, &path, body, input_encoding, output_encoding),
+            )
+            .await
+            .into_http_response(),
+        )
     }
 
     fn into_http_response(parts: crate::ServerFnHttpResponse) -> HttpResponse {

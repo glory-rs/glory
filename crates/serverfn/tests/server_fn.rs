@@ -203,6 +203,112 @@ fn http_response_parts_are_adapter_conformance_contract() {
     assert_eq!(serde_json::from_slice::<ServerFnError>(&response.body).unwrap(), redirect);
 }
 
+#[test]
+fn encoding_helpers_parse_content_types_and_accept_headers() {
+    assert_eq!(
+        glory_serverfn::ServerFnEncoding::from_content_type("Application/Json; charset=utf-8"),
+        Some(glory_serverfn::ServerFnEncoding::Json)
+    );
+    assert_eq!(
+        glory_serverfn::negotiate_response_encoding(Some("text/html, application/json;q=0.8")),
+        glory_serverfn::ServerFnEncoding::Json
+    );
+    assert_eq!(
+        glory_serverfn::negotiate_response_encoding(Some("application/unknown")),
+        glory_serverfn::ServerFnEncoding::Json
+    );
+
+    #[cfg(feature = "cbor")]
+    {
+        assert_eq!(
+            glory_serverfn::ServerFnEncoding::from_content_type("application/cbor"),
+            Some(glory_serverfn::ServerFnEncoding::Cbor)
+        );
+        assert_eq!(
+            glory_serverfn::negotiate_response_encoding(Some("application/json;q=0.5, application/cbor")),
+            glory_serverfn::ServerFnEncoding::Cbor
+        );
+    }
+
+    #[cfg(feature = "postcard")]
+    {
+        assert_eq!(
+            glory_serverfn::ServerFnEncoding::from_content_type("application/postcard"),
+            Some(glory_serverfn::ServerFnEncoding::Postcard)
+        );
+        assert_eq!(
+            glory_serverfn::negotiate_response_encoding(Some("application/json;q=0.5, application/postcard")),
+            glory_serverfn::ServerFnEncoding::Postcard
+        );
+    }
+}
+
+#[cfg(feature = "cbor")]
+#[test]
+fn cbor_dispatch_round_trips_arguments_results_and_errors() {
+    use glory_serverfn::{CBOR_CONTENT_TYPE, ServerFnEncoding, decode_error_with, decode_ok_with, dispatch_with_method, encode_args_with};
+
+    futures::executor::block_on(async {
+        let body = encode_args_with(ServerFnEncoding::Cbor, &("task".to_string(), 2usize)).unwrap();
+        let response = dispatch_with_method("POST", "/__glory/fn/list_todos", body, ServerFnEncoding::Cbor, ServerFnEncoding::Cbor)
+            .await
+            .into_http_response();
+        assert_eq!(response.status, 200);
+        assert_eq!(response.headers, vec![("content-type".to_owned(), CBOR_CONTENT_TYPE.to_owned())]);
+        let todos: Vec<Todo> = decode_ok_with(ServerFnEncoding::Cbor, &response.body).unwrap();
+        assert_eq!(todos[1].title, "task-1");
+
+        let response = dispatch_with_method("POST", "/__glory/fn/nope", Vec::new(), ServerFnEncoding::Cbor, ServerFnEncoding::Cbor)
+            .await
+            .into_http_response();
+        assert_eq!(response.status, 404);
+        assert_eq!(response.headers, vec![("content-type".to_owned(), CBOR_CONTENT_TYPE.to_owned())]);
+        assert!(matches!(
+            decode_error_with(ServerFnEncoding::Cbor, &response.body).unwrap(),
+            ServerFnError::NotFound(_)
+        ));
+    });
+}
+
+#[cfg(feature = "postcard")]
+#[test]
+fn postcard_dispatch_round_trips_arguments_results_and_errors() {
+    use glory_serverfn::{POSTCARD_CONTENT_TYPE, ServerFnEncoding, decode_error_with, decode_ok_with, dispatch_with_method, encode_args_with};
+
+    futures::executor::block_on(async {
+        let body = encode_args_with(ServerFnEncoding::Postcard, &("task".to_string(), 2usize)).unwrap();
+        let response = dispatch_with_method(
+            "POST",
+            "/__glory/fn/list_todos",
+            body,
+            ServerFnEncoding::Postcard,
+            ServerFnEncoding::Postcard,
+        )
+        .await
+        .into_http_response();
+        assert_eq!(response.status, 200);
+        assert_eq!(response.headers, vec![("content-type".to_owned(), POSTCARD_CONTENT_TYPE.to_owned())]);
+        let todos: Vec<Todo> = decode_ok_with(ServerFnEncoding::Postcard, &response.body).unwrap();
+        assert_eq!(todos[1].title, "task-1");
+
+        let response = dispatch_with_method(
+            "POST",
+            "/__glory/fn/nope",
+            Vec::new(),
+            ServerFnEncoding::Postcard,
+            ServerFnEncoding::Postcard,
+        )
+        .await
+        .into_http_response();
+        assert_eq!(response.status, 404);
+        assert_eq!(response.headers, vec![("content-type".to_owned(), POSTCARD_CONTENT_TYPE.to_owned())]);
+        assert!(matches!(
+            decode_error_with(ServerFnEncoding::Postcard, &response.body).unwrap(),
+            ServerFnError::NotFound(_)
+        ));
+    });
+}
+
 #[server]
 async fn whoami() -> Result<String, ServerFnError> {
     Ok(glory_serverfn::request_context()

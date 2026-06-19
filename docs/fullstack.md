@@ -38,6 +38,31 @@ The generated script uses `type="application/json"` and escapes JSON for safe
 embedding in HTML. Hydrated clients can parse the same JSON before falling back
 to a server-function fetch.
 
+## Server Function Encodings
+
+JSON is the default and remains available without extra features:
+
+```rust
+#[glory::server]
+async fn list_todos() -> Result<Vec<Todo>, glory_serverfn::ServerFnError> {
+    Ok(vec![])
+}
+```
+
+Enable `glory-serverfn/cbor` or `glory-serverfn/postcard` to add binary
+encodings. Adapter mounts decode POST bodies from `Content-Type` and encode
+responses from `Accept`; generated clients can request the same encoding:
+
+```rust
+#[glory::server(encoding = "cbor")]
+async fn save_todo(todo: Todo) -> Result<Todo, glory_serverfn::ServerFnError> {
+    Ok(todo)
+}
+```
+
+GET server functions keep JSON query arguments. Binary encodings are intended
+for POST bodies and responses.
+
 ## Streaming, SSE, And Uploads
 
 `glory-serverfn` has adapter-agnostic helpers for custom resource routes:

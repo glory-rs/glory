@@ -31,12 +31,17 @@ use syn::{FnArg, ItemFn, LitStr, Pat, parse_macro_input};
 /// functions in different modules would otherwise collide on the name.
 /// `#[server(method = "GET")]` sends the JSON tuple through a query string
 /// parameter; the default method is `POST`.
+/// `#[server(encoding = "cbor")]` or `#[server(encoding = "postcard")]`
+/// requests that encoding for the generated client stub when the matching
+/// `glory-serverfn` feature is enabled. GET server functions currently use
+/// JSON query arguments and therefore only support the default JSON encoding.
 #[proc_macro_attribute]
 pub fn server(attr: TokenStream, item: TokenStream) -> TokenStream {
     let item_fn = parse_macro_input!(item as ItemFn);
 
     let mut endpoint: Option<String> = None;
     let mut method = "POST".to_owned();
+    let mut encoding = "json".to_owned();
     if !attr.is_empty() {
         let parser = syn::meta::parser(|meta| {
             if meta.path.is_ident("endpoint") {
@@ -53,11 +58,29 @@ pub fn server(attr: TokenStream, item: TokenStream) -> TokenStream {
                     }
                     _ => Err(meta.error("unsupported #[server] method; expected `GET` or `POST`")),
                 }
+            } else if meta.path.is_ident("encoding") {
+                let value: LitStr = meta.value()?.parse()?;
+                let value = value.value().to_ascii_lowercase();
+                match value.as_str() {
+                    "json" | "cbor" | "postcard" => {
+                        encoding = value;
+                        Ok(())
+                    }
+                    _ => Err(meta.error("unsupported #[server] encoding; expected `json`, `cbor`, or `postcard`")),
+                }
             } else {
-                Err(meta.error("unsupported #[server] option; expected `endpoint = \"...\"` or `method = \"GET\"`"))
+                Err(meta.error("unsupported #[server] option; expected `endpoint = \"...\"`, `method = \"GET\"`, or `encoding = \"cbor\"`"))
             }
         });
         parse_macro_input!(attr with parser);
+    }
+    if method == "GET" && encoding != "json" {
+        return syn::Error::new(
+            item_fn.sig.span(),
+            "#[server(method = \"GET\")] currently supports only JSON query argument encoding",
+        )
+        .to_compile_error()
+        .into();
     }
 
     if item_fn.sig.asyncness.is_none() {
@@ -94,6 +117,12 @@ pub fn server(attr: TokenStream, item: TokenStream) -> TokenStream {
     let name = &sig.ident;
     let endpoint = endpoint.unwrap_or_else(|| name.to_string());
     let url = format!("/__glory/fn/{endpoint}");
+    let encoding = match encoding.as_str() {
+        "json" => quote! { glory_serverfn::ServerFnEncoding::Json },
+        "cbor" => quote! { glory_serverfn::ServerFnEncoding::Cbor },
+        "postcard" => quote! { glory_serverfn::ServerFnEncoding::Postcard },
+        _ => unreachable!("validated server fn encoding"),
+    };
     let decode_args = if arg_idents.len() == 1 {
         let arg_ident = &arg_idents[0];
         let arg_type = &arg_types[0];
@@ -102,12 +131,12 @@ pub fn server(attr: TokenStream, item: TokenStream) -> TokenStream {
                 let #arg_ident: #arg_type = glory_serverfn::decode_form(&__body)?;
                 ( #arg_ident, )
             } else {
-                glory_serverfn::decode_args(&__body)?
+                glory_serverfn::decode_args_with(__input_encoding, &__body)?
             }
         }
     } else {
         quote! {
-            glory_serverfn::decode_args(&__body)?
+            glory_serverfn::decode_args_with(__input_encoding, &__body)?
         }
     };
 
@@ -120,17 +149,17 @@ pub fn server(attr: TokenStream, item: TokenStream) -> TokenStream {
             glory_serverfn::ServerFnEntry {
                 path: #url,
                 method: #method,
-                handler: |__body: ::std::vec::Vec<u8>| ::std::boxed::Box::pin(async move {
+                handler: |__body: ::std::vec::Vec<u8>, __input_encoding: glory_serverfn::ServerFnEncoding, __output_encoding: glory_serverfn::ServerFnEncoding| ::std::boxed::Box::pin(async move {
                     let ( #(#arg_idents,)* ): ( #(#arg_types,)* ) = #decode_args;
                     let __output = #name( #(#arg_idents),* ).await?;
-                    glory_serverfn::encode_ok(&__output)
+                    glory_serverfn::encode_ok_with(__output_encoding, &__output)
                 }),
             }
         }
 
         #[cfg(target_arch = "wasm32")]
         #vis #sig {
-            glory_serverfn::call_remote_with_method(#method, #url, &( #(#arg_idents,)* )).await
+            glory_serverfn::call_remote_with_method_and_encoding(#method, #url, &( #(#arg_idents,)* ), #encoding).await
         }
     };
     expanded.into()
