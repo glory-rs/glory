@@ -9,8 +9,9 @@
 //!
 //! Multi-window: every window owns an independent `CommandHolder` (one
 //! reactive scope per `HolderId`), webview and command queue; IPC events
-//! carry the window index so batches never cross windows.
+//! carry a stable [`DesktopWindowId`] so batches never cross windows.
 
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -19,11 +20,186 @@ use glory_core::web::holders::CommandHolder;
 use glory_core::{Holder, Widget};
 use glory_hot_reload::{FunctionReloadBatch, ReloadMessage};
 use tao::event::{Event, WindowEvent};
-use tao::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy};
-use tao::window::{Window, WindowBuilder, WindowId};
+use tao::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy, EventLoopWindowTarget};
+use tao::window::{Fullscreen, Window, WindowBuilder, WindowId};
 use wry::{WebView, WebViewBuilder};
 
 use crate::IpcMessage;
+
+/// Stable process-local id for a desktop window.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
+pub struct DesktopWindowId(usize);
+
+impl DesktopWindowId {
+    pub fn as_usize(self) -> usize {
+        self.0
+    }
+}
+
+/// Cached window state visible to widget callbacks.
+#[derive(Clone, Debug)]
+pub struct DesktopWindowState {
+    id: DesktopWindowId,
+    fullscreen: bool,
+    maximized: bool,
+    focused: bool,
+    zoom_level: f64,
+    closed: bool,
+}
+
+impl DesktopWindowState {
+    fn new(id: DesktopWindowId) -> Self {
+        Self {
+            id,
+            fullscreen: false,
+            maximized: false,
+            focused: true,
+            zoom_level: 1.0,
+            closed: false,
+        }
+    }
+
+    pub fn id(&self) -> DesktopWindowId {
+        self.id
+    }
+
+    pub fn is_fullscreen(&self) -> bool {
+        self.fullscreen
+    }
+
+    pub fn is_maximized(&self) -> bool {
+        self.maximized
+    }
+
+    pub fn is_focused(&self) -> bool {
+        self.focused
+    }
+
+    pub fn zoom_level(&self) -> f64 {
+        self.zoom_level
+    }
+
+    pub fn is_closed(&self) -> bool {
+        self.closed
+    }
+}
+
+/// Handle that widget callbacks can capture to control their native window.
+#[derive(Clone)]
+pub struct DesktopWindowHandle {
+    id: DesktopWindowId,
+    proxy: EventLoopProxy<HostEvent>,
+    state: Rc<RefCell<DesktopWindowState>>,
+    window_queue: Rc<RefCell<Vec<PendingWindow>>>,
+    next_window_index: Rc<Cell<usize>>,
+}
+
+impl std::fmt::Debug for DesktopWindowHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DesktopWindowHandle")
+            .field("id", &self.id)
+            .field("state", &self.state())
+            .finish_non_exhaustive()
+    }
+}
+
+impl DesktopWindowHandle {
+    fn new(
+        id: DesktopWindowId,
+        proxy: EventLoopProxy<HostEvent>,
+        state: Rc<RefCell<DesktopWindowState>>,
+        window_queue: Rc<RefCell<Vec<PendingWindow>>>,
+        next_window_index: Rc<Cell<usize>>,
+    ) -> Self {
+        Self {
+            id,
+            proxy,
+            state,
+            window_queue,
+            next_window_index,
+        }
+    }
+
+    pub fn id(&self) -> DesktopWindowId {
+        self.id
+    }
+
+    pub fn state(&self) -> DesktopWindowState {
+        self.state.borrow().clone()
+    }
+
+    pub fn is_fullscreen(&self) -> bool {
+        self.state.borrow().is_fullscreen()
+    }
+
+    pub fn is_maximized(&self) -> bool {
+        self.state.borrow().is_maximized()
+    }
+
+    pub fn zoom_level(&self) -> f64 {
+        self.state.borrow().zoom_level()
+    }
+
+    pub fn drag_window(&self) -> bool {
+        self.send(WindowCommand::DragWindow)
+    }
+
+    pub fn set_fullscreen(&self, fullscreen: bool) -> bool {
+        self.state.borrow_mut().fullscreen = fullscreen;
+        self.send(WindowCommand::SetFullscreen(fullscreen))
+    }
+
+    pub fn set_maximized(&self, maximized: bool) -> bool {
+        self.state.borrow_mut().maximized = maximized;
+        self.send(WindowCommand::SetMaximized(maximized))
+    }
+
+    pub fn toggle_maximized(&self) -> bool {
+        let next = !self.is_maximized();
+        self.state.borrow_mut().maximized = next;
+        self.send(WindowCommand::SetMaximized(next))
+    }
+
+    pub fn focus(&self) -> bool {
+        self.send(WindowCommand::Focus)
+    }
+
+    pub fn set_zoom_level(&self, zoom_level: f64) -> bool {
+        if !zoom_level.is_finite() || zoom_level <= 0.0 {
+            return false;
+        }
+        self.state.borrow_mut().zoom_level = zoom_level;
+        self.send(WindowCommand::SetZoomLevel(zoom_level))
+    }
+
+    pub fn close(&self) -> bool {
+        self.close_window(self.id)
+    }
+
+    pub fn close_window(&self, id: DesktopWindowId) -> bool {
+        self.proxy
+            .send_event(HostEvent::WindowCommand {
+                id,
+                command: WindowCommand::Close,
+            })
+            .is_ok()
+    }
+
+    pub fn open_window<W>(&self, config: DesktopConfig, widget: impl FnOnce(DesktopWindowHandle) -> W + 'static) -> DesktopWindowId
+    where
+        W: Widget + 'static,
+    {
+        let id = DesktopWindowId(self.next_window_index.get());
+        self.next_window_index.set(id.0 + 1);
+        self.window_queue.borrow_mut().push(PendingWindow::new(id, config, widget));
+        let _ = self.proxy.send_event(HostEvent::OpenQueuedWindows);
+        id
+    }
+
+    fn send(&self, command: WindowCommand) -> bool {
+        self.proxy.send_event(HostEvent::WindowCommand { id: self.id, command }).is_ok()
+    }
+}
 
 /// One menu entry. `id` is what your `on_menu` callback receives.
 #[derive(Clone, Debug)]
@@ -125,11 +301,23 @@ impl Default for DesktopConfig {
 const BOOTSTRAP_HTML: &str = "<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head><body></body></html>";
 
 enum HostEvent {
-    Ready(usize),
-    Dom(usize, EventData),
-    Query(usize, glory_core::renderer::QueryResponse),
+    Ready(DesktopWindowId),
+    Dom(DesktopWindowId, Box<EventData>),
+    Query(DesktopWindowId, glory_core::renderer::QueryResponse),
     Reload(ReloadMessage),
     Menu(String),
+    WindowCommand { id: DesktopWindowId, command: WindowCommand },
+    OpenQueuedWindows,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum WindowCommand {
+    DragWindow,
+    SetFullscreen(bool),
+    SetMaximized(bool),
+    Focus,
+    SetZoomLevel(f64),
+    Close,
 }
 
 /// Connects to `glory-cli`'s `/live_reload` websocket when the CLI is
@@ -267,22 +455,40 @@ fn serve_asset(root: &std::path::Path, request: wry::http::Request<Vec<u8>>) -> 
 }
 
 type MountFn = Box<dyn FnOnce(CommandHolder) -> CommandHolder>;
+type MountFactory = Box<dyn FnOnce(DesktopWindowHandle) -> MountFn>;
 
 struct PendingWindow {
+    id: DesktopWindowId,
     config: DesktopConfig,
-    mount: MountFn,
+    state: Rc<RefCell<DesktopWindowState>>,
+    mount: MountFactory,
+}
+
+impl PendingWindow {
+    fn new<W>(id: DesktopWindowId, config: DesktopConfig, widget: impl FnOnce(DesktopWindowHandle) -> W + 'static) -> Self
+    where
+        W: Widget + 'static,
+    {
+        Self {
+            id,
+            config,
+            state: Rc::new(RefCell::new(DesktopWindowState::new(id))),
+            mount: Box::new(move |window| Box::new(move |holder| holder.mount(widget(window)))),
+        }
+    }
 }
 
 struct WindowSlot {
-    /// Original creation index — what the IPC closures and menu routes
+    /// Original creation id — what the IPC closures and menu routes
     /// carry. Stable across window closes (slots are removed, not
     /// reindexed).
-    index: usize,
+    id: DesktopWindowId,
     window: Window,
     webview: WebView,
     holder: Option<CommandHolder>,
     mount: Option<MountFn>,
     config: DesktopConfig,
+    state: Rc<RefCell<DesktopWindowState>>,
     /// Keeps the muda menu alive for the window's lifetime.
     #[allow(dead_code)]
     menu: Option<muda::Menu>,
@@ -302,6 +508,7 @@ struct WindowSlot {
 #[derive(Default)]
 pub struct Desktop {
     windows: Vec<PendingWindow>,
+    next_window_index: usize,
 }
 
 impl Desktop {
@@ -313,10 +520,17 @@ impl Desktop {
     where
         W: Widget + 'static,
     {
-        self.windows.push(PendingWindow {
-            config,
-            mount: Box::new(move |holder| holder.mount(widget())),
-        });
+        self = self.window_with_handle(config, move |_| widget());
+        self
+    }
+
+    pub fn window_with_handle<W>(mut self, config: DesktopConfig, widget: impl FnOnce(DesktopWindowHandle) -> W + 'static) -> Self
+    where
+        W: Widget + 'static,
+    {
+        let id = DesktopWindowId(self.next_window_index);
+        self.next_window_index += 1;
+        self.windows.push(PendingWindow::new(id, config, widget));
         self
     }
 
@@ -326,71 +540,31 @@ impl Desktop {
 
         let event_loop = EventLoopBuilder::<HostEvent>::with_user_event().build();
         let mut slots: Vec<(WindowId, WindowSlot)> = Vec::new();
-        let mut menu_routes: HashMap<String, usize> = HashMap::new();
+        let mut menu_routes: HashMap<String, DesktopWindowId> = HashMap::new();
+        let proxy = event_loop.create_proxy();
+        let window_queue: Rc<RefCell<Vec<PendingWindow>>> = Rc::new(RefCell::new(Vec::new()));
+        let next_window_index = Rc::new(Cell::new(self.next_window_index));
 
-        for (index, pending) in self.windows.into_iter().enumerate() {
-            let PendingWindow { config, mount } = pending;
-            let window = WindowBuilder::new()
-                .with_title(&config.title)
-                .with_inner_size(tao::dpi::LogicalSize::new(config.inner_size.0, config.inner_size.1))
-                .with_resizable(config.resizable)
-                .build(&event_loop)
-                .expect("glory-desktop: failed to create window");
-
-            let ipc_proxy = event_loop.create_proxy();
-            let assets_root_dir = assets_root(&config);
-            let webview = WebViewBuilder::new()
-                .with_initialization_script(crate::WRY_INTERPRETER_JS)
-                .with_html(BOOTSTRAP_HTML)
-                .with_devtools(config.devtools)
-                .with_custom_protocol("glory".into(), move |_webview_id, request| serve_asset(&assets_root_dir, request))
-                .with_ipc_handler(
-                    move |request: wry::http::Request<String>| match serde_json::from_str::<IpcMessage>(request.body()) {
-                        Ok(IpcMessage::GloryWryReady(_)) => {
-                            let _ = ipc_proxy.send_event(HostEvent::Ready(index));
-                        }
-                        Ok(IpcMessage::GloryWryEvent(data)) => {
-                            let _ = ipc_proxy.send_event(HostEvent::Dom(index, data));
-                        }
-                        Ok(IpcMessage::GloryWryQuery(response)) => {
-                            let _ = ipc_proxy.send_event(HostEvent::Query(index, response));
-                        }
-                        Err(err) => {
-                            tracing::warn!(%err, "glory-desktop: undecodable IPC message");
-                        }
-                    },
-                )
-                .build(&window)
-                .expect("glory-desktop: failed to create webview");
-
-            let menu = config.menu.as_ref().map(|spec| {
-                let menu = build_menu(spec, index, &mut menu_routes);
-                attach_menu(&menu, &window);
-                menu
-            });
-
-            slots.push((
-                window.id(),
-                WindowSlot {
-                    index,
-                    window,
-                    webview,
-                    holder: None,
-                    mount: Some(mount),
-                    config,
-                    menu,
-                },
-            ));
+        for pending in self.windows {
+            create_window(
+                &event_loop,
+                pending,
+                proxy.clone(),
+                window_queue.clone(),
+                next_window_index.clone(),
+                &mut slots,
+                &mut menu_routes,
+            );
         }
 
-        let menu_proxy = event_loop.create_proxy();
+        let menu_proxy = proxy.clone();
         muda::MenuEvent::set_event_handler(Some(move |event: muda::MenuEvent| {
             let _ = menu_proxy.send_event(HostEvent::Menu(event.id().0.clone()));
         }));
 
-        spawn_reload_client(event_loop.create_proxy());
+        spawn_reload_client(proxy.clone());
 
-        event_loop.run(move |event, _target, control_flow| {
+        event_loop.run(move |event, target, control_flow| {
             *control_flow = ControlFlow::Wait;
             match event {
                 Event::WindowEvent {
@@ -398,13 +572,33 @@ impl Desktop {
                     window_id,
                     ..
                 } => {
-                    slots.retain(|(id, _)| *id != window_id);
+                    close_slot_by_window_id(&mut slots, window_id);
                     if slots.is_empty() {
                         *control_flow = ControlFlow::Exit;
                     }
                 }
-                Event::UserEvent(HostEvent::Ready(index)) => {
-                    let Some(slot) = slot_by_index(&mut slots, index) else {
+                Event::WindowEvent {
+                    event: WindowEvent::Focused(focused),
+                    window_id,
+                    ..
+                } => {
+                    if let Some(slot) = slot_by_window_id(&mut slots, window_id) {
+                        slot.state.borrow_mut().focused = focused;
+                    }
+                }
+                Event::WindowEvent {
+                    event: WindowEvent::Resized(_),
+                    window_id,
+                    ..
+                } => {
+                    if let Some(slot) = slot_by_window_id(&mut slots, window_id) {
+                        let mut state = slot.state.borrow_mut();
+                        state.maximized = slot.window.is_maximized();
+                        state.fullscreen = slot.window.fullscreen().is_some();
+                    }
+                }
+                Event::UserEvent(HostEvent::Ready(id)) => {
+                    let Some(slot) = slot_by_id(&mut slots, id) else {
                         return;
                     };
                     let Some(mount) = slot.mount.take() else {
@@ -418,29 +612,49 @@ impl Desktop {
                     slot.holder = Some(holder);
                     let _ = &slot.window;
                 }
-                Event::UserEvent(HostEvent::Dom(index, data)) => {
-                    if let Some(slot) = slot_by_index(&mut slots, index)
+                Event::UserEvent(HostEvent::Dom(id, data)) => {
+                    if let Some(slot) = slot_by_id(&mut slots, id)
                         && let Some(holder) = &slot.holder
                     {
-                        holder.dispatch_event(data);
+                        holder.dispatch_event(*data);
                         flush(&slot.webview, holder);
                     }
                 }
-                Event::UserEvent(HostEvent::Query(index, response)) => {
-                    if let Some(slot) = slot_by_index(&mut slots, index)
+                Event::UserEvent(HostEvent::Query(id, response)) => {
+                    if let Some(slot) = slot_by_id(&mut slots, id)
                         && let Some(holder) = &slot.holder
                     {
                         holder.resolve_query(response);
                         flush(&slot.webview, holder);
                     }
                 }
-                Event::UserEvent(HostEvent::Menu(id)) => {
-                    let Some(index) = menu_routes.get(&id).copied() else { return };
-                    if let Some(slot) = slot_by_index(&mut slots, index)
+                Event::UserEvent(HostEvent::Menu(menu_id)) => {
+                    let Some(id) = menu_routes.get(&menu_id).copied() else { return };
+                    if let Some(slot) = slot_by_id(&mut slots, id)
                         && let (Some(callback), Some(holder)) = (&slot.config.on_menu, &slot.holder)
                     {
-                        holder.update(|| callback(holder, &id));
+                        holder.update(|| callback(holder, &menu_id));
                         flush(&slot.webview, holder);
+                    }
+                }
+                Event::UserEvent(HostEvent::WindowCommand { id, command }) => {
+                    apply_window_command(&mut slots, id, command);
+                    if slots.is_empty() {
+                        *control_flow = ControlFlow::Exit;
+                    }
+                }
+                Event::UserEvent(HostEvent::OpenQueuedWindows) => {
+                    let pending = window_queue.borrow_mut().drain(..).collect::<Vec<_>>();
+                    for window in pending {
+                        create_window(
+                            target,
+                            window,
+                            proxy.clone(),
+                            window_queue.clone(),
+                            next_window_index.clone(),
+                            &mut slots,
+                            &mut menu_routes,
+                        );
                     }
                 }
                 Event::UserEvent(HostEvent::Reload(message)) => match message {
@@ -479,16 +693,151 @@ impl Desktop {
     }
 }
 
-fn slot_by_index<'s>(slots: &'s mut [(WindowId, WindowSlot)], index: usize) -> Option<&'s mut WindowSlot> {
-    slots.iter_mut().map(|(_, slot)| slot).find(|slot| slot.index == index)
+fn create_window(
+    target: &EventLoopWindowTarget<HostEvent>,
+    pending: PendingWindow,
+    proxy: EventLoopProxy<HostEvent>,
+    window_queue: Rc<RefCell<Vec<PendingWindow>>>,
+    next_window_index: Rc<Cell<usize>>,
+    slots: &mut Vec<(WindowId, WindowSlot)>,
+    menu_routes: &mut HashMap<String, DesktopWindowId>,
+) {
+    let PendingWindow { id, config, state, mount } = pending;
+    let window = WindowBuilder::new()
+        .with_title(&config.title)
+        .with_inner_size(tao::dpi::LogicalSize::new(config.inner_size.0, config.inner_size.1))
+        .with_resizable(config.resizable)
+        .build(target)
+        .expect("glory-desktop: failed to create window");
+
+    {
+        let mut state = state.borrow_mut();
+        state.focused = true;
+        state.maximized = window.is_maximized();
+        state.fullscreen = window.fullscreen().is_some();
+    }
+
+    let handle = DesktopWindowHandle::new(id, proxy.clone(), state.clone(), window_queue, next_window_index);
+    let mount = mount(handle);
+    let ipc_proxy = proxy.clone();
+    let assets_root_dir = assets_root(&config);
+    let webview = WebViewBuilder::new()
+        .with_initialization_script(crate::WRY_INTERPRETER_JS)
+        .with_html(BOOTSTRAP_HTML)
+        .with_devtools(config.devtools)
+        .with_custom_protocol("glory".into(), move |_webview_id, request| serve_asset(&assets_root_dir, request))
+        .with_ipc_handler(
+            move |request: wry::http::Request<String>| match serde_json::from_str::<IpcMessage>(request.body()) {
+                Ok(IpcMessage::GloryWryReady(_)) => {
+                    let _ = ipc_proxy.send_event(HostEvent::Ready(id));
+                }
+                Ok(IpcMessage::GloryWryEvent(data)) => {
+                    let _ = ipc_proxy.send_event(HostEvent::Dom(id, data));
+                }
+                Ok(IpcMessage::GloryWryQuery(response)) => {
+                    let _ = ipc_proxy.send_event(HostEvent::Query(id, response));
+                }
+                Err(err) => {
+                    tracing::warn!(%err, "glory-desktop: undecodable IPC message");
+                }
+            },
+        )
+        .build(&window)
+        .expect("glory-desktop: failed to create webview");
+
+    let menu = config.menu.as_ref().map(|spec| {
+        let menu = build_menu(spec, id, menu_routes);
+        attach_menu(&menu, &window);
+        menu
+    });
+
+    slots.push((
+        window.id(),
+        WindowSlot {
+            id,
+            window,
+            webview,
+            holder: None,
+            mount: Some(mount),
+            config,
+            state,
+            menu,
+        },
+    ));
 }
 
-fn build_menu(spec: &MenuSpec, window_index: usize, routes: &mut HashMap<String, usize>) -> muda::Menu {
+fn slot_by_id<'s>(slots: &'s mut [(WindowId, WindowSlot)], id: DesktopWindowId) -> Option<&'s mut WindowSlot> {
+    slots.iter_mut().map(|(_, slot)| slot).find(|slot| slot.id == id)
+}
+
+fn slot_by_window_id<'s>(slots: &'s mut [(WindowId, WindowSlot)], window_id: WindowId) -> Option<&'s mut WindowSlot> {
+    slots.iter_mut().find(|(id, _)| *id == window_id).map(|(_, slot)| slot)
+}
+
+fn close_slot_by_window_id(slots: &mut Vec<(WindowId, WindowSlot)>, window_id: WindowId) -> bool {
+    let Some(position) = slots.iter().position(|(id, _)| *id == window_id) else {
+        return false;
+    };
+    let (_, slot) = slots.remove(position);
+    slot.state.borrow_mut().closed = true;
+    true
+}
+
+fn close_slot_by_id(slots: &mut Vec<(WindowId, WindowSlot)>, id: DesktopWindowId) -> bool {
+    let Some(position) = slots.iter().position(|(_, slot)| slot.id == id) else {
+        return false;
+    };
+    let (_, slot) = slots.remove(position);
+    slot.state.borrow_mut().closed = true;
+    true
+}
+
+fn apply_window_command(slots: &mut Vec<(WindowId, WindowSlot)>, id: DesktopWindowId, command: WindowCommand) {
+    if matches!(command, WindowCommand::Close) {
+        close_slot_by_id(slots, id);
+        return;
+    }
+
+    let Some(slot) = slot_by_id(slots, id) else {
+        tracing::warn!(window_id = id.as_usize(), "glory-desktop: window command target no longer exists");
+        return;
+    };
+
+    match command {
+        WindowCommand::DragWindow => {
+            if let Err(err) = slot.window.drag_window() {
+                tracing::warn!(%err, window_id = id.as_usize(), "glory-desktop: drag_window failed");
+            }
+        }
+        WindowCommand::SetFullscreen(fullscreen) => {
+            slot.window.set_fullscreen(fullscreen.then_some(Fullscreen::Borderless(None)));
+            slot.state.borrow_mut().fullscreen = fullscreen;
+        }
+        WindowCommand::SetMaximized(maximized) => {
+            slot.window.set_maximized(maximized);
+            slot.state.borrow_mut().maximized = maximized;
+        }
+        WindowCommand::Focus => {
+            slot.window.set_focus();
+            slot.state.borrow_mut().focused = true;
+        }
+        WindowCommand::SetZoomLevel(zoom_level) => {
+            if let Err(err) = slot.webview.zoom(zoom_level) {
+                tracing::warn!(%err, window_id = id.as_usize(), "glory-desktop: set_zoom_level failed");
+            } else {
+                slot.state.borrow_mut().zoom_level = zoom_level;
+            }
+        }
+        WindowCommand::Close => unreachable!("handled before slot lookup"),
+    }
+}
+
+fn build_menu(spec: &MenuSpec, window_id: DesktopWindowId, routes: &mut HashMap<String, DesktopWindowId>) -> muda::Menu {
     let menu = muda::Menu::new();
     for (title, items) in &spec.submenus {
         let submenu = muda::Submenu::new(title, true);
         for item in items {
-            routes.insert(item.id.clone(), window_index);
+            routes.insert(item.id.clone(), window_id);
             let menu_item = muda::MenuItem::with_id(muda::MenuId(item.id.clone()), &item.label, true, None);
             if let Err(err) = submenu.append(&menu_item) {
                 tracing::error!(%err, "glory-desktop: failed to append menu item");
@@ -510,7 +859,7 @@ fn attach_menu(menu: &muda::Menu, window: &Window) {
     #[cfg(target_os = "windows")]
     {
         use tao::platform::windows::WindowExtWindows;
-        if let Err(err) = unsafe { menu.init_for_hwnd(window.hwnd() as isize) } {
+        if let Err(err) = unsafe { menu.init_for_hwnd(window.hwnd()) } {
             tracing::error!(%err, "glory-desktop: failed to attach window menu");
         }
     }
@@ -539,6 +888,15 @@ where
     W: Widget + 'static,
 {
     Desktop::new().window(config, widget).run()
+}
+
+/// See [`launch_with_config`], but passes a [`DesktopWindowHandle`] into the
+/// root widget factory so callbacks can control the native window.
+pub fn launch_with_handle<W>(config: DesktopConfig, widget: impl FnOnce(DesktopWindowHandle) -> W + 'static) -> !
+where
+    W: Widget + 'static,
+{
+    Desktop::new().window_with_handle(config, widget).run()
 }
 
 fn flush(webview: &wry::WebView, holder: &CommandHolder) {
@@ -590,8 +948,9 @@ mod tests {
     fn menu_spec_builds_routes() {
         let spec = MenuSpec::new().submenu("File", vec![MenuItemSpec::new("open", "Open"), MenuItemSpec::new("quit", "Quit")]);
         let mut routes = HashMap::new();
-        let _menu = build_menu(&spec, 3, &mut routes);
-        assert_eq!(routes.get("open"), Some(&3));
-        assert_eq!(routes.get("quit"), Some(&3));
+        let window_id = DesktopWindowId(3);
+        let _menu = build_menu(&spec, window_id, &mut routes);
+        assert_eq!(routes.get("open"), Some(&window_id));
+        assert_eq!(routes.get("quit"), Some(&window_id));
     }
 }

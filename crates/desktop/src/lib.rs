@@ -93,7 +93,7 @@ pub enum IpcMessage {
     /// node 0). The host mounts the widget tree on receipt.
     GloryWryReady(bool),
     /// A DOM event captured by an `AttachEvent` listener.
-    GloryWryEvent(EventData),
+    GloryWryEvent(Box<EventData>),
     /// Answer to a `Command::Query` read request.
     GloryWryQuery(glory_core::renderer::QueryResponse),
 }
@@ -101,7 +101,10 @@ pub enum IpcMessage {
 #[cfg(feature = "runtime")]
 mod runtime;
 #[cfg(feature = "runtime")]
-pub use runtime::{Desktop, DesktopConfig, MenuItemSpec, MenuSpec, asset_url, launch, launch_with_config};
+pub use runtime::{
+    Desktop, DesktopConfig, DesktopWindowHandle, DesktopWindowId, DesktopWindowState, MenuItemSpec, MenuSpec, asset_url, launch, launch_with_config,
+    launch_with_handle,
+};
 
 #[cfg(test)]
 mod tests {

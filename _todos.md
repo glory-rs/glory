@@ -22,7 +22,7 @@
 | 异步/错误原语 | 无 Suspense 式自动边界、无 ErrorBoundary;`resource_in` 竞态已修 | **高** |
 | CLI/构建 | wasm-split 暂缓;Windows/Linux 原生安装器已有最小路径,macOS/AppImage/签名仍缺 | **中-高** |
 | 资产 | 无类型化清单、图片优化、CSS Modules、folder 资产宏(对照 manganis) | 中 |
-| 桌面 | 协议扎实,缺托盘/全局热键/窗口状态 API/文件对话框/异步自定义协议 | 中 |
+| 桌面 | 协议扎实,窗口控制 API 已补;仍缺托盘/全局热键/异步自定义协议 | 中 |
 | Native(Blitz)/LiveView/移动端 | 分别处于 spike(~20%)/可用但单适配器(~30%)/模板可编译但无真机验证(~30%) | 中-高 |
 
 性能:官方 js-framework-benchmark 9 项聚合 Glory 442ms vs Dioxus 456ms vs Leptos 589ms,
@@ -201,9 +201,13 @@ R5 仅评估,不阻塞任何人。
 现状 80%:协议/多窗口/菜单/自定义协议/热重载扎实;对照
 `packages/desktop/src/desktop_context.rs`(30+ 方法)缺以下 API。
 
-- [ ] **D1 P1** 窗口控制 API 包:`drag_window`、`set_fullscreen`/查询、
+- [x] **D1 P1** 窗口控制 API 包:`drag_window`、`set_fullscreen`/查询、
   `is_maximized`/`toggle_maximized`、`focus`、`set_zoom_level`、按 id 关闭任意窗口、
   运行时从窗口内新开窗口。多为 wry/tao 一行调用,作为一个 PR 打包。
+  2026-06-19 已完成:新增 `DesktopWindowHandle`/`DesktopWindowId`/
+  `DesktopWindowState`,支持 `launch_with_handle`、`window_with_handle`、窗口命令
+  分发、状态查询缓存、按 id 关闭与运行时 `open_window`;`desktop-counter` 与
+  desktop/platform 文档已覆盖调用方式。
 - [ ] **D2 P2** 托盘图标支持(tray-icon crate;`DesktopConfig` 字段 + 事件回调)。
 - [ ] **D3 P2** 全局热键(global-hotkey crate;注册/注销 API)。
 - [ ] **D4 P1** 异步自定义协议处理器:当前 `glory://` 仅同步;对照 Dioxus

@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 34 |
+| 已完成 `[x]` | 35 |
 | 部分完成 `[~]` | 3 |
-| 未完成 `[ ]` | 23 |
+| 未完成 `[ ]` | 22 |
 
 按能力权重估算:
 
@@ -34,7 +34,7 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 | CSR + SSR 基础使用 | 65-75% |
 | server functions | 55-65% |
 | CLI / bundle / dev server | 55-65% |
-| desktop webview | 60-70% |
+| desktop webview | 65-75% |
 | routing | 35-45% |
 | native Blitz / mobile / LiveView | 20-35% |
 | CI / release governance | 35-45% |
@@ -309,11 +309,8 @@ serverfn 基础可用，但对比成熟框架还缺:
 
 ### 5. Desktop API 不完整
 
-已有 runtime 很扎实，但平台 API 仍缺:
+已有 runtime 很扎实，窗口控制 API 已补齐第一批，平台 API 仍缺:
 
-- drag window。
-- fullscreen/maximize/focus/zoom。
-- runtime open window / close by id。
 - tray icon。
 - global hotkey。
 - async custom protocol。
@@ -471,7 +468,7 @@ cargo clippy -p glory-cli --lib --no-default-features -- -D warnings
    - 已完成 HTTPS/TLS/proxy 配置校验、打开 URL 与 app-server env 透传。
 3. [x] serverfn 支持 method 选择，至少 `#[server(method = "GET")]`。
 4. [x] Playwright CI 跑 CSR counter + SSR hydration 两个最小场景。
-5. Desktop 补窗口控制 API 包。
+5. [x] Desktop 补窗口控制 API 包。
 
 ### P2
 

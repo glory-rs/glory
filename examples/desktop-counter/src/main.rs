@@ -10,16 +10,20 @@ use glory_core::web::events;
 use glory_core::web::helpers::event_target_value;
 use glory_core::web::widgets::*;
 use glory_core::{Scope, Widget};
-use glory_desktop::DesktopConfig;
+use glory_desktop::{DesktopConfig, DesktopWindowHandle};
 
 #[derive(Debug)]
 struct Counter {
     value: Cage<i64>,
+    window: DesktopWindowHandle,
 }
 
 impl Counter {
-    fn new() -> Self {
-        Self { value: Cage::new(0) }
+    fn new(window: DesktopWindowHandle) -> Self {
+        Self {
+            value: Cage::new(0),
+            window,
+        }
     }
 }
 
@@ -42,9 +46,61 @@ impl Widget for Counter {
             let parsed = event_target_value(&ev).parse::<i64>().unwrap_or_default();
             value.revise(|mut value| *value = parsed);
         };
+        let drag_window = {
+            let window = self.window.clone();
+            move |_| {
+                window.drag_window();
+            }
+        };
+        let toggle_fullscreen = {
+            let window = self.window.clone();
+            move |_| {
+                window.set_fullscreen(!window.is_fullscreen());
+            }
+        };
+        let toggle_maximized = {
+            let window = self.window.clone();
+            move |_| {
+                window.toggle_maximized();
+            }
+        };
+        let zoom_in = {
+            let window = self.window.clone();
+            move |_| {
+                window.set_zoom_level((window.zoom_level() + 0.1).min(2.0));
+            }
+        };
+        let zoom_reset = {
+            let window = self.window.clone();
+            move |_| {
+                window.set_zoom_level(1.0);
+            }
+        };
+        let open_window = {
+            let window = self.window.clone();
+            move |_| {
+                window.open_window(
+                    DesktopConfig {
+                        title: "Runtime Window".to_owned(),
+                        inner_size: (480.0, 200.0),
+                        ..Default::default()
+                    },
+                    Counter::new,
+                );
+            }
+        };
+        let close_window = {
+            let window = self.window.clone();
+            move |_| {
+                window.close();
+            }
+        };
 
         div()
-            .attr("style", "font-family: sans-serif; padding: 2em; display: flex; gap: .5em; align-items: center;")
+            .attr(
+                "style",
+                "font-family: sans-serif; padding: 2em; display: flex; flex-wrap: wrap; gap: .5em; align-items: center;",
+            )
             .fill(button().text("-").on(events::click, decrease))
             .fill(
                 span()
@@ -54,6 +110,13 @@ impl Widget for Counter {
             .fill(button().text("+").on(events::click, increase))
             .fill(button().text("clear").on(events::click, clear))
             .fill(input().attr("placeholder", "set value").on(events::input, set_from_input))
+            .fill(button().text("drag").on(events::mousedown, drag_window))
+            .fill(button().text("fullscreen").on(events::click, toggle_fullscreen))
+            .fill(button().text("maximize").on(events::click, toggle_maximized))
+            .fill(button().text("zoom +").on(events::click, zoom_in))
+            .fill(button().text("zoom 1x").on(events::click, zoom_reset))
+            .fill(button().text("new window").on(events::click, open_window))
+            .fill(button().text("close").on(events::click, close_window))
             .show_in(ctx);
     }
 }
@@ -84,10 +147,13 @@ fn main() {
             ..Default::default()
         };
         Desktop::new()
-            .window(config, Counter::new)
-            .window(second, move || Counter { value: second_value })
+            .window_with_handle(config, Counter::new)
+            .window_with_handle(second, move |window| Counter {
+                value: second_value,
+                window,
+            })
             .run();
     }
 
-    glory_desktop::launch_with_config(config, Counter::new);
+    glory_desktop::launch_with_handle(config, Counter::new);
 }

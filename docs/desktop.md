@@ -41,6 +41,15 @@ fn main() {
 }
 ```
 
+If the root widget needs to control the native window, use
+`launch_with_handle`:
+
+```rust
+fn main() {
+    glory_desktop::launch_with_handle(Default::default(), |window| App { window });
+}
+```
+
 ## Multi-Window
 
 Each window owns an independent `CommandHolder`, command queue, webview, and
@@ -55,6 +64,47 @@ fn main() {
         .run();
 }
 ```
+
+Use `window_with_handle` when a window's widget tree needs a handle:
+
+```rust
+glory_desktop::Desktop::new()
+    .window_with_handle(Default::default(), |window| MainApp { window })
+    .run();
+```
+
+## Window Controls
+
+`DesktopWindowHandle` is cloneable and can be captured by widget event
+callbacks. It queues commands onto the tao/wry event loop and exposes a cached
+state snapshot for common queries:
+
+```rust
+let toggle_fullscreen = {
+    let window = self.window.clone();
+    move |_| {
+        window.set_fullscreen(!window.is_fullscreen());
+    }
+};
+
+let open_tools = {
+    let window = self.window.clone();
+    move |_| {
+        window.open_window(
+            glory_desktop::DesktopConfig {
+                title: "Tools".into(),
+                ..Default::default()
+            },
+            |tools| ToolsApp { window: tools },
+        );
+    }
+};
+```
+
+Available controls include `drag_window`, `set_fullscreen`,
+`set_maximized`, `toggle_maximized`, `focus`, `set_zoom_level`, `close`,
+`close_window(id)`, and `open_window`. `DesktopWindowId` is process-local and
+stable for the lifetime of the window.
 
 ## Menus
 

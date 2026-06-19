@@ -31,6 +31,37 @@ glory_desktop::Desktop::new()
     .run();
 ```
 
+## Runtime Window Controls
+
+Use `launch_with_handle` or `Desktop::window_with_handle` when widget callbacks
+need native window control:
+
+```rust
+glory_desktop::launch_with_handle(Default::default(), |window| App { window });
+```
+
+`DesktopWindowHandle` supports drag, fullscreen, maximized state, focus, zoom,
+closing by `DesktopWindowId`, and opening a new window from the running app:
+
+```rust
+let open_window = {
+    let window = self.window.clone();
+    move |_| {
+        let id = window.open_window(
+            glory_desktop::DesktopConfig {
+                title: "Inspector".into(),
+                ..Default::default()
+            },
+            |inspector| Inspector { window: inspector },
+        );
+        window.close_window(id);
+    }
+};
+```
+
+State queries such as `is_fullscreen`, `is_maximized`, and `zoom_level` read the
+runtime cache maintained by the host event loop.
+
 ## Menus As Commands
 
 Menus are the current stable way to route host-native actions back into the
