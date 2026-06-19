@@ -242,8 +242,12 @@ R5 仅评估,不阻塞任何人。
   (传输 trait 先定)。
 - [ ] **L3 P2** Query 应答接通:协议已有 Query 消息,服务端无应答路径;复用桌面解释器
   的 query 答复逻辑。
-- [ ] **L4 P2** HTML 模板配置(head/root div 自定义)、会话空闲超时/TTL、重连退避
+- [x] **L4 P2** HTML 模板配置(head/root div 自定义)、会话空闲超时/TTL、重连退避
   语义文档化。
+  2026-06-19 已完成:`docs/liveview.md` 明确 LiveView 只拥有协议/session/
+  route/client JS,HTML shell/head/root 由宿主应用负责;记录当前每 WebSocket
+  连接一会话、无 resume/idle TTL 配置,以及客户端 `reconnectMs` /
+  `maxReconnectMs` 指数退避语义。
 - [ ] **L5 P2** LiveView 示例项目(examples/ 下,Salvo 起步)。依赖 L2 的 trait 定型
   可顺带出 Axum 版。
 

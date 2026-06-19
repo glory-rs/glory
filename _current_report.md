@@ -21,9 +21,9 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 33 |
+| 已完成 `[x]` | 34 |
 | 部分完成 `[~]` | 3 |
-| 未完成 `[ ]` | 24 |
+| 未完成 `[ ]` | 23 |
 
 按能力权重估算:
 
@@ -356,7 +356,7 @@ serverfn 基础可用，但对比成熟框架还缺:
 - 缺 Axum/Actix adapter。
 - 缺端到端浏览器场景。
 - query 应答路径还需要更完整验证。
-- 缺 session TTL、重连退避、模板配置。
+- session TTL/resume 仍缺实现;HTML shell ownership 与重连退避语义已文档化。
 
 主要路径:
 
