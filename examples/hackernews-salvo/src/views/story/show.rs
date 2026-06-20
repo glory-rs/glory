@@ -31,10 +31,7 @@ impl Widget for ShowStory {
             truck.obtain::<PageInfo>().unwrap().clone()
         };
         let loader = Loader::new(
-            move || async move {
-                let url = show_story_api_url(story_id);
-                fetch_api::<Story>(&url).await
-            },
+            move || async move { fetch_story(story_id).await.ok().flatten() },
             move |story, ctx| {
                 if let Some(story) = story {
                     info.title.revise(|mut v| *v = story.title.clone());

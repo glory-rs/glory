@@ -9,3 +9,9 @@ cfg_feature! {
     mod server;
     pub use server::*;
 }
+
+cfg_feature! {
+    #![all(feature = "backend-command", not(feature = "single-app"))]
+    mod command;
+    pub use command::CommandHolder;
+}

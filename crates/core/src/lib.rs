@@ -55,6 +55,19 @@ mod cfg;
 #[macro_use]
 extern crate cfg_if;
 
+// Since the SSR convergence (`web-ssr` renders by replaying the command
+// stream) every non-browser target shares the CommandNode backend, so
+// `backend-command` + `web-ssr` may coexist in one build (a fullstack
+// desktop binary, or a workspace-wide build). Browser CSR is still an
+// exclusive target: it owns the browser DOM Node type and implies the
+// single-app scheduler.
+#[cfg(all(feature = "web-csr", feature = "web-ssr"))]
+compile_error!("features `web-csr` and `web-ssr` are mutually exclusive; build browser CSR and server SSR as separate targets");
+#[cfg(all(feature = "backend-command", feature = "web-csr", target_arch = "wasm32"))]
+compile_error!("feature `backend-command` cannot be combined with `web-csr` on wasm32: the browser DOM owns the Node type there");
+#[cfg(all(feature = "backend-command", feature = "single-app"))]
+compile_error!("feature `backend-command` requires the multi-holder scheduler; do not combine it with `single-app`");
+
 pub mod assets;
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
 pub mod console;
@@ -66,13 +79,14 @@ pub mod web;
 mod widget;
 pub use scope::Scope;
 pub use view::{View, ViewFactory, ViewId};
-pub use widget::{Filler, IntoFiller, Widget};
+pub use widget::{BoundaryError, Filler, IntoFiller, Widget};
 pub mod node;
 pub use node::{Node, NodeRef};
 pub mod widgets;
 
 pub mod config;
 pub use config::GloryConfig;
+pub mod devtools;
 
 mod truck;
 pub use truck::Truck;

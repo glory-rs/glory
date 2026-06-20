@@ -188,6 +188,21 @@ where
         let this = self.clone();
         Bond::new(move || mapper(this.get()))
     }
+
+    /// Read-only diagnostic snapshot for devtools.
+    #[doc(hidden)]
+    pub fn devtools_snapshot(&self) -> crate::devtools::ReactiveSnapshot {
+        let view_ids = self.view_ids.borrow();
+        let dependency_ids = self.gathers.borrow().keys().map(|id| id.as_u64()).collect();
+        crate::devtools::ReactiveSnapshot {
+            kind: crate::devtools::ReactiveKind::Bond,
+            id: self.id.as_u64(),
+            version: self.version(),
+            subscriber_count: view_ids.len(),
+            subscriber_views: view_ids.keys().cloned().map(|view_id| view_id.into_inner()).collect(),
+            dependency_ids,
+        }
+    }
 }
 
 impl<T> Clone for Bond<T>
@@ -321,5 +336,25 @@ mod tests {
         cage.revise(|mut v| *v = 0);
         let _ = *bond.get();
         assert!(bond.version() > v0, "value-changing revise must still bump version");
+    }
+
+    #[test]
+    fn devtools_snapshot_reports_bond_identity_and_subscribers() {
+        let cage = Cage::new(21_i32);
+        let cage_for_bond = cage;
+        let bond = Bond::new(move || *cage_for_bond.get() * 2);
+        bond.bind_view(&crate::view::ViewId::new(
+            #[cfg(not(feature = "single-app"))]
+            crate::HolderId::null(),
+            "root-0".to_owned(),
+        ));
+
+        let snapshot = bond.devtools_snapshot();
+        assert_eq!(snapshot.kind, crate::devtools::ReactiveKind::Bond);
+        assert_eq!(snapshot.id, bond.id().as_u64());
+        assert_eq!(snapshot.version, bond.version());
+        assert_eq!(snapshot.subscriber_count, 1);
+        assert_eq!(snapshot.subscriber_views, vec!["root-0"]);
+        assert_eq!(snapshot.dependency_ids, vec![cage.id().as_u64()]);
     }
 }

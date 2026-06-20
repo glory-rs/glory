@@ -22,7 +22,16 @@ async fn main() {
     let site_addr = handler.config.site_addr.clone();
     let router = route()
         .make_salvo_router(handler.clone())
-        .push(Router::with_path("<**path>").get(StaticDir::new(["target/site", "ssr-simple-salvo/target/site"])));
+        .push(Router::with_path("pkg/{**path}").get(StaticDir::new([
+            "target/site/pkg",
+            "ssr-simple-salvo/target/site/pkg",
+            "examples/ssr-simple-salvo/target/site/pkg",
+        ])))
+        .push(Router::with_path("{**path}").get(StaticDir::new([
+            "target/site",
+            "ssr-simple-salvo/target/site",
+            "examples/ssr-simple-salvo/target/site",
+        ])));
     println!("{:#?}", router);
     let service = salvo::Service::new(router).catcher(Catcher::default().hoop(handler));
     let acceptor = TcpListener::new(site_addr).bind().await;

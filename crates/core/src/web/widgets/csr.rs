@@ -2,6 +2,8 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::ops::Deref;
+use std::rc::Rc;
+use std::time::Duration;
 
 use educe::Educe;
 // #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
@@ -99,9 +101,11 @@ where
         ctx.last_child_node = Some(node.clone());
 
         let fillers = std::mem::take(&mut self.fillers);
+        let compact_fill_allowed = ctx.set_compact_fill_allowed(true);
         for filler in fillers {
             filler.fill(ctx);
         }
+        ctx.set_compact_fill_allowed(compact_fill_allowed);
         for (name, value) in &self.props {
             value.inject_to(&ctx.view_id, &mut node.clone(), name, true);
         }
@@ -114,15 +118,36 @@ where
             (listener)(&self.node);
         }
     }
+    fn fill_in(self, parent: &mut Scope)
+    where
+        Self: Sized,
+    {
+        if parent.compact_fill_allowed() && self.can_fill_compact() {
+            self.fill_compact(parent);
+        } else {
+            self.show_in(parent);
+        }
+    }
+    fn can_fill_compact(&self) -> bool {
+        self.can_compact_fill()
+    }
     fn detach(&mut self, ctx: &mut Scope) {
         if let Some(parent_node) = ctx.parent_node.as_ref() {
             let node = <T as AsRef<web_sys::Element>>::as_ref(&self.node);
             self.renderer.remove_child(parent_node, node);
         }
+        ctx.mark_descendants_dom_detached();
         let ids: Vec<ViewId> = ctx.child_views.keys().cloned().collect();
         for id in ids {
             ctx.detach_child(&id);
         }
+    }
+    fn suspend(&mut self, ctx: &mut Scope) {
+        if let Some(parent_node) = ctx.parent_node.as_ref() {
+            let node = <T as AsRef<web_sys::Element>>::as_ref(&self.node);
+            self.renderer.remove_child(parent_node, node);
+        }
+        ctx.mark_descendants_dom_detached();
     }
     fn patch(&mut self, ctx: &mut Scope) {
         let node = <T as AsRef<web_sys::Element>>::as_ref(&self.node);
@@ -138,6 +163,129 @@ where
         self.classes.inject_to(&ctx.view_id, &mut node.clone(), "class", false);
     }
 }
+
+type DomSubtreeBuild<State> = Box<dyn FnOnce(&mut Scope) -> (web_sys::Element, State)>;
+type DomSubtreeHook<State> = Box<dyn FnMut(&web_sys::Element, &mut State, &mut Scope)>;
+
+/// A CSR-only widget that lets one Glory view own a native DOM subtree.
+///
+/// This is the low-level path for hot rendering loops that already know their
+/// static DOM shape. The build closure may create nodes manually, clone a
+/// `<template>` skeleton, bind reactive handles to `ctx.view_id()`, and return
+/// the subtree root plus any app-specific state needed for patching.
+pub struct DomSubtree<State>
+where
+    State: 'static,
+{
+    build: Option<DomSubtreeBuild<State>>,
+    patch: DomSubtreeHook<State>,
+    detach: DomSubtreeHook<State>,
+    root: Option<web_sys::Element>,
+    state: Option<State>,
+}
+
+impl<State> fmt::Debug for DomSubtree<State>
+where
+    State: 'static,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DomSubtree")
+            .field("has_root", &self.root.is_some())
+            .field("has_state", &self.state.is_some())
+            .finish_non_exhaustive()
+    }
+}
+
+/// Construct a [`DomSubtree`] from a native DOM builder closure.
+pub fn dom_subtree<State>(build: impl FnOnce(&mut Scope) -> (web_sys::Element, State) + 'static) -> DomSubtree<State>
+where
+    State: 'static,
+{
+    DomSubtree::new(build)
+}
+
+impl<State> DomSubtree<State>
+where
+    State: 'static,
+{
+    pub fn new(build: impl FnOnce(&mut Scope) -> (web_sys::Element, State) + 'static) -> Self {
+        Self {
+            build: Some(Box::new(build)),
+            patch: Box::new(|_, _, _| {}),
+            detach: Box::new(|_, _, _| {}),
+            root: None,
+            state: None,
+        }
+    }
+
+    pub fn on_patch(mut self, patch: impl FnMut(&web_sys::Element, &mut State, &mut Scope) + 'static) -> Self {
+        self.patch = Box::new(patch);
+        self
+    }
+
+    pub fn on_detach(mut self, detach: impl FnMut(&web_sys::Element, &mut State, &mut Scope) + 'static) -> Self {
+        self.detach = Box::new(detach);
+        self
+    }
+}
+
+impl<State> Widget for DomSubtree<State>
+where
+    State: 'static,
+{
+    fn build(&mut self, ctx: &mut Scope) {
+        let build = self.build.take().expect("DomSubtree::build called more than once");
+        let (root, state) = build(ctx);
+        ctx.set_single_node_bounds(root.clone());
+        self.root = Some(root);
+        self.state = Some(state);
+    }
+
+    fn flood(&mut self, ctx: &mut Scope) {
+        if let Some(root) = self.root.as_ref() {
+            ctx.insert_node_at_placement(root);
+        }
+
+        let ids: Vec<ViewId> = ctx.child_views.keys().cloned().collect();
+        for id in ids {
+            ctx.attach_child(&id);
+        }
+    }
+
+    fn patch(&mut self, ctx: &mut Scope) {
+        if let Some(root) = self.root.as_ref() {
+            if root.parent_element().is_none() && ctx.parent_node().is_some() {
+                ctx.insert_node_at_placement(root);
+            }
+            if let Some(state) = self.state.as_mut() {
+                (self.patch)(root, state, ctx);
+            }
+        }
+    }
+
+    fn detach(&mut self, ctx: &mut Scope) {
+        if let Some(root) = self.root.as_ref() {
+            if let Some(state) = self.state.as_mut() {
+                (self.detach)(root, state, ctx);
+            }
+            ctx.remove_node_from_parent(root);
+        }
+        ctx.mark_descendants_dom_detached();
+
+        let ids: Vec<ViewId> = ctx.child_views.keys().cloned().collect();
+        for id in ids {
+            ctx.detach_child(&id);
+        }
+    }
+
+    fn suspend(&mut self, ctx: &mut Scope) {
+        if let Some(root) = self.root.as_ref() {
+            ctx.remove_node_from_parent(root);
+        }
+        ctx.mark_descendants_dom_detached();
+    }
+}
+
 impl<T> Deref for Element<T>
 where
     T: AsRef<web_sys::Element> + JsCast + fmt::Debug + Clone,
@@ -174,6 +322,37 @@ where
 
     pub fn node(&self) -> &T {
         &self.node
+    }
+
+    fn can_compact_fill(&self) -> bool {
+        !crate::web::is_hydrating()
+            && self.listeners.is_empty()
+            && self.attrs.values().all(|value| value.is_static())
+            && self.props.values().all(|value| value.is_static())
+            && self.classes.is_static()
+    }
+
+    fn fill_compact(mut self, ctx: &mut Scope) {
+        let parent_node = ctx.render_node.as_ref().unwrap_throw().clone();
+        let node = <T as AsRef<web_sys::Element>>::as_ref(&self.node).clone();
+
+        let previous_render_node = ctx.render_node.replace(node.clone());
+        let compact_fill_allowed = ctx.set_compact_fill_allowed(true);
+        for filler in std::mem::take(&mut self.fillers) {
+            filler.fill(ctx);
+        }
+        ctx.set_compact_fill_allowed(compact_fill_allowed);
+        ctx.render_node = previous_render_node;
+
+        for (name, value) in &self.props {
+            value.inject_to(&ctx.view_id, &mut node.clone(), name, true);
+        }
+        for (name, value) in &self.attrs {
+            value.inject_to(&ctx.view_id, &mut node.clone(), name, true);
+        }
+        self.classes.inject_to(&ctx.view_id, &mut node.clone(), "class", true);
+
+        parent_node.append_child(&node).unwrap_throw();
     }
 
     pub fn add_filler(&mut self, filler: impl IntoFiller) {
@@ -297,6 +476,7 @@ where
     pub fn add_event_listener<E, H>(&mut self, event: E, handler: H)
     where
         E: EventDescriptor + 'static,
+        E::EventType: JsCast,
         H: FnMut(E::EventType) + 'static,
     {
         cfg_if! {
@@ -318,6 +498,39 @@ where
 
         self.listeners.push(Box::new(move |node| {
             let event_name = event.name();
+            if event_name == "mounted" {
+                let mut wrapped = wrapped;
+                let _ = crate::web::set_timeout(
+                    move || {
+                        let event = web_sys::Event::new("mounted").unwrap_throw();
+                        wrapped(event.unchecked_into::<E::EventType>());
+                    },
+                    Duration::ZERO,
+                );
+                return;
+            }
+
+            if event_name == "visible" {
+                let wrapped = Rc::new(std::cell::RefCell::new(wrapped));
+                let callback = wasm_bindgen::closure::Closure::wrap(Box::new({
+                    let wrapped = wrapped.clone();
+                    move |entries: js_sys::Array, _observer: web_sys::IntersectionObserver| {
+                        for entry in entries.iter() {
+                            let entry = entry.unchecked_into::<web_sys::IntersectionObserverEntry>();
+                            if entry.is_intersecting() {
+                                let event = web_sys::Event::new("visible").unwrap_throw();
+                                wrapped.borrow_mut()(event.unchecked_into::<E::EventType>());
+                            }
+                        }
+                    }
+                })
+                    as Box<dyn FnMut(js_sys::Array, web_sys::IntersectionObserver)>);
+                let observer = web_sys::IntersectionObserver::new(callback.as_ref().unchecked_ref()).unwrap_throw();
+                observer.observe(node.as_ref());
+                let _ = callback.into_js_value();
+                std::mem::forget(observer);
+                return;
+            }
 
             if event.bubbles() {
                 crate::web::add_event_listener(node.as_ref(), event_name, wrapped);
@@ -332,6 +545,7 @@ where
     pub fn on<E, H>(mut self, event: E, handler: H) -> Self
     where
         E: EventDescriptor + 'static,
+        E::EventType: JsCast,
         H: FnMut(E::EventType) + 'static,
     {
         self.add_event_listener(event, handler);

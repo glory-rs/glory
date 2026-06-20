@@ -33,18 +33,27 @@ impl Debug for BrowserHolder {
 
 impl Holder for BrowserHolder {
     fn mount(self, widget: impl Widget) -> Self {
-        crate::web::HYDRATING.store(true, Ordering::Relaxed);
-        if let Ok(list) = crate::web::document().query_selector_all("[gly-id]") {
-              for i in 0..list.length() {
-                let ele = list.item(i).unwrap().unchecked_into::<web_sys::HtmlElement>();
-                ele.set_attribute("gly-hydrating", "1").unwrap_throw();
-            }
-        }
+        let hydrating = crate::web::document()
+            .query_selector_all("[gly-id]")
+            .map(|list| {
+                let hydrating = list.length() > 0;
+                if hydrating {
+                    for i in 0..list.length() {
+                        let ele = list.item(i).unwrap().unchecked_into::<web_sys::HtmlElement>();
+                        ele.set_attribute("gly-hydrating", "1").unwrap_throw();
+                    }
+                }
+                hydrating
+            })
+            .unwrap_or(false);
+        crate::web::HYDRATING.store(hydrating, Ordering::Relaxed);
         let view_id = ViewId::new(self.next_root_view_id.fetch_add(1, Ordering::Relaxed).to_string());
         let scope = Scope::new_root(view_id, self.truck.clone());
         widget.mount_to(scope, &self.host_node);
         crate::web::HYDRATING.store(false, Ordering::Relaxed);
-        if let Ok(list) = crate::web::document().query_selector_all("[gly-id]") {
+        if hydrating
+            && let Ok(list) = crate::web::document().query_selector_all("[gly-id]")
+        {
             for i in 0..list.length() {
                 let ele = list.item(i).unwrap().unchecked_into::<web_sys::HtmlElement>();
                 if ele.has_attribute("gly-hydrating") {

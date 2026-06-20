@@ -224,20 +224,7 @@ where
         }
 
         if !to_detach.is_empty() {
-            #[cfg(not(feature = "single-app"))]
-            let holder_id = ctx.holder_id();
-            let detach_all = || {
-                for view_id in &to_detach {
-                    ctx.detach_child(view_id);
-                }
-            };
-            cfg_if! {
-                if #[cfg(feature = "single-app")] {
-                    crate::reflow::batch(detach_all);
-                } else {
-                    crate::reflow::batch(holder_id, detach_all);
-                }
-            }
+            ctx.detach_children_bulk(&to_detach);
         }
 
         std::mem::swap(&mut self.key_view_ids, &mut new_key_view_ids);
@@ -279,8 +266,7 @@ where
                 continue;
             }
             if let Some(view) = ctx.child_views.get_mut(view_id) {
-                view.scope.is_attached = false;
-                view.scope.placement = crate::view::ViewPlacement::Unset;
+                mark_view_tree_for_reattach(view);
             }
         }
 
@@ -346,6 +332,14 @@ fn lis_positions(seq: &[Option<usize>]) -> Vec<usize> {
     chain.reverse();
 
     chain.into_iter().map(|pair_i| pairs[pair_i].1).collect()
+}
+
+fn mark_view_tree_for_reattach(view: &mut crate::View) {
+    view.scope.is_attached = false;
+    view.scope.placement = crate::view::ViewPlacement::Unset;
+    for child in view.scope.child_views.values_mut() {
+        mark_view_tree_for_reattach(child);
+    }
 }
 
 #[cfg(test)]

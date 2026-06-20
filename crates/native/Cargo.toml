@@ -13,8 +13,20 @@ license = { workspace = true }
 categories = { workspace = true }
 
 [dependencies]
+anyrender_vello = { version = "0.11", optional = true }
+blitz-dom = { version = "0.3.0-alpha.5", optional = true }
+blitz-shell = { version = "0.3.0-alpha.5", optional = true, default-features = false }
+blitz-traits = { version = "0.3.0-alpha.5", optional = true, default-features = false }
 glory-core = { workspace = true }
-glory-desktop = { path = "../desktop" }
+serde_json = { workspace = true, optional = true }
+winit = { version = "0.31.0-beta.2", optional = true }
 
 [lints]
 workspace = true
+
+[features]
+# Experimental Blitz consumer: applies Command batches to a blitz-dom
+# BaseDocument (the spike for a native non-webview renderer).
+blitz = ["dep:blitz-dom", "glory-core/backend-command"]
+shell = ["blitz", "dep:anyrender_vello", "dep:blitz-shell", "dep:blitz-traits", "dep:serde_json", "dep:winit"]
+accessibility = ["shell", "blitz-dom/accessibility", "blitz-shell/accessibility"]

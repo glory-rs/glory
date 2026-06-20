@@ -1,0 +1,70 @@
+[package]
+name = "glory-serverfn"
+version = { workspace = true }
+authors = { workspace = true }
+edition = { workspace = true }
+description = "Server functions runtime for Glory: registry, JSON codec, HTTP client stubs and adapter mounts."
+homepage = { workspace = true }
+repository = { workspace = true }
+documentation = "https://docs.rs/glory-serverfn/"
+readme = { workspace = true }
+keywords = { workspace = true }
+license = { workspace = true }
+categories = { workspace = true }
+
+[dependencies]
+glory-core = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+serde_urlencoded = { workspace = true }
+form_urlencoded = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+ciborium = { workspace = true, optional = true }
+postcard = { workspace = true, optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+futures = { workspace = true }
+inventory = { workspace = true }
+tokio = { workspace = true, features = ["rt"] }
+reqwest = { workspace = true, optional = true, features = ["json"] }
+salvo = { workspace = true, optional = true }
+axum = { workspace = true, optional = true }
+actix-web = { workspace = true, optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+js-sys = { workspace = true }
+wasm-bindgen = { workspace = true }
+wasm-bindgen-futures = { workspace = true }
+web-sys = { workspace = true, features = [
+  "CloseEvent",
+  "ErrorEvent",
+  "Headers",
+  "MessageEvent",
+  "Request",
+  "RequestInit",
+  "RequestMode",
+  "RequestRedirect",
+  "Response",
+  "WebSocket",
+  "Window",
+  "WorkerGlobalScope",
+] }
+
+[dev-dependencies]
+glory-macros = { workspace = true }
+futures = { workspace = true }
+
+[features]
+default = []
+# Server-side adapter mounts.
+salvo = ["dep:salvo"]
+axum = ["dep:axum"]
+actix = ["dep:actix-web"]
+# Non-wasm HTTP client (desktop apps calling a remote server).
+reqwest-client = ["dep:reqwest"]
+cbor = ["dep:ciborium"]
+postcard = ["dep:postcard"]
+
+[lints]
+workspace = true

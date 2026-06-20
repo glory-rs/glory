@@ -18,32 +18,70 @@ Both forms produce the `glory` binary on your `PATH`.
 ## Subcommands
 
 ```text
-glory new <name>     scaffold a new Glory project from the built-in template
-glory build          one-shot build (wasm + css + assets) into the site dir
+glory new            scaffold a new Glory project from a built-in template
+glory build          one-shot build into the site dir
+glory bundle         release build and collect distributable artifacts
 glory serve          like `build`, then host the result over HTTP
-glory watch          serve + filesystem notifier; rebuild on .rs/.css/.scss/.sass/assets changes
-glory test           run cargo-test for the current project
+glory serve --no-reload
+                     build and serve once without filesystem watching
+glory serve --port 8080 --no-open
+                     override the configured site port and skip browser open
+glory serve --https --tls-cert cert.pem --tls-key key.pem
+                     advertise/open https and pass TLS paths to the app server
+glory serve --proxy /api=http://127.0.0.1:9001
+                     pass dev proxy rules to the app server
+glory run --no-open
+                     build and run once without watching or live reload
+glory doctor         check local toolchains for the selected target
+glory config         validate Glory Cargo metadata
+glory config --schema
+                     print the Glory Cargo metadata schema
+glory completions powershell
+                     generate shell completions to stdout
+glory self-update    print update instructions for the installed CLI
+glory check          type-check the configured targets
+glory fmt            run cargo fmt
+glory test           run cargo test for the current project targets
 glory end-to-end     run end-to-end tests (uses Playwright when configured)
 ```
 
 Each subcommand accepts `--help` for its flags. Global flags live on
 `glory` itself (`--manifest-path`, `--release`, `--verbose`, etc.).
+`glory new --template <web|ssr|fullstack|desktop|mobile> --name my-app`
+uses built-in templates; pass `--git` or `--path` to use a cargo-generate
+template instead.
+
+In `glory serve` watch mode, line controls are available on stdin: `r` + Enter
+forces a rebuild, `v` + Enter cycles the log level, and `/` + Enter prints the
+control help.
+
+`glory serve --https` switches the advertised/opened site URL to `https://`.
+TLS paths and repeated `--proxy PATH=URL` rules are exposed to the launched app
+server through `GLORY_TLS_CERT`, `GLORY_TLS_KEY`, and `GLORY_PROXY_CONFIG`.
 
 ## Typical workflow
 
 ```sh
 glory new my-app
 cd my-app
-glory watch
+glory serve
 # edit src/...; refresh the browser; rebuilds run on save
 ```
 
 For deployment:
 
 ```sh
-glory build --release
-# the site/ directory is the deployable artefact
+glory bundle --release
+# dist/<project>/ contains the deployable artefact
 ```
+
+Use `glory bundle --optimize-images` to keep original PNG/JPEG assets and add
+WebP copies, with `glory-bundle.json` preferring the hashed WebP path.
+
+For mobile projects generated with `glory new --template mobile`, use
+`glory bundle --target android|ios --release`. Android bundles collect APKs
+and install/run scripts under `dist/<project>/android/`; iOS bundles collect
+`.app` bundles and optional archives under `dist/<project>/ios/`.
 
 ## Project layout the tool expects
 
@@ -65,11 +103,11 @@ The `[package.metadata.glory]` keys correspond 1-to-1 with
 
 ## File view
 
-This is mainly relevant for the `watch` mode.
+This is mainly relevant for `serve` mode.
 
 ```mermaid
 graph TD;
-  subgraph Watcher[watch]
+  subgraph Watcher[serve]
     Watch[FS Notifier];
   end
   Watch-->|"*.rs & input.css"| TailW;

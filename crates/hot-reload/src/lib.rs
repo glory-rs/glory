@@ -144,6 +144,31 @@ pub struct FunctionReloadBatch {
     pub reloads: Vec<FunctionReload>,
 }
 
+/// Wire message pushed by `glory-cli serve` over the
+/// `/live_reload` websocket. Shared by every reload client: the browser
+/// script injected during SSR and the desktop host's reload thread.
+///
+/// JSON shape (snake_case, internally tagged): `{"type":"full"}`,
+/// `{"type":"style","css_path":"..."}`,
+/// `{"type":"functions","payload":"<FunctionReloadBatch JSON>"}`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ReloadMessage {
+    Full,
+    Style { css_path: String },
+    Functions { payload: String },
+}
+
+impl std::fmt::Display for ReloadMessage {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Full => write!(f, "reload all"),
+            Self::Style { css_path } => write!(f, "reload {css_path}"),
+            Self::Functions { .. } => write!(f, "reload functions"),
+        }
+    }
+}
+
 #[derive(Default, Debug)]
 pub struct ReloadableFunctionVisitor<'a> {
     functions: Vec<&'a Macro>,

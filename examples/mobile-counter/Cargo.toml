@@ -1,0 +1,26 @@
+[package]
+name = "mobile-counter"
+version = "0.0.1"
+edition = "2024"
+
+# The mobile payload: a cdylib for Android (loaded by the host Gradle
+# project), a staticlib for iOS (linked by the Xcode project). `rlib`
+# keeps `cargo check` on the host platform working.
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[features]
+default = []
+mobile = []
+
+[dependencies]
+glory-core = { path = "../../crates/core", features = ["backend-command"] }
+# Protocol + JS interpreter only — the desktop window host stays out of
+# mobile builds (default-features = false skips wry/tao/muda/runtime).
+glory-desktop = { path = "../../crates/desktop", default-features = false, features = ["backend"] }
+serde_json = "1"
+tracing = "0.1"
+
+[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
+wry = "0.55"
+tao = "0.35"

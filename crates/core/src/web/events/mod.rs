@@ -22,8 +22,24 @@ macro_rules! generate_event_types {
           #[allow(non_camel_case_types)]
           pub struct $event;
 
+          #[cfg(not(feature = "backend-command"))]
           impl EventDescriptor for $event {
             type EventType = web_sys::$web_sys_event;
+
+            fn name(&self) -> Cow<'static, str> {
+              stringify!($event).into()
+            }
+
+            $(
+              generate_event_types!($does_not_bubble);
+            )?
+          }
+
+          // Command-stream backends deliver every event as the serializable
+          // cross-platform `EventData` payload instead of a `web_sys` type.
+          #[cfg(feature = "backend-command")]
+          impl EventDescriptor for $event {
+            type EventType = $crate::renderer::EventData;
 
             fn name(&self) -> Cow<'static, str> {
               stringify!($event).into()
@@ -78,8 +94,10 @@ generate_event_types! {
   beforeinput: InputEvent,
   #[does_not_bubble]
   blur: FocusEvent,
+  beforetoggle: Event,
   canplay: Event,
   canplaythrough: Event,
+  cancel: Event,
   change: Event,
   click: MouseEvent,
   #[does_not_bubble]
@@ -90,27 +108,30 @@ generate_event_types! {
   contextmenu: MouseEvent,
   cuechange: Event,
   dblclick: MouseEvent,
+  doubleclick: MouseEvent,
   drag: DragEvent,
   dragend: DragEvent,
   dragenter: DragEvent,
+  dragexit: DragEvent,
   dragleave: DragEvent,
   dragover: DragEvent,
   dragstart: DragEvent,
   drop: DragEvent,
   durationchange: Event,
   emptied: Event,
+  encrypted: Event,
   ended: Event,
   #[does_not_bubble]
   error: ErrorEvent,
   #[does_not_bubble]
   focus: FocusEvent,
-  #[does_not_bubble]
   focusin: FocusEvent,
-  #[does_not_bubble]
   focusout: FocusEvent,
   formdata: Event, // web_sys does not include `FormDataEvent`
   gotpointercapture: PointerEvent,
-  input: Event,
+  input: InputEvent,
+  interruptbegin: Event,
+  interruptend: Event,
   invalid: Event,
   keydown: KeyboardEvent,
   keypress: KeyboardEvent,
@@ -121,9 +142,12 @@ generate_event_types! {
   loadedmetadata: Event,
   #[does_not_bubble]
   loadstart: Event,
+  loadend: ProgressEvent,
   lostpointercapture: PointerEvent,
   mousedown: MouseEvent,
+  #[does_not_bubble]
   mouseenter: MouseEvent,
+  #[does_not_bubble]
   mouseleave: MouseEvent,
   mousemove: MouseEvent,
   mouseout: MouseEvent,
@@ -134,11 +158,14 @@ generate_event_types! {
   playing: Event,
   pointercancel: PointerEvent,
   pointerdown: PointerEvent,
+  #[does_not_bubble]
   pointerenter: PointerEvent,
+  #[does_not_bubble]
   pointerleave: PointerEvent,
   pointermove: PointerEvent,
   pointerout: PointerEvent,
   pointerover: PointerEvent,
+  pointerrawupdate: PointerEvent,
   pointerup: PointerEvent,
   #[does_not_bubble]
   progress: ProgressEvent,
@@ -147,16 +174,19 @@ generate_event_types! {
   resize: UiEvent,
   #[does_not_bubble]
   scroll: Event,
+  scrollend: Event,
   securitypolicyviolation: SecurityPolicyViolationEvent,
   seeked: Event,
   seeking: Event,
   select: Event,
   selectionchange: Event,
   selectstart: Event,
+  slotchange: Event,
   graffchange: Event,
   stalled: Event,
   submit: SubmitEvent,
   suspend: Event,
+  timeout: ProgressEvent,
   timeupdate: Event,
   toggle: Event,
   touchcancel: TouchEvent,
@@ -186,9 +216,9 @@ generate_event_types! {
   // =========================================================
   // DocumentAndElementEventHandlersEventMap
   // =========================================================
-  copy: Event, // ClipboardEvent is unstable
-  cut: Event, // ClipboardEvent is unstable
-  paste: Event, // ClipboardEvent is unstable
+  copy: ClipboardEvent,
+  cut: ClipboardEvent,
+  paste: ClipboardEvent,
 
   // =========================================================
   // DocumentEventMap
@@ -199,4 +229,40 @@ generate_event_types! {
   pointerlockerror: Event,
   readystatechange: Event,
   visibilitychange: Event,
+
+  // =========================================================
+  // Glory synthetic lifecycle events
+  // =========================================================
+  #[does_not_bubble]
+  mounted: Event,
+  #[does_not_bubble]
+  visible: Event,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::web::events::EventDescriptor;
+
+    #[test]
+    fn event_descriptors_match_dom_bubbling_for_delegation() {
+        assert!(!focus.bubbles());
+        assert!(focusin.bubbles());
+        assert!(focusout.bubbles());
+        assert!(!mouseenter.bubbles());
+        assert!(!mouseleave.bubbles());
+        assert!(!pointerenter.bubbles());
+        assert!(!pointerleave.bubbles());
+    }
+
+    #[test]
+    fn dioxus_coverage_gap_events_are_exposed() {
+        assert_eq!(dragexit.name(), "dragexit");
+        assert_eq!(doubleclick.name(), "doubleclick");
+        assert_eq!(encrypted.name(), "encrypted");
+        assert_eq!(loadend.name(), "loadend");
+        assert_eq!(mounted.name(), "mounted");
+        assert_eq!(timeout.name(), "timeout");
+        assert_eq!(visible.name(), "visible");
+    }
 }

@@ -64,3 +64,43 @@ impl Widget for Graff {
         }
     }
 }
+
+/// A named child slot for nested route layouts.
+///
+/// `Outlet` has the same rendering behavior as [`Graff`], but gives route
+/// layouts a clearer API:
+///
+/// ```ignore
+/// Router::with_path("admin")
+///     .layout("shell", || AdminShell)
+///     .push(Router::with_path("users").outlet("content", || UsersPage));
+/// ```
+///
+/// `AdminShell` would render `Outlet::new("content")` where the child page
+/// should appear, while the application root renders `Outlet::new("shell")`.
+#[derive(Debug)]
+pub struct Outlet {
+    graff: Graff,
+}
+
+impl Outlet {
+    pub fn new(name: impl Into<String>) -> Self {
+        Self { graff: Graff::new(name) }
+    }
+}
+
+impl Default for Outlet {
+    fn default() -> Self {
+        Self::new("outlet")
+    }
+}
+
+impl Widget for Outlet {
+    fn build(&mut self, ctx: &mut Scope) {
+        self.graff.build(ctx);
+    }
+
+    fn patch(&mut self, ctx: &mut Scope) {
+        self.graff.patch(ctx);
+    }
+}

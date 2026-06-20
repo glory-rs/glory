@@ -122,10 +122,23 @@ children) → later `Widget::patch` when a bound signal revises → eventually
   generation (`generate_tags!`) are fine — those are codegen, not DSL.
 - Don't break `web-csr` exclusivity with `web-ssr`. They never both compile
   in the same target.
+- `backend-command` (the command-stream Node backend for desktop/native/
+  TUI) can be combined with `web-ssr` after the SSR command-replay
+  convergence, but remains mutually exclusive with `web-csr`/`single-app`.
+  It must NOT be enabled by any workspace member's default features.
+  App crates (outside the workspace, e.g. `examples/desktop-counter`) opt in
+  via `glory-core/backend-command` or `glory-desktop`'s `runtime` feature.
+  Test it explicitly: `cargo test -p glory-core --features backend-command`
+  and `cargo check -p glory-core --features "web-ssr backend-command"`.
+- The renderer wire protocol (`glory_core::renderer::Command` serde shape,
+  `EventData`, `QueryResponse`) is consumed by
+  `crates/desktop/src/wry_interpreter.js`; `renderer/command_dom.rs` is the
+  reference interpreter for its semantics. Changing any of the three means
+  updating all three together (plus `_todos.md` §12).
 - Don't enable `single-app` outside the implication chain from `web-csr`.
-- Don't fix `glory-routing` / `glory-cli` pre-existing test brokenness as a
-  drive-by. Open a dedicated PR for those — their failures predate any
-  current branch.
+- `glory-routing` / `glory-cli` tests are currently expected to pass under
+  the targeted commands in `docs/release-readiness.md`. Treat new failures as
+  regressions unless a dedicated issue documents otherwise.
 
 ## Commit & PR hygiene
 

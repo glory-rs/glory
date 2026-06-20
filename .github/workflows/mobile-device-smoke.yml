@@ -1,0 +1,66 @@
+name: mobile-device-smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 19 * * *'
+
+jobs:
+  android-emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GLORY_ANDROID_ABI: x86_64
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-linux-android
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Configure Android NDK env
+        shell: bash
+        run: |
+          echo "ANDROID_NDK_HOME=${ANDROID_NDK_LATEST_HOME}" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=${ANDROID_NDK_LATEST_HOME}" >> "$GITHUB_ENV"
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Generate mobile smoke project
+        shell: bash
+        run: |
+          mkdir -p target
+          cd target
+          cargo run --manifest-path ../Cargo.toml -p glory-cli -- new --template mobile --name mobile-smoke
+
+      - name: Build, bundle, install, and launch on emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          script: |
+            set -euxo pipefail
+            cd target/mobile-smoke
+            cargo run --manifest-path ../../Cargo.toml -p glory-cli -- build --target android
+            cargo run --manifest-path ../../Cargo.toml -p glory-cli -- bundle --target android
+            pwsh -NoLogo -NoProfile -File ../../scripts/mobile-device-smoke.ps1 \
+              -Target android \
+              -AndroidApk dist/mobile-smoke/android/apk/app-debug.apk \
+              -AndroidPackage com.example.mobile_smoke \
+              -AndroidActivity .MainActivity
+
+      - name: Upload smoke logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-device-smoke
+          path: |
+            target/mobile-device-smoke
+            target/mobile-smoke/dist/mobile-smoke/android/apk

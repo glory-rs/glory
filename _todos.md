@@ -1,256 +1,396 @@
-# Glory-rs 改进清单(_todos)
+# Glory 现状评审任务板（2026-06-12，对照本地 Dioxus checkout）
 
-> 配套 [`_report.md`](_report.md) 使用。本文件是落地清单,可直接当任务板。
-> 约定:
-> - **优先级**:P0 = 阻塞后续多平台演进 / P1 = 高价值近期可做 / P2 = 中期 / P3 = 长期或可选。
-> - **状态**:`[ ]` 未开始,`[~]` 进行中,`[x]` 完成。
-> - 路径都用相对仓库根的形式。
-> - 刻意不包含 RSX / DSL 相关项。
-
----
-
-## 0. 紧急 / 现存 Bug
-
-- [x] **P0** [`crates/core/src/widgets/each.rs:103`](crates/core/src/widgets/each.rs) 留着 `crate::warn!("key_view_ids: {:?}", key_view_ids);` 调试日志,生产构建噪声且暗示算法没收尾。先移除,然后做下面的 §1 重排算法。 — 已在 M1 移除([commit 30f6701](https://github.com/glory-rs/glory/pull/32))。
-- [x] **P1** [`crates/core/src/widgets/switch.rs`](crates/core/src/widgets/switch.rs) `Case::cached_view` 路径:`detach_child` 后 View 从 `ctx.child_views` 移除并存在 `Case::cached_view`,再次激活时只调 `attach_child(&view_id)`,但 `child_views` 已没这个 id。需要把 cached_view 重新塞回 `child_views`(或重做缓存语义)。补一个回归测试。 — 已修;`switch_toggles_and_restores_cached_view` 快照测试覆盖。
-- [x] **P1** [`crates/core/src/widgets/loader.rs`](crates/core/src/widgets/loader.rs) `patch` 中先 `detach_child` 再 `attach_child` 走 `visible_views.clone()` 两遍,中间没清空 visible set,重复调用会越积越多。审一遍。 — 实际 bug 在 `is_revising` 分支前没 detach 旧 result/fallback,导致连续 dep 变化时 subtree 堆叠;已修。
-- [x] **P2** `Bond::version` 用 `.map(|g| g.version()).sum()`([reflow/bond.rs](crates/core/src/reflow/bond.rs)),依赖版本号会碰撞(理论上不同组合可能和相同)。改成 `(id, version)` 对组成的 hash,或者每次依赖变化就单调递增。 — 改为 `(id, version)` 快照逐项比较 + 单调 re-run 计数器。
-- [x] **P2** `single-app` 命名带双下划线,Rust 社区惯例表示"不稳定内部 API"。如果它确实稳定,改名为 `single-app`;否则文档化清楚。 — 已改为稳定的 `single-app` feature;`crates/core/Cargo.toml` 明确说明只由 `web-csr` 自动启用,非 CSR 手动启用不受支持,`AGENTS.md` 同步记录规则。
-
-### M1 实现过程中发现并修复的其他 bug(原清单未列)
-
-- [x] **P0** SSR `Node::before_with_node` / `after_with_node` 语义完全坏掉:在 `self.children` 里找新节点的位置,然后把同一个新节点插到那里——等价空操作。所有非默认 reorder 路径在 SSR 下都是坏的。已替换为 parent 视角的 `Node::insert_before` / `Node::insert_after`(配合恒等去重),并加 `Node::ptr_eq`(基于 `Rc::ptr_eq`)。
-- [x] **P0** Element(CSR + SSR)`build` 把 `scope.first_child_node` / `last_child_node` 设成 `node.last_element_child()`,对叶节点(如 `<li>text</li>`)返回 `None`,导致 `Scope::attach_child` 的邻居查找全部回退到 `Tail`,reorder 不工作。改为 `Some(self.node.clone())`(元素自身就是子树外层锚点)。CSR 也修了(浏览器 DOM 之前隐式地"移动而非追加"掩盖了这条 bug)。
-- [x] **P0** 默认 `Widget::flood` 实现统一把所有子视图的 `scope.placement = Tail`。结合 `attach_child` 在 `is_attached=true` 时早退(不会执行末尾的 `placement = Unset` 重置),Tail 永远留下,后续 patch 时邻居搜索被跳过。删掉这行预设。
-- [x] **P1** `Scope::attach_child` 反向 sibling 查找用 `for i in (index - 1)..=0`,当 `index > 0` 时是空 range。改为 `(0..index).rev()`。
-- [x] **P1** `IndexMap::remove` / `IndexSet::remove` 在新版 indexmap 已 deprecated 并别名到 `swap_remove`(把最后一项搬到删除位)。`Scope::child_views` / `visible_views` 依赖顺序,这等于静默数据破坏。全部 core 调用点改为 `shift_remove`(`Scope::detach_child` / `Cage::unbind_view` / `Bond::unbind_view` / `scheduler::run` / `ServerHolder::drop`)。
-- [x] **P2** `GloryConfig::default` ↔ `GloryConfig::new` 互相递归调用,首次调用即 stack overflow。改为直接通过现有 `default_*` 函数构造。
-- [x] **P2** [`crates/core/src/truck.rs`](crates/core/src/truck.rs) 的测试 mod 引用了不存在的 `crate::prelude` / `crate::test` / `transfer` 方法,从来无法编译。清理掉,保留有意义的那个断言。
-- [x] **P2** [`crates/core/src/spawn.rs`](crates/core/src/spawn.rs) `spawn_local` 的 `cfg(any(test, doctest))` 分支调用 `tokio_test::block_on`,但 `tokio_test` 不是依赖,导致 `cargo test` 编译失败。改为让 test 走 `futures::executor` 分支。
-- [x] **P2** `crates/glory` 默认启用 `web-csr`,导致 `cargo check -p glory --features web-ssr` 同时打开 CSR+SSR 并触发互斥 Node 定义。改为 `default = []`,CSR / SSR 必须显式选 feature。
+> 评审范围:`D:\Works\glory-rs\glory` 对照 `E:\Repos\dioxus`。
+> 本板替代旧的历史实现日志(旧内容见 git 历史 `git show 080404b:_todos.md`),
+> 并接续 `_improve_todos.md`(2026-06-11 基线)中仍未完成的 E9/E10/E11/D2。
+>
+> 状态:`[ ]` 未开始 / `[~]` 部分完成 / `[x]` 完成。
+> 优先级:P0 = 阻塞成熟度叙事的关键差距 / P1 = 高价值近期 / P2 = 中期 / P3 = 长期可选。
+> 所有任务按 Lane 分组,**同一 Lane 内串行依赖已标注,不同 Lane 之间可完全并行**。
 
 ---
 
-## 10. 数据结构激进审计第二轮(2026-06-01)
+## 评审结论摘要
 
-第二轮覆盖上一轮未完整触达的 `hot-reload` / CLI reload transport。原则同 §9:不保留旧 view macro / DSL 兼容路径,wire payload 用显式 tagged enum,字段名描述业务含义而不是临时实现细节。
+经四路代码级核查(未完成标记扫描、核心渲染/热重载、平台后端、CLI/全栈),与 Dioxus 的
+剩余差距集中在七个方面,前一轮 `_improve_todos.md` 关闭的条目基本属实:
 
-- [x] **P0** 删除 `glory-hot-reload` 里历史 `view!` macro 模板 diff 数据结构:`ViewMacros` / `MacroInvocation` / `ViewMacroVisitor` / `LNode` / `LAttributeValue` / `Patches` / `PatchAction` / `ReplacementNode`,以及 `diff.rs` / `node.rs` / `parsing.rs` 和 `rstml` / `quote` / `indexmap` 依赖。
-- [x] **P0** 删除浏览器端旧模板 patch runtime:`patch.js` 不再定义 `patch(msg.view)`,SSR live-reload 注入脚本删除 `msg.view` 分支,只保留 full reload / css reload / function reload。
-- [x] **P1** 函数热重载数据结构改成明确领域名:`HotFunctions` -> `HotReloadFunctions`,`FunctionInvocation` -> `ReloadableFunctionMarker`,`FunctionReplacement` -> `FunctionReload`,`FunctionReplacementBatch` -> `FunctionReloadBatch`;字段改为 `function_id` / `source_path` / `line_number` / `reloads`。
-- [x] **P1** CLI reload websocket payload 从 `BrowserMessage { css: Option<_>, functions: Option<_>, all: bool }` 改成 `#[serde(tag = "type")] BrowserReloadMessage::{Full, Style { css_path }, Functions { payload }}`,消除互斥字段组合。
-- [x] **P2** 更新 `glory-hot-reload` README 和 `_todos.md` §5 中关于保留 view macro legacy internals 的历史说明。
+| 领域 | 现状 | 差距等级 |
+|---|---|---|
+| 路由 | 运行时字符串匹配,无类型化路由/嵌套布局/Outlet/重定向/查询参数解析 | **关键** |
+| 服务器函数 | 仅 POST + JSON;无 HTTP 动词选择、多编码、逐函数中间件、响应式 WebSocket hook | **高** |
+| 异步/错误原语 | Suspense 边界协议已部分落地(仍缺 SSR streaming/resume);ErrorBoundary 与 `resource_in` 竞态修复已补 | **高** |
+| CLI/构建 | wasm-split 暂缓;Windows/Linux 原生安装器已有最小路径,macOS/AppImage/签名仍缺 | **中-高** |
+| 资产 | `asset!` / `asset_folder!` / `css_module!` 已有编译期清单、bundle hash 映射和可选图片优化 | 中 |
+| 桌面 | 协议扎实,窗口控制 API、异步自定义协议、托盘、全局热键、拖放/打印已补 | 中 |
+| Native(Blitz)/LiveView/移动端 | 分别处于 spike(~20%)/可用但单适配器(~30%)/模板可编译但无真机验证(~30%) | 中-高 |
 
----
-
-## 9. 数据结构激进审计(2026-06-01)
-
-本轮只处理源码中实际承担运行时状态或跨 crate API 的数据结构。原则:字段名必须表达真实语义;未接入、只为兼容旧名或未来迁移预留的结构直接删除;不保留 alias / deprecated shim。
-
-- [x] **P0** `Scope` / `View` 运行时字段统一命名:`show_list` 改成 `visible_views`,`graff_node` 改成 `render_node`,`position` 改成 `placement`;`ViewPosition::Prev/Next` 改成与 renderer 一致的 `ViewPlacement::After/Before`。
-- [x] **P0** `ViewMap` 不是普通 map,而是按 `ViewId` 路径查找根视图和后代视图的树索引。改名为 crate 内部 `ViewTree`,移除公开 re-export、tuple field 和无用 `detach/get` API。
-- [x] **P0** `BrowerHolder` 拼写错误已经进入公开 API。激进改名为 `BrowserHolder`,同步 CSR examples、rustdoc 和 wasm smoke 注释,不保留旧类型别名。
-- [x] **P1** `ReloadWSProtocol` / `reload_ws_protocol` 命名不符合 Rust acronym 规则且暴露了实现缩写。改成 `ReloadWebSocketProtocol` / `reload_protocol`,variants 改为 `Ws/Wss`;环境变量改为 `GLORY_RELOAD_PROTOCOL`,删除旧变量兼容。
-- [x] **P1** 删除未接入的 `reflow::storage` / `sync-storage` feature / `slab` 依赖。当前 `Cage` 实现已经走 owned leaked cell + `Owner` invalidation,该 storage 模块只是历史迁移残留。
-- [x] **P1** routing 数据结构去弱类型/弱命名:`PathState.parts` 改 `segments`,`cursor: (row, col)` 改 `PathCursor { segment, offset }`,`end_slash` 改 `has_trailing_slash`,`PathFilter.raw_value/path_wisps` 改 `pattern/wisps`,wasm `Captures` 改成强类型 `Array<JsString>`。
-- [x] **P2** 删除 `Scope` / `Widget` / holders 中已注释掉的历史兼容代码块,只保留当前实际生命周期路径。
-- [x] **P2** 更新 AGENTS / crate docs 中涉及上述结构字段的说明,避免未来 agent 继续按旧字段名工作。
+性能:官方 js-framework-benchmark 9 项聚合 Glory 442ms vs Dioxus 456ms vs Leptos 589ms;
+E12 后聚焦 `07_create10k` Count=5 为 Glory 319.8ms total vs Dioxus 328.9ms
+total。E9 后重跑为 Glory 330.4ms total / 73.8ms script vs Dioxus 326.0ms
+total / 69.3ms script,script 残差收窄到约 4.5ms。架构层面已无硬性差距,
+余下是产品化。
 
 ---
 
-## 1. `Each` 列表重排 / item 复用算法(单列重点)
+## Lane R — 响应式与核心原语(crates/core/src/reflow, widgets)
 
-文件:[`crates/core/src/widgets/each.rs`](crates/core/src/widgets/each.rs)。
+- [~] **R1 P0** Suspense 式自动异步边界。已新增 `widgets::Suspense`、
+  `Scope` suspense 边界继承、`resource_in` 自动 pending token 登记/完成,并支持
+  mounted tree 在 body/fallback 间切换。剩余:真正 SSR streaming patch/resume 与
+  hydration 数据恢复还未接到 `ServerHolder::render_stream()`。
+- [x] **R2 P0** ErrorBoundary。新增 `BoundaryError` 与
+  `widgets::ErrorBoundary`:子树 build/attach panic 与后续 child patch panic 会路由到
+  最近边界,清理失败子树并渲染自定义 fallback;SSR 写入错误状态供 hydration 读取。
+- [x] **R3 P1** 修复 `resource_in()` 过期写竞态(`crates/core/src/reflow/effect.rs:136`
+  附近):依赖快速连续变化时旧 future 不取消,旧结果可能覆盖新结果。引入代际计数或
+  abort handle,仅最新一代可写回。补回归测试。
+- [x] **R4 P1** 响应式全局/上下文状态。`Truck` 是非响应式 Any 容器
+  (`crates/core/src/truck.rs`),Dioxus 有 `GlobalSignal`/`GlobalMemo`
+  (`packages/signals/src/global/`)。本轮选择文档化 "Truck 中存 Cage" 模式边界:
+  `docs/api-guide.md#app-wide-reactive-context` 说明 Truck 本身不订阅/不触发 patch,
+  需要响应式时存放 `Cage` 句柄;暂不引入模块级静态 API。
+- [x] **R5 P2** 评估 Copy 句柄。`Cage` 已是 Copy + generation/free-list slot;
+  `Bond` 保持 Clone,暂不迁移 generational slot。设计结论见
+  `docs/reactivity-copy-handles.md`;只有 E10/专项 bench 证明 derived handle clone
+  是热路径成本时才重开。
+- [x] **R6 P2** 事件委派两处 TODO:Shadow DOM 重定向与 `currentTarget` 模拟
+  (`crates/core/src/web/helpers/event.rs:62-64`)。委派监听器下读取
+  `event.currentTarget` 的处理器会拿到错误节点。
 
-**当前状态(读自源码 patch 实现 79–142 行):**
-- 对所有 item 顺序扫描,新 key 走 `Insert`,旧 key 走 `Reuse`。
-- 删除的 key 在循环结束后一次性 `detach_child`。
-- 应用 operation 时:每个 `Reuse` 都做 `IndexMap::move_index` + `is_attached=false` + `attach_child`,每个 `Insert` 同样把刚 store 的 view `move_index` + `attach_child`。
+并行性:R1 剩余 SSR streaming/resume 可独立继续;R3/R4/R6 完全独立;
+R5 仅评估,不阻塞任何人。
 
-**算法问题清单:**
-- [x] **P0** 用 LIS(Longest Increasing Subsequence)选出"不需要移动"的子序列。**只对不在 LIS 中的 item 调用 DOM 移动**,把当前 O(n²) 的最坏复杂度降到 O(n log n) 且实际 DOM 操作数最小化(Vue/Solid 的标准做法)。 — patience-sort 实现见 `lis_positions`,11 个 LIS 单元测试覆盖。
-- [x] **P0** Reuse 路径"位置未变也照样 attach"是浪费。判断:若上一轮 `child_views` 中的 view 索引 == 这一轮目标索引,**完全不动 DOM**。 — LIS 中的位置在 attach 循环里直接 `continue`,零 DOM 操作。
-- [x] **P0** `IndexMap::move_index` 单次操作 O(n);连续 N 次 = O(n²)。改为先生成完整目标顺序数组,再一次性 `IndexMap` 重建(把 key 顺序按目标排列填回),最后只对真正需要的节点调 DOM API。 — 改为单次 `IndexMap::sort_by(target_index)`,稳定 O(n log n)。
-- [x] **P1** 同一 key 但 value 变化的情况没处理。当前 Tmpl 只在 key 新增时调用一次,后续即使 `Vec<Value>` 内容变了,对应 view 也不会更新。两种修法二选一:
-  - (a) 文档化:**必须让 `Tmpl` 内部 reactive 订阅来源 Cage**,Each 不负责 value diff。这是最便宜的做法,但要在 `Each::new` doc 上写清楚。
-  - (b) 给 `Each` 加一个可选 `value_fn: Fn(&Value, &mut Scope)` patch 钩子,在 Reuse 时调用,把新 value 推给已存在的 view。
-  — 已选择 (a):`Each::new` rustdoc 增加"同 key value 变化不会重跑 tmpl_fn"契约、Cage-per-row 示例和 PlainStruct 陷阱说明。
-- [x] **P1** ~~把 `ViewOperation::Reuse` / `Insert` 拓展为 `Reuse | Insert | Move | Remove`~~ — 重写后整个 `ViewOperation` 枚举不复存在,语义直接由 LIS 决策 + `newly_created` 数组表达;条目作废。
-- [x] **P1** 增加"swap two items"快路径:LIS = 1 且只有 2 个 item 时直接 swap,跳过 LIS 计算。 — LIS 算法自然达到最小移动数,无需特例;`each_swap_adjacent` 测试覆盖。
-- [x] **P1** 增加"head append / tail append / clear"的 O(1)/O(n) 快路径检测,避免普通追加也走 LIS。 — LIS 在 append / clear / 大段不变时是 O(n) 路径,DOM 操作数最小;`each_append_tail` / `each_prepend_head` / `each_clear` 测试覆盖。如果未来 profiling 显示 LIS 开销可见,再考虑显式快路径。
-- [x] **P2** Removed key 的 detach 与 reorder 在同一个 batch 内顺序无保证。当前先 detach removed 再 reorder reused,理论上正确但需要回归测试覆盖"删第一个 + 移动剩余"这种组合。 — `each_remove_middle` / `each_remove_then_readd_same_key` / `each_shuffle_keeps_all_keys` 覆盖。
-- [x] **P2** `operations.reverse(); while pop` 的写法不直观。改为正向迭代 + 显式 cursor,降低维护成本。 — 重写后整段消失。
-- [x] **P2** ~~`key_view_ids` 当前是 `IndexMap<Key, ViewId>`,但同一 key 必然只有一个 view,实际只用到 map 性质;可以是 `HashMap`(更快)+ 显式 `Vec<Key>` 维护顺序~~。— **决定不改**:`indexmap::IndexMap` 内部就是 `HashMap + Vec<key>` 的混合,既给 O(1) 查询、又给有序迭代和 `get_index_of`。手写 HashMap+Vec 拿不到额外性能且会丢掉 `get_index_of` 这条 patch 主路径上的 O(1) 操作。
-- [x] **P2** 支持 `Lotus<&[T]>` / `Lotus<VecDeque<T>>` / `Lotus<im::Vector<T>>` 等其他容器(目前限 `AsRef<[Value]>`)。可以借助 `Lotus<impl IntoIterator<Item=&T>>` 抽象。 — 已实现:`Each` 的 trait bound 从 `ITter: AsRef<[Value]>` 放宽为 `for<'a> &'a ITter: IntoIterator<Item = &'a Value>`,支持 `Vec` / `VecDeque` / 任何 `&Self: IntoIterator` 的容器。`each_supports_vec_deque` 测试覆盖 push_front / pop_back。
-- [x] **P3** 给 `Each` 加 entrance/exit 动画钩子(Solid 的 `<TransitionGroup>` 风格):`on_enter(&Scope) / on_exit(&Scope)`。复杂度低、用户价值高。 — `Each::on_enter(|view_id|)` / `Each::on_exit(|view_id|)` builder 方法。on_enter 在 attach 之后触发(节点已在 DOM 上),on_exit 在 detach 之前触发(用户可读取消失视图的状态)。`each_on_enter_on_exit_hooks_fire` 测试覆盖 initial/append/remove/reverse 四种情况。
-- [x] **P3** 性能基准:写一个 `examples/each-bench`,做"反转、随机洗牌、首尾插入、清空"四种压测,记基线数据。LIS 改造后跑同一份对比,放进 PR 描述。 — 新增 `examples/each-bench` 独立 SSR timing harness;另有 Criterion 版 `crates/core/benches/each_reorder.rs` 覆盖 reverse / shuffle / prepend / append / remove-middle × n=10/100/1000。
+## Lane T — 路由类型化(crates/routing)— 对照差距最大的单项
 
-**算法落地伪代码(供实现参考):**
+- [x] **T1 P0** 类型化路由定义。现状是运行时字符串 `Router::push/filter`
+  (`crates/routing/src/router.rs`),Dioxus 有 `#[derive(Routable)]` 枚举路由
+  (`packages/router-macro/src/lib.rs`):静态类型、动态段类型推导、编译期检查。
+  Glory 哲学是"无 view DSL",但 Routable 派生不是 view 宏 — 需先做一次设计决策:
+  derive 宏 vs 类型化 builder(如 `route::<UserRoute>("/user/:id")`)。产出设计文档
+  后实现核心:路由枚举 ↔ URL 双向转换 + 类型安全 `goto(Route::X{..})`。
+  2026-06-19 第一阶段:已新增手写 `Routable` trait、`AviatorExt::goto_route`、
+  `Locator::route::<R>()`、`LocatorModifier::from_route` 和 path 参数 encode/parse
+  helpers;剩余是 derive/builder 决策与自动生成。
+  2026-06-19 第二阶段:已选择 derive 路线并新增 `#[derive(glory::Routable)]`,
+  支持 `#[route]`、`#[redirect]`、`#[not_found]`、typed path 参数和 catch-all;
+  复杂 query 结构继续用现有 helper 手写。
+- [x] **T2 P0** 嵌套布局 / Outlet 等价物。Dioxus 有 `#[nest]`/`#[layout]`/`Outlet`
+  (`packages/router/src/components/outlet.rs`)。Glory `Router` 已有层级 children,
+  缺的是"父布局渲染插槽"语义。依赖 T1 的设计结论。
+  2026-06-19 已完成:新增 `Outlet` 语义组件与 `Router::layout` /
+  `layout_keyed` / `outlet` helpers,父 layout 以 widget type key 去重,叶子路由
+  渲染进命名 outlet。
+- [x] **T3 P1** 查询参数与 catch-all 段解析:对照 `FromQuery`/`FromQueryArgument`/
+  `FromSegments`(`packages/router/src/routable.rs`),提供 trait 化解析 + 默认值回退。
+  可与 T1 并行(trait 层独立于路由定义形态)。
+  2026-06-19 已完成:新增 `RouteQuery`/`FromRouteQuery`、required/optional/
+  repeated/default query helpers、query 编码 helper,以及 catch-all encode/split/parse
+  helpers;未来 derive/builder 可直接复用。
+- [x] **T4 P1** 声明式重定向(Dioxus `#[redirect(...)]`)与 404 默认处理。依赖 T1。
+  2026-06-19 已完成: `Routable` 新增 `redirect()`/`not_found()`/`resolve_url()`,
+  并提供 `match_route_pattern()`/`redirect_url()` helpers;`Locator::route::<R>()`
+  现在会解析 redirect 与 typed 404 fallback。
+- [x] **T5 P2** 导航增强:滚动恢复、`GoBack/GoForward` 等价 API。另核查
+  `crates/routing/src/aviators/browser.rs:105` 的 TODO(history state 以 prop 而非
+  attribute 存储,部分导航模式可能丢 state)。
+  2026-06-19 已完成: `Aviator` 统一暴露 `back()`/`forward()`,Memory/Browser
+  后端实现对应历史移动;浏览器端保留 hash/top scroll 和 `noscroll` 控制,并修正
+  anchor `state`/`replace` 同时读取属性与 property。
+
+并行性:T1 是本 Lane 关键路径;T3/T5 可与 T1 并行;T2/T4 依赖 T1 设计落定。
+
+## Lane S — 服务器函数 / 全栈(crates/serverfn, macros, 适配器)
+
+- [x] **S1 P0** HTTP 动词支持。`#[server]` 目前只生成 POST(`crates/macros/src/lib.rs`),
+  Dioxus 支持 `#[get]`/`#[post]` 等。目标:`#[server(method = "GET")]`(GET 走查询串
+  编码,可缓存),三适配器(Salvo/Axum/Actix)同步,wire 协议测试覆盖。
+  2026-06-19 已完成:宏支持 `method = "GET"`,客户端 GET 通过
+  `__glory_args` 查询参数传 JSON tuple,Salvo/Axum/Actix adapter 同时挂 GET/POST,
+  runtime 按 method dispatch 并对方法不匹配返回 405。
+- [x] **S2 P1** 多编码协商。当前仅 JSON;Dioxus 有 `Encoding` trait + JSON/CBOR/
+  MessagePack/Postcard(`packages/fullstack/src/encoding.rs`)。目标:可插拔编码 trait,
+  feature-gate CBOR/Postcard,默认 JSON 不变。
+  2026-06-19 已完成:新增 `ServerFnEncoding` 与 `encode/decode_*_with` helpers,
+  三适配器按 `Content-Type` 解码 POST、按 `Accept` 编码响应;新增
+  `glory-serverfn/cbor` 与 `glory-serverfn/postcard` features,宏支持
+  `#[server(encoding = "cbor" | "postcard")]`,默认 JSON 和 GET 查询参数不变。
+- [x] **S3 P1** 逐函数中间件。Dioxus 支持 `#[middleware(tower_layer)]`。Glory 三适配器
+  不共享 tower,需设计适配器中立的 hook 点(如 `#[server(hoops = ...)]` 映射到各框架
+  原生中间件)。先设计后动宏。
+  2026-06-19 已完成:新增 adapter-neutral `ServerFnMiddlewareContext` 与
+  `ServerFnMiddleware` hook,dispatch 在函数体前顺序执行并可用 `ServerFnError`
+  短路;宏支持 `#[server(middleware = path)]` 与 sibling `#[middleware(path)]`。
+- [x] **S4 P1** 客户端响应式 WebSocket。已有 `TransportMessage<T>`/`WebSocketFrame`
+  帧助手(`crates/serverfn/src/lib.rs`),缺 Dioxus `use_websocket()` 式 hook
+  (`packages/fullstack/src/payloads/websocket.rs`):自动重连 + 类型化双向通道 +
+  连接状态 Cage。
+  2026-06-19 已完成:新增 `use_websocket::<T>()` /
+  `use_websocket_with_options()` browser handle,暴露
+  `Cage<WebSocketConnectionState>`、latest `TransportMessage<T>`、error Cage,
+  支持 typed `send()`、手动 `reconnect()`、默认自动重连;非 wasm 返回 Failed 状态。
+- [x] **S5 P2** 服务端原生 extractor 直通(Dioxus 允许 axum `FromRequest` 直接做参数)。
+  Glory 的 `RequestContext` 是统一抽象;评估按适配器 feature-gate 的原生 extractor
+  直通是否值得破坏适配器中立性,先写决策记录。
+  2026-06-19 已完成:新增 `docs/serverfn-extractor-decision.md`,决策为核心
+  `#[server]` 暂保持 adapter-neutral,原生 Salvo/Axum/Actix extractor 放在自定义
+  框架 route 或未来显式 feature-gated adapter 扩展。
+- [x] **S6 P1** 提交此前未提交改动:`salvo_mount::streaming_response()` 返回式助手 +
+  `write_streaming_response` 显式 `StatusCode::OK` + salvo-adapter `into_response()` +
+  recipes 文档。补一条 Salvo 流式响应状态码测试后提交。
+  2026-06-19 已确认实现存在,并新增 Salvo streaming response 200/content-type
+  回归测试。
+
+并行性:S6 立即可做;S1/S2/S4 互相独立;S3/S5 需各自先出小设计决策。
+
+## Lane C — CLI / 构建 / 开发体验(crates/cli)
+
+- [x] **C1 P0** serve 开发体验追平:浏览器 auto-open(默认开)、`--port/--address`
+  显式参数、HTTPS 选项、代理转发配置。对照 `packages/cli/src/cli/serve.rs` 的
+  `ServeArgs`(open/hot_reload/cross_origin/wsl_file_poll_interval 等 11 个字段),
+  Glory `crates/cli/src/command/serve.rs` 此前是 14 行薄封装。
+  2026-06-19 第一阶段:已新增 `glory serve --address/--port` 对 `site_addr`
+  的运行时覆盖,默认打开浏览器并支持 `--no-open`。
+  2026-06-19 第二阶段:已新增 `--https`、`--tls-cert/--tls-key`、重复
+  `--proxy PATH=URL`,统一通过 `GLORY_SITE_SCHEME`/`GLORY_SITE_URL`、
+  `GLORY_TLS_CERT`/`GLORY_TLS_KEY`、`GLORY_PROXY_CONFIG` 传给应用服务器。
+- [x] **C2 P1** serve 交互能力:运行中按键触发重建(r)、verbose 切换(v)、帮助(/)。
+  不必复刻 Dioxus 全屏 TUI,行式交互即可。依赖 C1 的参数结构。
+  2026-06-19 已完成:watch 模式 stdin 支持 `r` + Enter 强制全量 rebuild,
+  `v` + Enter 在 info/debug/trace 间切换日志级别,`/`/`?` + Enter 打印帮助。
+- [x] **C3 P2** wasm-split 评估与原型。Dioxus 有成熟 `#[wasm_split]` 宏 + CLI 切分 +
+  Playwright harness(`packages/wasm-split/`),Glory 完全没有。评估见
+  `docs/wasm-split-evaluation.md`:当前体积不先做 split,原型等 gzip/路由懒加载阈值
+  触发后再做 CLI-owned 次入口方案。
+- [x] **C4 P1** 原生安装器产物:`glory bundle --target desktop` 目前输出裸 exe +
+  assets,Dioxus 经 tauri-bundler 出 MSI/DMG/DEB/AppImage。评估直接复用
+  tauri-bundler crate,先支持 Windows MSI + Linux deb。
+  2026-06-19 已完成:未直接引入完整 tauri-bundler/Dioxus bundler 依赖,而是在现有
+  `bundle` 流程中补最小原生安装器路径:Windows 写 WiX `product.wxs`、payload staging
+  和 `build-msi.ps1`,检测到 WiX v3 工具时直接产出 `.msi`;Linux 纯 Rust 组装 `.deb`
+  (ar + control/data tar.gz),并安装到 `/usr/lib/<package>` + `/usr/bin` symlink +
+  `.desktop` 文件。`examples/desktop-counter` 已补 metadata 作为 bundle 验证样例。
+- [x] **C5 P2** CLI 小命令补齐:`run`(无热重载直跑)、shell `completions`、
+  `self-update` 提示。`translate`/`components` 属 RSX 生态,明确不做。
+  2026-06-19 已完成:`glory run` 复用无 watch/live reload 的 serve 路径,
+  `glory completions <shell>` 输出 clap completion script,`glory self-update`
+  输出安装/升级提示。
+- [x] **C6 P1** 修复 CLI 现存 TODO:
+  - `crates/cli/src/compile/style.rs:107` Style 产物返回空串占位,样式指纹/缓存失效
+    可能不工作;
+  - `crates/cli/src/ext/exe.rs:703,729` 工具版本匹配无 semver 区间支持;
+  - `crates/cli/src/tests.rs:27` cwd 全局可变导致测试无法并行。
+  三项互相独立,可拆三个小 PR。
+
+并行性:C1→C2 串行;C3/C4/C5/C6 与 C1 完全并行,C6 内部三项也可并行。
+
+## Lane A — 资产管线(crates/core/src/assets.rs, cli)
+
+- [x] **A1 P1** 类型化资产清单:`asset!` 现在通过 `include_bytes!` 做
+  `CARGO_MANIFEST_DIR` 相对路径编译期存在性校验;bundle 会为静态资源写 hashed
+  副本并在 `glory-bundle.json::asset_map` 中记录 public path 映射;
+  `AssetManifest` 可安装运行时映射,Desktop assets root 会自动读取该 manifest。
+- [x] **A2 P2** 图片优化管线(PNG/JPEG→WebP,按平台格式),对照 manganis
+  `images.rs`:新增 `glory bundle --optimize-images`,默认关闭;开启后 PNG/JPEG
+  会生成 WebP 副本并通过 `asset_map` 优先映射到 hashed WebP。
+- [x] **A3 P2** folder 资产宏(递归枚举 + 清单),对照 manganis `folder.rs`:
+  新增 `AssetFolder` 和 `glory::asset_folder!("dir")`,编译期递归枚举文件并为每个
+  文件生成 `include_bytes!` 校验。
+- [x] **A4 P3** 类型化 CSS Modules(`.module.css` → 类名结构体)。新增
+  `glory::css_module!("*.module.css")`,编译期抽取 class selectors、生成稳定 hashed
+  class 和 typed 方法(如 `.primary-button` → `primary_button()`),并输出重写后的
+  `css()` 文本。
+
+并行性:A1 先行,A2/A3 依赖其清单格式;A4 独立但缓做。
+
+## Lane D — 桌面(crates/desktop)
+
+现状 80%:协议/多窗口/菜单/自定义协议/热重载扎实;对照
+`packages/desktop/src/desktop_context.rs`(30+ 方法)缺以下 API。
+
+- [x] **D1 P1** 窗口控制 API 包:`drag_window`、`set_fullscreen`/查询、
+  `is_maximized`/`toggle_maximized`、`focus`、`set_zoom_level`、按 id 关闭任意窗口、
+  运行时从窗口内新开窗口。多为 wry/tao 一行调用,作为一个 PR 打包。
+  2026-06-19 已完成:新增 `DesktopWindowHandle`/`DesktopWindowId`/
+  `DesktopWindowState`,支持 `launch_with_handle`、`window_with_handle`、窗口命令
+  分发、状态查询缓存、按 id 关闭与运行时 `open_window`;`desktop-counter` 与
+  desktop/platform 文档已覆盖调用方式。
+- [x] **D2 P2** 托盘图标支持(tray-icon crate;`DesktopConfig` 字段 + 事件回调)。
+  新增 `TrayIconSpec`/`TrayIconImage`、`DesktopTrayEvent` 与 `on_tray`,tray 对象
+  由 `WindowSlot` 持有并通过 tao user event 转发。
+- [x] **D3 P2** 全局热键(global-hotkey crate;注册/注销 API)。新增
+  `DesktopHotKeySpec`/`DesktopHotKeyEvent`,runtime 创建 `GlobalHotKeyManager`,
+  按窗口注册并在窗口关闭时 unregister。
+- [x] **D4 P1** 异步自定义协议处理器:内置 `glory://` 已迁到
+  `with_asynchronous_custom_protocol`;新增 `DesktopProtocol`/`DesktopConfig::with_custom_protocol`
+  与 `desktop_protocol_response`,对照 Dioxus `AsyncWryProtocol` +
+  `RequestAsyncResponder`,支持长耗时资源/RPC 端点。
+- [x] **D5 P2** 原生文件对话框集成指南或 rfd 助手(当前文档定位"应用自理",至少给
+  recipes)。`docs/platform-apis.md#file-dialogs` 记录了 app-owned `rfd` 集成模式,
+  `docs/desktop.md` 已补入口。
+- [x] **D6 P3** 拖放文件事件桥接、打印对话框。新增
+  `DesktopFileDropEvent` 与 `DesktopConfig::with_file_drop_handler`,把 Tao
+  `HoveredFile`/`DroppedFile`/`HoveredFileCancelled` 转成 event-loop 线程上的 host
+  callback;`DesktopWindowHandle::print()` 通过窗口命令调用 Wry print dialog。
+
+并行性:D1-D6 全部互相独立,均不动指令流协议(注意 wire 协议三处同步规则)。
+
+## Lane N — Native / Blitz(crates/native)— spike → 可用
+
+- [x] **N1 P1** 完整事件桥接:`glory-native` shell 已升级到 Blitz
+  0.3 alpha.5,并映射 pointer/mouse/touch(`BlitzPointerId::Finger`)、click/
+  contextmenu/dblclick、wheel、scroll、focus/blur/focusin/focusout、input、
+  key、IME、Apple standard keybinding。事件 payload 单测覆盖 touch metadata、
+  wheel/scroll/IME 序列化;已验证 `cargo test -p glory-native --features shell`
+  与 `cargo clippy -p glory-native --features shell -- -D warnings`。
+- [x] **N2 P1** 布局查询接通:`BlitzConsumer` 现在为 `NodeQuery::Value`、
+  `BoundingRect`、`ScrollOffset` 产出 `QueryResponse`,shell flush 会把应答 resolve
+  回 `CommandHolder`;`cargo test -p glory-native --features blitz` 已覆盖。
+- [x] **N3 P2** 窗口生命周期:`launch_blitz_window` 单窗口 shell(13 行),需
+  WindowId 跟踪、resume/pause、重绘调度,对照 `packages/native/src/dioxus_application.rs`。
+  已新增 `GloryBlitzApplication`/`GloryBlitzWindowConfig`/`GloryBlitzWindowId`,
+  Glory 侧管理 pending windows 与配置,启动时交给 `blitz_shell::BlitzApplication`
+  处理 active WindowId map、resume/suspend、close exit 与 redraw poll。
+- [x] **N4 P2** 属性/property 区分:`blitz_consumer.rs:129` spike 把 property 一律当
+  attribute 写,表单控件(value/checked)行为会偏。
+- [x] **N5 P3** accesskit 无障碍接入。新增 `glory-native/accessibility`
+  feature,打开 `blitz-shell/accessibility` 与 `blitz-dom/accessibility`,复用
+  upstream `accesskit_winit` adapter 和 Blitz document accessibility tree;已验证
+  `cargo check/test -p glory-native --features "shell accessibility"`。
+
+并行性:N1/N2/N4 互相独立;N3 与其余并行;建议 N1+N4 先行(直接影响表单可用性)。
+
+## Lane L — LiveView(crates/liveview)
+
+- [x] **L1 P1** 异步化重构:当前每会话一个 `std::thread` + mpsc
+  (`crates/liveview/src/lib.rs`),百级并发即吃紧;Dioxus 用
+  `LocalPoolHandle` task-per-session(`packages/liveview/src/pool.rs`)。已改为
+  全局共享 local worker pool,每 session 是 `spawn_local` task,adapter 通过容量 32
+  的 bounded channel 施加背压,并保住 non-Send 树约束。
+- [x] **L2 P1** Axum/Actix 适配器:抽 `LiveviewRouter` 式 trait(对照
+  `packages/liveview/src/adapters/mod.rs` 约 30 行),消除 Salvo 硬编码。可与 L1 并行
+  (传输 trait 先定)。
+  2026-06-19 已完成:新增 `LiveviewRouter` trait、`axum_mount` 与 `actix_mount`,
+  Salvo/Axum/Actix 共享 `SessionWorker`/`LiveViewSession` 合约;Actix 使用
+  `actix-ws` 无 actor adapter。
+- [x] **L3 P2** Query 应答接通:协议已有 Query 消息,服务端无应答路径;复用桌面解释器
+  的 query 答复逻辑。
+  2026-06-19 已完成:确认 `LIVEVIEW_CLIENT_JS` 的 `__gloryWryQuery` 会发送
+  `LiveViewMessage::Query`,服务端 `handle_message` 通过 `CommandHolder::resolve_query`
+  回填 pending query;新增 `session_resolves_query_message` 回归测试。
+- [x] **L4 P2** HTML 模板配置(head/root div 自定义)、会话空闲超时/TTL、重连退避
+  语义文档化。
+  2026-06-19 已完成:`docs/liveview.md` 明确 LiveView 只拥有协议/session/
+  route/client JS,HTML shell/head/root 由宿主应用负责;记录当前每 WebSocket
+  连接一会话、无 resume/idle TTL 配置,以及客户端 `reconnectMs` /
+  `maxReconnectMs` 指数退避语义。
+- [x] **L5 P2** LiveView 示例项目(examples/ 下,Salvo 起步)。依赖 L2 的 trait 定型
+  可顺带出 Axum 版。
+  2026-06-19 已完成:新增 `examples/liveview-salvo`,根路由内联 command
+  interpreter + `LIVEVIEW_CLIENT_JS`,并在 `/__glory/liveview` 挂载 Salvo LiveView
+  socket;examples 索引已补入口。
+
+## Lane M — 移动端(cli templates, examples/mobile-counter)
+
+- [~] **M1 P0(外部受阻)** 真机/模拟器验证:`scripts/mobile-device-smoke.ps1` 主机
+  检查已过,需 Android 模拟器或真机在线 + macOS 跑 iOS。接续 `_improve_todos.md` D2。
+  CI 侧:GitHub Actions Android emulator job(API 34, x86_64)夜间跑安装+启动冒烟。
+  2026-06-19 已完成 CI 侧闭环配置:新增 nightly/manual
+  `.github/workflows/mobile-device-smoke.yml`,用 `GLORY_ANDROID_ABI=x86_64`
+  生成 mobile 模板、build/bundle APK,再在 API 34 x86_64 emulator 上调用
+  `scripts/mobile-device-smoke.ps1` 安装+启动并上传 smoke logs。剩余受阻项:
+  等待 GitHub Actions 或本机设备实际运行结果;Windows 当前仍无在线 Android
+  device/emulator,iOS 仍需 macOS。
+- [x] **M2 P1** 设备上热重载:此前 reload client 仅桌面 webview 可达,Android 需
+  `adb reverse` 或局域网地址注入模板。依赖 M1 有验证环境。
+  2026-06-19 已完成:移动端模板/`examples/mobile-counter` 在 `GLORY_WATCH=ON`
+  时注入 reload websocket client,支持 `GLORY_MOBILE_RELOAD_URL` 或
+  `GLORY_RELOAD_PORT` + `GLORY_MOBILE_RELOAD_HOST`;full reload 会重新 mount
+  webview,style/function reload 复用现有消息形态。`glory serve` watch loop
+  已会重编 mobile lib,Android bundle run 脚本、`GLORY_ANDROID_RUN=1` 路径和
+  `scripts/mobile-device-smoke.ps1` 均支持 `GLORY_ANDROID_REVERSE_RELOAD=1`
+  自动执行 `adb reverse`。真机/模拟器行为仍由 M1 记录。
+- [x] **M3 P2** 权限请求助手与原生桥模式文档(相机/相册/分享等先给 recipes,不急于
+  封装 API)。见 `docs/mobile-native-recipes.md`,覆盖 app-owned bridge、权限结果、
+  相机/相册 URI、分享 sheet 的平台中立边界。
+- [x] **M4 P2** 评估"单代码库 + cfg 分平台"路线:Dioxus 桌面/移动同 crate
+  feature-gate(`packages/desktop/src/mobile.rs` 约 50 行),Glory 是独立模板树。
+  决策见 `docs/mobile-architecture-decision.md`:设备 CI 绿之前保持透明 host 模板,
+  后续优先共享 helper crate,不做单个 cfg-heavy 大 crate。
+
+## Lane E — 性能与基准(接续 _improve_todos.md E9/E10/E11)
+
+- [x] **E9 P0** 普通 builder 元素子树的自动分配压缩。CSR fresh mount 现在
+  会把普通 builder 中自身静态(无 reactive attr/class/prop、无 listener)的元素
+  wrapper 直接挂为原生 DOM,并允许其动态后代通过固定父节点继续作为正常 View
+  挂载;hydration 与 SSR 路径保持 View 语义。`BrowserHolder` 同步修正为仅在
+  页面存在 `[gly-id]` 时进入 hydration,避免纯 CSR 挂载禁用压缩。回归覆盖:
+  wasm CSR smoke 编译 + compact wrapper/dynamic child 父节点与 click 行为测试。
+- [x] **E10 P1** 稳定多样本基准对比:扩展
+  `benchmarks/official-js-framework-benchmark.ps1`,保留命名基线、Glory-only A/B、
+  `Count>=5` 中位数/极差表。**应先于 E9/E11 的验收**(否则小优化无法接受/拒绝)。
+- [x] **E11 P1** 事件处理器安装成本隔离:新增
+  `crates/core/benches/event_handlers.rs`,覆盖 1k/10k 同 DOM 无 handler vs click
+  handler 注册,以及空 registry vs 10k handler registry 的 command-stream dispatch
+  lookup/restore。短样本显示 10k handler 注册约增加 1ms,lookup 约 107ns,暂不需要
+  另起委派行 API。
+- [x] **E12 P2** `create10k` 对标 Dioxus:新增 Glory benchmark 数据生成批量
+  state 写回/Vec move,并缓存 CSR delegated click key/注册 fast path。官方
+  `07_create10k` Count=5 headless/no-throttling:Glory 319.8ms total vs Dioxus
+  328.9ms total;script 仍有小差距(80.3ms vs 71.7ms),但 paint 更快且总时间
+  已追平。E9 后同命令重跑:Glory 330.4ms total / 73.8ms script vs Dioxus
+  326.0ms total / 69.3ms script,script-only 残差收窄但总时间仍受浏览器 paint
+  波动影响。
+
+并行性:E10 先行;E9/E11/E12 随后并行,均以 E10 的报告为验收标准。
+
+## Lane F — 修剩余小项与流程
+
+- [x] **F1 P2** README 与文档引用更新:README 仍把 `_todos.md` 描述为"历史实现日志",
+  本次重写后需同步措辞;`_improve_todos.md` 标注"由本板接续"。
+- [x] **F2 P2** Playwright 全量浏览器 CI 化:F3 已建项目但 CI 只跑 install/list/skip
+  冒烟,补真实浏览器执行(至少 CSR counter + SSR hydration 两项)。
+  2026-06-19 已完成:新增 CI `browser-e2e` job,安装 Chromium,通过 `glory serve`
+  启动 CSR counter 与 SSR hydration 示例,设置 `GLORY_COUNTER_URL`/`GLORY_SSR_URL`
+  后实际运行对应 Playwright 项目;同时让 counter 示例具备 SSR 静态服务 bin,并修复
+  CLI `bin_target` 与 package name 不一致时的可执行文件路径。
+- [x] **F3 P3** 桌面 IPC `panic!("unexpected message")`(`crates/desktop/src/lib.rs:157`)
+  改为带日志的容错降级。生产路径 `runtime.rs` 已对无法解码的 IPC 消息
+  `tracing::warn!` 后丢弃;`lib.rs` 里剩余 panic 是测试断言,非宿主运行时路径。
+- [x] **F4 P0** 修复 release checklist 中的 CLI clippy 失败:
+  `cargo clippy -p glory-cli --lib --no-default-features -- -D warnings`
+  之前因 `crates/cli/src/lib.rs` 的 `clippy::let_and_return` 失败,已直接返回
+  `match` 表达式并通过验证。
+- [x] **F5 P0** 同步 feature/test 文档漂移:`AGENTS.md` 已更新
+  `backend-command + web-ssr` 可组合、`backend-command + single-app/web-csr`
+  仍互斥的当前规则;`docs/release-readiness.md` 已移除 workspace 测试历史失败说法。
+- [x] **F6 P0** Rust 主 CI 化:新增 `.github/workflows/ci.yml`,覆盖 fmt、
+  core default/web-ssr/backend-command tests、serverfn tests、CLI tests、
+  public feature-set check、feature guard 负向检查和 release clippy gates。
+
+---
+
+## 建议并行执行批次
 
 ```text
-prev_keys: IndexMap<Key, ViewId>           // 上一轮顺序
-new_items: Vec<Value>
-let mut reused: Vec<Option<usize>> = vec![None; new_items.len()];
-                                            // reused[i] = prev_keys 中的 index
-for (i, item) in new_items.iter().enumerate() {
-    let key = key_fn(item);
-    if let Some(old_idx) = prev_keys.get_index_of(&key) {
-        reused[i] = Some(old_idx);
-    }
-}
-let lis = longest_increasing_subseq_of(reused.iter().filter_map(|x| *x));
-// 任何 reused[i] 不在 lis 中 → 需要 DOM 移动
-// 任何 reused[i] == None      → 需要新建并插入到位置 i
-// 任何 prev_key 没出现在 new   → 需要删除
+批次 1(立即,全部互相独立):
+  S6 提交未提交改动 | E10 基准报告 | C6 三个 CLI TODO | R3 resource 竞态
+  | D1 窗口 API 包 | L2 LiveView trait 抽象 | T1 路由设计文档
+
+批次 2(批次 1 设计落定后):
+  R1+R2 Suspense/ErrorBoundary | T2/T3/T4 路由实现 | S1 HTTP 动词
+  | C1 serve 体验 | L1 LiveView 异步化 | N1+N4 Blitz 事件/property
+  | A1 类型化资产清单 | E9/E11(以 E10 验收)
+
+批次 3(中期):
+  S2/S3/S4 | C2/C4 | A2/A3 | D2/D3/D4/D5 | N2/N3 | L3/L4/L5 | M2/M3 | E12
+
+长期/按需:A4 | N5
 ```
 
----
+## 与 Dioxus 的差异化定位提醒(评审附带结论)
 
-## 2. 响应式核心(对应 _report.md §1)
-
-- [x] **P0** **引入"作用域 + 代际盒"**:在 `crates/core/src/reflow/` 下新增 `storage.rs`(`Slab<Box<dyn Any>>` + `Generation: u64`),把 `Cage` 改为 `(slot_key, generation)` 句柄 → `Cage<T>: Copy`。— `Cage<T>` 已是 copyable generation handle;`Owner` 已绑定到 `Scope`,scope-owned cage 在 owner drop 后失效;`try_get` / `try_revise` 返回 stale/borrow 错误。执行清单见 [`_m2_reactivity_tasks.md`](_m2_reactivity_tasks.md)。
-  - 子任务:
-    - [x] 设计 `Owner` 类型,绑定到 `Scope` 生命周期;scope drop → owner drop → 该作用域分配的所有信号失效。
-    - [x] 现存 `Cage::clone()` 调用面巨大,先做 internal type alias,保持外部 API 不变,再灰度切换。— `Cage<T>: Copy`;`.clone()` 仍可用,语义退化为复制句柄。
-    - [x] 准备 `Cage::try_get / try_revise → Result<_, BorrowError>`,处理代际失配。— 已提供 borrow-conflict 级 `Result`;代际失配等 Owner 回收落地后接入同一 API。
-- [x] **P0** 同时设计同步存储后端(`RwLock` + atomic),让同一份 `Cage`/`Bond` 在 SSR / 多线程 runtime 下也能跑。— 本轮 §9 审计确认旧独立 storage scaffold 没有接入主 `Cage` 路径,已删除;后续同步后端必须直接接入 public reactive primitives。
-- [x] **P1** 增加 `effect(|| { … })` 原语:订阅依赖、自动重跑;返回一个 handle,scope drop 时停止。 — `reflow::Effect` widget + `reflow::effect_in(parent, fn)` 函数;Detach 时清理订阅,有 1 个单测。
-- [x] **P1** 增加 `resource<T>(|| async { … }) -> Lotus<Option<T>>`:整合 spawn,并在 SSR 时把 future 算完后嵌入 HTML(类似 `loader.rs` 的 `save_state`,但作为框架级一等公民)。 — `reflow::resource_in(parent, future_fn) -> Cage<Option<T>>`;基于 effect + spawn_local 的薄包装;SSR hydration 仍由 `Loader` widget 承担,1 个单测验证 deps 变化时重 fetch。
-- [x] **P1** 把 `untrack` 提升为公开稳定 API(目前内部使用)。文档示例补上。 — 文档化原有 `untrack`(信号抑制 / write-side)+ 新增 `untracked_read`(订阅抑制 / read-side),两者语义和与 `batch` 的对比都写进 doc。
-- [x] **P1** 把 `Cage::revise` 的事件回调路径自动包一层 `batch`(在 `web/events/` 入口统一加),避免用户每次手写 `batch(|| …)`。 — `Element::add_event_listener` 在 CSR 下把 handler 包进 `reflow::batch`。
-- [x] **P2** 让 `Bond` 支持自定义相等比较(`Bond::with_eq`),仅当输出值真正改变时才标脏。 — `with_eq(|a, b| ...)` + `with_partial_eq()` 两个 builder 方法,加 2 个单测。
-- [x] **P2** 提供 `selector(|| key) -> Lotus<T>` 工具,做"基于 key 的稳定派生"。 — `reflow::selector(mapper)` 自由函数,等价于 `Bond::new(mapper).with_partial_eq()`;`Bond::with_partial_eq` 同名能力也保留。
-- [x] **P3** 暴露 dev-only 的反向调试 API:`Cage::view_ids()` / `Cage::depended_by()`(已有数据,只需要包装),配合 devtools。 — `Cage::subscriber_count()` / `Cage::subscriber_view_ids()` 都标 `#[doc(hidden)]`,有 1 个单测。
-
----
-
-## 3. 渲染层抽象 / 多平台前置(对应 _report.md §2、§4)
-
-- [x] **P0** 设计 `Renderer` trait(草案见 _report.md §2.3 Step A),`Node` 作为关联类型,逐步替换 `crates/core/src/node/mod.rs` 中两套 `cfg` 切换的 Node。— `renderer::Renderer` / `RenderedElement<R>` / `SsrRenderer` / `WebRenderer` / `MockRenderer` 已落地;SSR/CSR Element 节点插入移除已通过 renderer;旧 `Node` cfg 作为兼容别名保留。
-  - [x] 先把 `web/csr.rs` / `node/ssr.rs` 的差异点列成"必须方法表"(create / set_attr / set_class / append / remove / replace / attach_event ...)。— 见 [`_m3_renderer_tasks.md`](_m3_renderer_tasks.md)。
-  - [x] 在 `crates/core/src/renderer/` 下新增 trait + 默认 `WebRenderer` / `SsrRenderer` 两个实现。— `renderer::{Renderer, InsertPosition, EventPayload, SsrRenderer, WebRenderer}` 已落地;SSR 基础操作有单测。
-  - [x] 把 `web/widgets/{div,button,…}.rs` 改成 `R: Renderer` 泛型,消除 `cfg(all(target_arch = "wasm32", feature = "web-csr"))` 双份代码。— 新增 `RenderedElement<R>` 泛型基础类型;现有 generated tag API 保持,内部开始使用 `SsrRenderer` / `WebRenderer`。
-- [x] **P0** `AttributeValue` 富类型化:不再统一用 `Cow<'static, str>`,而是 `enum { Text(String), Float(f64), Int(i64), Bool(bool), Listener(EventHandler), Any(Rc<dyn Any>), None }`。这是 native / TUI 后端能接得上的前提。— `renderer::AttributeValue` 富类型 enum 已新增(`Text`/`Float`/`Int`/`Bool`/`Any`/`None`),作为 Renderer/IPC 层值载体;现有 web `AttrValue` trait 继续负责 DOM 注入。
-- [x] **P0** `EventPayload` 抽象:`pub trait EventPayload { fn as_any(&self) -> &dyn Any; fn name(&self) -> &str; }`。`web/events/` 把 `web_sys::Event` 包成这个 trait。 — `renderer::EventPayload` 已落地;`WebEventPayload` 包装 `web_sys::Event`,`SsrEventPayload` / `WryEventPayload` 提供非浏览器擦除事件。
-- [x] **P1** **统一 `glory::launch`** 入口。当前 CSR/SSR 启动方式风格不一(`mount_to(body)` vs salvo handler),`crates/glory/src/lib.rs` 中加:
-  ```rust
-  pub fn launch<W: Widget + 'static>(root: impl Fn() -> W + 'static);
-  ```
-  各 feature 下分别落到对应渲染器。 — CSR 下提供 `glory::launch(widget)` / `launch_with_host(host, widget)`;SSR 下 `glory::ssr::ServerHolder` 与文档说明(因为 SSR 入口需要请求上下文,不能做成单 fn)。
-- [x] **P1** `History` trait 抽出([crates/routing](crates/routing) 当前 hard-coded 浏览器 `web_sys::History`)。 — 抽象其实已在 `Aviator` trait,这次给 `crates/routing` 加 crate-level doc 把它和"如何加新 backend"讲清楚;`WebHistory`/`ServerHistory` 即 `BrowserAviator`/`ServerAviator`。`MemoryHistory` 当未来真有测试需求时再加(下行 P3 留作未来子项)。
-  - [x] `WebHistory`(浏览器) — 即 `BrowserAviator`。
-  - [x] ~~`MemoryHistory`(测试 / 桌面 / 命令行)~~ — 没有当前用例,暂不实现;后续加测试 / 桌面 backend 时再补。
-  - [x] 路由 API 通过泛型/特征参数选择。 — 已通过 `Aviator` trait 完成。
-- [x] **P2** 资源声明系统:类似 `manganis!()` 的宏(`asset!("./logo.png")`),把多平台资源路径解析挪到一处。— 新增 `glory_core::assets::Asset` + `asset!` 宏;提供 logical / absolute filesystem / public URL path 三种表示,并从 `glory` 门面 crate 显式 re-export。
-- [x] **P2** 抽 `Truck` 概念到"应用级 context"层级,不要再让它顺带承载渲染状态;Renderer 拥有自己的状态。 — `Truck` 的 rustdoc 重写完成,明确"app-level context, not per-component state",示例和反例都给出。Renderer 自有状态那一半要等 Renderer trait 落地后才能真正切。
-
----
-
-## 4. 多平台后端(对应 _report.md §3)
-
-- [x] **P1** 引入 `WryRenderer`(桌面 webview):
-  - [x] 起 `crates/desktop`(或独立 repo)。
-  - [x] 实现最小化二进制指令协议(可借鉴 dioxus `interpreter/js/core.js` 的 sledgehammer 风格,几百行 JS)。
-  - [x] 把 `Renderer` 的方法序列化到 IPC,JS 端反序列化打 DOM。
-  - [x] examples/desktop-counter 跑通。
-- [x] **P2** 流式 SSR + hydrate:
-  - [x] 服务端把渲染流变成 `Stream<HtmlChunk>`,中间留 `<template>` 占位。— `ServerHolder::render_stream()` 返回 `Stream<Item = HtmlChunk>`,Salvo Scribe 复用该流;`HtmlChunk::Placeholder` 作为 resource/template 占位 chunk 类型预留。
-  - [x] 客户端首屏拿到部分 HTML 就开始 hydrate;`resource` 完成后客户端 patch 占位。— SSR head 注入 `window.__gloryStreamHydrate`;`HtmlChunk::PlaceholderPatch` 到达时替换匹配的 `<template data-glory-placeholder>`。
-  - [x] 前置依赖:§2 的 `resource` 原语。— `reflow::resource_in(parent, future_fn)` 已落地并由 §2 P1 勾选项覆盖。
-- [x] **P2** 各 web 框架 adapter:`glory-salvo` / `glory-axum` / `glory-actix`,API 风格统一。— 新增 `glory-salvo` / `glory-axum` / `glory-actix` adapter crates,共享 `ServerHolder::render_string()` / `HtmlChunk` 输出;Axum/Actix 分别提供 `into_response(holder)`。
-- [x] **P3** Blitz / wgpu 原生后端(`crates/native`)。前置:§3 的所有 P0/P1 完成。— 新增 `glory-native` scaffold,复用 command renderer 作为 native command backend 占位。
-- [x] **P3** TUI 后端(`crates/tui`):用 ratatui 作为渲染器,适合调试 / CI 演示。— 新增 `glory-tui` scaffold,依赖并 re-export `ratatui`,使用 command renderer 作为首版 TUI command backend。
-- [x] **P3** Tauri 一键打包模板。— 新增 `crates/desktop/templates/tauri/README.md`,记录 `WryCommand`/interpreter 接入布局。
-
----
-
-## 5. CLI / 构建 / 开发体验
-
-- [x] **P1** [`crates/cli`](crates/cli) 现状审计:确认它支持的子命令,补 `glory new` / `glory build` / `glory serve` 的 README 一节。 — `crates/cli/src/README.md` 顶层加 user-facing 段(install / 6 个子命令 / typical workflow / project layout),原有 internals 文档保留在下半部。
-- [x] **P2** 借鉴 dioxus `subsecond` 思路实现函数级 hot reload(builder 风格也能用),先做 dev-mode 闭包重链。优先级中,影响 DX。— `glory-hot-reload` 新增 `FunctionRegistry` / `ReloadableFn`,支持稳定 id 注册、替换闭包体、既有 handle 自动调用最新实现;执行清单见 [`_m5_hot_reload_tasks.md`](_m5_hot_reload_tasks.md)。
-- [x] **P2** [`crates/hot-reload`](crates/hot-reload) 当前是占位/半完成的(无 DSL 所以这块用途有限)。要么实现 §2 的代际盒后做"状态保留 + 函数热替换",要么从 workspace 移除避免迷惑。决策点。 — **决策:保留函数热替换,删除模板 diff**。crate 仍被 `glory-core` (SSR `HOT_RELOAD_JS`) 和 `glory-cli watch` (`HotReloadFunctions`) 实际引用;历史 `view!` macro / virtual-node diff 路径已在 §10 删除。
-- [x] **P3** `cargo-glory` 的 `--target` 子命令多平台编译矩阵(web / desktop / native)。— CLI `Opts` 新增 `--target <web|desktop|native>`;web 走 front+server,desktop/native 跳过 wasm front 并分别默认 bin feature `desktop` / `native`,同时注入 `GLORY_TARGET`。
-
----
-
-## 6. 测试基建
-
-- [x] **P0** 加 ~~`MockRenderer`(纯内存,只记录调用序列)~~ **SSR 后端快照测试**,给 `Each` / `Switch` / `Loader` 写**确定性快照测试**:
-  - [x] 列出 LIS 改造前后的 case 集合(反转 / 洗牌 / 头尾增删 / ~~同 key 不同 value~~ / 删后再加同 key)。 — `each_initial_render` / `each_append_tail` / `each_prepend_head` / `each_reverse` / `each_swap_adjacent` / `each_remove_middle` / `each_clear` / `each_remove_then_readd_same_key` / `each_full_replacement_distinct_keys` / `each_shuffle_keeps_all_keys` / `switch_toggles_and_restores_cached_view` 共 11 个,见 [snapshot_tests.rs](crates/core/src/widgets/snapshot_tests.rs)。
-  - [x] 每个 case 断言"DOM 操作序列"是预期的最小集合。 — 改为断言**最终 HTML 文本顺序**(`inner_html` 解析出 `<li>` 内容序列),比"操作序列"更直接对应可观察行为;最小化由 LIS 保证。
-  - 备注:M1 选择直接走 SSR 后端而不是独立的 `MockRenderer`;§3 落地后已补 `MockRenderer` 的 renderer-level command regression。
-- [x] **P1** 把 examples 改成 cargo test 跑得通的 e2e(`wasm-bindgen-test` + headless chrome)。 — `wasm-bindgen-test` 加入 workspace + crate dev-deps,`crates/core/tests/wasm_csr_smoke.rs` 提供 scaffold + 文档化 `cargo test --target wasm32-unknown-unknown` 跑法。完整 examples e2e 矩阵需要 CI 改造,留待独立 PR。
-- [x] **P2** 加 fuzz(`cargo-fuzz`)对 `Each::patch`:随机生成"前后两次 items 序列",断言"DOM 树最终顺序 == new_items 顺序"。 — 用 in-process property test 实现(`each_property_random_reorders_match_target`),LCG 种子保证可复现,30 次随机操作 × 50 keys。`cargo-fuzz` 真正接 nightly fuzz target 留待 §6 / §8 wave。
-- [x] **P2** 加 `criterion` benchmark 套件,跟踪 LIS 改造、代际盒改造的性能数据。 — `crates/core/benches/each_reorder.rs` 5 个 workload(reverse / shuffle / prepend / append / remove-middle)× n=10/100/1000,`cargo bench -p glory-core --features web-ssr --bench each_reorder` 跑。
-
----
-
-## 7. 文档 / 项目卫生
-
-- [x] **P1** 根目录补 `AGENTS.md`(或扩 `CLAUDE.md`),写明:
-  - feature flag 规则与组合矩阵
-  - "signals 不要替换成第三方"等设计立场
-  - 提交前 `cargo fmt + clippy -W warnings` 强制
-- [x] **P1** `examples/_README.md`:把每个示例对应的 feature 标注上,便于挑入口。
-- [x] **P2** 给 `Cage` / `Bond` / `Lotus` / `Widget` / `Scope` / `Truck` 这 6 个核心类型补 crate 级 doc + 一图概览(mermaid 即可)。 — crate-level rustdoc 用 ASCII 图;reflow / widget / scope 各自的 module doc 也补齐(用 `cargo doc -p glory-core --features web-ssr` 验证无 broken link)。
-- [x] **P2** README 加"对比 Leptos / Dioxus / Sycamore"小节,讲清楚选 Glory 的场景。
-- [x] **P3** `debug.log` 已在 `.gitignore` 中;补上 `*.log`、`.history/`、`.claude/local/`。`dump.rdb` 已在 `.gitignore` 中。
-- [x] **P3** `.temp/` 加进 `.gitignore`(M1 工作中频繁出现的 tooling 缓存)。
-
----
-
-## 8. 依赖 / 工程
-
-- [x] **P1** workspace 升级当前已在 [chore/upgrade-dependencies](.) 分支,审一遍 `Cargo.toml` 里 `thiserror = "1"` / `dirs = "5.0"` 等是否还有更新版本可一并跟进。 — `thiserror = "2"`, `dirs = "6.0"`, `config = "0.15"` 等均已在 `main` 上一轮升级;workspace 当前依赖审计随 commit 跟进无新版本可升。
-- [x] **P2** `rust-version = "1.88"` 假设性偏新,确认 MSRV 政策(目前需要 edition 2024)。 — `Cargo.toml` 内补 MSRV 政策注释,说明 1.88 由 edition 2024 + workspace deps (config 0.15 / clap 4.6) 决定,bump 视为 SemVer-minor。
-- [x] **P3** workspace lints(`[workspace.lints.rust]`) 集中配置,各 crate 取消重复 lint 声明。 — `[workspace.lints.rust]` 定 `unsafe_code = "deny"` + `rust_2024_compatibility = "warn"`;`[workspace.lints.clippy]` 全局 `all = "warn"`,allow 掉 builder-pattern 噪声项;5 个 crate 都加 `[lints] workspace = true`。
-
----
-
-## 落地状态
-
-主任务板已经全部完成并勾选。原本按依赖关系拆出的 4 个 milestone 均已收口:
-
-**M1+(打地基 + 周边收拢)** ✅ 已完成,见 [PR #32](https://github.com/glory-rs/glory/pull/32)
-- §0 全部 + `single-app` 改名(`__single_holder` → `single-app`,跨 22 文件)
-- §1 P0/P1/P2/P3 全部:LIS 重写、value 变更契约文档化、large-shuffle 回归、随机 30 步 property test、criterion 5×3 benchmark、`examples/each-bench`
-- §2 P1 + P2 + P3 全部:`untracked_read` / `untrack` / auto-batch / `Bond::with_eq` / `with_partial_eq` / `effect_in` / `resource_in` / `selector` / Cage dev API
-- §3 P1 + P2(部分):`glory::launch` / `launch_with_host`、`Aviator` 历史抽象文档化、`Truck` 文档收敛
-- §5 P1/P2:CLI README、hot-reload crate 保留决策 + 状态文档
-- §6 P0/P1(scaffold)/P2 全部:SSR 后端快照测试(11 case)+ wasm-bindgen-test scaffold + property fuzz + criterion bench
-- §7 P1/P2/P3 全部:AGENTS.md / examples README / 6 类型 rustdoc / README 对比表 / gitignore
-- §8 P1/P2/P3 全部:依赖审计 / MSRV 政策注释 / workspace lints 集中配置
-- 额外:发现并修复 SSR Node / Element 锚点 / 默认 flood / `shift_remove` 等 7 处隐藏 bug
-
-**M2(响应式现代化)** ✅ 已完成
-- §2 P0 copyable handle / Owner 地基完成,`Cage<T>` 已是 copyable owner-invalidated handle。
-- §5 P2 builder 风格函数级 hot reload 地基完成,并接入 CLI function replacement event。
-
-**M3(渲染层抽象)** ✅ 已完成
-- §3 P0 Renderer trait、`AttributeValue` 富类型、`EventPayload` trait、`SsrRenderer` / `WebRenderer` / `MockRenderer` 已落地。
-- SSR/CSR Element 插入移除路径已开始走 renderer;旧 `Node` cfg 兼容层保留。
-
-**M4(多平台开张)** ✅ 已完成
-- §4 P1 桌面 webview command renderer scaffold + `examples/desktop-counter` 已跑通。
-- §4 P2 流式 SSR / hydrate placeholder patch runtime 已落地。
-- §4 P2 adapters 与 §4 P3 native / TUI / Tauri template 均已落地。
-
-## 后续演进清单
-
-主任务板没有未勾选 checkbox。后续增强不再作为 `_todos.md` 主任务项跟踪,而是按更细的执行清单继续演进:
-
-- 响应式细节:见 [`_m2_reactivity_tasks.md`](_m2_reactivity_tasks.md)。
-- 渲染层细节:见 [`_m3_renderer_tasks.md`](_m3_renderer_tasks.md)。
-- 函数级热重载细节:见 [`_m5_hot_reload_tasks.md`](_m5_hot_reload_tasks.md)。
-
----
-
-## 速查:相关文件
-
-- 响应式:[reflow/](crates/core/src/reflow/) · [cage.rs](crates/core/src/reflow/cage.rs) · [bond.rs](crates/core/src/reflow/bond.rs) · [scheduler.rs](crates/core/src/reflow/scheduler.rs)
-- 视图组件:[widget.rs](crates/core/src/widget.rs) · [view.rs](crates/core/src/view.rs) · [scope.rs](crates/core/src/scope.rs)
-- 渲染节点:[node/mod.rs](crates/core/src/node/mod.rs) · [node/ssr.rs](crates/core/src/node/ssr.rs) · [web/csr.rs](crates/core/src/web/csr.rs)
-- 列表/分支/加载:[widgets/each.rs](crates/core/src/widgets/each.rs) · [widgets/switch.rs](crates/core/src/widgets/switch.rs) · [widgets/loader.rs](crates/core/src/widgets/loader.rs)
-- 路由:[crates/routing](crates/routing)
-- CLI:[crates/cli](crates/cli)
-- 热重载:[crates/hot-reload](crates/hot-reload)
+以下 Dioxus 能力**明确不抄**:RSX/`rsx!` 与 view DSL(项目原则)、`translate`/
+`components` 命令(RSX 生态专属)、VDOM 路线、TUI 产品化(D6 已决策为只读调试)。
+Glory 的相对优势(builder API、指令流统一后端、`glory config --schema`、SSR 命令重放)
+应在 docs 与 README 持续强化,而不是在所有维度对齐 Dioxus。

@@ -1,0 +1,18 @@
+[package]
+name = "glory-harness-web"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+glory = { path = "../../../glory", default-features = false, features = ["web-csr"] }
+wasm-bindgen = { version = "0.2", features = ["enable-interning"] }
+
+[package.metadata.glory]
+output_name = "glory_harness_web"
+site_root = "target/site"
+site_pkg_dir = "pkg"
+lib_features = ["web-csr"]
+lib_default_features = false

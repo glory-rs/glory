@@ -109,6 +109,61 @@ the next frame. These are **relative** numbers for comparing the three apps on
 one machine in one browser — they are not a substitute for the official
 Chrome-tracing harness and should not be quoted as absolute submission numbers.
 
+## Official Chrome-tracing workflow
+
+Use the official krausest runner when you need publishable numbers:
+
+```powershell
+./benchmarks/official-js-framework-benchmark.ps1
+```
+
+The script clones or reuses `JS_FRAMEWORK_BENCHMARK_REPO`, generates official
+`frameworks/keyed/glory-rs` and `frameworks/keyed/dioxus-rs` adapters from the
+local apps, builds them with `trunk`, runs
+`npm run bench -- --framework keyed/glory-rs keyed/dioxus-rs`, and copies the
+official result artifacts into
+`target/benchmark-report/official-js-framework/`. It also writes
+`official-js-framework-summary.md` and `.json` with median/range tables for
+`total`, `script`, and `paint` timings.
+
+Pass `-SkipBench` to validate adapter generation/building without launching
+Chrome, or `-ChromeBinary` to pin the browser used by the webdriver runner.
+Use `-BaselineName name` to preserve the current result set under
+`target/benchmark-report/official-js-framework/baselines/name/`, and
+`-CompareBaseline name` to add a delta table against that baseline. Baseline
+names are not overwritten unless `-OverwriteBaseline` is set. For Glory-only
+optimization A/B runs, pass `-GloryOnly`.
+
+For a shorter CPU-suite smoke run:
+
+```powershell
+./benchmarks/official-js-framework-benchmark.ps1 `
+  -SkipInstall `
+  -Benchmarks 01_,02_,03_,04_,05_,06_,07_,08_,09_ `
+  -Count 1 `
+  -Headless `
+  -NoThrottling
+```
+
+For a stable local comparison before and after a Glory-only optimization:
+
+```powershell
+./benchmarks/official-js-framework-benchmark.ps1 `
+  -GloryOnly `
+  -Count 5 `
+  -Headless `
+  -NoThrottling `
+  -BaselineName before-e9
+
+./benchmarks/official-js-framework-benchmark.ps1 `
+  -GloryOnly `
+  -Count 5 `
+  -Headless `
+  -NoThrottling `
+  -CompareBaseline before-e9 `
+  -BaselineName after-e9
+```
+
 ## Bundle size (measured)
 
 Release build (`trunk build --release`), `wasm` + JS glue, on this repo's

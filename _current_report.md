@@ -1,0 +1,523 @@
+# Glory 当前完成度、缺陷与 Gaps 评审
+
+日期: 2026-06-19
+
+评审范围: 当前工作区 `D:\Works\glory-rs\glory`。本报告初版基于现有文档、源码结构、
+feature 组合和本地测试/检查结果；后续条目会随本分支实际完成状态更新。
+
+## 结论摘要
+
+Glory 当前不是只有雏形的状态。核心响应式、SSR、command-stream 渲染、server
+functions、desktop webview、hot reload scaffold 都已经能编译并有测试覆盖。
+
+更准确的定位是:
+
+- 核心架构已打通。
+- Web/SSR/desktop 基本可用。
+- native/mobile/liveview 已有技术路径，但仍偏 spike 或早期产品化阶段。
+- 最大差距已经从“架构是否可行”转向“CI、CLI、bundle、路由、fullstack batteries、端到端验证和平台 API 完整度”。
+
+按 `_todos.md` 任务板粗略计数:
+
+| 状态 | 数量 |
+|---|---:|
+| 已完成 `[x]` | 56 |
+| 部分完成 `[~]` | 2 |
+| 未完成 `[ ]` | 0 |
+
+按能力权重估算:
+
+| 模块 | 完成度判断 |
+|---|---:|
+| core 响应式 / Widget / SSR 快照 | 80-88% |
+| command-stream 渲染抽象 | 75-85% |
+| CSR + SSR 基础使用 | 65-75% |
+| server functions | 55-65% |
+| CLI / bundle / dev server | 55-65% |
+| desktop webview | 75-85% |
+| routing | 35-45% |
+| native Blitz / mobile / LiveView | 30-45% |
+| CI / release governance | 35-45% |
+
+## 初版发现的可复现缺陷与处理状态
+
+### 1. [x] CLI release clippy 门槛失败
+
+命令:
+
+```powershell
+cargo clippy -p glory-cli --lib --no-default-features -- -D warnings
+```
+
+初版结果: 失败。
+
+位置: `crates/cli/src/lib.rs:77-90`
+
+原因: `clippy::let_and_return`。`run_with_cli` 中先把 `match` 结果绑定到 `result`，随后直接返回
+`result`。在 `-D warnings` 下这会变成错误。
+
+影响:
+
+- `docs/release-readiness.md` 中列出的 required check 当前不能全部通过。
+- 这是低风险修复，但会阻断严格发布流程。
+
+当前状态:已修复 `clippy::let_and_return`,并通过
+`cargo clippy -p glory-cli --lib --no-default-features -- -D warnings`。
+
+### 2. [x] 项目文档与当前源码存在漂移
+
+`AGENTS.md` 仍声明 `backend-command` 与 `web-ssr` 互斥，但当前源码明确允许它们共存。
+
+当前源码证据:
+
+- `crates/core/src/lib.rs:58` 附近注释说明: SSR convergence 后 `backend-command + web-ssr` 可共存。
+- 只保留以下 compile guards:
+  - `web-csr + web-ssr` 互斥。
+  - wasm32 下 `backend-command + web-csr` 互斥。
+  - `backend-command + single-app` 互斥。
+
+实际验证:
+
+```powershell
+cargo check -p glory-core --features "web-ssr backend-command"
+```
+
+结果: 通过。
+
+影响:
+
+- AI/贡献者会按旧约束判断 feature matrix，容易误判。
+- release readiness 也仍保留“workspace-wide failures 是历史问题”的表述，但当前 `cargo test --workspace` 已通过。
+
+当前状态:`AGENTS.md` 与 `docs/release-readiness.md` 已同步当前 feature matrix 和
+workspace test 状态。
+
+### 3. [~] CI 覆盖不足
+
+`.github/workflows` 初版主要包含:
+
+- `format.yml`
+- `release.yml`
+
+当前已新增 `ci.yml` 覆盖 Rust 主路径，但还没有常规 CI 跑以下端到端检查:
+
+- Playwright 浏览器 e2e。
+- mobile/device smoke。
+
+影响:
+
+- 本地质量基线不错，但没有被 CI 强制执行。
+- 后续改动可能破坏 command protocol、SSR replay 或 CLI 行为而不被 PR 检出。
+
+当前状态:已新增主 Rust CI,覆盖 fmt、targeted tests、feature guard 与 clippy gates。
+Playwright 已在 CI 中跑 CSR counter + SSR hydration 两个真浏览器 smoke；mobile/device
+smoke 仍未闭环。
+
+## 已完成度较高的部分
+
+### Core / Reactivity
+
+当前 `Cage<T>` 已是 Copy handle，并带 generation/stale-handle 语义。
+
+测试覆盖包括:
+
+- Copy handle 共享状态。
+- stale handle。
+- owner drop invalidation。
+- active borrow 错误。
+- slot recycle。
+- resource stale completion 防护。
+- Suspense pending token 协议与 mounted tree fallback 切换。
+- ErrorBoundary 子树 build/patch panic fallback。
+- `Bond::with_partial_eq`。
+- devtools snapshot。
+
+主要路径:
+
+- `crates/core/src/reflow/cage.rs`
+- `crates/core/src/reflow/bond.rs`
+- `crates/core/src/reflow/effect.rs`
+
+### SSR / Widgets
+
+SSR feature 测试覆盖较完整:
+
+- `Each` reorder / random shuffle / large reverse。
+- `Switch`。
+- `resource` 初始与依赖变化。
+- `effect` mount/revision。
+- head mixin。
+- scoped style。
+- form controls。
+- SVG/MathML。
+- streaming boundary chunks。
+- ErrorBoundary fallback 和错误状态序列化。
+- Suspense SSR streaming/resume 仍待接入。
+
+主要路径:
+
+- `crates/core/src/widgets/snapshot_tests.rs`
+- `crates/core/src/web/holders/server.rs`
+- `crates/core/src/renderer/ssr_dom.rs`
+
+### Command Stream
+
+非浏览器路径已经有统一 command protocol:
+
+- `Command`
+- `AttributeValue`
+- `EventData`
+- `NodeQuery`
+- `QueryResponse`
+- `CommandNode`
+- `CommandQueue`
+
+验证覆盖:
+
+- command coalescing。
+- command DOM replay。
+- SSR replay 与 legacy HTML 对齐。
+- event dispatch/reentrancy。
+- query round-trip。
+- handler release。
+- event handler install/dispatch lookup synthetic benchmark。
+- desktop JS interpreter wire shape。
+
+主要路径:
+
+- `crates/core/src/renderer/command.rs`
+- `crates/core/src/renderer/command_dom.rs`
+- `crates/core/src/renderer/ssr_dom.rs`
+- `crates/core/benches/event_handlers.rs`
+- `crates/desktop/src/wry_interpreter.js`
+
+E11 当前结论:10k 同 DOM 构建中 click handler 注册约把本机短样本从
+3.43ms 提到 4.40ms;10k handler registry 的最后一行 dispatch lookup/restore
+约 107ns。create10k 的后续优化应优先看批量 DOM command 数和浏览器侧 apply 成本。
+
+E12/E9 当前结论:`benchmarks/glory` 已把数据生成改为批量 RNG/next-id 写回并避免
+`Vec<Row>` clone,CSR delegated click 注册也走缓存 key + click fast path。官方
+`07_create10k` Count=5(`-Headless -NoThrottling`)结果为 Glory 319.8ms total /
+80.3ms script / 241.2ms paint,Dioxus 328.9ms total / 71.7ms script /
+253.9ms paint。随后 E9 新增 CSR 普通 builder 静态 wrapper 自动压缩:纯 CSR
+fresh mount 不再误进 hydration,自身静态的元素直接挂为原生 DOM;动态后代仍以
+View 形式挂到固定父节点。E9 后同命令重跑为 Glory 330.4ms total / 73.8ms
+script / 244.0ms paint,Dioxus 326.0ms total / 69.3ms script / 252.3ms paint。
+script-only 残差收窄到约 4.5ms,总时间仍在浏览器 paint 波动范围内。
+
+### Server Functions
+
+已有能力:
+
+- `#[server]` 宏注册 endpoint。
+- JSON 参数/结果。
+- HTTP typed errors / redirect / headers。
+- request context。
+- cookies。
+- form / multipart。
+- NDJSON / SSE helpers。
+- streaming response helpers。
+- process-local server state/cache。
+- preload state。
+- Salvo/Axum/Actix adapter feature 编译与测试。
+
+主要路径:
+
+- `crates/macros/src/lib.rs`
+- `crates/serverfn/src/lib.rs`
+- `crates/serverfn/tests/server_fn.rs`
+
+### Desktop
+
+desktop runtime 已经是真 wry/tao 宿主，不只是测试 sink。
+
+已有能力:
+
+- launch / launch_with_config。
+- multi-window。
+- menu。
+- custom `glory://` protocol。
+- async custom protocols via Wry `RequestAsyncResponder`。
+- tray icon events。
+- global hotkeys。
+- hot reload message shape。
+- IPC event/query 回程。
+- asset path traversal 防护。
+- command surface interpreter 测试。
+
+主要路径:
+
+- `crates/desktop/src/runtime.rs`
+- `crates/desktop/src/lib.rs`
+- `crates/desktop/src/wry_interpreter.js`
+
+## 主要 Gaps
+
+### 1. Routing 是当前最大的用户层差距
+
+现状:
+
+- `Router` + runtime string path/filter。
+- 有路径解析和检测测试。
+- 手写 `Routable` trait、typed `goto_route`、`Locator::route::<R>()` 第一阶段已补。
+- `#[derive(glory::Routable)]` 已补,支持 `#[route]`、`#[redirect]`、
+  `#[not_found]`、typed path 参数和 catch-all。
+- `Outlet` 与 `Router::layout`/`outlet` 已补,父布局可保留并把叶子页面渲染到
+  命名插槽。
+- 查询字符串可读写,并已有 `RouteQuery`/`FromRouteQuery`/默认值 helper 第一阶段。
+- typed redirect / not-found fallback 第一阶段已补,`Locator::route::<R>()` 会走
+  `Routable::resolve_url()`。
+
+缺口:
+
+- Lane T 当前任务已清;后续主要是示例迁移和更复杂 query derive 语法糖。
+
+主要路径:
+
+- `crates/routing/src/router.rs`
+- `crates/routing/src/filters/path.rs`
+- `crates/routing/src/locator.rs`
+
+### 2. Fullstack batteries 仍少
+
+serverfn 基础可用，但对比成熟框架还缺:
+
+- 多 HTTP method 已补第一阶段:`#[server(method = "GET")]` 可用。
+- 多编码协商已补第一阶段:默认 JSON,可选 CBOR/Postcard feature,三适配器按
+  `Content-Type` / `Accept` 协商 POST 请求与响应。
+- 逐函数 middleware 已补 adapter-neutral hook:宏支持 `middleware = ...` 与
+  `#[middleware(...)]`,dispatch 前置执行并可短路。
+- 响应式 WebSocket client hook 已补:browser handle 暴露状态/latest/error Cage,
+  typed send/reconnect 和默认自动重连。
+- 原生 framework extractor 直通设计决策已补:核心 `#[server]` 暂保持
+  adapter-neutral,原生 extractor 放在自定义框架 route 或未来显式 adapter 扩展。
+
+### 3. CLI / Serve / Bundle 产品面偏薄
+
+现状:
+
+- `ServeOpts` 已有 `--no-reload`、`--address`、`--port`、`--open`、`--no-open`、
+  `--https`、`--tls-cert/--tls-key`、重复 `--proxy PATH=URL`。
+- `serve` 命令只是 build 后 spawn server。
+- `Bundle` 已有 manifest、压缩资产处理、Android/iOS host packaging、Windows WiX
+  MSI staging/optional build,以及 Linux `.deb` 生成。
+
+缺口:
+
+- CLI 已支持 HTTPS/TLS/proxy 配置透传；实际 TLS 监听和 proxy forwarding 仍由应用
+  server 实现。
+- desktop installer 仍缺 macOS DMG/AppImage、签名、公证和 WiX 自动下载。
+
+主要路径:
+
+- `crates/cli/src/config/cli.rs`
+- `crates/cli/src/command/serve.rs`
+- `crates/cli/src/command/bundle.rs`
+
+### 4. Assets 管线还不成熟
+
+现状:
+
+- `asset!` 可声明路径、编译期校验文件存在并生成 public path。
+- bundle 会为静态资源生成 hashed 副本，并在 `glory-bundle.json::asset_map`
+  记录 public path 映射。
+- `AssetManifest` 可解析 bundle manifest 并安装运行时映射;Desktop runtime 会从
+  assets root 自动读取 `glory-bundle.json`。
+- `glory::asset_folder!("dir")` 会在编译期递归枚举目录并生成 `AssetFolder` 清单。
+- `glory bundle --optimize-images` 默认关闭;开启后 PNG/JPEG 会生成 WebP 副本,
+  并通过 `asset_map` 优先映射到 hashed WebP。
+- `glory::css_module!("*.module.css")` 会编译期抽取 class selectors,生成 typed
+  class 方法和重写后的 CSS 文本。
+
+缺口:
+
+- 暂无当前任务板内资产缺口。
+
+### 5. Desktop API 不完整
+
+已有 runtime 很扎实，窗口控制 API、托盘、全局热键、文件拖放和打印入口已补齐第一批。
+
+缺口:
+
+- 暂无当前任务板内 desktop API 缺口;后续主要是平台行为真机/人工验证。
+
+### 6. Native Blitz 仍是 spike
+
+现状:
+
+- `glory-native/shell` 已升级到 Blitz 0.3 alpha.5 并可编译。
+- command stream 能写入 Blitz document。
+- pointer/mouse/touch、click/contextmenu/dblclick、wheel/scroll、focus/blur、
+  input、keyboard、IME 与 Apple standard keybinding 已映射到 Glory
+  `EventData`;payload 单测覆盖 touch metadata、wheel/scroll/IME。
+- property/attribute 分离已有测试。
+- `Command::Query` 已接通 Value、BoundingRect、ScrollOffset;Blitz shell 会回灌
+  `QueryResponse` 到 `CommandHolder`。
+- `GloryBlitzApplication`/`GloryBlitzWindowConfig` 提供 Glory 侧 shell wrapper,
+  并复用 `blitz_shell::BlitzApplication` 的 WindowId map、resume/suspend、redraw poll。
+- `glory-native/accessibility` feature 已接通 Blitz/AccessKit tree 与
+  `accesskit_winit` adapter。
+
+缺口:
+
+- 真实渲染截图/交互/a11y 人工验证缺失。
+
+主要路径:
+
+- `crates/native/src/blitz_consumer.rs`
+
+### 7. LiveView 可用但架构仍早期
+
+现状:
+
+- command stream over WebSocket。
+- reconnect client。
+- Salvo/Axum/Actix route adapters。
+- shared local worker pool with bounded per-session queues。
+- `examples/liveview-salvo` 最小示例。
+- mount/event/ping/query 基础测试。
+
+缺口:
+
+- 缺端到端浏览器场景。
+- query 应答路径已有回归测试覆盖。
+- session TTL/resume 仍缺实现;HTML shell ownership 与重连退避语义已文档化。
+
+主要路径:
+
+- `crates/liveview/src/lib.rs`
+
+### 8. Mobile 缺真机/模拟器闭环
+
+现状:
+
+- Android/iOS 模板。
+- host check。
+- safe-area / keyboard resize / foreground-background JS bootstrap。
+- watch-mode reload websocket client with Android adb reverse / LAN URL knobs。
+- device smoke script。
+- nightly/manual Android API 34 x86_64 emulator workflow scaffold。
+
+缺口:
+
+- Android emulator/device 实际安装启动记录仍需等待 CI 或本机设备运行结果。
+- iOS simulator/device 验证。
+- mobile CI 夜间 smoke 首次绿色结果。
+
+主要路径:
+
+- `crates/cli/templates/mobile`
+- `examples/mobile-counter`
+- `scripts/mobile-device-smoke.ps1`
+- `docs/mobile-validation.md`
+
+### 9. [~] Browser E2E CI 已覆盖核心 smoke
+
+Playwright 项目已存在，测试依赖环境变量，缺失时会 skip。当前 CI 已启动 CSR counter
+和 SSR hydration 示例，并设置 URL 后实际跑 Chromium。
+
+缺口:
+
+- router、fullstack、hot reload 示例尚未进入常规 CI。
+- mobile/device smoke 仍是独立缺口。
+
+主要路径:
+
+- `tests/playwright`
+
+## 实际执行的验证
+
+通过:
+
+```powershell
+cargo test --workspace
+cargo test -p glory-core --lib
+cargo test -p glory-core --lib --features web-ssr
+cargo test -p glory-core --features backend-command --test command_backend
+cargo check -p glory-core --features "web-ssr backend-command"
+cargo test -p glory-routing --lib --features web-ssr
+cargo test -p glory-serverfn
+cargo test -p glory-serverfn --features "salvo axum actix"
+cargo test -p glory-liveview
+cargo test -p glory-liveview --features "salvo axum actix"
+cargo test -p glory-cli
+cargo test -p glory-cli-harnesses
+cargo test -p glory-hot-reload
+cargo check -p glory-desktop --features runtime
+cargo test -p glory-desktop --features runtime
+cargo check -p glory-native --features shell
+cargo test -p glory-native --features shell
+cargo clippy -p glory-native --features shell -- -D warnings
+cargo check -p glory-native --features "shell accessibility"
+cargo test -p glory-native --features "shell accessibility"
+cargo clippy -p glory-native --features "shell accessibility" -- -D warnings
+cargo check -p glory --features "web-ssr backend-command routing server-fn"
+cargo check -p glory-salvo
+cargo check -p glory-axum
+cargo check -p glory-actix
+cargo bench -p glory-core --bench event_handlers -- --sample-size 10 --warm-up-time 0.1 --measurement-time 0.1
+cargo fmt --all --check
+cargo clippy -p glory-cli --lib --no-default-features -- -D warnings
+cargo clippy -p glory-core --lib --features web-ssr -- -D warnings
+cargo clippy -p glory-serverfn --all-targets -- -D warnings
+cargo test -p glory-cli --lib --no-default-features
+```
+
+初版失败、当前已修复:
+
+```powershell
+cargo clippy -p glory-cli --lib --no-default-features -- -D warnings
+```
+
+初版失败原因: `crates/cli/src/lib.rs:77-90` 的 `clippy::let_and_return`。
+
+未验证:
+
+- wasm32 CSR browser test 实际运行(当前 Windows 未配置 wasm-bindgen test runner;
+  wasm CSR test 已可编译)。
+- Playwright router/fullstack/hot-reload 真浏览器 e2e。
+- examples 全量 build/run。
+- mobile device/emulator。
+- desktop runtime 人工窗口启动。
+- native Blitz 真实窗口截图/交互。
+- cargo package/publish。
+
+## 建议优先级
+
+### P0
+
+- [x] 修复 `glory-cli` clippy failure。
+- [x] 更新 `AGENTS.md` / `docs/release-readiness.md` 中与当前 feature matrix 和 workspace test 状态不一致的内容。
+- [x] ErrorBoundary 子树 panic 捕获与 fallback 渲染。
+- [x] 增加主 CI:
+   - fmt。
+   - core default/web-ssr/backend-command tests。
+   - serverfn tests。
+   - CLI tests。
+   - feature combination checks。
+   - clippy required checks。
+
+### P1
+
+1. [x] 设计并实现 typed routing 第一阶段、derive 自动生成与 Outlet 布局。
+2. [x] 扩展 `glory serve` 参数和基本 DX。
+   - 已完成 `--address/--port` 运行时覆盖、默认 auto-open、`--no-open`。
+   - 已完成 HTTPS/TLS/proxy 配置校验、打开 URL 与 app-server env 透传。
+3. [x] serverfn 支持 method 选择，至少 `#[server(method = "GET")]`。
+4. [x] Playwright CI 跑 CSR counter + SSR hydration 两个最小场景。
+5. [x] Desktop 补窗口控制 API 包。
+
+### P2
+
+1. serverfn 多编码和 middleware。
+2. asset typed manifest / hash rewrite。
+3. LiveView async session worker。
+4. Mobile Android emulator smoke。
+
+### P3
+
+1. Native a11y。
+2. CSS Modules。
+3. 图片优化。
+4. Drag-drop/print 等 desktop 扩展。
+5. 更完整 devtools/telemetry。

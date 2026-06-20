@@ -24,6 +24,12 @@
 
 #![cfg(all(target_arch = "wasm32", feature = "web-csr"))]
 
+use glory_core::reflow::Cage;
+use glory_core::web::events;
+use glory_core::web::holders::BrowserHolder;
+use glory_core::web::widgets::{button, div, span};
+use glory_core::{Holder, Scope, Widget};
+use wasm_bindgen::{JsCast, UnwrapThrowExt};
 use wasm_bindgen_test::*;
 
 wasm_bindgen_test_configure!(run_in_browser);
@@ -35,4 +41,49 @@ fn smoke_runtime_loads() {
     // semantics are covered by the SSR snapshot suite on the host
     // toolchain.
     let _ = glory_core::reflow::Cage::new(0_i32);
+}
+
+#[derive(Debug)]
+struct CompactWrapperSmoke {
+    clicked: Cage<bool>,
+}
+
+impl Widget for CompactWrapperSmoke {
+    fn build(&mut self, ctx: &mut Scope) {
+        let clicked = self.clicked;
+        div()
+            .id("compact-root")
+            .fill(
+                span().id("compact-wrapper").fill(
+                    button()
+                        .id("compact-button")
+                        .text("Hit")
+                        .on(events::click, move |_| clicked.revise(|mut value| *value = true)),
+                ),
+            )
+            .show_in(ctx);
+    }
+}
+
+#[wasm_bindgen_test]
+fn compact_static_wrapper_keeps_dynamic_child_parented() {
+    let document = glory_core::web::document();
+    let host = document.create_element("div").unwrap_throw();
+    document.body().unwrap_throw().append_child(&host).unwrap_throw();
+
+    let clicked = Cage::new(false);
+    let _holder = BrowserHolder::with_host_node(&host).mount(CompactWrapperSmoke { clicked });
+
+    let wrapper = host.query_selector("#compact-wrapper").unwrap_throw().unwrap_throw();
+    let button = host
+        .query_selector("#compact-button")
+        .unwrap_throw()
+        .unwrap_throw()
+        .unchecked_into::<web_sys::HtmlElement>();
+
+    assert_eq!(button.parent_element().unwrap_throw().id(), wrapper.id());
+    button.click();
+    assert!(*clicked.get_untracked());
+
+    host.remove();
 }

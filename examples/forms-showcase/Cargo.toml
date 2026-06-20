@@ -1,0 +1,10 @@
+[package]
+name = "forms-showcase"
+version = "0.0.1"
+edition = "2024"
+publish = false
+
+[dependencies]
+glory = { path = "../../crates/glory", default-features = false, features = ["web-csr"] }
+wasm-bindgen = { version = "0.2", features = ["enable-interning"] }
+web-sys = "0.3"

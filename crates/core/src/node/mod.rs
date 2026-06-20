@@ -21,11 +21,17 @@ impl<N: fmt::Debug> NodeRef<N> {
     }
 }
 
+/// Browser CSR: widgets operate directly on live DOM elements.
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
 pub type Node = web_sys::Element;
 
-cfg_feature! {
-    #![not(all(target_arch = "wasm32", feature = "web-csr"))]
-    mod ssr;
-    pub use ssr::*;
-}
+/// Every other target speaks the command stream: widgets operate on
+/// id-based [`CommandNode`](crate::renderer::CommandNode) handles whose
+/// mutations are recorded as serializable
+/// [`Command`](crate::renderer::Command)s. Consumers decide what a batch
+/// means — the SSR holder replays it into an
+/// [`SsrDocument`](crate::renderer::ssr_dom::SsrDocument) for HTML,
+/// desktop ships it over IPC to a webview, native/TUI interpret it
+/// themselves.
+#[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
+pub type Node = crate::renderer::CommandNode;

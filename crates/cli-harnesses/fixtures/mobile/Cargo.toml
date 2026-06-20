@@ -1,0 +1,24 @@
+[package]
+name = "glory-harness-mobile"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib", "staticlib", "rlib"]
+
+[features]
+default = []
+mobile = []
+
+[dependencies]
+glory-core = { path = "../../../core", default-features = false, features = ["backend-command"] }
+glory-desktop = { path = "../../../desktop", default-features = false, features = ["backend"] }
+serde_json = "1"
+tracing = "0.1"
+
+[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
+tao = "0.35"
+wry = "0.55"

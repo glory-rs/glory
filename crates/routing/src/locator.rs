@@ -4,6 +4,7 @@ use multimap::MultiMap;
 
 use glory_core::reflow::{self, Cage, Lotus};
 
+use crate::Routable;
 use crate::url::Url;
 
 #[derive(Default, Clone, Debug)]
@@ -13,31 +14,43 @@ pub struct LocatorModifier {
     pub scroll: bool,
 }
 
-impl From<String> for LocatorModifier {
-    fn from(raw_url: String) -> Self {
+impl LocatorModifier {
+    pub fn new(raw_url: impl Into<String>) -> Self {
         Self {
-            raw_url,
+            raw_url: raw_url.into(),
             replace: false,
             scroll: true,
         }
+    }
+
+    pub fn from_route(route: &impl Routable) -> Self {
+        Self::new(route.to_url())
+    }
+
+    pub fn with_replace(mut self, replace: bool) -> Self {
+        self.replace = replace;
+        self
+    }
+
+    pub fn with_scroll(mut self, scroll: bool) -> Self {
+        self.scroll = scroll;
+        self
+    }
+}
+
+impl From<String> for LocatorModifier {
+    fn from(raw_url: String) -> Self {
+        Self::new(raw_url)
     }
 }
 impl<'a> From<&'a String> for LocatorModifier {
     fn from(raw_url: &'a String) -> Self {
-        Self {
-            raw_url: raw_url.to_owned(),
-            replace: false,
-            scroll: true,
-        }
+        Self::new(raw_url)
     }
 }
 impl<'a> From<&'a str> for LocatorModifier {
     fn from(raw_url: &'a str) -> Self {
-        Self {
-            raw_url: raw_url.to_owned(),
-            replace: false,
-            scroll: true,
-        }
+        Self::new(raw_url)
     }
 }
 
@@ -73,6 +86,13 @@ impl Locator {
 
     pub fn queries(&self) -> Lotus<MultiMap<String, String>> {
         Lotus::Cage(self.queries)
+    }
+
+    pub fn route<R>(&self) -> Option<R>
+    where
+        R: Routable,
+    {
+        R::resolve_url(&self.raw_url.get())
     }
 
     pub fn receive(&self, raw_url: impl Into<String>, raw_params: Option<BTreeMap<String, String>>) -> Result<(), crate::url::ParseError> {

@@ -1,0 +1,33 @@
+# XcodeGen spec for a Glory iOS host. Generate with `xcodegen generate`.
+#
+# Replace `mobile_counter` / `com.example.mobile-counter` with your crate
+# name / bundle id. Build the Rust staticlib first:
+#   cargo build --target aarch64-apple-ios --target-dir target/mobile --release --lib
+# (or `glory build --target ios --release`)
+name: GloryApp
+options:
+  bundleIdPrefix: com.example
+targets:
+  GloryApp:
+    type: application
+    platform: iOS
+    deploymentTarget: "13.0"
+    sources:
+      - main.swift
+    info:
+      path: Info.plist
+      properties:
+        UILaunchScreen: {}
+        CFBundleDisplayName: Glory App
+    settings:
+      base:
+        LIBRARY_SEARCH_PATHS:
+          - ../target/mobile/aarch64-apple-ios/release
+        OTHER_LDFLAGS:
+          - -lmobile_counter
+          # Frameworks wry/tao link against on iOS:
+          - -framework
+          - WebKit
+          - -framework
+          - UIKit
+        ENABLE_BITCODE: NO

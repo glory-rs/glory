@@ -1,9 +1,20 @@
+#[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+use std::cell::Cell;
+#[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+use std::collections::HashMap;
 use std::{borrow::Cow, cell::RefCell, collections::HashSet};
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt, closure::Closure, convert::FromWasmAbi, intern};
 
 thread_local! {
     pub static GLOBAL_EVENTS: RefCell<HashSet<Cow<'static, str>>> = RefCell::new(HashSet::new());
+}
+
+#[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+thread_local! {
+    static CLICK_EVENT_DELEGATED: Cell<bool> = Cell::new(false);
+    static CLICK_EVENT_DELEGATION_KEY: JsValue = JsValue::from_str("$$$click");
+    static EVENT_DELEGATION_KEYS: RefCell<HashMap<Cow<'static, str>, JsValue>> = RefCell::new(HashMap::new());
 }
 
 /// Adds an event listener to the target DOM element using implicit event delegation.
@@ -27,8 +38,8 @@ pub fn add_event_listener<E>(
     }
 
     let cb = Closure::wrap(Box::new(cb) as Box<dyn FnMut(E)>).into_js_value();
-    let key = event_delegation_key(&event_name);
-    _ = js_sys::Reflect::set(target, &JsValue::from_str(&key), &cb);
+    let key = event_delegation_key_value(&event_name);
+    _ = js_sys::Reflect::set(target, &key, &cb);
     add_delegated_event_listener(event_name);
 }
 
@@ -46,66 +57,87 @@ where
 // cf eventHandler in ryansolid/dom-expressions
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
 pub(crate) fn add_delegated_event_listener(event_name: Cow<'static, str>) {
-    GLOBAL_EVENTS.with_borrow_mut(|global_events| {
-        if !global_events.contains(&event_name) {
-            // create global handler
-            let key = JsValue::from_str(&event_delegation_key(&event_name));
-            let handler = move |ev: web_sys::Event| {
-                let target = ev.target();
-                let node = ev.composed_path().get(0);
-                let mut node = if node.is_undefined() || node.is_null() {
-                    JsValue::from(target)
-                } else {
-                    node
-                };
+    if should_add_delegated_event_listener(&event_name) {
+        // create global handler
+        let key = event_delegation_key_value(&event_name);
+        let handler = move |ev: web_sys::Event| {
+            let path = ev.composed_path();
+            let path_len = path.length();
 
-                // TODO reverse Shadow DOM retargetting
+            for index in 0..path_len {
+                let node = path.get(index);
+                if node.is_undefined() || node.is_null() {
+                    continue;
+                }
 
-                // TODO simulate currentTarget
+                if node.dyn_ref::<web_sys::Element>().is_none() {
+                    continue;
+                }
 
-                while !node.is_null() {
-                    let node_is_disabled = js_sys::Reflect::get(&node, &JsValue::from_str("disabled")).unwrap_throw().is_truthy();
-                    if !node_is_disabled {
-                        let maybe_handler = js_sys::Reflect::get(&node, &key).unwrap_throw();
-                        if !maybe_handler.is_undefined() {
-                            let f = maybe_handler.unchecked_ref::<js_sys::Function>();
-                            let _ = f.call1(&node, &ev);
+                let node_is_disabled = js_sys::Reflect::get(&node, &JsValue::from_str("disabled")).unwrap_throw().is_truthy();
+                if node_is_disabled {
+                    continue;
+                }
 
-                            if ev.cancel_bubble() {
-                                return;
-                            }
-                        }
-                    }
+                let maybe_handler = js_sys::Reflect::get(&node, &key).unwrap_throw();
+                if !maybe_handler.is_undefined() {
+                    let f = maybe_handler.unchecked_ref::<js_sys::Function>();
+                    with_current_target(&ev, &node, || {
+                        let _ = f.call1(&node, &ev);
+                    });
 
-                    // navigate up tree
-                    let host = js_sys::Reflect::get(&node, &JsValue::from_str("host")).unwrap_throw();
-                    if host.is_truthy() && host != node && host.dyn_ref::<web_sys::Element>().is_some() {
-                        node = host;
-                    } else if let Some(parent) = node.unchecked_into::<web_sys::Element>().parent_node() {
-                        node = parent.into()
-                    } else {
-                        node = JsValue::null()
+                    if ev.cancel_bubble() {
+                        return;
                     }
                 }
-            };
-
-            cfg_if! {
-              if #[cfg(debug_assertions)] {
-                let span = ::tracing::Span::current();
-                let handler = move |e| {
-                  let _guard = span.enter();
-                  handler(e);
-                };
-              }
             }
+        };
 
-            let handler = Box::new(handler) as Box<dyn FnMut(web_sys::Event)>;
-            let handler = Closure::wrap(handler).into_js_value();
-            _ = crate::web::window().add_event_listener_with_callback(&event_name, handler.unchecked_ref());
-
-            // register that we've created handler
-            global_events.insert(event_name);
+        cfg_if! {
+          if #[cfg(debug_assertions)] {
+            let span = ::tracing::Span::current();
+            let handler = move |e| {
+              let _guard = span.enter();
+              handler(e);
+            };
+          }
         }
+
+        let handler = Box::new(handler) as Box<dyn FnMut(web_sys::Event)>;
+        let handler = Closure::wrap(handler).into_js_value();
+        _ = crate::web::window().add_event_listener_with_callback(&event_name, handler.unchecked_ref());
+    }
+}
+
+#[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+fn should_add_delegated_event_listener(event_name: &Cow<'static, str>) -> bool {
+    if event_name.as_ref() == "click" {
+        return CLICK_EVENT_DELEGATED.with(|delegated| {
+            let should_add = !delegated.get();
+            if should_add {
+                delegated.set(true);
+            }
+            should_add
+        });
+    }
+
+    GLOBAL_EVENTS.with_borrow_mut(|global_events| global_events.insert(event_name.clone()))
+}
+
+#[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+fn event_delegation_key_value(event_name: &Cow<'static, str>) -> JsValue {
+    if event_name.as_ref() == "click" {
+        return CLICK_EVENT_DELEGATION_KEY.with(Clone::clone);
+    }
+
+    EVENT_DELEGATION_KEYS.with_borrow_mut(|keys| {
+        if let Some(key) = keys.get(event_name) {
+            return key.clone();
+        }
+
+        let key = JsValue::from_str(&event_delegation_key(event_name));
+        keys.insert(event_name.clone(), key.clone());
+        key
     })
 }
 
@@ -115,4 +147,25 @@ pub(crate) fn event_delegation_key(event_name: &str) -> String {
     let mut n = String::from("$$$");
     n.push_str(event_name);
     n
+}
+
+#[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+fn with_current_target(event: &web_sys::Event, current_target: &JsValue, action: impl FnOnce()) {
+    let key = JsValue::from_str("currentTarget");
+    let previous = js_sys::Reflect::get(event.as_ref(), &key).ok();
+
+    define_event_property(event, &key, current_target);
+    action();
+
+    if let Some(previous) = previous {
+        define_event_property(event, &key, &previous);
+    }
+}
+
+#[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+fn define_event_property(event: &web_sys::Event, key: &JsValue, value: &JsValue) {
+    let descriptor = js_sys::Object::new();
+    let _ = js_sys::Reflect::set(&descriptor, &JsValue::from_str("configurable"), &JsValue::from_bool(true));
+    let _ = js_sys::Reflect::set(&descriptor, &JsValue::from_str("value"), value);
+    let _ = js_sys::Reflect::define_property(event.as_ref(), key, descriptor.as_ref());
 }

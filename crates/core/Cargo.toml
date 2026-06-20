@@ -18,6 +18,13 @@ web-csr = ["single-app", "dep:wasm-bindgen"]
 web-ssr = ["dep:tokio", "dep:tokio-util", "dep:futures-channel", "dep:base64"]
 salvo = ["dep:salvo", "web-ssr"]
 
+# Command-stream extras for headless hosts (desktop webview / native /
+# TUI): `CommandHolder`, real event listeners with `EventData` typing.
+# Since the SSR convergence every non-browser target already uses the
+# CommandNode backend, so this combines freely with `web-ssr`; it cannot
+# be combined with `web-csr` on wasm32 or with `single-app`.
+backend-command = []
+
 # Optimisation flag, automatically enabled by `web-csr`. When on, the
 # framework assumes there is at most one application instance per
 # process (true for browser/WASM) and skips the `HolderId`-keyed thread
@@ -54,12 +61,10 @@ glory-hot-reload = { workspace = true }
 futures = { workspace = true }
 regex = { workspace = true }
 futures-channel = { workspace = true, optional = true }
+percent-encoding = { workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen-futures = { workspace = true }
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-percent-encoding = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
@@ -69,6 +74,24 @@ wasm-bindgen-test = { workspace = true }
 
 [[bench]]
 name = "each_reorder"
+harness = false
+required-features = ["web-ssr"]
+
+[[bench]]
+name = "command_wire"
+harness = false
+
+[[bench]]
+name = "event_handlers"
+harness = false
+
+[[bench]]
+name = "scheduler"
+harness = false
+required-features = ["web-ssr"]
+
+[[bench]]
+name = "ssr_stream"
 harness = false
 required-features = ["web-ssr"]
 

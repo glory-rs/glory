@@ -50,61 +50,57 @@ pub struct User {
     pub about: Option<String>,
 }
 
-#[cfg(feature = "web-ssr")]
-pub fn show_story_api_url(id: usize) -> String {
-    format!("https://node-hnapi.herokuapp.com/item/{}", id)
-}
-#[cfg(not(feature = "web-ssr"))]
-pub fn show_story_api_url(id: usize) -> String {
-    format!("/api/stories/{}", id)
+use glory::serverfn::ServerFnError;
+
+// Server functions: the bodies below run on the server only (they call
+// the upstream HN API); wasm builds get generated stubs that POST to
+// `/__glory/fn/<name>`, mounted in main.rs via
+// `glory::serverfn::salvo_mount::router()`. This replaces the old
+// hand-written `/api/...` salvo routes, the cfg'd URL builders and the
+// dual gloo-net/reqwest fetch implementations.
+
+#[glory::server]
+pub async fn fetch_user(id: String) -> Result<Option<User>, ServerFnError> {
+    let url = format!("https://hacker-news.firebaseio.com/v0/user/{id}.json");
+    Ok(upstream_json::<User>(&url).await)
 }
 
-#[cfg(feature = "web-ssr")]
-pub fn list_stories_api_url(cate: impl AsRef<str>, page: usize) -> String {
-    format!("https://node-hnapi.herokuapp.com/{}?page={}", cate.as_ref(), page)
-}
-#[cfg(not(feature = "web-ssr"))]
-pub fn list_stories_api_url(cate: impl AsRef<str>, page: usize) -> String {
-    format!("/api/stories/?cate={}&page={}", cate.as_ref(), page)
+#[glory::server]
+pub async fn fetch_stories(cate: String, page: usize) -> Result<Vec<Story>, ServerFnError> {
+    let url = format!("https://node-hnapi.herokuapp.com/{cate}?page={page}");
+    Ok(upstream_json::<Vec<Story>>(&url).await.unwrap_or_default())
 }
 
-#[cfg(feature = "web-ssr")]
-pub fn show_user_api_url(user_id: impl AsRef<str>) -> String {
-    format!("https://hacker-news.firebaseio.com/v0/user/{}.json", user_id.as_ref())
-}
-#[cfg(not(feature = "web-ssr"))]
-pub fn show_user_api_url(user_id: impl AsRef<str>) -> String {
-    format!("/api/users/{}", user_id.as_ref())
+#[glory::server]
+pub async fn fetch_story(id: usize) -> Result<Option<Story>, ServerFnError> {
+    let url = format!("https://node-hnapi.herokuapp.com/item/{id}");
+    Ok(upstream_json::<Story>(&url).await)
 }
 
-#[cfg(not(feature = "web-ssr"))]
-pub async fn fetch_api<T>(path: &str) -> Option<T>
+/// Upstream HN API call — server-side helper, never compiled to wasm.
+#[cfg(not(target_arch = "wasm32"))]
+async fn upstream_json<T>(url: &str) -> Option<T>
 where
     T: serde::de::DeserializeOwned,
 {
-    glory::info!("fetching {}", path);
-    gloo_net::http::Request::get(path)
-        .send()
-        .await
-        .map_err(|e| glory::error!("{e}"))
-        .ok()?
-        .json::<T>()
-        .await
-        .ok()
-}
-#[cfg(feature = "web-ssr")]
-pub async fn fetch_api<T>(path: &str) -> Option<T>
-where
-    T: serde::de::DeserializeOwned,
-{
-    println!("fetching {}", path);
-    reqwest::Client::new()
-        .get(path)
-        .send()
-        .await
-        .map_err(|e| tracing::error!("{e}"))
-        .ok()?
-        .json::<T>()
-        .await
-        .ok()
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "web-ssr")] {
+            tracing::info!("fetching {url}");
+            reqwest::Client::new()
+                .get(url)
+                .send()
+                .await
+                .map_err(|e| tracing::error!("{e}"))
+                .ok()?
+                .json::<T>()
+                .await
+                .map_err(|e| tracing::error!("{e}"))
+                .ok()
+        } else {
+            // Feature-less check builds have no HTTP client; the binary is
+            // only ever run with `web-ssr` enabled.
+            let _ = url;
+            None
+        }
+    }
 }

@@ -76,6 +76,7 @@ impl Project {
         for (mut project, mut config) in projects {
             overrides.apply_definition(&mut project);
             overrides.apply_config(&mut config);
+            config.validate()?;
             if config.output_name.is_empty() {
                 config.output_name = project.name.to_string();
             }
@@ -121,11 +122,23 @@ impl Project {
             ("GLORY_SITE_ROOT", self.site.root_dir.to_string()),
             ("GLORY_SITE_PKG_DIR", self.site.pkg_dir.to_string()),
             ("GLORY_SITE_ADDR", self.site.addr.to_string()),
+            ("GLORY_SITE_SCHEME", self.site.scheme().to_string()),
+            ("GLORY_SITE_URL", self.site.url()),
             ("GLORY_RELOAD_PORT", self.site.reload.port().to_string()),
             ("GLORY_LIB_DIR", self.lib.rel_dir.to_string()),
             ("GLORY_BIN_DIR", self.bin.rel_dir.to_string()),
             ("GLORY_TARGET", format!("{:?}", self.target).to_lowercase()),
         ];
+        if let Some(cert) = &self.site.tls_cert {
+            vec.push(("GLORY_TLS_CERT", cert.to_string()));
+        }
+        if let Some(key) = &self.site.tls_key {
+            vec.push(("GLORY_TLS_KEY", key.to_string()));
+        }
+        if !self.site.proxy.is_empty() {
+            let proxy = serde_json::to_string(&self.site.proxy).expect("proxy strings serialize");
+            vec.push(("GLORY_PROXY_CONFIG", proxy));
+        }
         if self.watch {
             vec.push(("GLORY_WATCH", "ON".to_string()))
         }
@@ -141,6 +154,21 @@ impl Project {
     pub fn builds_server(&self) -> bool {
         matches!(self.target, BuildTarget::Web | BuildTarget::Desktop | BuildTarget::Native)
     }
+
+    /// Android / iOS targets compile the lib package as a `cdylib` /
+    /// `staticlib` for a host mobile project instead of a server binary.
+    pub fn builds_mobile(&self) -> bool {
+        self.target.is_mobile()
+    }
+
+    /// Rust target triple for the mobile build.
+    pub fn mobile_target_triple(&self) -> Option<&'static str> {
+        match self.target {
+            BuildTarget::Android => Some("aarch64-linux-android"),
+            BuildTarget::Ios => Some("aarch64-apple-ios"),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Deserialize, Debug)]
@@ -149,6 +177,12 @@ pub struct ProjectConfig {
     pub output_name: String,
     #[serde(default = "default_site_addr")]
     pub site_addr: SocketAddr,
+    #[serde(default)]
+    pub site_https: bool,
+    pub tls_cert: Option<Utf8PathBuf>,
+    pub tls_key: Option<Utf8PathBuf>,
+    #[serde(default)]
+    pub proxy: Vec<String>,
     #[serde(default = "default_site_root")]
     pub site_root: Utf8PathBuf,
     #[serde(default = "default_pkg_dir")]
@@ -204,17 +238,44 @@ impl ProjectConfig {
         conf.config_dir = dir.to_path_buf();
         let dotenvs = load_dotenvs(dir)?;
         overlay_env(&mut conf, dotenvs)?;
-        if conf.site_root == "/" || conf.site_root == "." {
-            bail!(
-                "site-root cannot be '{}'. All the content is erased when building the site.",
-                conf.site_root
-            );
-        }
-        if conf.site_addr.port() == conf.reload_port {
-            bail!("The site-addr port and reload-port cannot be the same: {}", conf.reload_port);
-        }
+        conf.validate()?;
         Ok(conf)
     }
+
+    fn validate(&self) -> Result<()> {
+        if self.site_root == "/" || self.site_root == "." {
+            bail!(
+                "site-root cannot be '{}'. All the content is erased when building the site.",
+                self.site_root
+            );
+        }
+        if self.site_addr.port() == self.reload_port {
+            bail!("The site-addr port and reload-port cannot be the same: {}", self.reload_port);
+        }
+        if self.tls_cert.is_some() != self.tls_key.is_some() {
+            bail!("tls-cert and tls-key must be provided together");
+        }
+        for proxy in &self.proxy {
+            validate_proxy_rule(proxy)?;
+        }
+        Ok(())
+    }
+}
+
+pub fn validate_proxy_rule(rule: &str) -> Result<()> {
+    let Some((from, to)) = rule.split_once('=') else {
+        bail!("proxy rule must use PATH=URL format: {rule}");
+    };
+    if from.trim().is_empty() || to.trim().is_empty() {
+        bail!("proxy rule must include both PATH and URL: {rule}");
+    }
+    if !from.trim().starts_with('/') {
+        bail!("proxy PATH must start with '/': {rule}");
+    }
+    if !(to.trim().starts_with("http://") || to.trim().starts_with("https://") || to.trim().starts_with("ws://") || to.trim().starts_with("wss://")) {
+        bail!("proxy URL must start with http://, https://, ws://, or wss://: {rule}");
+    }
+    Ok(())
 }
 
 #[derive(Debug, Deserialize)]
@@ -320,4 +381,42 @@ fn default_reload_port() -> u16 {
 
 fn default_browser_query() -> String {
     "defaults".to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn project_config(value: serde_json::Value) -> ProjectConfig {
+        serde_json::from_value(value).unwrap()
+    }
+
+    #[test]
+    fn validates_proxy_rule_shape() {
+        assert!(validate_proxy_rule("/api=http://127.0.0.1:9000").is_ok());
+        assert!(validate_proxy_rule("/ws=wss://example.test/socket").is_ok());
+
+        assert!(validate_proxy_rule("/api").is_err());
+        assert!(validate_proxy_rule("api=http://127.0.0.1:9000").is_err());
+        assert!(validate_proxy_rule("/api=file:///tmp/socket").is_err());
+    }
+
+    #[test]
+    fn validates_tls_cert_and_key_pairing() {
+        let with_both = project_config(serde_json::json!({
+            "tls_cert": "cert.pem",
+            "tls_key": "key.pem"
+        }));
+        assert!(with_both.validate().is_ok());
+
+        let with_cert_only = project_config(serde_json::json!({
+            "tls_cert": "cert.pem"
+        }));
+        assert!(with_cert_only.validate().is_err());
+
+        let with_key_only = project_config(serde_json::json!({
+            "tls_key": "key.pem"
+        }));
+        assert!(with_key_only.validate().is_err());
+    }
 }

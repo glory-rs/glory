@@ -65,14 +65,18 @@ impl BrowserAviator {
         Ok(())
     }
     pub fn goto(&self, modifier: impl Into<LocatorModifier>) -> Result<(), NavigationError> {
+        self.goto_with_state(modifier, JsValue::NULL)
+    }
+
+    fn goto_with_state(&self, modifier: impl Into<LocatorModifier>, state: JsValue) -> Result<(), NavigationError> {
         let modifier = modifier.into();
         let history = glory_core::web::window().history().unwrap_throw();
         if modifier.replace {
             history
-                .replace_state_with_url(&JsValue::NULL, "", Some(&modifier.raw_url))
+                .replace_state_with_url(&state, "", Some(&modifier.raw_url))
                 .unwrap_throw();
         } else {
-            history.push_state_with_url(&JsValue::NULL, "", Some(&modifier.raw_url)).unwrap_throw();
+            history.push_state_with_url(&state, "", Some(&modifier.raw_url)).unwrap_throw();
         }
         let href = glory_core::web::location()
             .href()
@@ -100,10 +104,12 @@ impl BrowserAviator {
             let href = a.href();
             let target = a.target();
 
-            // let browser handle this event if link has target,
-            // or if it doesn't have href or state
-            // TODO "state" is set as a prop, not an attribute
-            if !target.is_empty() || (href.is_empty() && !a.has_attribute("state")) {
+            // Let the browser handle links with a target, or inert anchors.
+            // `state` may be supplied either as an attribute or a JS property.
+            if !target.is_empty() || (href.is_empty() && !has_marker(&a, "state")) {
+                return;
+            }
+            if href.is_empty() {
                 return;
             }
 
@@ -144,16 +150,13 @@ impl BrowserAviator {
             event.prevent_default();
 
             let to = format!("{path_name}{query}{fragment}");
-            let replace = glory_core::web::helpers::get_property(a.unchecked_ref(), "replace")
-                .ok()
-                .and_then(|value| value.as_bool())
-                .unwrap_or(false);
+            let replace = has_marker(&a, "replace");
             let modifier = LocatorModifier {
                 raw_url: to,
                 replace,
                 scroll: !a.has_attribute("noscroll"),
             };
-            self.goto(modifier).unwrap_throw();
+            self.goto_with_state(modifier, get_anchor_state(&a)).unwrap_throw();
         }
     }
 }
@@ -161,6 +164,22 @@ impl BrowserAviator {
 impl Aviator for BrowserAviator {
     fn goto(&self, url: &str) -> Result<(), NavigationError> {
         BrowserAviator::goto(self, url)
+    }
+
+    fn back(&self) -> Result<bool, NavigationError> {
+        let history = glory_core::web::window()
+            .history()
+            .map_err(|_| NavigationError::BrowserHistoryUnavailable)?;
+        history.back().map_err(|_| NavigationError::BrowserHistoryUnavailable)?;
+        Ok(true)
+    }
+
+    fn forward(&self) -> Result<bool, NavigationError> {
+        let history = glory_core::web::window()
+            .history()
+            .map_err(|_| NavigationError::BrowserHistoryUnavailable)?;
+        history.forward().map_err(|_| NavigationError::BrowserHistoryUnavailable)?;
+        Ok(true)
     }
 }
 
@@ -198,4 +217,18 @@ fn scroll_after_navigation() {
         }
     }
     glory_core::web::window().scroll_to_with_x_and_y(0.0, 0.0);
+}
+
+fn has_marker(anchor: &web_sys::HtmlAnchorElement, name: &str) -> bool {
+    if anchor.has_attribute(name) {
+        return true;
+    }
+    glory_core::web::helpers::get_property(anchor.unchecked_ref(), name)
+        .ok()
+        .and_then(|value| value.as_bool())
+        .unwrap_or(false)
+}
+
+fn get_anchor_state(anchor: &web_sys::HtmlAnchorElement) -> JsValue {
+    glory_core::web::helpers::get_property(anchor.unchecked_ref(), "state").unwrap_or(JsValue::NULL)
 }

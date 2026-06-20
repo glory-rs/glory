@@ -36,10 +36,16 @@ pub use aviator::{Aviator, NavigationError};
 mod graff;
 mod locator;
 mod router;
+mod typed;
 pub use filters::*;
-pub use graff::Graff;
+pub use graff::{Graff, Outlet};
 pub use locator::{Locator, LocatorModifier};
 pub use router::Router;
+pub use typed::{
+    AviatorExt, FromRouteParam, FromRouteQuery, Routable, RouteMatch, RouteParamError, RouteQuery, append_route_query_param, decode_route_param,
+    encode_catch_all, encode_route_param, encode_route_query, match_route_pattern, optional_query_param, parse_catch_all, parse_route_param,
+    parse_route_query, query_param_or, query_suffix, redirect_url, repeated_query_param, required_query_param, required_route_param, split_catch_all,
+};
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use regex;

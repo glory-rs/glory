@@ -1,0 +1,141 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches:
+      - '*'
+      - '!release'
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Check formatting
+        run: cargo fmt --all --check
+
+      - name: Test core default
+        run: cargo test -p glory-core --lib
+
+      - name: Test core SSR
+        run: cargo test -p glory-core --lib --features web-ssr
+
+      - name: Test command backend
+        run: cargo test -p glory-core --features backend-command --test command_backend
+
+      - name: Test server functions
+        run: cargo test -p glory-serverfn
+
+      - name: Test server function adapters
+        run: cargo test -p glory-serverfn --features "salvo axum actix"
+
+      - name: Test CLI
+        run: cargo test -p glory-cli
+
+      - name: Check public feature set
+        run: cargo check -p glory --features "web-ssr backend-command routing server-fn"
+
+      - name: Clippy core SSR
+        run: cargo clippy -p glory-core --lib --features web-ssr -- -D warnings
+
+      - name: Clippy server functions
+        run: cargo clippy -p glory-serverfn --all-targets -- -D warnings
+
+      - name: Clippy CLI
+        run: cargo clippy -p glory-cli --lib --no-default-features -- -D warnings
+
+  feature-guards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: web-csr and web-ssr are mutually exclusive
+        shell: bash
+        run: |
+          set +e
+          cargo check -p glory-core --features "web-csr web-ssr" >output.log 2>&1
+          status=$?
+          set -e
+          test "$status" -ne 0
+          grep -q "features \`web-csr\` and \`web-ssr\` are mutually exclusive" output.log
+
+      - name: backend-command requires multi-holder scheduler
+        shell: bash
+        run: |
+          set +e
+          cargo check -p glory-core --features "backend-command single-app" >output.log 2>&1
+          status=$?
+          set -e
+          test "$status" -ne 0
+          grep -q "feature \`backend-command\` requires the multi-holder scheduler" output.log
+
+      - name: backend-command can combine with web-ssr
+        run: cargo check -p glory-core --features "web-ssr backend-command"
+
+  browser-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Playwright
+        run: |
+          npm --prefix tests/playwright install --package-lock=false
+          npm --prefix tests/playwright exec -- playwright install --with-deps chromium
+
+      - name: Start counter example
+        shell: bash
+        run: |
+          cargo run -p glory-cli -- --manifest-path examples/counter/Cargo.toml serve --address 127.0.0.1 --port 4101 --no-open --no-reload > counter.log 2>&1 &
+          echo $! > counter.pid
+          for i in {1..120}; do
+            if curl -fsS http://127.0.0.1:4101 >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat counter.log
+          exit 1
+
+      - name: Start SSR hydration example
+        shell: bash
+        run: |
+          cargo run -p glory-cli -- --manifest-path examples/ssr-simple-salvo/Cargo.toml serve --address 127.0.0.1 --port 4102 --no-open --no-reload > ssr.log 2>&1 &
+          echo $! > ssr.pid
+          for i in {1..120}; do
+            if curl -fsS http://127.0.0.1:4102 >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat ssr.log
+          exit 1
+
+      - name: Run browser smoke tests
+        env:
+          GLORY_COUNTER_URL: http://127.0.0.1:4101
+          GLORY_SSR_URL: http://127.0.0.1:4102
+        run: npm --prefix tests/playwright run test -- --project=web-csr-counter --project=ssr-hydration
+
+      - name: Dump server logs
+        if: always()
+        shell: bash
+        run: |
+          cat counter.log || true
+          cat ssr.log || true

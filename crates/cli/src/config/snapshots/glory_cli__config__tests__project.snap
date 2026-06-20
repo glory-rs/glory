@@ -57,6 +57,10 @@ Config {
             site: Site {
                 addr: 127.0.0.1:8000,
                 reload: 127.0.0.1:3001,
+                https: false,
+                tls_cert: None,
+                tls_key: None,
+                proxy: [],
                 root_dir: "target\\site",
                 pkg_dir: "pkg",
                 file_reg: {},

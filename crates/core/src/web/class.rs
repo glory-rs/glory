@@ -26,6 +26,10 @@ impl Classes {
         self.parts.iter().filter_map(|part| part.to_string()).collect()
     }
 
+    pub fn is_static(&self) -> bool {
+        self.parts.iter().all(|part| part.is_static())
+    }
+
     #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
     pub fn to_array(&self) -> js_sys::Array {
         FromIterator::from_iter(self.raw_parts().iter().map(|v| JsValue::from_str(v)))
@@ -35,6 +39,9 @@ impl Classes {
 impl AttrValue for Classes {
     #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
     fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
+        if self.parts.is_empty() {
+            return;
+        }
         let is_revising = self.parts.iter().any(|part| part.is_revising());
         if is_revising || first_time {
             let value = AttrValue::to_string(self);
@@ -52,6 +59,9 @@ impl AttrValue for Classes {
     }
     #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
     fn inject_to(&self, view_id: &ViewId, node: &mut Node, name: &str, first_time: bool) {
+        if self.parts.is_empty() {
+            return;
+        }
         let is_revising = self.parts.iter().any(|part| part.is_revising());
         if is_revising || first_time {
             let value = AttrValue::to_string(self);
@@ -68,8 +78,16 @@ impl AttrValue for Classes {
         }
     }
     fn to_string(&self) -> Option<String> {
-        let value = self.raw_parts().join(" ");
-        if value.is_empty() { None } else { Some(value) }
+        let mut parts = self.parts.iter().filter_map(|part| part.to_string()).filter(|part| !part.is_empty());
+        let mut value = parts.next()?;
+        for part in parts {
+            value.push(' ');
+            value.push_str(&part);
+        }
+        Some(value)
+    }
+    fn is_static(&self) -> bool {
+        Classes::is_static(self)
     }
 }
 
@@ -77,6 +95,9 @@ pub trait ClassPart: fmt::Debug {
     fn bind_view(&self, _view_id: &ViewId) {}
     fn is_revising(&self) -> bool {
         false
+    }
+    fn is_static(&self) -> bool {
+        true
     }
     fn to_string(&self) -> Option<String>;
 }
@@ -90,6 +111,9 @@ where
     }
     fn is_revising(&self) -> bool {
         Revisable::is_revising(self)
+    }
+    fn is_static(&self) -> bool {
+        false
     }
     fn to_string(&self) -> Option<String> {
         (*self.get()).to_string()
@@ -105,6 +129,9 @@ where
     fn is_revising(&self) -> bool {
         Revisable::is_revising(self)
     }
+    fn is_static(&self) -> bool {
+        false
+    }
     fn to_string(&self) -> Option<String> {
         (*self.get()).to_string()
     }
@@ -118,6 +145,9 @@ where
     }
     fn is_revising(&self) -> bool {
         Revisable::is_revising(self)
+    }
+    fn is_static(&self) -> bool {
+        false
     }
     fn to_string(&self) -> Option<String> {
         (*self.get()).to_string()

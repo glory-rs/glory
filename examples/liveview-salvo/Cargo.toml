@@ -1,0 +1,12 @@
+[package]
+name = "liveview-salvo"
+version = "0.0.1"
+edition = "2024"
+
+[dependencies]
+glory-core = { path = "../../crates/core", features = ["backend-command"] }
+glory-desktop = { path = "../../crates/desktop" }
+glory-liveview = { path = "../../crates/liveview", features = ["salvo"] }
+salvo = { version = "0.93", default-features = true }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+tracing-subscriber = "0.3"

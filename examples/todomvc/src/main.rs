@@ -187,8 +187,11 @@ impl Widget for TodoMvc {
                             )
                             .fill(label().attr("for", "toggle-all").html("Mark all as complete"))
                             .fill(
-                                ul().class("todo-list")
-                                    .fill(Each::new(Lotus::<Vec<TodoItem>>::from(filtered_todos), |todo| todo.id, |todo| todo.clone())),
+                                ul().class("todo-list").fill(Each::<TodoItem, Vec<TodoItem>, _, Uuid, _, TodoItem>::new(
+                                    filtered_todos,
+                                    |todo: &TodoItem| todo.id,
+                                    |todo: &TodoItem| todo.clone(),
+                                )),
                             ),
                     )
                     .fill(

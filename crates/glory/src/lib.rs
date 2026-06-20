@@ -14,11 +14,45 @@ mod cfg;
 pub use glory_core::asset;
 #[doc(no_inline)]
 pub use glory_core::*;
+#[doc(hidden)]
+pub use glory_macros::__asset_folder;
+#[doc(hidden)]
+pub use glory_macros::__css_module;
+
+#[macro_export]
+macro_rules! asset_folder {
+    ($path:literal) => {
+        $crate::__asset_folder!($crate, $path)
+    };
+}
+
+#[macro_export]
+macro_rules! css_module {
+    ($path:literal) => {
+        $crate::__css_module!($crate, $path)
+    };
+}
 
 cfg_feature! {
     #![feature ="routing"]
+    /// The `#[derive(Routable)]` macro for enum-backed typed routes. The
+    /// generated impl targets [`glory::routing::Routable`].
+    #[doc(no_inline)]
+    pub use glory_macros::Routable;
     #[doc(no_inline)]
     pub use glory_routing as routing;
+}
+
+cfg_feature! {
+    #![feature = "server-fn"]
+    /// The `#[server]` attribute: write a function once, run its body on
+    /// the server, call it from any client transparently. App crates must
+    /// also depend on `glory-serverfn` directly (the macro expands to
+    /// `glory_serverfn::` paths).
+    #[doc(no_inline)]
+    pub use glory_macros::server;
+    #[doc(no_inline)]
+    pub use glory_serverfn as serverfn;
 }
 
 /// Mount a root widget into the browser body and return the running
@@ -74,4 +108,27 @@ where
 #[cfg(all(not(target_arch = "wasm32"), feature = "web-ssr"))]
 pub mod ssr {
     pub use glory_core::web::holders::ServerHolder;
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn asset_folder_macro_enumerates_front_door_sources() {
+        let folder = crate::asset_folder!("src");
+
+        assert!(folder.len() >= 2);
+        assert!(folder.get("src/lib.rs").is_some());
+        assert!(folder.iter().all(|asset| asset.public_path().starts_with("/src/")));
+    }
+
+    #[test]
+    fn css_module_macro_generates_typed_class_methods() {
+        let styles = crate::css_module!("src/test_styles.module.css");
+
+        assert!(styles.primary_button().starts_with("primary-button__gly_"));
+        assert!(styles.card().starts_with("card__gly_"));
+        assert!(styles.css().contains(styles.primary_button()));
+        assert!(styles.css().contains(styles.card()));
+        assert!(!styles.css().contains(".primary-button {"));
+    }
 }

@@ -111,7 +111,11 @@ const STREAM_HYDRATE_JS: &str = r#"(function () {
 
 #[cfg(feature = "web-ssr")]
 #[tracing::instrument(level = "trace", fields(error), skip_all)]
-pub fn html_parts_separated(config: &GloryConfig, truck: &Truck) -> (String, String, &'static str) {
+pub fn html_parts_separated(
+    config: &GloryConfig,
+    truck: &Truck,
+    document: &crate::renderer::ssr_dom::SsrDocument,
+) -> (String, String, &'static str) {
     let pkg_path = &config.site_pkg_dir;
     let output_name = &config.output_name;
 
@@ -125,22 +129,26 @@ pub fn html_parts_separated(config: &GloryConfig, truck: &Truck) -> (String, Str
     let nonce = nonce_attr(config);
     let glory_auto_reload = auto_reload(&nonce, config);
 
-    let html_open = if let Ok(node) = truck.get::<Node>(DEPOT_HTML_META_KEY) {
-        node.html_tag().0
-    } else {
-        "<html>".into()
-    };
-    let body_open = if let Ok(node) = truck.get::<Node>(DEPOT_BODY_META_KEY) {
-        node.html_tag().0
-    } else {
-        "<body>".into()
-    };
+    // The truck stores command-stream node handles; their rendered content
+    // lives in the replayed document.
+    let html_open = truck
+        .get::<Node>(DEPOT_HTML_META_KEY)
+        .ok()
+        .and_then(|node| document.html_tag(node.id()))
+        .map(|(open, _)| open)
+        .unwrap_or_else(|| "<html>".into());
+    let body_open = truck
+        .get::<Node>(DEPOT_BODY_META_KEY)
+        .ok()
+        .and_then(|node| document.html_tag(node.id()))
+        .map(|(open, _)| open)
+        .unwrap_or_else(|| "<body>".into());
 
-    let head_mixin = if let Ok(node) = truck.get::<Node>(DEPOT_HEAD_MIXIN_KEY) {
-        node.inner_html()
-    } else {
-        "".into()
-    };
+    let head_mixin = truck
+        .get::<Node>(DEPOT_HEAD_MIXIN_KEY)
+        .ok()
+        .map(|node| document.inner_html(node.id()))
+        .unwrap_or_default();
 
     (
         format!(
@@ -175,7 +183,8 @@ mod tests {
     fn ssr_head_installs_stream_hydrate_runtime() {
         let config = GloryConfig::default();
         let truck = Truck::new();
-        let (head, _, _) = html_parts_separated(&config, &truck);
+        let document = crate::renderer::ssr_dom::SsrDocument::new();
+        let (head, _, _) = html_parts_separated(&config, &truck, &document);
 
         assert!(head.contains("window.__gloryStreamHydrate"));
         assert!(head.contains("patchFromTemplate"));
@@ -189,7 +198,8 @@ mod tests {
             ..GloryConfig::default()
         };
         let truck = Truck::new();
-        let (head, _, _) = html_parts_separated(&config, &truck);
+        let document = crate::renderer::ssr_dom::SsrDocument::new();
+        let (head, _, _) = html_parts_separated(&config, &truck, &document);
 
         assert!(head.contains(r#"nonce="&quot;&lt;&amp;&gt;&quot;""#));
     }

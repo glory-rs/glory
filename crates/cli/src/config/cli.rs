@@ -1,6 +1,7 @@
 use crate::command::NewCommand;
 use camino::Utf8PathBuf;
 use clap::{Parser, Subcommand, ValueEnum};
+use std::net::IpAddr;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ValueEnum)]
 pub enum Log {
@@ -16,6 +17,17 @@ pub enum BuildTarget {
     Web,
     Desktop,
     Native,
+    /// Android library build (`cdylib` via cargo-ndk). See
+    /// `crates/cli/templates/mobile/README.md` for the host-project wiring.
+    Android,
+    /// iOS static library build (`staticlib`, macOS host required).
+    Ios,
+}
+
+impl BuildTarget {
+    pub fn is_mobile(&self) -> bool {
+        matches!(self, BuildTarget::Android | BuildTarget::Ios)
+    }
 }
 
 #[derive(Debug, Clone, Parser, PartialEq, Default)]
@@ -54,7 +66,7 @@ pub struct Opts {
 }
 
 #[derive(Debug, Parser)]
-#[clap(version)]
+#[command(name = "glory", version)]
 pub struct Cli {
     /// Path to Cargo.toml.
     #[arg(long)]
@@ -70,11 +82,14 @@ pub struct Cli {
 
 impl Cli {
     pub fn opts(&self) -> Option<Opts> {
-        use Commands::{Build, Bundle, Check, Clean, EndToEnd, Fmt, New, Serve, Test, Watch};
+        use Commands::{Build, Bundle, Check, Clean, Completions, Config, Doctor, EndToEnd, Fmt, New, Run, SelfUpdate, Serve, Test};
         match &self.command {
-            New(_) | Fmt(_) => None,
-            Build(opts) | Bundle(opts) | Check(opts) | Test(opts) | EndToEnd(opts) | Watch(opts) => Some(opts.clone()),
+            New(_) | Fmt(_) | Completions(_) | SelfUpdate => None,
+            Build(opts) | Check(opts) | Test(opts) | EndToEnd(opts) | Doctor(opts) => Some(opts.clone()),
+            Bundle(opts) => Some(opts.opts.clone()),
+            Config(opts) => Some(opts.opts.clone()),
             Serve(opts) => Some(opts.opts.clone()),
+            Run(opts) => Some(opts.opts.clone()),
             Clean(opts) => Some(opts.opts.clone()),
         }
     }
@@ -89,6 +104,73 @@ pub struct ServeOpts {
     /// Build and serve once without watching files or live-reloading.
     #[arg(long)]
     pub no_reload: bool,
+
+    /// Override the host address from Cargo metadata for this serve run.
+    #[arg(long)]
+    pub address: Option<IpAddr>,
+
+    /// Override the site port from Cargo metadata for this serve run.
+    #[arg(long)]
+    pub port: Option<u16>,
+
+    /// Open and advertise the dev site as HTTPS.
+    #[arg(long)]
+    pub https: bool,
+
+    /// TLS certificate path passed to the app server as GLORY_TLS_CERT.
+    #[arg(long = "tls-cert", requires = "tls_key")]
+    pub tls_cert: Option<Utf8PathBuf>,
+
+    /// TLS private key path passed to the app server as GLORY_TLS_KEY.
+    #[arg(long = "tls-key", requires = "tls_cert")]
+    pub tls_key: Option<Utf8PathBuf>,
+
+    /// Proxy rule passed to the app server as GLORY_PROXY_CONFIG. Format: PATH=URL.
+    #[arg(long = "proxy", value_name = "PATH=URL")]
+    pub proxy: Vec<String>,
+
+    /// Explicitly open the app in the default browser. This is the default.
+    #[arg(long, action = clap::ArgAction::SetTrue, conflicts_with = "no_open")]
+    pub open: bool,
+
+    /// Do not open the app in the default browser after the first build.
+    #[arg(long = "no-open", action = clap::ArgAction::SetTrue)]
+    pub no_open: bool,
+}
+
+impl ServeOpts {
+    pub fn should_open(&self) -> bool {
+        self.open || !self.no_open
+    }
+}
+
+/// Extra flags for `run`.
+#[derive(Debug, Clone, Parser, PartialEq, Default)]
+pub struct RunOpts {
+    #[command(flatten)]
+    pub opts: Opts,
+
+    /// Override the host address from Cargo metadata for this run.
+    #[arg(long)]
+    pub address: Option<IpAddr>,
+
+    /// Override the site port from Cargo metadata for this run.
+    #[arg(long)]
+    pub port: Option<u16>,
+
+    /// Explicitly open the app in the default browser. This is the default.
+    #[arg(long, action = clap::ArgAction::SetTrue, conflicts_with = "no_open")]
+    pub open: bool,
+
+    /// Do not open the app in the default browser after the build.
+    #[arg(long = "no-open", action = clap::ArgAction::SetTrue)]
+    pub no_open: bool,
+}
+
+impl RunOpts {
+    pub fn should_open(&self) -> bool {
+        self.open || !self.no_open
+    }
 }
 
 /// Extra flags for `clean`.
@@ -100,6 +182,32 @@ pub struct CleanOpts {
     /// Also run `cargo clean` at the workspace root.
     #[arg(long)]
     pub cargo: bool,
+}
+
+/// Extra flags for `bundle`.
+#[derive(Debug, Clone, Parser, PartialEq, Default)]
+pub struct BundleOpts {
+    #[command(flatten)]
+    pub opts: Opts,
+
+    /// Generate WebP copies for PNG/JPEG assets and prefer them in the bundle asset map.
+    #[arg(long)]
+    pub optimize_images: bool,
+}
+
+/// Flags for `config`.
+#[derive(Debug, Clone, Parser, PartialEq, Default)]
+pub struct ConfigOpts {
+    #[command(flatten)]
+    pub opts: Opts,
+
+    /// Print the resolved project summary as JSON.
+    #[arg(long)]
+    pub json: bool,
+
+    /// Print the Glory Cargo metadata schema and exit without loading a project.
+    #[arg(long)]
+    pub schema: bool,
 }
 
 /// Flags for `fmt` (a thin passthrough over `cargo fmt`).
@@ -114,27 +222,149 @@ pub struct FmtOpts {
     pub args: Vec<String>,
 }
 
+/// Flags for `completions`.
+#[derive(Debug, Clone, Parser, PartialEq)]
+pub struct CompletionsOpts {
+    /// Shell to generate completions for.
+    #[arg(value_enum)]
+    pub shell: clap_complete::Shell,
+}
+
 #[derive(Debug, Subcommand, PartialEq)]
 pub enum Commands {
     /// Start a hot-reloading dev server (build, serve and live-reload on change).
     Serve(ServeOpts),
+    /// Build and run the app server without watching files or live-reloading.
+    Run(RunOpts),
     /// Build the server (feature ssr) and the client (wasm with feature csr).
     Build(Opts),
     /// Build in release mode and collect the artifacts into a distributable `dist/` folder.
-    Bundle(Opts),
+    Bundle(BundleOpts),
     /// Remove build artifacts (front/server target dirs and the site root).
     Clean(CleanOpts),
     /// Type-check the client (wasm) and server without producing artifacts.
     Check(Opts),
+    /// Validate Glory Cargo metadata or print the metadata schema.
+    Config(ConfigOpts),
+    /// Check local toolchains and platform prerequisites for the selected target.
+    Doctor(Opts),
     /// Format the project sources (passthrough to `cargo fmt`).
     Fmt(FmtOpts),
+    /// Generate shell completions to stdout.
+    Completions(CompletionsOpts),
+    /// Print how to update the Glory CLI.
+    SelfUpdate,
     /// Run the cargo tests for app, client and server.
     Test(Opts),
     /// Start the server and end-2-end tests.
     EndToEnd(Opts),
-    /// Deprecated alias for `serve`; serve and automatically reload when files change.
-    #[command(hide = true)]
-    Watch(Opts),
-    /// WIP: Start wizard for creating a new project (using cargo-generate). Ask at Glory discord before using.
+    /// Scaffold a new Glory project from a built-in template or cargo-generate source.
     New(NewCommand),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn serve_accepts_network_and_open_flags() {
+        let cli = Cli::parse_from(["glory", "serve", "--address", "0.0.0.0", "--port", "9000", "--no-open"]);
+
+        let Commands::Serve(serve) = cli.command else {
+            panic!("expected serve command");
+        };
+
+        assert_eq!(serve.address, Some([0, 0, 0, 0].into()));
+        assert_eq!(serve.port, Some(9000));
+        assert!(!serve.should_open());
+    }
+
+    #[test]
+    fn serve_opens_by_default_and_accepts_explicit_open() {
+        let cli = Cli::parse_from(["glory", "serve"]);
+        let Commands::Serve(default_serve) = cli.command else {
+            panic!("expected serve command");
+        };
+        assert!(default_serve.should_open());
+
+        let cli = Cli::parse_from(["glory", "serve", "--open"]);
+        let Commands::Serve(explicit_serve) = cli.command else {
+            panic!("expected serve command");
+        };
+        assert!(explicit_serve.should_open());
+    }
+
+    #[test]
+    fn serve_rejects_conflicting_open_flags() {
+        let result = Cli::try_parse_from(["glory", "serve", "--open", "--no-open"]);
+
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn serve_accepts_https_tls_and_proxy_flags() {
+        let cli = Cli::parse_from([
+            "glory",
+            "serve",
+            "--https",
+            "--tls-cert",
+            "cert.pem",
+            "--tls-key",
+            "key.pem",
+            "--proxy",
+            "/api=http://127.0.0.1:9001",
+            "--proxy",
+            "/ws=ws://127.0.0.1:9002",
+        ]);
+
+        let Commands::Serve(serve) = cli.command else {
+            panic!("expected serve command");
+        };
+
+        assert!(serve.https);
+        assert_eq!(serve.tls_cert, Some(Utf8PathBuf::from("cert.pem")));
+        assert_eq!(serve.tls_key, Some(Utf8PathBuf::from("key.pem")));
+        assert_eq!(serve.proxy, ["/api=http://127.0.0.1:9001", "/ws=ws://127.0.0.1:9002"]);
+    }
+
+    #[test]
+    fn serve_requires_tls_cert_and_key_together() {
+        assert!(Cli::try_parse_from(["glory", "serve", "--tls-cert", "cert.pem"]).is_err());
+        assert!(Cli::try_parse_from(["glory", "serve", "--tls-key", "key.pem"]).is_err());
+    }
+
+    #[test]
+    fn run_accepts_network_and_open_flags() {
+        let cli = Cli::parse_from(["glory", "run", "--address", "127.0.0.1", "--port", "8080", "--no-open"]);
+
+        let Commands::Run(run) = cli.command else {
+            panic!("expected run command");
+        };
+
+        assert_eq!(run.address, Some([127, 0, 0, 1].into()));
+        assert_eq!(run.port, Some(8080));
+        assert!(!run.should_open());
+    }
+
+    #[test]
+    fn parses_project_free_utility_commands() {
+        let cli = Cli::parse_from(["glory", "completions", "powershell"]);
+        assert!(matches!(cli.command, Commands::Completions(_)));
+        assert!(cli.opts().is_none());
+
+        let cli = Cli::parse_from(["glory", "self-update"]);
+        assert_eq!(cli.command, Commands::SelfUpdate);
+        assert!(cli.opts().is_none());
+    }
+
+    #[test]
+    fn bundle_accepts_image_optimization_flag() {
+        let cli = Cli::parse_from(["glory", "bundle", "--optimize-images"]);
+        assert_eq!(cli.opts(), Some(Opts::default()));
+
+        let Commands::Bundle(bundle) = cli.command else {
+            panic!("expected bundle command");
+        };
+        assert!(bundle.optimize_images);
+    }
 }

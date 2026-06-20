@@ -105,7 +105,7 @@ fn App() -> impl IntoView {
                                 </td>
                                 <td class="col-md-1">
                                     <a class="remove" on:click=move |_| rows.update(|v| v.retain(|r| r.id != id))>
-                                        <span class="remove glyphicon glyphicon-remove" aria-hidden="true"></span>
+                                        <span class="remove glyphicon glyphicon-remove" aria-hidden="true">"x"</span>
                                     </a>
                                 </td>
                                 <td class="col-md-6"></td>

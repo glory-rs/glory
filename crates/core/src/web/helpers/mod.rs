@@ -1,7 +1,7 @@
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
 use std::time::Duration;
 
-#[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+#[cfg(all(target_arch = "wasm32", feature = "web-csr", debug_assertions))]
 use tracing::instrument;
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt, closure::Closure};
@@ -17,6 +17,21 @@ use crate::{
 
 mod event;
 pub use event::*;
+
+/// Command-stream counterpart of the CSR `event_target_value` helper:
+/// reads the serialized `target.value` snapshot carried by
+/// [`EventData`](crate::renderer::EventData), so `input` / `change`
+/// handlers compile unchanged across web and command backends.
+#[cfg(feature = "backend-command")]
+pub fn event_target_value(event: &crate::renderer::EventData) -> String {
+    event.target_value()
+}
+
+/// Command-stream counterpart of the CSR `event_target_checked` helper.
+#[cfg(feature = "backend-command")]
+pub fn event_target_checked(event: &crate::renderer::EventData) -> bool {
+    event.target_checked()
+}
 
 /// Sets a property on a DOM element.
 #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]

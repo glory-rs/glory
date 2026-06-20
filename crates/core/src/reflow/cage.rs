@@ -263,6 +263,28 @@ where
     pub fn subscriber_view_ids(&self) -> Vec<crate::view::ViewId> {
         self.inner.view_ids.borrow().iter().cloned().collect()
     }
+
+    /// Read-only diagnostic snapshot for devtools.
+    #[doc(hidden)]
+    pub fn devtools_snapshot(&self) -> crate::devtools::ReactiveSnapshot {
+        let subscriber_views = self.subscriber_view_ids().into_iter().map(|view_id| view_id.into_inner()).collect();
+        crate::devtools::ReactiveSnapshot {
+            kind: crate::devtools::ReactiveKind::Cage,
+            id: self.id.as_u64(),
+            version: self.version(),
+            subscriber_count: self.subscriber_count(),
+            subscriber_views,
+            dependency_ids: Vec::new(),
+        }
+    }
+
+    /// Number of invalidated slots of this `T` currently parked for reuse.
+    /// **Dev-only diagnostic** for leak tests and long-session debugging.
+    #[doc(hidden)]
+    pub fn recycled_slot_count_for_type() -> usize {
+        CAGE_FREE_LIST.with_borrow(|free| free.get(&TypeId::of::<Slot<T>>()).map(Vec::len).unwrap_or(0))
+    }
+
     // pub fn source<'a>(&'a self) -> std::cell::Ref<'a, S> {
     //     self.source.borrow()
     // }
@@ -525,10 +547,12 @@ mod tests {
         let dead = Cage::new(Uniq(1));
         let dead_slot: &'static Slot<Uniq> = dead.inner;
         dead.invalidate();
+        assert_eq!(Cage::<Uniq>::recycled_slot_count_for_type(), 1);
 
         // The next cage of the same type reuses the parked slot rather than
         // leaking a fresh allocation.
         let live = Cage::new(Uniq(2));
+        assert_eq!(Cage::<Uniq>::recycled_slot_count_for_type(), 0);
         assert!(std::ptr::eq(dead_slot, live.inner), "slot should be recycled");
 
         // The recycled handle is stale; the new handle is the live occupant
@@ -553,5 +577,17 @@ mod tests {
         let after = CAGE_FREE_LIST.with_borrow(|free| free.get(&TypeId::of::<Slot<i32>>()).map(Vec::len).unwrap_or(0));
         assert_eq!(before.saturating_sub(after), 1);
         assert!(reused.is_current());
+    }
+
+    #[test]
+    fn devtools_snapshot_reports_cage_identity_and_subscribers() {
+        let cage = Cage::new(7_i32);
+        let snapshot = cage.devtools_snapshot();
+        assert_eq!(snapshot.kind, crate::devtools::ReactiveKind::Cage);
+        assert_eq!(snapshot.id, cage.id().as_u64());
+        assert_eq!(snapshot.version, cage.version());
+        assert_eq!(snapshot.subscriber_count, 0);
+        assert!(snapshot.subscriber_views.is_empty());
+        assert!(snapshot.dependency_ids.is_empty());
     }
 }

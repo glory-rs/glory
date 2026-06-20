@@ -15,12 +15,17 @@ pub struct HeadMixin {
     #[allow(clippy::type_complexity)]
     pub fillers: Vec<Filler>,
 
-    head_node: Node,
+    head_node: Option<Node>,
 }
 
 impl Widget for HeadMixin {
     fn build(&mut self, ctx: &mut Scope) {
-        ctx.render_node = Some(self.head_node.clone());
+        #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
+        if self.head_node.is_none() {
+            self.head_node = Some(Node::new("head", false));
+        }
+        let head_node = self.head_node.as_ref().expect("head node initialized").clone();
+        ctx.render_node = Some(head_node.clone());
 
         let fillers = std::mem::take(&mut self.fillers);
         for filler in fillers {
@@ -28,7 +33,7 @@ impl Widget for HeadMixin {
         }
 
         #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
-        ctx.truck_mut().insert(DEPOT_HEAD_MIXIN_KEY, self.head_node.clone());
+        ctx.truck_mut().insert(DEPOT_HEAD_MIXIN_KEY, head_node);
     }
 
     fn flood(&mut self, ctx: &mut Scope) {
@@ -39,18 +44,19 @@ impl Widget for HeadMixin {
         self.patch(ctx);
     }
 }
+#[allow(clippy::derivable_impls)]
 impl Default for HeadMixin {
     fn default() -> Self {
         cfg_if! {
             if #[cfg(all(target_arch = "wasm32", feature = "web-csr"))] {
                 Self {
                     fillers: vec![],
-                    head_node: crate::web::document().head().unwrap_throw().into(),
+                    head_node: Some(crate::web::document().head().unwrap_throw().into()),
                 }
             } else {
                 Self {
                     fillers: vec![],
-                    head_node: Node::new("head", false),
+                    head_node: None,
                 }
             }
         }

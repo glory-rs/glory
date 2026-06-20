@@ -46,6 +46,8 @@ fn test_project_dev() {
     GLORY_SITE_ROOT=target\\site \
     GLORY_SITE_PKG_DIR=pkg \
     GLORY_SITE_ADDR=127.0.0.1:8000 \
+    GLORY_SITE_SCHEME=http \
+    GLORY_SITE_URL=http://127.0.0.1:8000 \
     GLORY_RELOAD_PORT=3001 \
     GLORY_LIB_DIR=. \
     GLORY_BIN_DIR=. \
@@ -57,6 +59,8 @@ fn test_project_dev() {
     GLORY_SITE_ROOT=target/site \
     GLORY_SITE_PKG_DIR=pkg \
     GLORY_SITE_ADDR=127.0.0.1:8000 \
+    GLORY_SITE_SCHEME=http \
+    GLORY_SITE_URL=http://127.0.0.1:8000 \
     GLORY_RELOAD_PORT=3001 \
     GLORY_LIB_DIR=. \
     GLORY_BIN_DIR=. \
@@ -97,6 +101,8 @@ fn test_workspace_project1() {
     GLORY_SITE_ROOT=target/site/project1 \
     GLORY_SITE_PKG_DIR=pkg \
     GLORY_SITE_ADDR=127.0.0.1:8000 \
+    GLORY_SITE_SCHEME=http \
+    GLORY_SITE_URL=http://127.0.0.1:8000 \
     GLORY_RELOAD_PORT=3001 \
     GLORY_LIB_DIR=project1\\front \
     GLORY_BIN_DIR=project1\\server \
@@ -108,6 +114,8 @@ fn test_workspace_project1() {
     GLORY_SITE_ROOT=target/site/project1 \
     GLORY_SITE_PKG_DIR=pkg \
     GLORY_SITE_ADDR=127.0.0.1:8000 \
+    GLORY_SITE_SCHEME=http \
+    GLORY_SITE_URL=http://127.0.0.1:8000 \
     GLORY_RELOAD_PORT=3001 \
     GLORY_LIB_DIR=project1/front \
     GLORY_BIN_DIR=project1/server \

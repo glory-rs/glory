@@ -13,6 +13,7 @@ use super::{Profile, ProjectConfig, cli::BuildTarget, project::ProjectDefinition
 
 pub struct BinPackage {
     pub name: String,
+    pub version: String,
     pub abs_dir: Utf8PathBuf,
     pub rel_dir: Utf8PathBuf,
     pub exe_file: Utf8PathBuf,
@@ -44,6 +45,7 @@ impl BinPackage {
                 BuildTarget::Web => features.push("web-ssr".to_string()),
                 BuildTarget::Desktop => features.push("desktop".to_string()),
                 BuildTarget::Native => features.push("native".to_string()),
+                BuildTarget::Android | BuildTarget::Ios => features.push("mobile".to_string()),
             }
         }
 
@@ -71,6 +73,7 @@ impl BinPackage {
         } else {
             return Err(many_targets_found(&name));
         };
+        let target_name = target.name.clone();
 
         let abs_dir = package.manifest_path.clone().without_last();
         let rel_dir = abs_dir.unbase(&metadata.workspace_root)?;
@@ -86,7 +89,7 @@ impl BinPackage {
             if let Some(triple) = &config.bin_target_triple {
                 file = file.join(triple)
             };
-            file.join(profile.to_string()).join(&name).with_extension(file_ext)
+            file.join(profile.to_string()).join(&target_name).with_extension(file_ext)
         };
 
         let mut src_paths = metadata.src_path_dependencies(&package.id);
@@ -97,10 +100,11 @@ impl BinPackage {
         }
         Ok(Self {
             name,
+            version: package.version.to_string(),
             abs_dir,
             rel_dir,
             exe_file,
-            target: target.name,
+            target: target_name,
             features,
             default_features: config.bin_default_features,
             src_paths,

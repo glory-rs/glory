@@ -7,8 +7,10 @@ use std::sync::Arc;
 use crate::config::GloryConfig;
 use crate::reflow::scheduler::{BATCHING, RUNNING};
 use crate::reflow::{PENDING_ITEMS, REVISING_ITEMS};
-use crate::{Holder, HolderId, ROOT_VIEWS, Scope, Truck, ViewId, Widget};
+use crate::renderer::CommandQueue;
+use crate::renderer::ssr_dom::SsrDocument;
 use crate::web::widgets::*;
+use crate::{Holder, HolderId, ROOT_VIEWS, Scope, Truck, ViewId, Widget};
 
 const DEPOT_URL_KEY: &str = "glory::url";
 
@@ -17,6 +19,9 @@ pub struct ServerHolder {
     pub config: Arc<GloryConfig>,
     pub truck: Rc<RefCell<Truck>>,
     pub host_node: HtmlDiv,
+    /// The command stream every widget mutation of this holder lands in;
+    /// rendering replays it into an [`SsrDocument`].
+    queue: CommandQueue,
     next_root_view_id: AtomicU64,
 }
 
@@ -61,23 +66,42 @@ impl ServerHolder {
     pub fn new(config: impl Into<Arc<GloryConfig>>, url: impl Into<String>) -> Self {
         let mut truck = Truck::new();
         truck.insert(DEPOT_URL_KEY, url.into());
+        let queue = CommandQueue::new();
+        let host_node = {
+            let _guard = queue.make_current();
+            crate::web::widgets::div()
+        };
+        let id = HolderId::next();
+        crate::renderer::command::register_holder_queue(id, queue.clone());
         Self {
-            id: HolderId::next(),
+            id,
             config: config.into(),
             truck: Rc::new(RefCell::new(truck)),
-            host_node: crate::web::widgets::div(),
+            host_node,
+            queue,
             next_root_view_id: AtomicU64::new(0),
         }
     }
 
+    /// Replays the recorded command stream into the legacy-exact SSR tree.
+    /// Non-draining: rendering is repeatable.
+    pub fn replay(&self) -> SsrDocument {
+        SsrDocument::replay(&self.queue.commands())
+    }
+
+    /// Rendered HTML of the mounted app subtree (what becomes the
+    /// [`HtmlChunk::App`] chunk).
+    pub fn app_html(&self) -> String {
+        self.replay().inner_html(self.host_node.node().id())
+    }
+
     pub fn html_chunks(&self) -> Vec<HtmlChunk> {
-        let (head, mid, tail) = crate::web::utils::html_parts_separated(&self.config, &self.truck.borrow());
-        vec![
-            HtmlChunk::DocumentStart(head),
-            HtmlChunk::BodyOpen(mid),
-            HtmlChunk::App(self.host_node.node().inner_html()),
-            HtmlChunk::DocumentEnd(tail),
-        ]
+        let document = self.replay();
+        let (head, mid, tail) = crate::web::utils::html_parts_separated(&self.config, &self.truck.borrow(), &document);
+        let mut chunks = vec![HtmlChunk::DocumentStart(head), HtmlChunk::BodyOpen(mid)];
+        chunks.extend(document.inner_html_chunks(self.host_node.node().id()).into_iter().map(HtmlChunk::App));
+        chunks.push(HtmlChunk::DocumentEnd(tail));
+        chunks
     }
 
     pub fn render_stream(&self) -> futures::stream::Iter<std::vec::IntoIter<HtmlChunk>> {
@@ -96,6 +120,7 @@ impl Debug for ServerHolder {
 }
 impl Drop for ServerHolder {
     fn drop(&mut self) {
+        crate::renderer::command::unregister_holder_queue(self.id);
         ROOT_VIEWS.with_borrow_mut(|root_views| {
             root_views.shift_remove(&self.id);
         });
@@ -118,9 +143,17 @@ impl Drop for ServerHolder {
 
 impl Holder for ServerHolder {
     fn mount(self, widget: impl Widget) -> Self {
+        let _guard = self.queue.make_current();
         let view_id = ViewId::new(self.id, self.next_root_view_id.fetch_add(1, Ordering::Relaxed).to_string());
         let scope = Scope::new_root(view_id, self.truck.clone());
         widget.mount_to(scope, self.host_node.node());
+        self
+    }
+    fn enable(self, enabler: impl crate::holder::Enabler + 'static) -> Self {
+        // Route handlers may build widgets/nodes; keep them on this
+        // holder's queue.
+        let _guard = self.queue.make_current();
+        enabler.enable(self.truck());
         self
     }
     fn truck(&self) -> Rc<RefCell<Truck>> {
@@ -174,7 +207,9 @@ cfg_feature! {
 
 #[cfg(test)]
 mod tests {
-    use crate::web::widgets::div;
+    use futures::StreamExt;
+
+    use crate::web::widgets::{div, li, ul};
     use crate::{Holder, Scope, Widget};
 
     use super::*;
@@ -195,9 +230,41 @@ mod tests {
 
         assert!(matches!(chunks[0], HtmlChunk::DocumentStart(_)));
         assert!(matches!(chunks[1], HtmlChunk::BodyOpen(_)));
-        assert_eq!(chunks[2], HtmlChunk::App("<div gly-id=\"0-0\">streamed</div>".to_string()));
+        let app_html = chunks
+            .iter()
+            .filter_map(|chunk| match chunk {
+                HtmlChunk::App(value) => Some(value.as_str()),
+                _ => None,
+            })
+            .collect::<String>();
+        assert_eq!(app_html, "<div gly-id=\"0-0\">streamed</div>");
         assert!(matches!(chunks[3], HtmlChunk::DocumentEnd(_)));
         assert!(holder.render_string().contains("streamed"));
+    }
+
+    #[derive(Debug)]
+    struct NestedStreamWidget;
+
+    impl Widget for NestedStreamWidget {
+        fn build(&mut self, ctx: &mut Scope) {
+            ul().fill(vec![li().text("a"), li().text("b"), li().text("c")]).show_in(ctx);
+        }
+    }
+
+    #[test]
+    fn render_stream_yields_dom_boundary_chunks() {
+        let holder = ServerHolder::new(GloryConfig::default(), "/").mount(NestedStreamWidget);
+        let expected = holder.render_string();
+        let chunks = holder.html_chunks();
+        let app_chunk_count = chunks.iter().filter(|chunk| matches!(chunk, HtmlChunk::App(_))).count();
+        assert!(app_chunk_count > 1, "{chunks:?}");
+        assert_eq!(chunks.clone().into_iter().map(HtmlChunk::into_string).collect::<String>(), expected);
+
+        let mut stream = holder.render_stream();
+        let first = futures::executor::block_on(stream.next()).unwrap();
+        let second = futures::executor::block_on(stream.next()).unwrap();
+        assert!(matches!(first, HtmlChunk::DocumentStart(_)));
+        assert!(matches!(second, HtmlChunk::BodyOpen(_)));
     }
 
     #[test]

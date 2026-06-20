@@ -106,12 +106,12 @@ impl ServerProcess {
 
             log::debug!("Serve running {}", GRAY.paint(bin_path.as_str()));
             let cmd = Some(Command::new(bin_path).envs(self.envs.clone()).spawn()?);
-            let port = self
+            let url = self
                 .envs
                 .iter()
-                .find_map(|(k, v)| if k == &"GLORY_SITE_ADDR" { Some(v.to_string()) } else { None })
+                .find_map(|(k, v)| if k == &"GLORY_SITE_URL" { Some(v.to_string()) } else { None })
                 .unwrap_or_default();
-            log::info!("Serving at http://{port}");
+            log::info!("Serving at {url}");
             cmd
         } else {
             log::debug!("Serve no exe found {}", GRAY.paint(bin.as_str()));

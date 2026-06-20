@@ -26,11 +26,13 @@
 //!   `REVISING_ITEMS`, calls `Widget::patch` for each bound view.
 
 mod cage;
-pub use cage::Cage;
+pub use cage::{Cage, CageAccessError, CageMutateError};
 mod bond;
 pub use bond::{Bond, selector};
 mod owner;
 pub use owner::Owner;
+mod store;
+pub use store::{BTreeMapStoreExt, CageLens, HashMapStoreExt, OptionStoreExt, StoreExt, VecStoreExt};
 mod lotus;
 pub use lotus::Lotus;
 mod effect;
@@ -185,6 +187,10 @@ pub struct RevisableId(u64);
 impl RevisableId {
     pub fn next() -> RevisableId {
         RevisableId(NEXT_REVISABLE_ID.fetch_add(1, Ordering::Relaxed))
+    }
+
+    pub fn as_u64(self) -> u64 {
+        self.0
     }
 }
 impl Display for RevisableId {
