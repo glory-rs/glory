@@ -27,3 +27,26 @@ pub fn document() -> web_sys::Document {
 pub fn is_hydrating() -> bool {
     HYDRATING.load(Ordering::Relaxed)
 }
+
+/// Reads (and consumes) a server-streamed resource value for `token`, when the
+/// SSR page embedded one in `window.__gloryResource`.
+///
+/// [`resource_hydratable_in`](crate::reflow::resource_hydratable_in) uses this
+/// to adopt the value the server already computed and skip the client refetch.
+/// The entry is deleted on read so a later re-render does not reuse stale data.
+pub fn take_hydrated_resource<T>(token: &str) -> Option<T>
+where
+    T: serde::de::DeserializeOwned,
+{
+    let window = window();
+    let store = js_sys::Reflect::get(&window, &JsValue::from_str("__gloryResource")).ok()?;
+    let store: &js_sys::Object = store.dyn_ref()?;
+    let key = JsValue::from_str(token);
+    let value = js_sys::Reflect::get(store, &key).ok()?;
+    if value.is_undefined() {
+        return None;
+    }
+    let _ = js_sys::Reflect::delete_property(store, &key);
+    let json = js_sys::JSON::stringify(&value).ok()?.as_string()?;
+    serde_json::from_str(&json).ok()
+}

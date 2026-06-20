@@ -21,8 +21,8 @@ functions、desktop webview、hot reload scaffold 都已经能编译并有测试
 
 | 状态 | 数量 |
 |---|---:|
-| 已完成 `[x]` | 56 |
-| 部分完成 `[~]` | 2 |
+| 已完成 `[x]` | 57 |
+| 部分完成 `[~]` | 1 (M1，外部受阻于真机/CI) |
 | 未完成 `[ ]` | 0 |
 
 按能力权重估算:
@@ -152,7 +152,13 @@ SSR feature 测试覆盖较完整:
 - SVG/MathML。
 - streaming boundary chunks。
 - ErrorBoundary fallback 和错误状态序列化。
-- Suspense SSR streaming/resume 仍待接入。
+- Suspense SSR streaming/resume 已接入:`ServerHolder::new_streaming` flush
+  fallback 占位 → 排空 deferred resource → 发 `PlaceholderPatch`,回归
+  `streaming_suspense_emits_placeholder_then_patch`。
+- Hydration 数据恢复已接入:`resource_hydratable_in` 服务端把解析值序列化进
+  `window.__gloryResource`,wasm 端 `take_hydrated_resource` 命中即跳过重复 fetch;
+  回归 `streaming_/blocking_hydratable_resource_embeds_value_payload`。唯一残留
+  为服务端首字节增量 flush(受 `!Send` 响应式运行时约束的 adapter 级增强)。
 
 主要路径:
 

@@ -166,8 +166,54 @@ Suspense::new(
 ```
 
 `resource_in(ctx, ...)` automatically registers with the nearest `Suspense`
-boundary. The current implementation switches between body and fallback in the
-mounted tree; full SSR streaming patch/resume is still tracked separately.
+boundary. In the mounted tree the boundary switches between body and fallback
+as resources resolve.
+
+### Streaming SSR
+
+On the server, mount through `ServerHolder::new_streaming(config, url)` (instead
+of `ServerHolder::new`) to render Suspense progressively:
+
+1. The shell flushes immediately with each pending boundary collapsed to a
+   `<template data-glory-placeholder="…">` marker wrapping its fallback —
+   async resources are *deferred* rather than blocked on.
+2. The deferred resources are then driven to completion, and every resolved
+   boundary streams back as a `<template data-glory-placeholder-patch="…">`
+   chunk.
+3. The client streaming runtime (installed in `<head>` for every SSR page)
+   swaps each marker for its resolved body as the patch arrives, via a
+   `MutationObserver`, so no extra wiring is needed in app code.
+
+Plain `ServerHolder::new` keeps the blocking behaviour: resources resolve
+during mount and the fully-resolved HTML is rendered in one pass.
+
+### Hydratable resources
+
+`resource_in` re-runs its fetch on the client during hydration. To carry the
+server-resolved value across instead, use `resource_hydratable_in` (or
+`ctx.resource_hydratable(...)`) — the value type just needs `Serialize +
+DeserializeOwned`:
+
+```rust
+use glory::reflow::resource_hydratable_in;
+
+let user = resource_hydratable_in(ctx, {
+    let id = self.id;
+    move || async move { fetch_user(id).await }
+});
+```
+
+Both server render paths embed each resolved value in the page
+(`window.__gloryResource`, keyed by a deterministic per-view token). On the
+wasm client the resource adopts that value immediately and skips the fetch,
+so a hydrated page issues no duplicate request. The token is derived from the
+view tree, so server and client must build the same tree — the usual SSR
+hydration requirement.
+
+The one streaming refinement still tracked separately is true over-the-wire
+incremental flush (flushing the shell's first bytes *before* resources
+resolve); it is constrained by the `!Send` reactive runtime and would need the
+holder to run on a dedicated executor bridged to the response by a channel.
 
 ## Forms
 
