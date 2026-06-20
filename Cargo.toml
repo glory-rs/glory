@@ -95,7 +95,7 @@ flate2 = "1.1"
 flexi_logger = "0.31"
 criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support"] }
 insta = { version = "1.47.2", features = ["yaml"] }
-itertools = "0.14"
+itertools = "0.15"
 lightningcss = { version = "1.0.0-alpha.71", features = ["browserslist"] }
 log = "0.4"
 notify = "8"
