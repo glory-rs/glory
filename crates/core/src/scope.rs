@@ -96,6 +96,7 @@ pub struct Scope {
     compact_fill_allowed: bool,
 
     next_child_view_id: AtomicU64,
+    next_resource_id: AtomicU64,
 
     pub truck: Rc<RefCell<Truck>>,
     owner: reflow::Owner,
@@ -126,6 +127,7 @@ impl Scope {
             compact_fill_allowed: false,
 
             next_child_view_id: AtomicU64::new(0),
+            next_resource_id: AtomicU64::new(0),
             truck,
             owner: reflow::Owner::new(),
         }
@@ -155,6 +157,7 @@ impl Scope {
             compact_fill_allowed: false,
 
             next_child_view_id: AtomicU64::new(0),
+            next_resource_id: AtomicU64::new(0),
             truck,
             owner: reflow::Owner::new(),
         }
@@ -190,6 +193,14 @@ impl Scope {
             ViewId::new(self.holder_id, format!("{}{VIEW_ID_DELIMITER}{}", self.view_id, self.next_child_view_id.fetch_add(1, Ordering::Relaxed)))
           }
         }
+    }
+    /// A stable, deterministic token for a resource created in this scope.
+    ///
+    /// SSR and the wasm client build the same view tree in the same order, so
+    /// the n-th resource of a given view gets the same token on both sides —
+    /// which is what lets a streamed resource value rehydrate its client cage.
+    pub fn next_resource_token(&self) -> String {
+        format!("{}/res{}", self.view_id, self.next_resource_id.fetch_add(1, Ordering::Relaxed))
     }
     pub fn beget(&self) -> Self {
         let mut scope = Scope::new(self.next_child_view_id(), self.truck.clone());
@@ -280,6 +291,18 @@ impl Scope {
         Fut: std::future::Future<Output = T> + 'static,
     {
         crate::reflow::resource_in(self, future_fn)
+    }
+
+    /// Hydration-aware [`resource`](Self::resource): the server streams the
+    /// resolved value into the page and the wasm client adopts it instead of
+    /// refetching. See [`crate::reflow::resource_hydratable_in`].
+    pub fn resource_hydratable<T, F, Fut>(&mut self, future_fn: F) -> reflow::Cage<Option<T>>
+    where
+        T: std::fmt::Debug + serde::Serialize + serde::de::DeserializeOwned + 'static,
+        F: Fn() -> Fut + 'static,
+        Fut: std::future::Future<Output = T> + 'static,
+    {
+        crate::reflow::resource_hydratable_in(self, future_fn)
     }
     pub fn attach_child(&mut self, view_id: &ViewId) {
         let Some(view) = self.child_views.get(view_id) else {

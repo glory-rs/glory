@@ -155,6 +155,71 @@ where
     cell
 }
 
+/// Hydration-aware variant of [`resource_in`].
+///
+/// Behaves exactly like [`resource_in`], except the resolved value is part of
+/// the SSR ↔ hydration contract:
+///
+/// - **On the server**, when the future resolves its value is serialized and
+///   recorded under a stable per-view token. The holder embeds these values in
+///   the rendered page (see
+///   [`ServerHolder`](crate::web::holders::ServerHolder)).
+/// - **On the wasm client**, the same token is looked up first; if the server
+///   streamed a value for it, the resource adopts that value immediately and
+///   *skips the fetch entirely* — avoiding the double request that plain
+///   [`resource_in`] incurs on hydration.
+///
+/// The extra `Serialize`/`DeserializeOwned` bounds are the price of that
+/// contract; reach for [`resource_in`] when the value cannot or need not cross
+/// the wire.
+pub fn resource_hydratable_in<T, F, Fut>(parent: &mut Scope, future_fn: F) -> super::Cage<Option<T>>
+where
+    T: std::fmt::Debug + serde::Serialize + serde::de::DeserializeOwned + 'static,
+    F: Fn() -> Fut + 'static,
+    Fut: std::future::Future<Output = T> + 'static,
+{
+    let token = parent.next_resource_token();
+
+    // Client hydration fast path: adopt the server-streamed value and skip the
+    // fetch when it is present.
+    #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
+    if let Some(value) = crate::web::take_hydrated_resource::<T>(&token) {
+        return super::Cage::new(Some(value));
+    }
+
+    let cell = super::Cage::new(None::<T>);
+    let cell_for_effect = cell;
+    let generation = Rc::new(Cell::new(0_u64));
+    let active_suspense_generation = Rc::new(Cell::new(0_u64));
+    let suspense_boundary = parent.suspense_boundary;
+    let future_fn = Rc::new(future_fn);
+    let token = Rc::new(token);
+    effect_in(parent, move || {
+        let future = (future_fn)();
+        let cell = cell_for_effect;
+        #[cfg(all(feature = "web-ssr", not(feature = "single-app"), not(target_arch = "wasm32")))]
+        let token = token.clone();
+        #[cfg(not(all(feature = "web-ssr", not(feature = "single-app"), not(target_arch = "wasm32"))))]
+        let _ = &token;
+        let run = ResourceRun::start(&generation, suspense_boundary, &active_suspense_generation);
+        crate::spawn::spawn_local(async move {
+            let val = future.await;
+            // Capture for hydration before the value is consumed by `commit`,
+            // but only persist it when this run is the one that wins the cell.
+            #[cfg(all(feature = "web-ssr", not(feature = "single-app"), not(target_arch = "wasm32")))]
+            let json = serde_json::to_string(&val).ok();
+            let committed = run.commit(cell, val);
+            #[cfg(all(feature = "web-ssr", not(feature = "single-app"), not(target_arch = "wasm32")))]
+            if committed && let Some(json) = json {
+                crate::stream_ssr::record_resource_json(&token, json);
+            }
+            #[cfg(not(all(feature = "web-ssr", not(feature = "single-app"), not(target_arch = "wasm32"))))]
+            let _ = committed;
+        });
+    });
+    cell
+}
+
 #[derive(Clone, Debug)]
 struct ResourceRun {
     generation: Rc<Cell<u64>>,

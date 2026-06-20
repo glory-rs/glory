@@ -67,6 +67,11 @@ impl SsrNode {
     pub fn set_attribute(&self, key: impl Into<Cow<'static, str>>, value: impl Into<Cow<'static, str>>) {
         self.attributes.borrow_mut().insert(key.into(), value.into());
     }
+    /// Reads back a previously-set attribute value. Used by streaming SSR to
+    /// recognise Suspense wrapper nodes (tagged `data-glory-suspense`).
+    pub fn get_attribute(&self, key: &str) -> Option<String> {
+        self.attributes.borrow().get(key).map(|value| value.to_string())
+    }
     pub fn remove_attribute(&self, key: &str) {
         self.attributes.borrow_mut().remove(key);
     }
@@ -193,6 +198,53 @@ impl SsrNode {
         chunks.push(tag_close);
     }
 
+    /// Like [`outer_html_chunks`](Self::outer_html_chunks) but lets `replace`
+    /// substitute a node's whole serialization. When `replace` returns
+    /// `Some(html)` for a node, that string is emitted verbatim and the node's
+    /// subtree is *not* walked; returning `None` falls back to normal
+    /// serialization. Streaming SSR uses this to swap a pending Suspense
+    /// wrapper for a `<template data-glory-placeholder>` marker, or to unwrap a
+    /// resolved wrapper into its children.
+    pub fn outer_html_chunks_with(&self, chunks: &mut Vec<String>, replace: &dyn Fn(&SsrNode) -> Option<String>) {
+        if let Some(replacement) = replace(self) {
+            chunks.push(replacement);
+            return;
+        }
+
+        if *self.is_void.borrow() {
+            chunks.push(self.html_tag().0);
+            return;
+        }
+
+        let children = self.children.borrow();
+        if children.is_empty() {
+            let (tag_open, tag_close) = self.html_tag();
+            chunks.push(format!("{tag_open}{}{tag_close}", self.leaf_inner_html()));
+            return;
+        }
+
+        let (tag_open, tag_close) = self.html_tag();
+        chunks.push(tag_open);
+        for child in children.iter() {
+            child.outer_html_chunks_with(chunks, replace);
+        }
+        chunks.push(tag_close);
+    }
+
+    /// Children serialization (no enclosing tag), honouring `replace` exactly
+    /// as [`outer_html_chunks_with`](Self::outer_html_chunks_with) does.
+    pub fn inner_html_with(&self, replace: &dyn Fn(&SsrNode) -> Option<String>) -> String {
+        let children = self.children.borrow();
+        if children.is_empty() {
+            return self.leaf_inner_html();
+        }
+        let mut chunks = Vec::new();
+        for child in children.iter() {
+            child.outer_html_chunks_with(&mut chunks, replace);
+        }
+        chunks.join("")
+    }
+
     pub fn inner_html(&self) -> String {
         let mut html = "".to_string();
         if !self.children.borrow().is_empty() {
@@ -279,6 +331,24 @@ impl SsrDocument {
             child.outer_html_chunks(&mut chunks);
         }
         chunks
+    }
+
+    /// Streaming variant of [`inner_html_chunks`](Self::inner_html_chunks):
+    /// `replace` may substitute (and prune) individual nodes' serialization.
+    pub fn inner_html_chunks_with(&self, id: u64, replace: &dyn Fn(&SsrNode) -> Option<String>) -> Vec<String> {
+        let Some(node) = self.nodes.get(&id) else {
+            return Vec::new();
+        };
+        let mut chunks = Vec::new();
+        for child in node.children.borrow().iter() {
+            child.outer_html_chunks_with(&mut chunks, replace);
+        }
+        chunks
+    }
+
+    /// Children HTML of `id` with the streaming `replace` hook applied.
+    pub fn inner_html_with(&self, id: u64, replace: &dyn Fn(&SsrNode) -> Option<String>) -> String {
+        self.nodes.get(&id).map(|node| node.inner_html_with(replace)).unwrap_or_default()
     }
 
     pub fn outer_html(&self, id: u64) -> String {

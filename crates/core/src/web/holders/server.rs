@@ -23,6 +23,10 @@ pub struct ServerHolder {
     /// rendering replays it into an [`SsrDocument`].
     queue: CommandQueue,
     next_root_view_id: AtomicU64,
+    /// When set, the holder mounts with Suspense streaming armed: async
+    /// resources defer instead of blocking, so the shell flushes with
+    /// fallbacks, then resolved bodies stream in as out-of-order patches.
+    streaming: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -64,6 +68,21 @@ fn escape_html_attr(value: &str) -> String {
 
 impl ServerHolder {
     pub fn new(config: impl Into<Arc<GloryConfig>>, url: impl Into<String>) -> Self {
+        Self::with_streaming(config, url, false)
+    }
+
+    /// Like [`new`](Self::new) but arms Suspense streaming SSR: the holder
+    /// flushes its shell with Suspense fallbacks immediately, defers async
+    /// resources instead of blocking on them, and streams each resolved body
+    /// back as an out-of-order `<template data-glory-placeholder-patch>` the
+    /// client runtime swaps in. Use this when an app has `Suspense`/`resource`
+    /// data you want progressively rendered; plain [`new`](Self::new) keeps
+    /// the blocking render-fully-resolved behaviour.
+    pub fn new_streaming(config: impl Into<Arc<GloryConfig>>, url: impl Into<String>) -> Self {
+        Self::with_streaming(config, url, true)
+    }
+
+    fn with_streaming(config: impl Into<Arc<GloryConfig>>, url: impl Into<String>, streaming: bool) -> Self {
         let mut truck = Truck::new();
         truck.insert(DEPOT_URL_KEY, url.into());
         let queue = CommandQueue::new();
@@ -80,6 +99,7 @@ impl ServerHolder {
             host_node,
             queue,
             next_root_view_id: AtomicU64::new(0),
+            streaming,
         }
     }
 
@@ -100,17 +120,142 @@ impl ServerHolder {
         let (head, mid, tail) = crate::web::utils::html_parts_separated(&self.config, &self.truck.borrow(), &document);
         let mut chunks = vec![HtmlChunk::DocumentStart(head), HtmlChunk::BodyOpen(mid)];
         chunks.extend(document.inner_html_chunks(self.host_node.node().id()).into_iter().map(HtmlChunk::App));
+        #[cfg(not(target_arch = "wasm32"))]
+        chunks.extend(resource_hydration_chunk());
+        chunks.push(HtmlChunk::DocumentEnd(tail));
+        chunks
+    }
+
+    /// The chunk sequence actually rendered for this holder: the streaming
+    /// pipeline when armed via [`new_streaming`](Self::new_streaming),
+    /// otherwise the blocking-resolved [`html_chunks`](Self::html_chunks).
+    fn rendered_chunks(&self) -> Vec<HtmlChunk> {
+        #[cfg(not(target_arch = "wasm32"))]
+        if self.streaming {
+            return self.streaming_chunks();
+        }
+        self.html_chunks()
+    }
+
+    /// Streaming SSR pipeline: serialize the shell with pending Suspense
+    /// boundaries collapsed to `<template data-glory-placeholder>` markers,
+    /// drive the deferred async resources to completion, then emit a
+    /// `PlaceholderPatch` carrying each resolved body.
+    #[cfg(not(target_arch = "wasm32"))]
+    fn streaming_chunks(&self) -> Vec<HtmlChunk> {
+        use std::collections::HashSet;
+
+        use crate::renderer::ssr_dom::SsrNode;
+
+        // Disarm streaming and collect the boundaries registered during mount.
+        let boundaries = crate::stream_ssr::finish();
+        // Pending *before* draining = the boundaries that need a placeholder
+        // now and a streamed patch later.
+        let pending: HashSet<String> = boundaries
+            .iter()
+            .filter(|registration| registration.boundary.pending_count() > 0)
+            .map(|registration| registration.placeholder_id.clone())
+            .collect();
+
+        let host_id = self.host_node.node().id();
+        let initial_doc = self.replay();
+
+        let pending_for_initial = pending.clone();
+        let initial_replace = move |node: &SsrNode| -> Option<String> {
+            let id = node.get_attribute("data-glory-suspense")?;
+            let inner = node.inner_html_with(&unwrap_suspense);
+            if pending_for_initial.contains(&id) {
+                Some(format!(
+                    r#"<template data-glory-placeholder="{}">{}</template>"#,
+                    escape_html_attr(&id),
+                    inner
+                ))
+            } else {
+                // Resolved synchronously (no async work) — unwrap inline.
+                Some(inner)
+            }
+        };
+
+        let (head, mid, tail) = crate::web::utils::html_parts_separated(&self.config, &self.truck.borrow(), &initial_doc);
+        let mut chunks = vec![HtmlChunk::DocumentStart(head), HtmlChunk::BodyOpen(mid)];
+        chunks.extend(initial_doc.inner_html_chunks_with(host_id, &initial_replace).into_iter().map(HtmlChunk::App));
+
+        // Resolve the deferred async resources; Suspense boundaries flip to
+        // their bodies as each resource commits.
+        crate::spawn::drive_deferred();
+        crate::spawn::end_deferred(None);
+
+        if !pending.is_empty() {
+            let resolved_doc = self.replay();
+            for registration in &boundaries {
+                if !pending.contains(&registration.placeholder_id) {
+                    continue;
+                }
+                let html = resolved_doc
+                    .node(registration.wrapper_id)
+                    .map(|node| node.inner_html_with(&unwrap_suspense))
+                    .unwrap_or_default();
+                chunks.push(HtmlChunk::PlaceholderPatch {
+                    id: registration.placeholder_id.clone(),
+                    html,
+                });
+            }
+        }
+
+        // Emit the resolved-resource payload after draining so streamed
+        // hydratable resources are included.
+        chunks.extend(resource_hydration_chunk());
+
         chunks.push(HtmlChunk::DocumentEnd(tail));
         chunks
     }
 
     pub fn render_stream(&self) -> futures::stream::Iter<std::vec::IntoIter<HtmlChunk>> {
-        futures::stream::iter(self.html_chunks())
+        futures::stream::iter(self.rendered_chunks())
     }
 
     pub fn render_string(&self) -> String {
-        self.html_chunks().into_iter().map(HtmlChunk::into_string).collect()
+        self.rendered_chunks().into_iter().map(HtmlChunk::into_string).collect()
     }
+}
+
+/// Recursively unwraps streaming Suspense wrappers (`data-glory-suspense`
+/// nodes) into their children, so serialized output never leaks the internal
+/// `<glory-suspense>` element.
+#[cfg(not(target_arch = "wasm32"))]
+fn unwrap_suspense(node: &crate::renderer::ssr_dom::SsrNode) -> Option<String> {
+    node.get_attribute("data-glory-suspense")?;
+    Some(node.inner_html_with(&unwrap_suspense))
+}
+
+/// Builds the `<script>window.__gloryResource=…</script>` payload chunk from
+/// the resolved [`resource_hydratable_in`](crate::reflow::resource_hydratable_in)
+/// values captured during the render, or `None` when none were recorded.
+#[cfg(not(target_arch = "wasm32"))]
+fn resource_hydration_chunk() -> Option<HtmlChunk> {
+    let data = crate::stream_ssr::take_resource_data();
+    if data.is_empty() {
+        return None;
+    }
+
+    let mut object = String::from("{");
+    for (index, (token, json)) in data.iter().enumerate() {
+        if index > 0 {
+            object.push(',');
+        }
+        // Tokens are framework-generated, but encode them as JSON strings so
+        // any future change stays valid; values are already JSON.
+        object.push_str(&serde_json::to_string(token).expect("resource token encodes as JSON"));
+        object.push(':');
+        object.push_str(json);
+    }
+    object.push('}');
+
+    // Never let an embedded `</script>` terminate the inline script early.
+    let safe = object.replace("</", "<\\/");
+    Some(HtmlChunk::App(format!(
+        r#"<script>window.__gloryResource=Object.assign(window.__gloryResource||{{}},{safe});</script>"#
+    )))
 }
 
 impl Debug for ServerHolder {
@@ -144,6 +289,18 @@ impl Drop for ServerHolder {
 impl Holder for ServerHolder {
     fn mount(self, widget: impl Widget) -> Self {
         let _guard = self.queue.make_current();
+        // Capture resolved `resource_hydratable_in` values for the hydration
+        // payload (both render paths).
+        #[cfg(not(target_arch = "wasm32"))]
+        crate::stream_ssr::arm_resource_capture();
+        // Arm streaming SSR before building so Suspense wraps its region and
+        // `resource`/`spawn_local` defers instead of blocking. The deferred
+        // futures are drained later by `streaming_chunks`.
+        #[cfg(not(target_arch = "wasm32"))]
+        if self.streaming {
+            crate::stream_ssr::begin();
+            let _ = crate::spawn::begin_deferred();
+        }
         let view_id = ViewId::new(self.id, self.next_root_view_id.fetch_add(1, Ordering::Relaxed).to_string());
         let scope = Scope::new_root(view_id, self.truck.clone());
         widget.mount_to(scope, self.host_node.node());

@@ -97,6 +97,7 @@ pub use holder::Holder;
 pub use holder::HolderId;
 
 pub mod spawn;
+pub(crate) mod stream_ssr;
 
 pub use reflow::Cage;
 

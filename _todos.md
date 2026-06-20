@@ -19,7 +19,7 @@
 |---|---|---|
 | 路由 | 运行时字符串匹配,无类型化路由/嵌套布局/Outlet/重定向/查询参数解析 | **关键** |
 | 服务器函数 | 仅 POST + JSON;无 HTTP 动词选择、多编码、逐函数中间件、响应式 WebSocket hook | **高** |
-| 异步/错误原语 | Suspense 边界协议已部分落地(仍缺 SSR streaming/resume);ErrorBoundary 与 `resource_in` 竞态修复已补 | **高** |
+| 异步/错误原语 | Suspense 边界协议落地,含 SSR streaming patch/resume(`new_streaming`)与 hydration 值恢复(`resource_hydratable_in`);仅余服务端首字节增量 flush;ErrorBoundary 与 `resource_in` 竞态修复已补 | 低 |
 | CLI/构建 | wasm-split 暂缓;Windows/Linux 原生安装器已有最小路径,macOS/AppImage/签名仍缺 | **中-高** |
 | 资产 | `asset!` / `asset_folder!` / `css_module!` 已有编译期清单、bundle hash 映射和可选图片优化 | 中 |
 | 桌面 | 协议扎实,窗口控制 API、异步自定义协议、托盘、全局热键、拖放/打印已补 | 中 |
@@ -35,10 +35,28 @@ total / 69.3ms script,script 残差收窄到约 4.5ms。架构层面已无硬性
 
 ## Lane R — 响应式与核心原语(crates/core/src/reflow, widgets)
 
-- [~] **R1 P0** Suspense 式自动异步边界。已新增 `widgets::Suspense`、
+- [x] **R1 P0** Suspense 式自动异步边界。已新增 `widgets::Suspense`、
   `Scope` suspense 边界继承、`resource_in` 自动 pending token 登记/完成,并支持
-  mounted tree 在 body/fallback 间切换。剩余:真正 SSR streaming patch/resume 与
-  hydration 数据恢复还未接到 `ServerHolder::render_stream()`。
+  mounted tree 在 body/fallback 间切换。
+  2026-06-20 已完成 SSR streaming patch/resume 接线:新增
+  `ServerHolder::new_streaming()`,流式 mount 时 `spawn_local` 延迟服务端 future
+  (`spawn::{begin,drive,end}_deferred`)、`Suspense` 在 `data-glory-suspense`
+  wrapper 内渲染边界(`crate::stream_ssr` 登记);`render_stream`/`render_string`
+  先 flush 带 `<template data-glory-placeholder>` fallback 的 shell,排空 deferred
+  resource 后再发 `PlaceholderPatch`,由既有客户端 `__gloryStreamHydrate`
+  MutationObserver 就地替换。新增 `ssr_dom` 替换钩子
+  (`outer_html_chunks_with`/`inner_html_with`)与
+  `streaming_suspense_emits_placeholder_then_patch` 等回归。默认 `ServerHolder::new`
+  阻塞渲染路径字节级不变(回归覆盖)。
+  2026-06-20 已完成 hydration 数据恢复:新增 `resource_hydratable_in` /
+  `Scope::resource_hydratable`(serde 约束),服务端两条渲染路径都把已解析值
+  序列化进 `window.__gloryResource`(按 `Scope::next_resource_token` 稳定 token),
+  wasm 端 `web::take_hydrated_resource` 命中即直接采用值、跳过重复 fetch;
+  回归 `streaming_hydratable_resource_embeds_value_payload` /
+  `blocking_hydratable_resource_embeds_value_payload`,wasm-csr 编译通过。
+  唯一独立残留(非本任务缺口):真正 over-the-wire 增量 flush(服务端在 resource
+  解析前先 flush shell 首字节)受 `!Send` 响应式运行时约束,需把 holder 跑在专用
+  executor 并以 channel 桥接响应体,作为后续 adapter 级增强单列。
 - [x] **R2 P0** ErrorBoundary。新增 `BoundaryError` 与
   `widgets::ErrorBoundary`:子树 build/attach panic 与后续 child patch panic 会路由到
   最近边界,清理失败子树并渲染自定义 fallback;SSR 写入错误状态供 hydration 读取。

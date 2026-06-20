@@ -8,7 +8,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use crate::config::GloryConfig;
-use crate::reflow::{Cage, Revisable, effect_in, resource_in};
+use crate::reflow::{Cage, Revisable, effect_in, resource_hydratable_in, resource_in};
 use crate::scope::SuspenseBoundary as SuspenseBoundaryHandle;
 use crate::web::holders::ServerHolder;
 use crate::web::widgets::{
@@ -59,6 +59,103 @@ fn suspense_shows_fallback_until_pending_boundary_resolves() {
     let html = render_html(&holder);
     assert!(html.contains("ready"), "{html}");
     assert!(!html.contains("loading"), "{html}");
+}
+
+#[derive(Debug)]
+struct StreamingResourceWidget;
+
+impl Widget for StreamingResourceWidget {
+    fn build(&mut self, ctx: &mut Scope) {
+        // An async resource keeps the boundary pending until its (deferred)
+        // future resolves during the streaming drain.
+        let _res = resource_in(ctx, || async { 1_i32 });
+        div().class("body").text("ready").show_in(ctx);
+    }
+}
+
+#[test]
+fn streaming_suspense_emits_placeholder_then_patch() {
+    let holder = ServerHolder::new_streaming(GloryConfig::default(), "/").mount(Suspense::new(StreamingResourceWidget, |ctx| {
+        div().class("fallback").text("loading").show_in(ctx);
+    }));
+
+    let html = holder.render_string();
+
+    // The initial shell collapses the pending boundary to a placeholder
+    // marker wrapping the fallback.
+    let marker = html.find(r#"data-glory-placeholder="gly-suspense-0""#).expect(&html);
+    assert!(html.contains("loading"), "{html}");
+
+    // The resolved body streams in afterwards as an out-of-order patch the
+    // client runtime applies.
+    let patch = html.find(r#"data-glory-placeholder-patch="gly-suspense-0""#).expect(&html);
+    assert!(html.contains("ready"), "{html}");
+    assert!(html.contains(r#"patchFromTemplate("gly-suspense-0")"#), "{html}");
+
+    // Placeholder is flushed before its patch.
+    assert!(marker < patch, "placeholder must precede patch: {html}");
+
+    // The internal wrapper element is never serialized.
+    assert!(!html.contains("<glory-suspense"), "{html}");
+}
+
+#[test]
+fn streaming_holder_without_suspense_matches_blocking_render() {
+    let streamed = ServerHolder::new_streaming(GloryConfig::default(), "/")
+        .mount(StreamWidget)
+        .render_string();
+    let blocking = make_holder().mount(StreamWidget).render_string();
+    assert_eq!(streamed, blocking);
+}
+
+#[derive(Debug)]
+struct StreamWidget;
+
+impl Widget for StreamWidget {
+    fn build(&mut self, ctx: &mut Scope) {
+        div().class("plain").text("static").show_in(ctx);
+    }
+}
+
+#[derive(Debug)]
+struct HydratableResourceWidget;
+
+impl Widget for HydratableResourceWidget {
+    fn build(&mut self, ctx: &mut Scope) {
+        // The resolved value (42) must end up in the hydration payload so the
+        // client can skip the refetch.
+        let _res = resource_hydratable_in(ctx, || async { 42_i32 });
+        div().class("body").text("ready").show_in(ctx);
+    }
+}
+
+#[test]
+fn streaming_hydratable_resource_embeds_value_payload() {
+    let holder = ServerHolder::new_streaming(GloryConfig::default(), "/").mount(Suspense::new(HydratableResourceWidget, |ctx| {
+        div().class("fallback").text("loading").show_in(ctx);
+    }));
+
+    let html = holder.render_string();
+
+    // The resolved value is streamed alongside the body patch.
+    assert!(html.contains("data-glory-placeholder-patch="), "{html}");
+    assert!(html.contains("window.__gloryResource=Object.assign"), "{html}");
+    // The value is serialized under the resource's stable token (42 appears
+    // only in the payload, never in the body text "ready").
+    assert!(html.contains(":42}"), "{html}");
+}
+
+#[test]
+fn blocking_hydratable_resource_embeds_value_payload() {
+    let holder = make_holder().mount(HydratableResourceWidget);
+    let html = holder.render_string();
+
+    // Even the non-streaming render embeds the value so hydration skips the
+    // refetch.
+    assert!(html.contains("window.__gloryResource"), "{html}");
+    assert!(html.contains(":42}"), "{html}");
+    // The body renders fully resolved.
+    assert!(html.contains("ready"), "{html}");
 }
 
 // ----------------------------------------------------------------------------
