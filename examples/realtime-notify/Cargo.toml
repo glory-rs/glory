@@ -1,0 +1,29 @@
+[package]
+name = "realtime-notify"
+version = "0.0.1"
+edition = "2024"
+publish = false
+
+[features]
+web-csr = ["glory/web-csr", "glory/server-fn", "dep:wasm-bindgen"]
+web-ssr = ["glory/salvo", "glory/server-fn", "glory-serverfn/salvo", "dep:salvo", "dep:tokio", "dep:tracing-subscriber", "dep:futures"]
+
+[dependencies]
+glory = { path = "../../crates/glory", default-features = false, features = ["server-fn"] }
+glory-serverfn = { path = "../../crates/serverfn" }
+serde = { version = "1", features = ["derive"] }
+salvo = { version = "0.93", default-features = true, optional = true, features = ["serve-static", "websocket"] }
+tokio = { version = "1", optional = true, features = ["macros", "rt-multi-thread", "time"] }
+tracing-subscriber = { version = "0.3", optional = true }
+futures = { version = "0.3", optional = true }
+wasm-bindgen = { version = "0.2", optional = true }
+
+[package.metadata.glory]
+output_name = "realtime-notify"
+site_root = "target/site"
+site_pkg_dir = "pkg"
+site_addr = "127.0.0.1:8011"
+bin_features = ["web-ssr"]
+bin_default_features = false
+lib_features = ["web-csr"]
+lib_default_features = false

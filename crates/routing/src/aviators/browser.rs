@@ -7,6 +7,7 @@ use glory_core::web::unescape;
 use glory_core::Truck;
 use wasm_bindgen::{JsCast, JsValue, UnwrapThrowExt};
 
+use crate::aviators::ScrollMemory;
 use crate::locator::LocatorModifier;
 use crate::url::Url;
 use crate::{Aviator, Handler, Locator, NavigationError, PathState, Router};
@@ -20,6 +21,16 @@ pub struct BrowserAviator {
     pub catcher: Rc<dyn Handler>,
     base_path: String,
     curr_path: RefCell<String>,
+    /// Full URL (path + query + fragment) of the entry currently on screen.
+    /// Used as the scroll-memory key for the *outgoing* entry when a
+    /// navigation switches away from it. `Rc`-shared so the value survives
+    /// across the per-event aviator clones obtained from the truck.
+    curr_url: Rc<RefCell<String>>,
+    /// Per-history-entry scroll positions (see [`ScrollMemory`]). Shared
+    /// across `Clone`s of the aviator so the `popstate` listener — which
+    /// obtains its own clone from the truck — sees the same recorded
+    /// positions as the navigation that left them.
+    scroll_memory: Rc<RefCell<ScrollMemory>>,
 }
 
 impl BrowserAviator {
@@ -30,8 +41,41 @@ impl BrowserAviator {
             catcher: Rc::new(catcher),
             base_path: Default::default(),
             curr_path: Default::default(),
+            curr_url: Default::default(),
+            scroll_memory: Default::default(),
         }
     }
+
+    /// Record the live `window` scroll offset for the entry currently on
+    /// screen, so it can be restored when the user navigates back/forward to
+    /// it later. No-op before the first navigation (no outgoing entry yet).
+    fn record_current_scroll(&self) {
+        let curr_url = self.curr_url.borrow().clone();
+        if curr_url.is_empty() {
+            return;
+        }
+        let window = glory_core::web::window();
+        let x = window.scroll_x().unwrap_or(0.0);
+        let y = window.scroll_y().unwrap_or(0.0);
+        self.scroll_memory.borrow_mut().record(curr_url, x, y);
+    }
+
+    /// Restore the remembered scroll offset for `new_url` if one exists,
+    /// otherwise fall back to top-of-page / hash-target scrolling. Also
+    /// updates the "current entry" key used for the next outgoing record.
+    /// When `do_scroll` is `false` (e.g. an anchor with `noscroll`) the
+    /// viewport is left untouched but the current-entry key is still updated.
+    fn restore_scroll_for(&self, new_url: &str, do_scroll: bool) {
+        if do_scroll {
+            if let Some((x, y)) = self.scroll_memory.borrow_mut().restore(new_url) {
+                glory_core::web::window().scroll_to_with_x_and_y(x, y);
+            } else {
+                scroll_after_navigation();
+            }
+        }
+        *self.curr_url.borrow_mut() = new_url.to_owned();
+    }
+
     pub(crate) fn locate(&self, raw_url: impl Into<String>) -> Result<(), NavigationError> {
         let raw_url = raw_url.into();
         let locator = {
@@ -70,6 +114,13 @@ impl BrowserAviator {
 
     fn goto_with_state(&self, modifier: impl Into<LocatorModifier>, state: JsValue) -> Result<(), NavigationError> {
         let modifier = modifier.into();
+        // Remember where we are scrolled before leaving this entry, so a
+        // later back/forward can restore it. `replace` overwrites the current
+        // entry rather than creating a new one, so its scroll is not worth
+        // remembering as a distinct entry.
+        if !modifier.replace {
+            self.record_current_scroll();
+        }
         let history = glory_core::web::window().history().unwrap_throw();
         if modifier.replace {
             history
@@ -81,10 +132,10 @@ impl BrowserAviator {
         let href = glory_core::web::location()
             .href()
             .map_err(|_| NavigationError::BrowserLocationUnavailable)?;
-        self.locate(href)?;
-        if modifier.scroll {
-            scroll_after_navigation();
-        }
+        self.locate(href.clone())?;
+        // Pushing a fresh entry has no remembered scroll, so this normally
+        // scrolls to top/hash; restoring only kicks in for back/forward.
+        self.restore_scroll_for(&href, modifier.scroll);
         Ok(())
     }
     pub(crate) fn handle_anchor_click(&self, event: web_sys::Event) {
@@ -187,14 +238,24 @@ impl Enabler for BrowserAviator {
     fn enable(mut self, truck: Rc<RefCell<Truck>>) {
         self.truck = truck.clone();
         truck.borrow_mut().inject(Locator::new());
-        self.locate(glory_core::web::location().href().unwrap_throw()).unwrap_throw();
+        let initial_href = glory_core::web::location().href().unwrap_throw();
+        self.locate(initial_href.clone()).unwrap_throw();
+        // Seed the current-entry key so the first navigation records the
+        // initial entry's scroll position (initial load itself is not
+        // scrolled — the browser already restored it).
+        *self.curr_url.borrow_mut() = initial_href;
         truck.borrow_mut().inject(self);
 
         glory_core::web::window_event_listener_untyped("popstate", {
             let truck = truck.clone();
             move |_| {
                 let this = truck.borrow_mut().obtain::<Self>().unwrap_throw().clone();
-                this.locate(glory_core::web::location().href().unwrap_throw()).unwrap_throw();
+                // back/forward: remember the entry we are leaving, switch to
+                // the target, then restore its remembered scroll (or top).
+                this.record_current_scroll();
+                let href = glory_core::web::location().href().unwrap_throw();
+                this.locate(href.clone()).unwrap_throw();
+                this.restore_scroll_for(&href, true);
             }
         });
         glory_core::web::window_event_listener_untyped("click", move |event| {

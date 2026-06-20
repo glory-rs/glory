@@ -700,24 +700,53 @@ trait Command {
     /// compare with the currently requested version
     /// inform a user if a more recent compatible version is available
     async fn resolve_version(&self) -> String {
-        // TODO revisit this logic when implementing the SemVer compatible ranges matching
-        // if env var is set, use the requested version and bypass caching logic
-        let is_force_pin_version = env::var(self.env_var_version_name()).is_ok();
-        log::trace!(
-            "Command [{}] is_force_pin_version: {} - {:?}",
-            self.name(),
-            is_force_pin_version,
-            env::var(self.env_var_version_name())
-        );
+        // If the per-tool version env var is set, honour it. The value can be
+        // either an exact version (a hard pin that bypasses the cache) or a
+        // SemVer *range* request such as `>=1.2, <2` / `^1.3`, in which case we
+        // resolve it to the latest available release that satisfies the range.
+        if let Ok(requested) = env::var(self.env_var_version_name()) {
+            log::trace!("Command [{}] requested version spec: {}", self.name(), requested);
+            if let Some(req) = parse_version_req(&requested) {
+                match self.check_for_latest_version().await {
+                    Some(latest) => {
+                        if let Some(norm_latest) = normalize_version(&latest)
+                            && req.matches(&norm_latest)
+                        {
+                            log::info!(
+                                "Command [{}] range {} resolved to latest matching version {}",
+                                self.name(),
+                                requested,
+                                latest
+                            );
+                            return latest;
+                        }
+                        log::warn!(
+                            "Command [{}] latest available version {} does not satisfy requested range {}; \
+                                falling back to default {}",
+                            self.name(),
+                            latest,
+                            requested,
+                            self.default_version()
+                        );
+                    }
+                    None => log::warn!(
+                        "Command [{}] failed to check latest version for range {}; falling back to default",
+                        self.name(),
+                        requested
+                    ),
+                }
+                return self.default_version().into();
+            }
+            // Exact pin: use the requested version verbatim, bypassing caching.
+            return requested;
+        }
 
-        if !is_force_pin_version && !self.should_check_for_new_version().await {
+        if !self.should_check_for_new_version().await {
             log::trace!("Command [{}] NOT checking for the latest available version", &self.name());
             return self.default_version().into();
         }
 
-        let version = env::var(self.env_var_version_name())
-            .unwrap_or_else(|_| self.default_version().into())
-            .to_owned();
+        let version = self.default_version().to_owned();
 
         let latest = self.check_for_latest_version().await;
 
@@ -759,6 +788,24 @@ fn is_newer_compatible_version(requested: &Version, latest: &Version) -> bool {
 
 fn compatible_version_req(version: &Version) -> Option<VersionReq> {
     VersionReq::parse(&format!("^{version}")).ok()
+}
+
+/// Classify a per-tool version env var value.
+///
+/// Returns `Some(req)` when `spec` is a SemVer *range* request (e.g. `^1.3`,
+/// `>=1.2, <2`, `1.*`) that should be resolved against the latest available
+/// release. Returns `None` when `spec` is an exact version pin (e.g. `1.2.3`,
+/// `v1.2.3`, `112`), which the caller honours verbatim.
+fn parse_version_req(spec: &str) -> Option<VersionReq> {
+    let trimmed = spec.trim();
+    // A value that normalizes to a concrete version and carries no range
+    // operators is a hard pin, not a range — even though `VersionReq::parse`
+    // would happily accept `1.2.3` as `^1.2.3`.
+    let has_range_op = trimmed.contains([',', ' ', '<', '>', '~', '^', '*', '=']);
+    if !has_range_op && normalize_version(trimmed).is_some() {
+        return None;
+    }
+    VersionReq::parse(trimmed).ok()
 }
 
 #[cfg(test)]
@@ -820,5 +867,25 @@ mod tests {
             &Version::parse("0.2.3").unwrap(),
             &Version::parse("0.3.0").unwrap()
         ));
+    }
+
+    #[test]
+    fn parse_version_req_treats_exact_versions_as_pins() {
+        assert!(parse_version_req("1.2.3").is_none());
+        assert!(parse_version_req("v1.2.3").is_none());
+        assert!(parse_version_req("112").is_none());
+        assert!(parse_version_req("version_112").is_none());
+    }
+
+    #[test]
+    fn parse_version_req_recognizes_ranges() {
+        assert!(parse_version_req("^1.3").is_some());
+        assert!(parse_version_req(">=1.2, <2").is_some());
+        assert!(parse_version_req("~1.4").is_some());
+        assert!(parse_version_req("1.*").is_some());
+
+        let req = parse_version_req(">=1.2, <2").unwrap();
+        assert!(req.matches(&Version::parse("1.9.0").unwrap()));
+        assert!(!req.matches(&Version::parse("2.0.0").unwrap()));
     }
 }

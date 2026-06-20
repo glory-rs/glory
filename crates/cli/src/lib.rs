@@ -105,6 +105,7 @@ pub async fn run_with(args: Cli, overrides: Overrides) -> Result<()> {
         Serve(serve) if serve.no_reload => command::serve(&config.current_project()?, serve.should_open()).await,
         Serve(serve) => command::watch(&config.current_project()?, serve.should_open()).await,
         Run(run) => command::serve(&config.current_project()?, run.should_open()).await,
+        Build(build) if !build.ssg.is_empty() => command::ssg_all(&config.current_project()?, &build.ssg).await,
         Build(_) => command::build_all(&config).await,
         Bundle(bundle) => command::bundle_all(&config, bundle.optimize_images).await,
         Clean(clean) => command::clean_all(&config, clean.cargo).await,

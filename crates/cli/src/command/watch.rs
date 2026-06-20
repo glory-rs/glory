@@ -190,6 +190,9 @@ pub async fn run_loop(proj: &Arc<Project>) -> Result<()> {
 
         if failed {
             log::warn!("Build failed");
+            // Surface the failure in the browser as a dismissible overlay; the
+            // full diagnostics remain in the terminal.
+            ReloadSignal::send_build_error("Build failed. See the terminal running `glory serve` for the full compiler output.");
             Interrupt::clear_source_changes().await;
         } else if interrupted {
             log::info!("Build interrupted. Restarting.");

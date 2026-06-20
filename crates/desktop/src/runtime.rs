@@ -14,8 +14,11 @@
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::future::Future;
 use std::path::PathBuf;
 use std::rc::Rc;
+
+use futures_channel::oneshot;
 
 use glory_core::renderer::EventData;
 use glory_core::web::holders::CommandHolder;
@@ -36,6 +39,243 @@ impl DesktopWindowId {
     pub fn as_usize(self) -> usize {
         self.0
     }
+}
+
+/// Stable id for a child webview hosted inside a desktop window.
+///
+/// Ids are allocated per host (process-local, monotonic) and stay stable
+/// across other children being added or removed.
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
+pub struct ChildWebviewId(usize);
+
+impl ChildWebviewId {
+    pub fn as_usize(self) -> usize {
+        self.0
+    }
+}
+
+/// Position + size (logical pixels) of a child webview relative to the
+/// top-left of its parent window's content area.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct DesktopChildBounds {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+}
+
+impl DesktopChildBounds {
+    pub fn new(x: f64, y: f64, width: f64, height: f64) -> Self {
+        Self { x, y, width, height }
+    }
+
+    /// Converts to the `wry::Rect` used by `build_as_child` / `set_bounds`.
+    /// Logical coordinates are used so the host honors the window's scale
+    /// factor automatically (matching the main window's logical sizing).
+    fn to_wry_rect(self) -> wry::Rect {
+        wry::Rect {
+            position: wry::dpi::LogicalPosition::new(self.x, self.y).into(),
+            size: wry::dpi::LogicalSize::new(self.width, self.height).into(),
+        }
+    }
+}
+
+impl Default for DesktopChildBounds {
+    fn default() -> Self {
+        // Mirrors wry's own child-webview default region.
+        Self {
+            x: 0.0,
+            y: 0.0,
+            width: 200.0,
+            height: 200.0,
+        }
+    }
+}
+
+/// What a child webview initially loads.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DesktopChildSource {
+    /// Navigate to a URL (e.g. `https://…`, or [`asset_url`] output).
+    Url(String),
+    /// Load an inline HTML document.
+    Html(String),
+}
+
+/// Declarative spec for a child webview added to an existing window.
+///
+/// Child webviews are plain wry webviews positioned inside the parent
+/// window; unlike the main window's webview they are *not* wired into a
+/// Glory [`CommandHolder`] transaction loop — they render their own URL or
+/// HTML. Use them to embed external content (docs, a map, an OAuth flow)
+/// beside the reactive widget tree.
+#[derive(Clone, Debug)]
+pub struct DesktopChildWebview {
+    pub bounds: DesktopChildBounds,
+    pub source: DesktopChildSource,
+    /// Webview devtools (defaults to on in debug builds).
+    pub devtools: bool,
+    /// Whether the child grabs focus when created.
+    pub focused: bool,
+}
+
+impl DesktopChildWebview {
+    /// A child showing a URL with default bounds.
+    pub fn url(url: impl Into<String>) -> Self {
+        Self {
+            bounds: DesktopChildBounds::default(),
+            source: DesktopChildSource::Url(url.into()),
+            devtools: cfg!(debug_assertions),
+            focused: false,
+        }
+    }
+
+    /// A child showing inline HTML with default bounds.
+    pub fn html(html: impl Into<String>) -> Self {
+        Self {
+            bounds: DesktopChildBounds::default(),
+            source: DesktopChildSource::Html(html.into()),
+            devtools: cfg!(debug_assertions),
+            focused: false,
+        }
+    }
+
+    pub fn with_bounds(mut self, bounds: DesktopChildBounds) -> Self {
+        self.bounds = bounds;
+        self
+    }
+
+    pub fn with_devtools(mut self, devtools: bool) -> Self {
+        self.devtools = devtools;
+        self
+    }
+
+    pub fn with_focused(mut self, focused: bool) -> Self {
+        self.focused = focused;
+        self
+    }
+}
+
+/// Pure allocator + registry for child webview ids within one window.
+///
+/// Kept free of any wry/tao types so the id-allocation, insert, remove and
+/// list logic can be unit-tested without a display.
+#[derive(Debug, Default)]
+struct ChildWebviewRegistry {
+    next_id: usize,
+    ids: Vec<ChildWebviewId>,
+}
+
+impl ChildWebviewRegistry {
+    fn new() -> Self {
+        Self::default()
+    }
+
+    /// Allocates a fresh, never-reused id and records it as present.
+    fn allocate(&mut self) -> ChildWebviewId {
+        let id = ChildWebviewId(self.next_id);
+        self.next_id += 1;
+        self.ids.push(id);
+        id
+    }
+
+    /// Removes an id; returns whether it was present.
+    fn remove(&mut self, id: ChildWebviewId) -> bool {
+        if let Some(pos) = self.ids.iter().position(|candidate| *candidate == id) {
+            self.ids.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
+
+    fn contains(&self, id: ChildWebviewId) -> bool {
+        self.ids.contains(&id)
+    }
+
+    /// Live ids in insertion order.
+    fn list(&self) -> Vec<ChildWebviewId> {
+        self.ids.clone()
+    }
+}
+
+/// Error from [`DesktopWindowHandle::eval`].
+#[derive(Clone, Debug)]
+pub enum EvalError {
+    /// The script threw, or its result could not be JSON-serialized. Carries
+    /// the JS-side error message.
+    Js(String),
+    /// The event loop is gone (process shutting down) or the result channel
+    /// was dropped before a reply arrived.
+    Disconnected,
+}
+
+impl std::fmt::Display for EvalError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            EvalError::Js(message) => write!(f, "eval failed: {message}"),
+            EvalError::Disconnected => f.write_str("eval failed: event loop disconnected"),
+        }
+    }
+}
+
+impl std::error::Error for EvalError {}
+
+/// Pending `eval` request registry, owned by the event-loop thread.
+///
+/// `eval` lives on the same thread-local reactive runtime as the rest of the
+/// host, so a `thread_local!` map keyed by an autoincrementing id is enough:
+/// the handle registers a oneshot sender, sends the command, and the IPC
+/// reply path resolves it.
+type EvalSender = oneshot::Sender<Result<serde_json::Value, EvalError>>;
+
+thread_local! {
+    static EVAL_NEXT_ID: Cell<u64> = const { Cell::new(0) };
+    static EVAL_PENDING: RefCell<HashMap<u64, EvalSender>> = RefCell::new(HashMap::new());
+}
+
+fn eval_alloc_id() -> u64 {
+    EVAL_NEXT_ID.with(|next| {
+        let id = next.get();
+        next.set(id.wrapping_add(1));
+        id
+    })
+}
+
+fn eval_register(id: u64, sender: EvalSender) {
+    EVAL_PENDING.with(|pending| {
+        pending.borrow_mut().insert(id, sender);
+    });
+}
+
+fn eval_take(id: u64) -> Option<EvalSender> {
+    EVAL_PENDING.with(|pending| pending.borrow_mut().remove(&id))
+}
+
+/// Resolves a pending eval. A dropped receiver (caller no longer awaiting) is
+/// tolerated — the `send` simply fails and is ignored.
+fn eval_resolve(id: u64, result: Result<serde_json::Value, EvalError>) {
+    if let Some(sender) = eval_take(id) {
+        let _ = sender.send(result);
+    }
+}
+
+/// Decodes a `GloryWryEval` IPC payload into the value the future resolves to.
+/// `ok=true` parses `value` as JSON; `ok=false` treats `value` as the error
+/// message. Non-JSON on the ok path becomes an [`EvalError::Js`].
+fn decode_eval_result(ok: bool, value: String) -> Result<serde_json::Value, EvalError> {
+    if ok {
+        serde_json::from_str::<serde_json::Value>(&value).map_err(|err| EvalError::Js(format!("non-JSON eval result: {err}")))
+    } else {
+        Err(EvalError::Js(value))
+    }
+}
+
+/// Builds the `evaluate_script` payload that drives `__gloryWryEval`. The
+/// user source is serialized as a JSON string literal so arbitrary JS (quotes,
+/// newlines, backslashes) survives embedding without manual escaping.
+fn build_eval_script(id: u64, js: &str) -> String {
+    let source = serde_json::to_string(js).expect("string serializes");
+    format!("window.__gloryWryEval({id}, {source});")
 }
 
 /// Cached window state visible to widget callbacks.
@@ -94,6 +334,9 @@ pub struct DesktopWindowHandle {
     state: Rc<RefCell<DesktopWindowState>>,
     window_queue: Rc<RefCell<Vec<PendingWindow>>>,
     next_window_index: Rc<Cell<usize>>,
+    /// Per-window child webview id allocator + mirror, shared with the host
+    /// slot so allocation and `list` answer synchronously on this thread.
+    children: Rc<RefCell<ChildWebviewRegistry>>,
 }
 
 impl std::fmt::Debug for DesktopWindowHandle {
@@ -112,6 +355,7 @@ impl DesktopWindowHandle {
         state: Rc<RefCell<DesktopWindowState>>,
         window_queue: Rc<RefCell<Vec<PendingWindow>>>,
         next_window_index: Rc<Cell<usize>>,
+        children: Rc<RefCell<ChildWebviewRegistry>>,
     ) -> Self {
         Self {
             id,
@@ -119,6 +363,7 @@ impl DesktopWindowHandle {
             state,
             window_queue,
             next_window_index,
+            children,
         }
     }
 
@@ -176,6 +421,92 @@ impl DesktopWindowHandle {
         }
         self.state.borrow_mut().zoom_level = zoom_level;
         self.send(WindowCommand::SetZoomLevel(zoom_level))
+    }
+
+    /// Change how this window reacts to a user-initiated close request
+    /// (title-bar close button): destroy it, or hide it and keep it alive.
+    pub fn set_close_behavior(&self, behavior: DesktopCloseBehavior) -> bool {
+        self.send(WindowCommand::SetCloseBehavior(behavior))
+    }
+
+    /// Open the webview devtools inspector for this window. No-op if the
+    /// webview was built without devtools support.
+    pub fn open_devtools(&self) -> bool {
+        self.send(WindowCommand::OpenDevtools)
+    }
+
+    /// Close the webview devtools inspector for this window.
+    pub fn close_devtools(&self) -> bool {
+        self.send(WindowCommand::CloseDevtools)
+    }
+
+    /// Evaluates `js` in this window's webview and resolves with its result.
+    ///
+    /// The script is wrapped in an async function body, so it may `await` and
+    /// return a value via a trailing expression; the JSON-serialized result
+    /// is sent back over IPC and decoded into a [`serde_json::Value`]. A
+    /// thrown error, a non-serializable result, or a lost event loop resolve
+    /// to [`EvalError`].
+    ///
+    /// Must be called on the event-loop thread (the same thread the widget
+    /// tree runs on), like every other handle method.
+    pub fn eval(&self, js: &str) -> impl Future<Output = Result<serde_json::Value, EvalError>> + 'static {
+        let id = eval_alloc_id();
+        let (sender, receiver) = oneshot::channel();
+        eval_register(id, sender);
+        let sent = self.send(WindowCommand::Eval { id, js: js.to_owned() });
+        if !sent {
+            // Event loop gone: drop the registration and fail immediately so
+            // the caller never awaits forever.
+            eval_resolve(id, Err(EvalError::Disconnected));
+        }
+        async move {
+            match receiver.await {
+                Ok(result) => result,
+                Err(_) => Err(EvalError::Disconnected),
+            }
+        }
+    }
+
+    /// Adds a child webview inside this window and returns its id
+    /// synchronously. The webview is actually built on the event-loop thread
+    /// shortly after (same deferred pattern as [`open_window`]); the returned
+    /// id is valid immediately for [`remove_child_webview`] /
+    /// [`set_child_webview_bounds`].
+    ///
+    /// [`open_window`]: Self::open_window
+    /// [`remove_child_webview`]: Self::remove_child_webview
+    /// [`set_child_webview_bounds`]: Self::set_child_webview_bounds
+    pub fn add_child_webview(&self, spec: DesktopChildWebview) -> ChildWebviewId {
+        let child_id = self.children.borrow_mut().allocate();
+        self.send(WindowCommand::AddChildWebview {
+            child_id,
+            spec: Box::new(spec),
+        });
+        child_id
+    }
+
+    /// Removes a previously added child webview. Returns `false` if the id is
+    /// unknown to this window.
+    pub fn remove_child_webview(&self, child_id: ChildWebviewId) -> bool {
+        if !self.children.borrow_mut().remove(child_id) {
+            return false;
+        }
+        self.send(WindowCommand::RemoveChildWebview { child_id })
+    }
+
+    /// Repositions / resizes a child webview. Returns `false` if the id is
+    /// unknown to this window.
+    pub fn set_child_webview_bounds(&self, child_id: ChildWebviewId, bounds: DesktopChildBounds) -> bool {
+        if !self.children.borrow().contains(child_id) {
+            return false;
+        }
+        self.send(WindowCommand::SetChildWebviewBounds { child_id, bounds })
+    }
+
+    /// Live child webview ids for this window, in insertion order.
+    pub fn child_webviews(&self) -> Vec<ChildWebviewId> {
+        self.children.borrow().list()
     }
 
     pub fn close(&self) -> bool {
@@ -471,6 +802,23 @@ pub struct DesktopConfig {
     /// Invoked on the event-loop thread when the native window receives a
     /// file hover/drop/cancel event.
     pub on_file_drop: Option<Rc<dyn Fn(&CommandHolder, DesktopFileDropEvent)>>,
+    /// What to do when the user requests the native window be closed (clicks
+    /// the title-bar close button). Defaults to [`DesktopCloseBehavior::Close`].
+    pub close_behavior: DesktopCloseBehavior,
+}
+
+/// How a window reacts to a user-initiated close request.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum DesktopCloseBehavior {
+    /// Close (destroy) the window — the default. When the last window closes
+    /// the event loop exits.
+    #[default]
+    Close,
+    /// Hide the window instead of destroying it, keeping its webview and state
+    /// alive (e.g. for tray-resident apps). Re-show it later via
+    /// [`DesktopWindowHandle::focus`] / a fresh `open_window`, or close it
+    /// programmatically with [`DesktopWindowHandle::close`].
+    Hide,
 }
 
 impl std::fmt::Debug for DesktopConfig {
@@ -513,6 +861,7 @@ impl Default for DesktopConfig {
             hotkeys: Vec::new(),
             on_hotkey: None,
             on_file_drop: None,
+            close_behavior: DesktopCloseBehavior::default(),
         }
     }
 }
@@ -534,6 +883,12 @@ impl DesktopConfig {
         self
     }
 
+    /// Set how the window reacts to a user-initiated close request.
+    pub fn with_close_behavior(mut self, behavior: DesktopCloseBehavior) -> Self {
+        self.close_behavior = behavior;
+        self
+    }
+
     pub fn with_file_drop_handler(mut self, handler: impl Fn(&CommandHolder, DesktopFileDropEvent) + 'static) -> Self {
         self.on_file_drop = Some(Rc::new(handler));
         self
@@ -546,6 +901,7 @@ enum HostEvent {
     Ready(DesktopWindowId),
     Dom(DesktopWindowId, Box<EventData>),
     Query(DesktopWindowId, glory_core::renderer::QueryResponse),
+    Eval { id: u64, result: Result<serde_json::Value, EvalError> },
     Reload(ReloadMessage),
     Menu(String),
     Tray(tray_icon::TrayIconEvent),
@@ -554,7 +910,7 @@ enum HostEvent {
     OpenQueuedWindows,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 enum WindowCommand {
     DragWindow,
     Print,
@@ -562,6 +918,24 @@ enum WindowCommand {
     SetMaximized(bool),
     Focus,
     SetZoomLevel(f64),
+    SetCloseBehavior(DesktopCloseBehavior),
+    OpenDevtools,
+    CloseDevtools,
+    Eval {
+        id: u64,
+        js: String,
+    },
+    AddChildWebview {
+        child_id: ChildWebviewId,
+        spec: Box<DesktopChildWebview>,
+    },
+    RemoveChildWebview {
+        child_id: ChildWebviewId,
+    },
+    SetChildWebviewBounds {
+        child_id: ChildWebviewId,
+        bounds: DesktopChildBounds,
+    },
     Close,
 }
 
@@ -748,6 +1122,12 @@ struct WindowSlot {
     #[allow(dead_code)]
     tray: Option<tray_icon::TrayIcon>,
     registered_hotkeys: Vec<global_hotkey::hotkey::HotKey>,
+    /// Child webviews hosted inside this window, keyed by their id. The
+    /// [`WebView`] handles must outlive the window, so they are owned here.
+    extra_webviews: Vec<(ChildWebviewId, WebView)>,
+    /// Host-side mirror of the child id allocator, shared with the window's
+    /// [`DesktopWindowHandle`] so id allocation stays consistent across both.
+    children: Rc<RefCell<ChildWebviewRegistry>>,
 }
 
 /// Multi-window host builder.
@@ -843,9 +1223,20 @@ impl Desktop {
                     window_id,
                     ..
                 } => {
-                    close_slot_by_window_id(&mut slots, window_id, hotkey_manager.as_ref(), &mut hotkey_routes);
-                    if slots.is_empty() {
-                        *control_flow = ControlFlow::Exit;
+                    // Honor a per-window "hide instead of close" policy: keep the
+                    // slot (webview + state) alive and just hide the window.
+                    let hide = slot_by_window_id(&mut slots, window_id)
+                        .map(|slot| slot.config.close_behavior == DesktopCloseBehavior::Hide)
+                        .unwrap_or(false);
+                    if hide {
+                        if let Some(slot) = slot_by_window_id(&mut slots, window_id) {
+                            slot.window.set_visible(false);
+                        }
+                    } else {
+                        close_slot_by_window_id(&mut slots, window_id, hotkey_manager.as_ref(), &mut hotkey_routes);
+                        if slots.is_empty() {
+                            *control_flow = ControlFlow::Exit;
+                        }
                     }
                 }
                 Event::WindowEvent {
@@ -919,6 +1310,9 @@ impl Desktop {
                         holder.resolve_query(response);
                         flush(&slot.webview, holder);
                     }
+                }
+                Event::UserEvent(HostEvent::Eval { id, result }) => {
+                    eval_resolve(id, result);
                 }
                 Event::UserEvent(HostEvent::Menu(menu_id)) => {
                     let Some(id) = menu_routes.get(&menu_id).copied() else { return };
@@ -1063,7 +1457,8 @@ fn create_window(
     let assets_root_dir = assets_root(&config);
     install_bundle_asset_manifest(&assets_root_dir);
 
-    let handle = DesktopWindowHandle::new(id, proxy.clone(), state.clone(), window_queue, next_window_index);
+    let children = Rc::new(RefCell::new(ChildWebviewRegistry::new()));
+    let handle = DesktopWindowHandle::new(id, proxy.clone(), state.clone(), window_queue, next_window_index, children.clone());
     let mount = mount(handle);
     let ipc_proxy = proxy.clone();
     let mut webview = WebViewBuilder::new()
@@ -1083,6 +1478,10 @@ fn create_window(
                 }
                 Ok(IpcMessage::GloryWryQuery(response)) => {
                     let _ = ipc_proxy.send_event(HostEvent::Query(id, response));
+                }
+                Ok(IpcMessage::GloryWryEval { id: eval_id, ok, value }) => {
+                    let result = decode_eval_result(ok, value);
+                    let _ = ipc_proxy.send_event(HostEvent::Eval { id: eval_id, result });
                 }
                 Err(err) => {
                     tracing::warn!(%err, "glory-desktop: undecodable IPC message");
@@ -1130,6 +1529,8 @@ fn create_window(
             menu,
             tray,
             registered_hotkeys,
+            extra_webviews: Vec::new(),
+            children,
         },
     ));
 }
@@ -1185,6 +1586,11 @@ fn apply_window_command(
     }
 
     let Some(slot) = slot_by_id(slots, id) else {
+        // Resolve a dangling eval so the caller stops awaiting; other
+        // commands are simply dropped.
+        if let WindowCommand::Eval { id: eval_id, .. } = command {
+            eval_resolve(eval_id, Err(EvalError::Disconnected));
+        }
         tracing::warn!(window_id = id.as_usize(), "glory-desktop: window command target no longer exists");
         return;
     };
@@ -1219,7 +1625,80 @@ fn apply_window_command(
                 slot.state.borrow_mut().zoom_level = zoom_level;
             }
         }
+        WindowCommand::SetCloseBehavior(behavior) => {
+            slot.config.close_behavior = behavior;
+        }
+        WindowCommand::OpenDevtools => {
+            slot.webview.open_devtools();
+        }
+        WindowCommand::CloseDevtools => {
+            slot.webview.close_devtools();
+        }
+        WindowCommand::Eval { id: eval_id, js } => {
+            let script = build_eval_script(eval_id, &js);
+            if let Err(err) = slot.webview.evaluate_script(&script) {
+                tracing::warn!(%err, window_id = id.as_usize(), "glory-desktop: eval failed");
+                // The webview never runs `__gloryWryEval`, so no IPC reply
+                // will arrive; resolve now to avoid a permanent await.
+                eval_resolve(eval_id, Err(EvalError::Js(err.to_string())));
+            }
+        }
+        WindowCommand::AddChildWebview { child_id, spec } => {
+            add_child_webview(slot, child_id, *spec);
+        }
+        WindowCommand::RemoveChildWebview { child_id } => {
+            remove_child_webview(slot, child_id);
+        }
+        WindowCommand::SetChildWebviewBounds { child_id, bounds } => {
+            if let Some((_, webview)) = slot.extra_webviews.iter().find(|(candidate, _)| *candidate == child_id) {
+                if let Err(err) = webview.set_bounds(bounds.to_wry_rect()) {
+                    tracing::warn!(%err, window_id = id.as_usize(), child = child_id.as_usize(), "glory-desktop: set child bounds failed");
+                }
+            } else {
+                tracing::warn!(
+                    window_id = id.as_usize(),
+                    child = child_id.as_usize(),
+                    "glory-desktop: set bounds for unknown child webview"
+                );
+            }
+        }
         WindowCommand::Close => unreachable!("handled before slot lookup"),
+    }
+}
+
+/// Builds a child webview inside `slot`'s window and stores it so it outlives
+/// the window. The host-side registry was already updated when the id was
+/// allocated on the handle; we only need to materialize the wry webview.
+fn add_child_webview(slot: &mut WindowSlot, child_id: ChildWebviewId, spec: DesktopChildWebview) {
+    let builder = WebViewBuilder::new()
+        .with_bounds(spec.bounds.to_wry_rect())
+        .with_devtools(spec.devtools)
+        .with_focused(spec.focused);
+    let builder = match spec.source {
+        DesktopChildSource::Url(url) => builder.with_url(url),
+        DesktopChildSource::Html(html) => builder.with_html(html),
+    };
+    match builder.build_as_child(&slot.window) {
+        Ok(webview) => slot.extra_webviews.push((child_id, webview)),
+        Err(err) => {
+            // Roll the id back out of the shared registry so `child_webviews`
+            // never reports a child that failed to build.
+            slot.children.borrow_mut().remove(child_id);
+            tracing::warn!(%err, window_id = slot.id.as_usize(), child = child_id.as_usize(), "glory-desktop: child webview creation failed");
+        }
+    }
+}
+
+fn remove_child_webview(slot: &mut WindowSlot, child_id: ChildWebviewId) {
+    if let Some(pos) = slot.extra_webviews.iter().position(|(candidate, _)| *candidate == child_id) {
+        // Dropping the WebView tears down the native child view.
+        let _ = slot.extra_webviews.remove(pos);
+    } else {
+        tracing::warn!(
+            window_id = slot.id.as_usize(),
+            child = child_id.as_usize(),
+            "glory-desktop: remove unknown child webview"
+        );
     }
 }
 
@@ -1551,6 +2030,155 @@ mod tests {
 
         glory_core::assets::clear_asset_manifest();
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn eval_ids_are_unique_and_monotonic() {
+        let a = eval_alloc_id();
+        let b = eval_alloc_id();
+        let c = eval_alloc_id();
+        assert_ne!(a, b);
+        assert_ne!(b, c);
+        assert_eq!(b, a.wrapping_add(1));
+        assert_eq!(c, b.wrapping_add(1));
+    }
+
+    #[test]
+    fn decode_eval_result_parses_ok_json() {
+        let value = decode_eval_result(true, "{\"n\":42}".to_owned()).unwrap();
+        assert_eq!(value, serde_json::json!({ "n": 42 }));
+
+        let number = decode_eval_result(true, "7".to_owned()).unwrap();
+        assert_eq!(number, serde_json::json!(7));
+
+        let null = decode_eval_result(true, "null".to_owned()).unwrap();
+        assert!(null.is_null());
+    }
+
+    #[test]
+    fn decode_eval_result_maps_err_payload() {
+        let err = decode_eval_result(false, "boom".to_owned()).unwrap_err();
+        match err {
+            EvalError::Js(message) => assert_eq!(message, "boom"),
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn decode_eval_result_rejects_non_json_on_ok_path() {
+        let err = decode_eval_result(true, "not json".to_owned()).unwrap_err();
+        match err {
+            EvalError::Js(message) => assert!(message.contains("non-JSON"), "{message}"),
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn build_eval_script_escapes_source() {
+        let script = build_eval_script(3, "return \"a\\nb\" + `c`;");
+        // The id is passed verbatim and the source becomes a JSON string
+        // literal: quotes/newlines/backslashes are escaped, not interpolated.
+        assert!(script.starts_with("window.__gloryWryEval(3, \""), "{script}");
+        assert!(script.ends_with(");"), "{script}");
+        assert!(script.contains("\\\"a\\\\nb\\\""), "{script}");
+        assert!(!script.contains("\n"), "embedded newline must be escaped: {script}");
+    }
+
+    #[test]
+    fn eval_resolve_tolerates_dropped_receiver() {
+        let id = eval_alloc_id();
+        let (sender, receiver) = oneshot::channel::<Result<serde_json::Value, EvalError>>();
+        eval_register(id, sender);
+        drop(receiver);
+        // Must not panic even though the caller is gone.
+        eval_resolve(id, Ok(serde_json::json!(1)));
+        // Registry entry is consumed.
+        assert!(eval_take(id).is_none());
+    }
+
+    #[test]
+    fn eval_resolve_delivers_to_receiver() {
+        let id = eval_alloc_id();
+        let (sender, mut receiver) = oneshot::channel::<Result<serde_json::Value, EvalError>>();
+        eval_register(id, sender);
+        eval_resolve(id, Ok(serde_json::json!("hi")));
+        let got = receiver.try_recv().expect("sender alive").expect("resolved").unwrap();
+        assert_eq!(got, serde_json::json!("hi"));
+    }
+
+    #[test]
+    fn eval_error_display_is_descriptive() {
+        assert_eq!(EvalError::Js("oops".to_owned()).to_string(), "eval failed: oops");
+        assert_eq!(EvalError::Disconnected.to_string(), "eval failed: event loop disconnected");
+    }
+
+    #[test]
+    fn child_registry_allocates_unique_monotonic_ids() {
+        let mut registry = ChildWebviewRegistry::new();
+        let a = registry.allocate();
+        let b = registry.allocate();
+        let c = registry.allocate();
+        assert_eq!(a.as_usize(), 0);
+        assert_eq!(b.as_usize(), 1);
+        assert_eq!(c.as_usize(), 2);
+        assert_eq!(registry.list(), vec![a, b, c]);
+    }
+
+    #[test]
+    fn child_registry_remove_does_not_reuse_ids() {
+        let mut registry = ChildWebviewRegistry::new();
+        let a = registry.allocate();
+        let b = registry.allocate();
+        assert!(registry.remove(a));
+        assert!(!registry.contains(a));
+        // Removing again reports absence.
+        assert!(!registry.remove(a));
+        // The next id keeps climbing; ids are never recycled.
+        let c = registry.allocate();
+        assert_eq!(c.as_usize(), 2);
+        assert_eq!(registry.list(), vec![b, c]);
+    }
+
+    #[test]
+    fn child_registry_preserves_insertion_order_after_middle_removal() {
+        let mut registry = ChildWebviewRegistry::new();
+        let a = registry.allocate();
+        let b = registry.allocate();
+        let c = registry.allocate();
+        assert!(registry.remove(b));
+        assert_eq!(registry.list(), vec![a, c]);
+        assert!(registry.contains(a));
+        assert!(registry.contains(c));
+        assert!(!registry.contains(b));
+    }
+
+    #[test]
+    fn child_bounds_default_matches_wry_region() {
+        let bounds = DesktopChildBounds::default();
+        assert_eq!(bounds, DesktopChildBounds::new(0.0, 0.0, 200.0, 200.0));
+    }
+
+    #[test]
+    fn child_bounds_convert_to_wry_logical_rect() {
+        let rect = DesktopChildBounds::new(10.0, 20.0, 300.0, 400.0).to_wry_rect();
+        assert_eq!(rect.position, wry::dpi::LogicalPosition::new(10.0, 20.0).into());
+        assert_eq!(rect.size, wry::dpi::LogicalSize::new(300.0, 400.0).into());
+    }
+
+    #[test]
+    fn child_webview_builders_set_source_and_options() {
+        let url = DesktopChildWebview::url("https://example.com")
+            .with_bounds(DesktopChildBounds::new(1.0, 2.0, 3.0, 4.0))
+            .with_devtools(false)
+            .with_focused(true);
+        assert_eq!(url.source, DesktopChildSource::Url("https://example.com".to_owned()));
+        assert_eq!(url.bounds, DesktopChildBounds::new(1.0, 2.0, 3.0, 4.0));
+        assert!(!url.devtools);
+        assert!(url.focused);
+
+        let html = DesktopChildWebview::html("<p>hi</p>");
+        assert_eq!(html.source, DesktopChildSource::Html("<p>hi</p>".to_owned()));
+        assert_eq!(html.bounds, DesktopChildBounds::default());
     }
 
     #[test]

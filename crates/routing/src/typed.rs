@@ -632,3 +632,81 @@ mod tests {
         ));
     }
 }
+
+/// RT6: derive-driven query parsing and redirect parameter transit.
+///
+/// The `#[derive(Routable)]` macro is exercised here from inside the routing
+/// crate itself; the macro resolves its helper paths to `crate` in this build.
+#[cfg(test)]
+mod derive_tests {
+    use super::Routable;
+
+    #[derive(Debug, Clone, PartialEq, Eq, glory_macros::Routable)]
+    enum AppRoute {
+        #[route("/")]
+        Home,
+        #[route("/users/<id>")]
+        #[redirect("/u/<id>")]
+        User { id: u64 },
+        #[route("/search?q&page&tag")]
+        Search { q: String, page: Option<u32>, tag: Vec<String> },
+        #[not_found]
+        NotFound { raw_url: String },
+    }
+
+    #[test]
+    fn derive_query_round_trips() {
+        let route = AppRoute::Search {
+            q: "hello world".to_owned(),
+            page: Some(2),
+            tag: vec!["rust".to_owned(), "ui".to_owned()],
+        };
+        assert_eq!(route.to_url(), "/search?q=hello+world&page=2&tag=rust&tag=ui");
+        assert_eq!(AppRoute::from_url("/search?q=hello+world&page=2&tag=rust&tag=ui"), Some(route));
+    }
+
+    #[test]
+    fn derive_query_handles_optional_and_repeated_defaults() {
+        // `page` absent -> None; `tag` absent -> empty vec; `q` required.
+        assert_eq!(
+            AppRoute::from_url("/search?q=rust"),
+            Some(AppRoute::Search {
+                q: "rust".to_owned(),
+                page: None,
+                tag: Vec::new(),
+            })
+        );
+        // Missing required `q` fails to parse.
+        assert_eq!(AppRoute::from_url("/search?page=1"), None);
+        // Invalid `page` fails to parse.
+        assert_eq!(AppRoute::from_url("/search?q=x&page=nan"), None);
+
+        let no_optionals = AppRoute::Search {
+            q: "x".to_owned(),
+            page: None,
+            tag: Vec::new(),
+        };
+        assert_eq!(no_optionals.to_url(), "/search?q=x");
+    }
+
+    #[test]
+    fn derive_redirect_transits_typed_params() {
+        // The `#[redirect("/u/<id>")]` pattern extracts `id` from the source
+        // pattern and constructs the typed target variant.
+        assert_eq!(AppRoute::redirect("/u/42"), Some(AppRoute::User { id: 42 }));
+        assert_eq!(AppRoute::resolve_url("/u/7"), Some(AppRoute::User { id: 7 }));
+        // Non-numeric id does not match the redirect.
+        assert_eq!(AppRoute::redirect("/u/not-a-number"), None);
+    }
+
+    #[test]
+    fn derive_not_found_fallback() {
+        assert_eq!(AppRoute::from_url("/"), Some(AppRoute::Home));
+        assert_eq!(
+            AppRoute::resolve_url("/missing"),
+            Some(AppRoute::NotFound {
+                raw_url: "/missing".to_owned(),
+            })
+        );
+    }
+}

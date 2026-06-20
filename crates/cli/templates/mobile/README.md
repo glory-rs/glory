@@ -66,6 +66,22 @@ the visual viewport can shrink when the soft keyboard opens. The bootstrap
 script mirrors `visualViewport` resize/scroll into CSS variables; app CSS can
 pad fixed footers with `var(--glory-keyboard-inset-bottom)`.
 
+### Native lifecycle bridge status (`_todos.md` MB2)
+
+Foreground/background are **already bridged at the webview level**: the
+bootstrap dispatches `glory:foreground` / `glory:background` from
+`visibilitychange` + window `focus`/`blur`. For a webview-hosted app these fire
+on the OS app-switch / lock transitions, so the common pause/resume need is
+covered without native code.
+
+The remaining **native-only** signals — Android `onTrimMemory` /
+`onLowMemory`, iOS `didReceiveMemoryWarning`, and explicit `onDestroy` /
+`applicationWillTerminate` — are **not yet bridged**. They require hooks in the
+wry-generated `WryActivity` (Kotlin) and the `start_app` Swift host, and can
+only be verified on a device/simulator (gated behind MB1/MB4). When those land,
+the intended contract is additional `glory:memory-warning` / `glory:destroy`
+custom events on the same dispatch channel.
+
 ## Android
 
 Prerequisites:

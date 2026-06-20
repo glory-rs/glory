@@ -82,14 +82,280 @@ impl LiveViewSession {
             LiveViewMessage::Event(event) => Some(self.dispatch_event(*event)),
             LiveViewMessage::Query(response) => Some(self.resolve_query(*response)),
             LiveViewMessage::Ping => Some(LiveViewMessage::Pong),
+            // Protocol negotiation: a client whose protocol version does not
+            // match the server's is told so, rather than being silently driven
+            // with a possibly-incompatible wire format.
+            LiveViewMessage::Hello { protocol_version } => {
+                if protocol_version != LIVEVIEW_PROTOCOL_VERSION {
+                    Some(LiveViewMessage::Error {
+                        message: format!("liveview protocol mismatch: client {protocol_version}, server {LIVEVIEW_PROTOCOL_VERSION}"),
+                    })
+                } else {
+                    None
+                }
+            }
             LiveViewMessage::Close { .. } => None,
-            LiveViewMessage::Hello { .. }
-            | LiveViewMessage::Mount { .. }
-            | LiveViewMessage::Patch { .. }
-            | LiveViewMessage::Error { .. }
-            | LiveViewMessage::Pong => None,
+            LiveViewMessage::Mount { .. } | LiveViewMessage::Patch { .. } | LiveViewMessage::Error { .. } | LiveViewMessage::Pong => None,
         }
     }
+
+    /// Snapshot the holder's pending command batch into an [`OutboundBuffer`]
+    /// as a single patch, applying its backpressure policy. Lets adapters
+    /// coalesce output when a client is consuming slowly (LV2).
+    pub fn enqueue_patch(&self, buffer: &mut OutboundBuffer) {
+        buffer.push(self.holder.take_batch());
+    }
+}
+
+/// Outbound command-batch buffer with a coalescing backpressure policy.
+///
+/// Each `push` appends a patch batch. While the number of pending batches is
+/// within `max_pending` they are kept separate; once the cap is exceeded, new
+/// batches are folded into the tail batch (commands are concatenated, which is
+/// a faithful sequential replay) so the queue cannot grow without bound when a
+/// client is slow. `max_pending == 0` disables the cap (unbounded).
+#[derive(Debug, Default)]
+pub struct OutboundBuffer {
+    max_pending: usize,
+    batches: std::collections::VecDeque<Vec<Command>>,
+}
+
+impl OutboundBuffer {
+    pub fn new(max_pending: usize) -> Self {
+        Self {
+            max_pending,
+            batches: std::collections::VecDeque::new(),
+        }
+    }
+
+    pub fn from_config(config: &LiveViewConfig) -> Self {
+        Self::new(config.max_pending_patches)
+    }
+
+    /// Enqueue a patch batch (empty batches are dropped). Folds into the tail
+    /// when over the pending cap.
+    pub fn push(&mut self, batch: Vec<Command>) {
+        if batch.is_empty() {
+            return;
+        }
+        if self.max_pending != 0
+            && self.batches.len() >= self.max_pending
+            && let Some(tail) = self.batches.back_mut()
+        {
+            tail.extend(batch);
+            return;
+        }
+        self.batches.push_back(batch);
+    }
+
+    /// Pop the oldest pending batch (FIFO).
+    pub fn drain_one(&mut self) -> Option<Vec<Command>> {
+        self.batches.pop_front()
+    }
+
+    /// Drain every pending batch in order.
+    pub fn take(&mut self) -> Vec<Vec<Command>> {
+        self.batches.drain(..).collect()
+    }
+
+    pub fn len(&self) -> usize {
+        self.batches.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.batches.is_empty()
+    }
+
+    pub fn max_pending(&self) -> usize {
+        self.max_pending
+    }
+
+    /// Total number of commands across all pending batches.
+    pub fn command_count(&self) -> usize {
+        self.batches.iter().map(Vec::len).sum()
+    }
+}
+
+/// Lifecycle policy for LiveView sessions held in a [`SessionRegistry`].
+///
+/// A value of `0` for either timeout field disables that particular check.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LiveViewConfig {
+    /// Reap a session after this many seconds without any client activity
+    /// (no event/query/ping touched it).
+    pub idle_timeout_secs: u64,
+    /// Hard cap on a session's total lifetime, regardless of activity.
+    pub max_lifetime_secs: u64,
+    /// Maximum number of pending outbound patch batches before an
+    /// [`OutboundBuffer`] starts coalescing. `0` = unbounded.
+    pub max_pending_patches: usize,
+}
+
+impl Default for LiveViewConfig {
+    fn default() -> Self {
+        // 5 minutes idle, 1 hour absolute, 64 pending patches — conservative
+        // defaults a host app can override.
+        Self {
+            idle_timeout_secs: 300,
+            max_lifetime_secs: 3600,
+            max_pending_patches: 64,
+        }
+    }
+}
+
+/// Opaque token a client presents to resume a previously registered session.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ResumeToken(String);
+
+impl ResumeToken {
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+
+    pub fn into_string(self) -> String {
+        self.0
+    }
+}
+
+impl std::fmt::Display for ResumeToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.0)
+    }
+}
+
+struct RegistryEntry<T> {
+    value: T,
+    created_at: u64,
+    last_active_at: u64,
+}
+
+impl<T> RegistryEntry<T> {
+    fn expired(&self, now: u64, config: &LiveViewConfig) -> bool {
+        let idle_expired = config.idle_timeout_secs > 0 && now.saturating_sub(self.last_active_at) >= config.idle_timeout_secs;
+        let lifetime_expired = config.max_lifetime_secs > 0 && now.saturating_sub(self.created_at) >= config.max_lifetime_secs;
+        idle_expired || lifetime_expired
+    }
+}
+
+/// Registry of live sessions keyed by a [`ResumeToken`], with idle/TTL reaping.
+///
+/// Framework- and clock-agnostic: every method needing the current time takes
+/// `now` (unix seconds) explicitly, so reaping/resume semantics are
+/// deterministic and unit-testable. Adapters pass [`current_unix_secs`]. `T` is
+/// the per-session state; no `Send` bound is imposed so the `!Send` reactive
+/// tree can live inside it.
+pub struct SessionRegistry<T> {
+    config: LiveViewConfig,
+    next_id: u64,
+    entries: std::collections::HashMap<String, RegistryEntry<T>>,
+}
+
+impl<T> SessionRegistry<T> {
+    pub fn new(config: LiveViewConfig) -> Self {
+        Self {
+            config,
+            next_id: 0,
+            entries: std::collections::HashMap::new(),
+        }
+    }
+
+    pub fn with_default_config() -> Self {
+        Self::new(LiveViewConfig::default())
+    }
+
+    pub fn config(&self) -> LiveViewConfig {
+        self.config
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Register a new session, returning a monotonic resume token. For
+    /// unguessable tokens (recommended in production) supply your own via
+    /// [`SessionRegistry::insert_with_token`].
+    pub fn insert(&mut self, now: u64, value: T) -> ResumeToken {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.insert_with_token(now, format!("lv-{id}"), value)
+    }
+
+    /// Register a session under a caller-supplied token. Overwrites any existing
+    /// entry with the same token.
+    pub fn insert_with_token(&mut self, now: u64, token: impl Into<String>, value: T) -> ResumeToken {
+        let token = token.into();
+        self.entries.insert(
+            token.clone(),
+            RegistryEntry {
+                value,
+                created_at: now,
+                last_active_at: now,
+            },
+        );
+        ResumeToken(token)
+    }
+
+    /// Resume a session by token if it is still alive at `now`, refreshing its
+    /// activity timestamp. Expired entries are removed and `None` is returned.
+    pub fn resume(&mut self, now: u64, token: &str) -> Option<&mut T> {
+        match self.entries.get(token) {
+            Some(entry) if entry.expired(now, &self.config) => {
+                self.entries.remove(token);
+                None
+            }
+            Some(_) => {
+                let entry = self.entries.get_mut(token).expect("entry present");
+                entry.last_active_at = now;
+                Some(&mut entry.value)
+            }
+            None => None,
+        }
+    }
+
+    /// Refresh a session's activity timestamp. Returns `false` if unknown.
+    pub fn touch(&mut self, now: u64, token: &str) -> bool {
+        match self.entries.get_mut(token) {
+            Some(entry) => {
+                entry.last_active_at = now;
+                true
+            }
+            None => false,
+        }
+    }
+
+    /// Remove a session, returning its state if present.
+    pub fn remove(&mut self, token: &str) -> Option<T> {
+        self.entries.remove(token).map(|entry| entry.value)
+    }
+
+    /// Remove and return every session that is idle or past its max lifetime
+    /// at `now`. Adapters should call this periodically.
+    pub fn reap(&mut self, now: u64) -> Vec<(ResumeToken, T)> {
+        let config = self.config;
+        let expired: Vec<String> = self
+            .entries
+            .iter()
+            .filter(|(_, entry)| entry.expired(now, &config))
+            .map(|(token, _)| token.clone())
+            .collect();
+        expired
+            .into_iter()
+            .filter_map(|token| self.entries.remove(&token).map(|entry| (ResumeToken(token), entry.value)))
+            .collect()
+    }
+}
+
+/// Current wall-clock time in unix seconds, for feeding the time-injected
+/// [`SessionRegistry`] methods from adapter code.
+pub fn current_unix_secs() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0)
 }
 
 /// Router abstraction for frameworks that can mount a Glory LiveView websocket
@@ -591,6 +857,108 @@ mod tests {
                 .fill(div().text(self.value))
                 .show_in(ctx);
         }
+    }
+
+    #[test]
+    fn hello_version_negotiation() {
+        let (session, _mount) = LiveViewSession::mount(Counter { value: Cage::new(0) });
+        assert!(session.handle_message(LiveViewMessage::hello()).is_none());
+        let reply = session.handle_message(LiveViewMessage::Hello { protocol_version: 999 });
+        assert!(matches!(reply, Some(LiveViewMessage::Error { .. })));
+    }
+
+    #[test]
+    fn registry_resume_refreshes_activity_and_survives_idle() {
+        let config = LiveViewConfig {
+            idle_timeout_secs: 100,
+            max_lifetime_secs: 0,
+            ..LiveViewConfig::default()
+        };
+        let mut registry: SessionRegistry<i32> = SessionRegistry::new(config);
+        let token = registry.insert(0, 7);
+
+        assert_eq!(registry.resume(90, token.as_str()).copied(), Some(7));
+        assert_eq!(registry.resume(150, token.as_str()).copied(), Some(7));
+        assert_eq!(registry.len(), 1);
+    }
+
+    #[test]
+    fn registry_reaps_idle_and_expired_sessions() {
+        let config = LiveViewConfig {
+            idle_timeout_secs: 50,
+            max_lifetime_secs: 200,
+            ..LiveViewConfig::default()
+        };
+        let mut registry: SessionRegistry<&str> = SessionRegistry::new(config);
+        let idle = registry.insert(0, "idle");
+        let active = registry.insert(0, "active");
+
+        assert!(registry.touch(40, active.as_str()));
+
+        let reaped = registry.reap(60);
+        assert_eq!(reaped.len(), 1);
+        assert_eq!(reaped[0].0, idle);
+        assert_eq!(reaped[0].1, "idle");
+        assert_eq!(registry.len(), 1);
+
+        assert!(registry.resume(60, idle.as_str()).is_none());
+
+        assert!(registry.touch(199, active.as_str()));
+        let reaped = registry.reap(200);
+        assert_eq!(reaped.len(), 1);
+        assert_eq!(reaped[0].1, "active");
+        assert!(registry.is_empty());
+    }
+
+    #[test]
+    fn registry_resume_drops_expired_entry() {
+        let mut registry: SessionRegistry<u8> = SessionRegistry::new(LiveViewConfig {
+            idle_timeout_secs: 10,
+            max_lifetime_secs: 0,
+            ..LiveViewConfig::default()
+        });
+        let token = registry.insert(0, 1);
+        assert!(registry.resume(50, token.as_str()).is_none());
+        assert!(registry.is_empty(), "expired entry removed on failed resume");
+    }
+
+    #[test]
+    fn outbound_buffer_keeps_batches_below_cap() {
+        let mut buf = OutboundBuffer::new(3);
+        buf.push(vec![Command::Remove { parent: 0, child: 1 }]);
+        buf.push(vec![Command::Remove { parent: 0, child: 2 }]);
+        assert_eq!(buf.len(), 2);
+        assert_eq!(buf.command_count(), 2);
+        assert_eq!(buf.drain_one().unwrap().len(), 1);
+        assert_eq!(buf.len(), 1);
+    }
+
+    #[test]
+    fn outbound_buffer_coalesces_over_cap_preserving_commands() {
+        let mut buf = OutboundBuffer::new(2);
+        buf.push(vec![Command::Remove { parent: 0, child: 1 }]);
+        buf.push(vec![Command::Remove { parent: 0, child: 2 }]);
+        // Third push exceeds the cap of 2 → folds into the tail batch.
+        buf.push(vec![Command::Remove { parent: 0, child: 3 }, Command::Remove { parent: 0, child: 4 }]);
+        assert_eq!(buf.len(), 2, "still capped at 2 batches");
+        assert_eq!(buf.command_count(), 4, "no commands dropped");
+        let batches = buf.take();
+        assert_eq!(batches[0].len(), 1);
+        assert_eq!(batches[1].len(), 3, "tail absorbed the overflow batch");
+    }
+
+    #[test]
+    fn outbound_buffer_unbounded_and_empty_behavior() {
+        let mut buf = OutboundBuffer::new(0);
+        for id in 0..10 {
+            buf.push(vec![Command::Remove { parent: 0, child: id }]);
+        }
+        assert_eq!(buf.len(), 10, "max_pending 0 = unbounded");
+        buf.push(Vec::new()); // empty batch ignored
+        assert_eq!(buf.len(), 10);
+        let mut empty = OutboundBuffer::new(4);
+        assert!(empty.is_empty());
+        assert!(empty.drain_one().is_none());
     }
 
     #[test]

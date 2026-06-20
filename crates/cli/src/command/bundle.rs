@@ -92,6 +92,10 @@ async fn bundle_desktop_installers(proj: &Project, dist: &Utf8Path) -> Result<()
     }
     if cfg!(target_os = "linux") {
         write_linux_deb(proj, dist).await?;
+        write_linux_appimage(proj, dist).await?;
+    }
+    if cfg!(target_os = "macos") {
+        write_macos_app_bundle(proj, dist).await?;
     }
 
     Ok(())
@@ -161,7 +165,11 @@ if ($WixBin) {{
     .await
     .dot()?;
 
-    let Some((heat, candle, light)) = wix_tools() else {
+    let tools = match wix_tools() {
+        Some(tools) => Some(tools),
+        None => ensure_wix_tools().await,
+    };
+    let Some((heat, candle, light)) = tools else {
         log::warn!(
             "WiX toolset not found; wrote MSI sources and build-msi.ps1 under {}",
             GRAY.paint(out_dir.as_str())
@@ -202,6 +210,458 @@ if ($WixBin) {{
         .arg("-out")
         .arg(out_dir.join(msi_name).as_str());
     run_checked("WiX light", light_cmd).await
+}
+
+// ---------------------------------------------------------------------------
+// CL4 — WiX toolset auto-download / cache.
+// ---------------------------------------------------------------------------
+
+/// Default WiX toolset release downloaded when neither `WIX_BIN` nor PATH
+/// resolve the tools. WiX v3 ships the classic `heat`/`candle`/`light` trio
+/// that [`write_windows_msi_artifacts`] drives.
+const WIX_VERSION: &str = "3.14.1";
+const WIX_RELEASE_TAG: &str = "wix3141rtm";
+
+/// GitHub release URL for the WiX binaries zip.
+fn wix_download_url(tag: &str) -> String {
+    format!("https://github.com/wixtoolset/wix3/releases/download/{tag}/wix314-binaries.zip")
+}
+
+/// Cache directory the downloaded WiX binaries are unpacked into, namespaced by
+/// version so upgrading the pinned release does not collide with an old cache.
+fn wix_cache_dir(version: &str) -> Result<std::path::PathBuf> {
+    let dir = dirs::cache_dir()
+        .ok_or_else(|| anyhow!("Cache directory does not exist"))?
+        .join("glory-cli")
+        .join(format!("wix-{version}"));
+    Ok(dir)
+}
+
+/// Try to make the WiX tools available by downloading the pinned release into
+/// the cli cache when they are not already present. Returns `None` (and warns)
+/// when the download/extraction cannot be completed (e.g. offline), so callers
+/// fall back to writing only the MSI sources.
+async fn ensure_wix_tools() -> Option<(std::path::PathBuf, std::path::PathBuf, std::path::PathBuf)> {
+    if cfg!(feature = "no_downloads") {
+        log::warn!("WiX toolset not found and downloads are disabled (no_downloads feature)");
+        return None;
+    }
+
+    let cache_dir = match wix_cache_dir(WIX_VERSION) {
+        Ok(dir) => dir,
+        Err(e) => {
+            log::warn!("WiX auto-download skipped: {e}");
+            return None;
+        }
+    };
+
+    if let Some(tools) = wix_tools_in(&cache_dir) {
+        return Some(tools);
+    }
+
+    let url = wix_download_url(WIX_RELEASE_TAG);
+    log::info!("WiX toolset not found; downloading {}", GRAY.paint(&url));
+    match download_and_unzip(&url, &cache_dir).await {
+        Ok(()) => wix_tools_in(&cache_dir).or_else(|| {
+            log::warn!(
+                "WiX archive downloaded but heat/candle/light were not found under {}",
+                cache_dir.display()
+            );
+            None
+        }),
+        Err(e) => {
+            log::warn!("WiX auto-download failed ({e}); wrote MSI sources only");
+            None
+        }
+    }
+}
+
+/// Resolve the WiX trio inside an already-populated directory.
+fn wix_tools_in(dir: &std::path::Path) -> Option<(std::path::PathBuf, std::path::PathBuf, std::path::PathBuf)> {
+    let heat = dir.join("heat.exe");
+    let candle = dir.join("candle.exe");
+    let light = dir.join("light.exe");
+    (heat.exists() && candle.exists() && light.exists()).then_some((heat, candle, light))
+}
+
+/// Download a zip archive and extract it into `dest`. Pure plumbing reused by
+/// the WiX auto-download path; isolated so the URL/cache logic stays testable.
+async fn download_and_unzip(url: &str, dest: &std::path::Path) -> Result<()> {
+    let response = reqwest::get(url).await?;
+    if !response.status().is_success() {
+        bail!("download from {url} returned status {}", response.status());
+    }
+    let bytes = response.bytes().await?;
+    std::fs::create_dir_all(dest)?;
+    let mut archive = zip::ZipArchive::new(Cursor::new(bytes))?;
+    archive.extract(dest)?;
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// CL1 — macOS `.app` bundle + DMG.  CL2 — codesign / notarize.
+// ---------------------------------------------------------------------------
+
+/// Assemble a macOS `.app` directory and (when `hdiutil` is present) a `.dmg`.
+/// The bundle layout and `Info.plist` are pure functions so they can be unit
+/// tested; signing/notarization is driven by [`maybe_codesign_app`] /
+/// [`maybe_notarize_dmg`] following the "present then run, else warn" pattern.
+async fn write_macos_app_bundle(proj: &Project, dist: &Utf8Path) -> Result<()> {
+    let exe_name = proj
+        .bin
+        .exe_file
+        .file_name()
+        .ok_or_else(|| anyhow!("desktop executable path has no file name: {}", proj.bin.exe_file))?;
+    let product = installer_product_name(&proj.name);
+    let out_dir = dist.join("installers/macos");
+    let app_dir = out_dir.join(format!("{product}.app"));
+    if app_dir.exists() {
+        fs::remove_dir_all(&app_dir).await.dot()?;
+    }
+
+    let layout = MacOsAppLayout::new(&product, exe_name);
+    fs::create_dir_all(app_dir.join(&layout.macos_dir)).await.dot()?;
+    fs::create_dir_all(app_dir.join(&layout.resources_dir)).await.dot()?;
+
+    let bundle_id = macos_bundle_id(&proj.name);
+    let plist = macos_info_plist(&product, exe_name, &bundle_id, &proj.bin.version);
+    fs::write(app_dir.join(&layout.info_plist), plist).await.dot()?;
+
+    // Copy the whole bundle payload (server exe + site assets) into MacOS/.
+    copy_bundle_payload(dist, &app_dir.join(&layout.macos_dir)).await?;
+
+    maybe_codesign_app(&app_dir).await?;
+
+    let dmg_path = out_dir.join(format!("{}_{}.dmg", package_file_stem(&proj.name), proj.bin.version));
+    let volname = product.clone();
+    if which::which("hdiutil").is_ok() {
+        if dmg_path.exists() {
+            fs::remove_file(&dmg_path).await.dot()?;
+        }
+        let mut cmd = Command::new("hdiutil");
+        cmd.args(["create", "-volname", &volname, "-srcfolder", app_dir.as_str(), "-ov", "-format", "UDZO"])
+            .arg(dmg_path.as_str());
+        run_checked("hdiutil (dmg)", cmd).await?;
+        maybe_notarize_dmg(&dmg_path).await?;
+    } else {
+        log::warn!("hdiutil not found; wrote {} but skipped DMG packaging", GRAY.paint(app_dir.as_str()));
+    }
+    Ok(())
+}
+
+/// Relative paths inside a macOS `.app` bundle for the executable, resources,
+/// and `Info.plist`. Pure value so the layout is unit-testable.
+#[derive(Debug, PartialEq, Eq)]
+struct MacOsAppLayout {
+    macos_dir: Utf8PathBuf,
+    resources_dir: Utf8PathBuf,
+    info_plist: Utf8PathBuf,
+    exe_path: Utf8PathBuf,
+}
+
+impl MacOsAppLayout {
+    fn new(_product: &str, exe_name: &str) -> Self {
+        let contents = Utf8PathBuf::from("Contents");
+        let macos_dir = contents.join("MacOS");
+        Self {
+            exe_path: macos_dir.join(exe_name),
+            macos_dir,
+            resources_dir: contents.join("Resources"),
+            info_plist: contents.join("Info.plist"),
+        }
+    }
+}
+
+/// Reverse-DNS bundle identifier derived from the project name, e.g.
+/// `My App` -> `com.glory.my-app`. Publisher prefix honours
+/// `GLORY_BUNDLE_IDENTIFIER_PREFIX` when set.
+fn macos_bundle_id(name: &str) -> String {
+    let prefix = env::var("GLORY_BUNDLE_IDENTIFIER_PREFIX").unwrap_or_else(|_| "com.glory".to_owned());
+    macos_bundle_id_with_prefix(&prefix, name)
+}
+
+/// Reverse-DNS join of an identifier prefix and a sanitized project name. Split
+/// out from [`macos_bundle_id`] so the (env-free) formatting is unit-testable.
+fn macos_bundle_id_with_prefix(prefix: &str, name: &str) -> String {
+    format!("{prefix}.{}", debian_package_name(name))
+}
+
+/// Generate a minimal but valid `Info.plist` for the desktop `.app`. Pure
+/// function (no IO) for unit testing.
+fn macos_info_plist(product: &str, exe_name: &str, bundle_id: &str, version: &str) -> String {
+    let short_version = msi_version(version);
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>{name}</string>
+	<key>CFBundleDisplayName</key>
+	<string>{name}</string>
+	<key>CFBundleExecutable</key>
+	<string>{exe}</string>
+	<key>CFBundleIdentifier</key>
+	<string>{id}</string>
+	<key>CFBundleVersion</key>
+	<string>{version}</string>
+	<key>CFBundleShortVersionString</key>
+	<string>{short_version}</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>10.13</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+</dict>
+</plist>
+"#,
+        name = plist_escape(product),
+        exe = plist_escape(exe_name),
+        id = plist_escape(bundle_id),
+        version = plist_escape(version),
+    )
+}
+
+fn plist_escape(value: &str) -> String {
+    xml_escape(value)
+}
+
+/// macOS code-signing credentials read from the environment.
+#[derive(Debug, PartialEq, Eq)]
+struct MacSignCredentials {
+    identity: String,
+}
+
+impl MacSignCredentials {
+    /// Resolve from `GLORY_MACOS_SIGN_IDENTITY` (preferred) or `APPLE_TEAM_ID`.
+    fn from_env() -> Option<Self> {
+        let identity = non_empty_env("GLORY_MACOS_SIGN_IDENTITY").or_else(|| non_empty_env("APPLE_TEAM_ID"))?;
+        Some(Self { identity })
+    }
+}
+
+/// Build the `codesign --deep --force --sign <identity> <app>` argv.
+fn codesign_args(creds: &MacSignCredentials, app: &str) -> Vec<String> {
+    vec![
+        "--deep".to_owned(),
+        "--force".to_owned(),
+        "--timestamp".to_owned(),
+        "--options".to_owned(),
+        "runtime".to_owned(),
+        "--sign".to_owned(),
+        creds.identity.clone(),
+        app.to_owned(),
+    ]
+}
+
+async fn maybe_codesign_app(app_dir: &Utf8Path) -> Result<()> {
+    let Some(creds) = MacSignCredentials::from_env() else {
+        log::warn!("macOS signing skipped: set GLORY_MACOS_SIGN_IDENTITY or APPLE_TEAM_ID to codesign the .app");
+        return Ok(());
+    };
+    if which::which("codesign").is_err() {
+        log::warn!("codesign not found on PATH; skipping macOS signing");
+        return Ok(());
+    }
+    let mut cmd = Command::new("codesign");
+    cmd.args(codesign_args(&creds, app_dir.as_str()));
+    run_checked("codesign", cmd).await
+}
+
+/// Apple notarization credentials read from the environment.
+#[derive(Debug, PartialEq, Eq)]
+struct NotaryCredentials {
+    apple_id: String,
+    team_id: String,
+    /// Either the app-specific password or an API key identifier.
+    secret: NotarySecret,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum NotarySecret {
+    Password(String),
+    ApiKey(String),
+}
+
+impl NotaryCredentials {
+    fn from_env() -> Option<Self> {
+        let apple_id = non_empty_env("APPLE_ID")?;
+        let team_id = non_empty_env("APPLE_TEAM_ID")?;
+        let secret = if let Some(key) = non_empty_env("APPLE_API_KEY") {
+            NotarySecret::ApiKey(key)
+        } else if let Some(pw) = non_empty_env("APPLE_APP_PASSWORD") {
+            NotarySecret::Password(pw)
+        } else {
+            return None;
+        };
+        Some(Self { apple_id, team_id, secret })
+    }
+}
+
+/// Build `xcrun notarytool submit <dmg> ... --wait` argv from credentials.
+fn notarytool_args(creds: &NotaryCredentials, dmg: &str) -> Vec<String> {
+    let mut args = vec!["notarytool".to_owned(), "submit".to_owned(), dmg.to_owned()];
+    match &creds.secret {
+        NotarySecret::Password(pw) => {
+            args.push("--apple-id".to_owned());
+            args.push(creds.apple_id.clone());
+            args.push("--team-id".to_owned());
+            args.push(creds.team_id.clone());
+            args.push("--password".to_owned());
+            args.push(pw.clone());
+        }
+        NotarySecret::ApiKey(key) => {
+            args.push("--key".to_owned());
+            args.push(key.clone());
+        }
+    }
+    args.push("--wait".to_owned());
+    args
+}
+
+/// Build `xcrun stapler staple <dmg>` argv.
+fn stapler_args(dmg: &str) -> Vec<String> {
+    vec!["stapler".to_owned(), "staple".to_owned(), dmg.to_owned()]
+}
+
+async fn maybe_notarize_dmg(dmg: &Utf8Path) -> Result<()> {
+    let Some(creds) = NotaryCredentials::from_env() else {
+        log::warn!("macOS notarization skipped: set APPLE_ID + APPLE_TEAM_ID + (APPLE_API_KEY or APPLE_APP_PASSWORD) to notarize");
+        return Ok(());
+    };
+    if which::which("xcrun").is_err() {
+        log::warn!("xcrun not found on PATH; skipping notarization");
+        return Ok(());
+    }
+    let mut submit = Command::new("xcrun");
+    submit.args(notarytool_args(&creds, dmg.as_str()));
+    run_checked("xcrun notarytool submit", submit).await?;
+
+    let mut staple = Command::new("xcrun");
+    staple.args(stapler_args(dmg.as_str()));
+    run_checked("xcrun stapler staple", staple).await
+}
+
+fn non_empty_env(name: &str) -> Option<String> {
+    env::var(name).ok().map(|v| v.trim().to_owned()).filter(|v| !v.is_empty())
+}
+
+// ---------------------------------------------------------------------------
+// CL3 — Linux AppImage.
+// ---------------------------------------------------------------------------
+
+/// Assemble an `AppDir` (AppRun, `.desktop`, icon) and, when packaging tools
+/// are present, build a self-contained `.AppImage`. The AppDir layout and the
+/// `AppRun` script are pure functions for unit testing; `linuxdeploy` /
+/// `appimagetool` follow the "present then run, else warn" pattern.
+async fn write_linux_appimage(proj: &Project, dist: &Utf8Path) -> Result<()> {
+    let exe_name = proj
+        .bin
+        .exe_file
+        .file_name()
+        .ok_or_else(|| anyhow!("desktop executable path has no file name: {}", proj.bin.exe_file))?;
+    let package = debian_package_name(&proj.name);
+    let product = installer_product_name(&proj.name);
+    let out_dir = dist.join("installers/linux");
+    let app_dir = out_dir.join(format!("{product}.AppDir"));
+    if app_dir.exists() {
+        fs::remove_dir_all(&app_dir).await.dot()?;
+    }
+    fs::create_dir_all(app_dir.join("usr/bin")).await.dot()?;
+    fs::create_dir_all(app_dir.join("usr/share/applications")).await.dot()?;
+
+    // Payload (server exe + site) lands under usr/bin so AppRun can exec it.
+    copy_bundle_payload(dist, &app_dir.join("usr/bin")).await?;
+
+    let apprun = apprun_script(exe_name);
+    let apprun_path = app_dir.join("AppRun");
+    fs::write(&apprun_path, &apprun).await.dot()?;
+    set_executable(&apprun_path).await?;
+
+    let desktop = appimage_desktop_entry(&product, &package);
+    fs::write(app_dir.join(format!("{package}.desktop")), &desktop).await.dot()?;
+    fs::write(app_dir.join("usr/share/applications").join(format!("{package}.desktop")), &desktop)
+        .await
+        .dot()?;
+    // Minimal placeholder icon (appimagetool requires a top-level .png icon).
+    fs::write(app_dir.join(format!("{package}.png")), MINIMAL_PNG).await.dot()?;
+
+    let appimage_path = out_dir.join(format!("{}_{}_{}.AppImage", package, proj.bin.version, appimage_arch()));
+
+    if let Ok(linuxdeploy) = which::which("linuxdeploy") {
+        let mut cmd = Command::new(linuxdeploy);
+        cmd.arg("--appdir")
+            .arg(app_dir.as_str())
+            .arg("--output")
+            .arg("appimage")
+            .env("OUTPUT", appimage_path.as_str());
+        run_checked("linuxdeploy (appimage)", cmd).await?;
+    } else if let Ok(appimagetool) = which::which("appimagetool") {
+        let mut cmd = Command::new(appimagetool);
+        cmd.arg(app_dir.as_str()).arg(appimage_path.as_str()).env("ARCH", appimage_arch());
+        run_checked("appimagetool", cmd).await?;
+    } else {
+        log::warn!(
+            "linuxdeploy/appimagetool not found; wrote AppDir {} but skipped AppImage packaging",
+            GRAY.paint(app_dir.as_str())
+        );
+    }
+    Ok(())
+}
+
+/// The `AppRun` entry script that execs the bundled binary, resolving its own
+/// directory so the AppImage is relocatable. Pure function for unit testing.
+fn apprun_script(exe_name: &str) -> String {
+    format!(
+        r#"#!/usr/bin/env sh
+set -eu
+HERE="$(dirname "$(readlink -f "$0")")"
+export PATH="$HERE/usr/bin:$PATH"
+exec "$HERE/usr/bin/{exe_name}" "$@"
+"#
+    )
+}
+
+/// `.desktop` entry for the AppImage (top-level + usr/share/applications).
+fn appimage_desktop_entry(product: &str, package: &str) -> String {
+    format!(
+        "[Desktop Entry]\nType=Application\nName={name}\nExec={package}\nIcon={package}\nTerminal=false\nCategories=Utility;\n",
+        name = desktop_value(product),
+    )
+}
+
+fn appimage_arch() -> &'static str {
+    match env::consts::ARCH {
+        "x86_64" => "x86_64",
+        "aarch64" => "aarch64",
+        "arm" => "armhf",
+        "x86" | "i686" => "i686",
+        other => other,
+    }
+}
+
+/// 1x1 transparent PNG used as a placeholder AppImage icon.
+const MINIMAL_PNG: &[u8] = &[
+    0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+    0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4, 0x89, 0x00, 0x00, 0x00, 0x0D, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+    0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+];
+
+#[cfg(target_family = "unix")]
+async fn set_executable(path: &Utf8Path) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    let mut perm = std::fs::metadata(path)?.permissions();
+    perm.set_mode(0o755);
+    std::fs::set_permissions(path, perm)?;
+    Ok(())
+}
+
+#[cfg(not(target_family = "unix"))]
+async fn set_executable(_path: &Utf8Path) -> Result<()> {
+    Ok(())
 }
 
 async fn write_linux_deb(proj: &Project, dist: &Utf8Path) -> Result<()> {
@@ -869,6 +1329,7 @@ fn deterministic_guid(input: &str) -> String {
 
 async fn write_manifest(proj: &Project, dist: &Utf8Path, asset_map: &BTreeMap<String, String>) -> Result<()> {
     let files = bundle_files(dist).await?;
+    log::info!("{}", format_bundle_size_report(&analyze_bundle_sizes(&files)));
     let manifest = serde_json::json!({
         "name": proj.name,
         "target": format!("{:?}", proj.target).to_lowercase(),
@@ -896,6 +1357,42 @@ async fn write_optimized_image_assets(target: BuildTarget, dist: &Utf8Path, asse
         };
         fs::write(dist.join(&webp_rel), webp).await.dot()?;
         asset_map.insert(asset_public_path(target, rel), asset_public_path(target, &webp_rel));
+
+        write_responsive_image_variants(target, dist, rel, &data, asset_map)
+            .await
+            .context(format!("Generating responsive variants for {rel}"))?;
+    }
+    Ok(())
+}
+
+/// For a source image, emit a few smaller WebP variants and record a `srcset`
+/// string (`/path-640w.webp 640w, ...`) under a `srcset:<public>` key in the
+/// asset map. Only widths strictly smaller than the source are emitted, so
+/// small images add nothing.
+async fn write_responsive_image_variants(
+    target: BuildTarget,
+    dist: &Utf8Path,
+    rel: &Utf8Path,
+    data: &[u8],
+    asset_map: &mut BTreeMap<String, String>,
+) -> Result<()> {
+    let source = image::load_from_memory(data)?;
+    let widths = responsive_widths(source.width());
+    let mut srcset = Vec::new();
+    for width in widths {
+        // Skip the full-size width: the primary `.glory.webp` already covers it.
+        if width >= source.width() {
+            continue;
+        }
+        let Some(variant_rel) = responsive_variant_path(rel, width) else {
+            continue;
+        };
+        let variant = encode_resized_webp(data, width)?;
+        fs::write(dist.join(&variant_rel), variant).await.dot()?;
+        srcset.push(format!("{} {width}w", asset_public_path(target, &variant_rel)));
+    }
+    if !srcset.is_empty() {
+        asset_map.insert(format!("srcset:{}", asset_public_path(target, rel)), srcset.join(", "));
     }
     Ok(())
 }
@@ -989,6 +1486,57 @@ fn encode_webp(data: &[u8], path: &Utf8Path) -> Result<Vec<u8>> {
     let mut output = Cursor::new(Vec::new());
     image.write_to(&mut output, image::ImageFormat::WebP)?;
     Ok(output.into_inner())
+}
+
+/// Smallest variant width we will emit. Below this a separate file is not worth
+/// the extra request / cache entry.
+const MIN_RESPONSIVE_WIDTH: u32 = 320;
+
+/// Produce a set of target widths for a responsive `srcset`, modelled on
+/// manganis: the source width plus halved/quartered steps, deduplicated,
+/// clamped to never exceed the source and never drop below
+/// [`MIN_RESPONSIVE_WIDTH`]. Small images return just their own width.
+///
+/// Result is sorted descending (largest first) and always contains `src_width`.
+fn responsive_widths(src_width: u32) -> Vec<u32> {
+    if src_width == 0 {
+        return Vec::new();
+    }
+    let mut widths = vec![src_width];
+    for divisor in [2, 4] {
+        let candidate = src_width / divisor;
+        if candidate >= MIN_RESPONSIVE_WIDTH && candidate < src_width {
+            widths.push(candidate);
+        }
+    }
+    widths.sort_unstable_by(|a, b| b.cmp(a));
+    widths.dedup();
+    widths
+}
+
+/// Decode `data`, scale it down proportionally to `target_width` (never
+/// upscaling), and re-encode as WebP. Reuses the same `image` crate decode path
+/// as [`encode_webp`].
+fn encode_resized_webp(data: &[u8], target_width: u32) -> Result<Vec<u8>> {
+    if target_width == 0 {
+        bail!("responsive image target width must be non-zero");
+    }
+    let image = image::load_from_memory(data)?;
+    let scaled = if image.width() <= target_width {
+        image
+    } else {
+        let height = ((image.height() as u64 * target_width as u64) / image.width() as u64).max(1) as u32;
+        image.resize_exact(target_width, height, image::imageops::FilterType::Lanczos3)
+    };
+    let mut output = Cursor::new(Vec::new());
+    scaled.write_to(&mut output, image::ImageFormat::WebP)?;
+    Ok(output.into_inner())
+}
+
+/// Filename for a responsive variant, e.g. `logo.glory-640w.webp`.
+fn responsive_variant_path(path: &Utf8Path, width: u32) -> Option<Utf8PathBuf> {
+    let stem = path.file_stem()?;
+    Some(path.with_file_name(format!("{stem}.glory-{width}w.webp")))
 }
 
 fn asset_public_path(target: BuildTarget, rel: &Utf8Path) -> String {
@@ -1160,16 +1708,138 @@ fn pascal_case(value: &str) -> String {
     if out.is_empty() { "GloryApp".to_owned() } else { out }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, serde::Deserialize, Clone)]
 struct BundleFile {
     path: String,
     bytes: u64,
     seahash: String,
 }
 
+/// Per-category (file extension) size aggregate for a bundle.
+#[derive(Debug, PartialEq, Eq)]
+struct BundleSizeEntry {
+    category: String,
+    bytes: u64,
+    count: usize,
+}
+
+/// A bundle's total size plus a per-extension breakdown, largest first.
+#[derive(Debug, PartialEq, Eq)]
+struct BundleSizeReport {
+    total_bytes: u64,
+    file_count: usize,
+    by_category: Vec<BundleSizeEntry>,
+}
+
+/// Group bundle files by extension and sum their bytes, so `glory bundle` can
+/// report which kinds of artifact dominate the output.
+fn analyze_bundle_sizes(files: &[BundleFile]) -> BundleSizeReport {
+    use std::collections::BTreeMap;
+    let mut groups: BTreeMap<String, (u64, usize)> = BTreeMap::new();
+    let mut total = 0u64;
+    for file in files {
+        total += file.bytes;
+        let entry = groups.entry(bundle_size_category(&file.path)).or_default();
+        entry.0 += file.bytes;
+        entry.1 += 1;
+    }
+    let mut by_category: Vec<BundleSizeEntry> = groups
+        .into_iter()
+        .map(|(category, (bytes, count))| BundleSizeEntry { category, bytes, count })
+        .collect();
+    // Largest category first; ties broken alphabetically for stable output.
+    by_category.sort_by(|a, b| b.bytes.cmp(&a.bytes).then_with(|| a.category.cmp(&b.category)));
+    BundleSizeReport {
+        total_bytes: total,
+        file_count: files.len(),
+        by_category,
+    }
+}
+
+fn bundle_size_category(path: &str) -> String {
+    Utf8Path::new(path)
+        .extension()
+        .map(|ext| ext.to_ascii_lowercase())
+        .unwrap_or_else(|| "(no ext)".to_owned())
+}
+
+fn human_bytes(bytes: u64) -> String {
+    const UNITS: [&str; 4] = ["B", "KiB", "MiB", "GiB"];
+    let mut value = bytes as f64;
+    let mut unit = 0;
+    while value >= 1024.0 && unit < UNITS.len() - 1 {
+        value /= 1024.0;
+        unit += 1;
+    }
+    if unit == 0 {
+        format!("{bytes} B")
+    } else {
+        format!("{value:.1} {}", UNITS[unit])
+    }
+}
+
+/// Render a [`BundleSizeReport`] as an aligned, human-readable block.
+fn format_bundle_size_report(report: &BundleSizeReport) -> String {
+    let mut out = format!("bundle size: {} across {} files", human_bytes(report.total_bytes), report.file_count);
+    for entry in &report.by_category {
+        out.push_str(&format!(
+            "\n  {:>10}  .{:<8} {} files",
+            human_bytes(entry.bytes),
+            entry.category,
+            entry.count
+        ));
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn analyze_bundle_sizes_groups_by_extension_largest_first() {
+        let files = vec![
+            BundleFile {
+                path: "pkg/app_bg.wasm".into(),
+                bytes: 900_000,
+                seahash: "a".into(),
+            },
+            BundleFile {
+                path: "pkg/app.js".into(),
+                bytes: 50_000,
+                seahash: "b".into(),
+            },
+            BundleFile {
+                path: "assets/logo.png".into(),
+                bytes: 20_000,
+                seahash: "c".into(),
+            },
+            BundleFile {
+                path: "style.css".into(),
+                bytes: 30_000,
+                seahash: "d".into(),
+            },
+            BundleFile {
+                path: "LICENSE".into(),
+                bytes: 1_000,
+                seahash: "e".into(),
+            },
+        ];
+        let report = analyze_bundle_sizes(&files);
+        assert_eq!(report.total_bytes, 1_001_000);
+        assert_eq!(report.file_count, 5);
+        // Largest first: wasm(900k) > js(50k) > css(30k) > png(20k) > ext-less(1k).
+        let cats: Vec<&str> = report.by_category.iter().map(|e| e.category.as_str()).collect();
+        assert_eq!(cats, vec!["wasm", "js", "css", "png", "(no ext)"]);
+        assert_eq!(report.by_category[0].bytes, 900_000);
+    }
+
+    #[test]
+    fn human_bytes_scales_units() {
+        assert_eq!(human_bytes(512), "512 B");
+        assert_eq!(human_bytes(2048), "2.0 KiB");
+        assert_eq!(human_bytes(5 * 1024 * 1024), "5.0 MiB");
+    }
 
     #[test]
     fn precompresses_static_text_and_wasm_assets() {
@@ -1248,6 +1918,73 @@ mod tests {
             assert!(mapped.starts_with("/assets/logo.glory."), "{mapped}");
             assert!(mapped.ends_with(".webp"), "{mapped}");
             assert!(root.join(mapped.trim_start_matches('/')).is_file());
+        });
+    }
+
+    #[test]
+    fn responsive_widths_small_image_returns_only_self() {
+        // Below the floor for any half-step: only the source width.
+        assert_eq!(responsive_widths(200), vec![200]);
+        assert_eq!(responsive_widths(600), vec![600]);
+        assert_eq!(responsive_widths(0), Vec::<u32>::new());
+    }
+
+    #[test]
+    fn responsive_widths_large_image_returns_dedup_descending_steps() {
+        // 1600 -> [1600, 800, 400]; halves stay >= MIN_RESPONSIVE_WIDTH (320).
+        assert_eq!(responsive_widths(1600), vec![1600, 800, 400]);
+        // 1000 -> [1000, 500]; quarter (250) drops below the 320 floor.
+        assert_eq!(responsive_widths(1000), vec![1000, 500]);
+        // Descending and unique.
+        let widths = responsive_widths(2048);
+        assert!(widths.windows(2).all(|w| w[0] > w[1]), "{widths:?}");
+    }
+
+    #[test]
+    fn encode_resized_webp_produces_nonempty_webp_at_target_width() {
+        let image = image::DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(800, 400, image::Rgba([0, 128, 255, 255])));
+        let mut png = Cursor::new(Vec::new());
+        image.write_to(&mut png, image::ImageFormat::Png).unwrap();
+        let png = png.into_inner();
+
+        let webp = encode_resized_webp(&png, 400).unwrap();
+        assert!(!webp.is_empty());
+        let decoded = image::load_from_memory_with_format(&webp, image::ImageFormat::WebP).unwrap();
+        assert_eq!(decoded.width(), 400);
+        // Aspect ratio preserved: 800x400 -> 400x200.
+        assert_eq!(decoded.height(), 200);
+
+        // Target larger than source must not upscale.
+        let same = encode_resized_webp(&png, 1600).unwrap();
+        let decoded = image::load_from_memory_with_format(&same, image::ImageFormat::WebP).unwrap();
+        assert_eq!(decoded.width(), 800);
+
+        assert!(encode_resized_webp(&png, 0).is_err());
+    }
+
+    #[test]
+    fn responsive_image_variants_emit_srcset_for_large_image() {
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        runtime.block_on(async {
+            let dir = temp_dir::TempDir::new().unwrap();
+            let root = Utf8PathBuf::from_path_buf(dir.path().join("dist")).unwrap();
+            std::fs::create_dir_all(root.join("assets")).unwrap();
+
+            let image = image::DynamicImage::ImageRgba8(image::RgbaImage::from_pixel(1600, 800, image::Rgba([10, 20, 30, 255])));
+            let mut png = Cursor::new(Vec::new());
+            image.write_to(&mut png, image::ImageFormat::Png).unwrap();
+            std::fs::write(root.join("assets/hero.png"), png.into_inner()).unwrap();
+
+            let mut asset_map = BTreeMap::new();
+            write_optimized_image_assets(BuildTarget::Desktop, &root, &mut asset_map).await.unwrap();
+
+            let srcset = asset_map.get("srcset:/assets/hero.png").expect("srcset recorded");
+            assert!(srcset.contains("/assets/hero.glory-800w.webp 800w"), "{srcset}");
+            assert!(srcset.contains("/assets/hero.glory-400w.webp 400w"), "{srcset}");
+            // Full-size width is not duplicated into the srcset.
+            assert!(!srcset.contains("1600w"), "{srcset}");
+            assert!(root.join("assets/hero.glory-800w.webp").is_file());
+            assert!(root.join("assets/hero.glory-400w.webp").is_file());
         });
     }
 
@@ -1358,6 +2095,122 @@ options:
         assert_eq!(ios_project_name(&root).as_deref(), Some("DemoApp"));
         assert_eq!(ios_bundle_id(&root, "DemoApp").as_deref(), Some("com.example.DemoApp"));
         assert_eq!(pascal_case("my-mobile_app"), "MyMobileApp");
+    }
+
+    #[test]
+    fn macos_app_layout_places_contents_subdirs() {
+        let layout = MacOsAppLayout::new("MyApp", "server");
+        assert_eq!(layout.macos_dir, Utf8PathBuf::from("Contents/MacOS"));
+        assert_eq!(layout.resources_dir, Utf8PathBuf::from("Contents/Resources"));
+        assert_eq!(layout.info_plist, Utf8PathBuf::from("Contents/Info.plist"));
+        assert_eq!(layout.exe_path, Utf8PathBuf::from("Contents/MacOS/server"));
+    }
+
+    #[test]
+    fn macos_info_plist_carries_identifiers_and_versions() {
+        let plist = macos_info_plist("My App", "server", "com.glory.my-app", "1.2.3-beta.1");
+        assert!(plist.contains("<key>CFBundleExecutable</key>\n\t<string>server</string>"), "{plist}");
+        assert!(
+            plist.contains("<key>CFBundleIdentifier</key>\n\t<string>com.glory.my-app</string>"),
+            "{plist}"
+        );
+        // CFBundleVersion keeps the full version; ShortVersionString is semver-trimmed.
+        assert!(plist.contains("<key>CFBundleVersion</key>\n\t<string>1.2.3-beta.1</string>"), "{plist}");
+        assert!(
+            plist.contains("<key>CFBundleShortVersionString</key>\n\t<string>1.2.3</string>"),
+            "{plist}"
+        );
+        assert!(plist.contains("<key>CFBundlePackageType</key>\n\t<string>APPL</string>"), "{plist}");
+    }
+
+    #[test]
+    fn macos_bundle_id_is_reverse_dns() {
+        // Name sanitized like a debian package and joined under the prefix.
+        assert_eq!(macos_bundle_id_with_prefix("com.glory", "My Cool App"), "com.glory.my-cool-app");
+        assert_eq!(macos_bundle_id_with_prefix("io.acme", "Glory++"), "io.acme.glory++");
+    }
+
+    #[test]
+    fn codesign_args_use_deep_sign_identity() {
+        let creds = MacSignCredentials {
+            identity: "Developer ID Application: Acme".to_owned(),
+        };
+        let args = codesign_args(&creds, "/tmp/MyApp.app");
+        assert_eq!(
+            args,
+            vec![
+                "--deep",
+                "--force",
+                "--timestamp",
+                "--options",
+                "runtime",
+                "--sign",
+                "Developer ID Application: Acme",
+                "/tmp/MyApp.app",
+            ]
+        );
+    }
+
+    #[test]
+    fn notarytool_args_for_password_and_api_key() {
+        let pw = NotaryCredentials {
+            apple_id: "dev@acme.io".to_owned(),
+            team_id: "ABCDE12345".to_owned(),
+            secret: NotarySecret::Password("app-pw".to_owned()),
+        };
+        let args = notarytool_args(&pw, "/tmp/app.dmg");
+        assert_eq!(
+            args,
+            vec![
+                "notarytool",
+                "submit",
+                "/tmp/app.dmg",
+                "--apple-id",
+                "dev@acme.io",
+                "--team-id",
+                "ABCDE12345",
+                "--password",
+                "app-pw",
+                "--wait",
+            ]
+        );
+
+        let key = NotaryCredentials {
+            apple_id: "dev@acme.io".to_owned(),
+            team_id: "ABCDE12345".to_owned(),
+            secret: NotarySecret::ApiKey("KEY123".to_owned()),
+        };
+        let args = notarytool_args(&key, "/tmp/app.dmg");
+        assert_eq!(args, vec!["notarytool", "submit", "/tmp/app.dmg", "--key", "KEY123", "--wait"]);
+
+        assert_eq!(stapler_args("/tmp/app.dmg"), vec!["stapler", "staple", "/tmp/app.dmg"]);
+    }
+
+    #[test]
+    fn apprun_script_execs_bundled_binary() {
+        let script = apprun_script("server");
+        assert!(script.starts_with("#!/usr/bin/env sh"), "{script}");
+        assert!(script.contains(r#"exec "$HERE/usr/bin/server" "$@""#), "{script}");
+        assert!(script.contains(r#"export PATH="$HERE/usr/bin:$PATH""#), "{script}");
+    }
+
+    #[test]
+    fn appimage_desktop_entry_references_package() {
+        let entry = appimage_desktop_entry("My App", "my-app");
+        assert!(entry.contains("Name=My App"), "{entry}");
+        assert!(entry.contains("Exec=my-app"), "{entry}");
+        assert!(entry.contains("Icon=my-app"), "{entry}");
+        assert!(entry.contains("Type=Application"), "{entry}");
+    }
+
+    #[test]
+    fn wix_download_url_and_cache_dir_are_deterministic() {
+        assert_eq!(
+            wix_download_url("wix3141rtm"),
+            "https://github.com/wixtoolset/wix3/releases/download/wix3141rtm/wix314-binaries.zip"
+        );
+        let dir = wix_cache_dir("3.14.1").unwrap();
+        assert!(dir.ends_with(std::path::Path::new("glory-cli/wix-3.14.1")), "{}", dir.display());
     }
 
     #[test]

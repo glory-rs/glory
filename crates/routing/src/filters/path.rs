@@ -832,6 +832,29 @@ impl Filter for PathFilter {
     fn filter(&self, url: &Url, _truck: &Truck, state: &mut PathState) -> bool {
         self.detect(url, state)
     }
+
+    #[inline]
+    fn specificity(&self) -> i32 {
+        self.wisps.iter().map(wisp_specificity).sum()
+    }
+}
+
+/// Per-segment specificity score: static segments rank highest, dynamic
+/// segments in the middle, and catch-alls lowest (negative) so they only win
+/// when nothing more specific matches. Summed across a pattern's segments by
+/// [`PathFilter::specificity`].
+fn wisp_specificity(wisp: &WispKind) -> i32 {
+    match wisp {
+        WispKind::Const(_) => 100,
+        // A constrained character set is nearly as specific as a const literal.
+        WispKind::Chars(_) => 90,
+        WispKind::Regex(w) if w.name.starts_with('*') => -100,
+        WispKind::Regex(_) => 60,
+        WispKind::Named(w) if w.0.starts_with('*') => -100,
+        WispKind::Named(_) => 40,
+        // A combined segment is as specific as the sum of its parts.
+        WispKind::Comb(comb) => comb.0.iter().map(wisp_specificity).sum(),
+    }
 }
 impl PathFilter {
     /// Create new `PathFilter`.
@@ -891,11 +914,27 @@ impl PathFilter {
 #[cfg(test)]
 mod tests {
     use super::PathParser;
+    use crate::filters::Filter;
     use crate::url::Url;
     use crate::{PathFilter, PathState};
 
     fn test_url() -> Url {
         Url::parse("http://localhost/").unwrap()
+    }
+
+    #[test]
+    fn specificity_ranks_static_above_dynamic_above_catch_all() {
+        let static_route = PathFilter::new("/users/list");
+        let dynamic = PathFilter::new("/users/<id>");
+        let catch_all = PathFilter::new("/users/<**rest>");
+        let bare_catch_all = PathFilter::new("/<**rest>");
+
+        assert!(static_route.specificity() > dynamic.specificity());
+        assert!(dynamic.specificity() > catch_all.specificity());
+        assert!(
+            bare_catch_all.specificity() < 0,
+            "a bare catch-all should rank below any concrete segment"
+        );
     }
 
     #[test]

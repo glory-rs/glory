@@ -18,8 +18,18 @@ blitz-dom = { version = "0.3.0-alpha.5", optional = true }
 blitz-shell = { version = "0.3.0-alpha.5", optional = true, default-features = false }
 blitz-traits = { version = "0.3.0-alpha.5", optional = true, default-features = false }
 glory-core = { workspace = true }
+log = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 winit = { version = "0.31.0-beta.2", optional = true }
+
+[dev-dependencies]
+# NT6 screenshot regression: drive the layout/paint pipeline (paint the blitz
+# document into a vello off-screen image buffer) and inspect the AccessKit tree.
+# Versions pinned to the workspace lock (anyrender 0.11, blitz-paint /
+# accesskit aligned with blitz-dom 0.3.0-alpha.5).
+anyrender = "0.11"
+blitz-paint = { version = "0.3.0-alpha.5", default-features = false }
+accesskit = "0.24"
 
 [lints]
 workspace = true
@@ -27,6 +37,11 @@ workspace = true
 [features]
 # Experimental Blitz consumer: applies Command batches to a blitz-dom
 # BaseDocument (the spike for a native non-webview renderer).
-blitz = ["dep:blitz-dom", "glory-core/backend-command"]
-shell = ["blitz", "dep:anyrender_vello", "dep:blitz-shell", "dep:blitz-traits", "dep:serde_json", "dep:winit"]
+# Experimental Blitz consumer: applies Command batches to a blitz-dom
+# BaseDocument (the spike for a native non-webview renderer). `blitz-traits`
+# is pulled in here (not just under `shell`) so the image/net provider (NT5)
+# and its loadable-asset resolution are available to any consumer, headless or
+# windowed.
+blitz = ["dep:blitz-dom", "dep:blitz-traits", "dep:log", "glory-core/backend-command"]
+shell = ["blitz", "dep:anyrender_vello", "dep:blitz-shell", "dep:serde_json", "dep:winit"]
 accessibility = ["shell", "blitz-dom/accessibility", "blitz-shell/accessibility"]

@@ -24,6 +24,11 @@ where
             self.second.filter(url, truck, state)
         }
     }
+
+    #[inline]
+    fn specificity(&self) -> i32 {
+        self.first.specificity().max(self.second.specificity())
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -44,6 +49,11 @@ where
         } else {
             (self.callback)(url, truck, state)
         }
+    }
+
+    #[inline]
+    fn specificity(&self) -> i32 {
+        self.filter.specificity()
     }
 }
 
@@ -72,6 +82,11 @@ where
             self.second.filter(url, truck, state)
         }
     }
+
+    #[inline]
+    fn specificity(&self) -> i32 {
+        self.first.specificity() + self.second.specificity()
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -92,6 +107,11 @@ where
         } else {
             (self.callback)(url, truck, state)
         }
+    }
+
+    #[inline]
+    fn specificity(&self) -> i32 {
+        self.filter.specificity()
     }
 }
 

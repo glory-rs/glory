@@ -10,6 +10,7 @@ mod fmt;
 mod new;
 mod self_update;
 mod serve;
+pub mod ssg;
 mod test;
 pub mod watch;
 
@@ -25,5 +26,6 @@ pub use fmt::fmt;
 pub use new::NewCommand;
 pub use self_update::self_update;
 pub use serve::serve;
+pub use ssg::generate_all as ssg_all;
 pub use test::test_all;
 pub use watch::watch;

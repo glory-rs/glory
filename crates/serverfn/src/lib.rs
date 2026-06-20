@@ -237,6 +237,53 @@ impl ServerFnError {
         Self::Http(ServerFnHttpError::new(status, message))
     }
 
+    /// 400 Bad Request.
+    pub fn bad_request(message: impl Into<String>) -> Self {
+        Self::http(400, message)
+    }
+
+    /// 401 Unauthorized — missing or invalid credentials.
+    pub fn unauthorized(message: impl Into<String>) -> Self {
+        Self::http(401, message)
+    }
+
+    /// 403 Forbidden — authenticated but not permitted.
+    pub fn forbidden(message: impl Into<String>) -> Self {
+        Self::http(403, message)
+    }
+
+    /// 404 Not Found, as a function-controlled HTTP error (distinct from
+    /// [`ServerFnError::NotFound`], which means *no function is registered*).
+    pub fn not_found(message: impl Into<String>) -> Self {
+        Self::http(404, message)
+    }
+
+    /// 409 Conflict.
+    pub fn conflict(message: impl Into<String>) -> Self {
+        Self::http(409, message)
+    }
+
+    /// 500 Internal Server Error, as an explicit HTTP error.
+    pub fn internal(message: impl Into<String>) -> Self {
+        Self::http(500, message)
+    }
+
+    /// The HTTP status this error maps to, whatever its variant. Alias of
+    /// [`status_code`](Self::status_code) read as a layered-error accessor.
+    pub fn http_status(&self) -> u16 {
+        self.status_code()
+    }
+
+    /// True when this is a client error (4xx).
+    pub fn is_client_error(&self) -> bool {
+        (400..500).contains(&self.status_code())
+    }
+
+    /// True when this is a server error (5xx).
+    pub fn is_server_error(&self) -> bool {
+        (500..600).contains(&self.status_code())
+    }
+
     pub fn redirect(location: impl Into<String>) -> Self {
         Self::Http(ServerFnHttpError::redirect(location))
     }
@@ -1111,6 +1158,358 @@ impl StreamingResponse {
     }
 }
 
+// ===========================================================================
+// FS1 — server functions that return a streaming response (NDJSON items)
+// ===========================================================================
+
+/// Content type carrying a binary download stream (FS2).
+pub const OCTET_STREAM_CONTENT_TYPE: &str = "application/octet-stream";
+
+/// A streaming server-function response: an `impl Stream<Item = Result<T,
+/// ServerFnError>>` that is encoded over the wire as NDJSON and decoded by the
+/// client back into a `Stream` of the same items.
+///
+/// Server functions annotated with `#[server(stream)]` return this type. Each
+/// item is serialized as one NDJSON line, so the client can surface values as
+/// soon as each line arrives instead of waiting for the whole body.
+///
+/// On the server build it owns the boxed item stream; the codec turns it into a
+/// [`StreamingResponse`] via [`StreamResponse::into_streaming_response`]. On the
+/// client it is constructed from a decoded item stream by
+/// [`StreamResponse::from_item_stream`].
+pub struct StreamResponse<T> {
+    #[cfg(not(target_arch = "wasm32"))]
+    items: futures::stream::BoxStream<'static, Result<T, ServerFnError>>,
+    #[cfg(target_arch = "wasm32")]
+    items: std::pin::Pin<Box<dyn futures::Stream<Item = Result<T, ServerFnError>>>>,
+}
+
+/// Alias matching the Dioxus `JsonStream<T>` naming. Identical to
+/// [`StreamResponse`]: items cross the wire as NDJSON lines.
+pub type JsonStream<T> = StreamResponse<T>;
+
+impl<T> StreamResponse<T>
+where
+    T: Serialize + DeserializeOwned + 'static,
+{
+    /// Wraps a server-side item stream. `Send` is required so the stream can be
+    /// driven by the adapter response writer.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn new(items: impl futures::Stream<Item = Result<T, ServerFnError>> + Send + 'static) -> Self {
+        Self { items: Box::pin(items) }
+    }
+
+    /// Convenience constructor for a server stream of infallible items.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn from_items<I>(items: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        I::IntoIter: Send + 'static,
+    {
+        use futures::StreamExt;
+        Self::new(futures::stream::iter(items).map(Ok))
+    }
+
+    /// Encodes the item stream as an NDJSON [`StreamingResponse`].
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn into_streaming_response(self) -> StreamingResponse {
+        use futures::StreamExt;
+        let body = self.items.map(|item| item.and_then(|value| encode_json_line(&value)));
+        StreamingResponse::new(NDJSON_CONTENT_TYPE, body)
+    }
+
+    /// Builds a client-side [`StreamResponse`] from an already-decoded item
+    /// stream (what the generated client stub returns).
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn from_item_stream(items: impl futures::Stream<Item = Result<T, ServerFnError>> + Send + 'static) -> Self {
+        Self { items: Box::pin(items) }
+    }
+
+    /// Builds a client-side [`StreamResponse`] from an already-decoded item
+    /// stream (what the generated client stub returns).
+    #[cfg(target_arch = "wasm32")]
+    pub fn from_item_stream(items: impl futures::Stream<Item = Result<T, ServerFnError>> + 'static) -> Self {
+        Self { items: Box::pin(items) }
+    }
+
+    /// Consumes the wrapper, yielding the underlying item stream.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn into_item_stream(self) -> futures::stream::BoxStream<'static, Result<T, ServerFnError>> {
+        self.items
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn into_item_stream(self) -> std::pin::Pin<Box<dyn futures::Stream<Item = Result<T, ServerFnError>>>> {
+        self.items
+    }
+}
+
+impl<T> futures::Stream for StreamResponse<T> {
+    type Item = Result<T, ServerFnError>;
+
+    fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {
+        self.items.as_mut().poll_next(cx)
+    }
+}
+
+/// Decodes a stream of raw byte chunks (an HTTP body delivered incrementally)
+/// into a stream of NDJSON items. Drives an [`NdjsonDecoder`] across chunk
+/// boundaries and flushes the trailing line when the source ends.
+///
+/// This is the client-side counterpart of
+/// [`StreamResponse::into_streaming_response`] and is transport-agnostic: feed
+/// it a `reqwest` `bytes_stream`, a wasm `fetch` reader, or a test fixture.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn decode_ndjson_stream<S, T>(chunks: S) -> impl futures::Stream<Item = Result<T, ServerFnError>> + Send
+where
+    S: futures::Stream<Item = Result<Vec<u8>, ServerFnError>> + Send + 'static,
+    T: DeserializeOwned + Send + 'static,
+{
+    decode_ndjson_stream_inner(Box::pin(chunks))
+}
+
+/// Wasm counterpart of [`decode_ndjson_stream`]: the `fetch` reader stream is
+/// not `Send`, so this variant drops the `Send` bounds.
+#[cfg(target_arch = "wasm32")]
+pub fn decode_ndjson_stream<S, T>(chunks: S) -> impl futures::Stream<Item = Result<T, ServerFnError>>
+where
+    S: futures::Stream<Item = Result<Vec<u8>, ServerFnError>> + 'static,
+    T: DeserializeOwned + 'static,
+{
+    use futures::StreamExt;
+    decode_ndjson_stream_inner(chunks.boxed_local())
+}
+
+/// Shared incremental NDJSON decode loop. Takes an already-pinned chunk stream
+/// so the `Send`/`!Send` boxing decision lives in the public wrappers.
+fn decode_ndjson_stream_inner<C, T>(chunks: C) -> impl futures::Stream<Item = Result<T, ServerFnError>>
+where
+    C: futures::Stream<Item = Result<Vec<u8>, ServerFnError>> + Unpin,
+    T: DeserializeOwned,
+{
+    use futures::StreamExt;
+
+    let decoder = NdjsonDecoder::<T>::new();
+    futures::stream::unfold((chunks, decoder, false), |(mut chunks, mut decoder, finished)| async move {
+        if finished {
+            return None;
+        }
+        loop {
+            match chunks.next().await {
+                Some(Ok(chunk)) => match decoder.push_chunk(&chunk) {
+                    Ok(items) if items.is_empty() => continue,
+                    Ok(items) => return Some((Ok(items), (chunks, decoder, false))),
+                    Err(err) => return Some((Err(err), (chunks, decoder, true))),
+                },
+                Some(Err(err)) => return Some((Err(err), (chunks, decoder, true))),
+                None => {
+                    let tail = decoder.finish();
+                    return Some((tail, (chunks, decoder, true)));
+                }
+            }
+        }
+    })
+    .flat_map(|batch: Result<Vec<T>, ServerFnError>| match batch {
+        Ok(items) => futures::stream::iter(items.into_iter().map(Ok).collect::<Vec<_>>()),
+        Err(err) => futures::stream::iter(vec![Err(err)]),
+    })
+}
+
+// ===========================================================================
+// FS2 — binary download streams
+// ===========================================================================
+
+/// A binary download stream: an `impl Stream<Item = Result<Vec<u8>,
+/// ServerFnError>>` of raw byte chunks, returned by `#[server(stream)]`
+/// functions whose item type is `Vec<u8>`.
+///
+/// Unlike [`StreamResponse`] the chunks are written to the response body
+/// verbatim (content type `application/octet-stream`) with no NDJSON framing,
+/// so it suits large file downloads and exports. The client reads the chunks
+/// back as a byte stream via [`StreamingBytes::from_chunk_stream`].
+pub struct StreamingBytes {
+    #[cfg(not(target_arch = "wasm32"))]
+    chunks: BoxedByteStream,
+    #[cfg(target_arch = "wasm32")]
+    chunks: std::pin::Pin<Box<dyn futures::Stream<Item = Result<Vec<u8>, ServerFnError>>>>,
+    content_type: String,
+}
+
+/// Alias for [`StreamingBytes`] mirroring the `ByteStream` naming used by other
+/// fullstack frameworks.
+pub type ByteStream = StreamingBytes;
+
+impl StreamingBytes {
+    /// Wraps a server-side chunk stream with the default
+    /// `application/octet-stream` content type.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn new(chunks: impl futures::Stream<Item = Result<Vec<u8>, ServerFnError>> + Send + 'static) -> Self {
+        Self {
+            chunks: Box::pin(chunks),
+            content_type: OCTET_STREAM_CONTENT_TYPE.to_owned(),
+        }
+    }
+
+    /// Wraps a chunk stream with an explicit content type (e.g. `image/png`).
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn with_content_type(
+        content_type: impl Into<String>,
+        chunks: impl futures::Stream<Item = Result<Vec<u8>, ServerFnError>> + Send + 'static,
+    ) -> Self {
+        Self {
+            chunks: Box::pin(chunks),
+            content_type: content_type.into(),
+        }
+    }
+
+    /// Streams a single in-memory buffer as one chunk.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn from_bytes(bytes: impl Into<Vec<u8>>) -> Self {
+        Self::new(futures::stream::once(futures::future::ready(Ok(bytes.into()))))
+    }
+
+    /// Streams a sequence of in-memory chunks.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn from_chunks<I>(chunks: I) -> Self
+    where
+        I: IntoIterator<Item = Vec<u8>>,
+        I::IntoIter: Send + 'static,
+    {
+        use futures::StreamExt;
+        Self::new(futures::stream::iter(chunks).map(Ok))
+    }
+
+    /// Sets the content type (builder form).
+    pub fn content_type(mut self, content_type: impl Into<String>) -> Self {
+        self.content_type = content_type.into();
+        self
+    }
+
+    pub fn content_type_str(&self) -> &str {
+        &self.content_type
+    }
+
+    /// Encodes the chunk stream as a raw binary [`StreamingResponse`].
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn into_streaming_response(self) -> StreamingResponse {
+        StreamingResponse::new(self.content_type, self.chunks)
+    }
+
+    /// Builds a client-side [`StreamingBytes`] from a decoded chunk stream.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn from_chunk_stream(chunks: impl futures::Stream<Item = Result<Vec<u8>, ServerFnError>> + Send + 'static) -> Self {
+        Self {
+            chunks: Box::pin(chunks),
+            content_type: OCTET_STREAM_CONTENT_TYPE.to_owned(),
+        }
+    }
+
+    /// Builds a client-side [`StreamingBytes`] from a decoded chunk stream.
+    #[cfg(target_arch = "wasm32")]
+    pub fn from_chunk_stream(chunks: impl futures::Stream<Item = Result<Vec<u8>, ServerFnError>> + 'static) -> Self {
+        Self {
+            chunks: Box::pin(chunks),
+            content_type: OCTET_STREAM_CONTENT_TYPE.to_owned(),
+        }
+    }
+
+    /// Collects every chunk into one buffer. Useful for tests and small bodies.
+    pub async fn collect_bytes(self) -> Result<Vec<u8>, ServerFnError> {
+        use futures::StreamExt;
+        let mut buffer = Vec::new();
+        let mut chunks = self.chunks;
+        while let Some(chunk) = chunks.next().await {
+            buffer.extend_from_slice(&chunk?);
+        }
+        Ok(buffer)
+    }
+}
+
+impl futures::Stream for StreamingBytes {
+    type Item = Result<Vec<u8>, ServerFnError>;
+
+    fn poll_next(mut self: std::pin::Pin<&mut Self>, cx: &mut std::task::Context<'_>) -> std::task::Poll<Option<Self::Item>> {
+        self.chunks.as_mut().poll_next(cx)
+    }
+}
+
+// ===========================================================================
+// FS3 — typed WebSocket endpoints (serverfn-style contract)
+// ===========================================================================
+
+/// A typed bidirectional WebSocket contract declared serverfn-style.
+///
+/// `In` is the message type the client sends to the server; `Out` is what the
+/// server sends back. Both travel as [`TransportMessage`] envelopes encoded as
+/// JSON text frames (see [`encode_transport_json`] / [`WebSocketFrame`]), so
+/// the contract is symmetric and reuses the existing transport codec.
+///
+/// The endpoint carries the URL its socket lives at (e.g.
+/// `/__glory/ws/chat`). On the server, an adapter upgrades the connection and
+/// uses [`WebSocketEndpoint::decode_incoming`] / [`encode_outgoing`] to talk
+/// the wire protocol. On the client, [`WebSocketEndpoint::connect`] returns the
+/// existing [`ReactiveWebSocket`] hook so consumers stay on one code path.
+pub struct WebSocketEndpoint<In, Out> {
+    path: String,
+    _marker: std::marker::PhantomData<fn(In) -> Out>,
+}
+
+impl<In, Out> Clone for WebSocketEndpoint<In, Out> {
+    fn clone(&self) -> Self {
+        Self {
+            path: self.path.clone(),
+            _marker: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<In, Out> WebSocketEndpoint<In, Out>
+where
+    In: Serialize + DeserializeOwned + std::fmt::Debug + 'static,
+    Out: Serialize + DeserializeOwned + std::fmt::Debug + 'static,
+{
+    /// Declares an endpoint served at `path`.
+    pub fn new(path: impl Into<String>) -> Self {
+        Self {
+            path: path.into(),
+            _marker: std::marker::PhantomData,
+        }
+    }
+
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
+    /// Decodes a text frame received from the peer into an inbound
+    /// [`TransportMessage`] (server-side view: messages of type `In`).
+    pub fn decode_incoming(&self, frame: &str) -> Result<TransportMessage<In>, ServerFnError> {
+        decode_transport_json(frame)
+    }
+
+    /// Encodes an outbound server message (`Out`) as a JSON text frame.
+    pub fn encode_outgoing(&self, message: &TransportMessage<Out>) -> Result<String, ServerFnError> {
+        encode_transport_json(message)
+    }
+
+    /// Encodes a plain `Out` value as a `Data` text frame.
+    pub fn encode_data(&self, value: Out) -> Result<String, ServerFnError> {
+        encode_transport_json(&TransportMessage::Data(value))
+    }
+
+    /// Connects from the client, reusing [`use_websocket`]. The reactive socket
+    /// receives `Out` messages from the server; send `In` messages with
+    /// [`ReactiveWebSocket::send`].
+    ///
+    /// Available on wasm clients (and as a graceful non-wasm stub) exactly like
+    /// [`use_websocket`].
+    pub fn connect(&self) -> ReactiveWebSocket<Out>
+    where
+        Out: Serialize + DeserializeOwned + std::fmt::Debug + 'static,
+    {
+        use_websocket::<Out>(self.path.clone())
+    }
+}
+
 /// Limits applied by [`decode_multipart`].
 #[cfg(not(target_arch = "wasm32"))]
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1845,6 +2244,289 @@ where
     }
 }
 
+// ---------------------------------------------------------------------------
+// Incremental static regeneration (ISR / SSR caching)
+// ---------------------------------------------------------------------------
+//
+// These primitives mirror Dioxus' `RenderFreshness` + `IncrementalRenderer` +
+// `FileSystemCache`: cache a rendered route body alongside the moment it was
+// generated and an optional TTL, then serve it until it goes stale and trigger
+// a background regeneration. Time is injected by the caller (`now: u64`,
+// seconds since the Unix epoch) so the core logic stays clock-free and unit
+// testable; [`now`] is a convenience for callers that want the wall clock.
+
+/// Wall-clock seconds since the Unix epoch, for callers that want to feed the
+/// `now` argument of the cache APIs. The cache logic itself never reads the
+/// clock — it always takes `now` as a parameter so it can be tested
+/// deterministically.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_secs())
+        .unwrap_or(0)
+}
+
+/// When a cached render was generated and how long it stays fresh.
+///
+/// `generated_at` and `ttl_secs` are both expressed in seconds (epoch and
+/// duration respectively). A `ttl_secs` of `None` marks an *immortal* entry
+/// that never goes stale.
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct RenderFreshness {
+    pub generated_at: u64,
+    #[serde(default)]
+    pub ttl_secs: Option<u64>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl RenderFreshness {
+    /// A render generated at `generated_at` that stays fresh for `ttl_secs`.
+    pub fn new(generated_at: u64, ttl_secs: Option<u64>) -> Self {
+        Self { generated_at, ttl_secs }
+    }
+
+    /// A render that never goes stale.
+    pub fn immortal(generated_at: u64) -> Self {
+        Self {
+            generated_at,
+            ttl_secs: None,
+        }
+    }
+
+    /// Seconds elapsed since the render was generated, saturating at 0 if
+    /// `now` predates `generated_at` (e.g. clock skew).
+    pub fn age(&self, now: u64) -> u64 {
+        now.saturating_sub(self.generated_at)
+    }
+
+    /// True when the render has lived past its TTL. Immortal renders
+    /// (`ttl_secs == None`) are never stale.
+    pub fn is_stale(&self, now: u64) -> bool {
+        match self.ttl_secs {
+            Some(ttl) => self.age(now) >= ttl,
+            None => false,
+        }
+    }
+}
+
+/// A rendered route body cached together with its [`RenderFreshness`].
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CachedRender {
+    pub body: Vec<u8>,
+    pub freshness: RenderFreshness,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl CachedRender {
+    pub fn new(body: Vec<u8>, freshness: RenderFreshness) -> Self {
+        Self { body, freshness }
+    }
+
+    /// The body decoded as UTF-8 (the common case for HTML renders).
+    pub fn body_str(&self) -> Result<&str, ServerFnError> {
+        std::str::from_utf8(&self.body).map_err(|err| ServerFnError::Deserialization(err.to_string()))
+    }
+}
+
+/// Process-local route cache for incremental static regeneration.
+///
+/// Keys are route strings (e.g. `/blog/hello`). Entries serve fresh until
+/// their TTL expires; [`get_stale_while_revalidate`](Self::get_stale_while_revalidate)
+/// lets callers serve a stale body immediately while kicking off a
+/// regeneration in the background.
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Debug, Default)]
+pub struct IncrementalCache {
+    entries: std::sync::RwLock<std::collections::HashMap<String, CachedRender>>,
+}
+
+/// Outcome of a stale-while-revalidate lookup.
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StaleRender {
+    pub render: CachedRender,
+    /// True when the returned body is stale and the caller should regenerate.
+    pub needs_revalidation: bool,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl IncrementalCache {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Caches `body` under `key`, generated at `now` with an optional TTL.
+    pub fn insert(&self, key: impl Into<String>, body: impl Into<Vec<u8>>, ttl_secs: Option<u64>, now: u64) {
+        let render = CachedRender::new(body.into(), RenderFreshness::new(now, ttl_secs));
+        self.entries.write().expect("incremental cache lock poisoned").insert(key.into(), render);
+    }
+
+    /// Returns the cached render only if it exists and is still fresh at `now`.
+    pub fn get(&self, key: &str, now: u64) -> Option<CachedRender> {
+        let entries = self.entries.read().expect("incremental cache lock poisoned");
+        let render = entries.get(key)?;
+        (!render.freshness.is_stale(now)).then(|| render.clone())
+    }
+
+    /// Returns the cached render whether fresh or stale, flagging when the
+    /// caller should regenerate it. Returns `None` only on a true miss.
+    pub fn get_stale_while_revalidate(&self, key: &str, now: u64) -> Option<StaleRender> {
+        let entries = self.entries.read().expect("incremental cache lock poisoned");
+        let render = entries.get(key)?.clone();
+        let needs_revalidation = render.freshness.is_stale(now);
+        Some(StaleRender { render, needs_revalidation })
+    }
+
+    /// Drops one route's cached render. Returns whether something was removed.
+    pub fn invalidate(&self, key: &str) -> bool {
+        self.entries.write().expect("incremental cache lock poisoned").remove(key).is_some()
+    }
+
+    /// Drops every cached render.
+    pub fn invalidate_all(&self) {
+        self.entries.write().expect("incremental cache lock poisoned").clear();
+    }
+
+    pub fn len(&self) -> usize {
+        self.entries.read().expect("incremental cache lock poisoned").len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+/// On-disk counterpart of [`IncrementalCache`] for persistent ISR.
+///
+/// Each route is stored as two files directly under `root`: `<slug>.body`
+/// holds the raw bytes and `<slug>.meta.json` holds the original key plus its
+/// [`RenderFreshness`]. The slug is produced by [`escape_cache_key`], which
+/// percent-style escapes every byte outside `[A-Za-z0-9._-]`, guaranteeing the
+/// artifacts stay directly under `root` with no path separators or `..`
+/// traversal.
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone, Debug)]
+pub struct FileSystemCache {
+    root: std::path::PathBuf,
+}
+
+/// Persisted metadata sidecar for a [`FileSystemCache`] entry.
+#[cfg(not(target_arch = "wasm32"))]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+struct FileSystemCacheMeta {
+    key: String,
+    freshness: RenderFreshness,
+}
+
+/// Escapes a cache key into a filesystem-safe slug. Every byte outside the
+/// `[A-Za-z0-9._-]` set becomes `_xx` (lowercase hex), so the result can never
+/// contain `/`, `\`, or `..` segments and always resolves directly under the
+/// cache root.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn escape_cache_key(key: &str) -> String {
+    let mut slug = String::with_capacity(key.len());
+    for (index, &byte) in key.as_bytes().iter().enumerate() {
+        // A leading `.` is escaped so a key like `.` or `..` can never produce
+        // a bare current-/parent-directory slug. Interior dots are safe (no
+        // separators ever survive, so no traversal component can form).
+        let safe = (byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'_' | b'-')) && !(byte == b'.' && index == 0);
+        if safe {
+            slug.push(byte as char);
+        } else {
+            slug.push('_');
+            slug.push_str(&format!("{byte:02x}"));
+        }
+    }
+    if slug.is_empty() {
+        slug.push('_');
+    }
+    slug
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl FileSystemCache {
+    /// Opens (without creating) a cache rooted at `root`. Directories are
+    /// created lazily on the first [`write`](Self::write).
+    pub fn new(root: impl Into<std::path::PathBuf>) -> Self {
+        Self { root: root.into() }
+    }
+
+    pub fn root(&self) -> &std::path::Path {
+        &self.root
+    }
+
+    fn body_path(&self, key: &str) -> std::path::PathBuf {
+        self.root.join(format!("{}.body", escape_cache_key(key)))
+    }
+
+    fn meta_path(&self, key: &str) -> std::path::PathBuf {
+        self.root.join(format!("{}.meta.json", escape_cache_key(key)))
+    }
+
+    /// Renders `body` to disk under `key`, generated at `now` with an
+    /// optional TTL.
+    pub fn insert(&self, key: &str, body: impl AsRef<[u8]>, ttl_secs: Option<u64>, now: u64) -> Result<(), ServerFnError> {
+        self.write(key, body.as_ref(), RenderFreshness::new(now, ttl_secs))
+    }
+
+    /// Persists `body` with an explicit [`RenderFreshness`].
+    pub fn write(&self, key: &str, body: &[u8], freshness: RenderFreshness) -> Result<(), ServerFnError> {
+        std::fs::create_dir_all(&self.root).map_err(|err| ServerFnError::ServerError(format!("create cache dir failed: {err}")))?;
+        let meta = FileSystemCacheMeta {
+            key: key.to_owned(),
+            freshness,
+        };
+        let meta_json = serde_json::to_vec(&meta).map_err(|err| ServerFnError::Serialization(err.to_string()))?;
+        std::fs::write(self.body_path(key), body).map_err(|err| ServerFnError::ServerError(format!("write cache body failed: {err}")))?;
+        std::fs::write(self.meta_path(key), meta_json).map_err(|err| ServerFnError::ServerError(format!("write cache meta failed: {err}")))?;
+        Ok(())
+    }
+
+    /// Loads the persisted render for `key`, fresh or stale. Returns `None`
+    /// when either sidecar file is absent.
+    pub fn load(&self, key: &str) -> Result<Option<CachedRender>, ServerFnError> {
+        let meta_path = self.meta_path(key);
+        let body_path = self.body_path(key);
+        if !meta_path.exists() || !body_path.exists() {
+            return Ok(None);
+        }
+        let meta_bytes = std::fs::read(&meta_path).map_err(|err| ServerFnError::ServerError(format!("read cache meta failed: {err}")))?;
+        let meta: FileSystemCacheMeta = serde_json::from_slice(&meta_bytes).map_err(|err| ServerFnError::Deserialization(err.to_string()))?;
+        let body = std::fs::read(&body_path).map_err(|err| ServerFnError::ServerError(format!("read cache body failed: {err}")))?;
+        Ok(Some(CachedRender::new(body, meta.freshness)))
+    }
+
+    /// Returns the persisted render only if it exists and is still fresh.
+    pub fn get(&self, key: &str, now: u64) -> Result<Option<CachedRender>, ServerFnError> {
+        Ok(self.load(key)?.filter(|render| !render.freshness.is_stale(now)))
+    }
+
+    /// Returns the persisted render whether fresh or stale, flagging when the
+    /// caller should regenerate it. Returns `None` only on a true miss.
+    pub fn get_stale_while_revalidate(&self, key: &str, now: u64) -> Result<Option<StaleRender>, ServerFnError> {
+        Ok(self.load(key)?.map(|render| {
+            let needs_revalidation = render.freshness.is_stale(now);
+            StaleRender { render, needs_revalidation }
+        }))
+    }
+
+    /// Removes both sidecar files for `key`. Returns whether anything existed.
+    pub fn invalidate(&self, key: &str) -> Result<bool, ServerFnError> {
+        let mut removed = false;
+        for path in [self.body_path(key), self.meta_path(key)] {
+            match std::fs::remove_file(&path) {
+                Ok(()) => removed = true,
+                Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+                Err(err) => return Err(ServerFnError::ServerError(format!("remove cache file failed: {err}"))),
+            }
+        }
+        Ok(removed)
+    }
+}
+
 /// JSON state bag that can be embedded into SSR HTML and read by a hydrated
 /// client before it calls the network.
 #[derive(Clone, Debug, Default, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -2084,6 +2766,171 @@ async fn call_remote_wasm(method: &str, path: &str, body: Vec<u8>, encoding: Ser
     } else {
         Err(decode_error_with(response_encoding, &bytes).unwrap_or_else(|_| ServerFnError::Request(format!("HTTP {}", response.status()))))
     }
+}
+
+// ---------------------------------------------------------------------------
+// Client leg — streaming (FS1 / FS2)
+// ---------------------------------------------------------------------------
+
+/// Boxed raw-chunk response stream. `Send` on non-wasm (reqwest), `!Send` on
+/// wasm (the `fetch` reader cannot be `Send`).
+#[cfg(not(target_arch = "wasm32"))]
+type ClientChunkStream = std::pin::Pin<Box<dyn futures::Stream<Item = Result<Vec<u8>, ServerFnError>> + Send>>;
+#[cfg(target_arch = "wasm32")]
+type ClientChunkStream = std::pin::Pin<Box<dyn futures::Stream<Item = Result<Vec<u8>, ServerFnError>>>>;
+
+/// Client leg of a `#[server(stream)]` call returning NDJSON items: POSTs the
+/// JSON-tuple `args`, then decodes the response body incrementally into a
+/// [`StreamResponse`] of `Out` items. Generated stubs call this.
+pub async fn call_remote_stream<Args, Out>(method: &str, path: &str, args: &Args) -> Result<StreamResponse<Out>, ServerFnError>
+where
+    Args: Serialize,
+    Out: DeserializeOwned + Serialize + Send + 'static,
+{
+    let chunks = call_remote_chunk_stream(method, path, args).await?;
+    Ok(StreamResponse::from_item_stream(decode_ndjson_stream::<_, Out>(chunks)))
+}
+
+/// Client leg of a `#[server(stream)]` call whose item type is `Vec<u8>`:
+/// returns the raw response body as a [`StreamingBytes`] chunk stream.
+pub async fn call_remote_byte_stream<Args>(method: &str, path: &str, args: &Args) -> Result<StreamingBytes, ServerFnError>
+where
+    Args: Serialize,
+{
+    let chunks = call_remote_chunk_stream(method, path, args).await?;
+    Ok(StreamingBytes::from_chunk_stream(chunks))
+}
+
+/// Obtains the raw HTTP response body of a streaming server function as a
+/// stream of byte chunks. Backed by `reqwest` `bytes_stream` on non-wasm
+/// clients and the `fetch` `ReadableStream` reader on wasm.
+#[allow(unused_variables)]
+async fn call_remote_chunk_stream<Args>(method: &str, path: &str, args: &Args) -> Result<ClientChunkStream, ServerFnError>
+where
+    Args: Serialize,
+{
+    let method = method.to_ascii_uppercase();
+    let body = encode_args(args)?;
+
+    #[cfg(all(not(target_arch = "wasm32"), feature = "reqwest-client"))]
+    {
+        return call_remote_chunk_stream_reqwest(&method, path, args, body).await;
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        return call_remote_chunk_stream_wasm(&method, path, args, body).await;
+    }
+
+    #[cfg(all(not(target_arch = "wasm32"), not(feature = "reqwest-client")))]
+    {
+        let _ = (method, path, body);
+        Err(ServerFnError::Request(
+            "no HTTP client available: enable the `reqwest-client` feature of glory-serverfn for non-wasm streaming clients".to_owned(),
+        ))
+    }
+}
+
+#[cfg(all(not(target_arch = "wasm32"), feature = "reqwest-client"))]
+async fn call_remote_chunk_stream_reqwest<Args>(method: &str, path: &str, args: &Args, body: Vec<u8>) -> Result<ClientChunkStream, ServerFnError>
+where
+    Args: Serialize,
+{
+    use futures::StreamExt;
+
+    let url = if method == "GET" {
+        format!("{}{}", server_url(), append_get_args(path, args)?)
+    } else {
+        format!("{}{}", server_url(), path)
+    };
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|err| ServerFnError::Request(err.to_string()))?;
+    let request = if method == "GET" {
+        client.get(&url)
+    } else {
+        client.post(&url).header("content-type", JSON_CONTENT_TYPE).body(body)
+    };
+    let response = request.send().await.map_err(|err| ServerFnError::Request(err.to_string()))?;
+    let status = response.status();
+    if !status.is_success() {
+        let bytes = response.bytes().await.map_err(|err| ServerFnError::Request(err.to_string()))?;
+        return Err(decode_error_with(ServerFnEncoding::Json, &bytes).unwrap_or_else(|_| ServerFnError::Request(format!("HTTP {status}"))));
+    }
+    let stream = response
+        .bytes_stream()
+        .map(|chunk| chunk.map(|bytes| bytes.to_vec()).map_err(|err| ServerFnError::Request(err.to_string())));
+    Ok(Box::pin(stream))
+}
+
+#[cfg(target_arch = "wasm32")]
+async fn call_remote_chunk_stream_wasm<Args>(method: &str, path: &str, args: &Args, body: Vec<u8>) -> Result<ClientChunkStream, ServerFnError>
+where
+    Args: Serialize,
+{
+    use wasm_bindgen::JsCast;
+    use wasm_bindgen_futures::JsFuture;
+
+    let request_err = |err: wasm_bindgen::JsValue| ServerFnError::Request(format!("{err:?}"));
+
+    let init = web_sys::RequestInit::new();
+    init.set_method(method);
+    init.set_redirect(web_sys::RequestRedirect::Manual);
+    let url = if method == "GET" {
+        append_get_args(path, args)?
+    } else {
+        let body_value = js_sys::Uint8Array::from(body.as_slice());
+        init.set_body(&body_value);
+        path.to_owned()
+    };
+    let request = web_sys::Request::new_with_str_and_init(&url, &init).map_err(request_err)?;
+    request.headers().set("accept", NDJSON_CONTENT_TYPE).map_err(request_err)?;
+    if method != "GET" {
+        request.headers().set("content-type", JSON_CONTENT_TYPE).map_err(request_err)?;
+    }
+
+    let window = web_sys::window().ok_or_else(|| ServerFnError::Request("no window".to_owned()))?;
+    let response: web_sys::Response = JsFuture::from(window.fetch_with_request(&request))
+        .await
+        .map_err(request_err)?
+        .dyn_into()
+        .map_err(request_err)?;
+
+    if !response.ok() {
+        let buffer = JsFuture::from(response.array_buffer().map_err(request_err)?).await.map_err(request_err)?;
+        let bytes = js_sys::Uint8Array::new(&buffer).to_vec();
+        return Err(
+            decode_error_with(ServerFnEncoding::Json, &bytes).unwrap_or_else(|_| ServerFnError::Request(format!("HTTP {}", response.status())))
+        );
+    }
+
+    let body = response
+        .body()
+        .ok_or_else(|| ServerFnError::Request("response has no body stream".to_owned()))?;
+    // `get_reader()` returns the default reader as an `Object`; it is always a
+    // `ReadableStreamDefaultReader` when called without a `mode` option.
+    let reader: web_sys::ReadableStreamDefaultReader = body.get_reader().unchecked_into();
+
+    let stream = futures::stream::unfold(Some(reader), |reader| async move {
+        let reader = reader?;
+        match JsFuture::from(reader.read()).await {
+            Ok(result) => {
+                let done = js_sys::Reflect::get(&result, &wasm_bindgen::JsValue::from_str("done"))
+                    .ok()
+                    .and_then(|value| value.as_bool())
+                    .unwrap_or(true);
+                if done {
+                    return None;
+                }
+                let value = js_sys::Reflect::get(&result, &wasm_bindgen::JsValue::from_str("value")).unwrap_or(wasm_bindgen::JsValue::UNDEFINED);
+                let chunk = js_sys::Uint8Array::new(&value).to_vec();
+                Some((Ok(chunk), Some(reader)))
+            }
+            Err(err) => Some((Err(ServerFnError::Request(format!("{err:?}"))), None)),
+        }
+    });
+    Ok(Box::pin(stream))
 }
 
 // ---------------------------------------------------------------------------

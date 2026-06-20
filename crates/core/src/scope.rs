@@ -304,6 +304,72 @@ impl Scope {
     {
         crate::reflow::resource_hydratable_in(self, future_fn)
     }
+
+    /// Spawn a fire-and-forget async task scoped to this scope. Convenience
+    /// wrapper around [`crate::reflow::use_future_in`].
+    pub fn use_future<F, Fut>(&mut self, future_fn: F) -> ViewId
+    where
+        F: Fn() -> Fut + 'static,
+        Fut: std::future::Future<Output = ()> + 'static,
+    {
+        crate::reflow::use_future_in(self, future_fn)
+    }
+
+    /// Start a long-lived, message-driven coroutine scoped to this scope.
+    /// Convenience wrapper around [`crate::reflow::use_coroutine_in`].
+    pub fn use_coroutine<M, F, Fut>(&mut self, build: F) -> reflow::Coroutine<M>
+    where
+        M: 'static,
+        F: FnOnce(futures::channel::mpsc::UnboundedReceiver<M>) -> Fut,
+        Fut: std::future::Future<Output = ()> + 'static,
+    {
+        crate::reflow::use_coroutine_in(self, build)
+    }
+
+    /// Provide an **app-wide reactive value**, stored as a `Cage<T>` handle in
+    /// the per-app [`Truck`] keyed by `T`. Returns the handle so the caller can
+    /// read/revise it immediately; any later [`use_cage`](Self::use_cage) /
+    /// [`cage_context`](Self::cage_context) of the same `T` resolves to it.
+    ///
+    /// This is Glory's request-isolated answer to a `GlobalSignal`: because the
+    /// `Truck` is scoped to one app/holder instance (not a process-wide
+    /// `static`), the value is naturally isolated per SSR request and per CSR
+    /// app, while still being reachable from any component without prop
+    /// drilling. The cage is **not** owner-reclaimed on any single scope drop —
+    /// it lives with the app context. See `docs/api-guide.md`.
+    pub fn provide_cage<T>(&self, value: T) -> Cage<T>
+    where
+        T: std::fmt::Debug + 'static,
+    {
+        let cage = Cage::new(value);
+        self.truck_mut().inject(cage);
+        cage
+    }
+
+    /// Return the app-wide [`Cage<T>`](Cage) provided earlier, or `None` if no
+    /// value of type `T` has been provided.
+    pub fn cage_context<T>(&self) -> Option<Cage<T>>
+    where
+        T: std::fmt::Debug + 'static,
+    {
+        self.truck().obtain::<Cage<T>>().ok().copied()
+    }
+
+    /// Get the app-wide [`Cage<T>`](Cage), lazily creating it from
+    /// `T::default()` on first use. Reading it inside `build`/`patch` subscribes
+    /// the current view as usual, so mutating the same handle from anywhere
+    /// re-renders every reader — the ergonomics of a `GlobalSignal`, but
+    /// request-isolated through the per-app [`Truck`].
+    pub fn use_cage<T>(&self) -> Cage<T>
+    where
+        T: std::fmt::Debug + Default + 'static,
+    {
+        if let Some(cage) = self.cage_context::<T>() {
+            return cage;
+        }
+        self.provide_cage(T::default())
+    }
+
     pub fn attach_child(&mut self, view_id: &ViewId) {
         let Some(view) = self.child_views.get(view_id) else {
             crate::warn!("attached child view not found in current scope: {}", view_id);
@@ -533,5 +599,37 @@ mod tests {
         };
 
         assert!(cage.try_get_untracked().is_err());
+    }
+
+    #[test]
+    fn use_cage_provides_shared_app_wide_handle() {
+        let truck = Rc::new(RefCell::new(Truck::new()));
+        let scope = Scope::new(
+            ViewId::new(
+                #[cfg(not(feature = "single-app"))]
+                crate::HolderId::null(),
+                "scope".to_string(),
+            ),
+            truck.clone(),
+        );
+
+        // First use creates the cage from Default.
+        let theme = scope.use_cage::<u32>();
+        assert_eq!(*theme.get_untracked(), 0);
+        theme.revise(|mut v| *v = 42);
+
+        // A second scope sharing the same truck resolves to the same handle.
+        let other = Scope::new(
+            ViewId::new(
+                #[cfg(not(feature = "single-app"))]
+                crate::HolderId::null(),
+                "other".to_string(),
+            ),
+            truck,
+        );
+        let same = other.use_cage::<u32>();
+        assert_eq!(*same.get_untracked(), 42);
+        assert!(other.cage_context::<u32>().is_some());
+        assert!(other.cage_context::<i64>().is_none());
     }
 }

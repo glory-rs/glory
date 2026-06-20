@@ -220,6 +220,98 @@ where
     cell
 }
 
+/// Fire-and-forget async task scoped to `parent`.
+///
+/// Unlike [`resource_in`], `use_future_in` does not produce a value cell — it
+/// is the "spawn this future, and re-spawn it when my reactive inputs change"
+/// pattern. `future_fn` is invoked synchronously inside an [`Effect`], so any
+/// reactive reads it does before returning the future subscribe automatically;
+/// when those deps revise, a fresh future is built and spawned.
+///
+/// The task is tied to `parent`'s lifecycle: detaching the scope drops the
+/// effect, so no new future is spawned afterwards. (An in-flight future from a
+/// prior run is not actively cancelled — model long-lived loops with
+/// [`use_coroutine_in`] when you need an explicit shutdown channel.)
+///
+/// ```ignore
+/// use glory::reflow::use_future_in;
+/// fn build(&mut self, ctx: &mut Scope) {
+///     let id = self.id; // Cage<u64>, Copy
+///     use_future_in(ctx, move || {
+///         let id = *id.get();
+///         async move { log_visit(id).await; }
+///     });
+/// }
+/// ```
+pub fn use_future_in<F, Fut>(parent: &mut Scope, future_fn: F) -> ViewId
+where
+    F: Fn() -> Fut + 'static,
+    Fut: std::future::Future<Output = ()> + 'static,
+{
+    let future_fn = Rc::new(future_fn);
+    effect_in(parent, move || {
+        let fut = (future_fn)();
+        crate::spawn::spawn_local(fut);
+    })
+}
+
+/// Handle to a coroutine started with [`use_coroutine_in`]. Cloneable and
+/// `Copy`-friendly to move into event handlers; call [`Coroutine::send`] to
+/// push a message to the running task.
+#[derive(Educe)]
+#[educe(Debug)]
+pub struct Coroutine<M> {
+    #[educe(Debug(ignore))]
+    tx: futures::channel::mpsc::UnboundedSender<M>,
+}
+
+impl<M> Clone for Coroutine<M> {
+    fn clone(&self) -> Self {
+        Self { tx: self.tx.clone() }
+    }
+}
+
+impl<M> Coroutine<M> {
+    /// Send a message to the coroutine. Returns `false` if the coroutine has
+    /// already finished (its receiver was dropped).
+    pub fn send(&self, message: M) -> bool {
+        self.tx.unbounded_send(message).is_ok()
+    }
+}
+
+/// Long-lived, message-driven async task scoped to `parent`.
+///
+/// `build` receives the receiving end of an unbounded channel and returns the
+/// future that drives the coroutine. The returned [`Coroutine`] handle owns the
+/// sender; store it (e.g. in your widget) and call [`Coroutine::send`] from
+/// event handlers to feed the task. When every handle is dropped — typically
+/// when the host widget detaches — the receiver yields `None`, letting a
+/// `while let Some(msg) = rx.next().await` loop terminate cleanly.
+///
+/// ```ignore
+/// use glory::reflow::{use_coroutine_in, Coroutine};
+/// use futures::StreamExt;
+/// // in build:
+/// let worker: Coroutine<String> = use_coroutine_in(ctx, |mut rx| async move {
+///     while let Some(line) = rx.next().await {
+///         send_to_server(line).await;
+///     }
+/// });
+/// // later, in an event handler: worker.send("hello".into());
+/// ```
+pub fn use_coroutine_in<M, F, Fut>(parent: &mut Scope, build: F) -> Coroutine<M>
+where
+    M: 'static,
+    F: FnOnce(futures::channel::mpsc::UnboundedReceiver<M>) -> Fut,
+    Fut: std::future::Future<Output = ()> + 'static,
+{
+    let _ = parent;
+    let (tx, rx) = futures::channel::mpsc::unbounded::<M>();
+    let fut = build(rx);
+    crate::spawn::spawn_local(fut);
+    Coroutine { tx }
+}
+
 #[derive(Clone, Debug)]
 struct ResourceRun {
     generation: Rc<Cell<u64>>,
@@ -299,6 +391,21 @@ impl ResourceSuspenseRun {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn coroutine_send_delivers_until_handle_dropped() {
+        let (tx, mut rx) = futures::channel::mpsc::unbounded::<u32>();
+        let handle = Coroutine { tx };
+        assert!(handle.send(1));
+        let clone = handle.clone();
+        assert!(clone.send(2));
+        assert_eq!(rx.try_recv().ok(), Some(1));
+        assert_eq!(rx.try_recv().ok(), Some(2));
+        // Dropping every sender lets the receiver's stream terminate.
+        drop(handle);
+        drop(clone);
+        assert!(rx.try_recv().is_err());
+    }
 
     #[test]
     fn resource_run_ignores_stale_completion() {

@@ -41,5 +41,10 @@ module.exports = defineConfig({
       testMatch: "hot-reload.spec.js",
       use: desktop,
     },
+    {
+      name: "liveview",
+      testMatch: "liveview.spec.js",
+      use: desktop,
+    },
   ],
 });

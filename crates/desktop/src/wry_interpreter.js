@@ -196,6 +196,38 @@
     }
   };
 
+  // Runs host-supplied JavaScript and posts the JSON-serialized result back
+  // as `{ GloryWryEval: { id, ok, value } }`. The source is wrapped in an
+  // async function body so callers can `await` and return via a trailing
+  // expression. Any thrown error or non-serializable result yields ok=false
+  // with a human-readable message in `value`.
+  window.__gloryWryEval = (id, source) => {
+    const finish = (ok, value) => post({ GloryWryEval: { id, ok, value } });
+    let result;
+    try {
+      const AsyncFunction = Object.getPrototypeOf(async function () {}).constructor;
+      const fn = new AsyncFunction(source);
+      result = fn();
+    } catch (err) {
+      finish(false, String(err && err.stack ? err.stack : err));
+      return;
+    }
+    Promise.resolve(result).then(
+      (value) => {
+        let json;
+        try {
+          json = JSON.stringify(value === undefined ? null : value);
+          if (json === undefined) json = "null";
+        } catch (err) {
+          finish(false, String(err && err.stack ? err.stack : err));
+          return;
+        }
+        finish(true, json);
+      },
+      (err) => finish(false, String(err && err.stack ? err.stack : err)),
+    );
+  };
+
   const announceReady = () => post({ GloryWryReady: true });
   if (document.readyState === "loading") {
     window.addEventListener("DOMContentLoaded", announceReady);

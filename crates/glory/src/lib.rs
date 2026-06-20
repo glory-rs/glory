@@ -18,6 +18,12 @@ pub use glory_core::*;
 pub use glory_macros::__asset_folder;
 #[doc(hidden)]
 pub use glory_macros::__css_module;
+/// The `#[derive(Store)]` macro: generate typed field-accessor stores that
+/// project a root [`Cage`](glory_core::reflow::Cage) into per-field
+/// [`CageLens`](glory_core::reflow::CageLens) handles. See the macro docs
+/// for the generated API and subscription-granularity notes.
+#[doc(no_inline)]
+pub use glory_macros::Store;
 
 #[macro_export]
 macro_rules! asset_folder {

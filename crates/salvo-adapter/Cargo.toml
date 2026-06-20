@@ -13,6 +13,7 @@ license = { workspace = true }
 categories = { workspace = true }
 
 [dependencies]
+futures = { workspace = true }
 glory-core = { workspace = true, features = ["salvo"] }
 salvo = { workspace = true }
 

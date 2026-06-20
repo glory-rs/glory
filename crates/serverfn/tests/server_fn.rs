@@ -717,3 +717,412 @@ fn preloaded_state_round_trips_and_escapes_script_payload() {
     assert!(script.contains("\\u003ctask\\u003e"), "{script}");
     assert!(!script.contains("<task>"), "{script}");
 }
+
+#[test]
+fn server_fn_error_http_status_layering_round_trips() {
+    for (err, status) in [
+        (ServerFnError::bad_request("bad"), 400),
+        (ServerFnError::unauthorized("no token"), 401),
+        (ServerFnError::forbidden("nope"), 403),
+        (ServerFnError::not_found("gone"), 404),
+        (ServerFnError::conflict("dup"), 409),
+        (ServerFnError::internal("boom"), 500),
+    ] {
+        assert_eq!(err.http_status(), status, "{err:?}");
+        // The HTTP layer (status + headers) survives the serialized boundary.
+        let json = serde_json::to_string(&err).unwrap();
+        let back: ServerFnError = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.http_status(), status, "round-trip {back:?}");
+    }
+
+    assert!(ServerFnError::unauthorized("x").is_client_error());
+    assert!(!ServerFnError::unauthorized("x").is_server_error());
+    assert!(ServerFnError::internal("x").is_server_error());
+}
+
+// ---------------------------------------------------------------------------
+// FS1: streaming server-function responses (NDJSON items)
+// ---------------------------------------------------------------------------
+
+#[server(stream)]
+async fn stream_todos(prefix: String, count: usize) -> Result<glory_serverfn::StreamResponse<Todo>, ServerFnError> {
+    let items = (0..count as u32).map(move |id| {
+        Ok(Todo {
+            id,
+            title: format!("{prefix}-{id}"),
+            done: id % 2 == 0,
+        })
+    });
+    Ok(glory_serverfn::StreamResponse::new(futures::stream::iter(items.collect::<Vec<_>>())))
+}
+
+#[test]
+fn stream_response_encodes_ndjson_and_decodes_back_to_items() {
+    use futures::StreamExt;
+
+    futures::executor::block_on(async {
+        // Server side: call the function directly, encode the item stream as an
+        // NDJSON streaming body, and collect the wire bytes.
+        let response = stream_todos("task".into(), 3).await.unwrap();
+        let body = response.into_streaming_response().into_body();
+        let chunks = body.collect::<Vec<_>>().await;
+        let wire: Vec<u8> = chunks.into_iter().flat_map(Result::unwrap).collect();
+
+        // Each item is one NDJSON line.
+        assert_eq!(wire.iter().filter(|byte| **byte == b'\n').count(), 3);
+
+        // Client side: decode the body (delivered as arbitrary chunks) back into
+        // a stream of items.
+        let split = wire.len() / 2;
+        let chunk_stream = futures::stream::iter(vec![Ok(wire[..split].to_vec()), Ok(wire[split..].to_vec())]);
+        let items: Vec<Todo> = glory_serverfn::decode_ndjson_stream::<_, Todo>(chunk_stream)
+            .map(Result::unwrap)
+            .collect()
+            .await;
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[1].title, "task-1");
+        assert!(items[0].done);
+    });
+}
+
+#[test]
+fn stream_response_from_item_stream_round_trips_on_client_side() {
+    use futures::StreamExt;
+
+    futures::executor::block_on(async {
+        let response = glory_serverfn::StreamResponse::from_item_stream(futures::stream::iter(vec![
+            Ok(Todo {
+                id: 1,
+                title: "a".into(),
+                done: false,
+            }),
+            Err(ServerFnError::ServerError("mid-stream".into())),
+        ]));
+        let collected: Vec<Result<Todo, ServerFnError>> = response.collect().await;
+        assert_eq!(collected.len(), 2);
+        assert_eq!(collected[0].as_ref().unwrap().title, "a");
+        assert!(matches!(collected[1], Err(ServerFnError::ServerError(_))));
+    });
+}
+
+#[test]
+fn decode_ndjson_stream_surfaces_chunk_errors() {
+    use futures::StreamExt;
+
+    futures::executor::block_on(async {
+        let chunks = futures::stream::iter(vec![
+            Ok(b"{\"id\":1,\"title\":\"a\",\"done\":false}\n".to_vec()),
+            Err(ServerFnError::Request("network".into())),
+        ]);
+        let items: Vec<Result<Todo, ServerFnError>> = glory_serverfn::decode_ndjson_stream::<_, Todo>(chunks).collect().await;
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0].as_ref().unwrap().id, 1);
+        assert!(matches!(items[1], Err(ServerFnError::Request(_))));
+    });
+}
+
+// ---------------------------------------------------------------------------
+// FS2: binary download streams
+// ---------------------------------------------------------------------------
+
+#[server(stream)]
+async fn download_blob(size: usize) -> Result<glory_serverfn::StreamingBytes, ServerFnError> {
+    let chunks = (0..size).map(|index| vec![index as u8; 4]);
+    Ok(glory_serverfn::StreamingBytes::from_chunks(chunks).content_type("application/octet-stream"))
+}
+
+#[test]
+fn streaming_bytes_encodes_raw_chunks_without_framing() {
+    use futures::StreamExt;
+
+    futures::executor::block_on(async {
+        let bytes = download_blob(3).await.unwrap();
+        assert_eq!(bytes.content_type_str(), "application/octet-stream");
+        let response = bytes.into_streaming_response();
+        assert_eq!(response.content_type(), glory_serverfn::OCTET_STREAM_CONTENT_TYPE);
+
+        let chunks = response.into_body().collect::<Vec<_>>().await;
+        let collected: Vec<Vec<u8>> = chunks.into_iter().map(Result::unwrap).collect();
+        // Raw chunk boundaries are preserved (no NDJSON newline framing).
+        assert_eq!(collected, vec![vec![0u8; 4], vec![1u8; 4], vec![2u8; 4]]);
+    });
+}
+
+#[test]
+fn streaming_bytes_collects_and_round_trips_via_chunk_stream() {
+    futures::executor::block_on(async {
+        let server = glory_serverfn::StreamingBytes::from_chunks(vec![b"hello ".to_vec(), b"world".to_vec()]);
+        let wire = server.collect_bytes().await.unwrap();
+        assert_eq!(wire, b"hello world");
+
+        // Client side: rebuild from a decoded chunk stream and collect.
+        let client = glory_serverfn::StreamingBytes::from_chunk_stream(futures::stream::iter(vec![Ok(b"hel".to_vec()), Ok(b"lo".to_vec())]));
+        assert_eq!(client.collect_bytes().await.unwrap(), b"hello");
+    });
+}
+
+// ---------------------------------------------------------------------------
+// FS3: typed WebSocket endpoints
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+struct ChatIn {
+    text: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+struct ChatOut {
+    from: String,
+    text: String,
+}
+
+#[test]
+fn websocket_endpoint_round_trips_typed_frames() {
+    let endpoint = glory_serverfn::WebSocketEndpoint::<ChatIn, ChatOut>::new("/__glory/ws/chat");
+    assert_eq!(endpoint.path(), "/__glory/ws/chat");
+
+    // Client -> server: an inbound `In` data frame.
+    let inbound_wire = glory_serverfn::encode_transport_json(&glory_serverfn::TransportMessage::Data(ChatIn { text: "hi".into() })).unwrap();
+    let decoded = endpoint.decode_incoming(&inbound_wire).unwrap();
+    assert_eq!(decoded, glory_serverfn::TransportMessage::Data(ChatIn { text: "hi".into() }));
+
+    // Server -> client: an outbound `Out` data frame.
+    let outbound = endpoint
+        .encode_data(ChatOut {
+            from: "srv".into(),
+            text: "yo".into(),
+        })
+        .unwrap();
+    assert_eq!(
+        glory_serverfn::decode_transport_json::<ChatOut>(&outbound).unwrap(),
+        glory_serverfn::TransportMessage::Data(ChatOut {
+            from: "srv".into(),
+            text: "yo".into()
+        })
+    );
+
+    // A close envelope crosses the same codec.
+    let close = endpoint
+        .encode_outgoing(&glory_serverfn::TransportMessage::<ChatOut>::close("bye"))
+        .unwrap();
+    assert_eq!(
+        glory_serverfn::decode_transport_json::<ChatOut>(&close).unwrap(),
+        glory_serverfn::TransportMessage::Close { reason: "bye".into() }
+    );
+
+    // The endpoint is cloneable (so it can be captured into adapter closures).
+    let cloned = endpoint.clone();
+    assert_eq!(cloned.path(), endpoint.path());
+}
+
+#[test]
+fn websocket_endpoint_connect_uses_use_websocket_hook() {
+    // `connect()` is a thin wrapper over `use_websocket`; on non-wasm it yields
+    // the graceful "unsupported" socket, proving the client path compiles and
+    // reuses the existing hook.
+    let endpoint = glory_serverfn::WebSocketEndpoint::<ChatIn, ChatOut>::new("ws://localhost/chat");
+    let socket = endpoint.connect();
+    assert!(matches!(
+        &*socket.state().get_untracked(),
+        glory_serverfn::WebSocketConnectionState::Failed(message) if message.contains("not available")
+    ));
+}
+
+// ---------------------------------------------------------------------------
+// FS6: ISR / SSR caching
+// ---------------------------------------------------------------------------
+
+use glory_serverfn::{CachedRender, FileSystemCache, IncrementalCache, RenderFreshness, escape_cache_key};
+
+/// Creates a unique, empty temp directory for a filesystem-cache test.
+fn unique_cache_dir(tag: &str) -> std::path::PathBuf {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_nanos())
+        .unwrap_or(0);
+    let seq = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!("glory-fscache-{tag}-{}-{nanos}-{seq}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+#[test]
+fn render_freshness_age_and_staleness() {
+    let fresh = RenderFreshness::new(100, Some(60));
+    assert_eq!(fresh.age(160), 60);
+    assert_eq!(fresh.age(130), 30);
+    // Saturating: a `now` before generation yields age 0, not underflow.
+    assert_eq!(fresh.age(50), 0);
+
+    assert!(!fresh.is_stale(159));
+    assert!(fresh.is_stale(160), "TTL boundary is inclusive (age >= ttl)");
+    assert!(fresh.is_stale(1_000));
+
+    // Immortal entries never go stale.
+    let immortal = RenderFreshness::immortal(100);
+    assert_eq!(immortal.ttl_secs, None);
+    assert!(!immortal.is_stale(u64::MAX));
+
+    // Freshness survives the serialized boundary.
+    let json = serde_json::to_string(&fresh).unwrap();
+    let back: RenderFreshness = serde_json::from_str(&json).unwrap();
+    assert_eq!(back, fresh);
+}
+
+#[test]
+fn cached_render_body_str() {
+    let render = CachedRender::new(b"<h1>hi</h1>".to_vec(), RenderFreshness::immortal(0));
+    assert_eq!(render.body_str().unwrap(), "<h1>hi</h1>");
+    // Invalid UTF-8 surfaces a deserialization error rather than panicking.
+    let binary = CachedRender::new(vec![0xff, 0xfe], RenderFreshness::immortal(0));
+    assert!(binary.body_str().is_err());
+}
+
+#[test]
+fn incremental_cache_hit_miss_and_ttl_expiry() {
+    let cache = IncrementalCache::new();
+    assert!(cache.is_empty());
+    assert!(cache.get("/a", 0).is_none(), "miss on empty cache");
+
+    cache.insert("/a", b"page-a".to_vec(), Some(30), 100);
+    assert_eq!(cache.len(), 1);
+    assert!(!cache.is_empty());
+
+    // Fresh hit.
+    let hit = cache.get("/a", 120).unwrap();
+    assert_eq!(hit.body, b"page-a");
+    assert_eq!(hit.freshness.generated_at, 100);
+
+    // Different key still misses.
+    assert!(cache.get("/b", 120).is_none());
+
+    // Past TTL: fresh `get` misses.
+    assert!(cache.get("/a", 130).is_none(), "expired at age == ttl");
+    assert!(cache.get("/a", 200).is_none());
+
+    // Immortal entry never expires.
+    cache.insert("/c", b"forever".to_vec(), None, 0);
+    assert!(cache.get("/c", u64::MAX).is_some());
+}
+
+#[test]
+fn incremental_cache_invalidate_and_invalidate_all() {
+    let cache = IncrementalCache::new();
+    cache.insert("/a", b"a".to_vec(), None, 0);
+    cache.insert("/b", b"b".to_vec(), None, 0);
+
+    assert!(cache.invalidate("/a"));
+    assert!(!cache.invalidate("/a"), "second invalidate is a no-op");
+    assert!(cache.get("/a", 0).is_none());
+    assert!(cache.get("/b", 0).is_some());
+
+    cache.invalidate_all();
+    assert!(cache.is_empty());
+    assert!(cache.get("/b", 0).is_none());
+}
+
+#[test]
+fn incremental_cache_stale_while_revalidate() {
+    let cache = IncrementalCache::new();
+    assert!(cache.get_stale_while_revalidate("/a", 0).is_none(), "true miss");
+
+    cache.insert("/a", b"page".to_vec(), Some(30), 100);
+
+    // Fresh: served without needing revalidation.
+    let fresh = cache.get_stale_while_revalidate("/a", 110).unwrap();
+    assert_eq!(fresh.render.body, b"page");
+    assert!(!fresh.needs_revalidation);
+
+    // Stale: still served, but flagged for regeneration.
+    let stale = cache.get_stale_while_revalidate("/a", 200).unwrap();
+    assert_eq!(stale.render.body, b"page");
+    assert!(stale.needs_revalidation);
+}
+
+#[test]
+fn filesystem_cache_write_then_read_back_from_new_instance() {
+    let dir = unique_cache_dir("roundtrip");
+
+    {
+        let cache = FileSystemCache::new(&dir);
+        cache.insert("/blog/hello world", b"<h1>hi</h1>", Some(3_600), 1_000).unwrap();
+    }
+
+    // Reopen the same directory with a fresh instance.
+    let reopened = FileSystemCache::new(&dir);
+    let loaded = reopened.load("/blog/hello world").unwrap().unwrap();
+    assert_eq!(loaded.body, b"<h1>hi</h1>");
+    assert_eq!(loaded.freshness.generated_at, 1_000);
+    assert_eq!(loaded.freshness.ttl_secs, Some(3_600));
+
+    // Fresh `get` hits within the TTL.
+    let hit = reopened.get("/blog/hello world", 2_000).unwrap().unwrap();
+    assert_eq!(hit.body_str().unwrap(), "<h1>hi</h1>");
+
+    // Missing key returns None, not an error.
+    assert!(reopened.load("/missing").unwrap().is_none());
+    assert!(reopened.get("/missing", 0).unwrap().is_none());
+
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn filesystem_cache_expired_entry_does_not_hit() {
+    let dir = unique_cache_dir("expiry");
+    let cache = FileSystemCache::new(&dir);
+    cache.insert("/a", b"page", Some(60), 100).unwrap();
+
+    // Within TTL: hit.
+    assert!(cache.get("/a", 150).unwrap().is_some());
+
+    // Past TTL: `get` misses, but the stale body is still loadable + flagged.
+    assert!(cache.get("/a", 160).unwrap().is_none());
+    let stale = cache.get_stale_while_revalidate("/a", 1_000).unwrap().unwrap();
+    assert_eq!(stale.render.body, b"page");
+    assert!(stale.needs_revalidation);
+
+    // Invalidate removes both sidecar files.
+    assert!(cache.invalidate("/a").unwrap());
+    assert!(!cache.invalidate("/a").unwrap());
+    assert!(cache.load("/a").unwrap().is_none());
+
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+#[test]
+fn filesystem_cache_key_escaping_prevents_traversal() {
+    // Path-traversal and separator bytes are all escaped away.
+    for key in ["../../etc/passwd", "/a/b", "a\\b", "..", "c:\\windows", "key with spaces", ""] {
+        let slug = escape_cache_key(key);
+        assert!(!slug.contains('/'), "slug {slug:?} from {key:?} contains /");
+        assert!(!slug.contains('\\'), "slug {slug:?} from {key:?} contains backslash");
+        // A slug can never be a traversal component: there are no separators,
+        // and a bare `.`/`..` slug would itself be a path component, so reject
+        // those explicitly. (Dots elsewhere in the slug are harmless without
+        // an accompanying separator.)
+        assert_ne!(slug, ".", "slug from {key:?} is a `.` component");
+        assert_ne!(slug, "..", "slug from {key:?} is a `..` component");
+        assert!(!slug.is_empty(), "slug for {key:?} is empty");
+        assert!(
+            slug.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-')),
+            "slug {slug:?} from {key:?} has unsafe bytes"
+        );
+    }
+
+    // A traversal-shaped key writes files that stay directly under root.
+    let dir = unique_cache_dir("traversal");
+    let cache = FileSystemCache::new(&dir);
+    cache.insert("../../escape", b"x", None, 0).unwrap();
+
+    let entries: Vec<_> = std::fs::read_dir(&dir).unwrap().map(|entry| entry.unwrap().path()).collect();
+    assert_eq!(entries.len(), 2, "exactly body + meta directly under root: {entries:?}");
+    for path in &entries {
+        assert_eq!(path.parent().unwrap(), dir, "artifact escaped the cache root: {path:?}");
+    }
+    // Round-trips under its original (unescaped) key.
+    assert_eq!(cache.load("../../escape").unwrap().unwrap().body, b"x");
+
+    std::fs::remove_dir_all(&dir).ok();
+}

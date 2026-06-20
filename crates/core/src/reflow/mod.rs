@@ -36,7 +36,7 @@ pub use store::{BTreeMapStoreExt, CageLens, HashMapStoreExt, OptionStoreExt, Sto
 mod lotus;
 pub use lotus::Lotus;
 mod effect;
-pub use effect::{Effect, effect_in, resource_hydratable_in, resource_in};
+pub use effect::{Coroutine, Effect, effect_in, resource_hydratable_in, resource_in, use_coroutine_in, use_future_in};
 pub mod scheduler;
 pub use scheduler::{batch, schedule};
 

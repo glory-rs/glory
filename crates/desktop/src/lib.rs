@@ -96,16 +96,19 @@ pub enum IpcMessage {
     GloryWryEvent(Box<EventData>),
     /// Answer to a `Command::Query` read request.
     GloryWryQuery(glory_core::renderer::QueryResponse),
+    /// Result of a [`DesktopWindowHandle::eval`] script. `value` holds the
+    /// JSON-serialized return value when `ok`, or an error string otherwise.
+    GloryWryEval { id: u64, ok: bool, value: String },
 }
 
 #[cfg(feature = "runtime")]
 mod runtime;
 #[cfg(feature = "runtime")]
 pub use runtime::{
-    Desktop, DesktopConfig, DesktopFileDropEvent, DesktopHotKeyEvent, DesktopHotKeySpec, DesktopHotKeyState, DesktopProtocol, DesktopProtocolRequest,
-    DesktopProtocolResponse, DesktopTrayEvent, DesktopTrayMouseButton, DesktopTrayMouseButtonState, DesktopWindowHandle, DesktopWindowId,
-    DesktopWindowState, MenuItemSpec, MenuSpec, TrayIconImage, TrayIconSpec, asset_url, desktop_protocol_response, launch, launch_with_config,
-    launch_with_handle,
+    ChildWebviewId, Desktop, DesktopChildBounds, DesktopChildSource, DesktopChildWebview, DesktopConfig, DesktopFileDropEvent, DesktopHotKeyEvent,
+    DesktopHotKeySpec, DesktopHotKeyState, DesktopProtocol, DesktopProtocolRequest, DesktopProtocolResponse, DesktopTrayEvent,
+    DesktopTrayMouseButton, DesktopTrayMouseButtonState, DesktopWindowHandle, DesktopWindowId, DesktopWindowState, EvalError, MenuItemSpec, MenuSpec,
+    TrayIconImage, TrayIconSpec, asset_url, desktop_protocol_response, launch, launch_with_config, launch_with_handle,
 };
 
 #[cfg(test)]
@@ -139,6 +142,8 @@ mod tests {
         assert!(WRY_INTERPRETER_JS.contains("GloryWryEvent"));
         assert!(WRY_INTERPRETER_JS.contains("GloryWryReady"));
         assert!(WRY_INTERPRETER_JS.contains("__gloryWryQuery"));
+        assert!(WRY_INTERPRETER_JS.contains("__gloryWryEval"));
+        assert!(WRY_INTERPRETER_JS.contains("GloryWryEval"));
     }
 
     #[test]
@@ -165,6 +170,16 @@ mod tests {
             serde_json::from_str(r#"{"GloryWryReady":true}"#).unwrap(),
             IpcMessage::GloryWryReady(true)
         ));
+
+        let eval: IpcMessage = serde_json::from_str(r#"{"GloryWryEval":{"id":7,"ok":true,"value":"42"}}"#).unwrap();
+        match eval {
+            IpcMessage::GloryWryEval { id, ok, value } => {
+                assert_eq!(id, 7);
+                assert!(ok);
+                assert_eq!(value, "42");
+            }
+            other => panic!("unexpected message {other:?}"),
+        }
     }
 
     #[test]

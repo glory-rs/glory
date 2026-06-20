@@ -393,6 +393,13 @@ fn stable_hash(bytes: &[u8]) -> u64 {
 /// `#[server(middleware = require_auth)]` or a sibling
 /// `#[middleware(require_auth)]` attribute registers an adapter-neutral
 /// server-side middleware function for this endpoint.
+/// `#[server(stream)]` marks a streaming server function. Its return type must
+/// be `Result<StreamResponse<T>, ServerFnError>` (NDJSON items),
+/// `Result<JsonStream<T>, ServerFnError>` (alias), or
+/// `Result<StreamingBytes, ServerFnError>` / `Result<ByteStream, ...>` (raw
+/// binary download chunks). The server build keeps the original function so an
+/// adapter/resource route can pipe it through `into_streaming_response()`; the
+/// wasm client stub fetches the body and decodes it back into a stream.
 #[proc_macro_attribute]
 pub fn server(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut item_fn = parse_macro_input!(item as ItemFn);
@@ -401,9 +408,13 @@ pub fn server(attr: TokenStream, item: TokenStream) -> TokenStream {
     let mut method = "POST".to_owned();
     let mut encoding = "json".to_owned();
     let mut middlewares = Vec::<Expr>::new();
+    let mut stream = false;
     if !attr.is_empty() {
         let parser = syn::meta::parser(|meta| {
-            if meta.path.is_ident("endpoint") {
+            if meta.path.is_ident("stream") {
+                stream = true;
+                Ok(())
+            } else if meta.path.is_ident("endpoint") {
                 let value: LitStr = meta.value()?.parse()?;
                 endpoint = Some(value.value());
                 Ok(())
@@ -433,7 +444,7 @@ pub fn server(attr: TokenStream, item: TokenStream) -> TokenStream {
                 Ok(())
             } else {
                 Err(meta.error(
-                    "unsupported #[server] option; expected `endpoint = \"...\"`, `method = \"GET\"`, `encoding = \"cbor\"`, `encoding = \"postcard\"`, or `middleware = path`",
+                    "unsupported #[server] option; expected `stream`, `endpoint = \"...\"`, `method = \"GET\"`, `encoding = \"cbor\"`, `encoding = \"postcard\"`, or `middleware = path`",
                 ))
             }
         });
@@ -501,6 +512,35 @@ pub fn server(attr: TokenStream, item: TokenStream) -> TokenStream {
         "postcard" => quote! { glory_serverfn::ServerFnEncoding::Postcard },
         _ => unreachable!("validated server fn encoding"),
     };
+    if stream {
+        if method == "GET" {
+            return syn::Error::new(sig.span(), "#[server(stream)] currently supports only POST requests")
+                .to_compile_error()
+                .into();
+        }
+        // Server build keeps the original function so adapter/resource routes can
+        // call it and pipe the result through `into_streaming_response()`. The
+        // wasm client stub fetches the response body and decodes it back into a
+        // stream. Byte-stream functions (returning `StreamingBytes`/`ByteStream`)
+        // read raw chunks; all others decode NDJSON items.
+        let byte_stream = server_fn_returns_byte_stream(&sig.output);
+        let client_call = if byte_stream {
+            quote! { glory_serverfn::call_remote_byte_stream(#method, #url, &( #(#arg_idents,)* )).await }
+        } else {
+            quote! { glory_serverfn::call_remote_stream(#method, #url, &( #(#arg_idents,)* )).await }
+        };
+        let expanded = quote! {
+            #[cfg(not(target_arch = "wasm32"))]
+            #item_fn
+
+            #[cfg(target_arch = "wasm32")]
+            #vis #sig {
+                #client_call
+            }
+        };
+        return expanded.into();
+    }
+
     let decode_args = if arg_idents.len() == 1 {
         let arg_ident = &arg_idents[0];
         let arg_type = &arg_types[0];
@@ -544,6 +584,203 @@ pub fn server(attr: TokenStream, item: TokenStream) -> TokenStream {
     expanded.into()
 }
 
+/// Derives a typed field-accessor *store* for a named-field struct, so a
+/// root [`Cage`] can be projected into a per-field
+/// [`CageLens`] without writing the getter/setter closures by hand.
+///
+/// For `struct Foo { a: A, b: B }` the derive generates:
+///
+/// - `FooStore<Root>` — a cheap, `Clone` accessor wrapping a
+///   `CageLens<Root, Foo>`. It exposes `.a() -> CageLens<Root, A>` and
+///   `.b() -> CageLens<Root, B>`, each built with
+///   `root_lens.lens(|f| &f.a, |f| &mut f.a)`. It also re-exposes the
+///   underlying root lens via `.as_lens()` / `.cage()` accessors.
+/// - `FooStoreExt` — an extension trait with `.store()`, implemented for
+///   both `Cage<Foo>` and `CageLens<R, Foo>`, so any handle to a `Foo`
+///   can produce a `FooStore`.
+///
+/// ```ignore
+/// #[derive(Debug, glory::Store)]
+/// struct Counter { count: i32, label: String }
+///
+/// let cage = glory::reflow::Cage::new(Counter { count: 0, label: "n".into() });
+/// let store = cage.store();          // FooStoreExt::store
+/// store.count().set(5);              // revises only the `count` projection
+/// assert_eq!(*store.label().get_untracked(), "n");
+/// ```
+///
+/// Subscription granularity: each field accessor returns a `CageLens`
+/// whose reads project through the **root** `Cage`. Reading
+/// `store.count().get()` subscribes the caller to the root cell, and
+/// writing through any field lens bumps the root `Cage` version. The
+/// ergonomic win is typed, boilerplate-free field projection; this derive
+/// does *not* add finer-than-root invalidation — that is bounded by what
+/// `CageLens::get()` subscribes to today (the root version).
+///
+/// Only named-field structs are supported. Tuple structs, unit structs,
+/// and enums produce a compile error.
+#[proc_macro_derive(Store)]
+pub fn derive_store(input: TokenStream) -> TokenStream {
+    match expand_store(parse_macro_input!(input as DeriveInput)) {
+        Ok(tokens) => tokens.into(),
+        Err(err) => err.to_compile_error().into(),
+    }
+}
+
+/// Resolve the path to the reflow module hosting [`CageLens`]/[`Cage`] for
+/// the crate currently invoking the [`Store`](derive_store) derive.
+///
+/// Resolves to `::glory::reflow` for downstream crates depending on the
+/// umbrella `glory` crate, `::glory_core::reflow` for crates depending on
+/// `glory-core` directly, and `crate::reflow` when used from within
+/// `glory-core` itself.
+fn reflow_path() -> TokenStream2 {
+    use proc_macro_crate::{FoundCrate, crate_name};
+
+    if let Ok(found) = crate_name("glory-core") {
+        return match found {
+            FoundCrate::Itself => quote! { crate::reflow },
+            FoundCrate::Name(name) => {
+                let ident = format_ident!("{}", name);
+                quote! { ::#ident::reflow }
+            }
+        };
+    }
+
+    match crate_name("glory") {
+        Ok(FoundCrate::Itself) => quote! { crate::reflow },
+        Ok(FoundCrate::Name(name)) => {
+            let ident = format_ident!("{}", name);
+            quote! { ::#ident::reflow }
+        }
+        Err(_) => quote! { ::glory::reflow },
+    }
+}
+
+fn expand_store(input: DeriveInput) -> syn::Result<TokenStream2> {
+    let fields = match &input.data {
+        Data::Struct(data) => match &data.fields {
+            Fields::Named(fields) => &fields.named,
+            Fields::Unnamed(_) | Fields::Unit => {
+                return Err(syn::Error::new(
+                    input.ident.span(),
+                    "#[derive(Store)] only supports structs with named fields",
+                ));
+            }
+        },
+        _ => {
+            return Err(syn::Error::new(input.ident.span(), "#[derive(Store)] can only be used on structs"));
+        }
+    };
+
+    if !input.generics.params.is_empty() {
+        return Err(syn::Error::new(
+            input.ident.span(),
+            "#[derive(Store)] does not support generic structs yet",
+        ));
+    }
+
+    let reflow = reflow_path();
+    let name = &input.ident;
+    let vis = &input.vis;
+    let store_ident = format_ident!("{}Store", name);
+    let ext_ident = format_ident!("{}StoreExt", name);
+
+    // Pick a root type parameter name that cannot collide with a real type.
+    let root_param = format_ident!("__GloryStoreRoot");
+
+    let mut accessors = Vec::with_capacity(fields.len());
+    for field in fields {
+        let field_ident = field.ident.as_ref().expect("named field has an ident");
+        let field_ty = &field.ty;
+        let doc = format!("Project a field lens onto `{name}::{field_ident}`.");
+        accessors.push(quote! {
+            #[doc = #doc]
+            #vis fn #field_ident(&self) -> #reflow::CageLens<#root_param, #field_ty> {
+                self.__glory_lens.lens(
+                    |__glory_root| &__glory_root.#field_ident,
+                    |__glory_root| &mut __glory_root.#field_ident,
+                )
+            }
+        });
+    }
+
+    let store_doc = format!("Typed field-accessor store for [`{name}`], generated by `#[derive(Store)]`.");
+    let ext_doc = format!("Extension trait producing a [`{store_ident}`] from any handle to a [`{name}`].");
+
+    Ok(quote! {
+        #[doc = #store_doc]
+        #vis struct #store_ident<#root_param>
+        where
+            #root_param: ::std::fmt::Debug + 'static,
+        {
+            __glory_lens: #reflow::CageLens<#root_param, #name>,
+        }
+
+        impl<#root_param> ::std::clone::Clone for #store_ident<#root_param>
+        where
+            #root_param: ::std::fmt::Debug + 'static,
+        {
+            fn clone(&self) -> Self {
+                Self {
+                    __glory_lens: ::std::clone::Clone::clone(&self.__glory_lens),
+                }
+            }
+        }
+
+        impl<#root_param> #store_ident<#root_param>
+        where
+            #root_param: ::std::fmt::Debug + 'static,
+        {
+            #[doc = "Wrap an existing root lens that points at this struct."]
+            #vis fn new(lens: #reflow::CageLens<#root_param, #name>) -> Self {
+                Self { __glory_lens: lens }
+            }
+
+            #[doc = "Borrow the underlying root lens for this struct."]
+            #vis fn as_lens(&self) -> #reflow::CageLens<#root_param, #name> {
+                ::std::clone::Clone::clone(&self.__glory_lens)
+            }
+
+            #[doc = "The root reactive cell backing this store."]
+            #vis fn cage(&self) -> #reflow::Cage<#root_param> {
+                self.__glory_lens.root()
+            }
+
+            #(#accessors)*
+        }
+
+        #[doc = #ext_doc]
+        #vis trait #ext_ident {
+            #[doc = "The root reactive type backing the produced store."]
+            type Root: ::std::fmt::Debug + 'static;
+            #[doc = "Produce the typed field-accessor store."]
+            fn store(self) -> #store_ident<Self::Root>;
+        }
+
+        impl #ext_ident for #reflow::Cage<#name> {
+            type Root = #name;
+            fn store(self) -> #store_ident<Self::Root> {
+                #store_ident::new(#reflow::StoreExt::lens(
+                    &self,
+                    |__glory_root| __glory_root,
+                    |__glory_root| __glory_root,
+                ))
+            }
+        }
+
+        impl<#root_param> #ext_ident for #reflow::CageLens<#root_param, #name>
+        where
+            #root_param: ::std::fmt::Debug + 'static,
+        {
+            type Root = #root_param;
+            fn store(self) -> #store_ident<Self::Root> {
+                #store_ident::new(self)
+            }
+        }
+    })
+}
+
 /// Derives `glory::routing::Routable` for an enum.
 ///
 /// Supported route attributes intentionally mirror Glory's existing path
@@ -573,6 +810,36 @@ pub fn derive_routable(input: TokenStream) -> TokenStream {
     }
 }
 
+/// Resolve the path to the `routing` module for the crate currently invoking
+/// the derive.
+///
+/// Resolves to `::glory::routing` for downstream crates that depend on the
+/// umbrella `glory` crate, and to `crate`/`::glory_routing` when the derive is
+/// used from within `glory-routing` itself (so the routing crate can exercise
+/// the derive in its own tests).
+fn routing_path() -> TokenStream2 {
+    use proc_macro_crate::{FoundCrate, crate_name};
+
+    if let Ok(found) = crate_name("glory-routing") {
+        return match found {
+            FoundCrate::Itself => quote! { crate },
+            FoundCrate::Name(name) => {
+                let ident = format_ident!("{}", name);
+                quote! { ::#ident }
+            }
+        };
+    }
+
+    match crate_name("glory") {
+        Ok(FoundCrate::Itself) => quote! { crate::routing },
+        Ok(FoundCrate::Name(name)) => {
+            let ident = format_ident!("{}", name);
+            quote! { ::#ident::routing }
+        }
+        Err(_) => quote! { ::glory::routing },
+    }
+}
+
 fn expand_routable(input: DeriveInput) -> syn::Result<TokenStream2> {
     let enum_data = match &input.data {
         Data::Enum(data) => data,
@@ -580,6 +847,8 @@ fn expand_routable(input: DeriveInput) -> syn::Result<TokenStream2> {
             return Err(syn::Error::new(input.ident.span(), "#[derive(Routable)] can only be used on enums"));
         }
     };
+
+    let krate = routing_path();
 
     let mut to_url_arms = Vec::new();
     let mut from_url_checks = Vec::new();
@@ -593,8 +862,8 @@ fn expand_routable(input: DeriveInput) -> syn::Result<TokenStream2> {
 
         if let Some(route) = route {
             let pattern = parse_route_pattern(&route)?;
-            to_url_arms.push(to_url_arm(&input.ident, &variant.ident, &variant.fields, &pattern)?);
-            from_url_checks.push(from_url_check(&input.ident, &variant.ident, &variant.fields, &pattern, &route.value())?);
+            to_url_arms.push(to_url_arm(&input.ident, &variant.ident, &variant.fields, &pattern, &krate)?);
+            from_url_checks.push(from_url_check(&input.ident, &variant.ident, &variant.fields, &pattern, &krate)?);
         } else if is_not_found {
             to_url_arms.push(not_found_to_url_arm(&input.ident, &variant.ident, &variant.fields)?);
         } else {
@@ -606,13 +875,7 @@ fn expand_routable(input: DeriveInput) -> syn::Result<TokenStream2> {
 
         for redirect in redirects {
             let pattern = parse_route_pattern(&redirect)?;
-            redirect_checks.push(from_url_check(
-                &input.ident,
-                &variant.ident,
-                &variant.fields,
-                &pattern,
-                &redirect.value(),
-            )?);
+            redirect_checks.push(from_url_check(&input.ident, &variant.ident, &variant.fields, &pattern, &krate)?);
         }
 
         if is_not_found {
@@ -628,7 +891,7 @@ fn expand_routable(input: DeriveInput) -> syn::Result<TokenStream2> {
     let not_found_body = not_found_impl.unwrap_or_else(|| quote! { None });
 
     Ok(quote! {
-        impl #impl_generics ::glory::routing::Routable for #name #type_generics #where_clause {
+        impl #impl_generics #krate::Routable for #name #type_generics #where_clause {
             fn to_url(&self) -> ::std::string::String {
                 match self {
                     #(#to_url_arms)*
@@ -654,8 +917,24 @@ fn expand_routable(input: DeriveInput) -> syn::Result<TokenStream2> {
 
 #[derive(Clone)]
 struct RoutePattern {
+    /// The path-only portion of the pattern (no `?query`), as a literal usable
+    /// with [`match_route_pattern`].
+    path_literal: String,
     parts: Vec<RoutePart>,
+    /// Path parameters, in pattern order.
     params: Vec<RouteParam>,
+    /// Declared query parameters, in pattern order.
+    queries: Vec<QueryParam>,
+}
+
+impl RoutePattern {
+    /// All variant fields bound by this pattern (path params then query params).
+    fn field_names(&self) -> impl Iterator<Item = &str> {
+        self.params
+            .iter()
+            .map(|p| p.field.as_str())
+            .chain(self.queries.iter().map(|q| q.field.as_str()))
+    }
 }
 
 #[derive(Clone)]
@@ -669,6 +948,14 @@ struct RouteParam {
     key: String,
     field: String,
     catch_all: bool,
+}
+
+#[derive(Clone)]
+struct QueryParam {
+    /// Query string key (defaults to the field name).
+    key: String,
+    /// Variant field this query parameter binds to.
+    field: String,
 }
 
 fn route_attr(attrs: &[Attribute]) -> syn::Result<Option<LitStr>> {
@@ -699,26 +986,32 @@ fn parse_route_pattern(lit: &LitStr) -> syn::Result<RoutePattern> {
     if !pattern.starts_with('/') {
         return Err(syn::Error::new(lit.span(), "route patterns must start with '/'"));
     }
-    if pattern.contains('?') || pattern.contains('#') {
+    if pattern.contains('#') {
         return Err(syn::Error::new(
             lit.span(),
-            "query strings and fragments are not supported in #[route]; use RouteQuery helpers in a manual Routable impl",
+            "URL fragments are not supported in #[route]; use a manual Routable impl",
         ));
     }
+
+    // Split off an optional `?query` declaration, e.g. `/search?q&page&tag`.
+    let (path_pattern, query_pattern) = match pattern.split_once('?') {
+        Some((path, query)) => (path, Some(query)),
+        None => (pattern.as_str(), None),
+    };
 
     let mut parts = Vec::new();
     let mut params = Vec::new();
     let mut cursor = 0;
-    while let Some(start_offset) = pattern[cursor..].find('<') {
+    while let Some(start_offset) = path_pattern[cursor..].find('<') {
         let start = cursor + start_offset;
         if start > cursor {
-            parts.push(RoutePart::Const(pattern[cursor..start].to_owned()));
+            parts.push(RoutePart::Const(path_pattern[cursor..start].to_owned()));
         }
-        let end = pattern[start + 1..]
+        let end = path_pattern[start + 1..]
             .find('>')
             .map(|offset| start + 1 + offset)
             .ok_or_else(|| syn::Error::new(lit.span(), "route parameter is missing closing '>'"))?;
-        let raw = &pattern[start + 1..end];
+        let raw = &path_pattern[start + 1..end];
         let param = parse_route_param_name(raw, lit)?;
         if params.iter().any(|existing: &RouteParam| existing.field == param.field) {
             return Err(syn::Error::new(lit.span(), "route parameter field names must be unique"));
@@ -727,11 +1020,61 @@ fn parse_route_pattern(lit: &LitStr) -> syn::Result<RoutePattern> {
         params.push(param);
         cursor = end + 1;
     }
-    if cursor < pattern.len() {
-        parts.push(RoutePart::Const(pattern[cursor..].to_owned()));
+    if cursor < path_pattern.len() {
+        parts.push(RoutePart::Const(path_pattern[cursor..].to_owned()));
     }
 
-    Ok(RoutePattern { parts, params })
+    let queries = parse_query_pattern(query_pattern, lit, &params)?;
+
+    Ok(RoutePattern {
+        path_literal: path_pattern.to_owned(),
+        parts,
+        params,
+        queries,
+    })
+}
+
+/// Parse the `?a&b=field&c` portion of a `#[route]` pattern into query params.
+///
+/// Each entry is either a bare name (`q`) where the query key and the variant
+/// field share the same identifier, or `key=field` to bind a differently named
+/// query key onto a field.
+fn parse_query_pattern(query: Option<&str>, lit: &LitStr, params: &[RouteParam]) -> syn::Result<Vec<QueryParam>> {
+    let Some(query) = query else {
+        return Ok(Vec::new());
+    };
+
+    let mut queries: Vec<QueryParam> = Vec::new();
+    for entry in query.split('&') {
+        let entry = entry.trim();
+        if entry.is_empty() {
+            continue;
+        }
+        let (key, field) = match entry.split_once('=') {
+            Some((key, field)) => (key.trim(), field.trim()),
+            None => (entry, entry),
+        };
+        if key.is_empty() || field.is_empty() {
+            return Err(syn::Error::new(lit.span(), "query parameter declarations cannot be empty"));
+        }
+        syn::parse_str::<Ident>(field).map_err(|_| {
+            syn::Error::new(
+                lit.span(),
+                "query parameter field names used by derive must be valid Rust field identifiers",
+            )
+        })?;
+        if params.iter().any(|p| p.field == field) {
+            return Err(syn::Error::new(lit.span(), "query parameter field collides with a path parameter field"));
+        }
+        if queries.iter().any(|q| q.field == field) {
+            return Err(syn::Error::new(lit.span(), "query parameter field names must be unique"));
+        }
+        queries.push(QueryParam {
+            key: key.to_owned(),
+            field: field.to_owned(),
+        });
+    }
+    Ok(queries)
 }
 
 fn parse_route_param_name(raw: &str, lit: &LitStr) -> syn::Result<RouteParam> {
@@ -756,24 +1099,44 @@ fn parse_route_param_name(raw: &str, lit: &LitStr) -> syn::Result<RouteParam> {
     })
 }
 
-fn to_url_arm(enum_ident: &Ident, variant_ident: &Ident, fields: &Fields, pattern: &RoutePattern) -> syn::Result<TokenStream2> {
-    let bindings = route_bindings(fields, &pattern.params)?;
+fn to_url_arm(enum_ident: &Ident, variant_ident: &Ident, fields: &Fields, pattern: &RoutePattern, krate: &TokenStream2) -> syn::Result<TokenStream2> {
+    let bindings = route_bindings(fields, pattern)?;
     let pat = bindings.pattern(enum_ident, variant_ident);
     let pushes = pattern.parts.iter().map(|part| match part {
         RoutePart::Const(value) => quote! {
             __glory_url.push_str(#value);
         },
         RoutePart::Param(param) => {
-            let binding = bindings.binding_for(param);
+            let binding = bindings.binding_for(&param.field);
             if param.catch_all {
                 quote! {
-                    __glory_url.push_str(&::glory::routing::encode_catch_all(#binding));
+                    __glory_url.push_str(&#krate::encode_catch_all(#binding));
                 }
             } else {
                 quote! {
-                    __glory_url.push_str(&::glory::routing::encode_route_param(#binding));
+                    __glory_url.push_str(&#krate::encode_route_param(#binding));
                 }
             }
+        }
+    });
+
+    let query_pushes = pattern.queries.iter().map(|query| {
+        let key = &query.key;
+        let binding = bindings.binding_for(&query.field);
+        match bindings.field_type(&query.field) {
+            Some(ty) if is_vec_type(ty) => quote! {
+                for __glory_value in #binding {
+                    #krate::append_route_query_param(&mut __glory_url, #key, __glory_value);
+                }
+            },
+            Some(ty) if is_option_type(ty) => quote! {
+                if let ::std::option::Option::Some(__glory_value) = #binding {
+                    #krate::append_route_query_param(&mut __glory_url, #key, __glory_value);
+                }
+            },
+            _ => quote! {
+                #krate::append_route_query_param(&mut __glory_url, #key, #binding);
+            },
         }
     });
 
@@ -781,6 +1144,7 @@ fn to_url_arm(enum_ident: &Ident, variant_ident: &Ident, fields: &Fields, patter
         #pat => {
             let mut __glory_url = ::std::string::String::new();
             #(#pushes)*
+            #(#query_pushes)*
             __glory_url
         }
     })
@@ -791,12 +1155,13 @@ fn from_url_check(
     variant_ident: &Ident,
     fields: &Fields,
     pattern: &RoutePattern,
-    route_literal: &str,
+    krate: &TokenStream2,
 ) -> syn::Result<TokenStream2> {
-    let builders = route_builders(fields, &pattern.params)?;
+    let builders = route_builders(fields, pattern, krate)?;
     let build = builders.constructor(enum_ident, variant_ident);
+    let path_literal = &pattern.path_literal;
     Ok(quote! {
-        if let ::std::option::Option::Some(__glory_matched) = ::glory::routing::match_route_pattern(url, #route_literal) {
+        if let ::std::option::Option::Some(__glory_matched) = #krate::match_route_pattern(url, #path_literal) {
             return ::std::option::Option::Some(#build);
         }
     })
@@ -848,6 +1213,8 @@ fn not_found_check(enum_ident: &Ident, variant_ident: &Ident, fields: &Fields) -
 
 struct RouteBindings {
     kind: BindingKind,
+    /// Field name -> declared type, for named variants (used by query encoding).
+    field_types: Vec<(String, Type)>,
 }
 
 enum BindingKind {
@@ -865,52 +1232,71 @@ impl RouteBindings {
         }
     }
 
-    fn binding_for(&self, param: &RouteParam) -> TokenStream2 {
+    /// Token for reading the value bound to `field` inside a match arm.
+    fn binding_for(&self, field: &str) -> TokenStream2 {
         match &self.kind {
             BindingKind::Unit => unreachable!("unit variants cannot have route params"),
             BindingKind::Named(_) => {
-                let ident = format_ident!("{}", param.field);
+                let ident = format_ident!("{}", field);
                 quote! { #ident }
             }
             BindingKind::Unnamed(fields) => {
-                let index = fields
-                    .iter()
-                    .position(|ident| ident == &format_ident!("__glory_field_{}", param.field))
-                    .unwrap_or(0);
+                let target = format_ident!("__glory_field_{}", field);
+                let index = fields.iter().position(|ident| ident == &target).unwrap_or(0);
                 let ident = &fields[index];
                 quote! { #ident }
             }
         }
     }
+
+    fn field_type(&self, field: &str) -> Option<&Type> {
+        self.field_types.iter().find(|(name, _)| name == field).map(|(_, ty)| ty)
+    }
 }
 
-fn route_bindings(fields: &Fields, params: &[RouteParam]) -> syn::Result<RouteBindings> {
+fn route_bindings(fields: &Fields, pattern: &RoutePattern) -> syn::Result<RouteBindings> {
+    let params = &pattern.params;
     match fields {
         Fields::Unit => {
-            if !params.is_empty() {
-                return Err(syn::Error::new_spanned(fields, "unit route variants cannot contain path parameters"));
+            if !params.is_empty() || !pattern.queries.is_empty() {
+                return Err(syn::Error::new_spanned(fields, "unit route variants cannot contain route parameters"));
             }
-            Ok(RouteBindings { kind: BindingKind::Unit })
+            Ok(RouteBindings {
+                kind: BindingKind::Unit,
+                field_types: Vec::new(),
+            })
         }
         Fields::Named(fields) => {
             let mut idents = Vec::new();
+            let mut field_types = Vec::new();
             for field in &fields.named {
                 let ident = field.ident.clone().unwrap();
-                if !params.iter().any(|param| ident == param.field) {
-                    return Err(syn::Error::new(ident.span(), "field does not appear in the #[route] path pattern"));
+                if !pattern.field_names().any(|name| ident == name) {
+                    return Err(syn::Error::new(
+                        ident.span(),
+                        "field does not appear in the #[route] path or query pattern",
+                    ));
                 }
+                field_types.push((ident.to_string(), field.ty.clone()));
                 idents.push(ident);
             }
-            for param in params {
-                if !idents.iter().any(|ident| ident == &format_ident!("{}", param.field)) {
+            for name in pattern.field_names() {
+                if !idents.iter().any(|ident| ident == name) {
                     return Err(syn::Error::new_spanned(fields, "route parameter has no matching field"));
                 }
             }
             Ok(RouteBindings {
                 kind: BindingKind::Named(idents),
+                field_types,
             })
         }
         Fields::Unnamed(fields) => {
+            if !pattern.queries.is_empty() {
+                return Err(syn::Error::new_spanned(
+                    fields,
+                    "tuple route variants do not support query parameters; use a named-field variant",
+                ));
+            }
             if fields.unnamed.len() != params.len() {
                 return Err(syn::Error::new_spanned(
                     fields,
@@ -919,6 +1305,7 @@ fn route_bindings(fields: &Fields, params: &[RouteParam]) -> syn::Result<RouteBi
             }
             Ok(RouteBindings {
                 kind: BindingKind::Unnamed(params.iter().map(|param| format_ident!("__glory_field_{}", param.field)).collect()),
+                field_types: Vec::new(),
             })
         }
     }
@@ -948,18 +1335,24 @@ impl RouteBuilders {
     }
 }
 
-fn route_builders(fields: &Fields, params: &[RouteParam]) -> syn::Result<RouteBuilders> {
+fn route_builders(fields: &Fields, pattern: &RoutePattern, krate: &TokenStream2) -> syn::Result<RouteBuilders> {
+    let params = &pattern.params;
     match fields {
         Fields::Unit => Ok(RouteBuilders { kind: BuilderKind::Unit }),
         Fields::Named(fields) => {
             let mut builders = Vec::new();
             for field in &fields.named {
                 let ident = field.ident.clone().unwrap();
-                let param = params
-                    .iter()
-                    .find(|param| ident == param.field)
-                    .ok_or_else(|| syn::Error::new(ident.span(), "field does not appear in the #[route] path pattern"))?;
-                builders.push((ident, param_parse_expr(param, &field.ty)));
+                if let Some(param) = params.iter().find(|param| ident == param.field) {
+                    builders.push((ident, param_parse_expr(param, &field.ty, krate)));
+                } else if let Some(query) = pattern.queries.iter().find(|query| ident == query.field) {
+                    builders.push((ident, query_parse_expr(query, &field.ty, krate)));
+                } else {
+                    return Err(syn::Error::new(
+                        ident.span(),
+                        "field does not appear in the #[route] path or query pattern",
+                    ));
+                }
             }
             Ok(RouteBuilders {
                 kind: BuilderKind::Named(builders),
@@ -976,7 +1369,7 @@ fn route_builders(fields: &Fields, params: &[RouteParam]) -> syn::Result<RouteBu
                 .unnamed
                 .iter()
                 .zip(params)
-                .map(|(field, param)| param_parse_expr(param, &field.ty))
+                .map(|(field, param)| param_parse_expr(param, &field.ty, krate))
                 .collect();
             Ok(RouteBuilders {
                 kind: BuilderKind::Unnamed(builders),
@@ -985,13 +1378,13 @@ fn route_builders(fields: &Fields, params: &[RouteParam]) -> syn::Result<RouteBu
     }
 }
 
-fn param_parse_expr(param: &RouteParam, ty: &Type) -> TokenStream2 {
+fn param_parse_expr(param: &RouteParam, ty: &Type, krate: &TokenStream2) -> TokenStream2 {
     let key = &param.key;
     if param.catch_all
         && let Some(inner) = vec_inner_type(ty)
     {
         quote! {
-            ::glory::routing::parse_catch_all::<#inner>(
+            #krate::parse_catch_all::<#inner>(
                 __glory_matched.params().get(#key).map(::std::string::String::as_str).unwrap_or_default()
             ).ok()?
         }
@@ -1002,12 +1395,67 @@ fn param_parse_expr(param: &RouteParam, ty: &Type) -> TokenStream2 {
     }
 }
 
+/// Build the expression that reads a derived query parameter from the matched
+/// route. `Vec<T>` fields collect repeated values, `Option<T>` fields parse an
+/// optional value, and every other type requires a single value.
+fn query_parse_expr(query: &QueryParam, ty: &Type, krate: &TokenStream2) -> TokenStream2 {
+    let key = &query.key;
+    if let Some(inner) = vec_inner_type(ty) {
+        quote! {
+            #krate::repeated_query_param::<#inner>(__glory_matched.query(), #key).ok()?
+        }
+    } else if let Some(inner) = option_inner_type(ty) {
+        quote! {
+            #krate::optional_query_param::<#inner>(__glory_matched.query(), #key).ok()?
+        }
+    } else {
+        quote! {
+            #krate::required_query_param(__glory_matched.query(), #key).ok()?
+        }
+    }
+}
+
+/// True when a `#[server(stream)]` function's `Ok` type is a binary chunk
+/// stream (`StreamingBytes` or its `ByteStream` alias), as opposed to an NDJSON
+/// item stream. Recognizes the bare type name regardless of module path.
+fn server_fn_returns_byte_stream(output: &syn::ReturnType) -> bool {
+    let syn::ReturnType::Type(_, ty) = output else {
+        return false;
+    };
+    // Unwrap `Result<Ok, _>` to inspect the `Ok` type when present; otherwise
+    // inspect the return type directly.
+    let ok_ty = generic_inner_type(ty, "Result").unwrap_or(ty);
+    let Type::Path(path) = ok_ty else {
+        return false;
+    };
+    path.path
+        .segments
+        .last()
+        .is_some_and(|segment| segment.ident == "StreamingBytes" || segment.ident == "ByteStream")
+}
+
+fn is_vec_type(ty: &Type) -> bool {
+    vec_inner_type(ty).is_some()
+}
+
+fn is_option_type(ty: &Type) -> bool {
+    option_inner_type(ty).is_some()
+}
+
 fn vec_inner_type(ty: &Type) -> Option<&Type> {
+    generic_inner_type(ty, "Vec")
+}
+
+fn option_inner_type(ty: &Type) -> Option<&Type> {
+    generic_inner_type(ty, "Option")
+}
+
+fn generic_inner_type<'a>(ty: &'a Type, wrapper: &str) -> Option<&'a Type> {
     let Type::Path(path) = ty else {
         return None;
     };
     let segment = path.path.segments.last()?;
-    if segment.ident != "Vec" {
+    if segment.ident != wrapper {
         return None;
     }
     let syn::PathArguments::AngleBracketed(args) = &segment.arguments else {

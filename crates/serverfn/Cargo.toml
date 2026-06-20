@@ -20,14 +20,14 @@ serde_urlencoded = { workspace = true }
 form_urlencoded = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+futures = { workspace = true }
 ciborium = { workspace = true, optional = true }
 postcard = { workspace = true, optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-futures = { workspace = true }
 inventory = { workspace = true }
 tokio = { workspace = true, features = ["rt"] }
-reqwest = { workspace = true, optional = true, features = ["json"] }
+reqwest = { workspace = true, optional = true, features = ["json", "stream"] }
 salvo = { workspace = true, optional = true }
 axum = { workspace = true, optional = true }
 actix-web = { workspace = true, optional = true }
@@ -41,6 +41,8 @@ web-sys = { workspace = true, features = [
   "ErrorEvent",
   "Headers",
   "MessageEvent",
+  "ReadableStream",
+  "ReadableStreamDefaultReader",
   "Request",
   "RequestInit",
   "RequestMode",

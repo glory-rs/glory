@@ -9,6 +9,8 @@ pub enum ReloadType {
     Full,
     Style,
     FunctionReloads(String),
+    /// A compile error that should surface in the browser as an overlay.
+    BuildError(String),
 }
 
 pub struct ReloadSignal {}
@@ -33,6 +35,14 @@ impl ReloadSignal {
                 }
             }
             Err(e) => log::error!(r#"Error could not send reload "Function Reloads" due to: {e}"#),
+        }
+    }
+
+    /// Push a compile-error message to connected reload clients so they can
+    /// render an in-page error overlay.
+    pub fn send_build_error(message: impl Into<String>) {
+        if let Err(e) = RELOAD_CHANNEL.send(ReloadType::BuildError(message.into())) {
+            log::debug!(r#"Error could not send reload "Build Error" due to: {e}"#);
         }
     }
 

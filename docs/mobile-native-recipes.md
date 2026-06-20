@@ -83,3 +83,22 @@ Promote a recipe into a first-party helper only after:
 - at least two examples need the same operation;
 - the data shape can be platform-neutral without hiding important platform
   permission states.
+
+### Decision for the two highest-frequency candidates (`_todos.md` MB3)
+
+Evaluated for promotion now: **permission request** and **share sheet**.
+
+Conclusion: **keep both as app-owned recipes for now; do not promote to a
+first-party Glory API yet.** Rationale against promoting today:
+
+- The first promotion gate above — Android + iOS device/simulator smoke green —
+  is not met (tracked as MB1, externally blocked on real-device/CI access). A
+  thin API we cannot exercise end-to-end on either platform would ship untested.
+- Permission flows are inherently stateful per-OS (granted / denied / "ask
+  again" / permanently-denied differ on Android vs iOS). A premature neutral
+  wrapper would hide exactly the states an app must branch on.
+
+When the gates are met, the intended shape is a minimal, result-returning
+bridge — `request_permission(kind) -> PermissionStatus` and
+`share(payload) -> ShareResult` — over the existing app-owned bridge, **not** a
+broad capability layer. Until then the recipes above are the supported path.

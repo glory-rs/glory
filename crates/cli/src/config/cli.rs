@@ -85,7 +85,8 @@ impl Cli {
         use Commands::{Build, Bundle, Check, Clean, Completions, Config, Doctor, EndToEnd, Fmt, New, Run, SelfUpdate, Serve, Test};
         match &self.command {
             New(_) | Fmt(_) | Completions(_) | SelfUpdate => None,
-            Build(opts) | Check(opts) | Test(opts) | EndToEnd(opts) | Doctor(opts) => Some(opts.clone()),
+            Check(opts) | Test(opts) | EndToEnd(opts) | Doctor(opts) => Some(opts.clone()),
+            Build(opts) => Some(opts.opts.clone()),
             Bundle(opts) => Some(opts.opts.clone()),
             Config(opts) => Some(opts.opts.clone()),
             Serve(opts) => Some(opts.opts.clone()),
@@ -184,6 +185,20 @@ pub struct CleanOpts {
     pub cargo: bool,
 }
 
+/// Extra flags for `build`.
+#[derive(Debug, Clone, Parser, PartialEq, Default)]
+pub struct BuildOpts {
+    #[command(flatten)]
+    pub opts: Opts,
+
+    /// Prerender the given route(s) to a static site (SSG) instead of (or in
+    /// addition to) the regular build. Repeatable, e.g.
+    /// `--ssg / --ssg /about --ssg /blog/post`. Each route is fetched from the
+    /// freshly built app server and written to `dist/<name>/<route>/index.html`.
+    #[arg(long = "ssg", value_name = "ROUTE")]
+    pub ssg: Vec<String>,
+}
+
 /// Extra flags for `bundle`.
 #[derive(Debug, Clone, Parser, PartialEq, Default)]
 pub struct BundleOpts {
@@ -237,7 +252,7 @@ pub enum Commands {
     /// Build and run the app server without watching files or live-reloading.
     Run(RunOpts),
     /// Build the server (feature ssr) and the client (wasm with feature csr).
-    Build(Opts),
+    Build(BuildOpts),
     /// Build in release mode and collect the artifacts into a distributable `dist/` folder.
     Bundle(BundleOpts),
     /// Remove build artifacts (front/server target dirs and the site root).

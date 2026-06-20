@@ -101,7 +101,14 @@ impl Router {
         }
         if !self.routers.is_empty() {
             let original_cursor = path_state.cursor;
-            for child in &self.routers {
+            // Visit children most-specific-first so static routes win over
+            // dynamic ones and catch-alls regardless of registration order. The
+            // sort is stable, so equally-specific siblings keep their declared
+            // order (preserving prior behaviour for unambiguous routes).
+            let mut order: Vec<usize> = (0..self.routers.len()).collect();
+            order.sort_by_key(|&i| std::cmp::Reverse(self.routers[i].specificity()));
+            for idx in order {
+                let child = &self.routers[idx];
                 if let Some(dm) = child.detect(url, truck, path_state) {
                     return Some(DetectMatched {
                         hoops: [&self.hoops[..], &dm.hoops[..]].concat(),
@@ -121,6 +128,14 @@ impl Router {
             });
         }
         None
+    }
+
+    /// Combined specificity of this router's own filters, used to rank it
+    /// against its siblings during [`detect`](Self::detect). Static path
+    /// segments score highest, dynamic ones lower, catch-alls negative.
+    #[inline]
+    pub fn specificity(&self) -> i32 {
+        self.filters.iter().map(|filter| filter.specificity()).sum()
     }
 
     /// Push a router as child of current router.
@@ -479,5 +494,26 @@ mod tests {
         assert!(stuffs.contains_key("shell"));
         assert!(stuffs.contains_key("content"));
         assert!(truck.contains_stuff_key("shell", std::any::type_name::<Shell>()));
+    }
+
+    #[test]
+    fn detect_prefers_static_route_over_earlier_catch_all() {
+        // Register the catch-all FIRST; ranking must still pick the static route.
+        let router = Rc::new(
+            Router::new()
+                .push(Router::with_path("<**rest>").goal(|truck: Rc<RefCell<Truck>>| truck.insert_stuff("page@catch", Shell)))
+                .push(Router::with_path("users").goal(|truck: Rc<RefCell<Truck>>| truck.insert_stuff("page@static", Settings))),
+        );
+        let catcher: Rc<dyn Handler> = Rc::new(|truck: Rc<RefCell<Truck>>| truck.insert_stuff("page@catcher", NotFound));
+        let truck = Rc::new(RefCell::new(Truck::default()));
+        truck.borrow_mut().inject(Locator::new());
+
+        run_route(&truck, &router, &catcher, "/users".to_owned()).unwrap();
+
+        assert!(
+            truck.contains_stuff_key("page", "static"),
+            "static `users` route should win over the earlier catch-all"
+        );
+        assert!(!truck.contains_stuff_key("page", "catch"), "catch-all must not have matched");
     }
 }

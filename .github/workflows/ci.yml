@@ -38,6 +38,9 @@ jobs:
       - name: Test CLI
         run: cargo test -p glory-cli
 
+      - name: Doc tests
+        run: cargo test --doc -p glory-core --features web-ssr
+
       - name: Check public feature set
         run: cargo check -p glory --features "web-ssr backend-command routing server-fn"
 
@@ -127,11 +130,59 @@ jobs:
           cat ssr.log
           exit 1
 
-      - name: Run browser smoke tests
+      - name: Start router example
+        shell: bash
+        run: |
+          cargo run -p glory-cli -- --manifest-path examples/router-basic/Cargo.toml serve --address 127.0.0.1 --port 4103 --no-open --no-reload > router.log 2>&1 &
+          for i in {1..120}; do
+            if curl -fsS http://127.0.0.1:4103 >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat router.log
+          exit 1
+
+      - name: Start fullstack example
+        shell: bash
+        run: |
+          cargo run -p glory-cli -- --manifest-path examples/todomvc-fullstack/Cargo.toml serve --address 127.0.0.1 --port 4104 --no-open --no-reload > fullstack.log 2>&1 &
+          for i in {1..180}; do
+            if curl -fsS http://127.0.0.1:4104 >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat fullstack.log
+          exit 1
+
+      - name: Start hot-reload server (counter under live reload)
+        shell: bash
+        run: |
+          cargo run -p glory-cli -- --manifest-path examples/counter/Cargo.toml serve --address 127.0.0.1 --port 4105 --no-open > hot-reload.log 2>&1 &
+          for i in {1..120}; do
+            if curl -fsS http://127.0.0.1:4105 >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat hot-reload.log
+          exit 1
+
+      - name: Start liveview example
+        shell: bash
+        run: |
+          cargo run --manifest-path examples/liveview-salvo/Cargo.toml > liveview.log 2>&1 &
+          for i in {1..120}; do
+            if curl -fsS http://127.0.0.1:8080 >/dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat liveview.log
+          exit 1
+
+      - name: Run browser e2e tests
         env:
           GLORY_COUNTER_URL: http://127.0.0.1:4101
           GLORY_SSR_URL: http://127.0.0.1:4102
-        run: npm --prefix tests/playwright run test -- --project=web-csr-counter --project=ssr-hydration
+          GLORY_ROUTER_URL: http://127.0.0.1:4103
+          GLORY_FULLSTACK_URL: http://127.0.0.1:4104
+          GLORY_HOT_RELOAD_URL: http://127.0.0.1:4105
+          GLORY_LIVEVIEW_URL: http://127.0.0.1:8080
+        run: npm --prefix tests/playwright run test -- --project=web-csr-counter --project=ssr-hydration --project=web-csr-routing --project=fullstack-serverfn --project=hot-reload --project=liveview
 
       - name: Dump server logs
         if: always()
@@ -139,3 +190,97 @@ jobs:
         run: |
           cat counter.log || true
           cat ssr.log || true
+          cat router.log || true
+          cat fullstack.log || true
+          cat hot-reload.log || true
+          cat liveview.log || true
+
+  cross-platform:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Check core (default)
+        run: cargo check -p glory-core --lib
+
+      - name: Test core (default)
+        run: cargo test -p glory-core --lib
+
+      - name: Test core (SSR)
+        run: cargo test -p glory-core --lib --features web-ssr
+
+      - name: Test server functions
+        run: cargo test -p glory-serverfn
+
+  benches:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Compile benchmarks (no run)
+        run: cargo bench -p glory-core --no-run
+
+  all-features:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-all-features
+        run: cargo install cargo-all-features --locked
+
+      - name: Check feature combinations
+        run: cargo check-all-features -p glory-core -p glory -p glory-routing
+
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install cargo-msrv
+        run: cargo install cargo-msrv --locked
+
+      - name: Verify MSRV (glory-core)
+        run: cargo msrv verify --path crates/core
+
+  semver:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check semver compatibility
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          package: glory-core, glory-routing, glory
+
+  native-screenshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install software Vulkan (lavapipe) + deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools libvulkan1 xvfb \
+            libwayland-dev libxkbcommon-dev
+
+      - name: Native render + screenshot regression (software Vulkan)
+        env:
+          VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          WGPU_BACKEND: vulkan
+        run: |
+          xvfb-run -a cargo test -p glory-native --features shell -- --include-ignored screenshot

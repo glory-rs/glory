@@ -1,3 +1,6 @@
+mod scroll;
+pub use scroll::{DEFAULT_SCROLL_MEMORY_CAPACITY, ScrollMemory, ScrollPosition};
+
 cfg_feature! {
     #![all(target_arch = "wasm32", feature = "web-csr")]
     mod browser;

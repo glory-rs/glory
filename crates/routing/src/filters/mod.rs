@@ -69,6 +69,15 @@ pub trait Filter: fmt::Debug + 'static {
 
     /// Filter a request path.
     fn filter(&self, url: &Url, truck: &Truck, path: &mut PathState) -> bool;
+
+    /// Relative specificity of this filter, used to rank sibling routes.
+    /// Higher wins. Defaults to `0`; [`PathFilter`](crate::filters::PathFilter)
+    /// overrides it from its segments so static routes outrank dynamic ones,
+    /// which outrank catch-alls — independent of registration order.
+    #[inline]
+    fn specificity(&self) -> i32 {
+        0
+    }
 }
 
 /// `FnFilter` accepts a function and uses it to filter a request.

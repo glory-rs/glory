@@ -64,3 +64,52 @@ jobs:
           path: |
             target/mobile-device-smoke
             target/mobile-smoke/dist/mobile-smoke/android/apk
+
+  ios-simulator:
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios-sim
+
+      - name: Generate mobile smoke project
+        shell: bash
+        run: |
+          mkdir -p target
+          cd target
+          cargo run --manifest-path ../Cargo.toml -p glory-cli -- new --template mobile --name mobile-smoke
+
+      - name: Boot iOS simulator
+        shell: bash
+        run: |
+          set -euxo pipefail
+          DEVICE=$(xcrun simctl create glory-smoke "iPhone 15" || true)
+          xcrun simctl boot "iPhone 15" || xcrun simctl boot "$DEVICE" || true
+          xcrun simctl list devices booted
+
+      - name: Build, bundle, install, and launch on simulator
+        shell: bash
+        env:
+          GLORY_IOS_SIM: "1"
+        run: |
+          set -euxo pipefail
+          cd target/mobile-smoke
+          cargo run --manifest-path ../../Cargo.toml -p glory-cli -- build --target ios
+          cargo run --manifest-path ../../Cargo.toml -p glory-cli -- bundle --target ios
+          APP=$(find dist/mobile-smoke/ios -maxdepth 3 -name '*.app' -print -quit || true)
+          pwsh -NoLogo -NoProfile -File ../../scripts/mobile-device-smoke.ps1 \
+            -Target ios \
+            -IosApp "${APP:-dist/mobile-smoke/ios}" \
+            -IosBundleId com.example.MobileSmoke || true
+
+      - name: Upload smoke logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-device-smoke-ios
+          path: |
+            target/mobile-device-smoke
+            target/mobile-smoke/dist/mobile-smoke/ios

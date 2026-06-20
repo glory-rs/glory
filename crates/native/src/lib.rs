@@ -19,6 +19,16 @@ pub use glory_core::renderer::{
 #[cfg(feature = "blitz")]
 mod blitz_consumer;
 #[cfg(feature = "blitz")]
-pub use blitz_consumer::BlitzConsumer;
+pub use blitz_consumer::{BlitzConsumer, LayoutCache, PropertyRoute, property_route};
+
+// Image / sub-resource loading (NT5). The pure URL-resolution helpers compile
+// without any Blitz feature; the `NetProvider` lives behind `blitz`.
+#[cfg(feature = "blitz")]
+mod image_provider;
 #[cfg(feature = "shell")]
-pub use blitz_consumer::{GloryBlitzApplication, GloryBlitzWindowConfig, GloryBlitzWindowId, launch_blitz_window, launch_blitz_window_with_config};
+pub use blitz_consumer::{
+    GloryBlitzApplication, GloryBlitzWindowConfig, GloryBlitzWindowId, launch_blitz_window, launch_blitz_window_with_config, map_dom_event,
+    resolve_event_target,
+};
+#[cfg(feature = "blitz")]
+pub use image_provider::{AssetSource, GLORY_SCHEME, GloryImageProvider, classify_asset_url, resolve_asset_url};

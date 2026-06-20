@@ -10,6 +10,10 @@ pub use ssr::*;
 
 mod head_mixin;
 pub use head_mixin::*;
+/// Typed `<head>` element helpers (`title`/`meta_name`/`link`/...) with
+/// dedup-on-key semantics. Use via `document::title(...)` etc. to avoid name
+/// clashes with the HTML element factories.
+pub mod document;
 pub mod math;
 mod node_meta;
 pub use node_meta::*;
