@@ -13,7 +13,7 @@ license = { workspace = true }
 categories = { workspace = true }
 
 [dependencies]
-anyrender_vello = { version = "0.11", optional = true }
+anyrender_vello = { version = "0.12", optional = true }
 blitz-dom = { version = "0.3.0-alpha.5", optional = true }
 blitz-shell = { version = "0.3.0-alpha.5", optional = true, default-features = false }
 blitz-traits = { version = "0.3.0-alpha.5", optional = true, default-features = false }
