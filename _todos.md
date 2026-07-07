@@ -11,6 +11,25 @@
 
 ---
 
+## 本会话执行情况(2026-07-07，`_report.md` 整改)
+
+根据 2026-07-07 统一审计报告,本轮优先处理可在当前仓库内落地并验证的 P0/P1 文档/门禁问题。
+
+- [x] **RP1 P0** 修复 `cargo test --workspace` 默认失败:给 `crates/glory/tests/routable_derive.rs`
+  配置 manifest 级 `required-features = ["routing"]`,让默认 workspace 测试跳过该 feature-gated
+  集成测试,同时保留显式 `cargo test -p glory --features routing` 覆盖。
+- [x] **RP2 P0** 同步 release readiness:说明 feature-gated integration tests 必须用
+  `required-features` 声明,并把 `cargo test -p glory --features routing` 加入必跑 targeted checks。
+- [x] **RP3 P1** 修正 LiveView 文档漂移:明确 `LiveViewConfig` / `SessionRegistry` /
+  `OutboundBuffer` 是已存在的 adapter-neutral building blocks,但 first-party adapters 还没有
+  协议级 resume/auth/reap 闭环。
+
+仍保留为后续工程项:FS4 真正 over-the-wire 首字节 streaming flush、LiveView adapter-level
+resume/reaper 接线、Mobile 真机/模拟器绿色结果、Native ignored GPU screenshot 常规化、全量
+cargo-all-features 覆盖重 feature crate。
+
+---
+
 ## 本会话执行情况(2026-06-20)
 
 本会话推进并**勾选**了一批可在本仓库内实现/决策并用 `cargo` 验证的任务,均带回归测试、

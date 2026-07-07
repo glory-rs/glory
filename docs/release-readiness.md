@@ -3,7 +3,9 @@
 Use this before tagging or publishing. `cargo test --workspace` is a useful
 broad smoke check, but do not substitute it for the targeted checks below: the
 feature matrix and command-backend paths catch failures a default workspace run
-will not exercise.
+will not exercise. Feature-gated integration tests should declare
+`required-features` in their crate manifest and be covered by an explicit
+targeted command here.
 
 ## Required Checks
 
@@ -16,6 +18,7 @@ will not exercise.
 - [ ] `cargo test -p glory-core --features backend-command`
 - [ ] `cargo test -p glory-serverfn`
 - [ ] `cargo test -p glory-serverfn --features "salvo axum actix"`
+- [ ] `cargo test -p glory --features routing`
 - [ ] `cargo test -p glory-cli --lib --no-default-features`
 - [ ] `cargo test --workspace`
 

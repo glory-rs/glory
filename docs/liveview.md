@@ -118,16 +118,21 @@ local task on the shared worker pool. The session is created after the socket
 upgrade succeeds, mounts the widget, sends the initial command batch, and is
 dropped when the socket loop exits or the worker is otherwise closed.
 
-The adapter-to-session channel is bounded at 32 pending messages, so slow
-server-side widget work applies backpressure instead of growing an unbounded
-queue. The worker pool defaults to `min(available_parallelism, 4)` OS threads
-and can be overridden with `GLORY_LIVEVIEW_WORKERS`.
+The worker pool defaults to `min(available_parallelism, 4)` OS threads and can
+be overridden with `GLORY_LIVEVIEW_WORKERS`.
 
-There is no protocol-level resume token, idle timeout, or session TTL setting
-yet. Connection age, authentication expiry, load balancer idle limits, and
-server shutdown policy must be enforced by the surrounding HTTP/WebSocket
-stack. If resume support is added later, it should be explicit in the protocol
-instead of silently reusing a stale `CommandHolder`.
+The crate includes `LiveViewConfig`, `SessionRegistry`, `ResumeToken`, and
+`OutboundBuffer` as framework-neutral building blocks. `OutboundBuffer` provides
+a coalescing backpressure policy for pending patch batches; `SessionRegistry`
+tracks idle timeout, max lifetime, resume, touch, remove, and reap semantics
+with explicit time injection so adapters can test their own policies.
+
+The first-party adapters still create one `LiveViewSession` per accepted socket
+and drop it when that socket exits. They do not yet expose a protocol-level
+resume handshake, authentication binding, or periodic registry reaper. Until
+those are wired into the adapter protocol, connection age, authentication
+expiry, load balancer idle limits, and server shutdown policy must still be
+enforced by the surrounding HTTP/WebSocket stack.
 
 ## Reconnect Backoff
 

@@ -23,6 +23,10 @@ codecov = { repository = "glory-rs/glory", branch = "main", service = "github" }
 name = "glory"
 path = "src/lib.rs"
 
+[[test]]
+name = "routable_derive"
+path = "tests/routable_derive.rs"
+required-features = ["routing"]
 
 [features]
 default = []
