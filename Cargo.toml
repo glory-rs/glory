@@ -8,11 +8,10 @@ resolver = "2"
 version = "0.3.1"
 authors = ["Chrislearn Young <chris@acroidea.com>"]
 edition = "2024"
-# MSRV policy: bumped to match Rust edition 2024 (stabilised in 1.85);
-# 1.88 is chosen because workspace dependencies (config 0.15, clap 4.6,
-# etc.) require it. Bumping this in a new commit is a SemVer-minor
-# change for Glory itself.
-rust-version = "1.88"
+# MSRV policy: track the highest minimum required by supported workspace
+# dependencies. Salvo 0.94 requires Rust 1.94; bumping this value is a
+# SemVer-minor change for Glory itself.
+rust-version = "1.94"
 description = """
 Glory is an experimental rust web front framework.
 """
