@@ -758,6 +758,7 @@ pub fn map_dom_event(name: &str, glory_id: u64, data: &blitz_traits::events::Dom
         D::PointerMove(pointer)
         | D::PointerDown(pointer)
         | D::PointerUp(pointer)
+        | D::PointerCancel(pointer)
         | D::PointerEnter(pointer)
         | D::PointerLeave(pointer)
         | D::PointerOver(pointer)
@@ -771,7 +772,11 @@ pub fn map_dom_event(name: &str, glory_id: u64, data: &blitz_traits::events::Dom
         | D::MouseOut(pointer)
         | D::Click(pointer)
         | D::ContextMenu(pointer)
-        | D::DoubleClick(pointer) => {
+        | D::DoubleClick(pointer)
+        | D::TouchStart(pointer)
+        | D::TouchMove(pointer)
+        | D::TouchEnd(pointer)
+        | D::TouchCancel(pointer) => {
             out.pointer = Some(pointer_data(pointer));
             out.extra = Some(pointer_event_extra(pointer));
         }
