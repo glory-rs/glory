@@ -275,7 +275,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y mesa-vulkan-drivers vulkan-tools libvulkan1 xvfb \
-            libwayland-dev libxkbcommon-dev
+            libwayland-dev libxkbcommon-dev libfontconfig1-dev
 
       - name: Native render + screenshot regression (software Vulkan)
         env:
