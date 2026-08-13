@@ -27,7 +27,7 @@ winit = { version = "0.31.0-beta.2", optional = true }
 # document into a vello off-screen image buffer) and inspect the AccessKit tree.
 # Versions pinned to the workspace lock (anyrender 0.11, blitz-paint /
 # accesskit aligned with blitz-dom 0.3.0-alpha.5).
-anyrender = "0.11"
+anyrender = "0.12"
 blitz-paint = { version = "0.3.0-alpha.5", default-features = false }
 accesskit = "0.24"
 
