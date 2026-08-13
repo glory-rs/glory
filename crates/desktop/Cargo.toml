@@ -18,7 +18,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tracing = { workspace = true }
 tao = { version = "0.35", optional = true }
-wry = { version = "0.55", optional = true }
+wry = { version = "0.56", optional = true }
 futures-channel = { workspace = true, optional = true }
 tungstenite = { version = "0.30.0", optional = true }
 glory-hot-reload = { version = "0.3.1", path = "../hot-reload" }
