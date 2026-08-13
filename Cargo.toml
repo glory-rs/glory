@@ -42,7 +42,7 @@ async-trait = "0.1.89"
 inventory = "0.3"
 proc-macro2 = "1"
 quote = "1"
-syn = { version = "2", features = ["full"] }
+syn = { version = "3", features = ["full"] }
 axum = "0.8"
 base64 = "0.22"
 cfg-if = "1"
