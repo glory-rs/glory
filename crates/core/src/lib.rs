@@ -24,9 +24,11 @@
 //!                                                   └──────────┘
 //! ```
 //!
-//! - [`Cage<T>`][reflow::Cage] — mutable reactive cell. Reading it inside
-//!   a tracking context (a `Bond` mapper or a `Widget` build/patch)
-//!   subscribes the caller. Writing via [`Cage::revise`][reflow::Cage::revise]
+//! - [`Cage<T>`][reflow::Cage] — mutable reactive cell. Reading it inside a
+//!   tracking context (a `Bond` mapper, an effect, a `Loader`) subscribes the
+//!   caller; a bare `.get()` in `Widget::build` / `Widget::patch` does not.
+//!   Views subscribe by receiving the handle itself (`.text(cage)`,
+//!   `.attr(name, cage)`). Writing via [`Cage::revise`][reflow::Cage::revise]
 //!   schedules re-renders for all subscribed views.
 //! - [`Bond<T>`][reflow::Bond] — derived value. Re-runs its mapper when
 //!   any of its tracked dependencies' `(id, version)` pair changes. Use

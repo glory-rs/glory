@@ -299,16 +299,40 @@ impl ServerFnError {
         Self::Validation(errors.into())
     }
 
+    /// A 500 whose detail stays on the server.
+    ///
+    /// Prefer this over `Err(err.to_string())?` / `ServerFnError::from(err)`
+    /// for infrastructure failures. Those put the original message — database
+    /// errors, file paths, connection strings — straight into the HTTP
+    /// response body, because [`ServerFnError`] is serialized to the client
+    /// verbatim. This logs the detail via `tracing` and sends the caller a
+    /// fixed message instead.
+    ///
+    /// ```ignore
+    /// let row = db.fetch(id).await.map_err(ServerFnError::internal_logged)?;
+    /// ```
+    pub fn internal_logged(detail: impl std::fmt::Display) -> Self {
+        tracing::error!(error = %detail, "server function failed");
+        Self::http(500, "internal server error")
+    }
+
     pub fn field_error(field: impl Into<String>, message: impl Into<String>) -> Self {
         Self::Validation(vec![FormFieldError::field(field, message)])
     }
 
+    /// HTTP status this error maps to when returned from a mounted server
+    /// function.
+    ///
+    /// `Deserialization` is a **client** error: it means the request body did
+    /// not match the function's argument types. Reporting it as 500 (as this
+    /// used to) turned every malformed request into a server-error alert.
     pub fn status_code(&self) -> u16 {
         match self {
             Self::NotFound(_) => 404,
             Self::Http(err) => err.status,
             Self::Validation(_) => 422,
-            Self::Request(_) | Self::Serialization(_) | Self::Deserialization(_) | Self::ServerError(_) => 500,
+            Self::Deserialization(_) => 400,
+            Self::Request(_) | Self::Serialization(_) | Self::ServerError(_) => 500,
         }
     }
 
@@ -614,11 +638,14 @@ impl SseDecoder {
             "event" => self.current.event = Some(value.to_owned()),
             "id" => self.current.id = Some(value.to_owned()),
             "retry" => {
-                self.current.retry_ms = Some(
-                    value
-                        .parse::<u64>()
-                        .map_err(|err| ServerFnError::Deserialization(format!("invalid SSE retry value: {err}")))?,
-                );
+                // The SSE spec says to ignore a `retry` field that is not a
+                // sequence of digits. Failing the whole stream over one
+                // malformed reconnection hint (as this used to) tears down a
+                // connection whose data frames are perfectly fine.
+                match value.parse::<u64>() {
+                    Ok(retry_ms) => self.current.retry_ms = Some(retry_ms),
+                    Err(_) => tracing::debug!(value, "ignoring malformed SSE retry field"),
+                }
             }
             "data" => {
                 if !self.current.data.is_empty() {
@@ -794,6 +821,7 @@ where
             socket: std::cell::RefCell::new(None),
             callbacks: std::cell::RefCell::new(Vec::new()),
             manual_close: std::cell::Cell::new(false),
+            generation: std::cell::Cell::new(0),
         }),
         _marker: std::marker::PhantomData,
     };
@@ -824,6 +852,14 @@ struct ReactiveWebSocketInner {
     socket: std::cell::RefCell<Option<web_sys::WebSocket>>,
     callbacks: std::cell::RefCell<Vec<wasm_bindgen::JsValue>>,
     manual_close: std::cell::Cell<bool>,
+    /// Incremented for every connection attempt.
+    ///
+    /// `close()` is asynchronous, so a socket's `onclose` can fire *after* its
+    /// replacement is already installed. Without a generation check that late
+    /// callback took the new socket out of `inner.socket` and scheduled yet
+    /// another reconnect, leaving two live sockets writing to the same cages
+    /// and `send()` reporting "not connected" in between.
+    generation: std::cell::Cell<u64>,
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -850,18 +886,31 @@ where
 
     pub fn close(&self) -> Result<(), ServerFnError> {
         self.inner.manual_close.set(true);
+        let socket = self.inner.socket.borrow().clone();
+        let Some(socket) = socket else {
+            // Nothing is open (the connection failed, or we are between
+            // reconnect attempts). Report `Closed` right away: no `onclose`
+            // will ever arrive to move us out of `Closing`, and a pending
+            // reconnect timer must not resurrect the connection.
+            self.state.revise(|mut state| *state = WebSocketConnectionState::Closed);
+            return Ok(());
+        };
         self.state.revise(|mut state| *state = WebSocketConnectionState::Closing);
-        if let Some(socket) = self.inner.socket.borrow().as_ref() {
-            socket
-                .close()
-                .map_err(|err| ServerFnError::Request(format!("websocket close failed: {err:?}")))?;
-        }
+        socket
+            .close()
+            .map_err(|err| ServerFnError::Request(format!("websocket close failed: {err:?}")))?;
         Ok(())
     }
 
     pub fn reconnect(&self) {
         self.inner.manual_close.set(false);
-        if let Some(socket) = self.inner.socket.borrow().as_ref() {
+        if let Some(socket) = self.inner.socket.borrow_mut().take() {
+            // Detach first: the handlers hold cages this reconnect is about to
+            // reuse, and `close()` only completes later.
+            socket.set_onopen(None);
+            socket.set_onmessage(None);
+            socket.set_onerror(None);
+            socket.set_onclose(None);
             let _ = socket.close();
         }
         connect_reactive_websocket::<T>(&self.inner, self.state, self.latest, self.error);
@@ -905,6 +954,8 @@ fn connect_reactive_websocket<T>(
     use wasm_bindgen::JsCast;
 
     inner.callbacks.borrow_mut().clear();
+    let generation = inner.generation.get().wrapping_add(1);
+    inner.generation.set(generation);
     state.revise(|mut state| *state = WebSocketConnectionState::Connecting);
     error.revise(|mut error| *error = None);
 
@@ -968,6 +1019,10 @@ fn connect_reactive_websocket<T>(
         let latest = latest;
         let error = error;
         move |event: web_sys::CloseEvent| {
+            // A superseded connection closing must not disturb its successor.
+            if inner.generation.get() != generation {
+                return;
+            }
             inner.socket.borrow_mut().take();
             if inner.manual_close.get() || !inner.options.reconnect {
                 state.revise(|mut state| *state = WebSocketConnectionState::Closed);
@@ -1002,7 +1057,15 @@ fn schedule_websocket_reconnect<T>(
 
     let callback = wasm_bindgen::closure::Closure::once_into_js({
         let inner = inner.clone();
-        move || connect_reactive_websocket::<T>(&inner, state, latest, error)
+        move || {
+            // `close()` may have been called while this timer was pending.
+            // Reconnecting anyway would reopen a connection the caller has
+            // explicitly shut down.
+            if inner.manual_close.get() {
+                return;
+            }
+            connect_reactive_websocket::<T>(&inner, state, latest, error)
+        }
     });
     if let Some(window) = web_sys::window() {
         let _ =
@@ -1010,7 +1073,35 @@ fn schedule_websocket_reconnect<T>(
     }
 }
 
+/// Process-wide `reqwest` client used by the non-wasm server-function client.
+///
+/// Building a client per call (as this used to) creates a fresh connection
+/// pool and TLS context each time, so a desktop app calling server functions
+/// in a loop opened a new connection for every request and paid the full
+/// handshake cost.
+#[cfg(all(not(target_arch = "wasm32"), feature = "reqwest-client"))]
+fn shared_reqwest_client() -> Result<reqwest::Client, ServerFnError> {
+    static CLIENT: std::sync::OnceLock<Result<reqwest::Client, String>> = std::sync::OnceLock::new();
+    CLIENT
+        .get_or_init(|| {
+            reqwest::Client::builder()
+                // Redirects are part of the protocol here: `ServerFnError::redirect`
+                // is decoded from the 3xx response rather than followed.
+                .redirect(reqwest::redirect::Policy::none())
+                .build()
+                .map_err(|err| err.to_string())
+        })
+        .clone()
+        .map_err(ServerFnError::Request)
+}
+
 /// One Server-Sent Event frame.
+/// Collapses CR/LF in a single-line SSE field value so it cannot end the field.
+#[cfg(not(target_arch = "wasm32"))]
+fn strip_sse_newlines(value: &str) -> String {
+    value.replace([char::from(13), char::from(10)], " ")
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SseEvent {
@@ -1063,14 +1154,18 @@ impl SseEvent {
                 frame.push('\n');
             }
         }
+        // `id` and `event` are single-line fields. A newline in either would
+        // terminate the field and let the rest of the value be parsed as new SSE
+        // fields -- an `id` taken from user input (a cursor, say) could inject a
+        // whole extra `data:` line into the stream.
         if let Some(id) = &self.id {
             frame.push_str("id: ");
-            frame.push_str(id);
+            frame.push_str(&strip_sse_newlines(id));
             frame.push('\n');
         }
         if let Some(event) = &self.event {
             frame.push_str("event: ");
-            frame.push_str(event);
+            frame.push_str(&strip_sse_newlines(event));
             frame.push('\n');
         }
         if let Some(retry_ms) = self.retry_ms {
@@ -1791,8 +1886,11 @@ pub fn registered_paths() -> Vec<&'static str> {
     inventory::iter::<ServerFnEntry>.into_iter().map(|entry| entry.path).collect()
 }
 
-/// Dispatches a raw request body to the function registered at `path`.
-/// This is the single entry point every adapter mount goes through.
+/// Dispatches a JSON request body to the function registered at `path`.
+///
+/// A convenience wrapper for tests and hand-written routes. The adapter mounts
+/// do **not** go through here: they call [`dispatch_with_method`] so they can
+/// negotiate encodings and carry a [`RequestContext`].
 #[cfg(not(target_arch = "wasm32"))]
 pub async fn handle(path: &str, body: Vec<u8>) -> Result<Vec<u8>, ServerFnError> {
     handle_with_method("POST", path, body).await
@@ -1903,6 +2001,142 @@ impl RequestContext {
     pub fn response_encoding(&self) -> ServerFnEncoding {
         negotiate_response_encoding(self.header("accept"))
     }
+
+    /// Rejects state-changing requests that a browser marked as cross-site.
+    ///
+    /// Without this, any page on the internet could auto-submit a form to
+    /// `/__glory/fn/<name>` and have the browser attach the user's cookies:
+    /// [`request_encoding`](Self::request_encoding) falls back to JSON for any
+    /// content type, and single-argument functions additionally accept
+    /// `application/x-www-form-urlencoded`, so a plain cross-site `<form>` (or
+    /// `enctype="text/plain"` carrying a JSON-shaped body) reaches the handler.
+    ///
+    /// The rules, in order:
+    ///
+    /// * `GET` is exempt. It is documented as read-only, and browsers cannot
+    ///   be stopped from issuing cross-site `GET`s anyway.
+    /// * `Sec-Fetch-Site` decides when present. Modern browsers always send it,
+    ///   and it cannot be set by page script. `cross-site` is rejected.
+    /// * Otherwise `Origin` must match the request's own host, or an entry in
+    ///   [`set_allowed_origins`].
+    /// * A request with neither header is allowed: that is a non-browser
+    ///   client (the `reqwest` client, curl, a native app), which is not
+    ///   subject to ambient-credential attacks.
+    pub fn ensure_same_site(&self) -> Result<(), ServerFnError> {
+        if self.method.eq_ignore_ascii_case("GET") || self.method.eq_ignore_ascii_case("HEAD") {
+            return Ok(());
+        }
+
+        if let Some(site) = self.header("sec-fetch-site") {
+            return match site.trim().to_ascii_lowercase().as_str() {
+                "same-origin" | "same-site" | "none" => Ok(()),
+                _ => {
+                    if self.origin_is_allowed() {
+                        Ok(())
+                    } else {
+                        Err(cross_site_rejected())
+                    }
+                }
+            };
+        }
+
+        match self.header("origin") {
+            None => Ok(()),
+            Some(_) if self.origin_is_allowed() => Ok(()),
+            Some(_) => Err(cross_site_rejected()),
+        }
+    }
+
+    fn origin_is_allowed(&self) -> bool {
+        let Some(origin) = self.header("origin") else {
+            return false;
+        };
+        let origin = origin.trim();
+        if origin.eq_ignore_ascii_case("null") {
+            return false;
+        }
+        if allowed_origins().iter().any(|allowed| allowed.eq_ignore_ascii_case(origin)) {
+            return true;
+        }
+        // Same-origin when the Origin's authority equals the Host header.
+        let Some(host) = self.header("host") else { return false };
+        origin
+            .split_once("://")
+            .map(|(_, authority)| authority.eq_ignore_ascii_case(host.trim()))
+            .unwrap_or(false)
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+fn cross_site_rejected() -> ServerFnError {
+    // Deliberately terse: the client does not need to learn which check fired.
+    ServerFnError::http(403, "cross-site server function requests are not allowed")
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+static ALLOWED_ORIGINS: std::sync::OnceLock<std::sync::RwLock<Vec<String>>> = std::sync::OnceLock::new();
+
+#[cfg(not(target_arch = "wasm32"))]
+fn allowed_origins() -> Vec<String> {
+    ALLOWED_ORIGINS
+        .get()
+        .map(|origins| origins.read().unwrap_or_else(std::sync::PoisonError::into_inner).clone())
+        .unwrap_or_default()
+}
+
+/// Additional origins allowed to call server functions with credentials.
+///
+/// Only needed when the browser app is served from a different origin than the
+/// server functions (see [`set_server_url`]). Same-origin requests are always
+/// allowed, so most apps never call this. Entries are full origins, e.g.
+/// `https://app.example.com`.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn set_allowed_origins(origins: impl IntoIterator<Item = impl Into<String>>) {
+    let origins = origins.into_iter().map(Into::into).collect();
+    let slot = ALLOWED_ORIGINS.get_or_init(|| std::sync::RwLock::new(Vec::new()));
+    *slot.write().unwrap_or_else(std::sync::PoisonError::into_inner) = origins;
+}
+
+/// Largest server function request body accepted by the adapter mounts.
+///
+/// The three adapters used to inherit wildly different framework defaults
+/// (Salvo 64 KiB, Actix 256 KiB, a hard-coded 16 MiB in the Axum mount), so
+/// the same server function silently accepted a 256x different payload
+/// depending on which adapter mounted it, and only some of them reported a
+/// usable error. They now all use this limit and answer `413`.
+#[cfg(not(target_arch = "wasm32"))]
+pub const DEFAULT_MAX_BODY_BYTES: usize = 2 * 1024 * 1024;
+
+#[cfg(not(target_arch = "wasm32"))]
+static MAX_BODY_BYTES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(DEFAULT_MAX_BODY_BYTES);
+
+/// Reads the body limit applied by the adapter mounts.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn max_body_bytes() -> usize {
+    MAX_BODY_BYTES.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Overrides [`max_body_bytes`]. Raise it for file-upload style functions.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn set_max_body_bytes(limit: usize) {
+    MAX_BODY_BYTES.store(limit, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// The error the mounts return when a body exceeds [`max_body_bytes`].
+#[cfg(not(target_arch = "wasm32"))]
+pub fn payload_too_large() -> ServerFnError {
+    ServerFnError::http(413, format!("request body exceeds the {} byte limit", max_body_bytes()))
+}
+
+/// Whether a response header may appear only once, so the adapter mounts know
+/// when to replace rather than append. Everything else (notably `set-cookie`)
+/// is appended so repeated values survive.
+#[cfg(all(not(target_arch = "wasm32"), any(feature = "salvo", feature = "axum", feature = "actix")))]
+pub(crate) fn is_single_valued_header(name: &str) -> bool {
+    matches!(
+        name.to_ascii_lowercase().as_str(),
+        "content-type" | "content-length" | "location" | "cache-control" | "content-encoding" | "content-disposition"
+    )
 }
 
 /// `SameSite` value for generated `Set-Cookie` headers.
@@ -2691,10 +2925,7 @@ where
     } else {
         format!("{}{}", server_url(), path)
     };
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(|err| ServerFnError::Request(err.to_string()))?;
+    let client = shared_reqwest_client()?;
     let request = if method == "GET" {
         client.get(&url).header("accept", encoding.content_type())
     } else {
@@ -2843,10 +3074,7 @@ where
     } else {
         format!("{}{}", server_url(), path)
     };
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(|err| ServerFnError::Request(err.to_string()))?;
+    let client = shared_reqwest_client()?;
     let request = if method == "GET" {
         client.get(&url)
     } else {
@@ -2960,6 +3188,10 @@ pub mod salvo_mount {
         };
         let input_encoding = context.request_encoding();
         let output_encoding = context.response_encoding();
+        if let Err(err) = context.ensure_same_site() {
+            write_http_response(res, crate::server_fn_error_response_parts_with_encoding(&err, output_encoding));
+            return;
+        }
         let body = if method.eq_ignore_ascii_case("GET") {
             match crate::decode_get_args_from_query(req.uri().query()) {
                 Ok(body) => body,
@@ -2969,8 +3201,17 @@ pub mod salvo_mount {
                 }
             }
         } else {
-            match req.payload().await {
+            // `payload()` would silently use Salvo's own (much smaller)
+            // `secure_max_size`; go through the shared limit instead.
+            match req.payload_with_max_size(crate::max_body_bytes()).await {
                 Ok(bytes) => bytes.to_vec(),
+                Err(salvo::http::ParseError::PayloadTooLarge) => {
+                    write_http_response(
+                        res,
+                        crate::server_fn_error_response_parts_with_encoding(&crate::payload_too_large(), output_encoding),
+                    );
+                    return;
+                }
                 Err(err) => {
                     write_http_response(
                         res,
@@ -2996,7 +3237,14 @@ pub mod salvo_mount {
         res.status_code(status);
         for (name, value) in response.headers {
             if let (Ok(name), Ok(value)) = (HeaderName::from_bytes(name.as_bytes()), HeaderValue::from_str(value.as_str())) {
-                res.headers_mut().insert(name, value);
+                // `append`, not `insert`: multi-valued headers such as
+                // `set-cookie` were being folded to the last value, so a login
+                // that sets a session *and* a CSRF cookie silently lost one.
+                if crate::is_single_valued_header(name.as_str()) {
+                    res.headers_mut().insert(name, value);
+                } else {
+                    res.headers_mut().append(name, value);
+                }
             }
         }
         let _ = res.write_body(response.body);
@@ -3061,21 +3309,31 @@ pub mod axum_mount {
                 .map(|(name, value)| (name.as_str().to_ascii_lowercase(), value.to_str().unwrap_or_default().to_owned()))
                 .collect(),
         };
+        let content_length = context.header("content-length").and_then(|value| value.trim().parse::<usize>().ok());
         let input_encoding = context.request_encoding();
         let output_encoding = context.response_encoding();
+        if let Err(err) = context.ensure_same_site() {
+            return into_response(crate::server_fn_error_response_parts_with_encoding(&err, output_encoding));
+        }
         let body = if method.eq_ignore_ascii_case("GET") {
             match crate::decode_get_args_from_query(query.as_deref()) {
                 Ok(body) => body,
                 Err(err) => return into_response(crate::server_fn_error_response_parts_with_encoding(&err, output_encoding)),
             }
         } else {
-            match axum::body::to_bytes(request.into_body(), 16 * 1024 * 1024).await {
+            let limit = crate::max_body_bytes();
+            match axum::body::to_bytes(request.into_body(), limit).await {
                 Ok(bytes) => bytes.to_vec(),
+                // `to_bytes` reports the limit breach as a generic body error,
+                // so classify by the declared length when we have one.
                 Err(err) => {
-                    return into_response(crate::server_fn_error_response_parts_with_encoding(
-                        &crate::ServerFnError::http(400, format!("invalid body: {err}")),
-                        output_encoding,
-                    ));
+                    let too_large = content_length.is_some_and(|len| len > limit);
+                    let error = if too_large {
+                        crate::payload_too_large()
+                    } else {
+                        crate::ServerFnError::http(400, format!("invalid body: {err}"))
+                    };
+                    return into_response(crate::server_fn_error_response_parts_with_encoding(&error, output_encoding));
                 }
             }
         };
@@ -3094,7 +3352,12 @@ pub mod axum_mount {
         let mut response = (status, parts.body).into_response();
         for (name, value) in parts.headers {
             if let (Ok(name), Ok(value)) = (HeaderName::from_bytes(name.as_bytes()), HeaderValue::from_str(value.as_str())) {
-                response.headers_mut().insert(name, value);
+                // See the Salvo mount: `insert` folds repeated `set-cookie`.
+                if crate::is_single_valued_header(name.as_str()) {
+                    response.headers_mut().insert(name, value);
+                } else {
+                    response.headers_mut().append(name, value);
+                }
             }
         }
         response
@@ -3134,7 +3397,12 @@ pub mod actix_mount {
     use actix_web::{HttpRequest, HttpResponse, web};
     use futures::StreamExt;
 
-    async fn server_fn_handler(request: HttpRequest, body: web::Bytes) -> HttpResponse {
+    // Takes `web::Payload` rather than `web::Bytes` on purpose. The `Bytes`
+    // extractor enforces Actix's own `PayloadConfig` limit (256 KiB by
+    // default) *before* the handler runs, and answers with a plain-text 413
+    // that clients cannot decode as a server-function error. Reading the
+    // payload here applies the shared limit and keeps the error shape.
+    async fn server_fn_handler(request: HttpRequest, mut payload: web::Payload) -> HttpResponse {
         let path = request.uri().path().to_owned();
         let method = request.method().to_string();
         let context = crate::RequestContext {
@@ -3148,13 +3416,37 @@ pub mod actix_mount {
         };
         let input_encoding = context.request_encoding();
         let output_encoding = context.response_encoding();
+        if let Err(err) = context.ensure_same_site() {
+            return into_http_response(crate::server_fn_error_response_parts_with_encoding(&err, output_encoding));
+        }
         let body = if method.eq_ignore_ascii_case("GET") {
             match crate::decode_get_args_from_query(Some(request.query_string())) {
                 Ok(body) => body,
                 Err(err) => return into_http_response(crate::server_fn_error_response_parts_with_encoding(&err, output_encoding)),
             }
         } else {
-            body.to_vec()
+            let limit = crate::max_body_bytes();
+            let mut collected: Vec<u8> = Vec::new();
+            while let Some(chunk) = payload.next().await {
+                match chunk {
+                    Ok(chunk) => {
+                        if collected.len() + chunk.len() > limit {
+                            return into_http_response(crate::server_fn_error_response_parts_with_encoding(
+                                &crate::payload_too_large(),
+                                output_encoding,
+                            ));
+                        }
+                        collected.extend_from_slice(&chunk);
+                    }
+                    Err(err) => {
+                        return into_http_response(crate::server_fn_error_response_parts_with_encoding(
+                            &crate::ServerFnError::http(400, format!("invalid body: {err}")),
+                            output_encoding,
+                        ));
+                    }
+                }
+            }
+            collected
         };
         into_http_response(
             crate::with_request_context(
@@ -3171,7 +3463,13 @@ pub mod actix_mount {
         let mut builder = HttpResponse::build(status);
         for (name, value) in parts.headers {
             if let (Ok(name), Ok(value)) = (HeaderName::from_bytes(name.as_bytes()), HeaderValue::from_str(value.as_str())) {
-                builder.insert_header((name, value));
+                // See the Salvo mount. Actix's `insert_header` replaces, so
+                // repeated `set-cookie` needs `append_header`.
+                if crate::is_single_valued_header(name.as_str()) {
+                    builder.insert_header((name, value));
+                } else {
+                    builder.append_header((name, value));
+                }
             }
         }
         builder.body(parts.body)

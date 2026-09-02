@@ -21,21 +21,47 @@ pub const LIVEVIEW_CLIENT_JS: &str = include_str!("liveview_client.js");
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "type", content = "payload", rename_all = "snake_case")]
 pub enum LiveViewMessage {
-    Hello { protocol_version: u32 },
-    Mount { commands: Vec<Command> },
+    Hello {
+        protocol_version: u32,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        resume_token: Option<String>,
+    },
+    Session {
+        token: String,
+    },
+    Resumed {
+        token: String,
+    },
+    Mount {
+        commands: Vec<Command>,
+    },
     Event(Box<EventData>),
     Query(Box<QueryResponse>),
-    Patch { commands: Vec<Command> },
-    Error { message: String },
+    Patch {
+        commands: Vec<Command>,
+    },
+    Error {
+        message: String,
+    },
     Ping,
     Pong,
-    Close { reason: String },
+    Close {
+        reason: String,
+    },
 }
 
 impl LiveViewMessage {
     pub fn hello() -> Self {
         Self::Hello {
             protocol_version: LIVEVIEW_PROTOCOL_VERSION,
+            resume_token: None,
+        }
+    }
+
+    pub fn hello_with_resume(token: impl Into<String>) -> Self {
+        Self::Hello {
+            protocol_version: LIVEVIEW_PROTOCOL_VERSION,
+            resume_token: Some(token.into()),
         }
     }
 
@@ -85,7 +111,7 @@ impl LiveViewSession {
             // Protocol negotiation: a client whose protocol version does not
             // match the server's is told so, rather than being silently driven
             // with a possibly-incompatible wire format.
-            LiveViewMessage::Hello { protocol_version } => {
+            LiveViewMessage::Hello { protocol_version, .. } => {
                 if protocol_version != LIVEVIEW_PROTOCOL_VERSION {
                     Some(LiveViewMessage::Error {
                         message: format!("liveview protocol mismatch: client {protocol_version}, server {LIVEVIEW_PROTOCOL_VERSION}"),
@@ -95,7 +121,12 @@ impl LiveViewSession {
                 }
             }
             LiveViewMessage::Close { .. } => None,
-            LiveViewMessage::Mount { .. } | LiveViewMessage::Patch { .. } | LiveViewMessage::Error { .. } | LiveViewMessage::Pong => None,
+            LiveViewMessage::Session { .. }
+            | LiveViewMessage::Resumed { .. }
+            | LiveViewMessage::Mount { .. }
+            | LiveViewMessage::Patch { .. }
+            | LiveViewMessage::Error { .. }
+            | LiveViewMessage::Pong => None,
         }
     }
 
@@ -189,6 +220,27 @@ pub struct LiveViewConfig {
     /// Maximum number of pending outbound patch batches before an
     /// [`OutboundBuffer`] starts coalescing. `0` = unbounded.
     pub max_pending_patches: usize,
+    /// Origins allowed to open a LiveView socket, in addition to the request's
+    /// own host. Empty (the default) means same-origin only.
+    ///
+    /// Browsers do **not** apply the same-origin policy to WebSocket
+    /// handshakes: any page on the internet can open a socket to this endpoint
+    /// and it will carry the user's cookies. Checking `Origin` is the standard
+    /// defence (cross-site WebSocket hijacking).
+    pub allowed_origins: &'static [&'static str],
+    /// Largest inbound websocket message accepted, in bytes. `0` = the
+    /// framework default (64 MiB for the tungstenite-based adapters), which is
+    /// far more than any legitimate LiveView frame and lets one client force a
+    /// very large allocation and parse.
+    pub max_message_bytes: usize,
+    /// Hard cap on concurrently registered sessions. `0` = unbounded.
+    ///
+    /// Each session owns a live widget tree and a task on a worker thread, and
+    /// a session outlives the socket that created it (that is what makes
+    /// resume possible). Without a cap, repeatedly opening and dropping
+    /// connections piles up trees until the idle timeout finally collects
+    /// them.
+    pub max_sessions: usize,
 }
 
 impl Default for LiveViewConfig {
@@ -199,6 +251,9 @@ impl Default for LiveViewConfig {
             idle_timeout_secs: 300,
             max_lifetime_secs: 3600,
             max_pending_patches: 64,
+            allowed_origins: &[],
+            max_message_bytes: 256 * 1024,
+            max_sessions: 10_000,
         }
     }
 }
@@ -282,6 +337,14 @@ impl<T> SessionRegistry<T> {
         let id = self.next_id;
         self.next_id += 1;
         self.insert_with_token(now, format!("lv-{id}"), value)
+    }
+
+    /// Whether the registry is at [`LiveViewConfig::max_sessions`].
+    ///
+    /// Callers should reap first and refuse the connection if this still holds;
+    /// admitting anyway would let a client with no valid token pin memory.
+    pub fn is_full(&self) -> bool {
+        self.config.max_sessions > 0 && self.entries.len() >= self.config.max_sessions
     }
 
     /// Register a session under a caller-supplied token. Overwrites any existing
@@ -382,6 +445,170 @@ fn normalize_liveview_path(path: &str) -> String {
 }
 
 #[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
+fn negotiate_hello(message: LiveViewMessage) -> Result<Option<String>, LiveViewMessage> {
+    match message {
+        LiveViewMessage::Hello {
+            protocol_version,
+            resume_token,
+        } if protocol_version == LIVEVIEW_PROTOCOL_VERSION => Ok(resume_token.filter(|token| !token.is_empty())),
+        LiveViewMessage::Hello { protocol_version, .. } => Err(LiveViewMessage::Error {
+            message: format!("liveview protocol mismatch: client {protocol_version}, server {LIVEVIEW_PROTOCOL_VERSION}"),
+        }),
+        _ => Err(LiveViewMessage::Error {
+            message: "first liveview message must be hello".to_owned(),
+        }),
+    }
+}
+
+#[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
+#[derive(Clone)]
+struct SessionManager {
+    registry: std::sync::Arc<std::sync::Mutex<SessionRegistry<SessionWorker>>>,
+}
+
+#[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
+struct SessionConnection {
+    worker: SessionWorker,
+    token: ResumeToken,
+    mount: Option<LiveViewMessage>,
+}
+
+#[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
+impl SessionManager {
+    fn new(config: LiveViewConfig) -> Self {
+        Self {
+            registry: std::sync::Arc::new(std::sync::Mutex::new(SessionRegistry::new(config))),
+        }
+    }
+
+    fn with_default_config() -> Self {
+        Self::new(LiveViewConfig::default())
+    }
+
+    async fn connect<W>(
+        &self,
+        factory: std::sync::Arc<dyn Fn() -> W + Send + Sync + 'static>,
+        resume_token: Option<String>,
+    ) -> Result<SessionConnection, ()>
+    where
+        W: Widget + 'static,
+    {
+        let now = current_unix_secs();
+        if let Some(token) = resume_token {
+            let worker = {
+                let mut registry = self.registry.lock().expect("liveview session registry poisoned");
+                registry.reap(now);
+                registry.resume(now, &token).cloned()
+            };
+            if let Some(worker) = worker {
+                return Ok(SessionConnection {
+                    worker,
+                    token: ResumeToken(token),
+                    mount: None,
+                });
+            }
+        } else {
+            self.reap();
+        }
+
+        // Refuse rather than admit past the cap: a new session allocates a
+        // widget tree that survives this socket.
+        {
+            let mut registry = self.registry.lock().expect("liveview session registry poisoned");
+            registry.reap(now);
+            if registry.is_full() {
+                return Err(());
+            }
+        }
+
+        let (worker, mount) = SessionWorker::spawn(factory).await?;
+        let token = self.insert_worker(worker.clone());
+        Ok(SessionConnection {
+            worker,
+            token,
+            mount: Some(mount),
+        })
+    }
+
+    /// Drop a session outright, used when the client says goodbye.
+    fn remove(&self, token: &str) {
+        self.registry.lock().expect("liveview session registry poisoned").remove(token);
+    }
+
+    fn config(&self) -> LiveViewConfig {
+        self.registry.lock().expect("liveview session registry poisoned").config
+    }
+
+    fn insert_worker(&self, worker: SessionWorker) -> ResumeToken {
+        let now = current_unix_secs();
+        let token = new_resume_token();
+        self.registry
+            .lock()
+            .expect("liveview session registry poisoned")
+            .insert_with_token(now, token, worker)
+    }
+
+    fn touch(&self, token: &str) -> bool {
+        let now = current_unix_secs();
+        let mut registry = self.registry.lock().expect("liveview session registry poisoned");
+        let touched = registry.touch(now, token);
+        let expired = registry.reap(now).into_iter().any(|(reaped, _)| reaped.as_str() == token);
+        touched && !expired
+    }
+
+    fn reap(&self) {
+        let now = current_unix_secs();
+        self.registry.lock().expect("liveview session registry poisoned").reap(now);
+    }
+}
+
+/// Whether a websocket handshake carrying `origin` (with the request's own
+/// `host`) may open a LiveView session.
+///
+/// A handshake without an `Origin` header is allowed: that is a non-browser
+/// client, which has no ambient cookies to abuse.
+pub fn origin_is_allowed(config: &LiveViewConfig, origin: Option<&str>, host: Option<&str>) -> bool {
+    let Some(origin) = origin.map(str::trim) else {
+        return true;
+    };
+    if origin.eq_ignore_ascii_case("null") {
+        return false;
+    }
+    if config.allowed_origins.iter().any(|allowed| allowed.eq_ignore_ascii_case(origin)) {
+        return true;
+    }
+    match (origin.split_once("://"), host) {
+        (Some((_, authority)), Some(host)) => authority.eq_ignore_ascii_case(host.trim()),
+        _ => false,
+    }
+}
+
+/// Generates a resume token from the OS CSPRNG.
+///
+/// A resume token is a bearer credential: whoever presents it takes over the
+/// session, including everything its widget tree can read and every handler it
+/// can run. It was previously built from the clock, the pid and a counter, all
+/// of which an attacker can narrow down, making tokens guessable. 128 bits of
+/// `getrandom` entropy removes that.
+#[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
+fn new_resume_token() -> String {
+    let mut bytes = [0u8; 16];
+    if getrandom::fill(&mut bytes).is_err() {
+        // The OS entropy source is unavailable. Refusing to hand out a
+        // predictable token is the only safe answer, so make it obvious.
+        panic!("liveview: OS randomness is unavailable; cannot mint a resume token");
+    }
+    let mut token = String::with_capacity(3 + bytes.len() * 2);
+    token.push_str("lv-");
+    for byte in bytes {
+        use std::fmt::Write;
+        let _ = write!(&mut token, "{byte:02x}");
+    }
+    token
+}
+
+#[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
+#[derive(Clone)]
 struct SessionWorker {
     sender: futures::channel::mpsc::Sender<SessionRequest>,
 }
@@ -392,7 +619,6 @@ enum SessionRequest {
         message: LiveViewMessage,
         reply: futures::channel::oneshot::Sender<Option<LiveViewMessage>>,
     },
-    Close,
 }
 
 #[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
@@ -518,15 +744,7 @@ async fn run_session<W>(
             SessionRequest::Message { message, reply } => {
                 let _ = reply.send(session.handle_message(message));
             }
-            SessionRequest::Close => break,
         }
-    }
-}
-
-#[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
-impl Drop for SessionWorker {
-    fn drop(&mut self) {
-        let _ = self.sender.try_send(SessionRequest::Close);
     }
 }
 
@@ -540,14 +758,22 @@ pub mod salvo_mount {
     use salvo::websocket::{Message, WebSocket, WebSocketUpgrade};
     use salvo::{Handler, async_trait};
 
-    use crate::{LIVEVIEW_DEFAULT_PATH, LiveViewMessage, SessionWorker};
+    use crate::{LIVEVIEW_DEFAULT_PATH, LiveViewConfig, LiveViewMessage, SessionManager, negotiate_hello};
 
     pub fn router<W>(widget: impl Fn() -> W + Send + Sync + 'static) -> Router
     where
         W: Widget + 'static,
     {
+        router_with_config(widget, LiveViewConfig::default())
+    }
+
+    pub fn router_with_config<W>(widget: impl Fn() -> W + Send + Sync + 'static, config: LiveViewConfig) -> Router
+    where
+        W: Widget + 'static,
+    {
         let factory: Arc<dyn Fn() -> W + Send + Sync + 'static> = Arc::new(widget);
-        Router::with_path(LIVEVIEW_DEFAULT_PATH.trim_start_matches('/')).get(LiveViewHandler { factory })
+        let sessions = SessionManager::new(config);
+        Router::with_path(LIVEVIEW_DEFAULT_PATH.trim_start_matches('/')).get(LiveViewHandler { factory, sessions })
     }
 
     struct LiveViewHandler<W>
@@ -555,6 +781,7 @@ pub mod salvo_mount {
         W: Widget + 'static,
     {
         factory: Arc<dyn Fn() -> W + Send + Sync + 'static>,
+        sessions: SessionManager,
     }
 
     #[async_trait]
@@ -564,24 +791,45 @@ pub mod salvo_mount {
     {
         async fn handle(&self, req: &mut Request, _depot: &mut Depot, res: &mut Response, _ctrl: &mut FlowCtrl) {
             let factory = self.factory.clone();
-            if let Err(err) = WebSocketUpgrade::new()
-                .upgrade(req, res, move |socket| handle_socket(socket, factory))
-                .await
-            {
+            let sessions = self.sessions.clone();
+            let config = self.sessions.config();
+            let header = |name: &str| req.headers().get(name).and_then(|value| value.to_str().ok());
+            if !crate::origin_is_allowed(&config, header("origin"), header("host")) {
+                res.status_code(salvo::http::StatusCode::FORBIDDEN);
+                res.render("cross-site liveview connections are not allowed");
+                return;
+            }
+            let mut upgrade = WebSocketUpgrade::new();
+            let max_message_bytes = config.max_message_bytes;
+            if max_message_bytes > 0 {
+                // Otherwise tungstenite's 64 MiB default applies, and a single
+                // client frame can force that much allocation and parsing.
+                upgrade = upgrade.max_message_size(max_message_bytes);
+            }
+            if let Err(err) = upgrade.upgrade(req, res, move |socket| handle_socket(socket, factory, sessions)).await {
                 res.render(err);
             }
         }
     }
 
-    async fn handle_socket<W>(mut socket: WebSocket, factory: Arc<dyn Fn() -> W + Send + Sync + 'static>)
+    async fn handle_socket<W>(mut socket: WebSocket, factory: Arc<dyn Fn() -> W + Send + Sync + 'static>, sessions: SessionManager)
     where
         W: Widget + 'static,
     {
-        let Ok((worker, mount)) = SessionWorker::spawn(factory).await else {
+        let Some(resume_token) = read_hello(&mut socket).await else {
+            return;
+        };
+        let Ok(connection) = sessions.connect(factory, resume_token).await else {
             let _ = send_error(&mut socket, "liveview session worker failed to mount").await;
             return;
         };
-        if send(&mut socket, mount).await.is_err() {
+        let worker = connection.worker;
+        let token = connection.token.to_string();
+        if let Some(mount) = connection.mount {
+            if send(&mut socket, LiveViewMessage::Session { token: token.clone() }).await.is_err() || send(&mut socket, mount).await.is_err() {
+                return;
+            }
+        } else if send(&mut socket, LiveViewMessage::Resumed { token: token.clone() }).await.is_err() {
             return;
         }
 
@@ -598,9 +846,27 @@ pub mod salvo_mount {
             };
             match LiveViewMessage::from_json(text) {
                 Ok(message) => {
+                    if !sessions.touch(&token) {
+                        let _ = send(
+                            &mut socket,
+                            LiveViewMessage::Close {
+                                reason: "liveview session expired".to_owned(),
+                            },
+                        )
+                        .await;
+                        break;
+                    }
+                    // A client saying goodbye releases its session now,
+                    // rather than pinning a widget tree until the idle
+                    // timeout expires.
+                    let closing = matches!(message, LiveViewMessage::Close { .. });
                     if let Some(reply) = worker.handle_message(message).await
                         && send(&mut socket, reply).await.is_err()
                     {
+                        break;
+                    }
+                    if closing {
+                        sessions.remove(&token);
                         break;
                     }
                 }
@@ -611,6 +877,36 @@ pub mod salvo_mount {
                 }
             }
         }
+    }
+
+    async fn read_hello(socket: &mut WebSocket) -> Option<Option<String>> {
+        while let Some(message) = socket.next().await {
+            let Ok(message) = message else {
+                return None;
+            };
+            if !message.is_text() {
+                continue;
+            }
+            let Ok(text) = message.as_str() else {
+                let _ = send_error(socket, "invalid UTF-8 websocket message").await;
+                return None;
+            };
+            let message = match LiveViewMessage::from_json(text) {
+                Ok(message) => message,
+                Err(err) => {
+                    let _ = send_error(socket, format!("invalid liveview message: {err}")).await;
+                    return None;
+                }
+            };
+            return match negotiate_hello(message) {
+                Ok(token) => Some(token),
+                Err(message) => {
+                    let _ = send(socket, message).await;
+                    None
+                }
+            };
+        }
+        None
     }
 
     async fn send(socket: &mut WebSocket, message: LiveViewMessage) -> Result<(), salvo::Error> {
@@ -628,11 +924,12 @@ pub mod axum_mount {
 
     use axum::Router;
     use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
+    use axum::response::IntoResponse;
     use axum::routing::get;
     use futures::StreamExt;
     use glory_core::Widget;
 
-    use crate::{LIVEVIEW_DEFAULT_PATH, LiveViewMessage, LiveviewRouter, SessionWorker, normalize_liveview_path};
+    use crate::{LIVEVIEW_DEFAULT_PATH, LiveViewConfig, LiveViewMessage, LiveviewRouter, SessionManager, negotiate_hello, normalize_liveview_path};
 
     pub fn router<W>(widget: impl Fn() -> W + Send + Sync + 'static) -> Router
     where
@@ -641,12 +938,45 @@ pub mod axum_mount {
         Router::new().with_liveview(LIVEVIEW_DEFAULT_PATH, widget)
     }
 
+    pub fn router_with_config<W>(widget: impl Fn() -> W + Send + Sync + 'static, config: LiveViewConfig) -> Router
+    where
+        W: Widget + 'static,
+    {
+        route_with_config(Router::new(), LIVEVIEW_DEFAULT_PATH, widget, config)
+    }
+
     pub fn route<S, W>(router: Router<S>, path: &str, widget: impl Fn() -> W + Send + Sync + 'static) -> Router<S>
     where
         S: Clone + Send + Sync + 'static,
         W: Widget + 'static,
     {
         router.with_liveview(path, widget)
+    }
+
+    pub fn route_with_config<S, W>(router: Router<S>, path: &str, widget: impl Fn() -> W + Send + Sync + 'static, config: LiveViewConfig) -> Router<S>
+    where
+        S: Clone + Send + Sync + 'static,
+        W: Widget + 'static,
+    {
+        let factory: Arc<dyn Fn() -> W + Send + Sync + 'static> = Arc::new(widget);
+        let sessions = SessionManager::new(config);
+        router.route(
+            &normalize_liveview_path(path),
+            get(move |headers: axum::http::HeaderMap, ws: WebSocketUpgrade| {
+                let factory = factory.clone();
+                let sessions = sessions.clone();
+                async move {
+                    let header = |name: &str| headers.get(name).and_then(|value| value.to_str().ok());
+                    // Browsers do not apply the same-origin policy to
+                    // websocket handshakes, so without this any site could
+                    // open a session with the user's cookies.
+                    if !crate::origin_is_allowed(&sessions.config(), header("origin"), header("host")) {
+                        return IntoResponse::into_response(axum::http::StatusCode::FORBIDDEN);
+                    }
+                    IntoResponse::into_response(ws.on_upgrade(move |socket| handle_socket(socket, factory, sessions)))
+                }
+            }),
+        )
     }
 
     impl<S> LiveviewRouter for Router<S>
@@ -661,26 +991,28 @@ pub mod axum_mount {
         where
             W: Widget + 'static,
         {
-            let factory: Arc<dyn Fn() -> W + Send + Sync + 'static> = Arc::new(widget);
-            self.route(
-                &normalize_liveview_path(path),
-                get(move |ws: WebSocketUpgrade| {
-                    let factory = factory.clone();
-                    async move { ws.on_upgrade(move |socket| handle_socket(socket, factory)) }
-                }),
-            )
+            route_with_config(self, path, widget, LiveViewConfig::default())
         }
     }
 
-    async fn handle_socket<W>(mut socket: WebSocket, factory: Arc<dyn Fn() -> W + Send + Sync + 'static>)
+    async fn handle_socket<W>(mut socket: WebSocket, factory: Arc<dyn Fn() -> W + Send + Sync + 'static>, sessions: SessionManager)
     where
         W: Widget + 'static,
     {
-        let Ok((worker, mount)) = SessionWorker::spawn(factory).await else {
+        let Some(resume_token) = read_hello(&mut socket).await else {
+            return;
+        };
+        let Ok(connection) = sessions.connect(factory, resume_token).await else {
             let _ = send_error(&mut socket, "liveview session worker failed to mount").await;
             return;
         };
-        if send(&mut socket, mount).await.is_err() {
+        let worker = connection.worker;
+        let token = connection.token.to_string();
+        if let Some(mount) = connection.mount {
+            if send(&mut socket, LiveViewMessage::Session { token: token.clone() }).await.is_err() || send(&mut socket, mount).await.is_err() {
+                return;
+            }
+        } else if send(&mut socket, LiveViewMessage::Resumed { token: token.clone() }).await.is_err() {
             return;
         }
 
@@ -693,9 +1025,27 @@ pub mod axum_mount {
             };
             match LiveViewMessage::from_json(text.as_str()) {
                 Ok(message) => {
+                    if !sessions.touch(&token) {
+                        let _ = send(
+                            &mut socket,
+                            LiveViewMessage::Close {
+                                reason: "liveview session expired".to_owned(),
+                            },
+                        )
+                        .await;
+                        break;
+                    }
+                    // A client saying goodbye releases its session now,
+                    // rather than pinning a widget tree until the idle
+                    // timeout expires.
+                    let closing = matches!(message, LiveViewMessage::Close { .. });
                     if let Some(reply) = worker.handle_message(message).await
                         && send(&mut socket, reply).await.is_err()
                     {
+                        break;
+                    }
+                    if closing {
+                        sessions.remove(&token);
                         break;
                     }
                 }
@@ -706,6 +1056,32 @@ pub mod axum_mount {
                 }
             }
         }
+    }
+
+    async fn read_hello(socket: &mut WebSocket) -> Option<Option<String>> {
+        while let Some(message) = socket.next().await {
+            let Ok(message) = message else {
+                return None;
+            };
+            let Message::Text(text) = message else {
+                continue;
+            };
+            let message = match LiveViewMessage::from_json(text.as_str()) {
+                Ok(message) => message,
+                Err(err) => {
+                    let _ = send_error(socket, format!("invalid liveview message: {err}")).await;
+                    return None;
+                }
+            };
+            return match negotiate_hello(message) {
+                Ok(token) => Some(token),
+                Err(message) => {
+                    let _ = send(socket, message).await;
+                    None
+                }
+            };
+        }
+        None
     }
 
     async fn send(socket: &mut WebSocket, message: LiveViewMessage) -> Result<(), axum::Error> {
@@ -724,7 +1100,7 @@ pub mod actix_mount {
     use actix_web::{HttpRequest, HttpResponse, Scope, web};
     use glory_core::Widget;
 
-    use crate::{LIVEVIEW_DEFAULT_PATH, LiveViewMessage, LiveviewRouter, SessionWorker, normalize_liveview_path};
+    use crate::{LIVEVIEW_DEFAULT_PATH, LiveViewConfig, LiveViewMessage, LiveviewRouter, SessionManager, negotiate_hello, normalize_liveview_path};
 
     pub fn scope<W>(widget: impl Fn() -> W + Send + Sync + 'static) -> Scope
     where
@@ -733,16 +1109,41 @@ pub mod actix_mount {
         web::scope("").with_liveview(LIVEVIEW_DEFAULT_PATH, widget)
     }
 
-    pub fn configure<W>(cfg: &mut web::ServiceConfig, widget: impl Fn() -> W + Send + Sync + 'static)
+    pub fn scope_with_config<W>(widget: impl Fn() -> W + Send + Sync + 'static, config: LiveViewConfig) -> Scope
     where
         W: Widget + 'static,
     {
         let factory: Arc<dyn Fn() -> W + Send + Sync + 'static> = Arc::new(widget);
+        let sessions = SessionManager::new(config);
+        web::scope("").route(
+            LIVEVIEW_DEFAULT_PATH,
+            web::get().to(move |req: HttpRequest, body: web::Payload| {
+                let factory = factory.clone();
+                let sessions = sessions.clone();
+                async move { handler(req, body, factory, sessions).await }
+            }),
+        )
+    }
+
+    pub fn configure<W>(cfg: &mut web::ServiceConfig, widget: impl Fn() -> W + Send + Sync + 'static)
+    where
+        W: Widget + 'static,
+    {
+        configure_with_config(cfg, widget, LiveViewConfig::default());
+    }
+
+    pub fn configure_with_config<W>(cfg: &mut web::ServiceConfig, widget: impl Fn() -> W + Send + Sync + 'static, config: LiveViewConfig)
+    where
+        W: Widget + 'static,
+    {
+        let factory: Arc<dyn Fn() -> W + Send + Sync + 'static> = Arc::new(widget);
+        let sessions = SessionManager::new(config);
         cfg.route(
             LIVEVIEW_DEFAULT_PATH,
             web::get().to(move |req: HttpRequest, body: web::Payload| {
                 let factory = factory.clone();
-                async move { handler(req, body, factory).await }
+                let sessions = sessions.clone();
+                async move { handler(req, body, factory, sessions).await }
             }),
         );
     }
@@ -757,22 +1158,35 @@ pub mod actix_mount {
             W: Widget + 'static,
         {
             let factory: Arc<dyn Fn() -> W + Send + Sync + 'static> = Arc::new(widget);
+            let sessions = SessionManager::with_default_config();
             self.route(
                 &normalize_liveview_path(path),
                 web::get().to(move |req: HttpRequest, body: web::Payload| {
                     let factory = factory.clone();
-                    async move { handler(req, body, factory).await }
+                    let sessions = sessions.clone();
+                    async move { handler(req, body, factory, sessions).await }
                 }),
             )
         }
     }
 
-    async fn handler<W>(req: HttpRequest, body: web::Payload, factory: Arc<dyn Fn() -> W + Send + Sync + 'static>) -> actix_web::Result<HttpResponse>
+    async fn handler<W>(
+        req: HttpRequest,
+        body: web::Payload,
+        factory: Arc<dyn Fn() -> W + Send + Sync + 'static>,
+        sessions: SessionManager,
+    ) -> actix_web::Result<HttpResponse>
     where
         W: Widget + 'static,
     {
+        let header = |name: &str| req.headers().get(name).and_then(|value| value.to_str().ok());
+        // See the other adapters: websocket handshakes are not same-origin
+        // protected by the browser.
+        if !crate::origin_is_allowed(&sessions.config(), header("origin"), header("host")) {
+            return Ok(HttpResponse::Forbidden().body("cross-site liveview connections are not allowed"));
+        }
         let (response, session, stream) = actix_ws::handle(&req, body)?;
-        actix_web::rt::spawn(handle_socket(session, stream, factory));
+        actix_web::rt::spawn(handle_socket(session, stream, factory, sessions));
         Ok(response)
     }
 
@@ -780,14 +1194,25 @@ pub mod actix_mount {
         mut session: actix_ws::Session,
         mut stream: actix_ws::MessageStream,
         factory: Arc<dyn Fn() -> W + Send + Sync + 'static>,
+        sessions: SessionManager,
     ) where
         W: Widget + 'static,
     {
-        let Ok((worker, mount)) = SessionWorker::spawn(factory).await else {
+        let Some(resume_token) = read_hello(&mut session, &mut stream).await else {
+            let _ = session.close(None).await;
+            return;
+        };
+        let Ok(connection) = sessions.connect(factory, resume_token).await else {
             let _ = send_error(&mut session, "liveview session worker failed to mount").await;
             return;
         };
-        if send(&mut session, mount).await.is_err() {
+        let worker = connection.worker;
+        let token = connection.token.to_string();
+        if let Some(mount) = connection.mount {
+            if send(&mut session, LiveViewMessage::Session { token: token.clone() }).await.is_err() || send(&mut session, mount).await.is_err() {
+                return;
+            }
+        } else if send(&mut session, LiveViewMessage::Resumed { token: token.clone() }).await.is_err() {
             return;
         }
 
@@ -798,9 +1223,26 @@ pub mod actix_mount {
             match message {
                 actix_ws::Message::Text(text) => match LiveViewMessage::from_json(text.as_ref()) {
                     Ok(message) => {
+                        if !sessions.touch(&token) {
+                            let _ = send(
+                                &mut session,
+                                LiveViewMessage::Close {
+                                    reason: "liveview session expired".to_owned(),
+                                },
+                            )
+                            .await;
+                            break;
+                        }
+                        // See the other adapters: a client `Close` releases
+                        // the session immediately.
+                        let closing = matches!(message, LiveViewMessage::Close { .. });
                         if let Some(reply) = worker.handle_message(message).await
                             && send(&mut session, reply).await.is_err()
                         {
+                            break;
+                        }
+                        if closing {
+                            sessions.remove(&token);
                             break;
                         }
                     }
@@ -821,6 +1263,40 @@ pub mod actix_mount {
         }
 
         let _ = session.close(None).await;
+    }
+
+    async fn read_hello(session: &mut actix_ws::Session, stream: &mut actix_ws::MessageStream) -> Option<Option<String>> {
+        while let Some(message) = stream.recv().await {
+            let Ok(message) = message else {
+                return None;
+            };
+            match message {
+                actix_ws::Message::Text(text) => {
+                    let message = match LiveViewMessage::from_json(text.as_ref()) {
+                        Ok(message) => message,
+                        Err(err) => {
+                            let _ = send_error(session, format!("invalid liveview message: {err}")).await;
+                            return None;
+                        }
+                    };
+                    return match negotiate_hello(message) {
+                        Ok(token) => Some(token),
+                        Err(message) => {
+                            let _ = send(session, message).await;
+                            None
+                        }
+                    };
+                }
+                actix_ws::Message::Ping(bytes) => {
+                    if session.pong(&bytes).await.is_err() {
+                        return None;
+                    }
+                }
+                actix_ws::Message::Close(_) => return None,
+                _ => {}
+            }
+        }
+        None
     }
 
     async fn send(session: &mut actix_ws::Session, message: LiveViewMessage) -> Result<(), actix_ws::Closed> {
@@ -863,7 +1339,10 @@ mod tests {
     fn hello_version_negotiation() {
         let (session, _mount) = LiveViewSession::mount(Counter { value: Cage::new(0) });
         assert!(session.handle_message(LiveViewMessage::hello()).is_none());
-        let reply = session.handle_message(LiveViewMessage::Hello { protocol_version: 999 });
+        let reply = session.handle_message(LiveViewMessage::Hello {
+            protocol_version: 999,
+            resume_token: None,
+        });
         assert!(matches!(reply, Some(LiveViewMessage::Error { .. })));
     }
 
@@ -966,6 +1445,10 @@ mod tests {
         let message = LiveViewMessage::hello();
         let json = message.to_json().unwrap();
         assert_eq!(LiveViewMessage::from_json(&json).unwrap(), message);
+
+        let message = LiveViewMessage::hello_with_resume("session-1");
+        let json = message.to_json().unwrap();
+        assert_eq!(LiveViewMessage::from_json(&json).unwrap(), message);
     }
 
     #[test]
@@ -973,6 +1456,8 @@ mod tests {
         assert!(LIVEVIEW_CLIENT_JS.contains("__gloryLiveViewConnect"));
         assert!(LIVEVIEW_CLIENT_JS.contains("__gloryWryEvent"));
         assert!(LIVEVIEW_CLIENT_JS.contains("__gloryWryQuery"));
+        assert!(LIVEVIEW_CLIENT_JS.contains("resumeToken"));
+        assert!(LIVEVIEW_CLIENT_JS.contains("onSessionToken"));
         assert!(LIVEVIEW_CLIENT_JS.contains("setTimeout(connect"));
     }
 
@@ -1068,5 +1553,149 @@ mod tests {
                 .iter()
                 .any(|command| matches!(command, Command::SetText { value, .. } if value == "1"))
         );
+    }
+
+    #[test]
+    #[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
+    fn session_manager_resumes_existing_worker() {
+        let manager = SessionManager::with_default_config();
+        let factory = std::sync::Arc::new(|| Counter { value: Cage::new(0) });
+
+        let connection = futures::executor::block_on(manager.connect(factory.clone(), None)).expect("session connects");
+        let token = connection.token.to_string();
+        let LiveViewMessage::Mount { commands } = connection.mount.as_ref().expect("new session mounts") else {
+            panic!("expected mount message");
+        };
+        let button_id = commands
+            .iter()
+            .find_map(|command| match command {
+                Command::Create { id, name, .. } if name == "button" => Some(*id),
+                _ => None,
+            })
+            .expect("button command");
+
+        let reply = futures::executor::block_on(
+            connection
+                .worker
+                .handle_message(LiveViewMessage::Event(Box::new(EventData::new("click", button_id)))),
+        );
+        let Some(LiveViewMessage::Patch { commands }) = reply else {
+            panic!("expected patch message");
+        };
+        assert!(
+            commands
+                .iter()
+                .any(|command| matches!(command, Command::SetText { value, .. } if value == "1"))
+        );
+
+        let resumed = futures::executor::block_on(manager.connect(factory, Some(token.clone()))).expect("session resumes");
+        assert_eq!(resumed.token.as_str(), token);
+        assert!(resumed.mount.is_none(), "resume keeps the existing DOM mounted");
+
+        let reply = futures::executor::block_on(
+            resumed
+                .worker
+                .handle_message(LiveViewMessage::Event(Box::new(EventData::new("click", button_id)))),
+        );
+        let Some(LiveViewMessage::Patch { commands }) = reply else {
+            panic!("expected patch message");
+        };
+        assert!(
+            commands
+                .iter()
+                .any(|command| matches!(command, Command::SetText { value, .. } if value == "2")),
+            "resumed worker preserves reactive state"
+        );
+    }
+    #[test]
+    #[cfg(any(feature = "salvo", feature = "axum", feature = "actix"))]
+    fn resume_tokens_are_unpredictable() {
+        // A resume token is a bearer credential. It used to be
+        // `clock + pid + counter`, every part of which an attacker can narrow
+        // down.
+        let tokens: std::collections::HashSet<String> = (0..256).map(|_| new_resume_token()).collect();
+        assert_eq!(tokens.len(), 256, "tokens must not repeat");
+        for token in &tokens {
+            let hex = token.strip_prefix("lv-").expect("tokens are prefixed");
+            assert_eq!(hex.len(), 32, "128 bits of entropy: {token}");
+            assert!(hex.chars().all(|c| c.is_ascii_hexdigit()), "{token}");
+        }
+        // Consecutive tokens must not be a counter apart.
+        let a = new_resume_token();
+        let b = new_resume_token();
+        let differing = a.bytes().zip(b.bytes()).filter(|(x, y)| x != y).count();
+        assert!(differing > 4, "consecutive tokens look sequential: {a} / {b}");
+    }
+
+    #[test]
+    fn cross_site_websocket_handshakes_are_rejected() {
+        // Browsers do not apply the same-origin policy to websocket
+        // handshakes, so any page could previously open a LiveView session
+        // carrying the user's cookies.
+        let config = LiveViewConfig::default();
+        assert!(!origin_is_allowed(&config, Some("https://evil.example"), Some("app.example.com")));
+        assert!(!origin_is_allowed(&config, Some("null"), Some("app.example.com")));
+
+        // Same-origin and non-browser clients are fine.
+        assert!(origin_is_allowed(&config, Some("https://app.example.com"), Some("app.example.com")));
+        assert!(origin_is_allowed(&config, None, Some("app.example.com")));
+
+        // Explicitly configured origins are allowed across sites.
+        let config = LiveViewConfig {
+            allowed_origins: &["https://trusted.example"],
+            ..LiveViewConfig::default()
+        };
+        assert!(origin_is_allowed(&config, Some("https://trusted.example"), Some("app.example.com")));
+        assert!(!origin_is_allowed(&config, Some("https://evil.example"), Some("app.example.com")));
+    }
+
+    #[test]
+    fn registry_refuses_sessions_past_the_cap() {
+        // Sessions outlive the socket that created them, so an uncapped
+        // registry lets repeated connect/disconnect pin widget trees until the
+        // idle timeout finally collects them.
+        let config = LiveViewConfig {
+            max_sessions: 2,
+            ..LiveViewConfig::default()
+        };
+        let mut registry = SessionRegistry::new(config);
+        assert!(!registry.is_full());
+        registry.insert_with_token(0, "a", 1);
+        assert!(!registry.is_full());
+        registry.insert_with_token(0, "b", 2);
+        assert!(registry.is_full(), "registry must report the cap");
+
+        registry.remove("a");
+        assert!(!registry.is_full(), "removing a session frees a slot");
+    }
+
+    #[test]
+    fn zero_max_sessions_means_unbounded() {
+        let config = LiveViewConfig {
+            max_sessions: 0,
+            ..LiveViewConfig::default()
+        };
+        let mut registry = SessionRegistry::new(config);
+        for index in 0..64 {
+            registry.insert_with_token(0, format!("t{index}"), index);
+        }
+        assert!(!registry.is_full());
+    }
+
+    #[test]
+    fn client_script_keeps_the_session_alive_and_resets_on_a_fresh_mount() {
+        // The server drops an idle session after `idle_timeout_secs`, so the
+        // client has to send something. Nothing did: `ping` existed in the
+        // protocol but neither side ever originated one, and a user who read
+        // the page for five minutes was disconnected on their next click.
+        const CLIENT: &str = include_str!("liveview_client.js");
+        assert!(CLIENT.contains("setInterval"), "client must send a heartbeat");
+        assert!(CLIENT.contains(r#"send({ type: "ping" })"#), "heartbeat must be a ping");
+
+        // A fresh `session` (as opposed to `resumed`) replays the tree from
+        // node 0, so the previous session's DOM has to go first or the page
+        // ends up with two copies of the UI.
+        assert!(CLIENT.contains("__gloryResetWryTree"), "client must reset the tree on a fresh session");
+        assert!(CLIENT.contains(r#"if (message.type === "session") resetTree();"#));
     }
 }

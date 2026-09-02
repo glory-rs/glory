@@ -101,12 +101,15 @@ impl Router {
         }
         if !self.routers.is_empty() {
             let original_cursor = path_state.cursor;
+            // Params captured by a child that matched partially must not leak
+            // into the sibling that is tried next; see `PathFilter::detect`.
+            let original_params = path_state.params.clone();
             // Visit children most-specific-first so static routes win over
             // dynamic ones and catch-alls regardless of registration order. The
             // sort is stable, so equally-specific siblings keep their declared
             // order (preserving prior behaviour for unambiguous routes).
             let mut order: Vec<usize> = (0..self.routers.len()).collect();
-            order.sort_by_key(|&i| std::cmp::Reverse(self.routers[i].specificity()));
+            order.sort_by_key(|&i| std::cmp::Reverse(self.routers[i].specificity_ranks()));
             for idx in order {
                 let child = &self.routers[idx];
                 if let Some(dm) = child.detect(url, truck, path_state) {
@@ -116,6 +119,7 @@ impl Router {
                     });
                 } else {
                     path_state.cursor = original_cursor;
+                    path_state.params = original_params.clone();
                 }
             }
         }
@@ -136,6 +140,13 @@ impl Router {
     #[inline]
     pub fn specificity(&self) -> i32 {
         self.filters.iter().map(|filter| filter.specificity()).sum()
+    }
+
+    /// Per-segment specificity of this router's own filters, compared
+    /// lexicographically when ranking siblings. See
+    /// [`Filter::specificity_ranks`](crate::filters::Filter::specificity_ranks).
+    pub fn specificity_ranks(&self) -> Vec<i32> {
+        self.filters.iter().flat_map(|filter| filter.specificity_ranks()).collect()
     }
 
     /// Push a router as child of current router.

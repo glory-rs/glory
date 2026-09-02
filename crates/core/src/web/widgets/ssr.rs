@@ -105,7 +105,13 @@ impl Widget for Element {
         if let Some(parent_node) = ctx.parent_node.as_ref() {
             self.renderer.remove_child(parent_node, &self.node);
         }
-        ctx.mark_descendants_dom_detached();
+        // NB: deliberately does NOT call `mark_descendants_dom_detached()`.
+        // Suspending moves this node's whole subtree out of the document in
+        // one piece, and the parent/child links *inside* that subtree stay
+        // valid. Clearing descendants' `parent_node` here left them unable to
+        // remove themselves later: a keyed row deleted while the boundary was
+        // pending kept its DOM node, which then reappeared when the boundary
+        // resolved. Descendants are re-anchored by `flood` on resume.
     }
     fn patch(&mut self, ctx: &mut Scope) {
         for (name, value) in &self.props {

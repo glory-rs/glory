@@ -126,7 +126,8 @@ pub async fn run_loop(proj: &Arc<Project>) -> Result<()> {
             return Ok(());
         }
 
-        let changes = Interrupt::get_source_changes().await;
+        let changes = Interrupt::get_source_changes();
+        let consumed_revision = changes.revision();
 
         // spawn separate style-update process
         tokio::spawn({
@@ -134,11 +135,26 @@ pub async fn run_loop(proj: &Arc<Project>) -> Result<()> {
             let proj = Arc::clone(proj);
             async move {
                 let style = compile::style(&proj, &changes).await;
-                if let Ok(Ok(Outcome::Success(Product::Style(_)))) = style.await {
-                    ReloadSignal::send_style();
-                    log::info!("Watch updated style");
-                    Interrupt::clear_source_changes().await;
+                match style.await {
+                    Ok(Ok(Outcome::Success(Product::Style(_)))) => {
+                        ReloadSignal::send_style();
+                        log::info!("Watch updated style");
+                    }
+                    Ok(Ok(Outcome::Success(_)) | Ok(Outcome::Stopped)) => {}
+                    Ok(Ok(Outcome::Failed)) => {
+                        log::warn!("Watch style build failed");
+                        ReloadSignal::send_build_error("Style build failed. See the terminal running `glory serve` for the full output.");
+                    }
+                    Ok(Err(error)) => {
+                        log::warn!("Watch style build errored: {error}");
+                        ReloadSignal::send_build_error(format!("Style build errored: {error}"));
+                    }
+                    Err(error) => log::warn!("Watch style task failed to join: {error}"),
                 }
+                // NB: the style task deliberately does not clear the change
+                // set. It runs concurrently with the main build, and clearing
+                // here used to wipe changes the main build still had to retry
+                // after an interrupt.
             }
         });
 
@@ -193,7 +209,7 @@ pub async fn run_loop(proj: &Arc<Project>) -> Result<()> {
             // Surface the failure in the browser as a dismissible overlay; the
             // full diagnostics remain in the terminal.
             ReloadSignal::send_build_error("Build failed. See the terminal running `glory serve` for the full compiler output.");
-            Interrupt::clear_source_changes().await;
+            Interrupt::clear_source_changes(consumed_revision);
         } else if interrupted {
             log::info!("Build interrupted. Restarting.");
         } else {
@@ -225,7 +241,7 @@ pub async fn run_loop(proj: &Arc<Project>) -> Result<()> {
                 ReloadSignal::send_full();
                 log::info!("Watch updated {set}")
             }
-            Interrupt::clear_source_changes().await;
+            Interrupt::clear_source_changes(consumed_revision);
         }
     }
 }

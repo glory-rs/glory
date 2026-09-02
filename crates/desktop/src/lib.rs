@@ -7,7 +7,7 @@
 //! - [`WRY_INTERPRETER_JS`] — the JS interpreter injected into a webview;
 //!   it applies serialized [`Command`] batches to the real DOM and posts
 //!   serialized [`EventData`] back over IPC.
-//! - [`launch`] / [`launch_with_config`] (feature `runtime`, on by
+//! - [`launch`] / [`launch_with_config`] (feature `runtime`, off by
 //!   default) — a tao + wry window host wiring webview IPC to a
 //!   [`CommandHolder`] transaction loop.
 //!
@@ -87,7 +87,13 @@ impl CommandSink for RecordingSink {
 }
 
 /// Envelope for messages posted from the webview over IPC.
+///
+/// Marked `#[non_exhaustive]`: new variants are added as the interpreter
+/// grows, so out-of-tree hosts must carry a `_` arm. Without this a variant
+/// addition silently breaks every custom host (that is exactly how the
+/// mobile hosts fell behind `GloryWryEval`).
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 pub enum IpcMessage {
     /// DOM is ready (interpreter installed, `document.body` registered as
     /// node 0). The host mounts the widget tree on receipt.
@@ -105,8 +111,8 @@ pub enum IpcMessage {
 mod runtime;
 #[cfg(feature = "runtime")]
 pub use runtime::{
-    ChildWebviewId, Desktop, DesktopChildBounds, DesktopChildSource, DesktopChildWebview, DesktopConfig, DesktopFileDropEvent, DesktopHotKeyEvent,
-    DesktopHotKeySpec, DesktopHotKeyState, DesktopProtocol, DesktopProtocolRequest, DesktopProtocolResponse, DesktopTrayEvent,
+    ChildWebviewId, Desktop, DesktopChildBounds, DesktopChildSource, DesktopChildWebview, DesktopCloseBehavior, DesktopConfig, DesktopFileDropEvent,
+    DesktopHotKeyEvent, DesktopHotKeySpec, DesktopHotKeyState, DesktopProtocol, DesktopProtocolRequest, DesktopProtocolResponse, DesktopTrayEvent,
     DesktopTrayMouseButton, DesktopTrayMouseButtonState, DesktopWindowHandle, DesktopWindowId, DesktopWindowState, EvalError, MenuItemSpec, MenuSpec,
     TrayIconImage, TrayIconSpec, asset_url, desktop_protocol_response, launch, launch_with_config, launch_with_handle,
 };
@@ -131,6 +137,9 @@ mod tests {
             "Remove",
             "AttachEvent",
             "DetachEvent",
+            // `Query` was missing from this guard, so deleting its handler in
+            // the interpreter would not have failed any test.
+            "Query",
         ] {
             assert!(
                 WRY_INTERPRETER_JS.contains(&format!("\"{command}\"")),

@@ -236,8 +236,15 @@ name = "{package_name}"
 version = "0.1.0"
 edition = "2024"
 
+# `lib_features` below names features of *this* package, so they have to exist
+# here. Turning the feature on in the `glory` dependency instead makes
+# `cargo build --features=web-csr` fail with "does not contain this feature".
+[features]
+default = ["web-csr"]
+web-csr = ["glory/web-csr"]
+
 [dependencies]
-glory = {{ version = "0.3.1", default-features = false, features = ["web-csr"] }}
+glory = {{ version = "{glory_version}", default-features = false }}
 wasm-bindgen = {{ version = "0.2", features = ["enable-interning"] }}
 
 [package.metadata.glory]
@@ -246,7 +253,8 @@ site_root = "target/site"
 site_pkg_dir = "pkg"
 lib_features = ["web-csr"]
 lib_default_features = false
-"#
+"#,
+                glory_version = env!("CARGO_PKG_VERSION")
             ),
         },
         TemplateFile {
@@ -384,10 +392,25 @@ name = "{package_name}"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+default = ["desktop"]
+desktop = []
+
 [dependencies]
-glory-core = {{ version = "0.3.1", default-features = false, features = ["backend-command"] }}
-glory-desktop = {{ version = "0.3.1", default-features = false, features = ["runtime"] }}
-"#
+glory-core = {{ version = "{glory_version}", default-features = false, features = ["backend-command"] }}
+glory-desktop = {{ version = "{glory_version}", default-features = false, features = ["runtime"] }}
+
+# Without this section `glory build` / `glory serve` refuse the project with
+# "Please define glory projects ...".
+[package.metadata.glory]
+output_name = "{package_name}"
+site_root = "target/site"
+site_pkg_dir = "pkg"
+bin_target = "{package_name}"
+bin_features = ["desktop"]
+bin_default_features = false
+"#,
+                glory_version = env!("CARGO_PKG_VERSION")
             ),
         },
         TemplateFile {
@@ -417,15 +440,25 @@ default = []
 mobile = []
 
 [dependencies]
-glory-core = {{ version = "0.3.1", default-features = false, features = ["backend-command"] }}
-glory-desktop = {{ version = "0.3.1", default-features = false, features = ["backend"] }}
+glory-core = {{ version = "{glory_version}", default-features = false, features = ["backend-command"] }}
+glory-desktop = {{ version = "{glory_version}", default-features = false, features = ["backend"] }}
 serde_json = "1"
 tracing = "0.1"
 
 [target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
 wry = "0.55"
 tao = "0.35"
-"#
+
+# Mobile builds compile this package as a cdylib for the host Android/iOS
+# project, so there is no server binary: `lib_*` only.
+[package.metadata.glory]
+output_name = "{crate_name}"
+site_root = "target/site"
+site_pkg_dir = "pkg"
+lib_features = ["mobile"]
+lib_default_features = false
+"#,
+                glory_version = env!("CARGO_PKG_VERSION")
             ),
         },
         TemplateFile {
@@ -839,6 +872,10 @@ mod host {
                 Ok(glory_desktop::IpcMessage::GloryWryQuery(response)) => {
                     let _ = ipc_proxy.send_event(HostEvent::Query(response));
                 }
+                // This host does not use the `eval()` bridge. `IpcMessage` is
+                // `#[non_exhaustive]`, so the catch-all also keeps generated
+                // projects compiling across future interpreter additions.
+                Ok(_) => {}
                 Err(err) => tracing::warn!(%err, "undecodable mobile IPC message"),
             })
             .build(&window)
@@ -929,6 +966,87 @@ mod tests {
         result.unwrap();
         assert!(dir.path().join("my-app/Cargo.toml").exists());
         assert!(dir.path().join("my-app/src/main.rs").exists());
+    }
+
+    /// Every feature named in `[package.metadata.glory]` must exist in the
+    /// generated package's own `[features]`.
+    ///
+    /// `lib_features` / `bin_features` are passed straight to
+    /// `cargo build --features=...` for *this* package, so naming a feature
+    /// that only exists on a dependency fails with "the package does not
+    /// contain this feature". The default `web` template shipped that way: it
+    /// declared `lib_features = ["web-csr"]` while enabling `web-csr` on the
+    /// `glory` dependency, so `glory new` produced a project that could not be
+    /// built or served.
+    #[test]
+    fn template_metadata_features_exist_in_the_generated_package() {
+        for template in [
+            TemplateKind::Web,
+            TemplateKind::Ssr,
+            TemplateKind::Fullstack,
+            TemplateKind::Desktop,
+            TemplateKind::Mobile,
+        ] {
+            let files = template.files("demo-app", "demo_app");
+            let manifest = files
+                .iter()
+                .find(|file| file.path == "Cargo.toml")
+                .unwrap_or_else(|| panic!("{template:?} template has no Cargo.toml"))
+                .body
+                .clone();
+
+            // Without this section `Config::load` bails with "Please define
+            // glory projects ...", so the generated project cannot be built or
+            // served at all. The desktop and mobile templates shipped without
+            // it.
+            assert!(
+                manifest.contains("[package.metadata.glory]"),
+                "{template:?} template has no [package.metadata.glory]; `glory build` would refuse the project"
+            );
+
+            let declared = declared_features(&manifest);
+            for key in ["lib_features", "bin_features"] {
+                for feature in metadata_feature_list(&manifest, key) {
+                    assert!(
+                        declared.contains(&feature),
+                        "{template:?} template: `{key}` names `{feature}`, which is not in its own [features] (declared: {declared:?})"
+                    );
+                }
+            }
+        }
+    }
+
+    /// Feature names declared in the manifest's own `[features]` table.
+    fn declared_features(manifest: &str) -> Vec<String> {
+        let mut out = Vec::new();
+        let mut in_features = false;
+        for line in manifest.lines() {
+            let line = line.trim();
+            if line.starts_with('[') {
+                in_features = line == "[features]";
+                continue;
+            }
+            if in_features && let Some((name, _)) = line.split_once('=') {
+                out.push(name.trim().to_owned());
+            }
+        }
+        out
+    }
+
+    /// Values of a `key = ["a", "b"]` line in `[package.metadata.glory]`.
+    fn metadata_feature_list(manifest: &str, key: &str) -> Vec<String> {
+        manifest
+            .lines()
+            .find_map(|line| line.trim().strip_prefix(key)?.trim().strip_prefix('=').map(str::trim).map(str::to_owned))
+            .map(|value| {
+                value
+                    .trim_matches(['[', ']'])
+                    .split(',')
+                    .map(|part| part.trim().trim_matches('"').to_owned())
+                    .filter(|part| !part.is_empty())
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     #[test]

@@ -16,26 +16,69 @@ fn auto_reload(nonce_str: &str, options: &GloryConfig) -> String {
             r#"<script crossorigin=""{nonce_str}>(function () {{
     {}
     let host = window.location.hostname;
+    const OVERLAY_ID = '__glory_build_error_overlay__';
+    const clearOverlay = () => {{
+        const existing = document.getElementById(OVERLAY_ID);
+        if (existing) existing.remove();
+    }};
+    const showBuildError = (message) => {{
+        clearOverlay();
+        const overlay = document.createElement('div');
+        overlay.id = OVERLAY_ID;
+        overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483647;background:rgba(20,20,20,0.92);color:#ff8585;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;padding:0;overflow:auto;';
+        const bar = document.createElement('div');
+        bar.style.cssText = 'display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:#1b1b1b;color:#fff;font-weight:600;position:sticky;top:0;';
+        const title = document.createElement('span');
+        title.textContent = 'Build failed';
+        const close = document.createElement('button');
+        close.textContent = '×';
+        close.setAttribute('aria-label', 'Dismiss build error');
+        close.style.cssText = 'background:none;border:none;color:#fff;font-size:22px;line-height:1;cursor:pointer;';
+        close.onclick = () => overlay.remove();
+        bar.appendChild(title);
+        bar.appendChild(close);
+        const pre = document.createElement('pre');
+        pre.style.cssText = 'margin:0;padding:16px;white-space:pre-wrap;word-break:break-word;';
+        // textContent, never innerHTML: compiler output is not markup.
+        pre.textContent = message || 'Build failed. See the terminal running `glory serve`.';
+        overlay.appendChild(bar);
+        overlay.appendChild(pre);
+        document.body.appendChild(overlay);
+    }};
+    let reconnectMs = 500;
+    const connect = () => {{
     let ws = new WebSocket({protocol} + host + ':{reload_port}/live_reload');
+    ws.onopen = () => {{ reconnectMs = 500; }};
     ws.onmessage = (ev) => {{
         let msg = JSON.parse(ev.data);
         if (msg.type === 'full') window.location.reload();
         if (msg.type === 'style') {{
+            clearOverlay();
             let found = false;
             document.querySelectorAll("link").forEach((link) => {{
-                if (link.getAttribute('href').includes(msg.css_path)) {{
-                    let newHref = '/' + msg.css_path + '?version=' + new Date().getMilliseconds();
+                const href = link.getAttribute('href');
+                if (href && href.includes(msg.css_path)) {{
+                    let newHref = '/' + msg.css_path + '?version=' + Date.now();
                     link.setAttribute('href', newHref);
                     found = true;
                 }}
             }});
             if (!found) console.warn(`CSS hot-reload: Could not find a <link href=/\"${{msg.css_path}}\"> element`);
         }};
+        if (msg.type === 'build_error') showBuildError(msg.message);
         if(msg.type === 'functions') {{
             window.dispatchEvent(new CustomEvent('glory:function-reload', {{ detail: JSON.parse(msg.payload) }}));
         }}
     }};
-    ws.onclose = () => console.warn('Live-reload stopped. Manual reload necessary.');
+    ws.onclose = () => {{
+        // The dev server restarts on its own (a server rebuild, a crash); back
+        // off and reconnect instead of stranding the page.
+        console.warn(`Live-reload disconnected, retrying in ${{reconnectMs}}ms.`);
+        setTimeout(connect, reconnectMs);
+        reconnectMs = Math.min(reconnectMs * 2, 10000);
+    }};
+    }};
+    connect();
 }})()
 </script>"#,
             glory_hot_reload::HOT_RELOAD_JS

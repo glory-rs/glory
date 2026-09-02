@@ -18,6 +18,7 @@ actix-web = { workspace = true, optional = true }
 actix-ws = { workspace = true, optional = true }
 axum = { workspace = true, optional = true, features = ["ws"] }
 futures = { workspace = true, optional = true }
+getrandom = { workspace = true }
 salvo = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
@@ -30,6 +31,9 @@ default = []
 actix = ["dep:actix-web", "dep:actix-ws", "dep:futures"]
 axum = ["dep:axum", "dep:futures"]
 salvo = ["dep:futures", "dep:salvo", "salvo/websocket"]
+
+[package.metadata.cargo-all-features]
+# Adapter mounts are additive; every combination must build.
 
 [lints]
 workspace = true

@@ -39,14 +39,14 @@ fn build_sass(proj: &Arc<Project>) -> JoinHandle<Result<Outcome<String>>> {
             return Ok(Outcome::Success("".to_string()));
         };
 
-        log::trace!("Style found: {}", &style_file);
+        log::trace!("Style found: {}", style_file);
         fs::create_dir_all(style_file.dest.clone().without_last()).await.dot()?;
         match style_file.source.extension() {
             Some("sass") | Some("scss") => compile_sass(style_file, proj.release)
                 .await
-                .context(format!("compile sass/scss: {}", &style_file)),
+                .context(format!("compile sass/scss: {}", style_file)),
             Some("css") => Ok(Outcome::Success(fs::read_to_string(&style_file.source).await.dot()?)),
-            _ => bail!("Not a css/sass/scss style file: {}", &style_file),
+            _ => bail!("Not a css/sass/scss style file: {}", style_file),
         }
     })
 }
@@ -58,7 +58,7 @@ fn build_tailwind(proj: &Arc<Project>) -> JoinHandle<Result<Outcome<String>>> {
             log::trace!("Tailwind not configured");
             return Ok(Outcome::Success("".to_string()));
         };
-        log::trace!("Tailwind config: {:?}", &tw_conf);
+        log::trace!("Tailwind config: {:?}", tw_conf);
         compile_tailwind(&proj, tw_conf).await
     })
 }

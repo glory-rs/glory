@@ -228,6 +228,17 @@ impl BlitzConsumer {
         self.blitz_to_glory.get(&blitz_id).copied()
     }
 
+    /// Blitz ids of `root` and every descendant, in document order.
+    fn collect_subtree(&mut self, root: usize) -> Vec<usize> {
+        let mut out = Vec::new();
+        let mut stack = vec![root];
+        while let Some(node) = stack.pop() {
+            out.push(node);
+            stack.extend(self.doc.mutate().child_ids(node));
+        }
+        out
+    }
+
     fn blitz_id(&self, glory_id: u64) -> Option<usize> {
         self.ids.get(&glory_id).copied()
     }
@@ -339,11 +350,22 @@ impl BlitzConsumer {
             }
             Command::Remove { child, .. } => {
                 if let Some(blitz_child) = self.blitz_id(*child) {
+                    // Collect the subtree *before* detaching it: the core only
+                    // sends `Remove` for the subtree root, so cleaning up just
+                    // that node left every descendant in `ids` /
+                    // `blitz_to_glory` / `classes` / `properties` forever. Worse,
+                    // a stale `blitz_to_glory` entry could map a recycled blitz
+                    // slot back to the old glory id and misroute events.
+                    let subtree = self.collect_subtree(blitz_child);
                     self.doc.mutate().remove_node(blitz_child);
-                    self.ids.remove(child);
-                    self.blitz_to_glory.remove(&blitz_child);
-                    self.classes.remove(child);
-                    self.properties.remove(child);
+                    for blitz_id in subtree {
+                        if let Some(glory_id) = self.blitz_to_glory.remove(&blitz_id) {
+                            self.ids.remove(&glory_id);
+                            self.classes.remove(&glory_id);
+                            self.properties.remove(&glory_id);
+                            self.listeners.retain(|(id, _)| *id != glory_id);
+                        }
+                    }
                     self.layout.mark_dirty();
                 }
             }
@@ -424,6 +446,13 @@ impl BlitzConsumer {
 
         if let Some(node) = self.blitz_id(glory_id) {
             match value {
+                // Boolean properties reflect as *presence*, so a falsy value
+                // has to clear the attribute. Writing `checked="false"` would
+                // read back as checked, since any value of an HTML boolean
+                // attribute means true.
+                Some(value) if is_boolean_blitz_property(name) && matches!(value.as_str(), "false" | "") => {
+                    self.doc.mutate().clear_attribute(node, qual(name))
+                }
                 Some(value) => self.doc.mutate().set_attribute(node, qual(name), value),
                 None => self.doc.mutate().clear_attribute(node, qual(name)),
             }
@@ -506,6 +535,12 @@ pub fn property_route(name: &str) -> PropertyRoute {
 /// lifecycle instead of being inert properties.
 fn is_reflected_blitz_property(name: &str) -> bool {
     matches!(name, "value" | "checked")
+}
+
+/// Reflected properties whose DOM type is boolean, so a falsy wire value must
+/// clear the attribute rather than set it to the string `"false"`.
+fn is_boolean_blitz_property(name: &str) -> bool {
+    matches!(name, "checked")
 }
 
 #[cfg(feature = "shell")]
@@ -965,13 +1000,65 @@ mod tests {
 
     impl Widget for Counter {
         fn build(&mut self, ctx: &mut Scope) {
-            let value = self.value.clone();
+            let value = self.value;
             div()
                 .attr("data-app", "counter")
                 .fill(button().text("+").on(events::click, move |_| value.revise(|mut v| *v += 1)))
-                .fill(span().text(self.value.clone()))
+                .fill(span().text(self.value))
                 .show_in(ctx);
         }
+    }
+
+    #[test]
+    fn removing_a_subtree_forgets_its_descendants() {
+        let mut consumer = BlitzConsumer::new();
+        consumer.apply_batch(&[
+            Command::Create {
+                id: 1,
+                name: "ul".into(),
+                is_void: false,
+            },
+            Command::Insert {
+                parent: 0,
+                child: 1,
+                position: CommandInsertPosition::Tail,
+            },
+            Command::Create {
+                id: 2,
+                name: "li".into(),
+                is_void: false,
+            },
+            Command::Insert {
+                parent: 1,
+                child: 2,
+                position: CommandInsertPosition::Tail,
+            },
+            Command::AddClass { id: 2, value: "row".into() },
+            Command::SetProperty {
+                id: 2,
+                name: "value".into(),
+                value: "x".into(),
+            },
+            Command::AttachEvent {
+                id: 2,
+                name: "click".into(),
+                bubbles: true,
+            },
+        ]);
+        assert!(consumer.blitz_id(2).is_some());
+
+        // The core only sends `Remove` for the subtree root.
+        consumer.apply_batch(&[Command::Remove { parent: 0, child: 1 }]);
+
+        // Regression: only the root's bookkeeping was dropped, so every
+        // descendant stayed in these maps for the lifetime of the process, and
+        // a recycled blitz slot could still resolve to the dead glory id.
+        assert!(consumer.blitz_id(1).is_none(), "root must be forgotten");
+        assert!(consumer.blitz_id(2).is_none(), "descendant must be forgotten");
+        assert!(!consumer.classes.contains_key(&2), "descendant classes must be dropped");
+        assert!(!consumer.properties.contains_key(&2), "descendant properties must be dropped");
+        assert!(!consumer.listeners.iter().any(|(id, _)| *id == 2), "descendant listeners must be dropped");
+        assert!(!consumer.blitz_to_glory.values().any(|id| *id == 2), "reverse map must be cleaned");
     }
 
     /// The actual spike: a real widget tree drives a real blitz document
@@ -979,7 +1066,7 @@ mod tests {
     #[test]
     fn widget_tree_renders_into_blitz_document() {
         let value = Cage::new(0i64);
-        let holder = CommandHolder::new().mount(Counter { value: value.clone() });
+        let holder = CommandHolder::new().mount(Counter { value });
 
         let mut consumer = BlitzConsumer::new();
         consumer.apply_batch(&holder.take_batch());

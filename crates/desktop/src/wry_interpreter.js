@@ -34,6 +34,40 @@
 
   const classParts = (value) => String(value).split(/\s+/).filter(Boolean);
 
+  // Commands carry property values as strings. Coerce back to the DOM
+  // property's own type, or `checked`/`disabled` would be set to the truthy
+  // string "false", and `input.value = undefined` would literally display
+  // "undefined".
+  const setProperty = (el, name, value) => {
+    if (typeof el[name] === "boolean") {
+      el[name] = value !== "false" && value !== "";
+    } else if (typeof el[name] === "number") {
+      const parsed = Number(value);
+      el[name] = Number.isNaN(parsed) ? el[name] : parsed;
+    } else {
+      el[name] = value;
+    }
+  };
+
+  const clearProperty = (el, name) => {
+    const current = el[name];
+    if (typeof current === "boolean") {
+      el[name] = false;
+    } else if (typeof current === "string") {
+      el[name] = "";
+    } else if (Object.prototype.hasOwnProperty.call(el, name)) {
+      // Own (expando) property: really remove it. Prototype accessors such as
+      // `value` cannot be deleted, hence the reset above.
+      try {
+        delete el[name];
+      } catch (_) {
+        el[name] = undefined;
+      }
+    } else {
+      el[name] = undefined;
+    }
+  };
+
   const insertChild = (parent, child, position) => {
     const name = positionName(position);
     const value = positionValue(position);
@@ -121,12 +155,9 @@
     } else if (type === "RemoveAttribute") {
       byId(data.id).removeAttribute(data.name);
     } else if (type === "SetProperty") {
-      byId(data.id)[data.name] = data.value;
+      setProperty(byId(data.id), data.name, data.value);
     } else if (type === "RemoveProperty") {
-      byId(data.id)[data.name] = undefined;
-      try {
-        delete byId(data.id)[data.name];
-      } catch (_) {}
+      clearProperty(byId(data.id), data.name);
     } else if (type === "AddClass") {
       byId(data.id).classList.add(...classParts(data.value));
     } else if (type === "RemoveClass") {
@@ -140,8 +171,13 @@
     } else if (type === "Remove") {
       const parent = byId(data.parent);
       const child = byId(data.child);
-      if (child.parentNode === parent) parent.removeChild(child);
-      else child.remove();
+      // Match the reference consumer (`command_dom`): a Remove whose parent no
+      // longer owns the child is stale (the child was moved by a later Insert
+      // in the same batch) and must be ignored, not applied to whatever the
+      // child's current parent happens to be.
+      if (child.parentNode !== parent) return;
+      parent.removeChild(child);
+      forgetSubtree(data.child, child);
     } else if (type === "AttachEvent") {
       const key = `${data.id}:${data.name}`;
       if (listeners.has(key)) {
@@ -194,6 +230,50 @@
     for (const cmd of commands) {
       window.__gloryApplyWryCommand(cmd);
     }
+  };
+
+  // Drops every node this interpreter knows about and empties the host root.
+  //
+  // A host calls this before replaying a fresh mount onto a page that already
+  // carries a previous tree — a LiveView client that reconnected after its
+  // session expired, for instance. Without it the new tree is appended next to
+  // the stale one (two copies of the UI) and the new node ids overwrite the
+  // old entries in this map.
+  // Drops a removed node and its descendants from the id/listener registries.
+  //
+  // These maps used to only shrink when a listener was detached, so every
+  // plain element the app ever created stayed reachable from `nodes` for the
+  // lifetime of the page. A list that churns rows grew both maps without
+  // bound.
+  const forgetSubtree = (rootId, rootNode) => {
+    const removed = new Set([rootId]);
+    const descendants = new Set();
+    const collect = (node) => {
+      descendants.add(node);
+      for (const child of node.childNodes || []) collect(child);
+    };
+    collect(rootNode);
+    for (const [id, node] of nodes) {
+      if (descendants.has(node)) removed.add(id);
+    }
+    for (const id of removed) nodes.delete(id);
+    for (const key of [...listeners.keys()]) {
+      const id = Number(key.slice(0, key.indexOf(":")));
+      if (removed.has(id)) listeners.delete(key);
+    }
+  };
+
+  window.__gloryResetWryTree = () => {
+    for (const [key, handler] of listeners) {
+      const split = key.indexOf(":");
+      const id = Number(key.slice(0, split));
+      const name = key.slice(split + 1);
+      const target = id === 0 ? document.body : nodes.get(id);
+      if (target) target.removeEventListener(name, handler);
+    }
+    listeners.clear();
+    nodes.clear();
+    document.body.replaceChildren();
   };
 
   // Runs host-supplied JavaScript and posts the JSON-serialized result back

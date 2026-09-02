@@ -147,12 +147,28 @@ where
             let node = <T as AsRef<web_sys::Element>>::as_ref(&self.node);
             self.renderer.remove_child(parent_node, node);
         }
-        ctx.mark_descendants_dom_detached();
+        // NB: deliberately does NOT call `mark_descendants_dom_detached()`.
+        // Suspending moves this node's whole subtree out of the document in
+        // one piece, and the parent/child links *inside* that subtree stay
+        // valid. Clearing descendants' `parent_node` here left them unable to
+        // remove themselves later: a keyed row deleted while the boundary was
+        // pending kept its DOM node, which then reappeared when the boundary
+        // resolved. Descendants are re-anchored by `flood` on resume.
     }
     fn patch(&mut self, ctx: &mut Scope) {
         let node = <T as AsRef<web_sys::Element>>::as_ref(&self.node);
-        if node.parent_element().is_none() {
-            ctx.parent_node.as_ref().unwrap().append_child(node).ok();
+        // Only re-insert a node that lost its parent while this view is still
+        // supposed to be in the document. A view suspended by `Suspense` (or
+        // detached) keeps its subscriptions, so a bound value changing during
+        // that window used to append the hidden node back — at the end of the
+        // parent, next to the fallback, in the wrong position. Also note
+        // `parent_node` is `None` for a detached view, so the old
+        // `.unwrap()` here could panic outright.
+        if node.parent_element().is_none()
+            && ctx.is_attached()
+            && let Some(parent_node) = ctx.parent_node.as_ref()
+        {
+            parent_node.append_child(node).ok();
         }
         for (name, value) in &self.props {
             value.inject_to(&ctx.view_id, &mut node.clone(), name, false);
@@ -282,7 +298,13 @@ where
         if let Some(root) = self.root.as_ref() {
             ctx.remove_node_from_parent(root);
         }
-        ctx.mark_descendants_dom_detached();
+        // NB: deliberately does NOT call `mark_descendants_dom_detached()`.
+        // Suspending moves this node's whole subtree out of the document in
+        // one piece, and the parent/child links *inside* that subtree stay
+        // valid. Clearing descendants' `parent_node` here left them unable to
+        // remove themselves later: a keyed row deleted while the boundary was
+        // pending kept its DOM node, which then reappeared when the boundary
+        // resolved. Descendants are re-anchored by `flood` on resume.
     }
 }
 

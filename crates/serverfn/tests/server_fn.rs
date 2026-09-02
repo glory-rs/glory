@@ -1126,3 +1126,147 @@ fn filesystem_cache_key_escaping_prevents_traversal() {
 
     std::fs::remove_dir_all(&dir).ok();
 }
+
+// ---------------------------------------------------------------------------
+// Cross-site request protection
+// ---------------------------------------------------------------------------
+
+fn context_with(method: &str, headers: &[(&str, &str)]) -> glory_serverfn::RequestContext {
+    glory_serverfn::RequestContext {
+        method: method.to_owned(),
+        uri: "/__glory/fn/toggle".to_owned(),
+        headers: headers
+            .iter()
+            .map(|(name, value)| (name.to_ascii_lowercase(), (*value).to_owned()))
+            .collect(),
+    }
+}
+
+#[test]
+fn cross_site_post_is_rejected() {
+    // A cross-site form auto-submitted by an attacker page. Browsers always
+    // send Sec-Fetch-Site, and page script cannot forge it.
+    let err = context_with("POST", &[("sec-fetch-site", "cross-site"), ("host", "app.example.com")])
+        .ensure_same_site()
+        .unwrap_err();
+    assert_eq!(err.status_code(), 403, "{err:?}");
+
+    // Same via a mismatched Origin on a client that omits Sec-Fetch-Site.
+    let err = context_with("POST", &[("origin", "https://evil.example"), ("host", "app.example.com")])
+        .ensure_same_site()
+        .unwrap_err();
+    assert_eq!(err.status_code(), 403, "{err:?}");
+}
+
+#[test]
+fn same_site_and_non_browser_posts_are_allowed() {
+    for site in ["same-origin", "same-site", "none"] {
+        context_with("POST", &[("sec-fetch-site", site), ("host", "app.example.com")])
+            .ensure_same_site()
+            .unwrap_or_else(|err| panic!("{site} must be allowed: {err:?}"));
+    }
+
+    // Same-origin fetch: Origin authority equals Host.
+    context_with("POST", &[("origin", "https://app.example.com"), ("host", "app.example.com")])
+        .ensure_same_site()
+        .expect("same-origin POST must be allowed");
+
+    // Non-browser client (reqwest, curl, a native app): no ambient cookies to
+    // abuse, and no Origin/Sec-Fetch-Site to check.
+    context_with("POST", &[("host", "app.example.com")])
+        .ensure_same_site()
+        .expect("non-browser POST must be allowed");
+
+    // GET is exempt: documented as read-only, and unblockable anyway.
+    context_with("GET", &[("sec-fetch-site", "cross-site"), ("host", "app.example.com")])
+        .ensure_same_site()
+        .expect("GET must stay exempt");
+}
+
+#[test]
+fn configured_origins_are_allowed_across_sites() {
+    glory_serverfn::set_allowed_origins(["https://trusted.example"]);
+    context_with(
+        "POST",
+        &[
+            ("sec-fetch-site", "cross-site"),
+            ("origin", "https://trusted.example"),
+            ("host", "app.example.com"),
+        ],
+    )
+    .ensure_same_site()
+    .expect("configured origin must be allowed");
+
+    // Anything else still fails.
+    let err = context_with(
+        "POST",
+        &[
+            ("sec-fetch-site", "cross-site"),
+            ("origin", "https://evil.example"),
+            ("host", "app.example.com"),
+        ],
+    )
+    .ensure_same_site()
+    .unwrap_err();
+    assert_eq!(err.status_code(), 403);
+
+    glory_serverfn::set_allowed_origins(Vec::<String>::new());
+}
+
+#[test]
+fn body_limit_is_shared_and_reports_413() {
+    // Every adapter mount reads the same limit, instead of inheriting its
+    // framework default (Salvo 64 KiB / Actix 256 KiB / a hard-coded 16 MiB).
+    assert_eq!(glory_serverfn::max_body_bytes(), glory_serverfn::DEFAULT_MAX_BODY_BYTES);
+    assert_eq!(glory_serverfn::payload_too_large().status_code(), 413);
+
+    glory_serverfn::set_max_body_bytes(1024);
+    assert_eq!(glory_serverfn::max_body_bytes(), 1024);
+    glory_serverfn::set_max_body_bytes(glory_serverfn::DEFAULT_MAX_BODY_BYTES);
+}
+
+#[test]
+fn malformed_request_body_is_a_client_error() {
+    futures::executor::block_on(async {
+        // Regression: this used to report 500, so every malformed request
+        // showed up as a server-error alert.
+        let err = handle("/__glory/fn/list_todos", b"not json".to_vec()).await.unwrap_err();
+        assert_eq!(err.status_code(), 400, "{err:?}");
+    });
+}
+
+#[test]
+fn sse_single_line_fields_cannot_inject_extra_frames() {
+    use glory_serverfn::SseEvent;
+
+    // Regression: `id` and `event` were written verbatim. A newline in either
+    // ends the field, so an id taken from user input (a pagination cursor,
+    // say) could append its own `data:` line to the stream.
+    let event = SseEvent::new("real").id("1\ndata: injected").event("update\nretry: 1");
+    let frame = String::from_utf8(event.encode()).unwrap();
+
+    // The injected text survives as field *content*, but must not become a
+    // field of its own.
+    let field_names: Vec<&str> = frame
+        .lines()
+        .filter_map(|line| line.split_once(':').map(|(name, _)| name))
+        .filter(|name| !name.is_empty())
+        .collect();
+    assert_eq!(field_names, vec!["id", "event", "data"], "{frame}");
+    assert!(frame.contains("data: real"), "{frame}");
+}
+
+#[test]
+fn sse_decoder_ignores_a_malformed_retry_hint() {
+    use glory_serverfn::SseDecoder;
+
+    // The SSE spec says to ignore a non-numeric `retry`. Failing the stream
+    // over a bad reconnection hint discarded perfectly good data frames.
+    let mut decoder = SseDecoder::new();
+    let events = decoder
+        .push_chunk(b"retry: soon\ndata: payload\n\n")
+        .expect("stream must survive a bad retry");
+    assert_eq!(events.len(), 1);
+    assert_eq!(events[0].data, "payload");
+    assert_eq!(events[0].retry_ms, None);
+}

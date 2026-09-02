@@ -121,13 +121,20 @@ impl BrowserAviator {
         if !modifier.replace {
             self.record_current_scroll();
         }
-        let history = glory_core::web::window().history().unwrap_throw();
-        if modifier.replace {
-            history
-                .replace_state_with_url(&state, "", Some(&modifier.raw_url))
-                .unwrap_throw();
+        let history = glory_core::web::window()
+            .history()
+            .map_err(|_| NavigationError::BrowserHistoryUnavailable)?;
+        // `pushState`/`replaceState` throw a `SecurityError` for a cross-origin
+        // (or `javascript:`) URL. `goto` already returns a `Result`, so report
+        // it instead of trapping the whole wasm app on caller-supplied input
+        // such as a `?next=` parameter.
+        let pushed = if modifier.replace {
+            history.replace_state_with_url(&state, "", Some(&modifier.raw_url))
         } else {
-            history.push_state_with_url(&state, "", Some(&modifier.raw_url)).unwrap_throw();
+            history.push_state_with_url(&state, "", Some(&modifier.raw_url))
+        };
+        if pushed.is_err() {
+            return Err(NavigationError::CrossOrigin(modifier.raw_url.clone()));
         }
         let href = glory_core::web::location()
             .href()
@@ -176,7 +183,14 @@ impl BrowserAviator {
                 return;
             }
 
-            let url = Url::try_from(href.as_str()).unwrap();
+            // `HTMLAnchorElement.href` falls back to the raw attribute when it
+            // is not parseable, so any malformed link on the page (user-
+            // generated content, for instance) reaches this point. Hand it back
+            // to the browser instead of trapping.
+            let Ok(url) = Url::try_from(href.as_str()) else {
+                glory_core::debug_warn!("anchor href is not a valid URL, leaving it to the browser: {href}");
+                return;
+            };
             let path_name = unescape(&url.path());
 
             // let browser handle this event if it leaves our domain

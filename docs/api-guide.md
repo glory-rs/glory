@@ -28,9 +28,13 @@ impl Widget for Counter {
 - `Cage<T>` is the mutable state handle.
 - `Bond<T>` derives a value from one or more cages/bonds.
 - `Lotus<T>` accepts either a plain value or a reactive value.
-- Reads inside `Widget::build` / `Widget::patch` subscribe the current view.
-- Reads inside event handlers do not subscribe unless another tracking context
-  is active.
+- Reads inside a `Bond` mapper, an effect or a `Loader` subscribe that
+  consumer.
+- A bare `.get()` inside `Widget::build` / `Widget::patch` does **not**
+  subscribe the view. Pass the handle to the builder instead
+  (`div().text(count)`, `.attr("title", cage)`, `.class(bond)`), or derive it
+  through a `Bond`.
+- Reads inside event handlers do not subscribe.
 - Use `reflow::batch(...)` around grouped writes when you are outside a CSR
   event callback.
 

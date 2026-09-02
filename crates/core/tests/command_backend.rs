@@ -23,17 +23,17 @@ struct Counter {
 
 impl Widget for Counter {
     fn build(&mut self, ctx: &mut Scope) {
-        let value = self.value.clone();
+        let value = self.value;
         let increase = move |_| {
             value.revise(|mut value| *value += 1);
         };
-        let value = self.value.clone();
+        let value = self.value;
         let set_from_input = move |ev: glory_core::renderer::EventData| {
             let v = glory_core::web::helpers::event_target_value(&ev).parse::<i64>().unwrap_or_default();
             value.revise(|mut value| *value = v);
         };
         div()
-            .fill(button().attr("data-role", "inc").text(self.value.clone()).on(events::click, increase))
+            .fill(button().attr("data-role", "inc").text(self.value).on(events::click, increase))
             .fill(input().attr("data-role", "in").on(events::input, set_from_input))
             .show_in(ctx);
     }
@@ -99,10 +99,10 @@ fn mounted_lifecycle_event_runs_before_initial_batch_is_drained() {
 
     impl Widget for MountedWidget {
         fn build(&mut self, ctx: &mut Scope) {
-            let text = self.text.clone();
+            let text = self.text;
             div()
                 .on(events::mounted, move |_| text.revise(|mut text| *text = "mounted"))
-                .text(self.text.clone())
+                .text(self.text)
                 .show_in(ctx);
         }
     }
@@ -128,7 +128,7 @@ struct EachListWidget {
 
 impl Widget for EachListWidget {
     fn build(&mut self, ctx: &mut Scope) {
-        ul().fill(Each::from_vec(self.items.clone(), |s| s.clone(), |s| li().text(s.clone())))
+        ul().fill(Each::from_vec(self.items, |s| s.clone(), |s| li().text(s.clone())))
             .show_in(ctx);
     }
 }
@@ -143,7 +143,7 @@ fn strs(values: &[&str]) -> Vec<String> {
 #[test]
 fn each_reorder_conformance_via_command_stream() {
     let items = Cage::new(strs(&["a", "b", "c", "d"]));
-    let holder = CommandHolder::new().mount(EachListWidget { items: items.clone() });
+    let holder = CommandHolder::new().mount(EachListWidget { items });
 
     let mut dom = CommandDom::new();
     dom.apply_batch(&holder.take_batch());
@@ -175,7 +175,7 @@ fn removed_rows_release_event_handlers() {
     impl Widget for ButtonRows {
         fn build(&mut self, ctx: &mut Scope) {
             ul().fill(Each::from_vec(
-                self.items.clone(),
+                self.items,
                 |s| s.clone(),
                 |s| li().fill(button().text(s.clone()).on(events::click, |_| {})),
             ))
@@ -184,7 +184,7 @@ fn removed_rows_release_event_handlers() {
     }
 
     let items = Cage::new(strs(&["a", "b"]));
-    let holder = CommandHolder::new().mount(ButtonRows { items: items.clone() });
+    let holder = CommandHolder::new().mount(ButtonRows { items });
     let batch = holder.take_batch();
     let attached: Vec<u64> = batch
         .iter()
@@ -300,4 +300,84 @@ fn markup_surface_conformance_via_command_stream() {
     assert!(html.contains("<circle"), "{html}");
     assert!(html.contains("<math"), "{html}");
     assert!(html.contains("<mfrac"), "{html}");
+}
+
+/// Regression: a `true` boolean property must reach the wire as a *set*, not a
+/// remove.
+///
+/// `PropValue for bool` encodes `true` as `set_property(name, None)` — the SSR
+/// spelling of a present, valueless property. That used to be translated into
+/// `Command::RemoveProperty`, which inverted the meaning and silently made
+/// `.prop("checked", true)` / `.prop("disabled", true)` no-ops on every
+/// command-stream backend (desktop webview, LiveView, native).
+#[derive(Debug)]
+struct BoolProps;
+
+impl Widget for BoolProps {
+    fn build(&mut self, ctx: &mut Scope) {
+        div()
+            .fill(input().attr("data-role", "on").attr("type", "checkbox").prop("checked", true))
+            .fill(input().attr("data-role", "off").attr("type", "checkbox").prop("checked", false))
+            .fill(button().attr("data-role", "btn").prop("disabled", true).text("Save"))
+            .show_in(ctx);
+    }
+}
+
+#[test]
+fn true_boolean_property_is_set_not_removed() {
+    let holder = CommandHolder::new().mount(BoolProps);
+    let batch = holder.take_batch();
+
+    let on = node_id_by_role(&CommandDom::new(), &batch, "on");
+    let off = node_id_by_role(&CommandDom::new(), &batch, "off");
+    let btn = node_id_by_role(&CommandDom::new(), &batch, "btn");
+
+    let property_command = |node: u64, prop: &str| {
+        batch
+            .iter()
+            .find(|command| match command {
+                Command::SetProperty { id, name, .. } | Command::RemoveProperty { id, name } => *id == node && name == prop,
+                _ => false,
+            })
+            .unwrap_or_else(|| panic!("no property command for node {node} / {prop} in {batch:?}"))
+    };
+
+    match property_command(on, "checked") {
+        Command::SetProperty { value, .. } => assert_eq!(value, "true", "`true` must be sent as a set with a truthy value"),
+        other => panic!("`checked(true)` must not be sent as {other:?}"),
+    }
+    match property_command(btn, "disabled") {
+        Command::SetProperty { value, .. } => assert_eq!(value, "true"),
+        other => panic!("`disabled(true)` must not be sent as {other:?}"),
+    }
+    // `false` still clears the property.
+    assert!(
+        matches!(property_command(off, "checked"), Command::RemoveProperty { .. }),
+        "`checked(false)` must clear the property"
+    );
+}
+
+#[test]
+fn true_boolean_property_reaches_the_reference_dom() {
+    let holder = CommandHolder::new().mount(BoolProps);
+    let batch = holder.take_batch();
+    let on = node_id_by_role(&CommandDom::new(), &batch, "on");
+    let off = node_id_by_role(&CommandDom::new(), &batch, "off");
+    let btn = node_id_by_role(&CommandDom::new(), &batch, "btn");
+
+    let mut dom = CommandDom::new();
+    dom.apply_batch(&batch);
+
+    // The reference consumer models properties separately from attributes
+    // (mirroring `el[name]` in the JS interpreter), so assert on that map
+    // rather than on serialized HTML.
+    assert_eq!(
+        dom.node(on).expect("checked node").properties.get("checked").map(String::as_str),
+        Some("true")
+    );
+    assert_eq!(
+        dom.node(btn).expect("button node").properties.get("disabled").map(String::as_str),
+        Some("true")
+    );
+    assert_eq!(dom.node(off).expect("unchecked node").properties.get("checked"), None);
 }

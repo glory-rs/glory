@@ -36,7 +36,7 @@ pub struct Opts {
     #[arg(short, long)]
     pub release: bool,
 
-    /// Turn on partial hot-reloading. Requires rust nightly [beta]
+    /// Turn on partial hot-reloading. Builder-function reload for `glory serve` [beta]
     #[arg(long)]
     pub hot_reload: bool,
 

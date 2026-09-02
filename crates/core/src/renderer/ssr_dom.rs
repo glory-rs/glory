@@ -262,16 +262,60 @@ impl SsrNode {
         let attributes = self.attributes.borrow();
         let inner_html = attributes.get("inner_html");
         let inner_text = attributes.get("inner_text");
+        let raw_text_element = is_raw_text_element(&self.name.borrow());
+        let render_text = |text: &str| {
+            if raw_text_element {
+                escape_raw_text(text)
+            } else {
+                escape_html_text(text)
+            }
+        };
         if let Some(Some(text)) = properties.get("text") {
-            escape_html_text(text)
+            render_text(text)
         } else if let Some(inner_html) = inner_html {
             inner_html.to_string()
         } else if let Some(inner_text) = inner_text {
-            escape_html_text(inner_text)
+            render_text(inner_text)
         } else {
             String::new()
         }
     }
+}
+
+/// `<script>` and `<style>` are HTML "raw text" elements: the parser does not
+/// decode character references inside them.
+fn is_raw_text_element(name: &str) -> bool {
+    name.eq_ignore_ascii_case("script") || name.eq_ignore_ascii_case("style")
+}
+
+/// Escapes text destined for a raw-text element.
+///
+/// Entity-escaping here (as the generic path does) is wrong and actively
+/// breaks output: the browser reads the entities literally, so the documented
+/// `style().text(scope.css())` idiom emitted `.cls &amp;gt; button { ... }`
+/// and the rule never applied. CSR was unaffected because it assigns
+/// `textContent`, which made the first paint differ from the hydrated page.
+///
+/// The one thing that must not survive is a closing tag: `</script` inside the
+/// text would end the element early and let the rest of the string be parsed
+/// as markup. Neutralising the slash keeps the content intact for JS and CSS
+/// (`<\/` is a valid escape in both) while making the sequence inert to the
+/// HTML tokenizer.
+fn escape_raw_text(value: &str) -> String {
+    let mut out = String::with_capacity(value.len());
+    let bytes = value.as_bytes();
+    let mut index = 0;
+    while index < value.len() {
+        if bytes[index] == b'<' && value[index..].starts_with("</") {
+            out.push_str(r"<\/");
+            index += 2;
+        } else {
+            let ch = value[index..].chars().next().expect("index is on a char boundary");
+            out.push(ch);
+            index += ch.len_utf8();
+        }
+    }
+    out
 }
 
 fn escape_html_text(value: &str) -> String {

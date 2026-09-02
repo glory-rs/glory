@@ -12,7 +12,8 @@ use crate::reflow::{Cage, Revisable, effect_in, resource_hydratable_in, resource
 use crate::scope::SuspenseBoundary as SuspenseBoundaryHandle;
 use crate::web::holders::ServerHolder;
 use crate::web::widgets::{
-    button, div, form, head_mixin, input, label, li, link, math as math_widgets, meta, option, select, style, svg as svg_widgets, textarea, title, ul,
+    button, div, form, head_mixin, input, label, li, link, math as math_widgets, meta, option, script, select, style, svg as svg_widgets, textarea,
+    title, ul,
 };
 use crate::widgets::{Each, ErrorBoundary, Suspense, Switch};
 use crate::{Holder, Scope, Widget};
@@ -59,6 +60,63 @@ fn suspense_shows_fallback_until_pending_boundary_resolves() {
     let html = render_html(&holder);
     assert!(html.contains("ready"), "{html}");
     assert!(!html.contains("loading"), "{html}");
+}
+
+/// A keyed list living inside a `Suspense` body, so the list can be mutated
+/// while the boundary is showing its fallback.
+#[derive(Debug)]
+struct SuspendedListWidget {
+    items: Cage<Vec<String>>,
+    boundary: Rc<RefCell<Option<SuspenseBoundaryHandle>>>,
+}
+
+impl Widget for SuspendedListWidget {
+    fn build(&mut self, ctx: &mut Scope) {
+        let boundary = ctx.suspense_boundary.expect("SuspendedListWidget must be under Suspense");
+        boundary.start();
+        *self.boundary.borrow_mut() = Some(boundary);
+        ul().fill(Each::from_vec(self.items, |s| s.clone(), |s| li().text(s.clone())))
+            .show_in(ctx);
+    }
+}
+
+#[test]
+fn rows_mutated_while_suspended_do_not_duplicate_or_leak_into_the_fallback() {
+    let items = Cage::new(vec!["a".to_owned(), "b".to_owned()]);
+    let boundary = Rc::new(RefCell::new(None));
+    let holder = make_holder().mount(Suspense::new(
+        SuspendedListWidget {
+            items,
+            boundary: boundary.clone(),
+        },
+        |ctx| {
+            div().class("fallback").text("loading").show_in(ctx);
+        },
+    ));
+
+    // Pending: only the fallback is in the document.
+    let html = render_html(&holder);
+    assert!(html.contains("loading"), "{html}");
+    assert!(!html.contains("<li"), "suspended body must not render rows: {html}");
+
+    // Remove "b" and add "c" while the body is hidden. `Each::patch` still
+    // runs (its subscriptions are live), so it detaches and attaches rows on
+    // a scope that is out of the document.
+    items.revise(|mut value| {
+        *value = vec!["a".to_owned(), "c".to_owned()];
+    });
+
+    // Regression: `attach_child` used to insert the new row's node anyway,
+    // so hidden content appeared alongside the fallback.
+    let html = render_html(&holder);
+    assert!(!html.contains("<li"), "hidden rows must not be inserted next to the fallback: {html}");
+
+    boundary.borrow().expect("suspense boundary captured").finish();
+
+    // Regression: `detach_child` bailed out on unattached views, so "b" stayed
+    // in `child_views` and the default `flood` re-attached it on resume.
+    let rows = each_html_items(&holder);
+    assert_eq!(rows, vec!["a".to_owned(), "c".to_owned()], "resumed list must match the current items");
 }
 
 #[derive(Debug)]
@@ -233,6 +291,63 @@ fn error_boundary_catches_child_patch_panics() {
     assert!(!html.contains("ready"), "{html}");
 }
 
+/// A widget whose `patch` attaches a child that panics during `build`.
+///
+/// `Scope::attach_child` re-enters `reflow::batch`, so the panic unwinds out of
+/// a *nested* batch — the path that used to leave `BATCHING` latched on.
+#[derive(Debug)]
+struct PanicOnPatchAttach {
+    trigger: Cage<bool>,
+}
+
+impl Widget for PanicOnPatchAttach {
+    fn build(&mut self, ctx: &mut Scope) {
+        self.trigger.bind_view(ctx.view_id());
+        div().text("ready").show_in(ctx);
+    }
+
+    fn patch(&mut self, ctx: &mut Scope) {
+        PanicBuildWidget.show_in(ctx);
+    }
+}
+
+#[derive(Debug)]
+struct NestedBatchPanicHost {
+    trigger: Cage<bool>,
+    counter: Cage<i64>,
+}
+
+impl Widget for NestedBatchPanicHost {
+    fn build(&mut self, ctx: &mut Scope) {
+        ErrorBoundary::new(PanicOnPatchAttach { trigger: self.trigger }, |error, ctx| {
+            div().class("error").text(error.message().to_owned()).show_in(ctx);
+        })
+        .show_in(ctx);
+        div().class("counter").text(self.counter).show_in(ctx);
+    }
+}
+
+#[test]
+fn caught_panic_inside_nested_batch_does_not_freeze_the_scheduler() {
+    let trigger = Cage::new(false);
+    let counter = Cage::new(1);
+    let holder = make_holder().mount(NestedBatchPanicHost { trigger, counter });
+    assert!(render_html(&holder).contains("ready"));
+
+    trigger.revise(|mut value| *value = true);
+    let html = render_html(&holder);
+    assert!(html.contains(r#"class="error""#), "boundary should render its fallback: {html}");
+
+    // Regression: the scheduler flags were plain `set(true) ... set(false)`
+    // pairs, so a panic unwinding through a nested `batch` left BATCHING (and
+    // RUNNING) latched for this holder. `schedule()` then took its
+    // `is_batching()` early return forever and every later revise was silently
+    // dropped -- the session looked frozen even though the panic was handled.
+    counter.revise(|mut value| *value = 42);
+    let html = render_html(&holder);
+    assert!(html.contains("42"), "scheduler must still process revisions after a caught panic: {html}");
+}
+
 // ----------------------------------------------------------------------------
 // Document head
 // ----------------------------------------------------------------------------
@@ -280,8 +395,149 @@ fn scoped_style_renders_style_and_scope_class() {
     let html = render_html(&holder);
     let scope = crate::web::scoped_css(":scope > button { color: red; }");
     assert!(html.contains(scope.class_name()), "{html}");
-    assert!(html.contains(&format!(".{} &gt; button", scope.class_name())), "{html}");
+    // `<style>` is an HTML raw-text element: the browser does not decode
+    // character references inside it. Entity-escaping the CSS (as SSR used to)
+    // emitted `.cls &gt; button`, which is not a selector, so the rule never
+    // applied until hydration replaced it.
+    assert!(html.contains(&format!(".{} > button", scope.class_name())), "{html}");
+    assert!(!html.contains("&gt;"), "CSS must not be entity-escaped: {html}");
     assert!(html.contains(r#"<button gly-id="#), "{html}");
+}
+
+#[test]
+fn duplicate_keys_collapse_to_one_row() {
+    // Documented behaviour: "duplicates collapse to a single view".
+    let items = Cage::new(vec!["a".to_owned(), "b".to_owned(), "a".to_owned()]);
+    let holder = make_holder().mount(EachListWidget { items });
+    assert_eq!(each_html_items(&holder), vec!["a".to_owned(), "b".to_owned()]);
+
+    // Regression: a *new* duplicated key built two views and registered only
+    // the second. Both rendered, and the first became unreachable, so it
+    // survived every later detach.
+    items.revise(|mut value| *value = vec!["c".to_owned(), "c".to_owned(), "d".to_owned()]);
+    assert_eq!(each_html_items(&holder), vec!["c".to_owned(), "d".to_owned()]);
+
+    // The orphan would show up here, as a stale row nothing can remove.
+    items.revise(|mut value| *value = vec!["d".to_owned()]);
+    assert_eq!(each_html_items(&holder), vec!["d".to_owned()]);
+}
+
+#[derive(Debug)]
+struct BranchingBondWidget {
+    flag: Cage<bool>,
+    a: Cage<i64>,
+    b: Cage<i64>,
+}
+
+impl Widget for BranchingBondWidget {
+    fn build(&mut self, ctx: &mut Scope) {
+        let (flag, a, b) = (self.flag, self.a, self.b);
+        // Reads `a` or `b` depending on `flag`, with an equality gate.
+        let shown = crate::reflow::Bond::new(move || if *flag.get() { *a.get() } else { *b.get() }).with_partial_eq();
+        div().class("value").text(shown).show_in(ctx);
+    }
+}
+
+#[test]
+fn a_bond_tracks_the_branch_it_actually_reads() {
+    let flag = Cage::new(true);
+    let a = Cage::new(1);
+    let b = Cage::new(1);
+    let holder = make_holder().mount(BranchingBondWidget { flag, a, b });
+    assert!(render_html(&holder).contains(">1<"));
+
+    // Switch to the `b` branch. `b == a`, so the equality gate reports "no
+    // change" — but the Bond now depends on `b`, not `a`.
+    flag.revise(|mut value| *value = false);
+
+    // Regression: new dependencies were only bound when the value changed, so
+    // `b` stayed unsubscribed and this write never reached the view.
+    b.revise(|mut value| *value = 42);
+    let html = render_html(&holder);
+    assert!(html.contains(">42<"), "the newly-read dependency must be subscribed: {html}");
+
+    // And the abandoned branch no longer drives the view.
+    a.revise(|mut value| *value = 999);
+    let html = render_html(&holder);
+    assert!(html.contains(">42<"), "dropped dependency must not resurrect the old branch: {html}");
+    assert!(!html.contains("999"), "{html}");
+}
+
+#[derive(Debug)]
+struct StringFillerWidget {
+    dynamic: Cage<String>,
+}
+
+impl Widget for StringFillerWidget {
+    fn build(&mut self, ctx: &mut Scope) {
+        div()
+            .class("literal")
+            .fill("<img src=x onerror=alert(1)>")
+            .fill(self.dynamic)
+            .show_in(ctx);
+        div().class("explicit").html("<b>markup</b>").show_in(ctx);
+    }
+}
+
+#[test]
+fn string_fillers_render_as_text_not_markup() {
+    let dynamic = Cage::new("<script>alert(2)</script>".to_owned());
+    let holder = make_holder().mount(StringFillerWidget { dynamic });
+    let html = render_html(&holder);
+
+    // Regression: `IntoFiller` for strings expanded to `span().html(..)`, so
+    // `div().fill(user_input)` wrote straight into innerHTML — an XSS sink
+    // with nothing in its spelling to warn you.
+    assert!(html.contains("&lt;img src=x onerror=alert(1)&gt;"), "{html}");
+    assert!(!html.contains("<img src=x"), "{html}");
+    assert!(html.contains("&lt;script&gt;alert(2)&lt;/script&gt;"), "{html}");
+
+    // Raw markup is still available, but only when asked for by name.
+    assert!(html.contains("<b>markup</b>"), "{html}");
+}
+
+#[test]
+fn reactive_string_fillers_update() {
+    // The old impl snapshotted `self.get()` at build time, so the value never
+    // changed afterwards even though the read had subscribed the view.
+    let dynamic = Cage::new("before".to_owned());
+    let holder = make_holder().mount(StringFillerWidget { dynamic });
+    assert!(render_html(&holder).contains("before"));
+
+    dynamic.revise(|mut value| *value = "after".to_owned());
+    let html = render_html(&holder);
+    assert!(html.contains("after"), "{html}");
+    assert!(!html.contains("before"), "{html}");
+}
+
+#[derive(Debug)]
+struct RawTextWidget;
+
+impl Widget for RawTextWidget {
+    fn build(&mut self, ctx: &mut Scope) {
+        style().text("a[data-x=\"1\"] > b { content: \"</style>\"; }").show_in(ctx);
+        script().text("if (a < b && c > d) { alert(\"</script>\"); }").show_in(ctx);
+        div().text("plain < text & more").show_in(ctx);
+    }
+}
+
+#[test]
+fn raw_text_elements_keep_their_source_but_cannot_be_closed_early() {
+    let holder = make_holder().mount(RawTextWidget);
+    let html = render_html(&holder);
+
+    // Operators survive verbatim in CSS and JS.
+    assert!(html.contains("a[data-x=\"1\"] > b"), "{html}");
+    assert!(html.contains("a < b && c > d"), "{html}");
+
+    // ... but a closing tag inside the text cannot terminate the element.
+    assert!(!html.contains("</style>\"; }"), "style must not be closed early: {html}");
+    assert!(!html.contains("</script>\"); }"), "script must not be closed early: {html}");
+    assert!(html.contains(r"<\/style>"), "{html}");
+    assert!(html.contains(r"<\/script>"), "{html}");
+
+    // Ordinary elements still escape their text.
+    assert!(html.contains("plain &lt; text &amp; more"), "{html}");
 }
 
 // ----------------------------------------------------------------------------

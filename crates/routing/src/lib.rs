@@ -203,7 +203,17 @@ impl TruckExt for Rc<RefCell<Truck>> {
     fn insert_stuff(&self, graff_and_key: impl Into<String>, widget: impl Widget) {
         let graff_and_key = graff_and_key.into();
         let graff = if let Some((graff, key)) = graff_and_key.split_once('@') {
-            if self.contains_stuff_key(graff, key) {
+            // The `@key` suffix means "skip if this exact content is already
+            // queued for this slot", which keeps a re-run of the same route
+            // from rebuilding the slot.
+            //
+            // The key alone is not enough to decide that: `Graff::build` /
+            // `patch` *consume* the stuff with `remove_stuff`, so after the
+            // slot has rendered once the key is still registered while the
+            // stuff is gone. Returning early then left the outlet permanently
+            // empty on a return visit (navigate away and back to a nested
+            // layout route). Require both.
+            if self.contains_stuff_key(graff, key) && self.stuffs().get_untracked().contains_key(graff) {
                 return;
             }
             self.insert_stuff_key(graff, key);

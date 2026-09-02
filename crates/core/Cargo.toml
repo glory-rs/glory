@@ -68,6 +68,8 @@ wasm-bindgen-futures = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
+# Integration tests drive SSR rendering from both runtime flavors.
+tokio = { workspace = true, features = ["full"] }
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 wasm-bindgen-test = { workspace = true }
@@ -97,7 +99,9 @@ required-features = ["web-ssr"]
 
 [package.metadata.cargo-all-features]
 denylist = ["stable"]
-skip_feature_sets = [["web-ssr", "web-csr"]]
+# Both of these combinations are rejected by `compile_error!` in lib.rs, so
+# the matrix must not try to build them.
+skip_feature_sets = [["web-ssr", "web-csr"], ["backend-command", "single-app"], ["backend-command", "web-csr"]]
 
 [lints]
 workspace = true

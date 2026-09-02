@@ -710,8 +710,17 @@ impl CommandNode {
     }
 
     /// Sets a property. The SSR-convention `text` property is translated to
-    /// [`Command::SetText`]. A `None` value maps to [`Command::RemoveProperty`]
-    /// (closest wire equivalent of a valueless property).
+    /// [`Command::SetText`].
+    ///
+    /// A `None` value means "present, valueless" — the SSR spelling of a set
+    /// boolean property such as `checked` or `disabled` (see
+    /// [`SsrNode::set_property`](crate::renderer::SsrNode::set_property)). It
+    /// is sent as [`Command::SetProperty`] with the literal value `"true"`, and
+    /// consumers coerce that back to a boolean for boolean DOM properties.
+    ///
+    /// It must NOT map to [`Command::RemoveProperty`]: that inverts the
+    /// meaning, and made `.checked(true)` / `.disabled(true)` no-ops on every
+    /// command-stream backend.
     pub fn set_property(&self, key: impl Into<Cow<'static, str>>, value: impl Into<Option<Cow<'static, str>>>) {
         let key = key.into();
         let value = value.into();
@@ -720,14 +729,10 @@ impl CommandNode {
                 id: self.id,
                 value: value.map(Cow::into_owned).unwrap_or_default(),
             }),
-            (_, Some(value)) => self.queue.push(Command::SetProperty {
+            (_, value) => self.queue.push(Command::SetProperty {
                 id: self.id,
                 name: key.into_owned(),
-                value: value.into_owned(),
-            }),
-            (_, None) => self.queue.push(Command::RemoveProperty {
-                id: self.id,
-                name: key.into_owned(),
+                value: value.map(Cow::into_owned).unwrap_or_else(|| "true".to_owned()),
             }),
         }
     }

@@ -677,15 +677,18 @@ impl PathParser {
                                 self.offset
                             ));
                         };
-                        WISP_BUILDERS.with_borrow(|builders| {
+                        // Report an unregistered sign (or a builder that
+                        // rejects its arguments) as a parse error. Unwrapping
+                        // here turned a bad pattern into a panic even on the
+                        // `try_new` path.
+                        let built = WISP_BUILDERS.with_borrow(|builders| {
                             let builder = builders
                                 .get(&sign)
-                                .ok_or_else(|| format!("WISP_BUILDERS does not contains fn part with sign {sign}"))
-                                .unwrap()
+                                .ok_or_else(|| format!("WISP_BUILDERS does not contains fn part with sign {sign}"))?
                                 .clone();
-
-                            wisps.push(builder.build(name, sign, args).unwrap());
-                        });
+                            builder.build(name, sign, args)
+                        })?;
+                        wisps.push(built);
                     } else {
                         self.next(false);
                         let regex = Regex::new(&self.scan_regex()?).map_err(|e| e.to_string())?;
@@ -824,7 +827,7 @@ pub struct PathFilter {
 
 impl fmt::Debug for PathFilter {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        write!(f, "path:{}", &self.pattern)
+        write!(f, "path:{}", self.pattern)
     }
 }
 impl Filter for PathFilter {
@@ -836,6 +839,10 @@ impl Filter for PathFilter {
     #[inline]
     fn specificity(&self) -> i32 {
         self.wisps.iter().map(wisp_specificity).sum()
+    }
+
+    fn specificity_ranks(&self) -> Vec<i32> {
+        self.wisps.iter().map(wisp_specificity).collect()
     }
 }
 
@@ -858,8 +865,23 @@ fn wisp_specificity(wisp: &WispKind) -> i32 {
 }
 impl PathFilter {
     /// Create new `PathFilter`.
+    ///
+    /// Panics on an invalid pattern. That is intentional for route
+    /// registration, which happens once at startup with patterns written by
+    /// the developer. Use [`try_new`](Self::try_new) when the pattern comes
+    /// from anywhere else at runtime.
     #[inline]
     pub fn new(value: impl Into<String>) -> Self {
+        let pattern = value.into();
+        match Self::try_new(pattern.clone()) {
+            Ok(filter) => filter,
+            Err(e) => panic!("{}, pattern: {}", e, pattern),
+        }
+    }
+
+    /// Fallible counterpart of [`new`](Self::new).
+    #[inline]
+    pub fn try_new(value: impl Into<String>) -> Result<Self, String> {
         let pattern = value.into();
         if pattern.is_empty() {
             tracing::warn!("you should not add empty string as path filter");
@@ -867,13 +889,8 @@ impl PathFilter {
             tracing::warn!("you should not add '/' as path filter");
         }
         let mut parser = PathParser::new(&pattern);
-        let wisps = match parser.parse() {
-            Ok(wisps) => wisps,
-            Err(e) => {
-                panic!("{}, pattern: {}", e, pattern);
-            }
-        };
-        PathFilter { pattern, wisps }
+        let wisps = parser.parse()?;
+        Ok(PathFilter { pattern, wisps })
     }
     /// Register new path wisp builder.
     #[inline]
@@ -893,17 +910,26 @@ impl PathFilter {
         });
     }
     /// Detect is that path is match.
+    ///
+    /// On failure both the cursor **and** the captured params are restored.
+    /// Rolling back only the cursor left parameters written by the wisps that
+    /// did match: trying `users/<id>/edit` against `/users/bob` recorded
+    /// `id=bob` before failing on `edit`, and a later `users/<name>` match then
+    /// exposed a phantom `id` alongside `name`.
     pub fn detect(&self, url: &Url, state: &mut PathState) -> bool {
         let original_cursor = state.cursor;
+        let original_params = state.params.clone();
         for ps in &self.wisps {
             let segment = state.cursor.segment;
             if ps.detect(url, state) {
                 if segment == state.cursor.segment && segment != state.segments.len() {
                     state.cursor = original_cursor;
+                    state.params = original_params;
                     return false;
                 }
             } else {
                 state.cursor = original_cursor;
+                state.params = original_params;
                 return false;
             }
         }

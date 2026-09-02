@@ -28,8 +28,16 @@ pub async fn assets(proj: &Arc<Project>, changes: &ChangeSet, first_sync: bool) 
             let mut changed = false;
             for watched in changes.asset_iter() {
                 log::trace!("Assets processing {watched:?}");
-                let change = update_asset(&proj, watched.clone(), &assets.dir, dest_root, &[]).await?;
-                changed |= change;
+                // A single asset event must never take down `glory serve`.
+                // Editors save atomically (write temp -> rename -> remove
+                // temp) and watchers replay directory events, so the mirrored
+                // path is routinely already gone, or is a directory, by the
+                // time we act on it. Log and carry on; a later rescan
+                // reconciles the tree.
+                match update_asset(&proj, watched.clone(), &assets.dir, dest_root, &[]).await {
+                    Ok(change) => changed |= change,
+                    Err(error) => log::warn!("Assets could not apply {watched:?}: {error:?}"),
+                }
             }
             changed
         };
@@ -64,8 +72,12 @@ async fn update_asset(proj: &Project, watched: Watched, src_root: &Utf8Path, des
             let path = f.rebase(src_root, dest_root)?;
             if path.is_dir() {
                 fs::remove_dir_all(&path).await.context(format!("remove dir recursively {path:?}"))?;
-            } else {
+            } else if path.exists() {
                 fs::remove_file(&path).await.context(format!("remove file {path:?}"))?;
+            } else {
+                // Never mirrored (e.g. an editor's temp file that was renamed
+                // away before we saw it), so there is nothing to remove.
+                log::trace!("Assets remove skipped, not mirrored: {path:?}");
             }
             false
         }
@@ -76,6 +88,16 @@ async fn update_asset(proj: &Project, watched: Watched, src_root: &Utf8Path, des
             true
         }
         Watched::Write(f) => {
+            // Windows reports `Modify(Any)` for the watched directory itself;
+            // reading it as a file fails with EISDIR.
+            if f.is_dir() {
+                log::trace!("Assets write skipped, path is a directory: {f:?}");
+                return Ok(false);
+            }
+            if !f.exists() {
+                log::trace!("Assets write skipped, source is gone: {f:?}");
+                return Ok(false);
+            }
             let file = SourcedSiteFile {
                 source: f.clone(),
                 dest: f.rebase(src_root, dest_root)?,

@@ -50,13 +50,24 @@ where
 {
     cfg_if! {
         if #[cfg(all(feature = "web-ssr", not(feature = "single-app"), not(test)))] {
-            tokio::task::block_in_place(move || {
-                tokio::runtime::Handle::current().block_on(async move {
-                    let local = tokio::task::LocalSet::new();
-                    local.spawn_local(fut);
-                    local.await;
-                });
-            });
+            // `block_in_place` is only legal on a multi-thread runtime, and
+            // `Handle::current()` needs a runtime at all. Rendering from a
+            // `#[tokio::test]` (current-thread by default), from a
+            // `#[tokio::main(flavor = "current_thread")]` server, or from a
+            // plain synchronous call used to panic instead of rendering.
+            // Fall back to a local executor in those cases.
+            match tokio::runtime::Handle::try_current() {
+                Ok(handle) if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread => {
+                    tokio::task::block_in_place(move || {
+                        handle.block_on(async move {
+                            let local = tokio::task::LocalSet::new();
+                            local.spawn_local(fut);
+                            local.await;
+                        });
+                    });
+                }
+                _ => futures::executor::block_on(fut),
+            }
         }  else {
             futures::executor::block_on(fut)
         }

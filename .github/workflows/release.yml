@@ -40,21 +40,16 @@ jobs:
 
   publish:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      max-parallel: 1
-      matrix:
-        package:
-          - crate: glory-hot-reload
-            path: crates/hot-reload
-          - crate: glory-core
-            path: crates/core
-          - crate: glory-routing
-            path: crates/routing
-          - crate: glory
-            path: crates/glory
-          - crate: glory-cli
-            path: crates/cli
+    needs: git-tag
+    env:
+      PUBLISH_PACKAGES: |
+        glory-hot-reload|crates/hot-reload
+        glory-macros|crates/macros
+        glory-core|crates/core
+        glory-routing|crates/routing
+        glory-serverfn|crates/serverfn
+        glory|crates/glory
+        glory-cli|crates/cli
     steps:
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -63,37 +58,68 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Get releasing version
-        working-directory: ${{ matrix.package.path }}
+      - name: Get workspace version
         run: echo NEXT_VERSION=$(sed -nE 's/^\s*version = "(.*?)"/\1/p' Cargo.toml) >> $GITHUB_ENV
 
-      - name: Check published version
-        run: echo PREV_VERSION=$(cargo search ${{ matrix.package.crate }} --limit 1 | sed -nE 's/^[^"]*"//; s/".*//1p' -) >> $GITHUB_ENV
-
-      - name: Cargo login
-        if: env.NEXT_VERSION != env.PREV_VERSION
-        run: cargo login ${{ secrets.CRATES_TOKEN }}
-
-      - name: Cargo package
-        if: env.NEXT_VERSION != env.PREV_VERSION
-        working-directory: ${{ matrix.package.path }}
+      - name: Publish crates in dependency order
+        env:
+          CRATES_TOKEN: ${{ secrets.CRATES_TOKEN }}
+        shell: bash
         run: |
-          echo "Releasing version: $NEXT_VERSION"
-          echo "Published version: $PREV_VERSION"
-          echo "Cargo Packaging..."
-          cargo package
+          set -euo pipefail
 
-      - name: Publish dry-run ${{ matrix.package.crate }}
-        if: env.NEXT_VERSION != env.PREV_VERSION
-        working-directory: ${{ matrix.package.path }}
-        run: |
-          echo "Cargo publish dry-run..."
-          cargo publish --dry-run
+          published_version() {
+            local crate="$1"
+            cargo search "$crate" --limit 20 \
+              | awk -v crate="$crate" -F ' = "' '$1 == crate { split($2, version, "\""); print version[1]; exit }'
+          }
 
-      - name: Publish ${{ matrix.package.name }}
-        if: env.NEXT_VERSION != env.PREV_VERSION
-        working-directory: ${{ matrix.package.path }}
-        run: |
-          echo "Cargo Publishing..."
-          cargo publish --no-verify
-          echo "New version $NEXT_VERSION has been published"
+          wait_for_version() {
+            local crate="$1"
+            local version="$2"
+
+            for _ in {1..20}; do
+              if [ "$(published_version "$crate" || true)" = "$version" ]; then
+                return 0
+              fi
+              sleep 15
+            done
+
+            echo "::error::$crate $version was not visible in the crates.io index after publishing"
+            return 1
+          }
+
+          logged_in=0
+          while IFS='|' read -r crate path; do
+            if [ -z "${crate// }" ]; then
+              continue
+            fi
+
+            echo "::group::$crate"
+            prev_version="$(published_version "$crate" || true)"
+            echo "Releasing version: $NEXT_VERSION"
+            echo "Published version: ${prev_version:-<none>}"
+
+            if [ "$NEXT_VERSION" = "$prev_version" ]; then
+              echo "$crate $NEXT_VERSION is already published; skipping."
+              echo "::endgroup::"
+              continue
+            fi
+
+            if [ "$logged_in" -eq 0 ]; then
+              cargo login "$CRATES_TOKEN"
+              logged_in=1
+            fi
+
+            echo "Cargo packaging $crate from $path..."
+            cargo package -p "$crate"
+
+            echo "Cargo publish dry-run for $crate..."
+            cargo publish -p "$crate" --dry-run
+
+            echo "Cargo publishing $crate..."
+            cargo publish -p "$crate" --no-verify
+            wait_for_version "$crate" "$NEXT_VERSION"
+            echo "$crate $NEXT_VERSION has been published"
+            echo "::endgroup::"
+          done <<< "$PUBLISH_PACKAGES"

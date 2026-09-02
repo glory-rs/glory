@@ -324,7 +324,8 @@ impl Widget for TodoItem {
                                     }
                                 }
                             })
-                            .html(self.title.clone()),
+                            // The title is user input: render it as text.
+                            .text(self.title.clone()),
                     )
                     .fill(button().class("destroy").on(events::click, {
                         let id = self.id;

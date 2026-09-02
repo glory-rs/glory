@@ -380,6 +380,19 @@ impl Scope {
             return;
         }
 
+        // This scope is itself out of the document: suspended by `Suspense`
+        // (`hide_child` clears `is_attached`) or already detached. Record the
+        // child as visible, but do not touch the DOM — inserting here would
+        // materialise "hidden" content right next to the Suspense fallback.
+        // `Widget::flood` re-runs `attach_child` for every child once this
+        // scope is attached again, so nothing is lost.
+        //
+        // `is_root` scopes and scopes mid-`build` are exempt: they legitimately
+        // attach children before their own `is_attached` flag is set.
+        if !self.is_attached && !self.is_root && !self.is_building {
+            return;
+        }
+
         #[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
         let target_parent_node = view.scope.fixed_parent_node.clone().or_else(|| self.render_node.clone());
         #[cfg(not(all(target_arch = "wasm32", feature = "web-csr")))]
@@ -462,10 +475,13 @@ impl Scope {
     pub fn detach_child(&mut self, view_id: &ViewId) -> Option<View> {
         self.visible_views.shift_remove(view_id);
 
-        let view = self.child_views.get_mut(view_id)?;
-        if !view.scope.is_attached() {
-            return None;
-        }
+        // A view that is not currently attached must still be removed here.
+        // Bailing out early used to leave it in `child_views` with its event
+        // handlers and reactive subscriptions alive: the default `flood`
+        // re-attached it when the parent came back, so a keyed row deleted
+        // while a `Suspense` fallback was showing reappeared as a duplicate,
+        // and `Switch` lost the ability to cache the outgoing branch.
+        //
         // `shift_remove` preserves the order of remaining siblings, which
         // sibling-positioning in `attach_child` and reorder paths in
         // widgets like `Each` depend on. The deprecated `remove` aliases
@@ -534,7 +550,10 @@ impl Scope {
         let mut detach_all = || {
             let old_child_views = old_child_views.take().unwrap_or_default();
             for (view_id, mut view) in old_child_views {
-                if targets.contains(&view_id) && view.scope.is_attached() {
+                // Targets are dropped whether or not they are currently
+                // attached — see `detach_child` for why keeping unattached
+                // ones resurrects deleted rows.
+                if targets.contains(&view_id) {
                     view.detach();
                     detached.push(view);
                 } else {

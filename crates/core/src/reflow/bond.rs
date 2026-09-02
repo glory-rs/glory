@@ -137,6 +137,41 @@ where
         };
 
         self.value.replace(new_value);
+
+        // Re-point this Bond's subscribers at the dependency set it *actually*
+        // read this time. Two bugs lived here:
+        //
+        // * Dropped dependencies were never unbound, so a view kept
+        //   re-rendering for a cage the mapper had stopped reading.
+        // * New dependencies were bound in `get`, but only when the value
+        //   changed. Under an equality gate a branch switch that happens to
+        //   produce an equal value left the newly-read dependency unbound, and
+        //   later writes to it were silently dropped:
+        //   `Bond::new(|| if *flag.get() { *a.get() } else { *b.get() })
+        //       .with_partial_eq()` stopped tracking `b` when `b == a` at the
+        //   moment `flag` flipped.
+        //
+        // Rebinding is therefore driven by the dependency set, not by whether
+        // the value changed.
+        {
+            let old_gathers = self.gathers.borrow();
+            let view_ids: Vec<(ViewId, usize)> = self.view_ids.borrow().iter().map(|(id, count)| (id.clone(), *count)).collect();
+            for (view_id, count) in &view_ids {
+                for (id, gather) in old_gathers.deref() {
+                    if !new_gathers.contains_key(id) {
+                        gather.unlace_view(view_id, *count);
+                    }
+                }
+                for (id, gather) in new_gathers.iter() {
+                    if !old_gathers.contains_key(id) {
+                        for _ in 0..*count {
+                            gather.bind_view(view_id);
+                        }
+                    }
+                }
+            }
+        }
+
         *self.gathers.borrow_mut() = new_gathers;
         *self.dep_versions.borrow_mut() = new_snapshot;
 
@@ -148,14 +183,10 @@ where
 
     pub fn get(&self) -> Ref<'_, T> {
         if self.deps_changed() {
-            let value_changed = self.recompute();
-            if value_changed {
-                for view_id in self.view_ids.borrow().keys() {
-                    for (_, gather) in self.gathers.borrow().deref() {
-                        gather.bind_view(view_id);
-                    }
-                }
-            }
+            // `recompute` handles rebinding; doing it again here double-counted
+            // the binding for every dependency that survived the recompute,
+            // which left stale subscriptions behind on unbind.
+            self.recompute();
         }
 
         // Always relay our dependencies up to the outer tracking layer

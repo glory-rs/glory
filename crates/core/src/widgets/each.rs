@@ -156,16 +156,34 @@ where
         // `items` borrow has been released (the hook is user code; we
         // don't want to be holding the items Ref when it runs).
         let mut entered: Vec<ViewId> = Vec::new();
-        let items_ref = self.items.get();
-        for item in &*items_ref {
-            let key = (self.key_fn)(item);
-            let view_id = (self.tmpl_fn)(item).show_in(ctx);
-            self.key_view_ids.insert(key, view_id.clone());
-            if self.on_enter.is_some() {
-                entered.push(view_id);
+        let mut stored: Vec<ViewId> = Vec::new();
+        {
+            let items_ref = self.items.get();
+            for item in &*items_ref {
+                let key = (self.key_fn)(item);
+                // Same rule as `patch`: a key repeated within one list
+                // collapses to a single view. Otherwise the later occurrence
+                // overwrote the earlier one in `key_view_ids`, leaving a
+                // rendered row that could never be found again to detach.
+                if self.key_view_ids.contains_key(&key) {
+                    crate::debug_warn!("Each: duplicate key in items; only the first occurrence is rendered");
+                    continue;
+                }
+                // `store_in`, not `show_in`: attaching runs the row's own
+                // `build`, which is user code. Running it while the items
+                // borrow is held panics with `BorrowMutError` as soon as a row
+                // touches the same list (`patch` already avoided this).
+                let view_id = (self.tmpl_fn)(item).store_in(ctx);
+                self.key_view_ids.insert(key, view_id.clone());
+                stored.push(view_id.clone());
+                if self.on_enter.is_some() {
+                    entered.push(view_id);
+                }
             }
         }
-        drop(items_ref);
+        for view_id in &stored {
+            ctx.attach_child(view_id);
+        }
         if let Some(hook) = &self.on_enter {
             for view_id in &entered {
                 hook(view_id);
@@ -192,6 +210,16 @@ where
 
             for item in &*items_ref {
                 let key = (self.key_fn)(item);
+                // A key repeated within one list collapses to a single view,
+                // as documented. Without this check the second occurrence of a
+                // *new* key built a second view and overwrote the first in
+                // `new_key_view_ids`: both were attached (the row rendered
+                // twice) and the first became unreachable, so it was never
+                // detached again.
+                if new_key_view_ids.contains_key(&key) {
+                    crate::debug_warn!("Each: duplicate key in items; only the first occurrence is rendered");
+                    continue;
+                }
                 if let Some((old_idx, _, view_id)) = prev_keys.get_full(&key) {
                     old_indices.push(Some(old_idx));
                     newly_created.push(false);

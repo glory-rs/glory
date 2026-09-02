@@ -231,6 +231,11 @@ body {
                     Ok(glory_desktop::IpcMessage::GloryWryQuery(response)) => {
                         let _ = ipc_proxy.send_event(HostEvent::Query(response));
                     }
+                    // This host does not use the `eval()` bridge, so eval
+                    // replies have nowhere to go. `IpcMessage` is
+                    // `#[non_exhaustive]`, so the catch-all also keeps this
+                    // host compiling across future interpreter additions.
+                    Ok(_) => {}
                     Err(err) => tracing::warn!(%err, "mobile-counter: undecodable IPC message"),
                 }
             })

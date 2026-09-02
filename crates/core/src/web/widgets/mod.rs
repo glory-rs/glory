@@ -718,44 +718,52 @@ generate_tags![
   template HtmlTemplate HtmlTemplateElement [],
 ];
 
+// A bare string filler is TEXT, not markup.
+//
+// These used to expand to `span().html(..)`, i.e. straight into `innerHTML`
+// on CSR and into unescaped output on SSR. `div().fill(user_input)` was
+// therefore an XSS sink with nothing in its spelling to suggest it — and
+// `.fill()` is the ordinary way to put a string on the page. Raw markup now
+// requires the explicit `.html(..)` builder.
 impl IntoFiller for String {
     fn into_filler(self) -> Filler {
-        span().html(self).into_filler()
+        span().text(self).into_filler()
     }
 }
 impl<'a> IntoFiller for &'a String {
     fn into_filler(self) -> Filler {
-        span().html(self.to_owned()).into_filler()
+        span().text(self.to_owned()).into_filler()
     }
 }
 
 impl<'a> IntoFiller for &'a str {
     fn into_filler(self) -> Filler {
-        span().html(self.to_owned()).into_filler()
+        span().text(self.to_owned()).into_filler()
     }
 }
 impl<'a> IntoFiller for Cow<'a, str> {
     fn into_filler(self) -> Filler {
-        span().html(self.into_owned()).into_filler()
+        span().text(self.into_owned()).into_filler()
     }
 }
 
+// Reactive string fillers stay reactive: passing the handle itself to `.text`
+// subscribes the view, whereas the previous `self.get()` snapshot rendered a
+// value that never updated while still registering a dependency.
 impl<T> IntoFiller for Cage<T>
 where
-    T: AsRef<str> + fmt::Debug + 'static,
+    T: AttrValue + fmt::Debug + Clone + 'static,
 {
     fn into_filler(self) -> Filler {
-        let html: String = (*self.get()).as_ref().to_owned();
-        span().html(html).into_filler()
+        span().text(self).into_filler()
     }
 }
 
 impl<T> IntoFiller for Bond<T>
 where
-    T: AsRef<str> + fmt::Debug + 'static,
+    T: AttrValue + fmt::Debug + Clone + 'static,
 {
     fn into_filler(self) -> Filler {
-        let html: String = (*self.get()).as_ref().to_owned();
-        span().html(html).into_filler()
+        span().text(self).into_filler()
     }
 }

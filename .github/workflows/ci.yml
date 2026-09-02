@@ -29,6 +29,9 @@ jobs:
       - name: Test command backend
         run: cargo test -p glory-core --features backend-command --test command_backend
 
+      - name: Test SSR runtime flavors
+        run: cargo test -p glory-core --features web-ssr --test ssr_runtime_flavors
+
       - name: Test server functions
         run: cargo test -p glory-serverfn
 
@@ -37,6 +40,23 @@ jobs:
 
       - name: Test CLI
         run: cargo test -p glory-cli
+
+      # These crates all carry real test suites that CI never ran, so a
+      # regression in any of them only showed up locally.
+      - name: Test routing
+        run: cargo test -p glory-routing --lib
+
+      - name: Test routing (feature-gated integration tests)
+        run: cargo test -p glory --features routing
+
+      - name: Test LiveView
+        run: cargo test -p glory-liveview --features "salvo axum actix"
+
+      - name: Test hot reload
+        run: cargo test -p glory-hot-reload
+
+      - name: Test desktop
+        run: cargo test -p glory-desktop
 
       - name: Doc tests
         run: cargo test --doc -p glory-core --features web-ssr
@@ -52,6 +72,21 @@ jobs:
 
       - name: Clippy CLI
         run: cargo clippy -p glory-cli --lib --no-default-features -- -D warnings
+
+      - name: Clippy routing
+        run: cargo clippy -p glory-routing --all-targets -- -D warnings
+
+      - name: Clippy LiveView
+        run: cargo clippy -p glory-liveview --all-targets --features "salvo axum actix" -- -D warnings
+
+      - name: Clippy desktop
+        run: cargo clippy -p glory-desktop --all-targets --features runtime -- -D warnings
+
+      - name: Clippy native
+        run: cargo clippy -p glory-native --all-targets --features blitz -- -D warnings
+
+      - name: Clippy command backend
+        run: cargo clippy -p glory-core --all-targets --features backend-command -- -D warnings
 
   feature-guards:
     runs-on: ubuntu-latest
@@ -239,7 +274,34 @@ jobs:
         run: cargo install cargo-all-features --locked
 
       - name: Check feature combinations
-        run: cargo check-all-features -p glory-core -p glory -p glory-routing
+        run: cargo check-all-features -p glory-core -p glory -p glory-routing -p glory-serverfn -p glory-liveview
+
+  # `examples/` is excluded from the workspace, so nothing in CI compiled it.
+  # A dependency bump in the workspace (salvo 0.93 -> 0.94) silently broke
+  # eight examples this way, and only the e2e job noticed, indirectly.
+  examples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check SSR examples
+        run: |
+          set -euo pipefail
+          for example in hackernews-salvo todomvc-fullstack file-upload ssr-simple-salvo ssr-modes-salvo tailwind-salvo realtime-notify; do
+            echo "::group::$example"
+            cargo check --manifest-path "examples/$example/Cargo.toml" --no-default-features --features web-ssr
+            echo "::endgroup::"
+          done
+
+      - name: Check LiveView and desktop examples
+        run: |
+          set -euo pipefail
+          cargo check --manifest-path examples/liveview-salvo/Cargo.toml
+          cargo check --manifest-path examples/desktop-counter/Cargo.toml
 
   msrv:
     runs-on: ubuntu-latest

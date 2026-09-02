@@ -68,5 +68,8 @@ reqwest-client = ["dep:reqwest"]
 cbor = ["dep:ciborium"]
 postcard = ["dep:postcard"]
 
+[package.metadata.cargo-all-features]
+# Adapter mounts are additive; every combination must build.
+
 [lints]
 workspace = true

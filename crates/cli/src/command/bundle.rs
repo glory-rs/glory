@@ -492,10 +492,9 @@ impl NotaryCredentials {
         let team_id = non_empty_env("APPLE_TEAM_ID")?;
         let secret = if let Some(key) = non_empty_env("APPLE_API_KEY") {
             NotarySecret::ApiKey(key)
-        } else if let Some(pw) = non_empty_env("APPLE_APP_PASSWORD") {
-            NotarySecret::Password(pw)
         } else {
-            return None;
+            let pw = non_empty_env("APPLE_APP_PASSWORD")?;
+            NotarySecret::Password(pw)
         };
         Some(Self { apple_id, team_id, secret })
     }

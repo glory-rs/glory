@@ -1160,9 +1160,19 @@ fn from_url_check(
     let builders = route_builders(fields, pattern, krate)?;
     let build = builders.constructor(enum_ident, variant_ident);
     let path_literal = &pattern.path_literal;
+    // The field builders use `?` on their parse results. Running them inside a
+    // closure keeps that `?` local to this variant: a pattern that matches
+    // but whose parameters do not parse falls through to the next variant,
+    // instead of aborting `from_url` and dropping the route on the
+    // `#[not_found]` fallback. That used to make declaration order
+    // significant, e.g. `/users/<id:u64>` before `/users/new` swallowed
+    // `/users/new`.
     Ok(quote! {
         if let ::std::option::Option::Some(__glory_matched) = #krate::match_route_pattern(url, #path_literal) {
-            return ::std::option::Option::Some(#build);
+            let __glory_route = (|| ::std::option::Option::Some(#build))();
+            if let ::std::option::Option::Some(__glory_route) = __glory_route {
+                return ::std::option::Option::Some(__glory_route);
+            }
         }
     })
 }

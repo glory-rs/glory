@@ -237,3 +237,82 @@ fn memory_aviator_goto_truncates_forward_history() {
     assert!(av.back().unwrap());
     assert_eq!(av.current().as_deref(), Some("/a"));
 }
+
+#[test]
+fn returning_to_a_route_repopulates_its_outlet_after_the_stuff_was_consumed() {
+    // `/app/settings` fills the `content` slot; `/elsewhere` fills a different
+    // slot, so it never overwrites `content`'s registered key.
+    let router = Router::with_path("app")
+        .layout("shell", || Shell)
+        .push(Router::with_path("settings").outlet("content@settings", || Settings))
+        .push(Router::with_path("dashboard").outlet("content@dashboard", || Dashboard));
+    let router = Router::new()
+        .push(router)
+        .push(Router::with_path("elsewhere").outlet("page@elsewhere", || UserPage));
+
+    let av = aviator(router);
+
+    av.goto("/app/settings").unwrap();
+    assert!(av.truck.stuffs().get().contains_key("content"));
+
+    // `Graff`/`Outlet` consume the queued stuff when they render. This harness
+    // has no widget tree, so drain the slot by hand to reach the same state.
+    assert!(av.truck.remove_stuff("content").is_some(), "outlet consumes its stuff");
+
+    // Navigate to a route that leaves `content`'s key untouched, then back.
+    av.goto("/elsewhere").unwrap();
+    assert!(
+        av.truck.contains_stuff_key("content", "settings"),
+        "the unrelated route must not clear the content key"
+    );
+    av.goto("/app/settings").unwrap();
+
+    // Regression: `insert_stuff` short-circuited on the registered `@key`
+    // alone. The key survives being consumed, so returning to a route left its
+    // outlet permanently empty.
+    assert!(
+        av.truck.stuffs().get().contains_key("content"),
+        "returning to a route must queue its outlet content again"
+    );
+    assert!(av.truck.contains_stuff_key("content", "settings"));
+}
+
+#[test]
+fn a_failed_match_does_not_leak_its_params_into_the_next_route() {
+    // `/users/<id>/edit` is tried first (it is more specific) and captures
+    // `id` before failing on the missing `edit` segment. `/users/<name>` then
+    // matches.
+    let router = Router::new()
+        .push(Router::with_path("users/<id>/edit").outlet("page@edit", || UserPage))
+        .push(Router::with_path("users/<name>").outlet("page@show", || UserPage));
+
+    let av = aviator(router);
+    av.goto("/users/bob").unwrap();
+
+    assert!(av.truck.contains_stuff_key("page", "show"), "the second route should match");
+    assert_eq!(current_param(&av, "name").as_deref(), Some("bob"));
+    // Regression: only the cursor was rolled back, so `id` survived from the
+    // route that did not match.
+    assert_eq!(current_param(&av, "id"), None, "params from a failed match must not leak");
+}
+
+#[test]
+fn a_static_prefix_beats_a_longer_dynamic_route() {
+    // `/x/<**rest>` (static + catch-all) must win over `/<a>/<b>/<c>` for
+    // `/x/y/z`, because its first segment is a literal.
+    let router = Router::new()
+        .push(Router::with_path("<a>/<b>/<c>").outlet("page@dynamic", || UserPage))
+        .push(Router::with_path("x/<**rest>").outlet("page@static", || Settings));
+
+    let av = aviator(router);
+    av.goto("/x/y/z").unwrap();
+
+    // Regression: sibling ranking compared the *sum* of per-segment scores, so
+    // three dynamic segments (120) outranked a static first segment (100) and
+    // the dynamic route captured the URL.
+    assert!(av.truck.contains_stuff_key("page", "static"), "the statically-anchored route must win");
+
+    // A URL the static route cannot serve still falls to the dynamic one.
+    av.goto("/q/y/z").unwrap();
+    assert!(av.truck.contains_stuff_key("page", "dynamic"));
+}

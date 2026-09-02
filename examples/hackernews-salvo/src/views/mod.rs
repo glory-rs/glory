@@ -23,7 +23,7 @@ impl Widget for App {
         head_mixin()
             .fill(link().rel("stylesheet").href("/pkg/hackernews-salvo.css"))
             .fill(meta().name("description").content(info.description.clone()))
-            .fill(title().html(info.title.clone()))
+            .fill(title().text(info.title.clone()))
             .show_in(ctx);
         Nav.show_in(ctx);
         Graff::new("section").show_in(ctx);

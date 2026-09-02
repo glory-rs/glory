@@ -78,6 +78,19 @@ pub trait Filter: fmt::Debug + 'static {
     fn specificity(&self) -> i32 {
         0
     }
+
+    /// Per-segment specificity, compared lexicographically when ranking
+    /// sibling routes.
+    ///
+    /// Ranking used to compare the [`specificity`](Self::specificity) *sum*,
+    /// which lets length beat precision: `/<a>/<b>/<c>` scored 120 against
+    /// `/x`'s 100, so `/x/y/z` was captured by the three-segment dynamic route
+    /// instead of the static prefix. Comparing segment by segment, as
+    /// `leptos_router` and `dioxus-router` do, makes the first segment decide.
+    #[inline]
+    fn specificity_ranks(&self) -> Vec<i32> {
+        vec![self.specificity()]
+    }
 }
 
 /// `FnFilter` accepts a function and uses it to filter a request.

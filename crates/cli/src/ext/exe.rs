@@ -47,7 +47,7 @@ impl ExeMeta {
     }
 
     fn get_name(&self) -> String {
-        format!("{}-{}", &self.name, &self.version)
+        format!("{}-{}", self.name, self.version)
     }
 
     async fn cached(&self) -> Result<PathBuf> {
@@ -214,13 +214,13 @@ impl Exe {
         } else if cfg!(feature = "no_downloads") {
             bail!(
                 "{} is required but was not found. Please install it using your OS's tool of choice",
-                &meta.name
+                meta.name
             );
         } else {
             meta.cached().await.context(meta.manual)?
         };
 
-        log::debug!("Command using {} {} {}", &meta.name, &meta.version, GRAY.paint(path.to_string_lossy()));
+        log::debug!("Command using {} {} {}", meta.name, meta.version, GRAY.paint(path.to_string_lossy()));
 
         Ok(path)
     }
@@ -742,7 +742,7 @@ trait Command {
         }
 
         if !self.should_check_for_new_version().await {
-            log::trace!("Command [{}] NOT checking for the latest available version", &self.name());
+            log::trace!("Command [{}] NOT checking for the latest available version", self.name());
             return self.default_version().into();
         }
 
@@ -761,16 +761,16 @@ trait Command {
                                         setting the {}={} env var and re-running the command",
                             self.name(),
                             version,
-                            &latest,
+                            latest,
                             self.env_var_version_name(),
-                            &latest
+                            latest
                         )
                     } else {
                         log::debug!(
                             "Command [{}] requested version {} is already same or newer than available compatible version {}",
                             self.name(),
                             version,
-                            &latest
+                            latest
                         )
                     }
                 }

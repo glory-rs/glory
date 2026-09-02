@@ -22,7 +22,8 @@ crates/
   glory/        thin re-export front door, depends on core (+ optional routing)
   routing/      client-side router (currently wasm32-only)
   cli/          glory-cli build tool (wasm compile, css, hot reload server)
-  hot-reload/   placeholder / partial; AST-diff types for future hot reload
+  hot-reload/   reload wire messages + reloadable-function registry;
+                the AST-diff prototype it once held is gone
 examples/       per-app crates (counter, todomvc, hackernews-salvo, ssr-*, ...)
 ```
 
@@ -51,10 +52,15 @@ exclusion — see `[package.metadata.cargo-all-features].skip_feature_sets`.
   Output is not value-compared by default — chain `.with_eq(|a, b| ...)`
   or `.with_partial_eq()` (for `T: PartialEq`) when you specifically want
   PartialEq gating, so observers only re-run on actual value change.
-- Inside `Widget::build` / `Widget::patch`, calling `.get()` on a `Cage` or
-  `Bond` **subscribes** the current view via `TRACKING_STACK`. Inside an
-  event handler it does NOT subscribe (no active tracking layer). Use
-  `.get_untracked()` if you want to read without subscribing.
+- **A bare `.get()` in `Widget::build` / `Widget::patch` does NOT subscribe
+  the view.** `TRACKING_STACK` layers are pushed only by `Bond` mappers,
+  `Effect`s and `Loader`; `View::build` and the scheduler's patch call do not
+  push one. So `let n = *self.count.get();` followed by hand-written markup
+  renders once and never updates.
+  Subscribe by passing the handle itself into the builder (`.text(count)`,
+  `.attr("title", cage)`, `.class(bond)`), which binds the view, or by reading
+  through a `Bond`. Use `.get_untracked()` to make a non-subscribing read
+  explicit inside a mapper or effect.
 - Mutations: call `Cage::revise(|mut v| ...)`. Repeated writes inside one
   user action should be wrapped in `reflow::batch(...)` to avoid intermediate
   re-renders. CSR event handlers are auto-batched by

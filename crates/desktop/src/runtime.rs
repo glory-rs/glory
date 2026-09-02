@@ -230,7 +230,12 @@ type EvalSender = oneshot::Sender<Result<serde_json::Value, EvalError>>;
 
 thread_local! {
     static EVAL_NEXT_ID: Cell<u64> = const { Cell::new(0) };
-    static EVAL_PENDING: RefCell<HashMap<u64, EvalSender>> = RefCell::new(HashMap::new());
+    /// Pending `eval` calls, keyed by request id and tagged with the window
+    /// that will answer them. The window tag lets `eval_fail_window` settle
+    /// everything still outstanding when that window goes away — otherwise
+    /// those futures never complete, because the reply can only come from a
+    /// webview that no longer exists.
+    static EVAL_PENDING: RefCell<HashMap<u64, (DesktopWindowId, EvalSender)>> = RefCell::new(HashMap::new());
 }
 
 fn eval_alloc_id() -> u64 {
@@ -241,14 +246,27 @@ fn eval_alloc_id() -> u64 {
     })
 }
 
-fn eval_register(id: u64, sender: EvalSender) {
+fn eval_register(id: u64, window_id: DesktopWindowId, sender: EvalSender) {
     EVAL_PENDING.with(|pending| {
-        pending.borrow_mut().insert(id, sender);
+        pending.borrow_mut().insert(id, (window_id, sender));
     });
 }
 
 fn eval_take(id: u64) -> Option<EvalSender> {
-    EVAL_PENDING.with(|pending| pending.borrow_mut().remove(&id))
+    EVAL_PENDING.with(|pending| pending.borrow_mut().remove(&id).map(|(_, sender)| sender))
+}
+
+/// Fails every eval still waiting on `window_id`, called when that window is
+/// closed.
+fn eval_fail_window(window_id: DesktopWindowId) {
+    let stranded: Vec<EvalSender> = EVAL_PENDING.with(|pending| {
+        let mut pending = pending.borrow_mut();
+        let ids: Vec<u64> = pending.iter().filter(|(_, (owner, _))| *owner == window_id).map(|(id, _)| *id).collect();
+        ids.into_iter().filter_map(|id| pending.remove(&id).map(|(_, sender)| sender)).collect()
+    });
+    for sender in stranded {
+        let _ = sender.send(Err(EvalError::Disconnected));
+    }
 }
 
 /// Resolves a pending eval. A dropped receiver (caller no longer awaiting) is
@@ -453,7 +471,7 @@ impl DesktopWindowHandle {
     pub fn eval(&self, js: &str) -> impl Future<Output = Result<serde_json::Value, EvalError>> + 'static {
         let id = eval_alloc_id();
         let (sender, receiver) = oneshot::channel();
-        eval_register(id, sender);
+        eval_register(id, self.id, sender);
         let sent = self.send(WindowCommand::Eval { id, js: js.to_owned() });
         if !sent {
             // Event loop gone: drop the registration and fail immediately so
@@ -1233,7 +1251,7 @@ impl Desktop {
                             slot.window.set_visible(false);
                         }
                     } else {
-                        close_slot_by_window_id(&mut slots, window_id, hotkey_manager.as_ref(), &mut hotkey_routes);
+                        close_slot_by_window_id(&mut slots, window_id, hotkey_manager.as_ref(), &mut hotkey_routes, &mut menu_routes, &mut tray_routes);
                         if slots.is_empty() {
                             *control_flow = ControlFlow::Exit;
                         }
@@ -1347,7 +1365,7 @@ impl Desktop {
                     }
                 }
                 Event::UserEvent(HostEvent::WindowCommand { id, command }) => {
-                    apply_window_command(&mut slots, id, command, hotkey_manager.as_ref(), &mut hotkey_routes);
+                    apply_window_command(&mut slots, id, command, hotkey_manager.as_ref(), &mut hotkey_routes, &mut menu_routes, &mut tray_routes);
                     if slots.is_empty() {
                         *control_flow = ControlFlow::Exit;
                     }
@@ -1548,12 +1566,16 @@ fn close_slot_by_window_id(
     window_id: WindowId,
     hotkey_manager: Option<&global_hotkey::GlobalHotKeyManager>,
     hotkey_routes: &mut HashMap<u32, (DesktopWindowId, DesktopHotKeySpec)>,
+    menu_routes: &mut HashMap<String, DesktopWindowId>,
+    tray_routes: &mut HashMap<String, DesktopWindowId>,
 ) -> bool {
     let Some(position) = slots.iter().position(|(id, _)| *id == window_id) else {
         return false;
     };
     let (_, slot) = slots.remove(position);
     unregister_hotkeys(&slot, hotkey_manager, hotkey_routes);
+    unregister_item_routes(slot.id, menu_routes, tray_routes);
+    eval_fail_window(slot.id);
     slot.state.borrow_mut().closed = true;
     true
 }
@@ -1563,12 +1585,16 @@ fn close_slot_by_id(
     id: DesktopWindowId,
     hotkey_manager: Option<&global_hotkey::GlobalHotKeyManager>,
     hotkey_routes: &mut HashMap<u32, (DesktopWindowId, DesktopHotKeySpec)>,
+    menu_routes: &mut HashMap<String, DesktopWindowId>,
+    tray_routes: &mut HashMap<String, DesktopWindowId>,
 ) -> bool {
     let Some(position) = slots.iter().position(|(_, slot)| slot.id == id) else {
         return false;
     };
     let (_, slot) = slots.remove(position);
     unregister_hotkeys(&slot, hotkey_manager, hotkey_routes);
+    unregister_item_routes(slot.id, menu_routes, tray_routes);
+    eval_fail_window(slot.id);
     slot.state.borrow_mut().closed = true;
     true
 }
@@ -1579,9 +1605,11 @@ fn apply_window_command(
     command: WindowCommand,
     hotkey_manager: Option<&global_hotkey::GlobalHotKeyManager>,
     hotkey_routes: &mut HashMap<u32, (DesktopWindowId, DesktopHotKeySpec)>,
+    menu_routes: &mut HashMap<String, DesktopWindowId>,
+    tray_routes: &mut HashMap<String, DesktopWindowId>,
 ) {
     if matches!(command, WindowCommand::Close) {
-        close_slot_by_id(slots, id, hotkey_manager, hotkey_routes);
+        close_slot_by_id(slots, id, hotkey_manager, hotkey_routes, menu_routes, tray_routes);
         return;
     }
 
@@ -1615,6 +1643,12 @@ fn apply_window_command(
             slot.state.borrow_mut().maximized = maximized;
         }
         WindowCommand::Focus => {
+            // A window hidden by `DesktopCloseBehavior::Hide` has to be made
+            // visible again before it can take focus. Without this, the
+            // documented "re-show it later via focus" was a no-op: an app whose
+            // windows all hide on close became unreachable, with the process
+            // still running.
+            slot.window.set_visible(true);
             slot.window.set_focus();
             slot.state.borrow_mut().focused = true;
         }
@@ -1778,6 +1812,21 @@ fn register_hotkeys(
         }
     }
     registered
+}
+
+/// Drops every menu/tray route pointing at `window_id`.
+///
+/// Routes are keyed by the item id alone, so a closed window's entries stayed
+/// in the table and kept matching activations of an item id a *later* window
+/// happens to reuse. Two windows built from the same `MenuSpec` also collide
+/// while both are open; see `build_menu`.
+fn unregister_item_routes(
+    window_id: DesktopWindowId,
+    menu_routes: &mut HashMap<String, DesktopWindowId>,
+    tray_routes: &mut HashMap<String, DesktopWindowId>,
+) {
+    menu_routes.retain(|_, owner| *owner != window_id);
+    tray_routes.retain(|_, owner| *owner != window_id);
 }
 
 fn unregister_hotkeys(
@@ -2088,7 +2137,7 @@ mod tests {
     fn eval_resolve_tolerates_dropped_receiver() {
         let id = eval_alloc_id();
         let (sender, receiver) = oneshot::channel::<Result<serde_json::Value, EvalError>>();
-        eval_register(id, sender);
+        eval_register(id, DesktopWindowId(0), sender);
         drop(receiver);
         // Must not panic even though the caller is gone.
         eval_resolve(id, Ok(serde_json::json!(1)));
@@ -2100,10 +2149,37 @@ mod tests {
     fn eval_resolve_delivers_to_receiver() {
         let id = eval_alloc_id();
         let (sender, mut receiver) = oneshot::channel::<Result<serde_json::Value, EvalError>>();
-        eval_register(id, sender);
+        eval_register(id, DesktopWindowId(0), sender);
         eval_resolve(id, Ok(serde_json::json!("hi")));
         let got = receiver.try_recv().expect("sender alive").expect("resolved").unwrap();
         assert_eq!(got, serde_json::json!("hi"));
+    }
+
+    /// Regression: a window closing left its pending `eval` futures waiting
+    /// forever, since the only thing that could answer them was the webview
+    /// that just went away.
+    #[test]
+    fn closing_a_window_fails_its_pending_evals() {
+        let window = DesktopWindowId(41);
+        let other = DesktopWindowId(42);
+
+        let id = eval_alloc_id();
+        let (sender, mut receiver) = oneshot::channel::<Result<serde_json::Value, EvalError>>();
+        eval_register(id, window, sender);
+
+        let survivor_id = eval_alloc_id();
+        let (survivor_sender, mut survivor_receiver) = oneshot::channel::<Result<serde_json::Value, EvalError>>();
+        eval_register(survivor_id, other, survivor_sender);
+
+        eval_fail_window(window);
+
+        assert!(
+            matches!(receiver.try_recv(), Ok(Some(Err(EvalError::Disconnected)))),
+            "pending eval on the closed window must fail"
+        );
+        // Another window's pending eval is untouched.
+        assert!(matches!(survivor_receiver.try_recv(), Ok(None)), "unrelated eval must stay pending");
+        eval_resolve(survivor_id, Ok(serde_json::json!(1)));
     }
 
     #[test]

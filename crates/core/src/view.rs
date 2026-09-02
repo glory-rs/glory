@@ -1,6 +1,7 @@
 use std::fmt::{self, Display};
 use std::hash::Hash;
 use std::ops::Deref;
+use std::panic::{AssertUnwindSafe, catch_unwind, resume_unwind};
 
 use indexmap::IndexMap;
 
@@ -144,18 +145,26 @@ impl View {
         if crate::web::is_hydrating() {
             self.widget.hydrate(&mut self.scope);
         }
+        // `is_building` must be cleared even if the widget panics. A panic here
+        // can be caught by an enclosing `ErrorBoundary`, and a scope stuck in
+        // "building" state makes later `attach_child` calls take the wrong
+        // branch for the rest of the session.
+        let build_once = |scope: &mut Scope, widget: &mut Box<dyn Widget + 'static>| {
+            scope.is_building = true;
+            let result = catch_unwind(AssertUnwindSafe(|| widget.build(scope)));
+            scope.is_building = false;
+            if let Err(payload) = result {
+                resume_unwind(payload);
+            }
+        };
         cfg_if! {
             if #[cfg(feature = "single-app")] {
                 crate::reflow::batch(|| {
-                    self.scope.is_building = true;
-                    self.widget.build(&mut self.scope);
-                    self.scope.is_building = false;
+                    build_once(&mut self.scope, &mut self.widget);
                 });
             } else {
                 crate::reflow::batch(self.holder_id(), || {
-                    self.scope.is_building = true;
-                    self.widget.build(&mut self.scope);
-                    self.scope.is_building = false;
+                    build_once(&mut self.scope, &mut self.widget);
                 });
             }
         }

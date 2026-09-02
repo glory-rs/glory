@@ -92,8 +92,23 @@ impl TrackingStack {
 }
 
 pub fn gather<R>(func: impl FnOnce() -> R) -> (IndexMap<RevisableId, Box<dyn Revisable>>, R) {
+    /// Pops the layer even if `func` panics. A layer left behind by a panicking
+    /// `Bond` mapper or `Effect` would keep capturing every subsequent reactive
+    /// read on this thread — the panic is caught by an `ErrorBoundary`, but the
+    /// tracking stack stays corrupted for the rest of the session.
+    struct LayerGuard(bool);
+    impl Drop for LayerGuard {
+        fn drop(&mut self) {
+            if self.0 {
+                TRACKING_STACK.with(|tracking_items| tracking_items.borrow_mut().pop_layer());
+            }
+        }
+    }
+
     TRACKING_STACK.with(|tracking_items| tracking_items.borrow_mut().push_layer());
+    let mut guard = LayerGuard(true);
     let result = (func)();
+    guard.0 = false;
     let gathers = TRACKING_STACK.with(|tracking_items| tracking_items.borrow_mut().pop_layer().unwrap());
     (gathers, result)
 }

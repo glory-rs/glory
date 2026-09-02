@@ -62,7 +62,7 @@ pub async fn run_with(args: Cli, overrides: Overrides) -> Result<()> {
         .to_owned()
         .unwrap_or_else(|| Utf8PathBuf::from("Cargo.toml"))
         .resolve_home_dir()
-        .context(format!("manifest_path: {:?}", &args.manifest_path))?;
+        .context(format!("manifest_path: {:?}", args.manifest_path))?;
     if manifest_path.is_relative() {
         manifest_path = cwd.join(manifest_path);
     }

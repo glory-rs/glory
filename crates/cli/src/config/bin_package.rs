@@ -51,10 +51,19 @@ impl BinPackage {
 
         let name = project.bin_package.clone();
         let packages = metadata.workspace_packages();
-        let package = packages
-            .iter()
-            .find(|p| p.name == name && p.has_bin_target())
-            .ok_or_else(|| anyhow!(r#"Could not find the project bin-package "{name}""#,))?;
+        let package = packages.iter().find(|p| p.name == name && p.has_bin_target()).ok_or_else(|| {
+            // Distinguish "no such package" from "package exists but is a
+            // library". The latter is the normal shape for a mobile project
+            // (the lib is compiled as a cdylib for the host app), and the old
+            // message sent people looking for a missing package instead.
+            if packages.iter().any(|p| p.name == name) {
+                anyhow!(
+                    r#"The project bin-package "{name}" has no [[bin]] target. Mobile targets build the lib package only -- run `glory build --target android` / `--target ios`, or add a binary for desktop/server targets."#
+                )
+            } else {
+                anyhow!(r#"Could not find the project bin-package "{name}""#)
+            }
+        })?;
 
         let package = (*package).clone();
 

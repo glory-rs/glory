@@ -145,7 +145,10 @@ impl RouteMatch {
 pub fn match_route_pattern(url: &str, pattern: &str) -> Option<RouteMatch> {
     let url = Url::parse(url).ok()?;
     let mut state = PathState::new(url.path());
-    let filter = PathFilter::new(pattern);
+    // `PathFilter::new` panics on a malformed pattern, which is the right
+    // behaviour for route registration but not here: `pattern` is a runtime
+    // argument of a public function, so an invalid one must simply not match.
+    let filter = PathFilter::try_new(pattern).ok()?;
     if !filter.detect(&url, &mut state) || !state.is_ended() {
         return None;
     }
@@ -365,13 +368,23 @@ where
         .join("/")
 }
 
-/// Split and decode a catch-all path tail into individual route segments.
+/// Split a catch-all path tail into individual route segments.
+///
+/// The input is the value the router captured for a `<**rest>` wisp, which
+/// `PathState` has **already** percent-decoded segment by segment. Decoding
+/// again here (as this used to) is a second decode pass: `%252e%252e` came out
+/// as `..`, so a path check written against the decoded parameter could be
+/// walked straight past.
+///
+/// Known limitation: because `PathState` decodes before the tail is
+/// reassembled, a `%2F` inside one segment has already become a real `/` and
+/// is split here into two segments.
 pub fn split_catch_all(value: &str) -> Vec<String> {
     value
         .trim_matches('/')
         .split('/')
         .filter(|segment| !segment.is_empty())
-        .map(decode_route_param)
+        .map(str::to_owned)
         .collect()
 }
 
@@ -544,15 +557,50 @@ mod tests {
 
     #[test]
     fn catch_all_helpers_round_trip_segments() {
-        let path = vec!["docs".to_owned(), "hello/world".to_owned(), "42".to_owned()];
-        let encoded = encode_catch_all(&path);
-        assert_eq!(encoded, "docs/hello%2Fworld/42");
-        assert_eq!(split_catch_all(&encoded), path);
+        // `split_catch_all` receives the tail *after* `PathState` has decoded
+        // each segment, so it must not decode again.
+        assert_eq!(
+            split_catch_all("docs/intro page.md/42"),
+            vec!["docs".to_owned(), "intro page.md".to_owned(), "42".to_owned()]
+        );
         assert_eq!(parse_catch_all::<u32>("1/2/3").unwrap(), vec![1, 2, 3]);
 
-        let route = AppRoute::Files { path };
-        assert_eq!(route.to_url(), "/files/docs/hello%2Fworld/42");
-        assert_eq!(AppRoute::from_url("/files/docs/hello%2Fworld/42"), Some(route));
+        let path = vec!["docs".to_owned(), "intro page.md".to_owned(), "42".to_owned()];
+        let route = AppRoute::Files { path: path.clone() };
+        assert_eq!(route.to_url(), "/files/docs/intro%20page.md/42");
+        assert_eq!(AppRoute::from_url("/files/docs/intro%20page.md/42"), Some(route));
+    }
+
+    #[test]
+    fn invalid_pattern_does_not_panic() {
+        // `pattern` is a runtime argument of a public function, so a malformed
+        // one must simply fail to match rather than take the process down.
+        assert_eq!(match_route_pattern("/u/42", "/u/<id"), None);
+        assert_eq!(match_route_pattern("/u/42", "/u/<id:nosuchsign>"), None);
+        assert!(PathFilter::try_new("/u/<id").is_err());
+        assert!(PathFilter::try_new("/u/<id>").is_ok());
+    }
+
+    #[test]
+    fn catch_all_does_not_decode_twice() {
+        // Regression: `PathState` already decoded the tail, and
+        // `split_catch_all` decoded it a second time, so `%252e%252e` arrived
+        // as `..` and a path check written against the decoded parameter could
+        // be walked past. The end-to-end derive counterpart lives in
+        // `crates/glory/tests/routable_derive.rs`.
+        assert_eq!(split_catch_all("%2e%2e/secret"), vec!["%2e%2e".to_owned(), "secret".to_owned()]);
+        assert_eq!(parse_catch_all::<String>("%2e%2e/x").unwrap(), vec!["%2e%2e".to_owned(), "x".to_owned()]);
+    }
+
+    #[test]
+    fn catch_all_encoding_round_trips_through_the_router() {
+        // `PathState` decodes each segment before the tail is reassembled, so
+        // an encoded separator inside one segment becomes a real separator.
+        // Asserted so the limitation stays visible.
+        assert_eq!(encode_catch_all(&["a/b".to_owned()]), "a%2Fb");
+        let matched = match_route_pattern("/files/a%2Fb", "/files/<**path>").unwrap();
+        assert_eq!(matched.params().get("**path").map(String::as_str), Some("a/b"));
+        assert_eq!(split_catch_all("a/b"), vec!["a".to_owned(), "b".to_owned()]);
     }
 
     #[test]

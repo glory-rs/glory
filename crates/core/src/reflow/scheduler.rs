@@ -58,39 +58,81 @@ pub fn is_batching(holder_id: HolderId) -> bool {
     BATCHING.with_borrow(|batching| batching.get(&holder_id).copied().unwrap_or(false))
 }
 
+/// Sets a scheduler flag and clears it on drop, **including while a panic
+/// unwinds**.
+///
+/// This must be RAII rather than a plain `set(false)` at the end of the block.
+/// A panic thrown inside `batch` or a widget `patch` can be caught further up
+/// by an `ErrorBoundary`; if the flag stayed latched, `schedule()` would take
+/// the `is_batching()` / `is_running()` early-return forever and every later
+/// `Cage::revise` would silently stop re-rendering. The session looks frozen
+/// even though the panic was "handled".
+#[cfg(feature = "single-app")]
+struct FlagGuard(&'static std::thread::LocalKey<Cell<bool>>);
+
+#[cfg(feature = "single-app")]
+impl FlagGuard {
+    fn set(key: &'static std::thread::LocalKey<Cell<bool>>) -> Self {
+        key.with(|flag| flag.set(true));
+        Self(key)
+    }
+}
+
+#[cfg(feature = "single-app")]
+impl Drop for FlagGuard {
+    fn drop(&mut self) {
+        self.0.with(|flag| flag.set(false));
+    }
+}
+
+/// See the `single-app` variant above.
+#[cfg(not(feature = "single-app"))]
+struct FlagGuard(&'static std::thread::LocalKey<RefCell<IndexMap<HolderId, bool>>>, HolderId);
+
+#[cfg(not(feature = "single-app"))]
+impl FlagGuard {
+    fn set(key: &'static std::thread::LocalKey<RefCell<IndexMap<HolderId, bool>>>, holder_id: HolderId) -> Self {
+        key.with_borrow_mut(|flags| flags.insert(holder_id, true));
+        Self(key, holder_id)
+    }
+}
+
+#[cfg(not(feature = "single-app"))]
+impl Drop for FlagGuard {
+    fn drop(&mut self) {
+        self.0.with_borrow_mut(|flags| flags.insert(self.1, false));
+    }
+}
+
 #[cfg(feature = "single-app")]
 pub fn batch<O, R>(opt: O) -> R
 where
     O: FnOnce() -> R,
 {
-    BATCHING.with(|batching| {
-        if !batching.get() {
-            batching.set(true);
-            let out = opt();
-            batching.set(false);
-            schedule();
-            out
-        } else {
-            opt()
-        }
-    })
+    if is_batching() {
+        return opt();
+    }
+    let out = {
+        let _guard = FlagGuard::set(&BATCHING);
+        opt()
+    };
+    schedule();
+    out
 }
 #[cfg(not(feature = "single-app"))]
 pub fn batch<O, R>(holder_id: HolderId, opt: O) -> R
 where
     O: FnOnce() -> R,
 {
-    BATCHING.with(|batching| {
-        if !batching.borrow().get(&holder_id).copied().unwrap_or(false) {
-            batching.borrow_mut().insert(holder_id, true);
-            let out = opt();
-            batching.borrow_mut().insert(holder_id, false);
-            schedule(holder_id);
-            out
-        } else {
-            opt()
-        }
-    })
+    if is_batching(holder_id) {
+        return opt();
+    }
+    let out = {
+        let _guard = FlagGuard::set(&BATCHING, holder_id);
+        opt()
+    };
+    schedule(holder_id);
+    out
 }
 
 #[cfg(feature = "single-app")]
@@ -112,11 +154,14 @@ fn run(#[cfg(not(feature = "single-app"))] holder_id: HolderId) {
     #[cfg(all(not(feature = "single-app"), not(all(target_arch = "wasm32", feature = "web-csr"))))]
     let _queue_guard = crate::renderer::command::make_holder_queue_current(holder_id);
 
+    // RAII: a widget `patch` that panics past the boundary handling below
+    // (no boundary registered, or the boundary itself rejects the error) must
+    // still clear RUNNING, or this holder never schedules again.
     cfg_if! {
         if #[cfg(feature = "single-app")] {
-            RUNNING.with(|running| running.set(true));
+            let _running_guard = FlagGuard::set(&RUNNING);
         } else {
-            RUNNING.with_borrow_mut(|running| running.insert(holder_id, true));
+            let _running_guard = FlagGuard::set(&RUNNING, holder_id);
         }
     }
     let mut loop_counts = 0;
@@ -194,19 +239,29 @@ fn run(#[cfg(not(feature = "single-app"))] holder_id: HolderId) {
             }
         }
         if !pending_items.is_empty() {
-            if loop_counts > 8 {
-                crate::warn!("schedule loop_counts > 8 and force break. pending_items: {:?}", pending_items);
-                break;
-            } else {
-                REVISING_ITEMS.with(|revising_items| {
-                    cfg_if! {
-                        if #[cfg(feature = "single-app")] {
-                            revising_items.replace(pending_items);
-                        } else {
-                            revising_items.borrow_mut().insert(holder_id, pending_items);
-                        }
+            // Whether or not we keep looping, the pending work is put back into
+            // REVISING_ITEMS. Dropping it on the cap (as this used to) left the
+            // views subscribed to those sources permanently behind their state,
+            // with nothing to recover from until an unrelated write happened to
+            // touch them again.
+            let exhausted = loop_counts > 8;
+            if exhausted {
+                crate::warn!(
+                    "reactive update did not settle in {loop_counts} rounds; deferring {} pending source(s) to the next flush. This usually means two sources write to each other.",
+                    pending_items.len()
+                );
+            }
+            REVISING_ITEMS.with(|revising_items| {
+                cfg_if! {
+                    if #[cfg(feature = "single-app")] {
+                        revising_items.replace(pending_items);
+                    } else {
+                        revising_items.borrow_mut().insert(holder_id, pending_items);
                     }
-                });
+                }
+            });
+            if exhausted {
+                break;
             }
         } else {
             REVISING_ITEMS.with(|revising_items| {
@@ -221,12 +276,5 @@ fn run(#[cfg(not(feature = "single-app"))] holder_id: HolderId) {
             break;
         }
     }
-
-    cfg_if! {
-        if #[cfg(feature = "single-app")] {
-            RUNNING.with(|running| running.set(false));
-        } else {
-            RUNNING.with_borrow_mut(|running| running.insert(holder_id, false));
-        }
-    }
+    // RUNNING is cleared by `_running_guard` on the way out, panic or not.
 }

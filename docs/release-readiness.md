@@ -63,8 +63,28 @@ targeted command here.
 ## Publishing
 
 - [ ] Versions are bumped consistently across workspace crates.
+- [ ] The next version is not already published on crates.io. If any package at
+  the current workspace version is already published, bump the workspace version
+  before cutting a new release.
 - [ ] docs.rs metadata uses an explicit compilable feature set, not `all-features`.
-- [ ] `cargo package -p glory-core`
-- [ ] `cargo package -p glory`
-- [ ] `cargo package -p glory-cli`
+- [ ] Publish and verify the core release crates in dependency order. Cargo
+  rewrites path dependencies to registry dependencies in package tarballs, so a
+  downstream crate may fail `cargo package` until its same-version internal
+  dependencies are visible in the crates.io index:
+
+  1. `cargo package -p glory-hot-reload`
+  2. `cargo package -p glory-macros`
+  3. `cargo package -p glory-core`
+  4. `cargo package -p glory-routing`
+  5. `cargo package -p glory-serverfn`
+  6. `cargo package -p glory`
+  7. `cargo package -p glory-cli`
+
+- [ ] For each crate above, run `cargo publish -p <crate> --dry-run` before the
+  real publish, then wait for the published version to appear in crates.io
+  search before moving to the next downstream crate.
+- [ ] If the release includes platform crates, run package and dry-run checks
+  after `glory-core` is published for `glory-actix`, `glory-axum`,
+  `glory-salvo`, `glory-desktop`, `glory-native`, `glory-liveview`, and
+  `glory-tui`.
 - [ ] Release notes mention breaking removals.

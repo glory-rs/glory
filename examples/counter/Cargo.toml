@@ -23,7 +23,7 @@ glory = { path = "../../crates/glory", default-features = false }
 wasm-bindgen = { version = "=0.2.121", optional = true, features = ["enable-interning"] }
 wasm-bindgen-futures = { version = "=0.4.71", optional = true }
 web-sys = { version = "=0.3.98", optional = true }
-salvo = { version = "0.93", default-features = true, optional = true, features = ["serve-static"] }
+salvo = { version = "0.94", default-features = true, optional = true, features = ["serve-static"] }
 tokio = { version = "1", optional = true }
 tracing-subscriber = { version = "0.3", optional = true }
 

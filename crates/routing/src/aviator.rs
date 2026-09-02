@@ -6,6 +6,9 @@ pub enum NavigationError {
     NotEnabled(&'static str),
     BrowserLocationUnavailable,
     BrowserHistoryUnavailable,
+    /// The browser refused to write this URL into its history, which it does
+    /// for a cross-origin or non-navigable (e.g. `javascript:`) target.
+    CrossOrigin(String),
 }
 
 impl fmt::Display for NavigationError {
@@ -15,6 +18,7 @@ impl fmt::Display for NavigationError {
             Self::NotEnabled(message) => write!(f, "navigation backend is not enabled: {message}"),
             Self::BrowserLocationUnavailable => write!(f, "browser location is unavailable"),
             Self::BrowserHistoryUnavailable => write!(f, "browser history is unavailable"),
+            Self::CrossOrigin(url) => write!(f, "refusing to navigate to a cross-origin or non-navigable URL: {url}"),
         }
     }
 }
