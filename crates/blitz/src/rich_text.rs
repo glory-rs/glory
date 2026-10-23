@@ -190,7 +190,11 @@ fn build(
                     css.push_str("color:#2563eb;text-decoration:underline;");
                 }
                 if marks.strike {
-                    css.push_str("text-decoration:line-through;");
+                    css.push_str(if marks.link.is_some() {
+                        "text-decoration:underline line-through;"
+                    } else {
+                        "text-decoration:line-through;"
+                    });
                 }
                 if marks.code {
                     css.push_str("background:#e1e5ec;");
@@ -1152,6 +1156,127 @@ mod tests {
         }
     }
     #[test]
+    fn table_selection_replaces_cell_content_without_removing_structural_cells() {
+        let cell = |id, text: &str| Block {
+            id,
+            kind: BlockKind::Cell,
+            spans: vec![Inline::Text {
+                text: text.into(),
+                marks: Marks::default(),
+            }],
+            children: vec![],
+        };
+        let document = Document {
+            root: Block {
+                id: 0,
+                kind: BlockKind::Root,
+                spans: vec![],
+                children: vec![Block {
+                    id: 1,
+                    kind: BlockKind::Table(vec![glory_render::rich_text::Alignment::Left; 2]),
+                    spans: vec![],
+                    children: vec![Block {
+                        id: 2,
+                        kind: BlockKind::Row,
+                        spans: vec![],
+                        children: vec![cell(3, "left"), cell(4, "right")],
+                    }],
+                }],
+            },
+        };
+        let (_app, renderer, id) = fixture(document.clone());
+        let mut state = renderer.0.borrow_mut();
+        let p = Point {
+            block: 4,
+            offset: 0,
+        };
+        state
+            .dom
+            .rich_set_selection(
+                id,
+                Selection {
+                    anchor: p,
+                    focus: p,
+                },
+            )
+            .unwrap();
+        assert!(!state.dom.rich_join_previous(id).unwrap());
+        let p = Point {
+            block: 3,
+            offset: 4,
+        };
+        state
+            .dom
+            .rich_set_selection(
+                id,
+                Selection {
+                    anchor: p,
+                    focus: p,
+                },
+            )
+            .unwrap();
+        assert!(!state.dom.rich_join_next(id).unwrap());
+        state
+            .dom
+            .rich_replace(
+                id,
+                Selection {
+                    anchor: Point {
+                        block: 3,
+                        offset: 2,
+                    },
+                    focus: Point {
+                        block: 4,
+                        offset: 3,
+                    },
+                },
+                "X",
+            )
+            .unwrap();
+        let doc = &state.dom.range(id).unwrap().rich.as_ref().unwrap().document;
+        doc.validate().unwrap();
+        assert_eq!(doc.root.children[0].children[0].children.len(), 2);
+        assert_eq!(text(doc.root.find(3).unwrap()), "leX");
+        assert_eq!(text(doc.root.find(4).unwrap()), "ht");
+    }
+    #[test]
+    fn delete_at_paragraph_end_joins_next_leaf_and_keeps_caret() {
+        let mut document = Document::default();
+        document.root.children[0].spans = vec![Inline::Text {
+            text: "one".into(),
+            marks: Marks::default(),
+        }];
+        document.root.children.push(Block {
+            id: 2,
+            kind: BlockKind::Paragraph,
+            spans: vec![Inline::Text {
+                text: "two".into(),
+                marks: Marks {
+                    bold: true,
+                    ..Marks::default()
+                },
+            }],
+            children: vec![],
+        });
+        let (_app, renderer, id) = fixture(document);
+        let mut state = renderer.0.borrow_mut();
+        let p = Point {
+            block: 1,
+            offset: 3,
+        };
+        let selection = Selection {
+            anchor: p,
+            focus: p,
+        };
+        state.dom.rich_set_selection(id, selection).unwrap();
+        assert!(state.dom.rich_join_next(id).unwrap());
+        assert_eq!(state.dom.rich_selection(id).unwrap(), selection);
+        let doc = &state.dom.range(id).unwrap().rich.as_ref().unwrap().document;
+        assert_eq!(doc.root.children.len(), 1);
+        assert_eq!(text(&doc.root.children[0]), "onetwo");
+        assert!(matches!(&doc.root.children[0].spans[1],Inline::Text{marks,..}if marks.bold));
+    }
+    #[test]
     fn removing_native_rich_editor_retires_internal_control_owners() {
         let (app, renderer, id) = fixture(Document::default());
         let control = renderer.0.borrow().dom.control(id).unwrap();
@@ -1321,8 +1446,10 @@ impl Dom {
         }
         let last = document.root.find(end.block).unwrap();
         let tail = slice(last, end.offset, last.units());
-        let same_parent = parent(&mut document.root, start.block)
-            .is_some_and(|p| p.children.iter().any(|c| c.id == end.block));
+        let same_parent = parent(&mut document.root, start.block).is_some_and(|p| {
+            !matches!(p.kind, BlockKind::Row | BlockKind::TableHead)
+                && p.children.iter().any(|c| c.id == end.block)
+        });
         if a == b {
             spans.extend(tail);
         } else if same_parent {
@@ -1566,7 +1693,10 @@ impl Dom {
             .iter()
             .position(|b| b.id == block)
             .unwrap();
-        if index == 0 || !container.children[index - 1].editable() {
+        if matches!(container.kind, BlockKind::Row | BlockKind::TableHead)
+            || index == 0
+            || !container.children[index - 1].editable()
+        {
             return Ok(false);
         }
         let removed = container.children.remove(index);
@@ -1588,6 +1718,40 @@ impl Dom {
                 focus: point,
             },
         )?;
+        Ok(true)
+    }
+    pub(super) fn rich_join_next(&mut self, id: NodeId) -> Result<bool, Error> {
+        let selection = self.rich_selection(id)?;
+        if selection.anchor != selection.focus {
+            return Ok(false);
+        }
+        let mut document = self.range(id)?.rich.as_ref().unwrap().document.clone();
+        let block = selection.focus.block;
+        if document.root.find(block).unwrap().units() != selection.focus.offset {
+            return Ok(false);
+        }
+        let container = parent(&mut document.root, block).unwrap();
+        let index = container
+            .children
+            .iter()
+            .position(|b| b.id == block)
+            .unwrap();
+        if matches!(container.kind, BlockKind::Row | BlockKind::TableHead)
+            || !container
+                .children
+                .get(index + 1)
+                .is_some_and(Block::editable)
+        {
+            return Ok(false);
+        }
+        let next = container.children.remove(index + 1);
+        for span in next.spans {
+            container.children[index].push(span);
+        }
+        document.validate()?;
+        self.rich_write(id, &document)?;
+        self.resolve();
+        self.rich_set_selection(id, selection)?;
         Ok(true)
     }
     pub(super) fn rich_adjacent(&self, id: NodeId, forward: bool) -> Result<Option<Point>, Error> {
@@ -1733,7 +1897,11 @@ impl Dom {
                                 css.push_str("color:#2563eb;text-decoration:underline;");
                             }
                             if marks.strike {
-                                css.push_str("text-decoration:line-through;");
+                                css.push_str(if marks.link.is_some() {
+                                    "text-decoration:underline line-through;"
+                                } else {
+                                    "text-decoration:line-through;"
+                                });
                             }
                             if marks.code {
                                 css.push_str("background:#e1e5ec;");

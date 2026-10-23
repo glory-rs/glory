@@ -275,6 +275,10 @@ pub(super) fn event(
                 emit(state, id, None, false)?;
                 return Ok(true);
             }
+            if name == "Delete" && !readonly && state.dom.rich_join_next(id)? {
+                emit(state, id, None, false)?;
+                return Ok(true);
+            }
             if readonly {
                 return Ok(!matches!(
                     name.as_str(),
