@@ -245,6 +245,12 @@ impl Descriptor {
     pub fn activation_enabled(&self) -> bool {
         self.props.enabled() && !self.semantics.as_ref().is_some_and(|s| s.disabled)
     }
+    pub fn readonly(&self) -> bool {
+        self.semantics.as_ref().is_some_and(|s| s.readonly)
+    }
+    pub fn field_part(&self) -> Option<crate::FieldPart> {
+        self.semantics.as_ref().and_then(|s| s.field_part)
+    }
     pub fn new(props: Props) -> Self {
         Self {
             props,

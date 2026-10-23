@@ -15,6 +15,17 @@ enum Key {
     Label(NodeId),
 }
 
+struct Relations {
+    owner: AxId,
+    controls: Option<AxId>,
+    label: Option<AxId>,
+    description: Option<AxId>,
+    error: Option<AxId>,
+    label_text: Option<String>,
+    description_text: Option<String>,
+    has_popup: bool,
+}
+
 #[derive(Default)]
 pub(super) struct Tree {
     next: u64,
@@ -135,10 +146,19 @@ impl Tree {
             if let Some(name) = &d.name {
                 node.set_label(normalize_text(name, true).into_owned());
             }
-            if !d.activation_enabled() {
+            if !d.activation_enabled() || !state.mapper.tree().enabled(id) {
                 node.set_disabled();
             }
             if let Some(s) = &d.semantics {
+                if s.required {
+                    node.set_required();
+                }
+                if s.readonly {
+                    node.set_read_only();
+                }
+                if s.invalid {
+                    node.set_invalid(accesskit::Invalid::True);
+                }
                 if let Some(expanded) = s.expanded {
                     node.set_expanded(expanded);
                 }
@@ -245,7 +265,8 @@ impl Tree {
                 node.set_live_atomic();
             }
             let control = state.dom.control(id).ok();
-            if d.props.enabled() && control.is_some_and(|control| state.dom.focus_visible(control))
+            if state.mapper.tree().enabled(id)
+                && control.is_some_and(|control| state.dom.focus_visible(control))
             {
                 if d.focus != FocusMode::Auto
                     || control.is_some_and(|control| {
@@ -258,10 +279,10 @@ impl Tree {
                 {
                     node.add_action(AxAction::Focus);
                 }
-                if d.activation_enabled() && clickable(state, id) {
+                if d.activation_enabled() && clickable(state, id) && !d.readonly() {
                     node.add_action(AxAction::Click);
                 }
-                if matches!(d.props, Props::Input(_)) {
+                if matches!(d.props, Props::Input(_)) && !d.readonly() {
                     node.add_action(AxAction::SetValue);
                 }
                 if revealable(state, id) {
@@ -308,6 +329,7 @@ impl Tree {
         }
         // All accessible target IDs now exist. Resolve only live, exported
         // nodes; forward references and hidden targets allocate no AX history.
+        let mut relations = Vec::new();
         for (key, ax_id) in &self.ids {
             let Key::Main(id) = key else { continue };
             let Some(d) = state.mapper.tree().node(*id).ok().map(|n| &n.descriptor) else {
@@ -325,17 +347,59 @@ impl Tree {
             let controls = s.controls.as_ref().and_then(resolve);
             let label = s.labelled_by.as_ref().and_then(resolve);
             let description = s.described_by.as_ref().and_then(resolve);
-            if let Some(node) = nodes.get_mut(ax_id) {
-                if let Some(target) = controls {
+            let error = s
+                .error_message
+                .as_ref()
+                .filter(|_| s.invalid)
+                .and_then(resolve);
+            // Consumer naming does not recurse through a structural Label or
+            // a generic description wrapper. Derive text from exported live
+            // content only; never read editor values (especially passwords).
+            let label_text = label.and_then(|target| relation_text(&nodes, target));
+            let mut description_text = description.and_then(|target| relation_text(&nodes, target));
+            if let Some(error) = error.and_then(|target| relation_text(&nodes, target)) {
+                if let Some(description) = &mut description_text {
+                    description.push(' ');
+                    description.push_str(&error);
+                } else {
+                    description_text = Some(error);
+                }
+            }
+            relations.push(Relations {
+                owner: *ax_id,
+                controls,
+                label,
+                description,
+                error,
+                label_text: label_text.filter(|_| d.name.is_none()),
+                description_text,
+                has_popup: s.has_popup,
+            });
+        }
+        // Read text before installing any derived names, so relation cycles
+        // and HashMap iteration order cannot change the resulting names.
+        for relation in relations {
+            if let Some(node) = nodes.get_mut(&relation.owner) {
+                if let Some(target) = relation.controls {
                     node.set_controls(vec![target]);
                 }
-                if let Some(target) = label {
+                if let Some(target) = relation.label {
                     node.set_labelled_by(vec![target]);
+                    if let Some(text) = relation.label_text {
+                        node.set_label(text);
+                    }
                 }
-                if let Some(target) = description {
+                if let Some(target) = relation.description {
                     node.set_described_by(vec![target]);
                 }
-                if s.has_popup {
+                if let Some(target) = relation.error {
+                    node.set_error_message(target);
+                    node.push_described_by(target);
+                }
+                if let Some(text) = relation.description_text {
+                    node.set_description(text);
+                }
+                if relation.has_popup {
                     node.set_has_popup(accesskit::HasPopup::Dialog);
                 }
             }
@@ -375,7 +439,9 @@ impl Tree {
             return Ok(false);
         }
         let d = &state.mapper.tree().node(id)?.descriptor;
-        if !d.props.enabled() {
+        if !state.mapper.tree().enabled(id)
+            || d.readonly() && matches!(request.action, AxAction::SetValue | AxAction::Click)
+        {
             return Ok(false);
         }
         state.dom.resolve();
@@ -541,7 +607,35 @@ fn clickable(state: &State, id: NodeId) -> bool {
         )
     }) || state.subscriptions.contains(&(id, EventKind::Activate))
 }
+fn relation_text(nodes: &BTreeMap<AxId, Node>, target: AxId) -> Option<String> {
+    let mut pending = vec![target];
+    let mut text = String::new();
+    while let Some(id) = pending.pop() {
+        let Some(node) = nodes.get(&id) else { continue };
+        let content = node.label().or_else(|| {
+            (node.role() == AxRole::Label)
+                .then(|| node.value())
+                .flatten()
+        });
+        if let Some(content) = content.filter(|value| !value.is_empty()) {
+            if !text.is_empty() {
+                text.push(' ');
+            }
+            text.push_str(content);
+        } else {
+            pending.extend(node.children().iter().rev().copied());
+        }
+    }
+    (!text.is_empty()).then_some(text)
+}
+
 fn role(d: &glory_render::Descriptor) -> AxRole {
+    if let Some(part) = d.field_part() {
+        return match part {
+            glory_render::FieldPart::Fieldset => AxRole::Group,
+            _ => AxRole::Label,
+        };
+    }
     if d.semantics.as_ref().is_some_and(|s| s.tab) {
         return AxRole::Tab;
     }

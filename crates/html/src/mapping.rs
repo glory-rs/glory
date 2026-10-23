@@ -71,7 +71,14 @@ fn changed<T: Copy + Default>(old: T, change: &Change<T>) -> T {
         Change::Clear => T::default(),
     }
 }
-fn view_tag(role: Option<Role>) -> &'static str {
+fn view_tag(role: Option<Role>, part: Option<glory_render::FieldPart>) -> &'static str {
+    if let Some(part) = part {
+        return match part {
+            glory_render::FieldPart::Label => "label",
+            glory_render::FieldPart::Fieldset => "fieldset",
+            glory_render::FieldPart::Legend => "legend",
+        };
+    }
     match role {
         Some(Role::Main) => "main",
         Some(Role::Navigation) => "nav",
@@ -165,8 +172,20 @@ pub fn preflight(node: &Descriptor, patch: Option<&Patch>) -> Result<(), Error> 
                 text_tag(changed(text.kind, change), options)?,
             ))
         }
-        (Props::View, Some(Patch::Role(change))) => {
-            Some((view_tag(node.role), view_tag(changed(node.role, change))))
+        (Props::View, Some(Patch::Role(change))) => Some((
+            view_tag(node.role, node.field_part()),
+            view_tag(changed(node.role, change), node.field_part()),
+        )),
+        (Props::View, Some(Patch::Semantics(change))) => {
+            let part = match change {
+                Change::Keep => node.field_part(),
+                Change::Clear => None,
+                Change::Set(value) => value.as_ref().and_then(|s| s.field_part),
+            };
+            Some((
+                view_tag(node.role, node.field_part()),
+                view_tag(node.role, part),
+            ))
         }
         (Props::Input(input), Some(Patch::Multiline(change)))
             if input.multiline != changed(input.multiline, change) =>
@@ -187,7 +206,7 @@ pub fn shape(descriptor: &Descriptor) -> Result<Shape, Error> {
         return Ok(Shape::default());
     }
     let tag = match &descriptor.props {
-        Props::View => view_tag(descriptor.role),
+        Props::View => view_tag(descriptor.role, descriptor.field_part()),
         Props::Text(text) => text_tag(text.kind, descriptor.options.get::<HtmlTextOptions>())?,
         Props::Button(_) => "button",
         Props::Input(input) if input.multiline => "textarea",

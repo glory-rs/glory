@@ -2106,3 +2106,10 @@ D:/BuildCache/glory-semantic-ui/measurement-evidence-2026-10-23.json。
 后续先用固定聚合计数分清宿主几何读取与业务依赖，再建立不丢scroll ack、
 query、hover、资源/viewport变化的失效条件。OS IME/辅助技术、Android宿主、
 主题和其他架构任务仍按原范围未完成。
+
+
+### 2026-10-24：显式静态构造计划
+
+已实现普通 Rust builders 的 `plan(...).part(...)`、`Scope::instantiate` 和弱 Scope 的实例绑定；没有 DSL 或模板 VM。render 的 CreatePlan 作为离线完整创建单元，HTML 编译静态 Shape，web 复用文档内有界原型并深克隆一次、挂载根一次。每个语义节点身份保留；静态后代由实例 Scope 管理，其他 HTML 适配器默认展开有限操作，stream v3 不变。Group 目前正确回退到逐节点路径。
+
+同库独立构建、两轮 864 个正式样本：千行创建 Script 55.27→28.36 ms，千行替换 83.79→46.38 ms，万行创建 646.39→362.41 ms。四版数据/身份/万行几何和六检查点画面一致；当前工作树 Windows/Linux 各 466 项测试及最终 26 个浏览器套件通过，真实行高与容差保留。体积成本、拆分对照、源码边界及完整证据见 [静态构造计划报告](static-construction-plan-2026-10-24.md)。

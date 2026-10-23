@@ -411,6 +411,36 @@ Blitz beta.4 没有 top layer 的物理实现，因此在 preflight 和 direct a
 浮层、实际 OS IME 或屏幕阅读器验收。Sapid 的三个浮层组件共用这些语义，浏览器
 验收与复现入口在同级 sapid 的 scripts/check.ps1 和 overlay-acceptance.js。
 
+## 字段与原生标签（2026-10-24）
+
+`Semantics::field_part` 提供有限的 Label、Fieldset、Legend；它们只属于无显式 role、
+无 focus 的结构 View。HTML 对应真实 label/fieldset/legend，节点生命周期内不可通过
+metadata 改变结构标签。Legend 必须直接属于 Fieldset；Label/Legend 不接受交互后代，
+因此没有首个 legend 内控件绕过组禁用的例外。`.field_part(...)` 在创建描述符时指定结构，
+不能先创建普通 View 再用响应绑定改标签。普通 Group 仍无盒子或表单角色。
+
+`label_for` 属于 Label，指向稳定 SemanticId；`labelled_by`、`described_by` 和
+`error_message` 分别表示名称、帮助和错误。符号可前向引用，适配器只解析存活目标。
+Check 的 ID/命名/状态映射到实际 input，而非包裹 label，外部标签能够原生切换复选框。
+错误关联只在 invalid 时输出，同时追加到 aria-describedby，保留已有帮助描述。
+
+`required`、`readonly`、`invalid` 仅接受 Input/Check。required 是状态而非跨宿主校验器；
+readonly 保留焦点、选择和程序写入，丢弃用户 ValueChanged/Commit/CheckedChanged，
+但仍先验证事件负载及输入 revision。三个状态的补丁都不写控件 value/checked，也不重置
+selection/preedit。HTML 字段差分与完整 shape oracle 共同覆盖状态设置、移除及关联。
+
+Fieldset 使用 `Semantics::disabled` 禁用后代；`Memory::enabled` 仅沿实际祖先检查，
+无需扫描业务数据或保存访问历史。共享事件路由、Focus action 和原生键盘/指针/AX 行为
+遵守组禁用，恢复组状态不覆盖子控件自己的 enabled。Web 由真实 disabled fieldset 与
+readonly input 配合宿主事件保护；readonly Check 在默认切换前阻止点击。Blitz shell
+实现标签目标聚焦/切换及只读编辑保护，AccessKit 输出 required/read_only/invalid、
+有效的标签/帮助/错误关系和继承禁用状态。SSR 和 stream 保留相同属性，浏览器采用前的
+原生字段行为不依赖 WASM。纯 SSR 不宣称输入能力，原生字段支持不扩大 Layer 的支持范围。
+
+验证入口：render/tests/fields.rs、html 的字段差分 oracle、Blitz command/accessibility
+字段测试，以及同级 Sapid 的 tests/fields.rs 和 examples/web/field-acceptance.js。
+浏览器 AX 协议与无窗口 AccessKit consumer 检查不等于真实屏幕阅读器或 OS IME 验收。
+
 ## R0 尚未收口
 
 - 全部 props/后端扩展的错误分类与恢复范围；描述符局部检查与借用 staged tree 的父子预检已接通，当前保留 partial-prefix/fault 契约。

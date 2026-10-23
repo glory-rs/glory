@@ -26,6 +26,7 @@ pub struct Node {
 #[derive(Clone, Copy, Debug)]
 pub enum Subtree<'a> {
     New(&'a Descriptor),
+    Plan(&'a Plan),
     Existing(NodeId),
 }
 
@@ -180,6 +181,10 @@ impl Memory {
     pub fn stats(&self) -> Stats {
         self.stats
     }
+    /// Accepted operation watermark, without forcing observation or layout.
+    pub fn receipt(&self) -> Receipt {
+        self.receipt
+    }
 
     /// Prepare against this validated/canonical live tree without cloning the
     /// descriptor or scanning unrelated payloads. The guard can be inspected by
@@ -201,6 +206,18 @@ impl Memory {
             prepared
                 .tree
                 .validate_name(prepared.descriptor(), Some(id))?;
+            if let Patch::Semantics(Change::Set(previous)) = prepared.previous()
+                && previous.as_ref().and_then(|s| s.field_part)
+                    != prepared.descriptor().field_part()
+            {
+                // Structural transitions must also validate existing content.
+                // State/association updates never scan the child collection.
+                for child in prepared.tree.nodes[&id].children.iter().copied() {
+                    prepared
+                        .tree
+                        .validate_child(Subtree::Existing(child), Some(id))?;
+                }
+            }
         }
         prepared
             .tree
@@ -212,6 +229,27 @@ impl Memory {
     /// and order. Disposing a parent also destroys its suspended children.
     pub fn active(&self, id: NodeId) -> bool {
         Self::active_in(&self.nodes, id)
+    }
+    /// Logical group disabling also applies before a host has committed markup.
+    /// No source scan: only the live target and its ancestors are inspected.
+    pub fn enabled(&self, id: NodeId) -> bool {
+        let mut cursor = Some(id);
+        while let Some(id) = cursor {
+            let Ok(node) = self.node(id) else {
+                return false;
+            };
+            if !node.descriptor.props.enabled()
+                || node
+                    .descriptor
+                    .semantics
+                    .as_ref()
+                    .is_some_and(|s| s.field_part == Some(crate::FieldPart::Fieldset) && s.disabled)
+            {
+                return false;
+            }
+            cursor = node.parent;
+        }
+        true
     }
 
     fn active_in(nodes: &HashMap<NodeId, Node>, id: NodeId) -> bool {
@@ -255,6 +293,15 @@ impl Memory {
             nodes.get(&id).ok_or(Error::NodeGone(id))
         };
         let target = get(id)?;
+        if target.descriptor.readonly()
+            && matches!(
+                event,
+                Event::ValueChanged { .. } | Event::Commit { .. } | Event::CheckedChanged(_)
+            )
+        {
+            event.validate_payload(id, &target.descriptor)?;
+            return Ok(false);
+        }
         if let Event::Drag { from, phase, .. } = event {
             event.validate_payload(id, &target.descriptor)?;
             let source = match get(*from) {
@@ -320,7 +367,7 @@ impl Memory {
                 | Event::CheckedChanged(_)
                 | Event::ValueChanged { .. }
                 | Event::Commit { .. }
-        ) && !node.descriptor.props.enabled()
+        ) && !self.enabled(id)
         {
             return Err(Error::InvalidProps(
                 "disabled control cannot receive user edits or activation",
@@ -384,6 +431,20 @@ impl Memory {
     /// modifying state. Ordinary moves visit ancestors only; only restricted
     /// interactive/button contexts require examining the child's live subtree.
     pub fn validate_child(&self, child: Subtree<'_>, parent: Option<NodeId>) -> Result<(), Error> {
+        let descriptor = match child {
+            Subtree::New(d) => d,
+            Subtree::Plan(plan) => &plan.nodes()[0].descriptor,
+            Subtree::Existing(id) => &self.node(id)?.descriptor,
+        };
+        if descriptor.field_part() == Some(crate::FieldPart::Legend)
+            && parent
+                .and_then(|id| self.node(id).ok())
+                .is_none_or(|node| node.descriptor.field_part() != Some(crate::FieldPart::Fieldset))
+        {
+            return Err(Error::InvalidPlacement(
+                "legend requires a direct fieldset parent",
+            ));
+        }
         if let Subtree::Existing(id) = child {
             self.node(id)?;
         }
@@ -400,7 +461,11 @@ impl Memory {
                     "leaf component cannot contain children",
                 ));
             }
-            interactive_ancestor |= node.descriptor.props.interactive();
+            interactive_ancestor |= node.descriptor.props.interactive()
+                || matches!(
+                    node.descriptor.field_part(),
+                    Some(crate::FieldPart::Label | crate::FieldPart::Legend)
+                );
             button_ancestor |= matches!(node.descriptor.props, Props::Button(_));
             cursor = node.parent;
         }
@@ -408,34 +473,24 @@ impl Memory {
         if let Subtree::New(descriptor) = child {
             self.validate_name(descriptor, None)?;
         }
+        if let Subtree::Plan(plan) = child {
+            for node in plan.nodes() {
+                self.validate_name(&node.descriptor, None)?;
+            }
+        }
         if !interactive_ancestor && !button_ancestor {
             return Ok(());
         }
         let check = |descriptor: &Descriptor| {
-            if interactive_ancestor
-                && (descriptor.props.interactive() || descriptor.focus != FocusMode::Auto)
-            {
-                return Err(Error::InvalidProps("interactive controls cannot be nested"));
-            }
-            if button_ancestor
-                && !matches!(
-                    descriptor.props,
-                    Props::Group
-                        | Props::Text(TextProps {
-                            kind: TextKind::Inline,
-                            ..
-                        })
-                        | Props::Image(_)
-                )
-            {
-                return Err(Error::InvalidProps(
-                    "button children must be inline text, images or groups",
-                ));
-            }
-            Ok(())
+            crate::plan::validate_context(descriptor, interactive_ancestor, button_ancestor)
         };
         match child {
             Subtree::New(descriptor) => check(descriptor)?,
+            Subtree::Plan(plan) => {
+                for node in plan.nodes() {
+                    check(&node.descriptor)?;
+                }
+            }
             Subtree::Existing(id) => {
                 let mut pending = vec![id];
                 while let Some(id) = pending.pop() {
@@ -522,6 +577,66 @@ impl Memory {
 
     fn apply_one(&mut self, mutation: &Mutation) -> Result<(), Error> {
         match mutation {
+            Mutation::CreatePlan { plan, ids } => {
+                if ids.len() != plan.nodes().len() {
+                    return Err(Error::InvalidProps("plan identity count"));
+                }
+                let mut slots = std::collections::HashSet::with_capacity(ids.len());
+                for (id, node) in ids.iter().zip(plan.nodes()) {
+                    self.check_runtime(*id)?;
+                    if !slots.insert(id.slot()) {
+                        return Err(Error::InvalidPlacement("duplicate plan slot"));
+                    }
+                    if self.nodes.contains_key(id) {
+                        return Err(Error::DuplicateNode(*id));
+                    }
+                    if let Some((generation, live)) = self.generations.get(&id.slot()) {
+                        if *live {
+                            return Err(Error::InvalidPlacement("slot is still occupied"));
+                        }
+                        if *generation >= id.generation() {
+                            return Err(Error::StaleNode(*id));
+                        }
+                    }
+                    self.validate_name(&node.descriptor, None)?;
+                }
+                for (index, node) in plan.nodes().iter().enumerate() {
+                    // The immutable declaration checked content/topology once;
+                    // the complete identity/name check above precedes mutation.
+                    // Fresh nodes need no unlink, ancestor walk or temporary Box.
+                    let id = ids[index];
+                    let descriptor = node.descriptor.clone();
+                    if let Some(name) = descriptor.semantic_id() {
+                        self.names.insert(name.clone(), id);
+                    }
+                    self.generations.insert(id.slot(), (id.generation(), true));
+                    self.nodes.insert(
+                        id,
+                        Node {
+                            descriptor,
+                            parent: node.parent.map(|parent| ids[parent]),
+                            children: Children::default(),
+                            placed: node.parent.is_some(),
+                            suspended: false,
+                            next: None,
+                        },
+                    );
+                    self.stats.created += 1;
+                    if let Some(parent) = node.parent {
+                        let siblings = &mut self
+                            .nodes
+                            .get_mut(&ids[parent])
+                            .expect("plan parent")
+                            .children;
+                        let previous = siblings.last().copied();
+                        siblings.insert(siblings.len(), id);
+                        if let Some(previous) = previous {
+                            self.nodes.get_mut(&previous).expect("plan sibling").next = Some(id);
+                        }
+                        self.stats.placed += 1;
+                    }
+                }
+            }
             Mutation::Create { id, node } => {
                 self.check_runtime(*id)?;
                 node.validate()?;

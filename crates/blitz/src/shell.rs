@@ -204,7 +204,7 @@ impl EventHandler for Events {
                     .mapper
                     .tree()
                     .node(node)
-                    .is_ok_and(|node| node.descriptor.props.enabled());
+                    .is_ok_and(|_| state.mapper.tree().enabled(node));
             if !enabled
                 && matches!(
                     event.data,
@@ -226,12 +226,35 @@ impl EventHandler for Events {
                     .is_some_and(|range| range.edit == EditKind::Text)
             {
                 event_state.prevent_default();
+                if state
+                    .mapper
+                    .tree()
+                    .node(node)
+                    .is_ok_and(|n| n.descriptor.readonly())
+                {
+                    if (matches!(ime, BlitzImeEvent::Disabled | BlitzImeEvent::Commit(_))
+                        || matches!(ime, BlitzImeEvent::Preedit(text, _) if text.is_empty()))
+                        && let Err(error) = state.end_editing(node)
+                    {
+                        state.input_error = Some(error);
+                    }
+                    return;
+                }
                 if let Err(error) = ime_event(&mut state, node, ime) {
                     state.input_error = Some(error);
                 }
                 return;
             }
             if let DomEventData::Input(input) = &event.data {
+                if state
+                    .mapper
+                    .tree()
+                    .node(node)
+                    .is_ok_and(|n| n.descriptor.readonly())
+                {
+                    event_state.prevent_default();
+                    return;
+                }
                 let edit = state.dom.ranges.get(&node).expect("mapped input").edit;
                 let value = match edit {
                     EditKind::Text => match editing::text_event(&mut state, node, &input.value) {
@@ -274,6 +297,46 @@ impl EventHandler for Events {
             }
             DomEventData::Click(_) if node.is_some() => {
                 let node = node.expect("mapped click");
+                let mut cursor = Some(node);
+                let mut label_for = None;
+                while let Some(id) = cursor {
+                    let Ok(current) = state.mapper.tree().node(id) else {
+                        break;
+                    };
+                    label_for = current
+                        .descriptor
+                        .semantics
+                        .as_ref()
+                        .and_then(|s| s.label_for.clone());
+                    if label_for.is_some() {
+                        break;
+                    }
+                    cursor = current.parent;
+                }
+                if let Some(target) = label_for.and_then(|name| state.mapper.tree().named(&name)) {
+                    event_state.prevent_default();
+                    state.inputs.push(Input::Event {
+                        node,
+                        event: Event::Activate,
+                    });
+                    if state.mapper.tree().enabled(target) && state.mapper.tree().active(target) {
+                        let _ = state.focus(target);
+                        if state.mapper.tree().node(target).is_ok_and(|n| {
+                            matches!(n.descriptor.props, glory_render::Props::Check(_))
+                                && !n.descriptor.readonly()
+                        }) {
+                            activate_control(&mut state, target);
+                        }
+                    }
+                    return;
+                }
+                if state.mapper.tree().node(node).is_ok_and(|n| {
+                    n.descriptor.readonly()
+                        && matches!(n.descriptor.props, glory_render::Props::Check(_))
+                }) {
+                    event_state.prevent_default();
+                    return;
+                }
                 state.inputs.push(Input::Event {
                     node,
                     event: Event::Activate,
@@ -436,6 +499,25 @@ fn drag_input(state: &mut State, target: EngineId, event: &DomEventData) -> bool
 
 fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
     let owner = state.dom.owner(target);
+    if owner.is_some_and(|id| {
+        state
+            .mapper
+            .tree()
+            .node(id)
+            .is_ok_and(|n| n.descriptor.readonly())
+    }) {
+        state.space = None;
+        let value = key.key.to_string();
+        let chord = key
+            .modifiers
+            .intersects(Modifiers::CONTROL | Modifiers::META);
+        if matches!(&key.key, Key::Character(_)) && !chord
+            || matches!(value.as_str(), "Backspace" | "Delete" | "Enter")
+            || chord && matches!(value.to_ascii_lowercase().as_str(), "x" | "v" | "z" | "y")
+        {
+            return true;
+        }
+    }
     let space = matches!(&key.key, Key::Character(value) if value == " ");
     if !key.state.is_pressed() {
         if space && let Some(armed) = state.space.take() {
@@ -613,10 +695,9 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
                             .attr(blitz_dom::LocalName::from("disabled"))
                             .is_none()
                     })
-                    && state
-                        .dom
-                        .owner(id)
-                        .is_some_and(|owner| state.mapper.tree().active(owner))
+                    && state.dom.owner(id).is_some_and(|owner| {
+                        state.mapper.tree().active(owner) && state.mapper.tree().enabled(owner)
+                    })
             })
         };
         let current = current.and_then(|id| nodes.iter().position(|candidate| *candidate == id));
@@ -702,6 +783,13 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
 }
 
 fn activate_control(state: &mut State, id: NodeId) {
+    if !state.mapper.tree().enabled(id)
+        || state.mapper.tree().node(id).is_ok_and(|n| {
+            n.descriptor.readonly() && matches!(n.descriptor.props, glory_render::Props::Check(_))
+        })
+    {
+        return;
+    }
     state.inputs.push(Input::Event {
         node: id,
         event: Event::Activate,

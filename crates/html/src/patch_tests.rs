@@ -191,6 +191,24 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
     }
     let semantic_cases = [
         Semantics {
+            required: true,
+            readonly: true,
+            invalid: true,
+            described_by: Some(SemanticId::new("description").unwrap()),
+            error_message: Some(SemanticId::new("error").unwrap()),
+            ..Default::default()
+        },
+        Semantics {
+            field_part: Some(FieldPart::Label),
+            label_for: Some(SemanticId::new("target").unwrap()),
+            ..Default::default()
+        },
+        Semantics {
+            field_part: Some(FieldPart::Fieldset),
+            disabled: true,
+            ..Default::default()
+        },
+        Semantics {
             id: Some(SemanticId::new("layer").unwrap()),
             described_by: Some(SemanticId::new("description").unwrap()),
             layer: Some(Layer::default()),
@@ -242,7 +260,12 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
         patches.push(Patch::Semantics(Change::Set(Some(Box::new(
             metadata.clone(),
         )))));
-        for props in [Props::View, Props::Button(ButtonProps::default())] {
+        for props in [
+            Props::View,
+            Props::Button(ButtonProps::default()),
+            Props::Input(InputProps::default()),
+            Props::Check(CheckProps::default()),
+        ] {
             let mut base = Descriptor::new(props);
             if metadata.layer.is_some() && matches!(base.props, Props::View) {
                 base.role = Some(Role::Dialog);

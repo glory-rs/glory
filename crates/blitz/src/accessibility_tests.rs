@@ -155,6 +155,98 @@ fn composite_roles_states_and_live_named_relations_reach_accesskit() {
 }
 
 #[test]
+fn field_states_label_description_error_and_disabled_group_reach_accesskit() {
+    use glory_render::{Change, FieldPart, Patch, SemanticId, Semantics};
+    let app = WindowApp::new();
+    let field = app.app.scope().cage(None);
+    let group = app.app.scope().cage(None);
+    let label = SemanticId::new("field-label").unwrap();
+    let help = SemanticId::new("field-help").unwrap();
+    let error = SemanticId::new("field-error").unwrap();
+    let states = Semantics {
+        id: Some(SemanticId::new("field-control").unwrap()),
+        labelled_by: Some(label.clone()),
+        described_by: Some(help.clone()),
+        error_message: Some(error.clone()),
+        required: true,
+        readonly: true,
+        invalid: true,
+        ..Default::default()
+    };
+    app.mount(
+        view()
+            .field_part(FieldPart::Fieldset)
+            .node_ref(group)
+            .fill((
+                view()
+                    .field_part(FieldPart::Legend)
+                    .fill(text().content("Profile")),
+                view()
+                    .field_part(FieldPart::Label)
+                    .semantics(Some(Box::new(Semantics {
+                        field_part: Some(FieldPart::Label),
+                        id: Some(label),
+                        label_for: states.id.clone(),
+                        ..Default::default()
+                    })))
+                    .fill(text().content("Email")),
+                view()
+                    .semantics(Some(Box::new(Semantics {
+                        id: Some(help),
+                        ..Default::default()
+                    })))
+                    .fill(text().content("Help")),
+                view()
+                    .semantics(Some(Box::new(Semantics {
+                        id: Some(error),
+                        ..Default::default()
+                    })))
+                    .fill(text().content("Error")),
+                input()
+                    .node_ref(field)
+                    .value("value")
+                    .semantics(Some(Box::new(states))),
+            )),
+    )
+    .unwrap();
+    let mut consumer = Consumer::new(build(&app, true), true);
+    let axid = nodes(&consumer)
+        .into_iter()
+        .find(|n| n.role() == AxRole::TextInput)
+        .unwrap()
+        .id();
+    let data = consumer.state().node_by_id(axid).unwrap();
+    assert_eq!(data.label().as_deref(), Some("Email"));
+    assert_eq!(data.description().as_deref(), Some("Help Error"));
+    assert!(data.data().is_required() && data.data().is_read_only());
+    assert_eq!(data.data().invalid(), Some(accesskit::Invalid::True));
+    assert_eq!(data.data().described_by().len(), 2);
+    assert!(data.data().error_message().is_some());
+    assert_eq!(data.data().labelled_by().len(), 1);
+    assert!(!data.data().supports_action(AxAction::SetValue));
+    app.app
+        .scope()
+        .patch(
+            group.get().unwrap(),
+            Patch::Semantics(Change::Set(Some(Box::new(Semantics {
+                field_part: Some(FieldPart::Fieldset),
+                disabled: true,
+                ..Default::default()
+            })))),
+        )
+        .unwrap();
+    consumer.update_and_process_changes(build(&app, false), &mut Changes);
+    assert!(
+        consumer
+            .state()
+            .node_by_id(axid)
+            .unwrap()
+            .data()
+            .is_disabled()
+    );
+}
+
+#[test]
 fn semantic_roles_labels_passwords_and_list_totals_form_a_valid_consumer_tree() {
     let app = WindowApp::new();
     app.mount(

@@ -128,5 +128,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         queries.html
     );
     std::fs::write(std::path::Path::new(&directory).join("queries.html"), page)?;
+    let plans = glory::ssr::snapshot_with(|scope| glory_semantic_web::plan_form::ui(scope).0)?;
+    let page = format!(
+        "<!doctype html><html><head><meta charset=\"utf-8\"><title>Static plans</title><style data-gly-base=\"v1\">{}</style></head><body><div id=\"plan-ssr\">{}</div><div id=\"app\"></div><script type=\"module\">import init,* as demo from './glory_semantic_web.js';await init();window.demo=demo;window.ready=true;</script></body></html>",
+        glory::html::BASE_CSS,
+        plans.html
+    );
+    std::fs::write(std::path::Path::new(&directory).join("plans.html"), page)?;
     Ok(())
 }

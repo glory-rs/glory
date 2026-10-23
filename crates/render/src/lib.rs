@@ -5,6 +5,7 @@
 pub mod conformance;
 mod id;
 pub mod memory;
+mod plan;
 pub mod profile;
 mod props;
 mod semantics;
@@ -12,8 +13,11 @@ mod text;
 
 pub use glory_style as style;
 pub use id::{NodeId, NodeIds, RuntimeId};
+pub use plan::{MAX_PLAN_NODES, Plan, PlanNode, WeakPlan};
 pub use props::*;
-pub use semantics::{DismissReason, Layer, LayerPlacement, Orientation, SemanticId, Semantics};
+pub use semantics::{
+    DismissReason, FieldPart, Layer, LayerPlacement, Orientation, SemanticId, Semantics,
+};
 pub use text::normalize_text;
 mod keyboard;
 pub use keyboard::{KeyboardCommand, KeyboardInput};
@@ -59,6 +63,12 @@ pub enum Mutation {
     Create {
         id: NodeId,
         node: Box<Descriptor>,
+    },
+    /// One validated, detached construction unit. Internal placement belongs
+    /// to this mutation; attach/move its root with a subsequent Place.
+    CreatePlan {
+        plan: Plan,
+        ids: Vec<NodeId>,
     },
     Patch {
         id: NodeId,

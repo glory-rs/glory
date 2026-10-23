@@ -461,7 +461,7 @@ impl Session {
             if !present.tree.validate_event(node, &event)? {
                 return Ok(false);
             }
-            if !props.enabled()
+            if !present.tree.enabled(node)
                 && matches!(
                     event,
                     Event::Activate
@@ -678,6 +678,61 @@ impl WeakScope {
 }
 
 impl Scope {
+    pub fn instantiate(&self, plan: &crate::Plan) -> Result<crate::PlanInstance> {
+        let session = self.session()?;
+        {
+            let present = session.present.borrow();
+            present
+                .tree
+                .validate_child(Subtree::Plan(&plan.semantic), self.0.parent)?;
+            let renderer = session.renderer.borrow();
+            for node in plan.semantic.nodes() {
+                session.check_style(&node.descriptor.style)?;
+                renderer.preflight(&node.descriptor, None)?;
+            }
+            renderer.preflight_place(
+                &present.tree,
+                Subtree::Plan(&plan.semantic),
+                self.0.parent,
+            )?;
+        }
+        let ids = {
+            let mut present = session.present.borrow_mut();
+            let ids: Vec<_> = plan
+                .semantic
+                .nodes()
+                .iter()
+                .map(|_| present.ids.allocate())
+                .collect();
+            let mutation = Mutation::CreatePlan {
+                plan: plan.semantic.clone(),
+                ids: ids.clone(),
+            };
+            if let Err(error) = present.tree.apply(std::slice::from_ref(&mutation)) {
+                for id in ids {
+                    present.ids.release(id);
+                }
+                return Err(error.into());
+            }
+            let owner = self.id();
+            for id in &ids {
+                present.node_owners.insert(*id, owner);
+            }
+            let owned = present.owners.entry(owner).or_default();
+            let first = owned.nodes.is_empty();
+            owned.nodes.extend(ids.iter().copied());
+            present.node_owner_count += usize::from(first);
+            present.commands.push(mutation);
+            ids
+        };
+        self.0.roots.borrow_mut().push(ids[0]);
+        session.place(ids[0], self.0.parent, None)?;
+        Ok(crate::PlanInstance {
+            scope: self.downgrade(),
+            plan: plan.semantic.clone(),
+            ids,
+        })
+    }
     pub fn mount_with<W: Widget>(&self, factory: impl FnOnce() -> W) -> Result<Mounted> {
         self.mount_at(self.0.parent, factory)
     }
@@ -816,6 +871,11 @@ impl Scope {
                 .node(action.node())?
                 .descriptor,
         )?;
+        if matches!(action, Action::Focus(_))
+            && !session.present.borrow().tree.enabled(action.node())
+        {
+            return Err(RenderError::Unsupported("focus in disabled fieldset").into());
+        }
         let capabilities = session.renderer.borrow().capabilities();
         match action {
             Action::Focus(_) if !capabilities.focus => {
@@ -926,6 +986,10 @@ impl std::ops::Deref for Scope {
 
 /// A component is built once; dynamic props/control flow install owned bindings.
 pub trait Widget: 'static {
+    #[doc(hidden)]
+    fn static_plan(&mut self) -> Result<crate::Plan> {
+        Err(RenderError::Unsupported("dynamic widget cannot be a static plan").into())
+    }
     fn build(&mut self, scope: &Scope) -> Result;
     fn mount(self, parent: &Scope) -> Result<Mounted>
     where
@@ -1233,6 +1297,7 @@ mod placement_tests {
                 && tree.node(parent)?.descriptor.name.as_deref() == Some("restricted")
             {
                 let descriptor = match child {
+                    Subtree::Plan(plan) => &plan.nodes()[0].descriptor,
                     Subtree::New(descriptor) => descriptor,
                     Subtree::Existing(id) => &tree.node(id)?.descriptor,
                 };

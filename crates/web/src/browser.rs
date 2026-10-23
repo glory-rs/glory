@@ -109,6 +109,11 @@ impl Render for Renderer {
             (|| {
                 for mutation in mutations {
                     match mutation {
+                        Mutation::CreatePlan { plan, .. } => {
+                            for node in plan.nodes() {
+                                self.check_layers(&node.descriptor, None)?;
+                            }
+                        }
                         Mutation::Create { node, .. } => self.check_layers(node, None)?,
                         Mutation::Patch { id, patch } => {
                             self.check_layers(&mapper.tree().node(*id)?.descriptor, Some(patch))?

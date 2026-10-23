@@ -274,6 +274,22 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
         return Ok(());
     };
     let entry = dom.entry(id)?;
+    if name == "click"
+        && element
+            .closest("fieldset[disabled]")
+            .map_err(backend)?
+            .is_some()
+    {
+        event.prevent_default();
+        return Ok(());
+    }
+    if name == "click"
+        && entry.edit == EditKind::Check
+        && entry.control()?.has_attribute("readonly")
+    {
+        event.prevent_default();
+        return Ok(());
+    }
     match name {
         "click" => {
             if dom.suppress_click.replace(false) {

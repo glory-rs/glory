@@ -29,10 +29,13 @@ async hostPage => {
     await page.waitForFunction(() => window.ready === true);
     await settle();
     const bridge = await page.evaluate(async () => {
-      const resource = performance.getEntriesByType('resource').find(entry =>
-        entry.name.includes('/snippets/glory-web-') && entry.name.endsWith('/inline0.js'));
-      if (!resource) throw Error('fresh-element bridge module was not loaded');
-      const { gloryCloneElement } = await import(resource.name);
+      let gloryCloneElement;
+      for (const resource of performance.getEntriesByType('resource').filter(entry =>
+        entry.name.includes('/snippets/glory-web-') && /\/inline\d+\.js$/.test(entry.name))) {
+        const module = await import(resource.name);
+        if (typeof module.gloryCloneElement === 'function') { gloryCloneElement = module.gloryCloneElement; break; }
+      }
+      if (!gloryCloneElement) throw Error('fresh-element bridge module was not loaded');
       const prototype = document.createElement('button');
       prototype.setAttribute('type', 'button');
       const identity = '18446744073709551615.4294967295.4294967295';

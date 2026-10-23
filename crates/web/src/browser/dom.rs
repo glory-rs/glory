@@ -12,6 +12,8 @@ use super::{backend, frame::Frame};
 #[path = "templates.rs"]
 mod templates;
 use templates::Templates;
+#[path = "plans.rs"]
+mod plans;
 
 // HTML has exactly three typed parts. Keep live DOM handles inline rather
 // than allocating a BTreeMap node for each semantic node.
@@ -189,6 +191,7 @@ pub(super) struct Dom {
     pub frame: Rc<Frame>,
     pub entries: RefCell<HashMap<NodeId, Rc<Entry>>>,
     templates: Templates,
+    plans: plans::Plans,
     pub tokens: RefCell<HashMap<String, NodeId>>,
     pub parents: RefCell<HashMap<NodeId, Option<NodeId>>>,
     pub inputs: RefCell<Vec<Input>>,
@@ -219,6 +222,7 @@ impl Dom {
             frame,
             entries: RefCell::new(HashMap::new()),
             templates: Templates::default(),
+            plans: plans::Plans::default(),
             tokens: RefCell::new(HashMap::new()),
             parents: RefCell::new(HashMap::new()),
             inputs: RefCell::new(Vec::new()),
@@ -527,6 +531,20 @@ impl Dom {
                 .append_child(&self.document.create_comment(&format!("gly:e:{key}")))
                 .map_err(backend)?;
         }
+        let entry = self.make_entry(token.clone(), &shape, parts, fragment)?;
+        self.entries.borrow_mut().insert(id, entry);
+        self.tokens.borrow_mut().insert(token, id);
+        Ok(())
+    }
+    fn make_entry(
+        &self,
+        token: String,
+        shape: &Shape,
+        parts: Parts,
+        fragment: Option<DocumentFragment>,
+    ) -> Result<Rc<Entry>, Error> {
+        #[cfg(feature = "hydrate")]
+        let is_virtual = virtual_shape(shape);
         let entry = Rc::new(Entry {
             token: token.clone(),
             #[cfg(feature = "hydrate")]
@@ -575,9 +593,7 @@ impl Dom {
                 }
             }
         }
-        self.entries.borrow_mut().insert(id, entry);
-        self.tokens.borrow_mut().insert(token, id);
-        Ok(())
+        Ok(entry)
     }
     fn place(
         &self,
@@ -738,6 +754,7 @@ impl Dom {
         super::layers::clear(self);
         let entries = std::mem::take(&mut *self.entries.borrow_mut());
         self.templates.clear();
+        self.plans.clear();
         self.tokens.borrow_mut().clear();
         self.parents.borrow_mut().clear();
         self.drag.borrow_mut().take();
@@ -764,6 +781,19 @@ impl Dom {
 }
 pub(super) struct Sink(pub Rc<Dom>);
 impl glory_html::Sink for Sink {
+    fn create_plan(
+        &mut self,
+        plan: &glory_render::Plan,
+        ids: &[NodeId],
+        keys: &[u64],
+        shape: &glory_html::PlanShape,
+    ) -> Result<(), Error> {
+        if self.0.staging.get() {
+            return Ok(());
+        }
+        self.0.create_plan(plan, ids, keys, shape)
+    }
+
     fn apply(&mut self, op: Op) -> Result<(), Error> {
         if self.0.staging.get() {
             return Ok(());

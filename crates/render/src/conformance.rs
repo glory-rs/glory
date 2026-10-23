@@ -130,7 +130,64 @@ pub fn verify(mut renderer: impl Render, runtime: RuntimeId, geometry: bool) {
         );
         assert_eq!(renderer.action(Action::Focus(id)), Err(Error::NodeGone(id)));
     }
+    // Construction units preserve the adapter's accepted-prefix watermark even
+    // when a later identity rejects the entire next unit.
+    let plan = Plan::new(vec![
+        PlanNode {
+            parent: None,
+            descriptor: Descriptor::new(Props::View),
+        },
+        PlanNode {
+            parent: Some(0),
+            descriptor: Descriptor::new(Props::Text(TextProps {
+                content: "plan".into(),
+                ..Default::default()
+            })),
+        },
+    ])
+    .unwrap();
+    let first = vec![ids.allocate(), ids.allocate()];
+    let prefix = renderer
+        .apply(&[
+            Mutation::CreatePlan {
+                plan: plan.clone(),
+                ids: first.clone(),
+            },
+            Mutation::Place {
+                id: first[0],
+                parent: None,
+                before: None,
+            },
+        ])
+        .unwrap();
     let foreign = NodeIds::new(RuntimeId::new()).allocate();
+    let unused = ids.allocate();
+    assert!(
+        renderer
+            .apply(&[Mutation::CreatePlan {
+                plan,
+                ids: vec![unused, foreign]
+            }])
+            .is_err()
+    );
+    assert_eq!(renderer.apply(&[]).unwrap(), prefix);
+    assert_eq!(
+        renderer.listen(unused, EventKind::Activate, true),
+        Err(Error::NodeGone(unused))
+    );
+    renderer
+        .request(Query::Bounds(first[1]), QueryToken(102))
+        .unwrap();
+    let mut responses = Vec::new();
+    renderer.drain(&mut responses);
+    assert!(responses.iter().any(|input| matches!(input, Input::Response { token: QueryToken(102), applied, .. } if *applied == prefix.applied)));
+    renderer
+        .apply(&[Mutation::Dispose { id: first[0] }])
+        .unwrap();
+    assert_eq!(
+        renderer.listen(first[1], EventKind::Activate, true),
+        Err(Error::NodeGone(first[1]))
+    );
     assert_eq!(
         renderer.listen(foreign, EventKind::Activate, true),
         Err(Error::ForeignRuntime)

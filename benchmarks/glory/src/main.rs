@@ -38,7 +38,44 @@ mod browser {
         model: Model,
     }
     thread_local! { static APP: RefCell<Option<Demo>> = const { RefCell::new(None) }; }
-    fn row(scope: &Scope, seed: Cage<Row>, model: Model) -> Result {
+    #[derive(Clone)]
+    struct RowPlan {
+        plan: Plan,
+        row: PlanPart,
+        id: PlanPart,
+        label: PlanPart,
+        remove: PlanPart,
+    }
+    impl RowPlan {
+        fn new() -> Self {
+            let declaration = plan(
+                view().role(Role::Row).mark("row").fill((
+                    view()
+                        .role(Role::Cell)
+                        .class("bench-cell col-md-1")
+                        .fill(text().mark("id")),
+                    view()
+                        .role(Role::Cell)
+                        .class("bench-cell col-md-4")
+                        .fill(button().class("lbl").mark("label")),
+                    view()
+                        .role(Role::Cell)
+                        .class("bench-cell col-md-1")
+                        .fill(button().class("remove").label("x").mark("remove")),
+                    view().role(Role::Cell).class("bench-cell col-md-6"),
+                )),
+            )
+            .unwrap();
+            Self {
+                row: declaration.part("row").unwrap(),
+                id: declaration.part("id").unwrap(),
+                label: declaration.part("label").unwrap(),
+                remove: declaration.part("remove").unwrap(),
+                plan: declaration,
+            }
+        }
+    }
+    fn row(scope: &Scope, seed: Cage<Row>, model: Model, declaration: &RowPlan) -> Result {
         let seed = seed.get_untracked();
         let id = seed.id;
         let label = scope.cage(seed.initial.to_string());
@@ -49,35 +86,29 @@ mod browser {
         })?;
         let selected = model.selected;
         let rows = model.rows;
-        view()
-            .role(Role::Row)
-            .class(selected.map(move |value| {
+        let instance = scope.instantiate(&declaration.plan)?;
+        instance.text(&declaration.id, id.to_string())?;
+        instance.class(
+            &declaration.row,
+            selected.map(move |value| {
                 if *value == Some(id) {
                     "bench-row danger".to_owned()
                 } else {
                     "bench-row".to_owned()
                 }
-            }))
-            .fill((
-                view()
-                    .role(Role::Cell)
-                    .class("bench-cell col-md-1")
-                    .fill(text().content(id.to_string())),
-                view().role(Role::Cell).class("bench-cell col-md-4").fill(
-                    button().class("lbl").label(label).on(activate, move |_| {
-                        selected.revise(|value| *value = Some(id));
-                    }),
-                ),
-                view().role(Role::Cell).class("bench-cell col-md-1").fill(
-                    button().class("remove").label("x").on(activate, move |_| {
-                        rows.revise(|rows| rows.retain(|row| row.id != id));
-                    }),
-                ),
-                view().role(Role::Cell).class("bench-cell col-md-6"),
-            ))
-            .build(scope)
+            }),
+        )?;
+        instance.label(&declaration.label, label)?;
+        instance.on(&declaration.label, activate, move |_| {
+            selected.revise(|value| *value = Some(id))
+        })?;
+        instance.on(&declaration.remove, activate, move |_| {
+            rows.revise(|rows| rows.retain(|row| row.id != id))
+        })?;
+        Ok(())
     }
     fn ui(model: Model) -> impl Widget {
+        let declaration = RowPlan::new();
         let (run, lots, add, update, clear, swap) = (
             model.clone(),
             model.clone(),
@@ -145,7 +176,8 @@ mod browser {
                     |row| row.id,
                     move |seed, _| {
                         let model = model.clone();
-                        component(move |scope| row(scope, seed, model.clone()))
+                        let declaration = declaration.clone();
+                        component(move |scope| row(scope, seed, model.clone(), &declaration))
                     },
                 ))),
         ))

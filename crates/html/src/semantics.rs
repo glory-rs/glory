@@ -19,10 +19,46 @@ pub(crate) fn attributes(
         ("aria-controls", &value.controls),
         ("aria-labelledby", &value.labelled_by),
         ("aria-describedby", &value.described_by),
+        ("for", &value.label_for),
     ] {
         if let Some(id) = id {
             attrs.insert(name, id.as_str().to_owned());
         }
+    }
+    if let Some(error) = &value.error_message
+        && value.invalid
+    {
+        attrs.insert("aria-errormessage", error.as_str().into());
+        attrs
+            .entry("aria-describedby")
+            .and_modify(|description| {
+                description.push(' ');
+                description.push_str(error.as_str());
+            })
+            .or_insert_with(|| error.as_str().into());
+    }
+    for (flag, name) in [(value.required, "required"), (value.readonly, "readonly")] {
+        if flag {
+            attrs.insert(name, String::new());
+        }
+    }
+    for (flag, name) in [
+        (value.required, "aria-required"),
+        (value.readonly, "aria-readonly"),
+        (value.invalid, "aria-invalid"),
+    ] {
+        if flag {
+            attrs.insert(name, "true".into());
+        }
+    }
+    if value.readonly {
+        attrs.insert("data-gly-readonly", String::new());
+    }
+    if value.invalid {
+        attrs.insert("data-gly-invalid", String::new());
+    }
+    if value.field_part == Some(glory_render::FieldPart::Fieldset) && value.disabled {
+        attrs.insert("disabled", String::new());
     }
     if value.tab {
         attrs.insert("role", "tab".into());

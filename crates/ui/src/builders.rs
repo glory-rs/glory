@@ -43,6 +43,7 @@ struct Element {
     children: Vec<Box<dyn Widget>>,
     needs_alt: bool,
     node_ref: Option<Cage<Option<NodeId>>>,
+    mark: Option<&'static str>,
 }
 impl Element {
     fn new(props: Props) -> Self {
@@ -55,6 +56,7 @@ impl Element {
             children: Vec::new(),
             needs_alt,
             node_ref: None,
+            mark: None,
         }
     }
     fn set<T: Clone + PartialEq + 'static>(
@@ -146,9 +148,41 @@ impl Element {
             .options
             .insert(value);
     }
+    fn static_plan(&mut self) -> Result<crate::Plan> {
+        if self.needs_alt
+            || !self.bindings.is_empty()
+            || !self.handlers.is_empty()
+            || self.node_ref.is_some()
+        {
+            return Err(glory_render::Error::InvalidProps(
+                "plan requires static declarations; bind events/values on the instance",
+            )
+            .into());
+        }
+        let mut descriptor = self.descriptor.take().ok_or(crate::Error::Gone)?;
+        descriptor.patches(std::mem::take(&mut self.initial).into_values())?;
+        let mut nodes = vec![glory_render::PlanNode {
+            parent: None,
+            descriptor,
+        }];
+        let mut marks = self
+            .mark
+            .take()
+            .map(|name| vec![(name, 0)])
+            .unwrap_or_default();
+        for mut child in self.children.drain(..) {
+            child.static_plan()?.append(0, &mut nodes, &mut marks);
+        }
+        crate::Plan::from_nodes(nodes, marks)
+    }
 }
 
 pub struct Children(Vec<Box<dyn Widget>>);
+impl IntoChildren for Children {
+    fn into_children(self) -> Children {
+        self
+    }
+}
 pub trait IntoChildren {
     fn into_children(self) -> Children;
 }
@@ -202,11 +236,19 @@ macro_rules! element {
             }
         }
         impl Widget for $name {
+            fn static_plan(&mut self) -> Result<crate::Plan> {
+                self.inner.static_plan()
+            }
             fn build(&mut self, scope: &Scope) -> Result {
                 self.inner.build(scope)
             }
         }
         impl $name {
+            /// Name a part of an explicit static plan; not a DOM id or data key.
+            pub fn mark(mut self, name: &'static str) -> Self {
+                self.inner.mark = Some(name);
+                self
+            }
             pub fn backend_options<T: 'static>(mut self, value: T) -> Self {
                 self.inner.options(value);
                 self
@@ -252,6 +294,17 @@ macro_rules! common {
 }
 common!(View, Text, Button, Input, Check, Image, Link);
 impl View {
+    /// Structural form kind is installed before reactive metadata bindings.
+    pub fn field_part(mut self, part: glory_render::FieldPart) -> Self {
+        self.inner
+            .descriptor
+            .as_mut()
+            .expect("unmounted builder")
+            .semantics
+            .get_or_insert_with(Default::default)
+            .field_part = Some(part);
+        self
+    }
     /// Structural role; controls, text and images retain their own semantics.
     pub fn role(mut self, role: Role) -> Self {
         self.inner.set(Slot::Role, Some(role), |value| {

@@ -3,6 +3,14 @@
 
 use crate::{Descriptor, Error, Navigation, Props, Role};
 
+/// Structural form content, fixed for a node's lifetime on HTML adapters.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FieldPart {
+    Label,
+    Fieldset,
+    Legend,
+}
+
 /// Host-managed top layer. Presence declares a focus scope; `hidden` controls
 /// whether it participates in the stack. Relations resolve only live names.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -125,6 +133,12 @@ impl Orientation {
 /// live names in their document. Removing a target retains no owning reference.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Semantics {
+    pub field_part: Option<FieldPart>,
+    pub label_for: Option<SemanticId>,
+    pub error_message: Option<SemanticId>,
+    pub required: bool,
+    pub readonly: bool,
+    pub invalid: bool,
     pub id: Option<SemanticId>,
     pub controls: Option<SemanticId>,
     pub labelled_by: Option<SemanticId>,
@@ -146,6 +160,32 @@ pub struct Semantics {
 }
 impl Semantics {
     pub(crate) fn validate(&self, d: &Descriptor) -> Result<(), Error> {
+        if self.field_part.is_some()
+            && (!matches!(d.props, Props::View)
+                || d.role.is_some()
+                || d.focus != crate::FocusMode::Auto
+                || self.layer.is_some()
+                || self.navigation.is_some())
+        {
+            return Err(Error::InvalidProps(
+                "form parts require an unfocused structural view",
+            ));
+        }
+        if self.label_for.is_some() && self.field_part != Some(FieldPart::Label) {
+            return Err(Error::InvalidProps(
+                "label association requires a label part",
+            ));
+        }
+        if self.label_for.is_some() && self.label_for == self.id {
+            return Err(Error::InvalidProps("a label cannot target itself"));
+        }
+        if (self.required || self.readonly || self.invalid || self.error_message.is_some())
+            && !matches!(d.props, Props::Input(_) | Props::Check(_))
+        {
+            return Err(Error::InvalidProps(
+                "field states require an input or check",
+            ));
+        }
         if self.has_popup && (!matches!(d.props, Props::Button(_)) || self.tab) {
             return Err(Error::InvalidProps(
                 "popup triggers require a non-tab button",
@@ -181,7 +221,10 @@ impl Semantics {
                 "group has no composite widget metadata",
             ));
         }
-        if (self.tab || self.expanded.is_some() || self.disabled || self.navigation_item)
+        if (self.tab
+            || self.expanded.is_some()
+            || (self.disabled && self.field_part != Some(FieldPart::Fieldset))
+            || self.navigation_item)
             && !matches!(d.props, Props::Button(_))
         {
             return Err(Error::InvalidProps(

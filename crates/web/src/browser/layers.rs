@@ -46,11 +46,17 @@ impl Drop for Working<'_> {
 }
 impl Layers {
     pub fn update(&mut self, tree: &glory_render::memory::Memory, mutations: &[Mutation]) {
-        for mutation in mutations {
-            let id = match mutation {
-                Mutation::Create { id, .. } | Mutation::Patch { id, .. } => *id,
-                _ => continue,
-            };
+        for id in mutations
+            .iter()
+            .flat_map(|mutation| match mutation {
+                Mutation::Create { id, .. } | Mutation::Patch { id, .. } => {
+                    std::slice::from_ref(id)
+                }
+                Mutation::CreatePlan { ids, .. } => ids.as_slice(),
+                _ => &[],
+            })
+            .copied()
+        {
             if let Ok(node) = tree.node(id) {
                 match node
                     .descriptor

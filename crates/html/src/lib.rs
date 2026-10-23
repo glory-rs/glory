@@ -1,6 +1,8 @@
 //! Common HTML lowering. No UI/core runtime, DOM, HTTP or window dependencies.
 mod mapping;
 mod patch;
+mod plan;
+pub use plan::PlanShape;
 #[cfg(test)]
 mod patch_tests;
 mod semantics;
@@ -157,6 +159,32 @@ pub enum Op {
 }
 pub trait Sink {
     fn apply(&mut self, op: Op) -> Result<(), Error>;
+    /// A detached semantic construction unit. Hosts without subtree cloning
+    /// expand it into their existing finite operations; stream v3 stays intact.
+    fn create_plan(
+        &mut self,
+        plan: &glory_render::Plan,
+        ids: &[NodeId],
+        keys: &[u64],
+        shape: &PlanShape,
+    ) -> Result<(), Error> {
+        shape.validate_instance(plan, ids, keys)?;
+        for (index, node) in shape.shapes.iter().enumerate() {
+            self.apply(Op::Create {
+                id: ids[index],
+                key: keys[index],
+                shape: node.clone(),
+            })?;
+            if let Some(parent) = shape.parents[index] {
+                self.apply(Op::Place {
+                    id: ids[index],
+                    parent: Some(ids[parent]),
+                    before: None,
+                })?;
+            }
+        }
+        Ok(())
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -196,6 +224,7 @@ pub struct Mapper {
     keys: HashMap<NodeId, u64>,
     next_key: u64,
     receipt: Receipt,
+    plans: plan::Plans,
 }
 impl Mapper {
     pub fn new(runtime: RuntimeId) -> Self {
@@ -204,6 +233,7 @@ impl Mapper {
             keys: HashMap::new(),
             next_key: 0,
             receipt: Receipt::default(),
+            plans: plan::Plans::default(),
         }
     }
     pub fn tree(&self) -> &Memory {
@@ -264,6 +294,23 @@ impl Mapper {
         let mut receipt = self.receipt;
         for mutation in mutations {
             let op = match mutation {
+                Mutation::CreatePlan { plan, ids } => {
+                    preflight_place(&self.tree, Subtree::Plan(plan), None)?;
+                    let shape = self.plans.shape(plan)?;
+                    let end = self
+                        .next_key
+                        .checked_add(ids.len() as u64)
+                        .ok_or(Error::InvalidProps("HTML key space exhausted"))?;
+                    receipt = self.tree.apply(std::slice::from_ref(mutation))?;
+                    let keys: Vec<_> = (self.next_key..end).collect();
+                    for (id, key) in ids.iter().zip(&keys) {
+                        self.keys.insert(*id, *key);
+                    }
+                    self.next_key = end;
+                    sink.create_plan(plan, ids, &keys, &shape)?;
+                    self.receipt = receipt;
+                    continue;
+                }
                 Mutation::Create { id, node } => {
                     let shape = shape(node)?;
                     let key = self.next_key;
@@ -366,7 +413,7 @@ pub fn preflight_place(
     // not bypass the button's phrasing-only content model, including when
     // a previously built Group is moved into a button. Ordinary list moves
     // do not scan their subtree.
-    if button {
+    if button || matches!(child, Subtree::Plan(_)) {
         let check = |descriptor: &glory_render::Descriptor| {
             if matches!(descriptor.props, glory_render::Props::Text(_))
                 && descriptor
@@ -381,6 +428,22 @@ pub fn preflight_place(
             Ok(())
         };
         match child {
+            Subtree::Plan(plan) => {
+                for (index, node) in plan.nodes().iter().enumerate() {
+                    let mut ancestor = plan.nodes()[index].parent;
+                    let mut in_button = button;
+                    while let Some(parent) = ancestor {
+                        in_button |= matches!(
+                            plan.nodes()[parent].descriptor.props,
+                            glory_render::Props::Button(_)
+                        );
+                        ancestor = plan.nodes()[parent].parent;
+                    }
+                    if in_button {
+                        check(&node.descriptor)?;
+                    }
+                }
+            }
             Subtree::New(descriptor) => check(descriptor)?,
             Subtree::Existing(id) => {
                 let mut pending = vec![id];

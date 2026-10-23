@@ -929,11 +929,7 @@ impl State {
         if let Some(next) = next
             && (!self.mapper.tree().active(next)
                 || physical.is_some_and(|node| !self.dom.focus_visible(node))
-                || !self
-                    .mapper
-                    .tree()
-                    .node(next)
-                    .is_ok_and(|node| node.descriptor.props.enabled()))
+                || !self.mapper.tree().enabled(next))
         {
             self.dom.doc.clear_focus();
             self.dom.invalidate();
@@ -947,7 +943,7 @@ impl State {
             return Err(Error::Unsupported("headless Blitz focus"));
         }
         let descriptor = &self.mapper.tree().node(id)?.descriptor;
-        if !descriptor.props.enabled() {
+        if !self.mapper.tree().enabled(id) {
             return Err(Error::Unsupported("focus on disabled control"));
         }
         let explicit = descriptor.focus != glory_render::FocusMode::Auto;
@@ -1186,6 +1182,12 @@ impl Render for Renderer {
         let result = (|| {
             for mutation in mutations {
                 match mutation {
+                    Mutation::CreatePlan { plan, .. } => {
+                        for node in plan.nodes() {
+                            check_layer(&node.descriptor, None)?;
+                            check_style(&node.descriptor.style)?;
+                        }
+                    }
                     Mutation::Create { node, .. } => check_layer(node, None)?,
                     Mutation::Patch { id, patch } => {
                         check_layer(&mapper.tree().node(*id)?.descriptor, Some(patch))?
@@ -1261,6 +1263,11 @@ impl Render for Renderer {
     fn action(&mut self, action: glory_render::Action) -> Result<(), Error> {
         let mut state = self.0.borrow_mut();
         action.validate_target(&state.mapper.tree().node(action.node())?.descriptor)?;
+        if matches!(action, glory_render::Action::Focus(_))
+            && !state.mapper.tree().enabled(action.node())
+        {
+            return Err(Error::Unsupported("focus in disabled fieldset"));
+        }
         if !state.mapper.tree().active(action.node()) {
             return Err(Error::Unsupported("action on disconnected Blitz range"));
         }
