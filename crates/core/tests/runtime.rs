@@ -7,6 +7,35 @@ use glory_core::{AccessError, Bond, Cage, Host, HostError, LocalFuture, Runtime,
 use glory_render::profile::{Phase, Profile};
 
 #[test]
+fn source_versions_are_generation_checked_untracked_stamps_and_detect_equal_restoration() {
+    let runtime = Runtime::new();
+    let owner = runtime.owner();
+    let source = owner.cage("same".to_string());
+    let runs = Rc::new(Cell::new(0));
+    let seen = runs.clone();
+    owner.effect(move || {
+        source.try_version().unwrap();
+        seen.set(seen.get() + 1);
+    });
+    runtime.flush().unwrap();
+    let initial = source.try_version().unwrap();
+    source.revise(|value| *value = "other".into());
+    source.revise(|value| *value = "same".into());
+    assert_eq!(source.try_version().unwrap(), initial + 2);
+    // The stamp is available while the value is mutably borrowed; obtaining it
+    // neither borrows the payload nor creates an effect dependency.
+    source.revise(|_| assert_eq!(source.try_version().unwrap(), initial + 2));
+    runtime.flush().unwrap();
+    assert_eq!(runs.get(), 1);
+    owner.dispose();
+    assert_eq!(source.try_version(), Err(AccessError::Disposed));
+    let replacement_owner = runtime.owner();
+    let replacement = replacement_owner.cage(0);
+    assert!(replacement.try_version().is_ok());
+    assert_eq!(source.try_version(), Err(AccessError::Disposed));
+}
+
+#[test]
 fn instance_entry_checks_generation_and_runtime_before_business_code_without_retaining_ownership() {
     let runtime = Runtime::new();
     let global = runtime.owner();

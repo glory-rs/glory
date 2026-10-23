@@ -23,7 +23,8 @@ reduced workspace check as proof that those adapters/platforms work.
   Maximum sizes use Limit::{None,Px,Percent}, not Length::Auto. Option::None
   leaves the stylesheet in charge; Some(Limit::None) explicitly removes its cap.
   Keep min > max valid (the engine applies the minimum). HTML/RECORD profiles
-  are v3; the native Blitz profile is v4 after typography/decoration expansion.
+  are v4 after FieldSizing; the native Blitz profile is v5 and rejects FieldSizing
+  until intrinsic editor sizing exists. Fixed-row Textarea uses ordinary dimensions.
   Family distinguishes named faces from generics; named faces serialize as CSS
   strings (escape quotes, backslashes, controls and '<', including in Sheet).
   WhiteSpace controls collapsing/wrapping, not word breaking. Keep border width,

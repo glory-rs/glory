@@ -1,8 +1,8 @@
 //! Machine-readable acceptance of the typed inline style contract. This is not
 //! a CSS parser, cascade engine, or claim that every HTML stylesheet is portable.
 use crate::{
-    Align, BorderStyle, Display, Family, FlexDirection, Justify, Length, Limit, Overflow, Position,
-    Style, WhiteSpace,
+    Align, BorderStyle, Display, Family, FieldSizing, FlexDirection, FlexWrap, Justify, Length,
+    Limit, Overflow, Position, Style, TextOverflow, WhiteSpace,
 };
 
 macro_rules! properties {
@@ -27,6 +27,7 @@ macro_rules! properties {
 properties! {
     Position => position => "position", Top => top => "top", Left => left => "left",
     Display => display => "display", Direction => flex_direction => "flex-direction",
+    FlexWrap => flex_wrap => "flex-wrap",
     Width => width => "width", Height => height => "height",
     MinWidth => min_width => "min-width", MinHeight => min_height => "min-height",
     MaxWidth => max_width => "max-width", MaxHeight => max_height => "max-height",
@@ -38,9 +39,9 @@ properties! {
     Background => background => "background-color", FontSize => font_size => "font-size",
     LineHeight => line_height => "line-height",
     FontFamily => font_family => "font-family", FontWeight => font_weight => "font-weight",
-    WhiteSpace => white_space => "white-space", BorderWidth => border_width => "border-width",
+    WhiteSpace => white_space => "white-space", TextOverflow => text_overflow => "text-overflow", FieldSizing => field_sizing => "field-sizing", BorderWidth => border_width => "border-width",
     BorderColor => border_color => "border-color", BorderStyle => border_style => "border-style",
-    Radius => radius => "border-radius", Opacity => opacity => "opacity",
+    Radius => radius => "border-radius", Opacity => opacity => "opacity", BoxShadow => box_shadow => "box-shadow",
 }
 
 macro_rules! values {
@@ -57,7 +58,9 @@ values! {
     AlignStart, AlignEnd, AlignCenter, AlignStretch, JustifyStart, JustifyEnd,
     JustifyCenter, Between, Around, Evenly, Row, Column,
     Normal, NoWrap, Pre, PreWrap, BorderNone, BorderSolid,
-    FontNamed, Serif, Sans, Mono, System, Cursive, Fantasy,
+    FontNamed, Serif, Sans, Mono, System, Cursive, Fantasy, FieldFixed, FieldContent,
+    ShadowNone, ShadowOutset, FlexNoWrap, FlexWrap,
+    TextClip, TextEllipsis,
 }
 macro_rules! convert {
     ($ty:ty, $($from:ident => $to:ident),+ $(,)?) => {
@@ -72,7 +75,10 @@ convert!(Overflow, Visible => Visible, Hidden => Hidden, Clip => Clip, Auto => O
 convert!(Align, Start => AlignStart, End => AlignEnd, Center => AlignCenter, Stretch => AlignStretch);
 convert!(Justify, Start => JustifyStart, End => JustifyEnd, Center => JustifyCenter, Between => Between, Around => Around, Evenly => Evenly);
 convert!(FlexDirection, Row => Row, Column => Column);
+convert!(FlexWrap, NoWrap => FlexNoWrap, Wrap => FlexWrap);
 convert!(WhiteSpace, Normal => Normal, NoWrap => NoWrap, Pre => Pre, PreWrap => PreWrap);
+convert!(TextOverflow, Clip => TextClip, Ellipsis => TextEllipsis);
+convert!(FieldSizing, Fixed => FieldFixed, Content => FieldContent);
 convert!(BorderStyle, None => BorderNone, Solid => BorderSolid);
 impl From<&Family> for Value {
     fn from(value: &Family) -> Self {
@@ -181,6 +187,7 @@ impl Support {
             style
                 .flex_direction
                 .map(|v| (Property::Direction, v.into())),
+            style.flex_wrap.map(|v| (Property::FlexWrap, v.into())),
             style.width.map(|v| (Property::Width, v.into())),
             style.height.map(|v| (Property::Height, v.into())),
             style.min_width.map(|v| (Property::MinWidth, v.into())),
@@ -208,12 +215,31 @@ impl Support {
             style.line_height.map(|_| (Property::LineHeight, Value::Px)),
             style.white_space.map(|v| (Property::WhiteSpace, v.into())),
             style
+                .text_overflow
+                .map(|v| (Property::TextOverflow, v.into())),
+            style
+                .field_sizing
+                .map(|v| (Property::FieldSizing, v.into())),
+            style
                 .border_style
                 .map(|v| (Property::BorderStyle, v.into())),
             style
                 .border_width
                 .map(|_| (Property::BorderWidth, Value::Px)),
             style.radius.map(|_| (Property::Radius, Value::Px)),
+            style.box_shadow.map(|shadow| {
+                (
+                    Property::BoxShadow,
+                    match shadow {
+                        crate::BoxShadow::None => Value::ShadowNone,
+                        crate::BoxShadow::Outset(_) => Value::ShadowOutset,
+                    },
+                )
+            }),
+            style.box_shadow.and_then(|shadow| {
+                matches!(shadow, crate::BoxShadow::Outset(_))
+                    .then_some((Property::BoxShadow, Value::Px))
+            }),
         ];
         for (property, value) in values.into_iter().flatten() {
             if !self.supports_value(value) {
@@ -265,7 +291,7 @@ impl Profile {
     /// Reference storage accepts typed declarations but performs no CSS/layout.
     pub const RECORD: Self = Self {
         name: "record",
-        version: 3,
+        version: 5,
         inline: Support::ALL,
         css: Css::None,
     };
@@ -273,7 +299,7 @@ impl Profile {
     /// remains engine-specific; this is not a complete stylesheet validator.
     pub const HTML: Self = Self {
         name: "html",
-        version: 3,
+        version: 5,
         inline: Support::ALL,
         css: Css::Html,
     };
@@ -313,7 +339,7 @@ mod tests {
                 );
             }
         }
-        assert_eq!((Profile::HTML.version, Profile::RECORD.version), (3, 3));
+        assert_eq!((Profile::HTML.version, Profile::RECORD.version), (5, 5));
     }
 
     #[test]
@@ -324,6 +350,7 @@ mod tests {
             left: Some(Length::Px(-1.0)),
             display: Some(Display::Flex),
             flex_direction: Some(FlexDirection::Row),
+            flex_wrap: Some(FlexWrap::Wrap),
             width: Some(Length::Percent(100.0)),
             height: Some(Length::Auto),
             min_width: Some(Length::Px(1.0)),
@@ -347,11 +374,14 @@ mod tests {
             font_family: Some(vec![Family::System]),
             font_weight: Some(450.5),
             white_space: Some(WhiteSpace::PreWrap),
+            text_overflow: Some(TextOverflow::Ellipsis),
+            field_sizing: Some(FieldSizing::Content),
             border_width: Some(Edges::all(1.0)),
             border_color: Some(Color(0, 0, 0, 255)),
             border_style: Some(BorderStyle::Solid),
             radius: Some(4.0),
             opacity: Some(0.5),
+            box_shadow: Some(crate::BoxShadow::None),
         };
         style.validate().unwrap();
         assert_eq!(style.properties().collect::<Vec<_>>(), Property::ALL);
@@ -374,6 +404,38 @@ mod tests {
     fn finite_enum_values_and_length_units_are_all_checked() {
         for value in Value::ALL {
             let (property, style) = match value {
+                Value::TextClip => (
+                    Property::TextOverflow,
+                    Style::new().text_overflow(TextOverflow::Clip),
+                ),
+                Value::TextEllipsis => (
+                    Property::TextOverflow,
+                    Style::new().text_overflow(TextOverflow::Ellipsis),
+                ),
+                Value::FlexNoWrap => (Property::FlexWrap, Style::new().flex_wrap(FlexWrap::NoWrap)),
+                Value::FlexWrap => (Property::FlexWrap, Style::new().flex_wrap(FlexWrap::Wrap)),
+                Value::ShadowNone => (
+                    Property::BoxShadow,
+                    Style::new().box_shadow(crate::BoxShadow::None),
+                ),
+                Value::ShadowOutset => (
+                    Property::BoxShadow,
+                    Style::new().box_shadow(crate::BoxShadow::Outset(crate::Shadow {
+                        x: 0.0,
+                        y: 2.0,
+                        blur: 4.0,
+                        spread: 0.0,
+                        color: Color(0, 0, 0, 30),
+                    })),
+                ),
+                Value::FieldFixed => (
+                    Property::FieldSizing,
+                    Style::new().field_sizing(FieldSizing::Fixed),
+                ),
+                Value::FieldContent => (
+                    Property::FieldSizing,
+                    Style::new().field_sizing(FieldSizing::Content),
+                ),
                 Value::Auto => (Property::Width, Style::new().width(Length::Auto)),
                 Value::Px => (Property::Width, Style::new().width(Length::Px(1.0))),
                 Value::Percent => (Property::Width, Style::new().width(Length::Percent(1.0))),

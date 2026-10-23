@@ -190,6 +190,9 @@ pub trait Sink {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TextTag {
     Span,
+    Code,
+    Kbd,
+    Mark,
     P,
     H1,
     H2,
@@ -459,7 +462,12 @@ pub fn preflight_place(
 }
 
 #[cfg(test)]
-fn difference(old: &Shape, new: &Shape, checked_write: bool) -> Result<Vec<Edit>, Error> {
+fn difference(
+    old: &Shape,
+    new: &Shape,
+    checked_write: bool,
+    mode_write: bool,
+) -> Result<Vec<Edit>, Error> {
     if old.pieces.len() != new.pieces.len()
         || old.control != new.control
         || old.edit != new.edit
@@ -523,6 +531,8 @@ fn difference(old: &Shape, new: &Shape, checked_write: bool) -> Result<Vec<Edit>
                     if old_props.get(name) != Some(value)
                         || revision && *name == "value"
                         || checked_write && *name == "checked"
+                        || *name == "checked" && old.get("type") != attrs.get("type")
+                        || mode_write && *name == "indeterminate"
                     {
                         edits.push(Edit::Property {
                             part: new.part,

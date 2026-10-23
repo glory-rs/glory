@@ -5,7 +5,7 @@
   if (!globalThis.GloryStream) {
     const controllers = new Map(), notes = new WeakMap();
     const MAX_BYTES = 8 * 1024 * 1024, MAX_NODES = 100000;
-    const tags = new Set(['div', 'main', 'nav', 'section', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'button', 'input', 'textarea', 'label', 'img', 'a']);
+    const tags = new Set(['div', 'main', 'nav', 'section', 'form', 'fieldset', 'legend', 'span', 'code', 'kbd', 'mark', 'blockquote', 'ol', 'ul', 'li', 'dl', 'dt', 'dd', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'button', 'input', 'textarea', 'label', 'img', 'a']);
     const fail = message => { throw new Error(`Glory stream: ${message}`); };
     const key = value => {
       if (typeof value !== 'string' || !/^(0|[1-9][0-9]{0,19})$/.test(value) || BigInt(value) > 18446744073709551615n) fail('invalid key');
@@ -28,13 +28,29 @@
       if (event.type === 'compositionstart') state.composing = true;
       else if (event.type === 'compositionend') { state.composing = false; state.dirty.add('value'); }
       else {
-        state.dirty.add(element.type === 'checkbox' ? 'checked' : 'value');
+        state.dirty.add(['checkbox','radio'].includes(element.type) ? 'checked' : 'value');
+        if (['checkbox','radio'].includes(element.type)) state.dirty.add('indeterminate');
+        if (element.type === 'radio' && element.name) {
+          // Native radios uncheck their peers without firing a change event on
+          // those peers. Protect the whole live native group until adoption.
+          for (const peer of document.getElementsByName(element.name)) {
+            if (peer instanceof HTMLInputElement && peer.type === 'radio' && peer.form === element.form && peer.getRootNode() === element.getRootNode() && root.contains(peer)) {
+              note(peer).dirty.add('checked'); note(peer).dirty.add('indeterminate');
+            }
+          }
+        }
         if (event.isComposing) state.composing = true;
       }
       element[Symbol.for('glory.preload.composition')] = state.composing;
       controllers.get(root)?.settle(element);
     };
     for (const type of ['input', 'change', 'compositionstart', 'compositionend']) document.addEventListener(type, editEvent, true);
+    // Server forms are application requests, including before WASM adoption.
+    // Never let a pending streamed form navigate or reset dirty controls.
+    for (const type of ['submit','reset']) document.addEventListener(type,event=>{
+      if(event.target instanceof Element && event.target.matches('form[data-gly-form]')
+        && event.target.closest('[data-gly-stream-pending],[data-gly-stream-state="ready"]')) event.preventDefault();
+    },true);
     function focusState() {
       const element = document.activeElement;
       let selection = null;
@@ -148,13 +164,14 @@
         if (shape.children !== null && !seen.has(shape.children)) fail('child slot');
       }
       attributeName(name, value) { if (typeof value !== 'string' && value !== null || !/^[a-z][a-z0-9-]*$/.test(name) || name.startsWith('on') || ['srcdoc', 'data-gly-key', 'data-gly-part', 'data-gly-node', 'data-gly-live'].includes(name)) fail('attribute'); }
-      propertyName(name, value) { if (!['value', 'checked', 'disabled'].includes(name) || (name === 'value' ? typeof value !== 'string' : typeof value !== 'boolean')) fail('property'); }
+      propertyName(name, value) { if (!['value', 'checked', 'disabled', 'indeterminate'].includes(name) || (name === 'value' ? typeof value !== 'string' : typeof value !== 'boolean')) fail('property'); }
       baseline(entry, piece, element) {
         for (const [name, value] of Object.entries(piece.properties)) {
           let expected = value;
           if (name === 'value') { const probe = element.cloneNode(false); probe.value = value; expected = probe.value; }
           entry.expected[`${piece.part}/${name}`] = expected;
-          if (['value', 'checked'].includes(name) && element[name] !== expected) note(element).dirty.add(name);
+          if (name === 'indeterminate' && !note(element).dirty.has(name) && !note(element).dirty.has('checked')) element[name] = expected;
+          if (['value', 'checked', 'indeterminate'].includes(name) && element[name] !== expected) note(element).dirty.add(name);
         }
       }
       createParts(entry) {
@@ -211,7 +228,7 @@
           } else if (edit.edit === 'property') {
             this.propertyName(edit.name, edit.value);
             const slot = `${edit.part}/${edit.name}`, state = note(node);
-            const dirty = ['value', 'checked'].includes(edit.name) && (state.dirty.has(edit.name) || state.composing || node[edit.name] !== entry.expected[slot]);
+            const dirty = ['value', 'checked', 'indeterminate'].includes(edit.name) && (state.dirty.has(edit.name) || state.composing || node[edit.name] !== entry.expected[slot]);
             let expected = edit.value;
             if (edit.name === 'value') { const probe = node.cloneNode(false); probe.value = edit.value; expected = probe.value; }
             entry.expected[slot] = expected;

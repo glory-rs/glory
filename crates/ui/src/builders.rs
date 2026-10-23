@@ -30,6 +30,7 @@ enum Slot {
     Purpose,
     Multiline,
     Checked,
+    CheckMode,
     Source,
     Alternative,
     Target,
@@ -294,6 +295,18 @@ macro_rules! common {
 }
 common!(View, Text, Button, Input, Check, Image, Link);
 impl View {
+    /// Intrinsic document structure, installed before reactive metadata. Its
+    /// kind cannot change on a live node; remount for a different document part.
+    pub fn document_part(mut self, part: glory_render::DocumentPart) -> Self {
+        self.inner
+            .descriptor
+            .as_mut()
+            .expect("unmounted builder")
+            .semantics
+            .get_or_insert_with(Default::default)
+            .document_part = Some(part);
+        self
+    }
     /// Structural form kind is installed before reactive metadata bindings.
     pub fn field_part(mut self, part: glory_render::FieldPart) -> Self {
         self.inner
@@ -379,6 +392,13 @@ impl Input {
     }
 }
 impl Check {
+    pub fn mode(mut self, value: impl Into<Lotus<glory_render::CheckMode>>) -> Self {
+        self.inner.set(Slot::CheckMode, value, |value| {
+            Patch::CheckMode(Change::Set(value))
+        });
+        self
+    }
+
     pub fn checked(mut self, value: impl Into<Lotus<bool>>) -> Self {
         self.inner.set(Slot::Checked, value, |value| {
             Patch::Checked(Change::Set(value))

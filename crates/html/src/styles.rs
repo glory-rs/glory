@@ -58,6 +58,16 @@ pub fn style(style: &Style) -> String {
     let mut declaration = |name: &str, value: String| {
         write!(out, "{name}:{value};").expect("string write");
     };
+    if let Some(value) = style.flex_wrap {
+        declaration(
+            "flex-wrap",
+            match value {
+                FlexWrap::NoWrap => "nowrap",
+                FlexWrap::Wrap => "wrap",
+            }
+            .into(),
+        );
+    }
     for (name, value) in [
         ("width", style.width),
         ("height", style.height),
@@ -164,6 +174,26 @@ pub fn style(style: &Style) -> String {
             value.iter().map(family).collect::<Vec<_>>().join(","),
         );
     }
+    if let Some(value) = style.field_sizing {
+        declaration(
+            "field-sizing",
+            match value {
+                FieldSizing::Fixed => "fixed",
+                FieldSizing::Content => "content",
+            }
+            .into(),
+        );
+    }
+    if let Some(value) = style.text_overflow {
+        declaration(
+            "text-overflow",
+            match value {
+                TextOverflow::Clip => "clip",
+                TextOverflow::Ellipsis => "ellipsis",
+            }
+            .into(),
+        );
+    }
     if let Some(value) = style.white_space {
         declaration(
             "white-space",
@@ -234,6 +264,22 @@ pub fn style(style: &Style) -> String {
                 Justify::Evenly => "space-evenly",
             }
             .into(),
+        );
+    }
+    if let Some(shadow) = style.box_shadow {
+        declaration(
+            "box-shadow",
+            match shadow {
+                BoxShadow::None => "none".into(),
+                BoxShadow::Outset(shadow) => format!(
+                    "{}px {}px {}px {}px {}",
+                    shadow.x,
+                    shadow.y,
+                    shadow.blur,
+                    shadow.spread,
+                    color(shadow.color)
+                ),
+            },
         );
     }
     out

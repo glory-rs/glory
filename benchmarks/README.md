@@ -1,6 +1,21 @@
 # Glory / Leptos / Dioxus: current semantic browser benchmark
 
-最新优化及源码分析见 [2026-10-24 创建提交/Dioxus 报告](../docs/bulk-create-dioxus-2026-10-24.md)：
+最新优化实测见 [2026-10-24 节点存储与 DOM 元数据报告](../docs/node-storage-dom-metadata-2026-10-24.md)：
+五个全新独立 target，Memory-only 拆分对照，四轮 **2,160 个**正式样本。
+Glory 千行创建 / 替换 / 万行创建 / 清空的 Script 为
+**23.90 / 36.87 / 256.21 / 16.86 ms**，相对本轮 before 降低约 14% / 20% / 25% / 31%。
+双份 Memory、完整节点身份和全部 DOM 属性仍保留。报告包含三框架全表、
+未获益的小操作、首轮慢样本与补跑、源码边界及完整回归证据。
+
+上一轮三框架实测见 [2026-10-24 静态构造计划后对照](../docs/framework-benchmark-static-plan-2026-10-24.md)：
+三个全新独立 target、相同九项、正反顺序 648 样本。Glory / Leptos / Dioxus
+千行创建 Script 为 **28.47 / 14.21 / 4.46 ms**，万行总耗时为
+**620.65 / 437.40 / 298.25 ms**。数据、存续节点身份、完整万行几何和 18 张画面检查点一致。
+完整主表保留选行的运行历史效应，并附 72 个独立诊断样本；本轮未改实现或 workload。
+
+静态计划实现及同库 before/after 见 [静态构造计划报告](../docs/static-construction-plan-2026-10-24.md)。
+
+此前优化及源码分析见 [2026-10-24 创建提交/Dioxus 报告](../docs/bulk-create-dioxus-2026-10-24.md)：
 独立构建、相同九项、正反顺序 1,080 样本；保留的 Glory 创建桥接将万行 Script 从
 702.08 降到 654.75 ms，当前三框架万行总耗时为 909.45 / 465.10 / 313.70 ms。
 历史结果和未保留实验均有明确边界，主计时 workload/harness 未改。

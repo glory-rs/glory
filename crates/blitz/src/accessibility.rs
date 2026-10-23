@@ -165,6 +165,13 @@ impl Tree {
                 if let Some(selected) = s.selected {
                     node.set_selected(selected);
                 }
+                if let Some(pressed) = s.pressed {
+                    node.set_toggled(if pressed {
+                        Toggled::True
+                    } else {
+                        Toggled::False
+                    });
+                }
                 if d.role == Some(Role::TabList)
                     && let Some(axis) = s.navigation
                 {
@@ -211,7 +218,7 @@ impl Tree {
             };
             match &d.props {
                 Props::Text(p) => {
-                    if p.kind == TextKind::Inline {
+                    if matches!(p.kind, TextKind::Inline | TextKind::Kbd) {
                         node.set_value(normalize_text(&p.content, true).into_owned());
                     }
                     if let TextKind::Heading(level) = p.kind {
@@ -294,7 +301,9 @@ impl Tree {
             let label = match &d.props {
                 Props::Button(p) => Some(p.label.as_str()),
                 Props::Link(p) => Some(p.label.as_str()),
-                Props::Text(p) if p.kind != TextKind::Inline => Some(p.content.as_str()),
+                Props::Text(p) if !matches!(p.kind, TextKind::Inline | TextKind::Kbd) => {
+                    Some(p.content.as_str())
+                }
                 _ => None,
             };
             if let Some(label) = label.filter(|label| !label.is_empty()) {
@@ -630,8 +639,21 @@ fn relation_text(nodes: &BTreeMap<AxId, Node>, target: AxId) -> Option<String> {
 }
 
 fn role(d: &glory_render::Descriptor) -> AxRole {
+    if let Some(part) = d.document_part() {
+        return match part {
+            glory_render::DocumentPart::Blockquote => AxRole::Blockquote,
+            glory_render::DocumentPart::OrderedList | glory_render::DocumentPart::UnorderedList => {
+                AxRole::List
+            }
+            glory_render::DocumentPart::ListItem => AxRole::ListItem,
+            glory_render::DocumentPart::DescriptionList => AxRole::DescriptionList,
+            glory_render::DocumentPart::Term => AxRole::Term,
+            glory_render::DocumentPart::Definition => AxRole::Definition,
+        };
+    }
     if let Some(part) = d.field_part() {
         return match part {
+            glory_render::FieldPart::Form => AxRole::Form,
             glory_render::FieldPart::Fieldset => AxRole::Group,
             _ => AxRole::Label,
         };
@@ -656,6 +678,7 @@ fn role(d: &glory_render::Descriptor) -> AxRole {
             Some(Role::Dialog) => AxRole::Dialog,
             Some(Role::TabList) => AxRole::TabList,
             Some(Role::TabPanel) => AxRole::TabPanel,
+            Some(Role::RadioGroup) => AxRole::RadioGroup,
             Some(Role::Heading(_)) => AxRole::Heading,
             None => AxRole::GenericContainer,
         },
@@ -663,6 +686,9 @@ fn role(d: &glory_render::Descriptor) -> AxRole {
             TextKind::Heading(_) => AxRole::Heading,
             TextKind::Paragraph => AxRole::Paragraph,
             TextKind::Inline => AxRole::Label,
+            TextKind::Code => AxRole::Code,
+            TextKind::Kbd => AxRole::Label,
+            TextKind::Mark => AxRole::Mark,
         },
         Props::Button(_) => AxRole::Button,
         Props::Input(p) if p.multiline => AxRole::MultilineTextInput,
@@ -674,6 +700,8 @@ fn role(d: &glory_render::Descriptor) -> AxRole {
             Purpose::Tel => AxRole::PhoneNumberInput,
             Purpose::Text | Purpose::Number => AxRole::TextInput,
         },
+        Props::Check(p) if p.mode == glory_render::CheckMode::Switch => AxRole::Switch,
+        Props::Check(p) if p.mode == glory_render::CheckMode::Radio => AxRole::RadioButton,
         Props::Check(_) => AxRole::CheckBox,
         Props::Image(_) => AxRole::Image,
         Props::Link(_) => AxRole::Link,

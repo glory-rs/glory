@@ -47,6 +47,9 @@ impl Descriptor {
                 exchange(change, &mut p.multiline, false)
             }
             (Patch::Checked(change), Props::Check(p)) => exchange(change, &mut p.checked, false),
+            (Patch::CheckMode(change), Props::Check(p)) => {
+                exchange(change, &mut p.mode, CheckMode::default())
+            }
             (Patch::Source(change), Props::Image(p)) => {
                 exchange(change, &mut p.source, String::new())
             }

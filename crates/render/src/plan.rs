@@ -31,8 +31,22 @@ impl Plan {
         let mut contexts = Vec::with_capacity(nodes.len());
         for index in 0..nodes.len() {
             let parent = nodes[index].parent;
-            let (interactive, button) = match parent {
-                None if index == 0 => (false, false),
+            if parent.is_none_or(|parent| parent < index) {
+                let mut boxed_parent = parent;
+                while let Some(index) = boxed_parent {
+                    if !matches!(nodes[index].descriptor.props, Props::Group) {
+                        break;
+                    }
+                    boxed_parent = nodes[index].parent;
+                }
+                crate::document::validate_child(
+                    &nodes[index].descriptor,
+                    boxed_parent.map(|parent| &nodes[parent].descriptor),
+                    boxed_parent.is_none(),
+                )?;
+            }
+            let (interactive, button, form) = match parent {
+                None if index == 0 => (false, false, false),
                 Some(parent) if parent < index => {
                     if nodes[index].descriptor.field_part() == Some(crate::FieldPart::Legend)
                         && nodes[parent].descriptor.field_part() != Some(crate::FieldPart::Fieldset)
@@ -57,6 +71,9 @@ impl Plan {
             let descriptor = &mut nodes[index].descriptor;
             descriptor.normalize_input()?;
             descriptor.validate()?;
+            if form && descriptor.field_part() == Some(crate::FieldPart::Form) {
+                return Err(Error::InvalidPlacement("forms cannot be nested"));
+            }
             validate_context(descriptor, interactive, button)?;
             if let Some(name) = descriptor.semantic_id()
                 && !names.insert(name.clone())
@@ -71,6 +88,7 @@ impl Plan {
                         Some(crate::FieldPart::Label | crate::FieldPart::Legend)
                     ),
                 button || matches!(descriptor.props, Props::Button(_)),
+                form || descriptor.field_part() == Some(crate::FieldPart::Form),
             ));
         }
         Ok(Self(nodes.into()))
@@ -118,7 +136,7 @@ pub(crate) fn validate_context(
             descriptor.props,
             Props::Group
                 | Props::Text(TextProps {
-                    kind: TextKind::Inline,
+                    kind: TextKind::Inline | TextKind::Code | TextKind::Kbd | TextKind::Mark,
                     ..
                 })
                 | Props::Image(_)

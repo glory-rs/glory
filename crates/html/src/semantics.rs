@@ -14,6 +14,31 @@ pub(crate) fn attributes(
         attrs.insert("aria-level", level.to_string());
     }
     let Some(value) = value else { return attrs };
+    if value.link_open == Some(glory_render::LinkOpen::NewContext) {
+        attrs.insert("target", "_blank".into());
+        attrs.insert("rel", "noopener noreferrer".into());
+    }
+    if value.field_part == Some(glory_render::FieldPart::Form) {
+        attrs.insert("novalidate", String::new());
+        attrs.insert("data-gly-form", String::new());
+    }
+    if let Some(action) = value.form_action {
+        let action = match action {
+            glory_render::FormAction::Submit => "submit",
+            glory_render::FormAction::Reset => "reset",
+        };
+        attrs.insert("type", action.into());
+        attrs.insert("data-gly-form-action", action.into());
+    }
+    if let Some(group) = &value.check_group {
+        attrs.insert("name", group.as_str().into());
+    }
+    if let Some(control) = &value.form_control {
+        attrs.insert("name", control.name.clone());
+        if let Some(value) = &control.value {
+            attrs.insert("value", value.clone());
+        }
+    }
     for (name, id) in [
         ("id", &value.id),
         ("aria-controls", &value.controls),
@@ -74,6 +99,7 @@ pub(crate) fn attributes(
     for (name, state) in [
         ("aria-expanded", value.expanded),
         ("aria-selected", value.selected),
+        ("aria-pressed", value.pressed),
     ] {
         if let Some(state) = state {
             attrs.insert(name, state.to_string());
@@ -88,13 +114,16 @@ pub(crate) fn attributes(
     if value.selected == Some(true) {
         attrs.insert("data-gly-selected", String::new());
     }
+    if value.pressed == Some(true) {
+        attrs.insert("data-gly-pressed", String::new());
+    }
     if value.hidden {
         attrs.insert("hidden", String::new());
         attrs.insert("data-gly-hidden", String::new());
     }
     if let Some(axis) = value.navigation {
         attrs.insert("data-gly-navigation", axis.as_str().into());
-        if role == Some(Role::TabList) {
+        if matches!(role, Some(Role::TabList | Role::RadioGroup)) {
             attrs.insert("aria-orientation", axis.as_str().into());
         }
     }

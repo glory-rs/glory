@@ -6,9 +6,34 @@ use crate::{Descriptor, Error, Navigation, Props, Role};
 /// Structural form content, fixed for a node's lifetime on HTML adapters.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FieldPart {
+    Form,
     Label,
     Fieldset,
     Legend,
+}
+
+/// The host captures requests; application policy owns validation and transport.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FormAction {
+    Submit,
+    Reset,
+}
+
+/// Submission metadata is separate from the accessible name. Text input values
+/// come from InputProps; Check/Button may supply an explicit successful value.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FormControl {
+    pub name: String,
+    pub value: Option<String>,
+}
+
+/// Native links may use their current context or request a separate one.
+/// Opening a system browser remains an outer native host service.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum LinkOpen {
+    #[default]
+    Current,
+    NewContext,
 }
 
 /// Host-managed top layer. Presence declares a focus scope; `hidden` controls
@@ -133,6 +158,10 @@ impl Orientation {
 /// live names in their document. Removing a target retains no owning reference.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Semantics {
+    pub link_open: Option<LinkOpen>,
+    pub document_part: Option<crate::DocumentPart>,
+    pub form_action: Option<FormAction>,
+    pub form_control: Option<FormControl>,
     pub field_part: Option<FieldPart>,
     pub label_for: Option<SemanticId>,
     pub error_message: Option<SemanticId>,
@@ -147,6 +176,8 @@ pub struct Semantics {
     pub layer: Option<Layer>,
     pub expanded: Option<bool>,
     pub selected: Option<bool>,
+    /// A toggle button's application-owned state; independent from disclosure.
+    pub pressed: Option<bool>,
     /// Refine a Button's intrinsic interaction to a tab, retaining activation.
     pub tab: bool,
     /// Keep a control focusable, while suppressing activation (e.g. the sole
@@ -157,9 +188,61 @@ pub struct Semantics {
     /// Explicit collection boundary, independent of virtual-list navigation.
     pub navigation: Option<Orientation>,
     pub navigation_item: bool,
+    /// Native radio association; not an accessible name or a submission value.
+    /// HTML uses the same attribute for native grouping and successful names.
+    pub check_group: Option<SemanticId>,
 }
 impl Semantics {
     pub(crate) fn validate(&self, d: &Descriptor) -> Result<(), Error> {
+        if self.link_open.is_some() && !matches!(d.props, Props::Link(_)) {
+            return Err(Error::InvalidProps("link context requires a link"));
+        }
+        if self.document_part.is_some()
+            && (!matches!(d.props, Props::View)
+                || d.role.is_some()
+                || d.focus != crate::FocusMode::Auto
+                || self.field_part.is_some()
+                || self.layer.is_some()
+                || self.navigation.is_some())
+        {
+            return Err(Error::InvalidProps(
+                "document parts require an unfocused structural view",
+            ));
+        }
+        if let Some(group) = &self.check_group
+            && (!matches!(&d.props, Props::Check(check) if check.mode == crate::CheckMode::Radio)
+                || self
+                    .form_control
+                    .as_ref()
+                    .is_some_and(|control| control.name != group.as_str()))
+        {
+            return Err(Error::InvalidProps(
+                "radio association requires a radio and matching successful-control name",
+            ));
+        }
+        if self.form_action.is_some()
+            && (!matches!(d.props, Props::Button(_))
+                || self.tab
+                || self.has_popup
+                || self.expanded.is_some()
+                || self.pressed.is_some())
+        {
+            return Err(Error::InvalidProps("form actions require ordinary buttons"));
+        }
+        if let Some(control) = &self.form_control
+            && (!matches!(
+                d.props,
+                Props::Input(_) | Props::Check(_) | Props::Button(_)
+            ) || control.name.len() > 256
+                || control.name.contains(['\0', '\r', '\n'])
+                || control
+                    .value
+                    .as_ref()
+                    .is_some_and(|value| value.contains(['\0', '\r']))
+                || control.value.is_some() && matches!(d.props, Props::Input(_)))
+        {
+            return Err(Error::InvalidProps("invalid successful-control metadata"));
+        }
         if self.field_part.is_some()
             && (!matches!(d.props, Props::View)
                 || d.role.is_some()
@@ -179,8 +262,12 @@ impl Semantics {
         if self.label_for.is_some() && self.label_for == self.id {
             return Err(Error::InvalidProps("a label cannot target itself"));
         }
-        if (self.required || self.readonly || self.invalid || self.error_message.is_some())
-            && !matches!(d.props, Props::Input(_) | Props::Check(_))
+        let input_field = matches!(d.props, Props::Input(_) | Props::Check(_))
+            || d.role == Some(Role::RadioGroup);
+        if ((self.required || self.readonly) && !input_field)
+            || ((self.invalid || self.error_message.is_some())
+                && !input_field
+                && self.field_part != Some(FieldPart::Fieldset))
         {
             return Err(Error::InvalidProps(
                 "field states require an input or check",
@@ -189,6 +276,13 @@ impl Semantics {
         if self.has_popup && (!matches!(d.props, Props::Button(_)) || self.tab) {
             return Err(Error::InvalidProps(
                 "popup triggers require a non-tab button",
+            ));
+        }
+        if self.pressed.is_some()
+            && (!matches!(d.props, Props::Button(_)) || self.tab || self.has_popup)
+        {
+            return Err(Error::InvalidProps(
+                "pressed requires a non-tab toggle button",
             ));
         }
         if let Some(layer) = &self.layer {
@@ -223,12 +317,20 @@ impl Semantics {
         }
         if (self.tab
             || self.expanded.is_some()
-            || (self.disabled && self.field_part != Some(FieldPart::Fieldset))
-            || self.navigation_item)
+            || (self.disabled
+                && !matches!(self.field_part, Some(FieldPart::Fieldset | FieldPart::Form))))
             && !matches!(d.props, Props::Button(_))
         {
             return Err(Error::InvalidProps(
                 "composite trigger metadata requires a button",
+            ));
+        }
+        if self.navigation_item
+            && !matches!(&d.props, Props::Button(_))
+            && !matches!(&d.props, Props::Check(check) if check.mode == crate::CheckMode::Radio)
+        {
+            return Err(Error::InvalidProps(
+                "navigation items require a button or radio",
             ));
         }
         if self.selected.is_some() && !self.tab
@@ -257,7 +359,11 @@ impl Semantics {
         if self.labelled_by.is_some() && self.id == self.labelled_by {
             return Err(Error::InvalidProps("a node cannot label itself"));
         }
-        if self.navigation.is_some() && !matches!(d.role, None | Some(Role::Group | Role::TabList))
+        if self.navigation.is_some()
+            && !matches!(
+                d.role,
+                None | Some(Role::Group | Role::TabList | Role::RadioGroup)
+            )
         {
             return Err(Error::InvalidProps(
                 "navigation requires a generic group or tab list",

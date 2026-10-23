@@ -14,7 +14,7 @@ fn interested(dom: &Dom, mut id: NodeId) -> Option<NodeId> {
         if entry.interests.borrow().contains(&EventKind::Drag) {
             return Some(id);
         }
-        id = dom.parents.borrow().get(&id).copied().flatten()?;
+        id = entry.parent.get()?;
     }
 }
 fn hit(dom: &Dom, x: f64, y: f64) -> Option<NodeId> {

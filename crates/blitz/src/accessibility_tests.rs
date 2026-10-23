@@ -3,6 +3,8 @@ use accesskit_consumer::{NodeRef, Tree as Consumer, TreeChangeHandler};
 use glory_render::style::{Length, Style};
 use glory_ui::{ItemPosition, Widget, button, check, group, image, input, link, list, text, view};
 use std::cell::Cell;
+#[path = "accessibility_document_tests.rs"]
+mod document;
 #[cfg(target_os = "windows")]
 #[path = "accessibility_windows_tests.rs"]
 mod windows;
@@ -870,4 +872,97 @@ fn row_reveal_scrolls_native_ancestors_and_the_document_viewport_after_logical_l
     app.app.clear().unwrap();
     build(&app, false);
     assert!(app.accessibility.borrow().pending_reveals.is_empty());
+}
+
+#[test]
+fn switch_exports_independent_role_actual_engine_checked_and_live_name() {
+    let app = WindowApp::new();
+    let reference = app.app.scope().cage(None);
+    let checked = app.app.scope().cage(false);
+    app.mount(
+        check()
+            .mode(glory_render::CheckMode::Switch)
+            .label("Notifications")
+            .checked(checked)
+            .node_ref(reference),
+    )
+    .unwrap();
+    let semantic = reference.get().unwrap();
+    let mut tree = Consumer::new(build(&app, true), true);
+    let ax = nodes(&tree)
+        .into_iter()
+        .find(|node| node.role() == AxRole::Switch)
+        .unwrap()
+        .id();
+    let switch = tree.state().node_by_id(ax).unwrap();
+    assert_eq!(switch.role(), AxRole::Switch);
+    assert_eq!(switch.label().as_deref(), Some("Notifications"));
+    assert_eq!(switch.data().toggled(), Some(Toggled::False));
+    checked.revise(|checked| *checked = true);
+    tree.update_and_process_changes(build(&app, false), &mut Changes);
+    assert_eq!(
+        tree.state().node_by_id(ax).unwrap().data().toggled(),
+        Some(Toggled::True)
+    );
+    app.app
+        .scope()
+        .patch(
+            semantic,
+            glory_render::Patch::Name(glory_render::Change::Set(Some("Sounds".into()))),
+        )
+        .unwrap();
+    tree.update_and_process_changes(build(&app, false), &mut Changes);
+    let switch = tree.state().node_by_id(ax).unwrap();
+    assert_eq!(switch.label().as_deref(), Some("Sounds"));
+    assert_eq!(switch.data().toggled(), Some(Toggled::True));
+}
+
+#[test]
+fn toggle_button_state_updates_accesskit_without_replacing_native_button() {
+    use glory_render::{Change, Patch, Semantics};
+    let app = WindowApp::new();
+    let reference = app.app.scope().cage(None);
+    app.mount(
+        button()
+            .label("Bold")
+            .semantics(Some(Box::new(Semantics {
+                pressed: Some(false),
+                ..Default::default()
+            })))
+            .node_ref(reference),
+    )
+    .unwrap();
+    let update = build(&app, true);
+    let tree = Consumer::new(update, true);
+    let button = reference.get().unwrap();
+    let identity = nodes(&tree)
+        .into_iter()
+        .find(|node| node.role() == AxRole::Button)
+        .unwrap()
+        .id();
+    let node = nodes(&tree)
+        .into_iter()
+        .find(|node| node.id() == identity)
+        .unwrap();
+    assert_eq!(node.role(), AxRole::Button);
+    assert_eq!(node.toggled(), Some(Toggled::False));
+    app.app
+        .scope()
+        .patch(
+            button,
+            Patch::Semantics(Change::Set(Some(Box::new(Semantics {
+                pressed: Some(true),
+                ..Default::default()
+            })))),
+        )
+        .unwrap();
+    let update = build(&app, false);
+    let mut tree = tree;
+    tree.update_and_process_changes(update, &mut Changes);
+    let node = nodes(&tree)
+        .into_iter()
+        .find(|node| node.id() == identity)
+        .unwrap();
+    assert_eq!(node.toggled(), Some(Toggled::True));
+    assert!(node.data().supports_action(AxAction::Click));
 }

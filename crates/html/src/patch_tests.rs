@@ -43,6 +43,21 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
             label: "old".into(),
             ..Default::default()
         }),
+        Props::Check(CheckProps {
+            mode: CheckMode::Mixed,
+            checked: true,
+            ..Default::default()
+        }),
+        Props::Check(CheckProps {
+            mode: CheckMode::Switch,
+            checked: true,
+            ..Default::default()
+        }),
+        Props::Check(CheckProps {
+            mode: CheckMode::Radio,
+            checked: true,
+            ..Default::default()
+        }),
         Props::Image(Default::default()),
         Props::Image(ImageProps {
             source: "old.png".into(),
@@ -64,6 +79,26 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
         .options
         .insert(HtmlTextOptions::default().tag(TextTag::P));
     bases.push(overridden);
+    for kind in [TextKind::Code, TextKind::Kbd, TextKind::Mark] {
+        bases.push(Descriptor::new(Props::Text(TextProps {
+            content: "old".into(),
+            kind,
+            ..Default::default()
+        })));
+    }
+    for part in [
+        DocumentPart::Blockquote,
+        DocumentPart::OrderedList,
+        DocumentPart::UnorderedList,
+        DocumentPart::DescriptionList,
+    ] {
+        let mut descriptor = Descriptor::new(Props::View);
+        descriptor.semantics = Some(Box::new(Semantics {
+            document_part: Some(part),
+            ..Default::default()
+        }));
+        bases.push(descriptor);
+    }
     let mut named = Descriptor::new(Props::View);
     named.name = Some("old\0".into());
     bases.push(named);
@@ -75,6 +110,11 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
     });
     bases.push(item);
     let mut patches = vec![
+        Patch::Semantics(Change::Set(Some(Box::new(Semantics {
+            check_group: Some(SemanticId::new("radio-association").unwrap()),
+            navigation_item: true,
+            ..Default::default()
+        })))),
         Patch::Semantics(Change::Keep),
         Patch::Semantics(Change::Clear),
         Patch::Semantics(Change::Set(None)),
@@ -125,6 +165,12 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
         Patch::Multiline(Change::Set(false)),
         Patch::Multiline(Change::Set(true)),
         Patch::Multiline(Change::Clear),
+        Patch::CheckMode(Change::Keep),
+        Patch::CheckMode(Change::Set(CheckMode::Checkbox)),
+        Patch::CheckMode(Change::Set(CheckMode::Mixed)),
+        Patch::CheckMode(Change::Set(CheckMode::Switch)),
+        Patch::CheckMode(Change::Set(CheckMode::Radio)),
+        Patch::CheckMode(Change::Clear),
         Patch::Checked(Change::Keep),
         Patch::Checked(Change::Set(false)),
         Patch::Checked(Change::Set(true)),
@@ -146,6 +192,36 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
         Patch::Classes(Change::Set(vec!["bad token".into()])),
         Patch::Classes(Change::Clear),
         Patch::Style(Change::Keep),
+        Patch::Style(Change::Set(Box::new(
+            style::Style::new().text_overflow(style::TextOverflow::Clip),
+        ))),
+        Patch::Style(Change::Set(Box::new(
+            style::Style::new().text_overflow(style::TextOverflow::Ellipsis),
+        ))),
+        Patch::Style(Change::Set(Box::new(
+            style::Style::new().flex_wrap(style::FlexWrap::Wrap),
+        ))),
+        Patch::Style(Change::Set(Box::new(
+            style::Style::new().flex_wrap(style::FlexWrap::NoWrap),
+        ))),
+        Patch::Style(Change::Set(Box::new(
+            style::Style::new().box_shadow(style::BoxShadow::None),
+        ))),
+        Patch::Style(Change::Set(Box::new(style::Style::new().box_shadow(
+            style::BoxShadow::Outset(style::Shadow {
+                x: -2.0,
+                y: 3.0,
+                blur: 4.0,
+                spread: -1.0,
+                color: style::Color(10, 20, 30, 40),
+            }),
+        )))),
+        Patch::Style(Change::Set(Box::new(
+            style::Style::new().field_sizing(style::FieldSizing::Content),
+        ))),
+        Patch::Style(Change::Set(Box::new(
+            style::Style::new().field_sizing(style::FieldSizing::Fixed),
+        ))),
         Patch::Style(Change::Set(Box::new(
             style::Style::new().width(style::Length::Px(-0.0)),
         ))),
@@ -190,6 +266,50 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
         bases.push(named);
     }
     let semantic_cases = [
+        Semantics {
+            link_open: Some(glory_render::LinkOpen::Current),
+            ..Default::default()
+        },
+        Semantics {
+            link_open: Some(glory_render::LinkOpen::NewContext),
+            ..Default::default()
+        },
+        Semantics {
+            pressed: Some(false),
+            ..Default::default()
+        },
+        Semantics {
+            pressed: Some(true),
+            ..Default::default()
+        },
+        Semantics {
+            field_part: Some(FieldPart::Form),
+            ..Default::default()
+        },
+        Semantics {
+            field_part: Some(FieldPart::Form),
+            labelled_by: Some(SemanticId::new("form-label").unwrap()),
+            ..Default::default()
+        },
+        Semantics {
+            form_action: Some(FormAction::Submit),
+            form_control: Some(FormControl {
+                name: "intent".into(),
+                value: Some("save".into()),
+            }),
+            ..Default::default()
+        },
+        Semantics {
+            form_action: Some(FormAction::Reset),
+            ..Default::default()
+        },
+        Semantics {
+            form_control: Some(FormControl {
+                name: "value".into(),
+                value: None,
+            }),
+            ..Default::default()
+        },
         Semantics {
             required: true,
             readonly: true,
@@ -261,6 +381,7 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
             metadata.clone(),
         )))));
         for props in [
+            Props::Link(LinkProps::default()),
             Props::View,
             Props::Button(ButtonProps::default()),
             Props::Input(InputProps::default()),
@@ -280,6 +401,7 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
     for role in [
         Role::TabList,
         Role::TabPanel,
+        Role::RadioGroup,
         Role::Heading(1),
         Role::Heading(6),
         Role::Heading(0),
@@ -352,6 +474,7 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
                     &shape(&base)?,
                     &shape(&next)?,
                     matches!(update, Patch::Checked(Change::Set(_) | Change::Clear)),
+                    matches!(update, Patch::CheckMode(Change::Set(_) | Change::Clear)),
                 )
             });
             let runtime = RuntimeId::new();

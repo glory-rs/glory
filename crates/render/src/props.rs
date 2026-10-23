@@ -46,6 +46,14 @@ pub enum TextKind {
     Inline,
     Paragraph,
     Heading(u8),
+    Code,
+    Kbd,
+    Mark,
+}
+impl TextKind {
+    pub const fn is_inline(self) -> bool {
+        matches!(self, Self::Inline | Self::Code | Self::Kbd | Self::Mark)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -81,6 +89,7 @@ pub enum Role {
     Dialog,
     TabList,
     TabPanel,
+    RadioGroup,
     Heading(u8),
 }
 
@@ -137,8 +146,20 @@ impl Default for InputProps {
     }
 }
 
+/// Finite native check semantics. Mixed preserves indeterminacy independently
+/// of the stored checked bit; Switch and Radio never expose a mixed state.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CheckMode {
+    #[default]
+    Checkbox,
+    Mixed,
+    Switch,
+    Radio,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CheckProps {
+    pub mode: CheckMode,
     pub checked: bool,
     pub label: String,
     pub enabled: bool,
@@ -147,6 +168,7 @@ pub struct CheckProps {
 impl Default for CheckProps {
     fn default() -> Self {
         Self {
+            mode: CheckMode::Checkbox,
             checked: false,
             label: String::new(),
             enabled: true,
@@ -251,6 +273,9 @@ impl Descriptor {
     pub fn field_part(&self) -> Option<crate::FieldPart> {
         self.semantics.as_ref().and_then(|s| s.field_part)
     }
+    pub fn document_part(&self) -> Option<crate::DocumentPart> {
+        self.semantics.as_ref().and_then(|s| s.document_part)
+    }
     pub fn new(props: Props) -> Self {
         Self {
             props,
@@ -261,6 +286,12 @@ impl Descriptor {
     /// Naming an otherwise generic View creates an accessible group; unnamed
     /// generic Views remain only layout boxes. Explicit structural roles win.
     pub fn effective_role(&self) -> Option<Role> {
+        if self.document_part().is_some() {
+            return None;
+        }
+        if self.field_part() == Some(crate::FieldPart::Form) {
+            return None;
+        }
         self.role.or_else(|| {
             (matches!(self.props, Props::View)
                 && (self.name.is_some()
@@ -436,6 +467,7 @@ impl Descriptor {
             (Patch::Purpose(change), Props::Input(p)) => change.apply(&mut p.purpose),
             (Patch::Multiline(change), Props::Input(p)) => change.apply(&mut p.multiline),
             (Patch::Checked(change), Props::Check(p)) => change.apply(&mut p.checked),
+            (Patch::CheckMode(change), Props::Check(p)) => change.apply(&mut p.mode),
             (Patch::Source(change), Props::Image(p)) => change.apply(&mut p.source),
             (Patch::Alternative(change), Props::Image(p)) => change.apply(&mut p.alternative),
             (Patch::Target(change), Props::Link(p)) => change.apply(&mut p.target),
@@ -476,6 +508,7 @@ pub enum Patch {
     /// An explicit Set/Clear also synchronizes the host control property when
     /// the semantic value is equal (for example a rejected native toggle).
     Checked(Change<bool>),
+    CheckMode(Change<CheckMode>),
     Source(Change<String>),
     Alternative(Change<Option<String>>),
     Target(Change<String>),

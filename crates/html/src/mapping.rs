@@ -71,9 +71,25 @@ fn changed<T: Copy + Default>(old: T, change: &Change<T>) -> T {
         Change::Clear => T::default(),
     }
 }
-fn view_tag(role: Option<Role>, part: Option<glory_render::FieldPart>) -> &'static str {
+fn view_tag(
+    role: Option<Role>,
+    part: Option<glory_render::FieldPart>,
+    document: Option<glory_render::DocumentPart>,
+) -> &'static str {
+    if let Some(document) = document {
+        return match document {
+            glory_render::DocumentPart::Blockquote => "blockquote",
+            glory_render::DocumentPart::OrderedList => "ol",
+            glory_render::DocumentPart::UnorderedList => "ul",
+            glory_render::DocumentPart::ListItem => "li",
+            glory_render::DocumentPart::DescriptionList => "dl",
+            glory_render::DocumentPart::Term => "dt",
+            glory_render::DocumentPart::Definition => "dd",
+        };
+    }
     if let Some(part) = part {
         return match part {
+            glory_render::FieldPart::Form => "form",
             glory_render::FieldPart::Label => "label",
             glory_render::FieldPart::Fieldset => "fieldset",
             glory_render::FieldPart::Legend => "legend",
@@ -103,6 +119,7 @@ pub(crate) fn role_name(role: Role) -> &'static str {
         Role::Dialog => "dialog",
         Role::TabList => "tablist",
         Role::TabPanel => "tabpanel",
+        Role::RadioGroup => "radiogroup",
         Role::Heading(_) => "heading",
     }
 }
@@ -125,6 +142,9 @@ pub(crate) fn input_mode(purpose: Purpose) -> Option<&'static str> {
 fn text_tag(kind: TextKind, options: Option<&HtmlTextOptions>) -> Result<&'static str, Error> {
     let default = match kind {
         TextKind::Inline => TextTag::Span,
+        TextKind::Code => TextTag::Code,
+        TextKind::Kbd => TextTag::Kbd,
+        TextKind::Mark => TextTag::Mark,
         TextKind::Paragraph => TextTag::P,
         TextKind::Heading(level @ 1..=6) => [
             TextTag::H1,
@@ -137,7 +157,7 @@ fn text_tag(kind: TextKind, options: Option<&HtmlTextOptions>) -> Result<&'stati
         TextKind::Heading(_) => return Err(Error::InvalidProps("heading level must be 1..=6")),
     };
     let selected = options.and_then(|options| options.tag).unwrap_or(default);
-    if (matches!(kind, TextKind::Heading(_) | TextKind::Paragraph) && selected != default)
+    if (kind != TextKind::Inline && selected != default)
         || matches!(kind, TextKind::Inline) && !matches!(selected, TextTag::Span | TextTag::P)
     {
         return Err(Error::InvalidProps(
@@ -146,6 +166,9 @@ fn text_tag(kind: TextKind, options: Option<&HtmlTextOptions>) -> Result<&'stati
     }
     Ok(match selected {
         TextTag::Span => "span",
+        TextTag::Code => "code",
+        TextTag::Kbd => "kbd",
+        TextTag::Mark => "mark",
         TextTag::P => "p",
         TextTag::H1 => "h1",
         TextTag::H2 => "h2",
@@ -173,18 +196,27 @@ pub fn preflight(node: &Descriptor, patch: Option<&Patch>) -> Result<(), Error> 
             ))
         }
         (Props::View, Some(Patch::Role(change))) => Some((
-            view_tag(node.role, node.field_part()),
-            view_tag(changed(node.role, change), node.field_part()),
+            view_tag(node.role, node.field_part(), node.document_part()),
+            view_tag(
+                changed(node.role, change),
+                node.field_part(),
+                node.document_part(),
+            ),
         )),
         (Props::View, Some(Patch::Semantics(change))) => {
+            let document = match change {
+                Change::Keep => node.document_part(),
+                Change::Clear => None,
+                Change::Set(value) => value.as_ref().and_then(|s| s.document_part),
+            };
             let part = match change {
                 Change::Keep => node.field_part(),
                 Change::Clear => None,
                 Change::Set(value) => value.as_ref().and_then(|s| s.field_part),
             };
             Some((
-                view_tag(node.role, node.field_part()),
-                view_tag(node.role, part),
+                view_tag(node.role, node.field_part(), node.document_part()),
+                view_tag(node.role, part, document),
             ))
         }
         (Props::Input(input), Some(Patch::Multiline(change)))
@@ -206,7 +238,11 @@ pub fn shape(descriptor: &Descriptor) -> Result<Shape, Error> {
         return Ok(Shape::default());
     }
     let tag = match &descriptor.props {
-        Props::View => view_tag(descriptor.role, descriptor.field_part()),
+        Props::View => view_tag(
+            descriptor.role,
+            descriptor.field_part(),
+            descriptor.document_part(),
+        ),
         Props::Text(text) => text_tag(text.kind, descriptor.options.get::<HtmlTextOptions>())?,
         Props::Button(_) => "button",
         Props::Input(input) if input.multiline => "textarea",
@@ -261,12 +297,25 @@ pub fn shape(descriptor: &Descriptor) -> Result<Shape, Error> {
             shape
                 .pieces
                 .push(element(Part::Control, Some(Part::Main), "input"));
-            attrs(&mut shape, Part::Control).insert("type", "checkbox".into());
+            attrs(&mut shape, Part::Control).insert("type", check_type(value.mode).into());
             if value.checked {
                 attrs(&mut shape, Part::Control).insert("checked", String::new());
                 attrs(&mut shape, Part::Main).insert("data-gly-checked", String::new());
             }
             props(&mut shape, Part::Control).insert("checked", Property::Bool(value.checked));
+            props(&mut shape, Part::Control).insert(
+                "indeterminate",
+                Property::Bool(value.mode == glory_render::CheckMode::Mixed),
+            );
+            if value.mode == glory_render::CheckMode::Mixed {
+                attrs(&mut shape, Part::Control).insert("data-gly-indeterminate", String::new());
+                attrs(&mut shape, Part::Main).insert("data-gly-mixed", String::new());
+            }
+            if value.mode == glory_render::CheckMode::Switch {
+                attrs(&mut shape, Part::Control).insert("role", "switch".into());
+            }
+            attrs(&mut shape, Part::Control)
+                .insert("aria-checked", check_aria(value.mode, value.checked).into());
             enabled(&mut shape, Part::Control, value.enabled);
             text(&mut shape, &value.label);
             "check"
@@ -362,6 +411,25 @@ pub fn shape(descriptor: &Descriptor) -> Result<Shape, Error> {
         }
     }
     Ok(shape)
+}
+
+/// Shared with field lowering: explicit false remains observable to AT.
+pub(crate) fn check_aria(mode: glory_render::CheckMode, checked: bool) -> &'static str {
+    if mode == glory_render::CheckMode::Mixed {
+        "mixed"
+    } else if checked {
+        "true"
+    } else {
+        "false"
+    }
+}
+
+pub(crate) fn check_type(mode: glory_render::CheckMode) -> &'static str {
+    if mode == glory_render::CheckMode::Radio {
+        "radio"
+    } else {
+        "checkbox"
+    }
 }
 
 #[cfg(test)]

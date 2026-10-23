@@ -8,6 +8,8 @@ use glory_core::{AccessError, Resource, ResourceState};
 use glory_ui::{Widget, component, group, list, text, view, when};
 
 use super::*;
+#[path = "document_tests.rs"]
+mod document;
 
 #[test]
 fn stream_preflight_rejects_structural_and_grouped_child_changes_before_model_or_queue_updates() {

@@ -6,6 +6,7 @@ use glory_render::{Error, NodeId, Plan, WeakPlan};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap},
+    fmt::Write,
 };
 use wasm_bindgen::{JsCast, JsValue, prelude::wasm_bindgen};
 use web_sys::{Document, Node};
@@ -187,11 +188,21 @@ impl Dom {
             }
             return Ok(());
         };
-        let tokens: Vec<_> = ids
-            .iter()
-            .map(|id| format!("{}.{}.{}", id.runtime().value(), id.slot(), id.generation()))
-            .collect();
-        let parts = clone_plan(&prototype, &tokens.join("\0"), self.live.get()).map_err(backend)?;
+        let mut tokens = String::with_capacity(ids.len() * 24);
+        for (index, id) in ids.iter().enumerate() {
+            if index != 0 {
+                tokens.push('\0');
+            }
+            write!(
+                &mut tokens,
+                "{}.{}.{}",
+                id.runtime().value(),
+                id.slot(),
+                id.generation()
+            )
+            .expect("identity string");
+        }
+        let parts = clone_plan(&prototype, &tokens, self.live.get()).map_err(backend)?;
         let mut offset = 0;
         let mut entries = Vec::with_capacity(ids.len());
         for (index, shape) in shapes.shapes.iter().enumerate() {
@@ -200,20 +211,17 @@ impl Dom {
                 own.insert(piece.part, parts.get(offset).unchecked_into());
                 offset += 1;
             }
-            entries.push(self.make_entry(tokens[index].clone(), shape, own, None)?);
+            let entry = self.make_entry(shape, own, None)?;
+            entry
+                .parent
+                .set(shapes.parents[index].map(|parent| ids[parent]));
+            entries.push(entry);
         }
         // All fallible host work completed while detached. Register the whole
         // instance together; subsequent internal edges need no physical writes.
-        for (index, entry) in entries.into_iter().enumerate() {
-            self.entries.borrow_mut().insert(ids[index], entry);
-            self.tokens
-                .borrow_mut()
-                .insert(tokens[index].clone(), ids[index]);
-            if let Some(parent) = shapes.parents[index] {
-                self.parents
-                    .borrow_mut()
-                    .insert(ids[index], Some(ids[parent]));
-            }
+        let mut table = self.entries.borrow_mut();
+        for (id, entry) in ids.iter().zip(entries) {
+            table.insert(*id, entry);
         }
         Ok(())
     }

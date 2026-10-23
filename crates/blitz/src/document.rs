@@ -21,13 +21,16 @@ use style::computed_values::visibility::T as Visibility;
 /// goes to Stylo, but parsing a declaration does not establish its layout
 /// behaviour: beta.4 does not implement sticky offsets or automatic scroll
 /// anchoring. Explicitly disabling anchoring (used by virtual lists) is valid.
-/// Re-audit these exclusions against real geometry before widening the profile.
+/// Intrinsic editor sizing and text-overflow rendering are also unavailable.
+/// Re-audit these exclusions against real geometry/paint before widening them.
 pub const STYLE_PROFILE: glory_render::style::Profile = glory_render::style::Profile {
     name: "blitz",
-    version: 4,
+    version: 6,
     inline: glory_render::style::Support::ALL
         .without_value(glory_render::style::Value::Sticky)
-        .without_value(glory_render::style::Value::AnchorAuto),
+        .without_value(glory_render::style::Value::AnchorAuto)
+        .without_property(glory_render::style::Property::FieldSizing)
+        .without_property(glory_render::style::Property::TextOverflow),
     css: glory_render::style::Css::Html,
 };
 
@@ -57,6 +60,33 @@ fn check_layer(
     };
     if value.is_some_and(|s| s.layer.is_some()) {
         return Err(Error::Unsupported("native top layers"));
+    }
+    if value.is_some_and(|s| s.link_open == Some(glory_render::LinkOpen::NewContext)) {
+        return Err(Error::Unsupported("native separate link contexts"));
+    }
+    Ok(())
+}
+
+/// The pinned native engine has no indeterminate editor state. Never publish
+/// an AX mixed state while displaying a plain boolean checkbox.
+fn check_mode(
+    node: &glory_render::Descriptor,
+    patch: Option<&glory_render::Patch>,
+) -> Result<(), Error> {
+    use glory_render::{Change, CheckMode, Patch, Props};
+    let Props::Check(check) = &node.props else {
+        return Ok(());
+    };
+    let mode = match patch {
+        Some(Patch::CheckMode(Change::Set(mode))) => *mode,
+        Some(Patch::CheckMode(Change::Clear)) => CheckMode::default(),
+        _ => check.mode,
+    };
+    if mode == CheckMode::Mixed {
+        return Err(Error::Unsupported("native indeterminate checks"));
+    }
+    if mode == CheckMode::Radio {
+        return Err(Error::Unsupported("native radio groups"));
     }
     Ok(())
 }
@@ -433,6 +463,7 @@ impl Dom {
             }
             // Blitz beta.4 parses the controlled checked attribute as bool.
             // Empty HTML boolean attributes only initialize it on attachment.
+            ("indeterminate", Property::Bool(false)) => {}
             ("checked", Property::Bool(true)) => m.set_attribute(node, attr(name), "true"),
             ("disabled", Property::Bool(true)) => m.set_attribute(node, attr(name), ""),
             ("disabled" | "checked", Property::Bool(false)) => m.clear_attribute(node, attr(name)),
@@ -1128,6 +1159,7 @@ impl Render for Renderer {
         patch: Option<&glory_render::Patch>,
     ) -> Result<(), Error> {
         check_layer(node, patch)?;
+        check_mode(node, patch)?;
         match patch {
             None => check_style(&node.style)?,
             Some(glory_render::Patch::Style(glory_render::Change::Set(style))) => {
@@ -1185,12 +1217,18 @@ impl Render for Renderer {
                     Mutation::CreatePlan { plan, .. } => {
                         for node in plan.nodes() {
                             check_layer(&node.descriptor, None)?;
+                            check_mode(&node.descriptor, None)?;
                             check_style(&node.descriptor.style)?;
                         }
                     }
-                    Mutation::Create { node, .. } => check_layer(node, None)?,
+                    Mutation::Create { node, .. } => {
+                        check_layer(node, None)?;
+                        check_mode(node, None)?;
+                    }
                     Mutation::Patch { id, patch } => {
-                        check_layer(&mapper.tree().node(*id)?.descriptor, Some(patch))?
+                        let descriptor = &mapper.tree().node(*id)?.descriptor;
+                        check_layer(descriptor, Some(patch))?;
+                        check_mode(descriptor, Some(patch))?;
                     }
                     _ => {}
                 }

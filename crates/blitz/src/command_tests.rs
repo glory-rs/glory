@@ -17,6 +17,108 @@ fn key(app: &mut WindowApp, key: &str, modifiers: Modifiers, composing: bool, re
 }
 
 #[test]
+fn native_form_requests_queue_enter_and_button_defaults_without_resetting_the_editor() {
+    use glory_render::{FieldPart, FormAction, Semantics};
+    let mut app = WindowApp::new();
+    let input_ref = app.app.scope().cage(None);
+    let submit_ref = app.app.scope().cage(None);
+    let reset_ref = app.app.scope().cage(None);
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let submit_seen = events.clone();
+    let reset_seen = events.clone();
+    app.mount(
+        view()
+            .field_part(FieldPart::Form)
+            .style(glory_render::style::Style::new().width(glory_render::style::Length::Px(360.0)))
+            .on(EventKind::Submit, move |event| {
+                submit_seen.borrow_mut().push(event)
+            })
+            .on(EventKind::Reset, move |event| {
+                reset_seen.borrow_mut().push(event)
+            })
+            .fill((
+                input().value("preserved").node_ref(input_ref),
+                glory_ui::button()
+                    .label("Submit")
+                    .node_ref(submit_ref)
+                    .semantics(Some(Box::new(Semantics {
+                        form_action: Some(FormAction::Submit),
+                        ..Default::default()
+                    }))),
+                glory_ui::button()
+                    .label("Reset")
+                    .node_ref(reset_ref)
+                    .semantics(Some(Box::new(Semantics {
+                        form_action: Some(FormAction::Reset),
+                        ..Default::default()
+                    }))),
+            )),
+    )
+    .unwrap();
+    tick(&mut app);
+    let input = input_ref.get().unwrap();
+    let physical = app
+        .renderer
+        .engine_id(input, glory_html::Part::Main)
+        .unwrap();
+    native_focus(&mut app, input);
+    key(&mut app, "Enter", Modifiers::empty(), false, false);
+    assert!(events.borrow().is_empty(), "native callbacks only enqueue");
+    tick(&mut app);
+    assert_eq!(
+        events.borrow().as_slice(),
+        [Event::Submit { submitter: None }]
+    );
+    for (button, expected) in [
+        (
+            submit_ref.get().unwrap(),
+            Event::Submit {
+                submitter: submit_ref.get(),
+            },
+        ),
+        (reset_ref.get().unwrap(), Event::Reset),
+    ] {
+        let rect = bounds_now(&app, button);
+        app.handle_ui_event(UiEvent::PointerMove(pointer(
+            (rect.x + 8.) as f32,
+            (rect.y + 8.) as f32,
+            false,
+        )));
+        app.handle_ui_event(UiEvent::PointerDown(pointer(
+            (rect.x + 8.) as f32,
+            (rect.y + 8.) as f32,
+            true,
+        )));
+        app.handle_ui_event(UiEvent::PointerUp(pointer(
+            (rect.x + 8.) as f32,
+            (rect.y + 8.) as f32,
+            false,
+        )));
+        tick(&mut app);
+        assert_eq!(events.borrow().last(), Some(&expected));
+    }
+    assert_eq!(
+        app.renderer
+            .engine_id(input, glory_html::Part::Main)
+            .unwrap(),
+        physical
+    );
+    app.renderer.inspect(|doc| {
+        assert_eq!(
+            doc.get_node(physical)
+                .unwrap()
+                .element_data()
+                .unwrap()
+                .text_input_data()
+                .unwrap()
+                .editor
+                .raw_text(),
+            "preserved"
+        )
+    });
+}
+
+#[test]
 fn native_field_label_readonly_and_disabled_group_preserve_editor_identity() {
     use glory_render::style::{Length, Style};
     use glory_render::{FieldPart, SemanticId, Semantics};
@@ -369,5 +471,77 @@ fn native_color_scheme_is_queued_coalesced_and_initializes_late_view_interests()
     assert_eq!(
         seen.borrow().last(),
         Some(&Event::ColorSchemeChanged { dark: false })
+    );
+}
+
+#[test]
+fn native_toggle_button_space_enter_queue_activation_and_keep_pressed_engine_identity() {
+    use glory_render::Semantics;
+    let mut app = WindowApp::new();
+    let reference = app.app.scope().cage(None);
+    let pressed = app.app.scope().cage(false);
+    let seen = Rc::new(RefCell::new(Vec::new()));
+    let trace = seen.clone();
+    let metadata = app.app.scope().bond(move || {
+        Some(Box::new(Semantics {
+            pressed: Some(pressed.get()),
+            ..Default::default()
+        }))
+    });
+    app.mount(
+        glory_ui::button()
+            .label("Bold")
+            .node_ref(reference)
+            .semantics(metadata)
+            .on(EventKind::Activate, move |_| {
+                pressed.revise(|value| *value = !*value);
+                trace.borrow_mut().push(pressed.get());
+            }),
+    )
+    .unwrap();
+    tick(&mut app);
+    let button = reference.get().unwrap();
+    native_focus(&mut app, button);
+    let physical = app
+        .renderer
+        .engine_id(button, glory_html::Part::Main)
+        .unwrap();
+    key(&mut app, "Enter", Modifiers::empty(), false, false);
+    assert!(seen.borrow().is_empty());
+    tick(&mut app);
+    assert_eq!(&*seen.borrow(), &[true]);
+    key(&mut app, " ", Modifiers::empty(), false, false);
+    tick(&mut app);
+    assert_eq!(seen.borrow().len(), 1, "Space arms until release");
+    app.handle_ui_event(UiEvent::KeyUp(BlitzKeyEvent {
+        key: Key::Character(" ".into()),
+        code: keyboard_types::Code::Space,
+        modifiers: Modifiers::empty(),
+        location: keyboard_types::Location::Standard,
+        is_auto_repeating: false,
+        is_composing: false,
+        state: blitz_traits::events::KeyState::Released,
+        text: None,
+    }));
+    assert_eq!(seen.borrow().len(), 1, "release only queues");
+    tick(&mut app);
+    assert_eq!(&*seen.borrow(), &[true, false]);
+    assert_eq!(
+        app.renderer
+            .engine_id(button, glory_html::Part::Main)
+            .unwrap(),
+        physical
+    );
+    assert_eq!(
+        app.app
+            .tree()
+            .node(button)
+            .unwrap()
+            .descriptor
+            .semantics
+            .as_ref()
+            .unwrap()
+            .pressed,
+        Some(false)
     );
 }

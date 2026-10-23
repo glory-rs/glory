@@ -70,7 +70,7 @@ pub(super) struct Editing {
     pending: Option<String>,
 }
 pub(super) struct Entry {
-    token: String,
+    pub parent: Cell<Option<NodeId>>,
     #[cfg(feature = "hydrate")]
     is_virtual: bool,
     pub parts: Parts,
@@ -189,11 +189,9 @@ pub(super) struct Dom {
     pub document: Document,
     pub root: Element,
     pub frame: Rc<Frame>,
-    pub entries: RefCell<HashMap<NodeId, Rc<Entry>>>,
+    pub entries: RefCell<glory_render::NodeMap<Rc<Entry>>>,
     templates: Templates,
     plans: plans::Plans,
-    pub tokens: RefCell<HashMap<String, NodeId>>,
-    pub parents: RefCell<HashMap<NodeId, Option<NodeId>>>,
     pub inputs: RefCell<Vec<Input>>,
     pub layout: RefCell<BTreeSet<(NodeId, EventKind)>>,
     pub sizes: RefCell<HashMap<NodeId, Rect>>,
@@ -220,11 +218,9 @@ impl Dom {
             document,
             root,
             frame,
-            entries: RefCell::new(HashMap::new()),
+            entries: RefCell::new(glory_render::NodeMap::default()),
             templates: Templates::default(),
             plans: plans::Plans::default(),
-            tokens: RefCell::new(HashMap::new()),
-            parents: RefCell::new(HashMap::new()),
             inputs: RefCell::new(Vec::new()),
             layout: RefCell::new(BTreeSet::new()),
             sizes: RefCell::new(HashMap::new()),
@@ -248,12 +244,19 @@ impl Dom {
             .cloned()
             .ok_or(Error::NodeGone(id))
     }
+    pub fn parent(&self, id: NodeId) -> Option<NodeId> {
+        self.entries.borrow().get(&id)?.parent.get()
+    }
+    pub fn id_for_token(&self, token: &str) -> Option<NodeId> {
+        self.entries.borrow().id_for_token(token)
+    }
     #[cfg(feature = "hydrate")]
     pub fn adopt(
         &self,
         id: NodeId,
         key: u64,
         shape: &Shape,
+        parent: Option<NodeId>,
         parts: BTreeMap<Part, Node>,
         first: Node,
         last: Node,
@@ -277,7 +280,7 @@ impl Dom {
             }
         }
         let entry = Rc::new(Entry {
-            token: token.clone(),
+            parent: Cell::new(parent),
             #[cfg(feature = "hydrate")]
             is_virtual: virtual_shape(shape),
             parts: parts.into(),
@@ -300,8 +303,33 @@ impl Dom {
         if entry.edit == EditKind::Text {
             entry.value()?;
         }
+        if entry.edit == EditKind::Check {
+            // HTML cannot encode the native indeterminate property. Restore it
+            // only after whole-subtree validation, preserving a pre-hydration
+            // user toggle; controlled widgets reconcile through the queued event.
+            if let Some(Kind::Element { properties, .. }) = shape
+                .pieces
+                .iter()
+                .find(|piece| Some(piece.part) == shape.control)
+                .map(|piece| &piece.kind)
+            {
+                let control = entry.control()?;
+                let checked = js_sys::Reflect::get(&control, &"checked".into())
+                    .map_err(backend)?
+                    .as_bool()
+                    .unwrap_or(false);
+                if properties.get("checked") == Some(&Property::Bool(checked))
+                    && let Some(value) = properties.get("indeterminate")
+                {
+                    entry.property(
+                        shape.control.expect("check control"),
+                        "indeterminate",
+                        value,
+                    )?;
+                }
+            }
+        }
         self.entries.borrow_mut().insert(id, entry);
-        self.tokens.borrow_mut().insert(token, id);
         Ok(())
     }
     #[cfg(feature = "hydrate")]
@@ -531,14 +559,12 @@ impl Dom {
                 .append_child(&self.document.create_comment(&format!("gly:e:{key}")))
                 .map_err(backend)?;
         }
-        let entry = self.make_entry(token.clone(), &shape, parts, fragment)?;
+        let entry = self.make_entry(&shape, parts, fragment)?;
         self.entries.borrow_mut().insert(id, entry);
-        self.tokens.borrow_mut().insert(token, id);
         Ok(())
     }
     fn make_entry(
         &self,
-        token: String,
         shape: &Shape,
         parts: Parts,
         fragment: Option<DocumentFragment>,
@@ -546,7 +572,7 @@ impl Dom {
         #[cfg(feature = "hydrate")]
         let is_virtual = virtual_shape(shape);
         let entry = Rc::new(Entry {
-            token: token.clone(),
+            parent: Cell::new(None),
             #[cfg(feature = "hydrate")]
             is_virtual,
             first: parts
@@ -658,7 +684,7 @@ impl Dom {
         if let Some(selection) = selection {
             selection.restore(&self.document);
         }
-        self.parents.borrow_mut().insert(id, semantic_parent);
+        entry.parent.set(semantic_parent);
         Ok(())
     }
     fn patch(&self, id: NodeId, edits: Vec<Edit>) -> Result<(), Error> {
@@ -703,17 +729,9 @@ impl Dom {
         // descendants. Remove those keys directly: retaining the whole parent
         // table for each row makes bulk teardown repeatedly scan unrelated rows.
         {
-            let mut parents = self.parents.borrow_mut();
             let mut sizes = self.sizes.borrow_mut();
             for id in &subtree {
-                parents.remove(id);
                 sizes.remove(id);
-            }
-        }
-        {
-            let mut tokens = self.tokens.borrow_mut();
-            for entry in &removed {
-                tokens.remove(&entry.token);
             }
         }
         self.layout
@@ -755,8 +773,6 @@ impl Dom {
         let entries = std::mem::take(&mut *self.entries.borrow_mut());
         self.templates.clear();
         self.plans.clear();
-        self.tokens.borrow_mut().clear();
-        self.parents.borrow_mut().clear();
         self.drag.borrow_mut().take();
         self.suppress_click.set(false);
         self.layout.borrow_mut().clear();

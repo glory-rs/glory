@@ -437,6 +437,14 @@ impl Session {
     }
 
     fn route(&self, node: NodeId, event: Event) -> Result<bool> {
+        let default_form_action = match &event {
+            Event::Activate => Some(false),
+            Event::Keyboard {
+                command: glory_render::KeyboardCommand::Submit,
+                ..
+            } => Some(true),
+            _ => None,
+        };
         // Suspension preserves the scope/observers. Terminal focus/composition
         // loss still releases pins/editing after its physical range detaches.
         // Disposal remains guarded by generational identity and live handlers.
@@ -465,6 +473,8 @@ impl Session {
                 && matches!(
                     event,
                     Event::Activate
+                        | Event::Submit { .. }
+                        | Event::Reset
                         | Event::Keyboard { .. }
                         | Event::Drag { .. }
                         | Event::ValueChanged { .. }
@@ -562,6 +572,32 @@ impl Session {
                     Err(error) => return Err(error.into()),
                 }
             }
+        }
+        let request=default_form_action.and_then(|keyboard| {
+            let present=self.present.borrow();
+            let source=present.tree.node(node).ok()?;
+            if !present.tree.active(node) || !present.tree.enabled(node) { return None; }
+            let action=if keyboard {
+                if !matches!(&source.descriptor.props,glory_render::Props::Input(input) if !input.multiline) { return None; }
+                glory_render::FormAction::Submit
+            } else {
+                source.descriptor.semantics.as_ref()?.form_action?
+            };
+            let mut cursor=source.parent;
+            while let Some(id)=cursor {
+                let current=present.tree.node(id).ok()?;
+                if current.descriptor.field_part()==Some(glory_render::FieldPart::Form) {
+                    return Some((id,match action {
+                        glory_render::FormAction::Submit=>Event::Submit { submitter:(!keyboard).then_some(node) },
+                        glory_render::FormAction::Reset=>Event::Reset,
+                    }));
+                }
+                cursor=current.parent;
+            }
+            None
+        });
+        if let Some((form, event)) = request {
+            return Ok(self.route(form, event)? || handled);
         }
         Ok(handled)
     }
@@ -807,6 +843,13 @@ impl Scope {
     /// A callback may upgrade transiently without retaining its owning UI scope.
     pub fn downgrade(&self) -> WeakScope {
         self.weak()
+    }
+    /// Apply several writes as one observation boundary. Nested calls remain
+    /// atomic and unwind releases the boundary. Host output still commits at
+    /// the App's normal flush/event boundary.
+    pub fn batch<R>(&self, callback: impl FnOnce() -> R) -> Result<R> {
+        let session = self.session()?;
+        Ok(session.runtime.batch(callback)?)
     }
     pub fn child(&self) -> Result<Self> {
         let session = self.session()?;

@@ -1435,6 +1435,20 @@ impl Drop for Write {
     }
 }
 impl<T> Cage<T> {
+    /// Current source version, without subscribing or borrowing the value.
+    /// Every successful write advances this stamp, even when equal data is
+    /// restored. The identity is generation checked; a live collection path
+    /// may still refer to a missing value. This does not flush pending work.
+    pub fn try_version(self) -> Result<u64, AccessError> {
+        fields::allow_read()?;
+        let state = lookup(self.handle.runtime)?;
+        let state = state.borrow();
+        Ok(state
+            .nodes
+            .get(self.handle.key)
+            .ok_or(AccessError::Disposed)?
+            .version)
+    }
     pub fn try_revise<R>(self, f: impl FnOnce(&mut T) -> R) -> Result<R, AccessError> {
         if EVALUATING.with_borrow(|stack| stack.last().is_some_and(|mode| *mode == Mode::Pure)) {
             return Err(AccessError::WriteDuringCompute);

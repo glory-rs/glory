@@ -329,3 +329,50 @@ fn live_field_validation_matches_full_descriptor_validation_for_all_patch_varian
         }
     }
 }
+
+#[test]
+fn check_mode_prepare_swaps_only_mode_and_rolls_back_without_counters() {
+    let runtime = RuntimeId::new();
+    let id = NodeIds::new(runtime).allocate();
+    let mut memory = Memory::new(runtime);
+    create(
+        &mut memory,
+        id,
+        Descriptor::new(Props::Check(CheckProps {
+            label: "x".repeat(1_048_576),
+            ..Default::default()
+        })),
+        None,
+    );
+    let pointer = match &memory.node(id).unwrap().descriptor.props {
+        Props::Check(check) => check.label.as_ptr(),
+        _ => unreachable!(),
+    };
+    let before = memory.stats();
+    let receipt = memory.apply(&[]).unwrap();
+    {
+        let staged = memory
+            .prepare_patch(id, &Patch::CheckMode(Change::Set(CheckMode::Mixed)))
+            .unwrap();
+        assert!(
+            matches!(&staged.descriptor().props, Props::Check(check) if check.mode == CheckMode::Mixed && check.label.as_ptr() == pointer)
+        );
+        assert_eq!(
+            staged.previous(),
+            &Patch::CheckMode(Change::Set(CheckMode::Checkbox))
+        );
+    }
+    assert_eq!(memory.stats(), before);
+    assert_eq!(memory.apply(&[]).unwrap(), receipt);
+    assert!(
+        matches!(&memory.node(id).unwrap().descriptor.props, Props::Check(check) if check.mode == CheckMode::Checkbox && check.label.as_ptr() == pointer)
+    );
+    assert_eq!(
+        memory
+            .prepare_patch(id, &Patch::CheckMode(Change::Set(CheckMode::Switch)))
+            .unwrap()
+            .commit()
+            .applied,
+        receipt.applied + 1
+    );
+}

@@ -114,7 +114,7 @@ fn named(dom: &Dom, id: Option<&glory_render::SemanticId>) -> Option<Element> {
 fn named_control(dom: &Dom, id: Option<&glory_render::SemanticId>) -> Option<Element> {
     let element = named(dom, id)?;
     let token = element.get_attribute("data-gly-node")?;
-    let id = *dom.tokens.borrow().get(&token)?;
+    let id = dom.id_for_token(&token)?;
     dom.entry(id).ok()?.control().ok()
 }
 fn candidates(element: &Element) -> Vec<Element> {

@@ -92,6 +92,13 @@ pub enum FlexDirection {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum FlexWrap {
+    #[default]
+    NoWrap,
+    Wrap,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Overflow {
     #[default]
     Visible,
@@ -166,6 +173,24 @@ impl Edges {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Color(pub u8, pub u8, pub u8, pub u8);
 
+/// One finite outset shadow, expressed in CSS pixels. Insets, multiple layers
+/// and currentColor are outside this explicit portable declaration.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Shadow {
+    pub x: f64,
+    pub y: f64,
+    pub blur: f64,
+    pub spread: f64,
+    pub color: Color,
+}
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub enum BoxShadow {
+    /// Explicitly remove an author stylesheet's shadow.
+    #[default]
+    None,
+    Outset(Shadow),
+}
+
 /// A named face is always serialized as a CSS string, distinct from a generic
 /// family (including a face literally named "serif"). Resolution is host-owned.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -190,10 +215,26 @@ pub enum WhiteSpace {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum TextOverflow {
+    #[default]
+    Clip,
+    Ellipsis,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum BorderStyle {
     #[default]
     None,
     Solid,
+}
+
+/// Intrinsic control sizing. Content sizing requires host support; native
+/// adapters must reject it until their editors participate in intrinsic layout.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum FieldSizing {
+    #[default]
+    Fixed,
+    Content,
 }
 
 /// The portable v1 style subset. An adapter diagnoses unsupported features;
@@ -208,6 +249,7 @@ pub struct Style {
     pub left: Option<Length>,
     pub display: Option<Display>,
     pub flex_direction: Option<FlexDirection>,
+    pub flex_wrap: Option<FlexWrap>,
     pub width: Option<Length>,
     pub height: Option<Length>,
     pub min_width: Option<Length>,
@@ -234,6 +276,8 @@ pub struct Style {
     /// Absolute CSS weight in [1, 1000], including variable-font fractions.
     pub font_weight: Option<f64>,
     pub white_space: Option<WhiteSpace>,
+    pub text_overflow: Option<TextOverflow>,
+    pub field_sizing: Option<FieldSizing>,
     pub border_width: Option<Edges>,
     pub border_color: Option<Color>,
     pub border_style: Option<BorderStyle>,
@@ -241,9 +285,26 @@ pub struct Style {
     pub radius: Option<f64>,
     /// Group opacity in [0, 1], applied by the engine after compositing children.
     pub opacity: Option<f64>,
+    pub box_shadow: Option<BoxShadow>,
 }
 
 impl Style {
+    pub fn text_overflow(mut self, value: TextOverflow) -> Self {
+        self.text_overflow = Some(value);
+        self
+    }
+    pub fn flex_wrap(mut self, value: FlexWrap) -> Self {
+        self.flex_wrap = Some(value);
+        self
+    }
+    pub fn box_shadow(mut self, value: BoxShadow) -> Self {
+        self.box_shadow = Some(value);
+        self
+    }
+    pub fn field_sizing(mut self, value: FieldSizing) -> Self {
+        self.field_sizing = Some(value);
+        self
+    }
     pub fn position(mut self, value: Position) -> Self {
         self.position = Some(value);
         self
@@ -415,6 +476,14 @@ impl Style {
             .is_some_and(|v| !v.is_finite() || !(0.0..=1.0).contains(&v))
         {
             return Err("opacity must be finite and in [0, 1]");
+        }
+        if let Some(BoxShadow::Outset(shadow)) = self.box_shadow
+            && (![shadow.x, shadow.y, shadow.blur, shadow.spread]
+                .into_iter()
+                .all(f64::is_finite)
+                || shadow.blur < 0.0)
+        {
+            return Err("shadow offsets/spread must be finite and blur finite and nonnegative");
         }
         Ok(())
     }

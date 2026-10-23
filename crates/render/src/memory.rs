@@ -42,7 +42,7 @@ pub struct Stats {
 #[derive(Debug)]
 pub struct Memory {
     runtime: RuntimeId,
-    nodes: HashMap<NodeId, Node>,
+    nodes: NodeMap<Node>,
     names: HashMap<SemanticId, NodeId>,
     generations: HashMap<u32, (u32, bool)>,
     roots: Children,
@@ -113,7 +113,7 @@ impl Memory {
     pub fn new(runtime: RuntimeId) -> Self {
         Self {
             runtime,
-            nodes: HashMap::new(),
+            nodes: NodeMap::default(),
             names: HashMap::new(),
             generations: HashMap::new(),
             roots: Children::default(),
@@ -203,6 +203,12 @@ impl Memory {
             inverse: Some(inverse),
         };
         if matches!(patch, Patch::Semantics(_)) {
+            if let Patch::Semantics(Change::Set(previous)) = prepared.previous()
+                && previous.as_ref().and_then(|s| s.document_part)
+                    != prepared.descriptor().document_part()
+            {
+                return Err(Error::InvalidProps("live document structure cannot change"));
+            }
             prepared
                 .tree
                 .validate_name(prepared.descriptor(), Some(id))?;
@@ -212,6 +218,17 @@ impl Memory {
             {
                 // Structural transitions must also validate existing content.
                 // State/association updates never scan the child collection.
+                if prepared.descriptor().field_part() == Some(crate::FieldPart::Form) {
+                    let mut pending: Vec<_> =
+                        prepared.tree.nodes[&id].children.iter().copied().collect();
+                    while let Some(child) = pending.pop() {
+                        let node = &prepared.tree.nodes[&child];
+                        if node.descriptor.field_part() == Some(crate::FieldPart::Form) {
+                            return Err(Error::InvalidPlacement("forms cannot be nested"));
+                        }
+                        pending.extend(node.children.iter().copied());
+                    }
+                }
                 for child in prepared.tree.nodes[&id].children.iter().copied() {
                     prepared
                         .tree
@@ -239,11 +256,12 @@ impl Memory {
                 return false;
             };
             if !node.descriptor.props.enabled()
-                || node
-                    .descriptor
-                    .semantics
-                    .as_ref()
-                    .is_some_and(|s| s.field_part == Some(crate::FieldPart::Fieldset) && s.disabled)
+                || node.descriptor.semantics.as_ref().is_some_and(|s| {
+                    matches!(
+                        s.field_part,
+                        Some(crate::FieldPart::Fieldset | crate::FieldPart::Form)
+                    ) && s.disabled
+                })
             {
                 return false;
             }
@@ -252,7 +270,7 @@ impl Memory {
         true
     }
 
-    fn active_in(nodes: &HashMap<NodeId, Node>, id: NodeId) -> bool {
+    fn active_in(nodes: &NodeMap<Node>, id: NodeId) -> bool {
         let mut cursor = Some(id);
         while let Some(id) = cursor {
             let Some(node) = nodes.get(&id) else {
@@ -281,7 +299,7 @@ impl Memory {
     }
 
     fn event_in(
-        nodes: &HashMap<NodeId, Node>,
+        nodes: &NodeMap<Node>,
         runtime: RuntimeId,
         id: NodeId,
         event: &Event,
@@ -293,6 +311,31 @@ impl Memory {
             nodes.get(&id).ok_or(Error::NodeGone(id))
         };
         let target = get(id)?;
+        if let Event::Submit {
+            submitter: Some(submitter),
+        } = event
+        {
+            event.validate_payload(id, &target.descriptor)?;
+            let source = match get(*submitter) {
+                Ok(source) => source,
+                Err(Error::NodeGone(_)) => return Ok(false),
+                Err(error) => return Err(error),
+            };
+            if source
+                .descriptor
+                .semantics
+                .as_ref()
+                .and_then(|s| s.form_action)
+                != Some(crate::FormAction::Submit)
+            {
+                return Err(Error::InvalidEvent(
+                    "submit origin requires a submit button",
+                ));
+            }
+            if !source.descriptor.activation_enabled() || !Self::active_in(nodes, *submitter) {
+                return Ok(false);
+            }
+        }
         if target.descriptor.readonly()
             && matches!(
                 event,
@@ -332,6 +375,18 @@ impl Memory {
             }
             let mut cursor = Some(origin);
             while cursor != Some(id) {
+                if matches!(event, Event::Submit { .. })
+                    && cursor.and_then(|id| nodes.get(&id)).is_some_and(|node| {
+                        node.descriptor.field_part() == Some(crate::FieldPart::Fieldset)
+                            && node
+                                .descriptor
+                                .semantics
+                                .as_ref()
+                                .is_some_and(|s| s.disabled)
+                    })
+                {
+                    return Ok(false);
+                }
                 cursor = cursor
                     .and_then(|id| nodes.get(&id))
                     .and_then(|node| node.parent);
@@ -363,6 +418,8 @@ impl Memory {
         if matches!(
             event,
             Event::Activate
+                | Event::Submit { .. }
+                | Event::Reset
                 | Event::Keyboard { .. }
                 | Event::CheckedChanged(_)
                 | Event::ValueChanged { .. }
@@ -436,6 +493,7 @@ impl Memory {
             Subtree::Plan(plan) => &plan.nodes()[0].descriptor,
             Subtree::Existing(id) => &self.node(id)?.descriptor,
         };
+        self.validate_document_placement(child, parent)?;
         if descriptor.field_part() == Some(crate::FieldPart::Legend)
             && parent
                 .and_then(|id| self.node(id).ok())
@@ -451,6 +509,7 @@ impl Memory {
         let mut cursor = parent;
         let mut interactive_ancestor = false;
         let mut button_ancestor = false;
+        let mut form_ancestor = false;
         while let Some(ancestor) = cursor {
             if matches!(child, Subtree::Existing(id) if ancestor == id) {
                 return Err(Error::InvalidPlacement("tree cycle"));
@@ -467,6 +526,7 @@ impl Memory {
                     Some(crate::FieldPart::Label | crate::FieldPart::Legend)
                 );
             button_ancestor |= matches!(node.descriptor.props, Props::Button(_));
+            form_ancestor |= node.descriptor.field_part() == Some(crate::FieldPart::Form);
             cursor = node.parent;
         }
         // Most placements (including ordinary list moves) need no subtree scan.
@@ -478,10 +538,23 @@ impl Memory {
                 self.validate_name(&node.descriptor, None)?;
             }
         }
-        if !interactive_ancestor && !button_ancestor {
+        if form_ancestor && descriptor.field_part() == Some(crate::FieldPart::Form) {
+            return Err(Error::InvalidPlacement("forms cannot be nested"));
+        }
+        // A same-parent property update/reorder cannot introduce a new nested
+        // form. Only a changed ancestor context needs the moved live subtree.
+        let form_scan = form_ancestor
+            && match child {
+                Subtree::Existing(id) => self.node(id)?.parent != parent,
+                _ => true,
+            };
+        if !interactive_ancestor && !button_ancestor && !form_scan {
             return Ok(());
         }
         let check = |descriptor: &Descriptor| {
+            if form_scan && descriptor.field_part() == Some(crate::FieldPart::Form) {
+                return Err(Error::InvalidPlacement("forms cannot be nested"));
+            }
             crate::plan::validate_context(descriptor, interactive_ancestor, button_ancestor)
         };
         match child {
@@ -497,6 +570,60 @@ impl Memory {
                     let node = self.node(id)?;
                     check(&node.descriptor)?;
                     pending.extend(node.children.iter().copied());
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_document_placement(
+        &self,
+        child: Subtree<'_>,
+        parent: Option<NodeId>,
+    ) -> Result<(), Error> {
+        let mut boxed_parent = parent;
+        while let Some(id) = boxed_parent {
+            let node = self.node(id)?;
+            if !matches!(node.descriptor.props, Props::Group) {
+                break;
+            }
+            boxed_parent = node.parent;
+        }
+        let parent = boxed_parent
+            .map(|id| self.node(id).map(|node| &node.descriptor))
+            .transpose()?;
+        let check =
+            |descriptor: &Descriptor| crate::document::validate_child(descriptor, parent, false);
+        match child {
+            Subtree::New(descriptor) => check(descriptor)?,
+            Subtree::Existing(id) => {
+                // Only transparent ranges change the physical parent of their
+                // contents. Stop at boxed nodes; never scan business sources.
+                let node = self.node(id)?;
+                check(&node.descriptor)?;
+                if matches!(node.descriptor.props, Props::Group) {
+                    let mut pending = node.children.iter().copied().collect::<Vec<_>>();
+                    while let Some(id) = pending.pop() {
+                        let node = self.node(id)?;
+                        check(&node.descriptor)?;
+                        if matches!(node.descriptor.props, Props::Group) {
+                            pending.extend(node.children.iter().copied());
+                        }
+                    }
+                }
+            }
+            Subtree::Plan(plan) => {
+                for node in plan.nodes() {
+                    let mut cursor = node.parent;
+                    while let Some(index) = cursor {
+                        if !matches!(plan.nodes()[index].descriptor.props, Props::Group) {
+                            break;
+                        }
+                        cursor = plan.nodes()[index].parent;
+                    }
+                    if cursor.is_none() {
+                        check(&node.descriptor)?;
+                    }
                 }
             }
         }

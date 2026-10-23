@@ -571,10 +571,13 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
             let own_interest = state.subscriptions.contains(&(origin, EventKind::Keyboard));
             let mut cursor = Some(origin);
             let mut interested = false;
+            let mut in_form = false;
             while let Some(id) = cursor {
+                in_form |= state.mapper.tree().node(id).is_ok_and(|node| {
+                    node.descriptor.field_part() == Some(glory_render::FieldPart::Form)
+                });
                 if state.subscriptions.contains(&(id, EventKind::Keyboard)) {
                     interested = true;
-                    break;
                 }
                 cursor = state
                     .mapper
@@ -583,7 +586,9 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
                     .ok()
                     .and_then(|node| node.parent);
             }
-            if interested && (!editable || own_interest) {
+            let form_submit=in_form && command==glory_render::KeyboardCommand::Submit
+                && state.mapper.tree().node(origin).is_ok_and(|node| matches!(&node.descriptor.props,glory_render::Props::Input(input) if !input.multiline));
+            if interested && (!editable || own_interest) || form_submit {
                 if command == glory_render::KeyboardCommand::Submit {
                     let revision = state
                         .dom

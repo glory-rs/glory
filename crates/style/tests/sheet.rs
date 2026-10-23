@@ -127,6 +127,11 @@ fn profile_rejection_uses_each_original_declaration_not_the_final_winner() {
 fn every_typed_property_has_a_valid_finite_text_representation() {
     let css = ".all{position:relative;top:-2px;left:3%;display:flex;flex-direction:row;width:20px;height:30%;min-width:0;min-height:auto;max-width:none;max-height:100%;gap:2px;padding:1px 2px 3px 4px;margin:-1px;flex-grow:.5;flex-shrink:2;align-items:center;justify-content:space-between;overflow-x:auto;overflow-y:hidden;overflow-anchor:none;color:#123;background-color:transparent;font-size:16px;line-height:20px}";
     let css = css.replace("line-height:20px", "line-height:20px;font-family:system-ui;font-weight:450.5;white-space:pre-wrap;border-width:1px 2px;border-color:#123;border-style:solid;border-radius:4px;opacity:.5");
+    let css = css.replace("line-height:20px", "line-height:20px;field-sizing:content");
+    let css = css.replace(
+        "field-sizing:content",
+        "field-sizing:content;box-shadow:0 2px 4px #0003;flex-wrap:wrap;text-overflow:ellipsis",
+    );
     let sheet = Sheet::parse(&css).unwrap();
     let mut actual: Vec<_> = sheet.rules()[0]
         .declarations()
@@ -138,6 +143,26 @@ fn every_typed_property_has_a_valid_finite_text_representation() {
     expected.sort_by_key(|p| p.name());
     assert_eq!(actual, expected);
     sheet.check(Profile::HTML).unwrap();
+}
+
+#[test]
+fn field_sizing_checks_each_original_declaration_and_rejects_unknown_values() {
+    use glory_style::FieldSizing;
+    let sheet = Sheet::parse(".a{field-sizing:content;field-sizing:fixed}").unwrap();
+    assert_eq!(
+        sheet.rules()[0].declarations()[0].style().field_sizing,
+        Some(FieldSizing::Content)
+    );
+    assert_eq!(
+        sheet.rules()[0].declarations()[1].style().field_sizing,
+        Some(FieldSizing::Fixed)
+    );
+    let profile = Profile {
+        inline: Support::ALL.without_value(glory_style::Value::FieldContent),
+        ..Profile::HTML
+    };
+    assert!(sheet.check(profile).is_err());
+    assert!(Sheet::parse(".a{field-sizing:auto}").is_err());
 }
 
 #[test]

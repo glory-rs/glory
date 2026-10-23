@@ -4,11 +4,15 @@
 #[cfg(feature = "conformance")]
 pub mod conformance;
 mod id;
+mod node_map;
+pub use node_map::NodeMap;
+mod document;
 pub mod memory;
 mod plan;
 pub mod profile;
 mod props;
 mod semantics;
+pub use document::DocumentPart;
 mod text;
 
 pub use glory_style as style;
@@ -16,7 +20,8 @@ pub use id::{NodeId, NodeIds, RuntimeId};
 pub use plan::{MAX_PLAN_NODES, Plan, PlanNode, WeakPlan};
 pub use props::*;
 pub use semantics::{
-    DismissReason, FieldPart, Layer, LayerPlacement, Orientation, SemanticId, Semantics,
+    DismissReason, FieldPart, FormAction, FormControl, LinkOpen, Layer, LayerPlacement, Orientation,
+    SemanticId, Semantics,
 };
 pub use text::normalize_text;
 mod keyboard;
@@ -247,6 +252,12 @@ pub enum QueryValue {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
+    /// Native form default behavior is cancelled before this queued request.
+    /// None represents a programmatic request or implicit keyboard submission.
+    Submit {
+        submitter: Option<NodeId>,
+    },
+    Reset,
     Activate,
     /// A request only: the application may keep controlled state open.
     Dismiss(DismissReason),
@@ -331,6 +342,8 @@ pub struct ScrollAck {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum EventKind {
+    Submit,
+    Reset,
     Activate,
     Dismiss,
     ColorSchemeChanged,
@@ -353,6 +366,10 @@ impl EventKind {
     /// observations cannot. Recording a valid interest does not promise the host
     /// can produce it (SSR records handlers for later browser adoption).
     pub fn validate_target(self, node: &Descriptor) -> Result<(), Error> {
+        if matches!(self, Self::Submit | Self::Reset) && node.field_part() != Some(FieldPart::Form)
+        {
+            return Err(Error::InvalidProps("form request requires a form"));
+        }
         // Interests may be registered before layer metadata bindings run.
         if self == Self::Dismiss && !matches!(node.props, Props::View) {
             return Err(Error::InvalidProps("dismiss requires a view"));
@@ -400,6 +417,7 @@ impl Event {
 
     pub(crate) fn origin(&self) -> Option<NodeId> {
         match self {
+            Self::Submit { submitter } => *submitter,
             Self::FocusWithin { node, .. } => Some(*node),
             Self::Navigate { from, .. } => Some(*from),
             Self::Keyboard { from, .. } => Some(*from),
@@ -520,6 +538,8 @@ impl Event {
 
     pub fn kind(&self) -> EventKind {
         match self {
+            Self::Submit { .. } => EventKind::Submit,
+            Self::Reset => EventKind::Reset,
             Self::Activate => EventKind::Activate,
             Self::Dismiss(_) => EventKind::Dismiss,
             Self::ColorSchemeChanged { .. } => EventKind::ColorSchemeChanged,

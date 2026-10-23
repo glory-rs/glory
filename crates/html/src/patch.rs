@@ -82,8 +82,12 @@ fn semantics(
     old_role: Option<Role>,
     new_role: Option<Role>,
 ) {
-    let old = crate::semantics::attributes(old, old_role);
-    let new = crate::semantics::attributes(new, new_role);
+    let mut old = crate::semantics::attributes(old, old_role);
+    let mut new = crate::semantics::attributes(new, new_role);
+    if old.contains_key("type") || new.contains_key("type") {
+        old.entry("type").or_insert_with(|| "button".into());
+        new.entry("type").or_insert_with(|| "button".into());
+    }
     for (name, value) in &new {
         attribute(
             edits,
@@ -184,7 +188,10 @@ pub(crate) fn lower(next: &Descriptor, inverse: &Patch) -> Vec<Edit> {
                 old.as_deref(),
                 next.name.as_deref(),
             );
-            if matches!(next.props, Props::View) {
+            if matches!(next.props, Props::View)
+                && next.field_part() != Some(glory_render::FieldPart::Form)
+                && next.document_part().is_none()
+            {
                 attribute(
                     &mut edits,
                     Part::Main,
@@ -205,6 +212,8 @@ pub(crate) fn lower(next: &Descriptor, inverse: &Patch) -> Vec<Edit> {
             let old = *old!(change);
             let old = old.or_else(|| {
                 (matches!(next.props, Props::View)
+                    && next.document_part().is_none()
+                    && next.field_part() != Some(glory_render::FieldPart::Form)
                     && (next.name.is_some()
                         || next
                             .semantics
@@ -225,6 +234,8 @@ pub(crate) fn lower(next: &Descriptor, inverse: &Patch) -> Vec<Edit> {
             let old = old!(change);
             let old_role = next.role.or_else(|| {
                 (matches!(next.props, Props::View)
+                    && next.document_part().is_none()
+                    && next.field_part() != Some(glory_render::FieldPart::Form)
                     && (next.name.is_some()
                         || old.as_ref().is_some_and(|s| s.labelled_by.is_some())))
                 .then_some(Role::Group)
@@ -298,11 +309,72 @@ pub(crate) fn lower(next: &Descriptor, inverse: &Patch) -> Vec<Edit> {
                 });
             }
         }
+        Patch::CheckMode(change) => {
+            let old = *old!(change);
+            let Props::Check(value) = &next.props else {
+                unreachable!()
+            };
+            use glory_render::CheckMode;
+            attribute(
+                &mut edits,
+                control,
+                "type",
+                Some(crate::mapping::check_type(old)),
+                Some(crate::mapping::check_type(value.mode)),
+            );
+            if (old == CheckMode::Radio) != (value.mode == CheckMode::Radio) {
+                edits.push(Edit::Property {
+                    part: control,
+                    name: "checked",
+                    value: Property::Bool(value.checked),
+                });
+            }
+            attribute(
+                &mut edits,
+                control,
+                "role",
+                (old == CheckMode::Switch).then_some("switch"),
+                (value.mode == CheckMode::Switch).then_some("switch"),
+            );
+            attribute(
+                &mut edits,
+                control,
+                "aria-checked",
+                Some(crate::mapping::check_aria(old, value.checked)),
+                Some(crate::mapping::check_aria(value.mode, value.checked)),
+            );
+            attribute(
+                &mut edits,
+                control,
+                "data-gly-indeterminate",
+                (old == CheckMode::Mixed).then_some(""),
+                (value.mode == CheckMode::Mixed).then_some(""),
+            );
+            attribute(
+                &mut edits,
+                Part::Main,
+                "data-gly-mixed",
+                (old == CheckMode::Mixed).then_some(""),
+                (value.mode == CheckMode::Mixed).then_some(""),
+            );
+            edits.push(Edit::Property {
+                part: control,
+                name: "indeterminate",
+                value: Property::Bool(value.mode == CheckMode::Mixed),
+            });
+        }
         Patch::Checked(change) => {
             let old = *old!(change);
             let Props::Check(value) = &next.props else {
                 unreachable!()
             };
+            attribute(
+                &mut edits,
+                control,
+                "aria-checked",
+                Some(crate::mapping::check_aria(value.mode, old)),
+                Some(crate::mapping::check_aria(value.mode, value.checked)),
+            );
             if old != value.checked {
                 attribute(
                     &mut edits,

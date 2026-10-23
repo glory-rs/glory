@@ -45,14 +45,14 @@ pub mod prelude {
     #[cfg(feature = "resources")]
     pub use glory_resource::Resources;
     pub use glory_style::{
-        Align, BorderStyle, Color, Display, Edges, Family, FlexDirection, Justify, Length, Limit,
-        Overflow, Position, Style, WhiteSpace,
+        Align, BorderStyle, Color, Display, Edges, Family, FieldSizing, FlexDirection, Justify,
+        Length, Limit, Overflow, Position, Style, WhiteSpace,
     };
     pub use glory_ui::events::*;
     pub use glory_ui::{
-        App, DismissReason, FieldPart, FocusMode, ItemPosition, Layer, LayerPlacement, Navigation,
-        Orientation, Plan, PlanInstance, PlanPart, Purpose, Result, Role, Scope, SemanticId,
-        Semantics, TextKind, Widget, button, check, col, component, each, group, image, input,
-        link, list, plan, row, text, view, when,
+        App, DismissReason, FieldPart, FocusMode, FormAction, FormControl, LinkOpen, ItemPosition, Layer,
+        LayerPlacement, Navigation, Orientation, Plan, PlanInstance, PlanPart, Purpose, Result,
+        Role, Scope, SemanticId, Semantics, TextKind, Widget, button, check, col, component, each,
+        group, image, input, link, list, plan, row, text, view, when,
     };
 }

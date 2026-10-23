@@ -2,6 +2,26 @@
 use glory_style::{Profile, Sheet};
 
 #[test]
+fn field_sizing_lowers_and_roundtrips_without_changing_other_declarations() {
+    use glory_style::{FieldSizing, Style};
+    for (value, css_value) in [
+        (FieldSizing::Fixed, "fixed"),
+        (FieldSizing::Content, "content"),
+    ] {
+        let style = Style::new().field_sizing(value);
+        let css = glory_html::style(&style);
+        assert_eq!(css, format!("field-sizing:{css_value};"));
+        let sheet = Sheet::parse(&format!(".a{{{css}}}")).unwrap();
+        assert_eq!(sheet.rules()[0].declarations()[0].style(), &style);
+        assert!(
+            glory_html::sheet(&sheet, Profile::HTML)
+                .unwrap()
+                .contains(&css)
+        );
+    }
+}
+
+#[test]
 fn lowering_preserves_order_and_specificity_without_selecting_internal_parts() {
     let sheet = Sheet::parse(
         ".a.hot > .b:checked, .c:focus {width:10px;width:20px} .b:disabled{height:30px}",

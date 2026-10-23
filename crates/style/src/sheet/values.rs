@@ -108,6 +108,24 @@ fn color<'i>(input: &mut Parser<'i>) -> Result<Color> {
     }
     Ok(Color(out[0], out[1], out[2], out[3]))
 }
+
+fn box_shadow<'i>(input: &mut Parser<'i>) -> Result<BoxShadow> {
+    if input.try_parse(|p| p.expect_ident_matching("none")).is_ok() {
+        return Ok(BoxShadow::None);
+    }
+    let x = px(input)?;
+    let y = px(input)?;
+    let blur = input.try_parse(px).unwrap_or(0.0);
+    let spread = input.try_parse(px).unwrap_or(0.0);
+    let color = color(input)?;
+    Ok(BoxShadow::Outset(Shadow {
+        x,
+        y,
+        blur,
+        spread,
+        color,
+    }))
+}
 macro_rules! keyword {
     ($input:expr, $($name:literal => $value:expr),+ $(,)?) => {{
         match $input.expect_ident()?.to_ascii_lowercase().as_str() {
@@ -200,6 +218,10 @@ pub(super) fn parse<'i>(name: &str, input: &mut Parser<'i>) -> Result<Style> {
                 keyword!(input, "normal"=>400.0, "bold"=>700.0)
             });
         }
+        "field-sizing" => {
+            style.field_sizing = Some(keyword!(input,
+                "fixed" => FieldSizing::Fixed, "content" => FieldSizing::Content));
+        }
         "white-space" => {
             style.white_space = Some(keyword!(input,
             "normal"=>WhiteSpace::Normal, "nowrap"=>WhiteSpace::NoWrap,
@@ -213,6 +235,11 @@ pub(super) fn parse<'i>(name: &str, input: &mut Parser<'i>) -> Result<Style> {
         }
         "border-radius" => style.radius = Some(px(input)?),
         "opacity" => style.opacity = Some(input.expect_number()?.into()),
+        "box-shadow" => style.box_shadow = Some(box_shadow(input)?),
+        "text-overflow" => {
+            style.text_overflow =
+                Some(keyword!(input,"clip"=>TextOverflow::Clip,"ellipsis"=>TextOverflow::Ellipsis))
+        }
         "position" => {
             style.position = Some(
                 keyword!(input,"static"=>Position::Static,"relative"=>Position::Relative,"absolute"=>Position::Absolute,"sticky"=>Position::Sticky),
@@ -226,6 +253,10 @@ pub(super) fn parse<'i>(name: &str, input: &mut Parser<'i>) -> Result<Style> {
         "flex-direction" => {
             style.flex_direction =
                 Some(keyword!(input,"row"=>FlexDirection::Row,"column"=>FlexDirection::Column))
+        }
+        "flex-wrap" => {
+            style.flex_wrap =
+                Some(keyword!(input,"nowrap"=>FlexWrap::NoWrap,"wrap"=>FlexWrap::Wrap))
         }
         "align-items" => {
             style.align = Some(

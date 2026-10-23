@@ -2113,3 +2113,30 @@ query、hover、资源/viewport变化的失效条件。OS IME/辅助技术、And
 已实现普通 Rust builders 的 `plan(...).part(...)`、`Scope::instantiate` 和弱 Scope 的实例绑定；没有 DSL 或模板 VM。render 的 CreatePlan 作为离线完整创建单元，HTML 编译静态 Shape，web 复用文档内有界原型并深克隆一次、挂载根一次。每个语义节点身份保留；静态后代由实例 Scope 管理，其他 HTML 适配器默认展开有限操作，stream v3 不变。Group 目前正确回退到逐节点路径。
 
 同库独立构建、两轮 864 个正式样本：千行创建 Script 55.27→28.36 ms，千行替换 83.79→46.38 ms，万行创建 646.39→362.41 ms。四版数据/身份/万行几何和六检查点画面一致；当前工作树 Windows/Linux 各 466 项测试及最终 26 个浏览器套件通过，真实行高与容差保留。体积成本、拆分对照、源码边界及完整证据见 [静态构造计划报告](static-construction-plan-2026-10-24.md)。
+
+
+## Sapid P1-04–06：输入组合与内容尺寸（2026-10-24）
+
+Sapid 增加独立 Textarea、PasswordInput 和 InputGroup/Addon/Section，继续使用
+既有 Input、Field 和版本/Owner 协议。Textarea 行数换算为显式 line-height、padding、
+border 对应的尺寸；自动高度通过 style::FieldSizing::{Fixed,Content}，不注入组件 DOM
+或隐藏测量输入。HTML/RECORD style profile 升至 v4；CSS Sheet 校验每项原始声明，
+HTML full-shape/字段 Patch 差分 oracle 覆盖新增声明与重置。stream 使用相同样式串，
+不改变当前 HTML snapshot/stream wire 版本。
+
+Blitz style profile 升至 v5，明确拒绝 FieldSizing 两值，包含 App 创建/预检/更新、
+独立 direct apply、成功前缀/查询水位和 shell 拒绝后编辑恢复。固定行数沿用普通尺寸；
+本次不宣称原生自动高度。密码切换只修改 Purpose，选区/编辑器与已有 native 密码投影
+约定一致；未增加 OS IME 或屏幕阅读器语音的验收声明。
+
+验证入口：Sapid scripts/check.ps1 -Web -Native、tests/inputs.rs、
+examples/web/input-acceptance.js；Glory style/tests/sheet.rs、html/tests/sheet.rs、
+html/src/patch_tests.rs、blitz/tests/style_profile.rs。具体本次执行结果与适配器边界
+记录在同级 Sapid docs/widget-inventory.json。
+
+
+### 2026-10-24：分页活节点存储与 DOM 元数据归并
+
+保留 staged / committed 两份 Memory 和全部节点身份，改用带完整 runtime / generation 校验的分页 NodeMap；DOM parent 并入 Entry，移除重复 token 索引和字符串副本，静态计划批量登记。五份全新独立构建、四轮 2,160 样本，千行创建 / 替换 / 万行创建 / 清空的 Script 中位数降低约 14% / 20% / 25% / 31%；小操作未全面改善。
+
+实测候选 Windows / Linux 各 470 测试、27 浏览器套件、真实行高 64/1024 缓存检查通过，全部数据 / 存续身份 / 万行几何 / 画面一致。另行冻结同期功能修改做合并验证，493 项 Windows 测试及 native/WASM 严格 Clippy 通过；这批代码不混入性能收益。完整拆分对照、剩余开销、体积/空间代价和证据边界见 [节点存储与 DOM 元数据报告](node-storage-dom-metadata-2026-10-24.md)。

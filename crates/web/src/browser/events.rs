@@ -69,6 +69,8 @@ impl Listeners {
             });
         }
         for name in [
+            "submit",
+            "reset",
             "click",
             "input",
             "change",
@@ -210,11 +212,7 @@ pub(super) fn target(dom: &Dom, element: &Element) -> Option<(NodeId, Element)> 
         return None;
     }
     let target = element.closest("[data-gly-node]").ok().flatten()?;
-    let id = dom
-        .tokens
-        .borrow()
-        .get(&target.get_attribute("data-gly-node")?)
-        .copied()?;
+    let id = dom.id_for_token(&target.get_attribute("data-gly-node")?)?;
     Some((id, target))
 }
 fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_render::Error> {
@@ -274,6 +272,30 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
         return Ok(());
     };
     let entry = dom.entry(id)?;
+    if matches!(name, "submit" | "reset") {
+        if !element.has_attribute("data-gly-form") {
+            return Ok(());
+        }
+        event.prevent_default();
+        if name == "reset" {
+            dom.queue(id, Event::Reset);
+        } else {
+            let submitter = event
+                .dyn_ref::<web_sys::SubmitEvent>()
+                .and_then(|event| event.submitter());
+            let submitter = match submitter {
+                Some(element) => {
+                    let Some((submitter, _)) = target(dom, element.unchecked_ref()) else {
+                        return Ok(());
+                    };
+                    Some(submitter)
+                }
+                None => None,
+            };
+            dom.queue(id, Event::Submit { submitter });
+        }
+        return Ok(());
+    }
     if name == "click"
         && element
             .closest("fieldset[disabled]")
@@ -292,6 +314,9 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
     }
     match name {
         "click" => {
+            if element.has_attribute("data-gly-form-action") {
+                event.prevent_default();
+            }
             if dom.suppress_click.replace(false) {
                 event.prevent_default();
                 return Ok(());
@@ -377,10 +402,11 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
                 return Ok(());
             }
             let editable = entry.edit == EditKind::Text
-                || element
-                    .closest("input,textarea,select,[contenteditable=true],[role=textbox]")
-                    .map_err(backend)?
-                    .is_some();
+                || entry.edit != EditKind::Check
+                    && element
+                        .closest("input,textarea,select,[contenteditable=true],[role=textbox]")
+                        .map_err(backend)?
+                        .is_some();
             let command = KeyboardInput {
                 key: &key.key(),
                 control: key.ctrl_key(),
@@ -393,6 +419,13 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
             }
             .command();
             if let Some(command) = command {
+                let form_submit = command == KeyboardCommand::Submit
+                    && entry.edit == EditKind::Text
+                    && entry.control()?.tag_name() != "TEXTAREA"
+                    && element
+                        .closest("form[data-gly-form]")
+                        .map_err(backend)?
+                        .is_some();
                 let own_interest = entry.interests.borrow().contains(&EventKind::Keyboard);
                 let mut cursor = Some(id);
                 let mut interested = false;
@@ -404,9 +437,9 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
                         interested = true;
                         break;
                     }
-                    cursor = dom.parents.borrow().get(&node).copied().flatten();
+                    cursor = dom.parent(node);
                 }
-                if interested && (!editable || own_interest) {
+                if interested && (!editable || own_interest) || form_submit {
                     if command == KeyboardCommand::Submit {
                         dom.queue(
                             id,

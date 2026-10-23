@@ -20,15 +20,37 @@ fn app() -> (App, Renderer) {
 fn unsupported(property: Property, value: Value) -> Error {
     Error::UnsupportedStyle {
         profile: "blitz",
-        version: 4,
+        version: 6,
         requirement: Unsupported {
             property,
             value: Some(value),
         },
     }
 }
-fn rejected() -> [(Style, Error); 2] {
+fn rejected() -> [(Style, Error); 6] {
     [
+        (
+            Style::new().text_overflow(glory_render::style::TextOverflow::Clip),
+            Error::UnsupportedStyle {
+                profile: "blitz",
+                version: 6,
+                requirement: Unsupported {
+                    property: Property::TextOverflow,
+                    value: None,
+                },
+            },
+        ),
+        (
+            Style::new().text_overflow(glory_render::style::TextOverflow::Ellipsis),
+            Error::UnsupportedStyle {
+                profile: "blitz",
+                version: 6,
+                requirement: Unsupported {
+                    property: Property::TextOverflow,
+                    value: None,
+                },
+            },
+        ),
         (
             Style::new().position(Position::Sticky).top(Length::Px(0.0)),
             unsupported(Property::Position, Value::Sticky),
@@ -36,6 +58,28 @@ fn rejected() -> [(Style, Error); 2] {
         (
             Style::new().scroll_anchor(true),
             unsupported(Property::ScrollAnchor, Value::AnchorAuto),
+        ),
+        (
+            Style::new().field_sizing(glory_render::style::FieldSizing::Fixed),
+            Error::UnsupportedStyle {
+                profile: "blitz",
+                version: 6,
+                requirement: Unsupported {
+                    property: Property::FieldSizing,
+                    value: None,
+                },
+            },
+        ),
+        (
+            Style::new().field_sizing(glory_render::style::FieldSizing::Content),
+            Error::UnsupportedStyle {
+                profile: "blitz",
+                version: 6,
+                requirement: Unsupported {
+                    property: Property::FieldSizing,
+                    value: None,
+                },
+            },
         ),
     ]
 }
@@ -57,7 +101,11 @@ fn native_profile_distinguishes_unimplemented_values_from_the_html_dialect() {
     assert_eq!(app.style_profile(), profile);
     assert_eq!(app.scope().style_profile().unwrap(), profile);
     for property in Property::ALL {
-        assert!(profile.inline.supports_property(*property), "{property:?}");
+        assert_eq!(
+            profile.inline.supports_property(*property),
+            !matches!(property, Property::FieldSizing | Property::TextOverflow),
+            "{property:?}"
+        );
     }
     for value in Value::ALL {
         assert_eq!(
@@ -68,7 +116,7 @@ fn native_profile_distinguishes_unimplemented_values_from_the_html_dialect() {
     }
     assert_eq!(
         (profile.name, profile.version, profile.css),
-        ("blitz", 4, Css::Html)
+        ("blitz", 6, Css::Html)
     );
     assert!(
         glory_render::style::Profile::HTML
