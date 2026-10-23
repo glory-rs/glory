@@ -61,19 +61,31 @@ struct PendingQuery {
     reply: Reply,
     cancelled: bool,
 }
+#[derive(Default)]
+struct Owned {
+    nodes: BTreeSet<NodeId>,
+    subscriptions: BTreeSet<(NodeId, EventKind)>,
+    queries: BTreeSet<QueryToken>,
+}
+impl Owned {
+    fn is_empty(&self) -> bool {
+        self.nodes.is_empty() && self.subscriptions.is_empty() && self.queries.is_empty()
+    }
+}
+
 struct Present {
     tree: Memory,
     ids: NodeIds,
-    owners: HashMap<InstanceId, BTreeSet<NodeId>>,
+    owners: HashMap<InstanceId, Owned>,
+    node_owner_count: usize,
+    query_owner_count: usize,
     node_owners: HashMap<NodeId, InstanceId>,
     handlers: HashMap<NodeId, BTreeMap<EventKind, Subscription>>,
-    subscriptions: HashMap<InstanceId, BTreeSet<(NodeId, EventKind)>>,
     listeners: Vec<(NodeId, EventKind, bool)>,
     commands: Vec<Mutation>,
     actions: Vec<Action>,
     queries: HashMap<QueryToken, PendingQuery>,
     node_queries: HashMap<NodeId, BTreeSet<QueryToken>>,
-    owner_queries: HashMap<InstanceId, BTreeSet<QueryToken>>,
     next_query: u64,
 }
 
@@ -86,10 +98,13 @@ impl Present {
                 self.node_queries.remove(&pending.node);
             }
         }
-        if let Some(tokens) = self.owner_queries.get_mut(&pending.owner) {
-            tokens.remove(&token);
-            if tokens.is_empty() {
-                self.owner_queries.remove(&pending.owner);
+        if let Some(owned) = self.owners.get_mut(&pending.owner) {
+            owned.queries.remove(&token);
+            if owned.queries.is_empty() {
+                self.query_owner_count -= 1;
+            }
+            if owned.is_empty() {
+                self.owners.remove(&pending.owner);
             }
         }
         Some(pending)
@@ -121,15 +136,15 @@ impl Session {
                 tree: Memory::new(id),
                 ids: NodeIds::new(id),
                 owners: HashMap::new(),
+                node_owner_count: 0,
+                query_owner_count: 0,
                 node_owners: HashMap::new(),
                 handlers: HashMap::new(),
-                subscriptions: HashMap::new(),
                 listeners: Vec::new(),
                 commands: Vec::new(),
                 actions: Vec::new(),
                 queries: HashMap::new(),
                 node_queries: HashMap::new(),
-                owner_queries: HashMap::new(),
                 next_query: 1,
             }),
             renderer: RefCell::new(renderer),
@@ -232,15 +247,23 @@ impl Session {
         let mut cancelled = Vec::new();
         {
             let mut present = self.present.borrow_mut();
-            if let Some(tokens) = present.owner_queries.remove(&owner) {
-                for token in tokens {
+            // One record covers all presentation interests of this Owner.
+            // Ancestor cleanup may already have removed its nodes/listeners;
+            // an empty Scope needs no further hash lookups or tree work.
+            let Some(owned) = present.owners.remove(&owner) else {
+                return;
+            };
+            present.node_owner_count -= usize::from(!owned.nodes.is_empty());
+            present.query_owner_count -= usize::from(!owned.queries.is_empty());
+            {
+                for token in owned.queries {
                     if let Some(query) = present.remove_query(token) {
                         discarded_queries.push(query);
                     }
                 }
             }
-            if let Some(subscriptions) = present.subscriptions.remove(&owner) {
-                for (node, kind) in subscriptions {
+            {
+                for (node, kind) in owned.subscriptions {
                     if let Some(subscription) = present
                         .handlers
                         .get_mut(&node)
@@ -254,8 +277,7 @@ impl Session {
                     }
                 }
             }
-            let roots = present.owners.remove(&owner).unwrap_or_default();
-            for mut id in roots {
+            for mut id in owned.nodes {
                 if !present.ids.contains(id) {
                     continue;
                 }
@@ -285,21 +307,21 @@ impl Session {
                 for child in all {
                     present.ids.release(child);
                     if let Some(owner) = present.node_owners.remove(&child)
-                        && let Some(nodes) = present.owners.get_mut(&owner)
+                        && let Some(owned) = present.owners.get_mut(&owner)
                     {
-                        nodes.remove(&child);
-                        if nodes.is_empty() {
+                        owned.nodes.remove(&child);
+                        let empty_nodes = owned.nodes.is_empty();
+                        if owned.is_empty() {
                             present.owners.remove(&owner);
                         }
+                        present.node_owner_count -= usize::from(empty_nodes);
                     }
                     if let Some(handlers) = present.handlers.remove(&child) {
                         for (kind, subscription) in handlers {
-                            if let Some(subscriptions) =
-                                present.subscriptions.get_mut(&subscription.owner)
-                            {
-                                subscriptions.remove(&(child, kind));
-                                if subscriptions.is_empty() {
-                                    present.subscriptions.remove(&subscription.owner);
+                            if let Some(owned) = present.owners.get_mut(&subscription.owner) {
+                                owned.subscriptions.remove(&(child, kind));
+                                if owned.is_empty() {
+                                    present.owners.remove(&subscription.owner);
                                 }
                             }
                             discarded.push(subscription.callback);
@@ -580,11 +602,10 @@ impl Session {
                 .entry(query.node())
                 .or_default()
                 .insert(token);
-            present
-                .owner_queries
-                .entry(owner)
-                .or_default()
-                .insert(token);
+            let owned = present.owners.entry(owner).or_default();
+            let first_query = owned.queries.is_empty();
+            owned.queries.insert(token);
+            present.query_owner_count += usize::from(first_query);
             present.queries.insert(
                 token,
                 PendingQuery {
@@ -743,7 +764,10 @@ impl Scope {
                 return Err(error.into());
             }
             present.node_owners.insert(id, self.id());
-            present.owners.entry(self.id()).or_default().insert(id);
+            let owned = present.owners.entry(self.id()).or_default();
+            let first_node = owned.nodes.is_empty();
+            owned.nodes.insert(id);
+            present.node_owner_count += usize::from(first_node);
             present.commands.push(mutation);
             id
         };
@@ -836,17 +860,18 @@ impl Scope {
                 },
             );
             if let Some(previous) = &previous
-                && let Some(subscriptions) = present.subscriptions.get_mut(&previous.owner)
+                && let Some(owned) = present.owners.get_mut(&previous.owner)
             {
-                subscriptions.remove(&(node, kind));
-                if subscriptions.is_empty() {
-                    present.subscriptions.remove(&previous.owner);
+                owned.subscriptions.remove(&(node, kind));
+                if owned.is_empty() {
+                    present.owners.remove(&previous.owner);
                 }
             }
             present
-                .subscriptions
+                .owners
                 .entry(self.id())
                 .or_default()
+                .subscriptions
                 .insert((node, kind));
             if previous.is_none() {
                 present.listeners.push((node, kind, true));
@@ -1033,10 +1058,10 @@ impl App {
         UiStats {
             nodes: present.tree.len(),
             node_slots: present.ids.capacity(),
-            owners: present.owners.len(),
+            owners: present.node_owner_count,
             handlers: present.handlers.values().map(BTreeMap::len).sum(),
             queries: present.queries.len(),
-            query_owners: present.owner_queries.len(),
+            query_owners: present.query_owner_count,
             query_targets: present.node_queries.len(),
             pending: present.commands.len() + present.actions.len() + present.listeners.len(),
         }

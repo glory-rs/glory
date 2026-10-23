@@ -448,12 +448,15 @@ impl State {
     }
 
     fn dispose_owner(&mut self, key: Key) -> Cleanup {
-        let mut pending = vec![key];
         let mut cleanup = Cleanup::default();
-        while let Some(key) = pending.pop() {
-            let Some(owner) = self.owners.remove(key) else {
-                continue;
-            };
+        let Some(mut owner) = self.owners.remove(key) else {
+            return cleanup;
+        };
+        // Most repeated disposals come from handles already retired by an
+        // ancestor. Do not allocate a traversal stack for them or for leaves.
+        let mut pending = Vec::new();
+        let mut key = key;
+        loop {
             if let Some(parent) = owner.parent.and_then(|parent| self.owners.get_mut(parent)) {
                 parent.children.remove(&key);
             }
@@ -472,8 +475,17 @@ impl State {
             for node in owner.nodes {
                 self.remove_node(node, &mut cleanup);
             }
+            loop {
+                let Some(next) = pending.pop() else {
+                    return cleanup;
+                };
+                if let Some(next_owner) = self.owners.remove(next) {
+                    key = next;
+                    owner = next_owner;
+                    break;
+                }
+            }
         }
-        cleanup
     }
 }
 

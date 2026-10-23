@@ -1,5 +1,106 @@
 # Performance Notes
 
+## Owner and Binding retirement follow-up — 2026-10-23
+
+本轮在 DOM 父表修复后冻结新基线，继续定位 Owner/Binding 销毁。清空万行的
+基线 CPU 诊断中，`Owner::dispose` 含回调约 155.29 ms，其中 UI Scope 清理
+约 127.71 ms；核心 `State::dispose_owner` 约 18.06 ms，`remove_node`
+约 5.30 ms。后两者是包含关系，所有包含式统计均不可相加。
+Owner 栈包含语义树、监听、查询和组件资源清理，不能全部归因于响应式图。
+
+实际优化：
+
+- `glory-core` 先用代际身份取出 Owner。重复退休直接返回，叶 Owner 不再先分配
+  `vec![key]`，有孩子才扩展遍历栈。完整退休后执行回调、子先父后/反向注册顺序、
+  借用外释放捕获，以及任务取消规则保持不变。
+- `glory-ui` 将同一 Instance 的节点、监听、查询集中到一个 `Owned` 记录。
+  最后一个兴趣退休时移除记录，后续 Scope 回调一次未命中即可返回。
+  外部节点上的监听、外部目标的查询仍归注册 Scope，三类兴趣互不代替。
+  `UiStats` 独立计数节点 Owner 和查询 Owner，不扫描所有 Owner 来计算。
+
+Binding 仍从实际存活来源注销，立即取消调度成员，在图借用之外释放捕获。
+此处没有全图 retain；双向边注销和用户析构是必要工作。队列代际校验、FIFO、
+阶段顺序及 `2 * live + 64` 物理条目上限保持原契约。
+
+两份冻结源码各 239 个输入，仅两个实现文件、两个回归测试文件不同。
+各自从独立 D: target 全新构建，opt-level=3/LTO/单 codegen unit，
+wasm-bindgen/CLI 0.2.129，无 wasm-opt。`semantic-rows-v1` 应用、锁文件、
+生成器、种子、CSS、计时脚本完全相同，每行完整挂载。
+Chrome 155.0.8059.84，1280×900，scale=1；正反顺序各一轮，独立 context，
+每项三次预热、12 次采样：**432 样本，每个版本/操作 24 样本**。
+回归冻结树与被测 release 的全部 239 个输入逐字节一致，无后续实现修补。
+
+中位数，单位 ms。Wall 为点击到两次 RAF；Script 为 CDP 脚本计数器差值，
+包含共用驱动开销。本机另有独立 Cargo 任务；本次对照不代表专用空闲机器。
+
+| 操作 | Wall 前 → 后 | Script 前 → 后 | Script 降低 |
+|---|---:|---:|---:|
+| create_1k | 91.35 → 91.45 | 64.99 → 65.23 | -0.4% |
+| replace_1k | 118.35 → 121.55 | 92.11 → 94.39 | -2.5% |
+| update_10th | 11.75 → 12.35 | 0.74 → 0.68 | 8.7% |
+| select_row | 8.50 → 10.05 | 1.13 → 1.07 | 5.4% |
+| swap_rows | 10.90 → 9.60 | 0.58 → 0.56 | 4.1% |
+| remove_row | 11.30 → 8.15 | 0.62 → 0.62 | 0.2% |
+| append_1k | 100.35 → 100.80 | 71.88 → 70.11 | 2.5% |
+| create_10k | 1061.25 → 1058.55 | 775.26 → 767.35 | 1.0% |
+| clear_1k | 37.65 → 34.85 | 34.35 → 32.05 | 6.7% |
+
+清空千行在两个顺序中均改善，分别约 10.4% 和 6.6%；合并后的 Script 中位数
+**34.35 → 32.05 ms，降低 6.7%**。替换千行合并后慢 2.5%，第二轮 after
+波动尤其大（116.04 ms，对照 93.00 ms），不能称为替换优化。
+创建万行的 Script 差异约 1%，没有足够证据声称创建提速。
+小操作的 RAF 差异也不作为架构收益。
+
+另行包装 DOM 方法及 CPU 采样的诊断，不进入上述 432 个计时样本：
+
+| 诊断 | Busy sampled 前 → 后 | Owner 含回调前 → 后 | UI Scope 清理前 → 后 |
+|---|---:|---:|---:|
+| replace_1k | 123.16 → 112.10 | 13.65 → 12.20 | 11.39 → 11.15 |
+| clear_1k | 30.47 → 26.75 | 15.22 → 13.78 | 12.11 → 9.48 |
+| clear_10k | 320.74 → 311.47 | 155.29 → 142.28 | 127.70 → 108.97 |
+| clear_1k_after_10k | 34.07 → 33.03 | 14.36 → 14.64 | 10.11 → 10.88 |
+
+万行 Owner 含回调样本降低约 8.4%，UI Scope 清理降低约 14.7%。
+同次核心 `State::dispose_owner` 为 18.06 → 21.13 ms，`remove_node` 为
+5.30 → 5.74 ms，核心部分未显示稳定降低。两项修改合并测量，未做单项消融，
+不能给免分配快路径单独分配收益。编译内联/采样粒度影响函数归属，
+诊断不能代替重复计时分布。
+
+六个诊断案例的 DOM 方法、属性写入次数和节点/图统计完全一致。
+每千行增加 8,000 语义节点、6,000 图节点、9,000 Owners；替换仍创建
+8,000 个元素、写 32,000 次属性、删除 1,000 个行根。
+清空回到 0 行/label、10 语义节点、3 图节点、13 Owners。
+合并记录的单条载荷更大，活跃条目和节点数不等于 RSS；本轮不声称内存字节降低。
+
+一致性与完整回归：
+
+- 所有计时样本核对种子数据；更新、选择、交换、删除、追加保留存活 Element、
+  Text Node 和语义身份，替换后旧后代断开，万行几何摘要一致。
+- 六个视口 PNG 检查点逐字节相同，含万行中部；两份构建的 DOM 调用计数一致。
+- Windows/Linux 各 430 项工作区、各 289 项 fork 测试通过；原生/wasm 严格
+  Clippy、fmt、Linux 无默认 feature/paint 检查通过。
+- Windows shell/accesskit 两次真实窗口探针和双窗口 UIA 通过；Linux
+  X11/Wayland × shell/accesskit 四次真实窗口探针及 CPU raster 通过。
+- Chromium 24/24 套件通过；64/1024 测量缓存各 70 次小数更新、真实行高、
+  原有 0.1/0.15 容差、节点身份及各 73 张锚点截图通过，最终位置和画面一致。
+- SSR fixture 四项测试及流式 Shell/Patch/End、资源交接、断连取消、
+  慢消费者背压通过。
+- 新增测试覆盖重复退休后的 Binding 槽位复用、回调顺序、捕获析构重入，
+  以及目标退休后的独立查询完成、兴趣清空后的重新注册、退休请求不再回调。
+
+剩余优先项是 UI Scope 中逐节点索引操作，以及语义 `Memory::unlink` 的
+兄弟位置搜索/Vec 搬移；万行诊断后端 DOM sink 仍约 108 ms。
+依赖边和捕获释放可继续细分，但当前纯核心占比不支持优先进行更大的生命周期重写。
+
+原始样本、构建/源码哈希、CPU profiles、DOM 计数、截图和完整日志：
+`D:/BuildCache/glory-owner-retirement-20261023/evidence-index.json`。
+`evidence.py` 校验冻结源码、样本、像素、身份、回归及产物哈希；
+`profile-summary.py` 重算包含式函数族时间。
+复现使用该目录 before/release/source，以 `benchmarks/build.ps1` 指定独立
+BuildRoot，启动目录 HTTP 服务，再执行 `bulk-compare.cjs`、`--integrity`
+及 `summarize-bulk.py`。完整验证入口为已归档的 `run-windows.ps1`、
+`linux-base.sh`、`linux-window-root.sh` 和 `scripts/test-semantic-browser.cjs`。
+
 ## DOM retirement follow-up — 2026-10-23
 
 The parent lookup added for DOM keyboard/drag routing used `HashMap::retain`

@@ -1,5 +1,9 @@
 # Glory / Leptos / Dioxus: current semantic browser benchmark
 
+The [Owner/Binding retirement follow-up](../docs/performance.md#owner-and-binding-retirement-follow-up--2026-10-23)
+records the next 432-sample paired run, identity/pixel checks and full regression.
+Clear-1k script median improves 6.7%; replacement has no demonstrated gain.
+
 The subsequent [DOM retirement follow-up](../docs/performance.md#dom-retirement-follow-up--2026-10-23)
 compares fresh Glory before/after builds with 432 unchanged-workload samples,
 removes repeated parent-table scans, and records complete regression evidence.

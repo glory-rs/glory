@@ -645,3 +645,80 @@ fn ordinary_focus_refusal_continues_but_backend_failures_still_fault() {
         }
     }
 }
+
+#[test]
+fn owner_interests_survive_independent_node_listener_and_query_retirement() {
+    let (app, external, wire) = fixture();
+    let baseline = app.stats();
+    let owner = app.scope().child().unwrap();
+    let node = owner
+        .create(Descriptor::new(Props::Button(Default::default())))
+        .unwrap();
+    let listener = app.scope().child().unwrap();
+    listener.on(node, EventKind::Activate, |_| {}).unwrap();
+    let calls = Rc::new(Cell::new(0));
+    let out = calls.clone();
+    let pending = listener
+        .request(Query::Bounds(external), move |result| {
+            result.unwrap();
+            out.set(out.get() + 1);
+        })
+        .unwrap();
+    let accepted = wire.borrow().applied;
+    owner.dispose(); // Removes listener's sole target, but not its pending query.
+    app.flush().unwrap();
+    assert_eq!(app.stats().owners, baseline.owners);
+    assert_eq!(app.stats().query_owners, 1);
+    reply(
+        &wire,
+        pending,
+        accepted,
+        Ok(QueryValue::Bounds(Rect::default())),
+    );
+    app.pump().unwrap();
+    assert_eq!(calls.get(), 1);
+    assert_eq!(app.stats().query_owners, 0);
+    // The same live Owner can acquire new interests after its last one retires.
+    listener
+        .on(external, EventKind::FocusChanged, |_| {})
+        .unwrap();
+    let drops = Rc::new(Cell::new(0));
+    let capture = Dropped(drops.clone());
+    let cancelled = listener
+        .request(Query::Bounds(external), move |_| {
+            std::hint::black_box(&capture);
+            panic!("retired requester");
+        })
+        .unwrap();
+    let accepted = wire.borrow().applied;
+    listener.dispose();
+    app.flush().unwrap();
+    assert_eq!(drops.get(), 1);
+    reply(
+        &wire,
+        cancelled,
+        accepted,
+        Ok(QueryValue::Bounds(Rect::default())),
+    );
+    app.pump().unwrap();
+    assert_eq!(calls.get(), 1);
+    let stats = app.stats();
+    assert_eq!(
+        (
+            stats.nodes,
+            stats.owners,
+            stats.handlers,
+            stats.queries,
+            stats.query_owners,
+            stats.query_targets
+        ),
+        (
+            baseline.nodes,
+            baseline.owners,
+            baseline.handlers,
+            baseline.queries,
+            baseline.query_owners,
+            baseline.query_targets
+        )
+    );
+}

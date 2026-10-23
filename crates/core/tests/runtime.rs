@@ -1235,3 +1235,65 @@ fn deterministic_mixed_batches_match_plain_dynamic_diamond_evaluation() {
         assert_eq!(runtime.stats().queued, 0);
     }
 }
+
+#[test]
+fn repeated_subtree_retirement_preserves_cleanup_order_and_reused_binding_identity() {
+    let runtime = Rc::new(Runtime::new());
+    let parent = runtime.owner();
+    let child = parent.child();
+    let grandchild = child.child();
+    let trace = Rc::new(RefCell::new(Vec::new()));
+    for (owner, name) in [
+        (&parent, "parent"),
+        (&child, "child"),
+        (&grandchild, "grandchild"),
+    ] {
+        for index in 0..2 {
+            let trace = trace.clone();
+            owner
+                .on_cleanup(move || trace.borrow_mut().push((name, index)))
+                .unwrap();
+        }
+    }
+    struct Capture(Rc<Runtime>, Rc<Cell<usize>>);
+    impl Drop for Capture {
+        fn drop(&mut self) {
+            // Captures must be released after the graph borrow, exactly once.
+            assert_eq!(self.0.stats().nodes, 0);
+            let live = self.0.owner();
+            assert_eq!(live.cage(7).get(), 7);
+            self.1.set(self.1.get() + 1);
+        }
+    }
+    let drops = Rc::new(Cell::new(0));
+    let capture = Capture(runtime.clone(), drops.clone());
+    let old = grandchild.binding(move || {
+        std::hint::black_box(&capture);
+    });
+    parent.dispose();
+    assert_eq!(
+        &*trace.borrow(),
+        &[
+            ("grandchild", 1),
+            ("grandchild", 0),
+            ("child", 1),
+            ("child", 0),
+            ("parent", 1),
+            ("parent", 0)
+        ]
+    );
+    assert_eq!(drops.get(), 1);
+    let replacement = runtime.owner();
+    let called = Rc::new(Cell::new(0));
+    let out = called.clone();
+    let binding = replacement.binding(move || out.set(out.get() + 1));
+    for _ in 0..3 {
+        parent.dispose();
+        child.dispose();
+        grandchild.dispose();
+        old.dispose();
+    }
+    runtime.flush().unwrap();
+    assert!(binding.is_alive());
+    assert_eq!((drops.get(), called.get()), (1, 1));
+}
