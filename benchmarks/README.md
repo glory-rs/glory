@@ -1,3 +1,118 @@
+# Glory / Leptos / Dioxus: current semantic browser benchmark
+
+The subsequent [DOM retirement follow-up](../docs/performance.md#dom-retirement-follow-up--2026-10-23)
+compares fresh Glory before/after builds with 432 unchanged-workload samples,
+removes repeated parent-table scans, and records complete regression evidence.
+
+The latest rerun independently rebuilt all three apps and measured two
+opposite-order rounds (648 samples). The current table, CPU counters, untimed
+node census, selection diagnostic and immutable evidence are in
+[Performance Notes](../docs/performance.md#current-three-framework-rerun--2026-10-23).
+The earlier one-round table below remains historical.
+
+The [bulk DOM follow-up](../docs/bulk-dom-optimization-2026-10-23.md) compares
+Glory before/after framework optimizations with this same unchanged workload:
+432 samples, reversed-order rounds, independent builds and identity/pixel checks.
+Its paired results and the then-existing adaptive anchor failure are recorded
+separately from the earlier three-framework table below. The anchor failure was
+subsequently [fixed](../docs/anchor-residual-fix-2026-10-23.md). Use `bulk-compare.cjs`
+and `summarize-bulk.py` for the paired run; the report includes exact commands.
+
+The active workload is **semantic-rows-v1**. It compares Glory's new public Rust
+builders and full keyed `each` with Leptos 0.8.19 and Dioxus 0.7.9. All three
+use the same seeded Rust generator, div/button/span element structure and CSS.
+Framework-specific attributes and comment markers remain measured overhead.
+The operations are create 1k/10k, replace, update every tenth label, select,
+swap, remove, append and clear. Every row is mounted; this is not a virtual list.
+
+These are **local comparison results**, not official HTML-table scores. The
+official adapter script is explicitly disabled for this changed DOM contract.
+Historical official tables below do not describe the current architecture.
+
+## Run
+
+Use PowerShell on Windows with Rust's `wasm32-unknown-unknown` target, Node and
+the Playwright package under `tests/playwright/node_modules` installed. Supply
+wasm-bindgen-cli **0.2.129** at
+`D:/BuildCache/glory-framework-compare/tools/bin/wasm-bindgen.exe`.
+The framework library versions and bindgen cohort are locked in the three
+checked-in Cargo.lock files; the CLI version must match.
+
+```powershell
+./benchmarks/compare.ps1
+```
+
+This freezes the current owned crate/app inputs with SHA-256, builds each app
+in an independent D: Cargo target (release opt-level=3/LTO/one codegen unit),
+runs strict WASM Clippy, generates web bindings without wasm-opt, starts a
+loopback server, launches an independent headless Chrome and performs semantic
+conformance before timing. It closes its browser and owned server on exit.
+The default browser is installed Google Chrome; `-Browser` selects an executable.
+All targets, temporary browser profiles and results must stay under D:/BuildCache.
+
+```powershell
+# Reuse already built sites; each run needs a new output directory.
+./benchmarks/compare.ps1 -SkipBuild `
+  -OutDir D:/BuildCache/glory-framework-compare/my-round
+```
+
+To check order sensitivity, reuse one build and run a separate reversed round:
+
+```powershell
+./benchmarks/compare.ps1 -SkipBuild -Order 'leptos,glory,dioxus' -OutDir D:/BuildCache/glory-framework-compare/forward-round
+./benchmarks/compare.ps1 -SkipBuild -Order 'dioxus,glory,leptos' -OutDir D:/BuildCache/glory-framework-compare/reverse-round
+```
+
+For a one-app preview use `./benchmarks/run.ps1 glory` and visit the printed URL.
+The module exposes `window.__BENCH__.runAll()`; structured three-app measurements
+should use compare.ps1 so the CPU counters and conformance checks are included.
+The old Trunk cache/output path is no longer used by the supported runner.
+
+## What is validated and timed
+
+- An independent JS seed oracle verifies row IDs/labels and all nine operations.
+- Swap must preserve keyed DOM identities. Every one of the 10k rows has a box.
+- Clear/recreate checks that Glory's live label registry and graph return to
+  baseline. Other frameworks' internal reactive graphs are not inspected.
+- Same-checkpoint viewport PNGs are byte-identical; final normalized row-data
+  hashes agree for every timed sample. This is not a claim about every pixel
+  in every possible state or browser.
+- Each operation warms 3 times and measures 12 samples. Setup and row-data
+  checks are outside the click-to-two-RAF interval. This is not presentation/FPS.
+- CDP script/layout/style/task CPU counter deltas are recorded as diagnostics;
+  they include common harness overhead. Inclusive metrics must not be summed.
+
+## First current-architecture round: 2026-10-23
+
+Chrome 155.0.8059.84, 1280×900, 324 measured samples. Wall medians in ms:
+
+| Operation | Glory | Leptos | Dioxus |
+|---|---:|---:|---:|
+| create_1k | 133.65 | 43.35 | 49.80 |
+| replace_1k | 173.80 | 49.75 | 47.30 |
+| update_10th | 14.40 | 14.60 | 22.60 |
+| select_row | 11.00 | 250.60 | 9.45 |
+| swap_rows | 12.30 | 10.80 | 11.15 |
+| remove_row | 14.65 | 12.80 | 15.95 |
+| append_1k | 169.55 | 66.65 | 67.70 |
+| create_10k | 2809.90 | 509.30 | 554.90 |
+| clear_1k | 83.05 | 20.70 | 10.50 |
+
+Glory currently trails substantially on bulk mount/replacement/append/clear;
+create-10k is about 2.81 s versus 0.51/0.55 s. Its script time is the largest
+gap. Small updates are much closer. The Leptos mixed selection result is
+history-sensitive; fresh-list diagnostics do not reproduce it as a general
+selection baseline. There is no overall ranking from this one ordered round.
+
+See [current measurements and caveats](../docs/performance.md) for CPU counters,
+the separate selection probe, live node census, build details and raw evidence.
+
+<details>
+<summary>Historical table workload and previous-architecture measurements</summary>
+
+The material below is retained history. Its old APIs, official-table commands,
+bundle settings and results do not describe the semantic-rows-v1 apps above.
+
 # Frontend framework benchmarks: glory vs leptos vs dioxus
 
 A side-by-side performance comparison of **glory**, **leptos** and **dioxus**
@@ -312,3 +427,5 @@ the environment artifact, not a real cost.
 > Canonical, paint-inclusive numbers come from the in-browser harness
 > (**“▶ Run all benchmarks”**) in a **visible** tab — see Methodology. The table
 > above and the bundle sizes are reproducible from the steps in this README.
+
+</details>

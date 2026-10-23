@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use glory_core::Lotus;
+use glory_core::{Cage, Lotus};
 use glory_render::{
     ButtonProps, Change, CheckProps, Descriptor, Event, EventKind, FocusMode, ImageProps,
     InputProps, ItemPosition, LinkProps, NodeId, Patch, Props, Purpose, Role, TextKind, TextProps,
@@ -41,6 +41,7 @@ struct Element {
     handlers: BTreeMap<EventKind, Handler>,
     children: Vec<Box<dyn Widget>>,
     needs_alt: bool,
+    node_ref: Option<Cage<Option<NodeId>>>,
 }
 impl Element {
     fn new(props: Props) -> Self {
@@ -52,6 +53,7 @@ impl Element {
             handlers: BTreeMap::new(),
             children: Vec::new(),
             needs_alt,
+            node_ref: None,
         }
     }
     fn set<T: Clone + PartialEq + 'static>(
@@ -121,12 +123,18 @@ impl Element {
         for (kind, handler) in std::mem::take(&mut self.handlers) {
             scope.on(node, kind, handler)?;
         }
-        if !self.children.is_empty() {
-            let content = scope.child_in(node)?;
-            for child in self.children.drain(..) {
-                child.show_in(&content)?;
-            }
-            scope.retain(content)?;
+        for child in self.children.drain(..) {
+            scope.fill(node, child)?;
+        }
+        if let Some(reference) = self.node_ref.take() {
+            reference.try_revise(|value| *value = Some(node))?;
+            scope.on_cleanup(move || {
+                let _ = reference.try_revise(|value| {
+                    if *value == Some(node) {
+                        *value = None;
+                    }
+                });
+            })?;
         }
         Ok(())
     }
@@ -232,6 +240,8 @@ macro_rules! common {
             }
             pub fn focus(mut self, mode: FocusMode) -> Self { self.inner.set(Slot::Focus, mode, |value| Patch::Focus(Change::Set(value))); self }
             pub fn on(mut self, kind: EventKind, handler: impl FnMut(Event) + 'static) -> Self { self.inner.handlers.insert(kind, Box::new(handler)); self }
+            /// Publish the mounted semantic identity and clear it on retirement.
+            pub fn node_ref(mut self, reference: Cage<Option<NodeId>>) -> Self { self.inner.node_ref = Some(reference); self }
         }
     )+};
 }
@@ -297,7 +307,7 @@ impl Input {
         });
         self
     }
-    pub fn purpose(mut self, value: Purpose) -> Self {
+    pub fn purpose(mut self, value: impl Into<Lotus<Purpose>>) -> Self {
         self.inner.set(Slot::Purpose, value, |value| {
             Patch::Purpose(Change::Set(value))
         });
@@ -391,6 +401,10 @@ pub mod events {
     pub const focus_within: EventKind = EventKind::FocusWithin;
     #[allow(non_upper_case_globals)]
     pub const navigate: EventKind = EventKind::Navigate;
+    #[allow(non_upper_case_globals)]
+    pub const keyboard: EventKind = EventKind::Keyboard;
+    #[allow(non_upper_case_globals)]
+    pub const drag: EventKind = EventKind::Drag;
     #[allow(non_upper_case_globals)]
     pub const composition: EventKind = EventKind::Composition;
     #[allow(non_upper_case_globals)]

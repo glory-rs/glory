@@ -418,14 +418,17 @@ mod native {
         result
     }
     pub fn serve() -> std::io::Result<()> {
-        let listener = TcpListener::bind("127.0.0.1:8789")?;
+        let address = std::env::args()
+            .nth(2)
+            .unwrap_or_else(|| "127.0.0.1:8789".into());
+        let listener = TcpListener::bind(&address)?;
         let metrics = Arc::new(Metrics::default());
         let directory = PathBuf::from(
             std::env::args()
                 .nth(1)
                 .unwrap_or_else(|| "D:/BuildCache/glory-semantic-ui/web-demo".into()),
         );
-        println!("Stream transport fixture at http://127.0.0.1:8789/stream");
+        println!("Stream transport fixture at http://{address}/stream");
         for socket in listener.incoming() {
             let socket = socket?;
             let metrics = metrics.clone();

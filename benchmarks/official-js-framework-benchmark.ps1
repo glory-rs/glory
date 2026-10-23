@@ -22,6 +22,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+throw 'The current apps use semantic-rows-v1, not the official table/tr/td contract. Use benchmarks/build.ps1 and benchmarks/browser-run.js for the local comparison. Historical official results remain documented separately.'
 $Root = Resolve-Path (Join-Path $PSScriptRoot '..')
 if (-not $BenchmarkRepo) {
   $BenchmarkRepo = Join-Path $Root 'target/external/js-framework-benchmark'

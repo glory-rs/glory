@@ -5,7 +5,14 @@ edition = "2021"
 publish = false
 
 [dependencies]
-leptos = { version = "0.8", features = ["csr"] }
+leptos = { version = "=0.8.19", features = ["csr"] }
+wasm-bindgen = { version = "=0.2.129", features = ["enable-interning"] }
+web-sys = { version = "=0.3.106", features = ["Window", "Document", "Element", "HtmlElement"] }
+
+[workspace]
+
+[package.metadata.benchmark]
+contract = "semantic-rows-v1"
 
 [profile.release]
 opt-level = 3

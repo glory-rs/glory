@@ -1180,6 +1180,17 @@ pub struct InstanceId {
     key: Key,
 }
 impl InstanceId {
+    /// Whether this generational instance and its Owner are still live.
+    /// Does not enter construction context or invoke application code.
+    pub fn is_alive(self) -> bool {
+        lookup(self.runtime).is_ok_and(|state| {
+            let state = state.borrow();
+            state
+                .instances
+                .get(self.key)
+                .is_some_and(|instance| state.owners.get(instance.owner).is_some())
+        })
+    }
     pub fn runtime(self) -> RuntimeId {
         self.runtime
     }

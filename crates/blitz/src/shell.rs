@@ -256,6 +256,10 @@ impl EventHandler for Events {
                 return;
             }
         }
+        if drag_input(&mut state, event.target, &event.data) {
+            event_state.prevent_default();
+            return;
+        }
         match &event.data {
             DomEventData::KeyDown(key) | DomEventData::KeyUp(key)
                 if keyboard(&mut state, event.target, key) =>
@@ -278,6 +282,156 @@ impl EventHandler for Events {
             _ => {}
         }
     }
+}
+
+fn drag_observer(state: &State, mut node: NodeId) -> Option<NodeId> {
+    loop {
+        if state.subscriptions.contains(&(node, EventKind::Drag))
+            && state.mapper.tree().active(node)
+        {
+            return Some(node);
+        }
+        node = state.mapper.tree().node(node).ok()?.parent?;
+    }
+}
+fn cancel_drag(state: &mut State) {
+    if let Some(drag) = state.drag.take()
+        && drag.started
+    {
+        state.inputs.push(Input::Event {
+            node: drag.from,
+            event: Event::Drag {
+                from: drag.from,
+                phase: glory_render::DragPhase::Cancel,
+                x: drag.x,
+                y: drag.y,
+            },
+        });
+    }
+}
+fn drag_input(state: &mut State, target: EngineId, event: &DomEventData) -> bool {
+    use glory_render::DragPhase;
+    if matches!(event, DomEventData::Click(_)) {
+        return std::mem::take(&mut state.suppress_click);
+    }
+    let (pointer, phase) = match event {
+        DomEventData::PointerDown(pointer) => (pointer, 0),
+        DomEventData::PointerMove(pointer) => (pointer, 1),
+        DomEventData::PointerUp(pointer) => (pointer, 2),
+        DomEventData::PointerCancel(pointer) => (pointer, 3),
+        _ => return false,
+    };
+    if !pointer.is_primary {
+        return false;
+    }
+    let x = f64::from(pointer.client_x());
+    let y = f64::from(pointer.client_y());
+    if phase == 0 {
+        state.suppress_click = false;
+        cancel_drag(state);
+        if pointer.button != blitz_traits::events::MouseEventButton::Main {
+            return false;
+        }
+        let Some(origin) = state.dom.owner(target) else {
+            return false;
+        };
+        let mut cursor = Some(origin);
+        while let Some(id) = cursor {
+            let Ok(node) = state.mapper.tree().node(id) else {
+                return false;
+            };
+            if matches!(
+                node.descriptor.props,
+                glory_render::Props::Input(_)
+                    | glory_render::Props::Button(_)
+                    | glory_render::Props::Link(_)
+                    | glory_render::Props::Check(_)
+            ) {
+                return false;
+            }
+            cursor = node.parent;
+        }
+        if let Some(from) = drag_observer(state, origin) {
+            state.drag = Some(DragSession {
+                from,
+                pointer: pointer.id,
+                x,
+                y,
+                started: false,
+            });
+        }
+        return false;
+    }
+    let Some(mut drag) = state.drag.take() else {
+        return false;
+    };
+    if drag.pointer != pointer.id {
+        state.drag = Some(drag);
+        return false;
+    }
+    if !state.mapper.tree().active(drag.from) || phase == 3 {
+        let started = drag.started;
+        state.drag = Some(drag);
+        cancel_drag(state);
+        return started;
+    }
+    if phase == 1 {
+        if !drag.started && (x - drag.x).hypot(y - drag.y) >= 6.0 {
+            drag.started = true;
+            state.inputs.push(Input::Event {
+                node: drag.from,
+                event: Event::Drag {
+                    from: drag.from,
+                    phase: DragPhase::Start,
+                    x: drag.x,
+                    y: drag.y,
+                },
+            });
+        }
+        if drag.started {
+            let next = Input::Event {
+                node: drag.from,
+                event: Event::Drag {
+                    from: drag.from,
+                    phase: DragPhase::Move,
+                    x,
+                    y,
+                },
+            };
+            if matches!(state.inputs.last(),Some(Input::Event {node,event:Event::Drag {phase:DragPhase::Move,..}}) if *node==drag.from)
+            {
+                *state.inputs.last_mut().expect("last move") = next;
+            } else {
+                state.inputs.push(next);
+            }
+        }
+        let started = drag.started;
+        state.drag = Some(drag);
+        return started;
+    }
+    if drag.started {
+        state.suppress_click = true;
+        state.dom.resolve();
+        let drop = state
+            .dom
+            .doc
+            .element_from_point(x as f32, y as f32)
+            .and_then(|engine| state.dom.owner(engine))
+            .and_then(|id| drag_observer(state, id));
+        let (node, phase) = drop.map_or((drag.from, DragPhase::Cancel), |target| {
+            (target, DragPhase::Drop)
+        });
+        state.inputs.push(Input::Event {
+            node,
+            event: Event::Drag {
+                from: drag.from,
+                phase,
+                x,
+                y,
+            },
+        });
+    }
+    drag.started
 }
 
 fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
@@ -303,6 +457,84 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
         // IME owns text/caret keys until its terminal update; beta.4's default
         // key handler otherwise inserts text a second time during composition.
         return true;
+    }
+    let origin = owner.or_else(|| {
+        state.mapper.tree().roots().iter().copied().find(|id| {
+            state
+                .mapper
+                .tree()
+                .node(*id)
+                .is_ok_and(|node| !matches!(node.descriptor.props, glory_render::Props::Group))
+        })
+    });
+    if let Some(origin) = origin {
+        let editable = state
+            .mapper
+            .tree()
+            .node(origin)
+            .is_ok_and(|node| matches!(node.descriptor.props, glory_render::Props::Input(_)));
+        let key_name = key.key.to_string();
+        let command = glory_render::KeyboardInput {
+            key: &key_name,
+            control: key.modifiers.contains(Modifiers::CONTROL),
+            meta: key.modifiers.contains(Modifiers::META),
+            alt: key.modifiers.contains(Modifiers::ALT),
+            shift: key.modifiers.contains(Modifiers::SHIFT),
+            repeat: key.is_auto_repeating,
+            composing: false,
+            editable,
+        }
+        .command();
+        if let Some(command) = command {
+            let own_interest = state.subscriptions.contains(&(origin, EventKind::Keyboard));
+            let mut cursor = Some(origin);
+            let mut interested = false;
+            while let Some(id) = cursor {
+                if state.subscriptions.contains(&(id, EventKind::Keyboard)) {
+                    interested = true;
+                    break;
+                }
+                cursor = state
+                    .mapper
+                    .tree()
+                    .node(id)
+                    .ok()
+                    .and_then(|node| node.parent);
+            }
+            if interested && (!editable || own_interest) {
+                if command == glory_render::KeyboardCommand::Submit {
+                    let revision = state
+                        .dom
+                        .ranges
+                        .get(&origin)
+                        .expect("input range")
+                        .editing
+                        .revision;
+                    match state.dom.text_value(origin) {
+                        Ok(value) => state.inputs.push(Input::Event {
+                            node: origin,
+                            event: Event::ValueChanged {
+                                value,
+                                composing: false,
+                                revision,
+                            },
+                        }),
+                        Err(error) => {
+                            state.input_error = Some(error);
+                            return true;
+                        }
+                    }
+                }
+                state.inputs.push(Input::Event {
+                    node: origin,
+                    event: Event::Keyboard {
+                        from: origin,
+                        command,
+                    },
+                });
+                return true;
+            }
+        }
     }
     if let Some(id) = owner
         && key.modifiers.is_empty()
@@ -593,10 +825,32 @@ pub struct Shell {
     error: Rc<RefCell<Option<ShellError>>>,
 }
 fn prepare(view: &mut blitz_shell::View<CpuRenderer>) {
+    if let Some(theme) = view.window.theme() {
+        queue_color_scheme(
+            &mut view.downcast_doc_mut::<WindowApp>().renderer.0.borrow_mut(),
+            theme == winit::window::Theme::Dark,
+        );
+    }
     let seconds = view.current_animation_time();
     let app = view.downcast_doc_mut::<WindowApp>();
     if let Err(error) = app.renderer.advance_time(seconds) {
         app.error.get_or_insert(error.into());
+    }
+}
+fn queue_color_scheme(state: &mut State, dark: bool) {
+    if state.color_scheme.replace(dark) == Some(dark) {
+        return;
+    }
+    let nodes = state
+        .subscriptions
+        .iter()
+        .filter_map(|(node, kind)| (*kind == EventKind::ColorSchemeChanged).then_some(*node))
+        .collect::<Vec<_>>();
+    for node in nodes {
+        state.inputs.push(Input::Event {
+            node,
+            event: Event::ColorSchemeChanged { dark },
+        });
     }
 }
 impl Shell {
@@ -710,6 +964,15 @@ impl ApplicationHandler for Shell {
         }
         if let Some(view) = self.inner.windows.get_mut(&id) {
             prepare(view);
+            if let WindowEvent::ThemeChanged(theme) = &event {
+                queue_color_scheme(
+                    &mut view.downcast_doc_mut::<WindowApp>().renderer.0.borrow_mut(),
+                    *theme == winit::window::Theme::Dark,
+                );
+            }
+            if matches!(event, WindowEvent::Focused(false)) {
+                cancel_drag(&mut view.downcast_doc_mut::<WindowApp>().renderer.0.borrow_mut());
+            }
             if matches!(event, WindowEvent::RedrawRequested) {
                 // Read queued scroll/resize inputs and commit the current
                 // virtual window before the shell paints this frame.
@@ -789,6 +1052,9 @@ impl ApplicationHandler for Shell {
     }
 }
 
+#[cfg(test)]
+#[path = "command_tests.rs"]
+mod command_tests;
 #[cfg(test)]
 #[path = "editing_tests.rs"]
 mod editing_tests;

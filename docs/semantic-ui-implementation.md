@@ -36,6 +36,31 @@ R8 的其他工具包按报告作为后续按需适配项，不用空 crate 或�
 
 ## 当前实施
 
+2026-10-23 DOM 父节点表销毁改为按 mapper 完整子树中的 NodeId 删除，尺寸缓存同步
+按键清理；每个行子树不再重复扫描父表。同期独立构建的 432 样本对照中，替换千行
+221.50→143.80ms、清空千行 150.15→40.30ms，创建/追加基本不变。存活后代与 Text
+身份、万行几何及六个 PNG 检查点一致。随后修正基线中的 Clippy 条件与桌面 feature
+隔离，再以相同最终源码补跑 108 样本及完整门禁：Windows/Linux 各 428 项工作区测试、
+浏览器 24/24、实窗/UIA/CPU 绘制及流式检查通过。该冻结快照与并行后续改动的边界、
+原始采样和失败重跑记录见[销毁修复报告](performance.md#dom-retirement-follow-up--2026-10-23)。
+
+2026-10-23 批量 DOM 修订已取消 Element.fill 的中间 content Scope，保留每个子组件
+独立 Owner。Memory 保存存活节点的逻辑 next sibling，使无变化位置检查不再扫描
+全部兄弟；Scope 内容节点不加入容器的 movable roots。Core 完整退休 Owner 子树后，
+UI 清理沿已经退休的语义祖先合并 Dispose，遇到存活 Owner 停止；用户清理回调顺序
+不变，已释放身份不重复提交。CSR 创建直接持有 Part/Node 引用，省去解析用的
+key/part 属性和文本注释，Group 范围与 SSR/stream/hydration v3 格式继续保留。
+data-gly-live 只用于 VirtualPart；普通节点不创建停放 fragment，真正 Suspend 时
+按需创建。详见[批量优化报告](bulk-dom-optimization-2026-10-23.md)：432 个配对样本、
+节点/画面验证与当时仍可复现的 0.375 px 基线锚点问题均单独记录。
+
+随后修复变高列表的宿主滚动量化余差：行样式 origin 使用 `segment_origin + bias`，
+新目标请求原始物理投影，不重复扣除旧余差；动作去重不再吞掉真实小数变化。
+64/1024 测量缓存均保留真实行高和原 0.1px 容差，70 次连续变化保持锚点与全部存活
+后代（含 Text Node）身份，收敛后 PNG 一致；24 套浏览器验收全部通过。
+极远逻辑段另有 0.125px 投影变化回归，完整门禁与独立快照见
+[滚动余差修复报告](anchor-residual-fix-2026-10-23.md)。
+
 已建立 style/render/core/resource/ui/html/web/ssr/blitz/glory 十个活动 workspace 包。依赖主线为 style ← render ← core ← ui；HTML mapper 只依赖 render/style，web/ssr/blitz 在外层组装，可选 resource 依赖 core/serde。门面默认不引入 Web/GPU/serde/Blitz，web、ssr feature 可同时开启；resources feature 可独立使用，只向已选择的宿主转发集成。原生 blitz feature 另行选择，不为默认/HTML/SSR 引入引擎。旧 core 入口与门面已经替换，旧 feature 和全局 Node alias 不再编入活动代码。旧适配器和工具目录暂时移出 workspace，旧 core 未引用源文件作为行为提取参考，最后仍需清理；这是实现过程的中间状态，不是最终兼容方案。
 
 已实现并验证的子项：

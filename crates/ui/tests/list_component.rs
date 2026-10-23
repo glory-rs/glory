@@ -2064,6 +2064,180 @@ fn controlled_navigation_accepts_quantized_scroll_and_preserves_a_racing_one_pix
 }
 
 #[test]
+fn fractional_measurements_preserve_visual_anchor_without_accumulating_scroll_quantization() {
+    use glory_render::style::Length;
+    use glory_render::{ScrollAck, ScrollRequest};
+    for limit in [64, 1024] {
+        let (app, observed) = app();
+        let position = app.scope().cage(0.0);
+        let latest = Rc::new(RefCell::new(None));
+        let inspected = latest.clone();
+        app.mount(
+            list(
+                100_000_000usize,
+                |index| index,
+                |_, key| text().content(format!("row:{key}")),
+            )
+            .measure(24.0)
+            .measure_limit(limit)
+            .position(position)
+            .inspect(move |stats| *inspected.borrow_mut() = Some(stats)),
+        )
+        .unwrap();
+        let root = root(&app);
+        let ack = |requested: f64, actual: f64| Event::Scroll {
+            x: 0.0,
+            y: actual,
+            viewport: Rect {
+                width: 800.0,
+                height: 600.0,
+                ..Rect::default()
+            },
+            ack: Some(ScrollAck {
+                requested: ScrollRequest {
+                    x: 0.0,
+                    y: requested,
+                },
+                x: 0.0,
+                y: actual,
+            }),
+        };
+        position.revise(|value| *value = 4802.0);
+        app.flush().unwrap();
+        app.dispatch(root, ack(4802.0, 4802.0)).unwrap();
+        let anchor = rows(&app)
+            .into_iter()
+            .find(|id| row_index(&app, *id) == 200)
+            .unwrap();
+        let preceding = rows(&app)
+            .into_iter()
+            .find(|id| row_index(&app, *id) == 199)
+            .unwrap();
+        let top = || match app.tree().node(anchor).unwrap().descriptor.style.top {
+            Some(Length::Px(value)) => value,
+            _ => panic!("absolute row top"),
+        };
+        assert_eq!(top() - 4802.0, -2.0);
+        for delta in [30.375, 0.0, 0.125, 0.625, 0.25, -0.375, 0.0]
+            .into_iter()
+            .cycle()
+            .take(70)
+        {
+            let start = observed.borrow().actions.len();
+            app.dispatch(preceding, measure_event(24.0 + delta))
+                .unwrap();
+            let requested = observed.borrow().actions[start..]
+                .iter()
+                .rev()
+                .find_map(|action| match action {
+                    Action::ScrollTo { y, .. } => Some(*y),
+                    _ => None,
+                })
+                .expect("every fractional projection change needs host readback");
+            assert!(
+                (requested - (4802.0 + delta)).abs() < 0.001,
+                "old bias accumulated: {limit}, {delta}, {requested}"
+            );
+            let actual = requested.round();
+            let issued = observed.borrow().actions.len();
+            app.dispatch(root, ack(requested, actual)).unwrap();
+            app.dispatch(root, ack(requested, actual)).unwrap();
+            assert_eq!(
+                observed.borrow().actions.len(),
+                issued,
+                "readback must settle without another scroll"
+            );
+            assert!(
+                (top() - actual + 2.0).abs() < 0.001,
+                "visual anchor drift: {limit}, {delta}"
+            );
+            assert!((latest.borrow().as_ref().unwrap().logical - (4802.0 + delta)).abs() < 0.001);
+            assert_eq!(row_index(&app, anchor), 200);
+            assert_eq!(row_index(&app, preceding), 199);
+        }
+    }
+}
+
+#[test]
+#[cfg(target_pointer_width = "64")]
+fn far_segment_roundoff_does_not_hide_a_fractional_viewport_resize() {
+    use glory_render::style::Length;
+    use glory_render::{ScrollAck, ScrollRequest};
+    for limit in [64, 1024] {
+        let (app, observed) = app();
+        let logical = glory_ui::list::MAX_EXTENT / 2.0;
+        let position = app.scope().cage(logical);
+        app.mount(
+            list(
+                (glory_ui::list::MAX_EXTENT / 24.0) as usize,
+                |i| i,
+                |_, key| text().content(format!("row:{key}")),
+            )
+            .measure(24.0)
+            .measure_limit(limit)
+            .position(position),
+        )
+        .unwrap();
+        let root = root(&app);
+        let requested = observed
+            .borrow()
+            .actions
+            .iter()
+            .find_map(|action| match action {
+                Action::ScrollTo { y, .. } => Some(*y),
+                _ => None,
+            })
+            .unwrap();
+        let viewport = |height| Rect {
+            width: 800.0,
+            height,
+            ..Rect::default()
+        };
+        let ack = |requested, actual, height| Event::Scroll {
+            x: 0.0,
+            y: actual,
+            viewport: viewport(height),
+            ack: Some(ScrollAck {
+                requested: ScrollRequest {
+                    x: 0.0,
+                    y: requested,
+                },
+                x: 0.0,
+                y: actual,
+            }),
+        };
+        app.dispatch(root, ack(requested, requested, 600.0))
+            .unwrap();
+        let row = rows(&app)[4];
+        let top = || match app.tree().node(row).unwrap().descriptor.style.top {
+            Some(Length::Px(value)) => value,
+            _ => panic!("row top"),
+        };
+        let before = top() - requested;
+        let start = observed.borrow().actions.len();
+        app.dispatch(
+            root,
+            Event::Resize {
+                size: Rect::default(),
+                viewport: viewport(600.25),
+            },
+        )
+        .unwrap();
+        let target = observed.borrow().actions[start..]
+            .iter()
+            .find_map(|action| match action {
+                Action::ScrollTo { y, .. } => Some(*y),
+                _ => None,
+            })
+            .expect("logical-scale epsilon must not suppress a real 0.125px projection change");
+        assert!((target - requested + 0.125).abs() < 0.001);
+        app.dispatch(root, ack(target, target.round(), 600.25))
+            .unwrap();
+        assert!((top() - target.round() - before).abs() < 0.001);
+    }
+}
+
+#[test]
 fn oversized_initial_windows_fail_before_source_access_or_component_creation() {
     use glory_ui::list::{DEFAULT_ROW_LIMIT, Error as ListError};
     for (height, row_height, overscan) in [

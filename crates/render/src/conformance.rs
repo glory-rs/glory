@@ -47,6 +47,7 @@ pub fn verify(mut renderer: impl Render, runtime: RuntimeId, geometry: bool) {
             EventKind::Activate,
             EventKind::FocusWithin,
             EventKind::Navigate,
+            EventKind::Keyboard,
         ] {
             renderer.listen(id, kind, true).unwrap();
             renderer.listen(id, kind, false).unwrap();
@@ -60,6 +61,8 @@ pub fn verify(mut renderer: impl Render, runtime: RuntimeId, geometry: bool) {
             (EventKind::Commit, edits),
             (EventKind::Composition, edits),
             (EventKind::CheckedChanged, checks),
+            (EventKind::Drag, matches!(props, Props::View)),
+            (EventKind::ColorSchemeChanged, matches!(props, Props::View)),
         ] {
             let result = renderer.listen(id, kind, true);
             assert_eq!(result.is_ok(), valid, "{props:?}/{kind:?}: {result:?}");

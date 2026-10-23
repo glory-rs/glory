@@ -8,13 +8,18 @@ import sys
 if sys.platform == "win32":
     sys.pycache_prefix = "D:/BuildCache/glory-semantic-ui/pycache"
 import http.client
+import argparse
 import json
 import socket
 import time
 
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--port', type=int, default=8789)
+port = parser.parse_args().port
+
 
 def stats():
-    connection = http.client.HTTPConnection("127.0.0.1", 8789, timeout=3)
+    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=3)
     try:
         connection.request("GET", "/stats")
         return json.loads(connection.getresponse().read())
@@ -33,7 +38,7 @@ def wait_for(predicate, timeout=3):
 
 
 before = stats()
-connection = http.client.HTTPConnection("127.0.0.1", 8789, timeout=3)
+connection = http.client.HTTPConnection("127.0.0.1", port, timeout=3)
 started = time.perf_counter()
 connection.request("GET", "/stream")
 response = connection.getresponse()
@@ -58,7 +63,7 @@ assert len(terminal["resources"]["records"]) == 2
 wait_for(lambda s: s["active"] == 0 and s["timers"] == 0)
 
 for _ in range(5):
-    connection = http.client.HTTPConnection("127.0.0.1", 8789, timeout=3)
+    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=3)
     connection.request("GET", "/stream")
     response = connection.getresponse()
     assert json.loads(response.readline())["kind"] == "shell"
@@ -71,7 +76,7 @@ before_pressure = stats()
 slow = socket.socket()
 slow.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 4096)
 slow.settimeout(3)
-slow.connect(("127.0.0.1", 8789))
+slow.connect(("127.0.0.1", port))
 slow.sendall(b"GET /pressure HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
 reader = slow.makefile("rb")
 while reader.readline().strip():

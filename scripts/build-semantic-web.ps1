@@ -1,7 +1,14 @@
-param([switch]$Serve)
+param(
+    [switch]$Serve,
+    [string]$BuildRoot = 'D:/BuildCache/glory-semantic-ui',
+    [string]$Bindgen = 'wasm-bindgen'
+)
 
 $ErrorActionPreference = 'Stop'
-$taskBuildRoot = 'D:/BuildCache/glory-semantic-ui'
+$taskBuildRoot = [IO.Path]::GetFullPath($BuildRoot)
+if (-not $taskBuildRoot.Replace('\', '/').StartsWith('D:/BuildCache/', [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'BuildRoot must be on D:/BuildCache'
+}
 $taskWorkspace = Split-Path -Parent $PSScriptRoot
 $savedEnvironment = @{}
 foreach ($name in @('CARGO_HOME', 'CARGO_TARGET_DIR', 'TEMP', 'TMP', 'PYTHONPYCACHEPREFIX')) {
@@ -9,7 +16,7 @@ foreach ($name in @('CARGO_HOME', 'CARGO_TARGET_DIR', 'TEMP', 'TMP', 'PYTHONPYCA
 }
 Push-Location $taskWorkspace
 try {
-    $env:CARGO_HOME = "$taskBuildRoot/cargo"
+    $env:CARGO_HOME = 'D:/BuildCache/glory-semantic-ui/cargo'
     $env:CARGO_TARGET_DIR = "$taskBuildRoot/target"
     $env:TEMP = "$taskBuildRoot/tmp"
     $env:TMP = $env:TEMP
@@ -20,11 +27,11 @@ try {
     $actual = [IO.Path]::GetFullPath($metadata.target_directory)
     if (-not [string]::Equals($actual, [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR), [StringComparison]::OrdinalIgnoreCase)) { throw "Unexpected build directory: $actual" }
     Write-Output "Verified target: $actual"
-    $bindgen = wasm-bindgen --version
-    if ($LASTEXITCODE -ne 0 -or $bindgen.Trim() -ne 'wasm-bindgen 0.2.123') { throw 'This fixture requires wasm-bindgen-cli 0.2.123 (same as the pinned library).' }
+    $bindgenVersion = & $Bindgen --version
+    if ($LASTEXITCODE -ne 0 -or $bindgenVersion.Trim() -ne 'wasm-bindgen 0.2.129') { throw 'This fixture requires wasm-bindgen-cli 0.2.129 (same as the pinned library).' }
     cargo build --locked --manifest-path examples/semantic-web/Cargo.toml --lib --target wasm32-unknown-unknown
     if ($LASTEXITCODE -ne 0) { throw 'Web fixture build failed' }
-    wasm-bindgen "$taskBuildRoot/target/wasm32-unknown-unknown/debug/glory_semantic_web.wasm" --target web --out-dir "$taskBuildRoot/web-demo"
+    & $Bindgen "$taskBuildRoot/target/wasm32-unknown-unknown/debug/glory_semantic_web.wasm" --target web --out-dir "$taskBuildRoot/web-demo"
     if ($LASTEXITCODE -ne 0) { throw 'WASM bindings failed' }
     Copy-Item -LiteralPath examples/semantic-web/index.html -Destination "$taskBuildRoot/web-demo/index.html"
     cargo run --locked --manifest-path examples/semantic-web/Cargo.toml --bin ssr_fixture -- "$taskBuildRoot/web-demo"

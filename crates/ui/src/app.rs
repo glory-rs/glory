@@ -203,17 +203,12 @@ impl Session {
     fn place(&self, id: NodeId, parent: Option<NodeId>, before: Option<NodeId>) -> Result {
         let mut present = self.present.borrow_mut();
         let node = present.tree.node(id)?;
-        if node.placed && !node.suspended && node.parent == parent {
-            let siblings = if let Some(parent) = parent {
-                &present.tree.node(parent)?.children
-            } else {
-                present.tree.roots()
-            };
-            if let Some(index) = siblings.iter().position(|child| *child == id)
-                && siblings.get(index + 1).copied() == before
-            {
-                return Ok(());
-            }
+        if node.placed
+            && !node.suspended
+            && node.parent == parent
+            && present.tree.next_sibling(id)? == before
+        {
+            return Ok(());
         }
         let mutation = if node.suspended {
             Mutation::Resume { id, parent, before }
@@ -260,9 +255,24 @@ impl Session {
                 }
             }
             let roots = present.owners.remove(&owner).unwrap_or_default();
-            for id in roots {
+            for mut id in roots {
                 if !present.ids.contains(id) {
                     continue;
+                }
+                // Core retires the complete Owner subtree before running any
+                // cleanup callbacks. Remove the highest already-retired
+                // semantic ancestor once, rather than disposing every leaf
+                // separately. A live parent (even under a different Scope) is
+                // a hard boundary. Later cleanup callbacks still run in their
+                // original order; released identities cannot be removed twice.
+                while let Some(parent) = present.tree.node(id).expect("owned node").parent {
+                    let Some(parent_owner) = present.node_owners.get(&parent) else {
+                        break;
+                    };
+                    if parent_owner.is_alive() {
+                        break;
+                    }
+                    id = parent;
                 }
                 let mut all = Vec::new();
                 let mut pending = vec![id];
@@ -405,6 +415,8 @@ impl Session {
                 && matches!(
                     event,
                     Event::Activate
+                        | Event::Keyboard { .. }
+                        | Event::Drag { .. }
                         | Event::ValueChanged { .. }
                         | Event::CheckedChanged(_)
                         | Event::Commit { .. }
@@ -416,7 +428,9 @@ impl Session {
             let mut handler = None;
             while let Some(id) = cursor {
                 let current = present.tree.node(id)?;
-                if matches!(event, Event::Activate) && !current.descriptor.props.enabled() {
+                if matches!(event, Event::Activate | Event::Keyboard { .. })
+                    && !current.descriptor.props.enabled()
+                {
                     return Ok(false);
                 }
                 if handler.is_none() {
@@ -426,7 +440,10 @@ impl Session {
                         .and_then(|handlers| handlers.get(&event.kind()))
                         .map(|subscription| (id, subscription.callback.clone()));
                 }
-                if !matches!(event, Event::Activate | Event::Navigate { .. }) {
+                if !matches!(
+                    event,
+                    Event::Activate | Event::Navigate { .. } | Event::Keyboard { .. }
+                ) {
                     break;
                 }
                 cursor = current.parent;
@@ -596,7 +613,7 @@ struct ScopeState {
     children: RefCell<Vec<Mounted>>,
     resources: RefCell<Vec<Box<dyn Any>>>,
 }
-pub(crate) struct WeakScope(Weak<ScopeState>);
+pub struct WeakScope(Weak<ScopeState>);
 impl Clone for WeakScope {
     fn clone(&self) -> Self {
         Self(self.0.clone())
@@ -613,12 +630,19 @@ impl WeakScope {
 
 impl Scope {
     pub fn mount_with<W: Widget>(&self, factory: impl FnOnce() -> W) -> Result<Mounted> {
+        self.mount_at(self.0.parent, factory)
+    }
+    fn mount_at<W: Widget>(
+        &self,
+        parent: Option<NodeId>,
+        factory: impl FnOnce() -> W,
+    ) -> Result<Mounted> {
         let _span = self
             .session()?
             .runtime
             .profile()
             .map(|profile| profile.span(Phase::Build));
-        let scope = self.child()?;
+        let scope = Self::new(self.0.core.child(), &self.session()?, parent)?;
         let widget = glory_core::untracked(|| {
             scope.owner().enter(|| {
                 let mut widget = factory();
@@ -629,6 +653,13 @@ impl Scope {
         let roots = scope.roots();
         scope.retain(widget)?;
         Ok(Mounted { scope, roots })
+    }
+    pub(crate) fn fill(&self, node: NodeId, child: Box<dyn Widget>) -> Result {
+        self.session()?.present.borrow().tree.node(node)?;
+        let mounted = self.mount_at(Some(node), || child)?;
+        // Content has a different semantic parent, so it is retained for
+        // ownership but must not join this Scope's movable root range.
+        self.retain(mounted)
     }
     fn new(core: glory_core::Scope, session: &Rc<Session>, parent: Option<NodeId>) -> Result<Self> {
         let scope = Self(Rc::new(ScopeState {
@@ -668,6 +699,10 @@ impl Scope {
     }
     pub(crate) fn weak(&self) -> WeakScope {
         WeakScope(Rc::downgrade(&self.0))
+    }
+    /// A callback may upgrade transiently without retaining its owning UI scope.
+    pub fn downgrade(&self) -> WeakScope {
+        self.weak()
     }
     pub fn child(&self) -> Result<Self> {
         let session = self.session()?;
@@ -1092,6 +1127,44 @@ impl Drop for App {
 #[cfg(test)]
 mod placement_tests {
     use super::*;
+
+    #[test]
+    fn retiring_subtree_emits_one_dispose_and_stops_at_a_live_semantic_parent() {
+        let app = App::memory();
+        let parent = app
+            .scope()
+            .create(Descriptor::new(glory_render::Props::View))
+            .unwrap();
+        let content = app.scope().child_in(parent).unwrap();
+        let mounted = crate::view()
+            .fill((
+                crate::text().content("first"),
+                crate::group().fill(crate::input().value("draft")),
+            ))
+            .mount(&content)
+            .unwrap();
+        let root = mounted.roots()[0];
+        let instance = mounted.scope().id();
+        app.flush().unwrap();
+        assert!(instance.is_alive());
+        drop(mounted);
+        assert!(!instance.is_alive());
+        assert!(content.id().is_alive());
+        assert_eq!(app.stats().nodes, 1);
+        assert!(app.tree().node(parent).unwrap().children.is_empty());
+        assert_eq!(
+            app.session.present.borrow().commands,
+            [Mutation::Dispose { id: root }]
+        );
+        app.flush().unwrap();
+        // Arena reuse must not make a retired generational instance live again.
+        let replacement = crate::view().mount(&content).unwrap();
+        assert!(replacement.scope().id().is_alive());
+        assert!(!instance.is_alive());
+        drop(replacement);
+        app.flush().unwrap();
+        assert_eq!(app.stats().nodes, 1);
+    }
 
     /// A backend with an extra content restriction, exercising the public hook
     /// without pulling an HTML/platform dependency into the UI layer.

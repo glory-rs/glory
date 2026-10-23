@@ -1,0 +1,10 @@
+body { font-family: Arial, sans-serif; font-size: 16px; margin: 8px; color: #000; background: #fff; }
+*, *::before, *::after { box-sizing: border-box; }
+button { font: inherit; margin: 2px; }
+span { margin: 0; font: inherit; }
+.danger { background: #d9534f; color: #fff; }
+.bench-table { display: table; border-collapse: collapse; }
+.bench-body { display: table-row-group; }
+.bench-row { display: table-row; }
+.bench-cell { display: table-cell; padding: 2px 8px; }
+.lbl, .remove { border: 0; padding: 0; margin: 0; font: inherit; color: inherit; background: transparent; cursor: pointer; }

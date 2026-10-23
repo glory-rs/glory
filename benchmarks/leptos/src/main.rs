@@ -1,119 +1,56 @@
-//! Leptos implementation of the js-framework-benchmark "row table" workload.
-//!
-//! Same DOM contract and control buttons as the glory app, driven by the same
-//! `../bench-harness.js`. Each row's label is its own `RwSignal<String>` so the
-//! "update every 10th row" op touches only those signals — leptos's
-//! fine-grained reactivity patches the matching text nodes directly.
-
+#[path = "../../data.rs"]
+mod data;
 use leptos::prelude::*;
-
-const ADJECTIVES: [&str; 25] = [
-    "pretty", "large", "big", "small", "tall", "short", "long", "handsome", "plain", "quaint",
-    "clean", "elegant", "easy", "angry", "crazy", "helpful", "mushy", "odd", "unsightly",
-    "adorable", "important", "inexpensive", "cheap", "expensive", "fancy",
-];
-const COLOURS: [&str; 11] = [
-    "red", "yellow", "blue", "green", "pink", "brown", "purple", "brown", "white", "black",
-    "orange",
-];
-const NOUNS: [&str; 13] = [
-    "table", "chair", "house", "bbq", "desk", "car", "pony", "cookie", "sandwich", "burger",
-    "pizza", "mouse", "keyboard",
-];
-
+use wasm_bindgen::JsCast;
 #[derive(Clone)]
 struct Row {
     id: usize,
-    label: RwSignal<String>,
+    label: ArcRwSignal<String>,
 }
-
 fn main() {
-    leptos::mount::mount_to_body(App);
+    let root = web_sys::window()
+        .unwrap()
+        .document()
+        .unwrap()
+        .get_element_by_id("main")
+        .unwrap();
+    leptos::mount::mount_to(root.unchecked_into(), App).forget();
 }
-
 #[component]
 fn App() -> impl IntoView {
     let rows = RwSignal::new(Vec::<Row>::new());
     let selected = RwSignal::new(None::<usize>);
-    // Shared, framework-agnostic state kept in `StoredValue` so the make-rows
-    // closure can be `Copy` and reused across several button handlers.
-    let next_id = StoredValue::new(1usize);
-    let rng = StoredValue::new(0x2545_F491_4F6C_DD1D_u64);
-
-    let make_rows = move |count: usize| -> Vec<Row> {
-        let mut state = rng.get_value();
-        let mut draw = |n: usize| {
-            state = state
-                .wrapping_mul(6364136223846793005)
-                .wrapping_add(1442695040888963407);
-            ((state >> 33) as usize) % n
-        };
-        let out = (0..count)
-            .map(|_| {
-                let id = next_id.get_value();
-                next_id.set_value(id + 1);
-                let label = format!(
-                    "{} {} {}",
-                    ADJECTIVES[draw(ADJECTIVES.len())],
-                    COLOURS[draw(COLOURS.len())],
-                    NOUNS[draw(NOUNS.len())],
-                );
-                Row {
-                    id,
-                    label: RwSignal::new(label),
-                }
+    let generator = StoredValue::new(data::Generator::default());
+    let make = move |count| {
+        generator
+            .try_update_value(|generator| generator.rows(count))
+            .unwrap()
+            .into_iter()
+            .map(|row| Row {
+                id: row.id,
+                label: ArcRwSignal::new(row.label),
             })
-            .collect();
-        rng.set_value(state);
-        out
+            .collect::<Vec<_>>()
     };
-
     view! {
-        <button id="run" on:click=move |_| rows.set(make_rows(1_000))>"Create 1,000 rows"</button>
-        <button id="runlots" on:click=move |_| rows.set(make_rows(10_000))>"Create 10,000 rows"</button>
-        <button id="add" on:click=move |_| {
-            let extra = make_rows(1_000);
-            rows.update(|v| v.extend(extra));
-        }>"Append 1,000 rows"</button>
-        <button id="update" on:click=move |_| rows.with(|v| {
-            let mut i = 0;
-            while i < v.len() {
-                v[i].label.update(|s| s.push_str(" !!!"));
-                i += 10;
-            }
-        })>"Update every 10th row"</button>
-        <button id="clear" on:click=move |_| { rows.set(Vec::new()); selected.set(None); }>"Clear"</button>
-        <button id="swaprows" on:click=move |_| rows.update(|v| {
-            if v.len() > 998 { v.swap(1, 998); }
-        })>"Swap rows"</button>
-
-        <table class="table test-data">
-            <tbody>
-                <For
-                    each=move || rows.get()
-                    key=|row| row.id
-                    children=move |row| {
-                        let id = row.id;
-                        let label = row.label;
-                        view! {
-                            <tr class:danger=move || selected.get() == Some(id)>
-                                <td class="col-md-1">{id}</td>
-                                <td class="col-md-4">
-                                    <a class="lbl" on:click=move |_| selected.set(Some(id))>
-                                        {move || label.get()}
-                                    </a>
-                                </td>
-                                <td class="col-md-1">
-                                    <a class="remove" on:click=move |_| rows.update(|v| v.retain(|r| r.id != id))>
-                                        <span class="remove glyphicon glyphicon-remove" aria-hidden="true">"x"</span>
-                                    </a>
-                                </td>
-                                <td class="col-md-6"></td>
-                            </tr>
-                        }
-                    }
-                />
-            </tbody>
-        </table>
+        <button class="bench-run" on:click=move |_| rows.set(make(1000))>"Create 1,000 rows"</button>
+        <button class="bench-runlots" on:click=move |_| rows.set(make(10000))>"Create 10,000 rows"</button>
+        <button class="bench-add" on:click=move |_| { let next = make(1000); rows.update(|rows| rows.extend(next)); }>"Append 1,000 rows"</button>
+        <button class="bench-update" on:click=move |_| rows.with(|rows| { for row in rows.iter().step_by(10) { row.label.update(|label| label.push_str(" !!!")); } })>"Update every 10th row"</button>
+        <button class="bench-clear" on:click=move |_| { rows.set(Vec::new()); selected.set(None); }>"Clear"</button>
+        <button class="bench-swaprows" on:click=move |_| rows.update(|rows| if rows.len() > 998 { rows.swap(1, 998); })>"Swap rows"</button>
+        <div role="table" class="bench-table"><div class="bench-body">
+            <For each=move || rows.get() key=|row| row.id children=move |row| {
+                let id = row.id;
+                view! {
+                    <div role="row" class="bench-row" class:danger=move || selected.get() == Some(id)>
+                        <div role="cell" class="bench-cell col-md-1"><span>{id}</span></div>
+                        <div role="cell" class="bench-cell col-md-4"><button class="lbl" on:click=move |_| selected.set(Some(id))>{move || row.label.get()}</button></div>
+                        <div role="cell" class="bench-cell col-md-1"><button class="remove" on:click=move |_| rows.update(|rows| rows.retain(|row| row.id != id))>"x"</button></div>
+                        <div role="cell" class="bench-cell col-md-6"></div>
+                    </div>
+                }
+            }/>
+        </div></div>
     }
 }

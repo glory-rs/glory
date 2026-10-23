@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::task::{Poll, Waker};
 use std::time::{Duration, Instant};
 
-fn tick(app: &mut WindowApp) -> bool {
+pub(super) fn tick(app: &mut WindowApp) -> bool {
     app.poll(Some(Context::from_waker(Waker::noop())))
 }
 pub(super) fn pointer(x: f32, y: f32, pressed: bool) -> BlitzPointerEvent {
@@ -52,7 +52,7 @@ fn native_key(app: &mut WindowApp, value: Key) {
         text,
     }));
 }
-fn native_focus(app: &mut WindowApp, node: NodeId) {
+pub(super) fn native_focus(app: &mut WindowApp, node: NodeId) {
     app.app
         .scope()
         .action(glory_render::Action::Focus(node))
@@ -73,7 +73,7 @@ fn native_focused(app: &WindowApp) -> NodeId {
         .owner(state.dom.doc.get_focussed_node_id().unwrap())
         .unwrap()
 }
-fn bounds_now(app: &WindowApp, node: NodeId) -> Rect {
+pub(super) fn bounds_now(app: &WindowApp, node: NodeId) -> Rect {
     let output = Rc::new(RefCell::new(None));
     let result = output.clone();
     app.app

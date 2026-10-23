@@ -83,6 +83,11 @@ pub(crate) fn role_name(role: Role) -> &'static str {
         Role::ListItem => "listitem",
         Role::Status => "status",
         Role::Alert => "alert",
+        Role::Table => "table",
+        Role::Row => "row",
+        Role::ColumnHeader => "columnheader",
+        Role::Cell => "cell",
+        Role::Dialog => "dialog",
     }
 }
 pub(crate) fn input_type(purpose: Purpose) -> &'static str {

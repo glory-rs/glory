@@ -21,6 +21,11 @@ fn structural_roles_do_not_replace_the_intrinsic_semantics_of_controls_text_or_i
             Role::ListItem,
             Role::Status,
             Role::Alert,
+            Role::Table,
+            Role::Row,
+            Role::ColumnHeader,
+            Role::Cell,
+            Role::Dialog,
         ] {
             assert_eq!(
                 node.patch(Patch::Role(Change::Set(Some(role)))),

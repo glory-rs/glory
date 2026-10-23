@@ -29,10 +29,12 @@ pub(super) struct Editing {
 }
 pub(super) struct Entry {
     token: String,
+    #[cfg(feature = "hydrate")]
+    is_virtual: bool,
     pub parts: BTreeMap<Part, Node>,
     pub first: Node,
     pub last: Node,
-    pub fragment: DocumentFragment,
+    pub fragment: RefCell<Option<DocumentFragment>>,
     pub children: Option<Part>,
     control: Option<Part>,
     pub edit: EditKind,
@@ -130,12 +132,22 @@ impl Entry {
     }
 }
 
+pub(super) struct DragSession {
+    pub from: NodeId,
+    pub pointer: i32,
+    pub x: f64,
+    pub y: f64,
+    pub started: bool,
+}
 pub(super) struct Dom {
+    pub drag: RefCell<Option<DragSession>>,
+    pub suppress_click: Cell<bool>,
     pub document: Document,
     pub root: Element,
     pub frame: Rc<Frame>,
     pub entries: RefCell<HashMap<NodeId, Rc<Entry>>>,
     pub tokens: RefCell<HashMap<String, NodeId>>,
+    pub parents: RefCell<HashMap<NodeId, Option<NodeId>>>,
     pub inputs: RefCell<Vec<Input>>,
     pub layout: RefCell<BTreeSet<(NodeId, EventKind)>>,
     pub sizes: RefCell<HashMap<NodeId, Rect>>,
@@ -155,11 +167,14 @@ impl Dom {
     pub fn new(document: Document, root: Element, frame: Rc<Frame>) -> Rc<Self> {
         let error = root.set_attribute("data-gly-app", "").err().map(backend);
         Rc::new(Self {
+            drag: RefCell::new(None),
+            suppress_click: Cell::new(false),
             document,
             root,
             frame,
             entries: RefCell::new(HashMap::new()),
             tokens: RefCell::new(HashMap::new()),
+            parents: RefCell::new(HashMap::new()),
             inputs: RefCell::new(Vec::new()),
             layout: RefCell::new(BTreeSet::new()),
             sizes: RefCell::new(HashMap::new()),
@@ -213,10 +228,12 @@ impl Dom {
         }
         let entry = Rc::new(Entry {
             token: token.clone(),
+            #[cfg(feature = "hydrate")]
+            is_virtual: virtual_shape(shape),
             parts,
             first,
             last,
-            fragment: self.document.create_document_fragment(),
+            fragment: RefCell::new(None),
             children: shape.children,
             control: shape.control,
             edit: shape.edit,
@@ -241,6 +258,9 @@ impl Dom {
     pub fn activate(&self) -> Result<(), Error> {
         let entries: Vec<_> = self.entries.borrow().values().cloned().collect();
         for entry in entries {
+            if !entry.is_virtual {
+                continue;
+            }
             for node in entry.parts.values() {
                 if let Some(element) = node.dyn_ref::<Element>() {
                     element
@@ -262,6 +282,22 @@ impl Dom {
             entry.interests.borrow_mut().insert(kind);
         } else {
             entry.interests.borrow_mut().remove(&kind);
+        }
+        if enabled
+            && kind == EventKind::ColorSchemeChanged
+            && let Some(media) = self.document.default_view().and_then(|window| {
+                window
+                    .match_media("(prefers-color-scheme: dark)")
+                    .ok()
+                    .flatten()
+            })
+        {
+            self.queue(
+                id,
+                Event::ColorSchemeChanged {
+                    dark: media.matches(),
+                },
+            );
         }
         if kind == EventKind::Resize {
             let element = entry.element()?;
@@ -326,6 +362,30 @@ impl Dom {
                 }
             }
         }
+        if matches!(
+            event,
+            Event::Drag {
+                phase: glory_render::DragPhase::Move,
+                ..
+            }
+        ) && let Some(Input::Event {
+            node,
+            event: previous,
+        }) = inputs.last_mut()
+            && *node == id
+            && matches!(
+                previous,
+                Event::Drag {
+                    phase: glory_render::DragPhase::Move,
+                    ..
+                }
+            )
+        {
+            *previous = event;
+            drop(inputs);
+            self.frame.input();
+            return;
+        }
         inputs.push(Input::Event { node: id, event });
         drop(inputs);
         self.frame.input();
@@ -377,7 +437,14 @@ impl Dom {
     pub fn create(&self, id: NodeId, key: u64, shape: Shape) -> Result<(), Error> {
         let token = format!("{}.{}.{}", id.runtime().value(), id.slot(), id.generation());
         let mut parts = BTreeMap::<Part, Node>::new();
-        let fragment = self.document.create_document_fragment();
+        let is_virtual = virtual_shape(&shape);
+        // Parsed HTML needs key/part attributes and text markers to recover
+        // identity. Fresh DOM already has typed part references; only Groups
+        // need a physical range. Keep the serialized/adopted wire shape intact.
+        let fragment = shape
+            .pieces
+            .is_empty()
+            .then(|| self.document.create_document_fragment());
         for piece in &shape.pieces {
             let node: Node = match &piece.kind {
                 Kind::Text(value) => self.document.create_text_node(value).into(),
@@ -391,13 +458,7 @@ impl Dom {
                     element
                         .set_attribute("data-gly-node", &token)
                         .map_err(backend)?;
-                    element
-                        .set_attribute("data-gly-key", &key.to_string())
-                        .map_err(backend)?;
-                    element
-                        .set_attribute("data-gly-part", piece.part.name())
-                        .map_err(backend)?;
-                    if self.live.get() {
+                    if self.live.get() && is_virtual {
                         element
                             .set_attribute("data-gly-live", "")
                             .map_err(backend)?;
@@ -405,19 +466,12 @@ impl Dom {
                     element.into()
                 }
             };
-            let parent: &Node = piece
-                .parent
-                .and_then(|part| parts.get(&part))
-                .unwrap_or(fragment.as_ref());
-            if matches!(piece.kind, Kind::Text(_)) {
-                parent
-                    .append_child(&self.document.create_comment(&format!("gly:t:{key}")))
-                    .map_err(backend)?;
+            if let Some(parent) = piece.parent.and_then(|part| parts.get(&part)) {
+                parent.append_child(&node).map_err(backend)?;
             }
-            parent.append_child(&node).map_err(backend)?;
             parts.insert(piece.part, node);
         }
-        if parts.is_empty() {
+        if let Some(fragment) = &fragment {
             fragment
                 .append_child(&self.document.create_comment(&format!("gly:s:{key}")))
                 .map_err(backend)?;
@@ -427,9 +481,19 @@ impl Dom {
         }
         let entry = Rc::new(Entry {
             token: token.clone(),
-            first: fragment.first_child().expect("created range"),
-            last: fragment.last_child().expect("created range"),
-            fragment,
+            #[cfg(feature = "hydrate")]
+            is_virtual,
+            first: parts
+                .get(&Part::Main)
+                .cloned()
+                .or_else(|| fragment.as_ref()?.first_child())
+                .expect("created range"),
+            last: parts
+                .get(&Part::Main)
+                .cloned()
+                .or_else(|| fragment.as_ref()?.last_child())
+                .expect("created range"),
+            fragment: RefCell::new(fragment),
             parts,
             children: shape.children,
             control: shape.control,
@@ -461,6 +525,7 @@ impl Dom {
         before: Option<NodeId>,
     ) -> Result<(), Error> {
         let entry = self.entry(id)?;
+        let semantic_parent = parent;
         let (parent, end) = if let Some(parent) = parent {
             let parent = self.entry(parent)?;
             if let Some(part) = parent.children {
@@ -485,30 +550,38 @@ impl Dom {
             end
         };
         let nodes = range(&entry)?;
-        let selection = Selection::capture(&self.document);
+        // A detached new/resumed range cannot own the document's focus. Avoid
+        // selection property reads and moveBefore reflection for these inserts.
+        let connected = entry.first.is_connected();
+        let selection = connected.then(|| Selection::capture(&self.document));
         // moveBefore keeps focus, IME and element state on supporting engines.
-        let mover = js_sys::Reflect::get(&parent, &"moveBefore".into())
-            .ok()
-            .and_then(|value| value.dyn_into::<js_sys::Function>().ok());
+        let mover = (connected && parent.is_connected())
+            .then(|| {
+                js_sys::Reflect::get(&parent, &"moveBefore".into())
+                    .ok()
+                    .and_then(|value| value.dyn_into::<js_sys::Function>().ok())
+            })
+            .flatten();
         for node in nodes {
-            let used = node.is_connected()
-                && parent.is_connected()
-                && mover.as_ref().is_some_and(|mover| {
-                    mover
-                        .call2(
-                            &parent,
-                            &node,
-                            before.as_ref().map_or(&JsValue::NULL, |node| node.as_ref()),
-                        )
-                        .is_ok()
-                });
+            let used = mover.as_ref().is_some_and(|mover| {
+                mover
+                    .call2(
+                        &parent,
+                        &node,
+                        before.as_ref().map_or(&JsValue::NULL, |node| node.as_ref()),
+                    )
+                    .is_ok()
+            });
             if !used {
                 parent
                     .insert_before(&node, before.as_ref())
                     .map_err(backend)?;
             }
         }
-        selection.restore(&self.document);
+        if let Some(selection) = selection {
+            selection.restore(&self.document);
+        }
+        self.parents.borrow_mut().insert(id, semantic_parent);
         Ok(())
     }
     fn patch(&self, id: NodeId, edits: Vec<Edit>) -> Result<(), Error> {
@@ -541,6 +614,25 @@ impl Dom {
             subtree.iter().filter_map(|id| entries.remove(id)).collect()
         };
         let subtree: HashSet<_> = subtree.into_iter().collect();
+        if self
+            .drag
+            .borrow()
+            .as_ref()
+            .is_some_and(|drag| subtree.contains(&drag.from))
+        {
+            self.drag.borrow_mut().take();
+        }
+        // The mapper supplies the complete semantic subtree, including parked
+        // descendants. Remove those keys directly: retaining the whole parent
+        // table for each row makes bulk teardown repeatedly scan unrelated rows.
+        {
+            let mut parents = self.parents.borrow_mut();
+            let mut sizes = self.sizes.borrow_mut();
+            for id in &subtree {
+                parents.remove(id);
+                sizes.remove(id);
+            }
+        }
         {
             let mut tokens = self.tokens.borrow_mut();
             for entry in &removed {
@@ -550,9 +642,6 @@ impl Dom {
         self.layout
             .borrow_mut()
             .retain(|(id, _)| !subtree.contains(id));
-        self.sizes
-            .borrow_mut()
-            .retain(|id, _| !subtree.contains(id));
         self.inputs
             .borrow_mut()
             .retain(|input| !matches!(input, Input::Event { node, .. } if subtree.contains(node)));
@@ -587,6 +676,9 @@ impl Dom {
         }
         let entries = std::mem::take(&mut *self.entries.borrow_mut());
         self.tokens.borrow_mut().clear();
+        self.parents.borrow_mut().clear();
+        self.drag.borrow_mut().take();
+        self.suppress_click.set(false);
         self.layout.borrow_mut().clear();
         self.sizes.borrow_mut().clear();
         self.inputs.borrow_mut().clear();
@@ -620,15 +712,26 @@ impl glory_html::Sink for Sink {
             Op::Dispose { id, subtree } => self.0.dispose(id, subtree),
             Op::Suspend { id } => {
                 let entry = self.0.entry(id)?;
+                let mut parking = entry.fragment.borrow_mut();
+                let fragment =
+                    parking.get_or_insert_with(|| self.0.document.create_document_fragment());
                 for node in range(&entry)? {
-                    entry.fragment.append_child(&node).map_err(backend)?;
+                    fragment.append_child(&node).map_err(backend)?;
                 }
                 Ok(())
             }
         }
     }
 }
+fn virtual_shape(shape: &Shape) -> bool {
+    shape.pieces.iter().any(|piece| {
+        matches!(&piece.kind, Kind::Element { attributes, .. } if attributes.contains_key("data-gly-virtual"))
+    })
+}
 fn range(entry: &Entry) -> Result<Vec<Node>, Error> {
+    if entry.first == entry.last {
+        return Ok(vec![entry.first.clone()]);
+    }
     let mut nodes = Vec::new();
     let mut next = Some(entry.first.clone());
     while let Some(node) = next {

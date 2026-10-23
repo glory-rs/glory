@@ -931,7 +931,14 @@ fn paused_host_bounds_decoded_results_and_cancel_resume_close_releases_real_leas
     assert_eq!(loader.stats().completed, 1);
     assert!(s.rejected >= 2);
     app.clear().unwrap();
-    wait(|| loader.stats().active == 0 && loader.stats().queued == 0);
+    // The local RunningGuard publishes idle before the job argument's handler
+    // drops its decode lease. Wait for that distinct lifetime too, without
+    // pumping the host or refunding the still-queued completion early.
+    wait(|| {
+        loader.stats().active == 0
+            && loader.stats().queued == 0
+            && renderer.resource_stats().requests == 1
+    });
     let stale = renderer.resource_stats();
     assert_eq!(
         (stale.requests, stale.completions, stale.completion_bytes),

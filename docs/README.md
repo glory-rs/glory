@@ -13,6 +13,14 @@ Start here when evaluating or extending Glory:
 - [Semantic component contract audit](semantic-ui-contract.md):
   eight-component content, event/query/action targets, adapter conformance and
   explicit remaining R0 work.
+- [Current browser framework comparison](performance.md): semantic Glory/Leptos/Dioxus
+  full-row workloads, independent builds, actual results and explicit historical boundaries.
+- [DOM retirement follow-up](performance.md#dom-retirement-follow-up--2026-10-23):
+  parent-table scan removal, paired timings, final-source verification and full regression.
+- [Bulk DOM optimization](bulk-dom-optimization-2026-10-23.md): Owner/Binding, metadata,
+  comment/range costs, paired timings, identity/pixel checks and the existing anchor failure.
+- [Fractional list anchor correction](anchor-residual-fix-2026-10-23.md): 0.375 px residual
+  fix, 64/1024 real-height caches, settled pixel/node identity and complete regression evidence.
 - [Engine forks](engine-forks.md): immutable glory-rs Blitz/Taffy Git dependencies,
   source provenance, fork tests and the prohibition on vendoring.
 

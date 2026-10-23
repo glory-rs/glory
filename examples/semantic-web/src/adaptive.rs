@@ -30,15 +30,19 @@ pub(crate) fn clear() {
 
 #[wasm_bindgen]
 pub fn adaptive_mount() -> Result {
-    mount(false)
+    mount(false, 64)
+}
+#[wasm_bindgen]
+pub fn adaptive_mount_limit(limit: usize) -> Result {
+    mount(false, limit)
 }
 /// Same indexed 100-million source, with intrinsic text heights instead of
 /// explicit row heights. Used to verify typography-driven Resize measurements.
 #[wasm_bindgen]
 pub fn adaptive_text_mount() -> Result {
-    mount(true)
+    mount(true, 64)
 }
-fn mount(text_mode: bool) -> Result {
+fn mount(text_mode: bool, measure_limit: usize) -> Result {
     crate::browser::unmount();
     let root = web_sys::window()
         .and_then(|window| window.document())
@@ -93,7 +97,7 @@ fn mount(text_mode: bool) -> Result {
             )
             .height(600.0)
             .measure(if text_mode { 20.0 } else { 24.0 })
-            .measure_limit(64)
+            .measure_limit(measure_limit)
             .position(position)
             .locate(move |key| {
                 key.checked_sub(base.get())

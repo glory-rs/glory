@@ -275,6 +275,44 @@ fn only_the_last_binding_for_a_property_is_installed() {
 }
 
 #[test]
+fn bound_password_visibility_patches_purpose_without_replacing_the_input_or_value() {
+    let (app, trace) = app(false);
+    let visible = app.scope().cage(false);
+    let value = app.scope().cage(String::from("secret"));
+    app.mount(input().value(value).purpose(visible.map(|visible| {
+        if *visible {
+            Purpose::Text
+        } else {
+            Purpose::Password
+        }
+    })))
+    .unwrap();
+    let id = find(&app, |props| matches!(props, Props::Input(_)));
+    let before = app.tree().node(id).unwrap().descriptor.clone();
+    trace.borrow_mut().mutations.clear();
+    visible.revise(|visible| *visible = true);
+    app.flush().unwrap();
+    assert_eq!(find(&app, |props| matches!(props, Props::Input(_))), id);
+    let after = app.tree().node(id).unwrap().descriptor.clone();
+    let (Props::Input(before), Props::Input(after)) = (before.props, after.props) else {
+        panic!("input expected");
+    };
+    assert_eq!(after.purpose, Purpose::Text);
+    assert_eq!(after.value, before.value);
+    assert_eq!(after.revision, before.revision);
+    assert_eq!(trace.borrow().mutations.len(), 1);
+    assert!(matches!(
+        &trace.borrow().mutations[0],
+        Mutation::Patch { id: target, patch: glory_render::Patch::Purpose(glory_render::Change::Set(Purpose::Text)) }
+            if *target == id
+    ));
+    trace.borrow_mut().mutations.clear();
+    visible.revise(|visible| *visible = true);
+    app.flush().unwrap();
+    assert!(trace.borrow().mutations.is_empty());
+}
+
+#[test]
 fn eight_components_and_configuration_validation_are_backend_independent() {
     let app = App::memory();
     app.mount(

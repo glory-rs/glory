@@ -7,6 +7,9 @@ debug.log
 **/Cargo.lock
 !/Cargo.lock
 !/examples/semantic-web/Cargo.lock
+!/benchmarks/glory/Cargo.lock
+!/benchmarks/leptos/Cargo.lock
+!/benchmarks/dioxus/Cargo.lock
 
 **/node_modules
 **/package-lock.json

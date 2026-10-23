@@ -5,10 +5,14 @@ edition = "2024"
 publish = false
 
 [dependencies]
-glory = { path = "../../crates/glory", default-features = false, features = ["web-csr"] }
-wasm-bindgen = { version = "0.2", features = ["enable-interning"] }
-wasm-bindgen-futures = "0.4.71"
-web-sys = "0.3"
+glory = { path = "../../crates/glory", default-features = false, features = ["web"] }
+wasm-bindgen = { version = "=0.2.129", features = ["enable-interning"] }
+web-sys = { version = "=0.3.106", features = ["Window", "Document", "Element"] }
+
+[workspace]
+
+[package.metadata.benchmark]
+contract = "semantic-rows-v1"
 
 [profile.release]
 opt-level = 3

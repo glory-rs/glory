@@ -12,6 +12,8 @@ pub struct Node {
     pub children: Vec<NodeId>,
     pub placed: bool,
     pub suspended: bool,
+    // Logical adjacency, including suspended siblings. No historical identities.
+    next: Option<NodeId>,
 }
 
 /// A proposed child of a logical parent. New descriptors have no identity or
@@ -190,9 +192,19 @@ impl Memory {
             nodes.get(&id).ok_or(Error::NodeGone(id))
         };
         let target = get(id)?;
+        if let Event::Drag { from, phase, .. } = event {
+            event.validate_payload(id, &target.descriptor)?;
+            let source = match get(*from) {
+                Ok(source) => source,
+                Err(Error::NodeGone(_)) => return Ok(false),
+                Err(error) => return Err(error),
+            };
+            EventKind::Drag.validate_target(&source.descriptor)?;
+            return Ok(Self::active_in(nodes, *from) || *phase == crate::DragPhase::Cancel);
+        }
         // Navigation's explicit origin must be exactly the target, even if a
         // mismatched embedded identity has already been retired.
-        if matches!(event, Event::Navigate { .. }) {
+        if matches!(event, Event::Navigate { .. } | Event::Keyboard { .. }) {
             event.validate_payload(id, &target.descriptor)?;
             return Ok(true);
         }
@@ -238,6 +250,7 @@ impl Memory {
         if matches!(
             event,
             Event::Activate
+                | Event::Keyboard { .. }
                 | Event::CheckedChanged(_)
                 | Event::ValueChanged { .. }
                 | Event::Commit { .. }
@@ -273,7 +286,29 @@ impl Memory {
         } else {
             &mut self.roots
         };
-        siblings.retain(|child| *child != id);
+        let index = if siblings.last() == Some(&id) {
+            siblings.len() - 1
+        } else {
+            siblings
+                .iter()
+                .position(|child| *child == id)
+                .expect("placed sibling")
+        };
+        let previous = index.checked_sub(1).map(|index| siblings[index]);
+        siblings.remove(index);
+        if let Some(previous) = previous {
+            self.nodes
+                .get_mut(&previous)
+                .expect("previous sibling")
+                .next = self.nodes[&id].next;
+        }
+    }
+
+    /// Next logical sibling of a placed node, including suspended siblings.
+    /// Identity validation precedes the constant-time adjacency lookup.
+    pub fn next_sibling(&self, id: NodeId) -> Result<Option<NodeId>, Error> {
+        let node = self.node(id)?;
+        Ok(node.placed.then_some(node.next).flatten())
     }
 
     /// Check a proposed parent/child relation without allocating identities or
@@ -393,8 +428,16 @@ impl Memory {
                     .expect("validated sibling")
             })
             .unwrap_or(siblings.len());
+        let previous = index.checked_sub(1).map(|index| siblings[index]);
         siblings.insert(index, id);
+        if let Some(previous) = previous {
+            self.nodes
+                .get_mut(&previous)
+                .expect("previous sibling")
+                .next = Some(id);
+        }
         let node = self.nodes.get_mut(&id).expect("validated node");
+        node.next = before;
         node.parent = parent;
         node.placed = true;
         node.suspended = false;
@@ -429,6 +472,7 @@ impl Memory {
                         children: Vec::new(),
                         placed: false,
                         suspended: false,
+                        next: None,
                     },
                 );
                 self.stats.created += 1;

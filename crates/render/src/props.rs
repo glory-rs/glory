@@ -72,6 +72,13 @@ pub enum Role {
     ListItem,
     Status,
     Alert,
+    /// Read-only tabular data; rows contain column headers or cells.
+    Table,
+    Row,
+    ColumnHeader,
+    Cell,
+    /// A named dialog. Modality and focus management belong to the host.
+    Dialog,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

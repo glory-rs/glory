@@ -888,9 +888,6 @@ impl<K: Clone + Eq + Hash + 'static> Widget for List<K> {
                 if previous_range != next.render {
                     range.revise(|range| *range = next.render.clone());
                 }
-                if origin.get_untracked() != state.space.origin() {
-                    origin.revise(|origin| *origin = state.space.origin());
-                }
                 if extent.get_untracked() != state.space.extent() {
                     extent.revise(|extent| *extent = state.space.extent());
                 }
@@ -900,23 +897,42 @@ impl<K: Clone + Eq + Hash + 'static> Widget for List<K> {
                 if physical != projected - state.bias {
                     state.bias = projected - physical;
                 }
+                // Ignore only arithmetic roundoff from logical/segment
+                // coordinate conversion, never a subpixel height change.
+                let roundoff =
+                    4.0 * f64::EPSILON * projected.abs().max(input.physical.abs()).max(1.0);
                 if scope.capabilities()?.scroll
                     && scope.is_active(root)?
-                    && (input.physical - physical).abs() > 0.25
+                    && ((input.physical - physical).abs() > roundoff
+                        || state
+                            .expected
+                            .as_ref()
+                            .is_some_and(|expected| expected.projected != projected))
                     && !state
                         .expected
                         .as_ref()
-                        .is_some_and(|expected| (expected.requested - physical).abs() < 0.25)
+                        .is_some_and(|expected| expected.projected == projected)
                 {
                     scope.action(Action::ScrollTo {
                         node: root,
                         x: 0.0,
-                        y: physical,
+                        // Request the new projection itself. Subtracting the
+                        // previous quantization error would accumulate bias
+                        // across successive fractional measurements.
+                        y: projected,
                     })?;
                     state.expected = Some(ExpectedScroll {
-                        requested: physical,
+                        requested: projected,
                         projected,
                     });
+                }
+                // The same mapping must drive logical scrolling AND painting:
+                // row_top = prefix - segment_origin - bias - host_scroll.
+                // Host readback can differ from the requested projection while
+                // the logical anchor and its exact within-row offset survive.
+                let display_origin = state.space.origin() + state.bias;
+                if origin.get_untracked() != display_origin {
+                    origin.revise(|origin| *origin = display_origin);
                 }
                 let keys_changed = keys.with(|snapshot| {
                     if rows.start == next.render.start && rows.keys == *snapshot {
