@@ -539,7 +539,11 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
                     .ok()
                     .and_then(|node| node.parent);
             }
-            if interested && (!editable || own_interest) {
+            // Escape belongs to the nearest interested dialog even inside an editor.
+            // Enter still requires the editor itself to opt into Submit.
+            if interested
+                && (!editable || own_interest || command == glory_render::KeyboardCommand::Dismiss)
+            {
                 if command == glory_render::KeyboardCommand::Submit {
                     let revision = state
                         .dom

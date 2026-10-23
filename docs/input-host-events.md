@@ -30,3 +30,20 @@ suite), `framework-clean-native-tests1.txt` (three native keyboard, pointer and
 appearance probes), `framework-clean-browser1.txt` (two real Edge DOM probes,
 including multiple applications and twenty remounts). These probes do not assert
 actual OS IME acceptance, screen-reader announcements or authenticated app flows.
+
+## Editor dismissal regression (2026-10-24)
+
+Web and the native WindowApp driver allow Escape from a focused editor to reach
+its nearest live Keyboard observer. The editor need not register a no-op handler.
+Enter is different: Submit still requires that editor's own Keyboard interest;
+ordinary multiline Enter and Shift+Enter retain their editing behavior. Existing
+composition, repeat, Alt and prevented-event filtering stays in force.
+
+`native_dismiss_bubbles_from_editor_without_stealing_submit_or_ime` drives actual
+WindowApp key events, checks deferred delivery and original source identity, and
+fails when only the routing condition is reverted. The shell library suite ran
+43 tests successfully (one pre-existing ignored test). The runnable browser
+fixture exports `keyboard_mount`; `keyboard-acceptance.js` ran against freshly
+built WASM in real Edge and checked multiline editing, ancestor dismissal,
+nearest-observer ownership, explicit Submit, composition filtering and teardown.
+Composition events in that browser test are a protocol probe, not OS IME evidence.

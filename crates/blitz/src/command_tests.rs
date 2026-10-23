@@ -161,3 +161,44 @@ fn native_color_scheme_is_queued_coalesced_and_initializes_late_view_interests()
         Some(&Event::ColorSchemeChanged { dark: false })
     );
 }
+
+#[test]
+fn native_dismiss_bubbles_from_editor_without_stealing_submit_or_ime() {
+    let mut app = WindowApp::new();
+    let input_ref = app.app.scope().cage(None);
+    let seen = Rc::new(RefCell::new(Vec::new()));
+    let observed = seen.clone();
+    app.mount(
+        view()
+            .on(EventKind::Keyboard, move |event| {
+                observed.borrow_mut().push(event);
+            })
+            .fill(input().multiline(true).node_ref(input_ref)),
+    )
+    .unwrap();
+    tick(&mut app);
+    let id = input_ref.get().unwrap();
+    native_focus(&mut app, id);
+    key(&mut app, "Enter", Modifiers::empty(), false, false);
+    tick(&mut app);
+    assert!(
+        seen.borrow().is_empty(),
+        "ancestor interest must not steal editor Enter"
+    );
+    assert_eq!(app.renderer.0.borrow().dom.text_value(id).unwrap(), "\n");
+    for (modifiers, composing, repeat) in [
+        (Modifiers::empty(), true, false),
+        (Modifiers::ALT, false, false),
+        (Modifiers::empty(), false, true),
+    ] {
+        key(&mut app, "Escape", modifiers, composing, repeat);
+        tick(&mut app);
+        assert!(seen.borrow().is_empty(), "filtered Escape must not dismiss");
+    }
+    key(&mut app, "Escape", Modifiers::empty(), false, false);
+    assert!(seen.borrow().is_empty(), "host callback must only enqueue");
+    tick(&mut app);
+    assert!(
+        matches!(seen.borrow().as_slice(), [Event::Keyboard {from, command: KeyboardCommand::Dismiss}] if *from == id)
+    );
+}

@@ -25,6 +25,8 @@ pub mod input_form;
 #[cfg(target_arch = "wasm32")]
 mod intrinsic;
 #[cfg(target_arch = "wasm32")]
+mod keyboard_client;
+#[cfg(target_arch = "wasm32")]
 mod owner_client;
 pub mod owner_form;
 #[cfg(target_arch = "wasm32")]
@@ -203,6 +205,7 @@ mod browser {
         crate::owner_client::clear();
         crate::query_client::clear();
         crate::input_client::clear();
+        crate::keyboard_client::clear();
         crate::semantics_client::clear();
         crate::size_client::clear();
         crate::flex_client::clear();

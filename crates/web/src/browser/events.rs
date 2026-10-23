@@ -515,7 +515,10 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
                     }
                     cursor = dom.parents.borrow().get(&node).copied().flatten();
                 }
-                if interested && (!editable || own_interest) {
+                // Escape belongs to the nearest interested dialog even inside an editor.
+                // Enter still requires the editor itself to opt into Submit.
+                if interested && (!editable || own_interest || command == KeyboardCommand::Dismiss)
+                {
                     if command == KeyboardCommand::Submit {
                         dom.queue(
                             id,
