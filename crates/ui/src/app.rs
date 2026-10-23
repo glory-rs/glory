@@ -405,6 +405,8 @@ impl Session {
                 && matches!(
                     event,
                     Event::Activate
+                        | Event::Keyboard { .. }
+                        | Event::Drag { .. }
                         | Event::ValueChanged { .. }
                         | Event::CheckedChanged(_)
                         | Event::Commit { .. }
@@ -416,7 +418,9 @@ impl Session {
             let mut handler = None;
             while let Some(id) = cursor {
                 let current = present.tree.node(id)?;
-                if matches!(event, Event::Activate) && !current.descriptor.props.enabled() {
+                if matches!(event, Event::Activate | Event::Keyboard { .. })
+                    && !current.descriptor.props.enabled()
+                {
                     return Ok(false);
                 }
                 if handler.is_none() {
@@ -426,7 +430,10 @@ impl Session {
                         .and_then(|handlers| handlers.get(&event.kind()))
                         .map(|subscription| (id, subscription.callback.clone()));
                 }
-                if !matches!(event, Event::Activate | Event::Navigate { .. }) {
+                if !matches!(
+                    event,
+                    Event::Activate | Event::Navigate { .. } | Event::Keyboard { .. }
+                ) {
                     break;
                 }
                 cursor = current.parent;
@@ -596,7 +603,7 @@ struct ScopeState {
     children: RefCell<Vec<Mounted>>,
     resources: RefCell<Vec<Box<dyn Any>>>,
 }
-pub(crate) struct WeakScope(Weak<ScopeState>);
+pub struct WeakScope(Weak<ScopeState>);
 impl Clone for WeakScope {
     fn clone(&self) -> Self {
         Self(self.0.clone())
@@ -668,6 +675,10 @@ impl Scope {
     }
     pub(crate) fn weak(&self) -> WeakScope {
         WeakScope(Rc::downgrade(&self.0))
+    }
+    /// A callback may upgrade transiently without retaining its owning UI scope.
+    pub fn downgrade(&self) -> WeakScope {
+        self.weak()
     }
     pub fn child(&self) -> Result<Self> {
         let session = self.session()?;

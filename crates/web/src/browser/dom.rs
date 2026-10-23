@@ -130,12 +130,22 @@ impl Entry {
     }
 }
 
+pub(super) struct DragSession {
+    pub from: NodeId,
+    pub pointer: i32,
+    pub x: f64,
+    pub y: f64,
+    pub started: bool,
+}
 pub(super) struct Dom {
+    pub drag: RefCell<Option<DragSession>>,
+    pub suppress_click: Cell<bool>,
     pub document: Document,
     pub root: Element,
     pub frame: Rc<Frame>,
     pub entries: RefCell<HashMap<NodeId, Rc<Entry>>>,
     pub tokens: RefCell<HashMap<String, NodeId>>,
+    pub parents: RefCell<HashMap<NodeId, Option<NodeId>>>,
     pub inputs: RefCell<Vec<Input>>,
     pub layout: RefCell<BTreeSet<(NodeId, EventKind)>>,
     pub sizes: RefCell<HashMap<NodeId, Rect>>,
@@ -155,11 +165,14 @@ impl Dom {
     pub fn new(document: Document, root: Element, frame: Rc<Frame>) -> Rc<Self> {
         let error = root.set_attribute("data-gly-app", "").err().map(backend);
         Rc::new(Self {
+            drag: RefCell::new(None),
+            suppress_click: Cell::new(false),
             document,
             root,
             frame,
             entries: RefCell::new(HashMap::new()),
             tokens: RefCell::new(HashMap::new()),
+            parents: RefCell::new(HashMap::new()),
             inputs: RefCell::new(Vec::new()),
             layout: RefCell::new(BTreeSet::new()),
             sizes: RefCell::new(HashMap::new()),
@@ -263,6 +276,21 @@ impl Dom {
         } else {
             entry.interests.borrow_mut().remove(&kind);
         }
+        if enabled && kind == EventKind::ColorSchemeChanged {
+            if let Some(media) = self.document.default_view().and_then(|window| {
+                window
+                    .match_media("(prefers-color-scheme: dark)")
+                    .ok()
+                    .flatten()
+            }) {
+                self.queue(
+                    id,
+                    Event::ColorSchemeChanged {
+                        dark: media.matches(),
+                    },
+                );
+            }
+        }
         if kind == EventKind::Resize {
             let element = entry.element()?;
             let observer = self.observer.borrow();
@@ -323,6 +351,34 @@ impl Dom {
                         ..
                     } => {}
                     _ => break,
+                }
+            }
+        }
+        if matches!(
+            event,
+            Event::Drag {
+                phase: glory_render::DragPhase::Move,
+                ..
+            }
+        ) {
+            if let Some(Input::Event {
+                node,
+                event: previous,
+            }) = inputs.last_mut()
+            {
+                if *node == id
+                    && matches!(
+                        previous,
+                        Event::Drag {
+                            phase: glory_render::DragPhase::Move,
+                            ..
+                        }
+                    )
+                {
+                    *previous = event;
+                    drop(inputs);
+                    self.frame.input();
+                    return;
                 }
             }
         }
@@ -461,6 +517,7 @@ impl Dom {
         before: Option<NodeId>,
     ) -> Result<(), Error> {
         let entry = self.entry(id)?;
+        let semantic_parent = parent;
         let (parent, end) = if let Some(parent) = parent {
             let parent = self.entry(parent)?;
             if let Some(part) = parent.children {
@@ -509,6 +566,7 @@ impl Dom {
             }
         }
         selection.restore(&self.document);
+        self.parents.borrow_mut().insert(id, semantic_parent);
         Ok(())
     }
     fn patch(&self, id: NodeId, edits: Vec<Edit>) -> Result<(), Error> {
@@ -541,6 +599,17 @@ impl Dom {
             subtree.iter().filter_map(|id| entries.remove(id)).collect()
         };
         let subtree: HashSet<_> = subtree.into_iter().collect();
+        if self
+            .drag
+            .borrow()
+            .as_ref()
+            .is_some_and(|drag| subtree.contains(&drag.from))
+        {
+            self.drag.borrow_mut().take();
+        }
+        self.parents
+            .borrow_mut()
+            .retain(|id, _| !subtree.contains(id));
         {
             let mut tokens = self.tokens.borrow_mut();
             for entry in &removed {
@@ -587,6 +656,9 @@ impl Dom {
         }
         let entries = std::mem::take(&mut *self.entries.borrow_mut());
         self.tokens.borrow_mut().clear();
+        self.parents.borrow_mut().clear();
+        self.drag.borrow_mut().take();
+        self.suppress_click.set(false);
         self.layout.borrow_mut().clear();
         self.sizes.borrow_mut().clear();
         self.inputs.borrow_mut().clear();

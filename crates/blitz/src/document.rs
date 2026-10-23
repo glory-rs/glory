@@ -818,7 +818,17 @@ impl Sink for Dom {
     }
 }
 
+struct DragSession {
+    from: NodeId,
+    pointer: blitz_traits::events::BlitzPointerId,
+    x: f64,
+    y: f64,
+    started: bool,
+}
 struct State {
+    color_scheme: Option<bool>,
+    drag: Option<DragSession>,
+    suppress_click: bool,
     #[cfg(feature = "paint")]
     runtime: RuntimeId,
     mapper: Mapper,
@@ -985,6 +995,9 @@ impl Renderer {
             subscriptions: BTreeSet::new(),
             input_error: None,
             space: None,
+            drag: None,
+            color_scheme: None,
+            suppress_click: false,
         })))
     }
     /// Physical viewport and DPI. A zero-sized minimized surface is permitted.
@@ -1193,6 +1206,14 @@ impl Render for Renderer {
         }
         if enabled {
             state.subscriptions.insert((node, kind));
+            if kind == EventKind::ColorSchemeChanged {
+                if let Some(dark) = state.color_scheme {
+                    state.inputs.push(Input::Event {
+                        node,
+                        event: Event::ColorSchemeChanged { dark },
+                    });
+                }
+            }
         } else {
             state.subscriptions.remove(&(node, kind));
         }

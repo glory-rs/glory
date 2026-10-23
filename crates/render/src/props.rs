@@ -72,6 +72,8 @@ pub enum Role {
     ListItem,
     Status,
     Alert,
+    /// A named dialog. Modality and focus management belong to the host.
+    Dialog,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

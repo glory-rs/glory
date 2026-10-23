@@ -201,6 +201,7 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
             Role::ListItem,
             Role::Status,
             Role::Alert,
+            Role::Dialog,
         ]
         .into_iter()
         .map(|role| Patch::Role(Change::Set(Some(role)))),

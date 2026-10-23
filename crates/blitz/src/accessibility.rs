@@ -497,6 +497,7 @@ fn role(d: &glory_render::Descriptor) -> AxRole {
             Some(Role::ListItem) => AxRole::ListItem,
             Some(Role::Status) => AxRole::Status,
             Some(Role::Alert) => AxRole::Alert,
+            Some(Role::Dialog) => AxRole::Dialog,
             None => AxRole::GenericContainer,
         },
         Props::Text(p) => match p.kind {

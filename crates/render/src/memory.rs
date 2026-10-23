@@ -190,9 +190,19 @@ impl Memory {
             nodes.get(&id).ok_or(Error::NodeGone(id))
         };
         let target = get(id)?;
+        if let Event::Drag { from, phase, .. } = event {
+            event.validate_payload(id, &target.descriptor)?;
+            let source = match get(*from) {
+                Ok(source) => source,
+                Err(Error::NodeGone(_)) => return Ok(false),
+                Err(error) => return Err(error),
+            };
+            EventKind::Drag.validate_target(&source.descriptor)?;
+            return Ok(Self::active_in(nodes, *from) || *phase == crate::DragPhase::Cancel);
+        }
         // Navigation's explicit origin must be exactly the target, even if a
         // mismatched embedded identity has already been retired.
-        if matches!(event, Event::Navigate { .. }) {
+        if matches!(event, Event::Navigate { .. } | Event::Keyboard { .. }) {
             event.validate_payload(id, &target.descriptor)?;
             return Ok(true);
         }
@@ -238,6 +248,7 @@ impl Memory {
         if matches!(
             event,
             Event::Activate
+                | Event::Keyboard { .. }
                 | Event::CheckedChanged(_)
                 | Event::ValueChanged { .. }
                 | Event::Commit { .. }

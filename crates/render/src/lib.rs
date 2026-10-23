@@ -13,6 +13,10 @@ pub use glory_style as style;
 pub use id::{NodeId, NodeIds, RuntimeId};
 pub use props::*;
 pub use text::normalize_text;
+mod keyboard;
+pub use keyboard::{KeyboardCommand, KeyboardInput};
+mod drag;
+pub use drag::DragPhase;
 
 /// Optional windowed-view metadata. Engines can show a flow preview before
 /// geometry is available without changing logical ownership or identity.
@@ -232,6 +236,22 @@ pub enum QueryValue {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
     Activate,
+    /// Host preference, independent of an application's explicit appearance.
+    ColorSchemeChanged {
+        dark: bool,
+    },
+    /// Physical origin remains explicit while App routes to the nearest observer.
+    Keyboard {
+        from: NodeId,
+        command: KeyboardCommand,
+    },
+    /// Start/Move/Cancel target the source. Drop targets a live accepting node.
+    Drag {
+        from: NodeId,
+        phase: DragPhase,
+        x: f64,
+        y: f64,
+    },
     ValueChanged {
         value: String,
         composing: bool,
@@ -298,6 +318,9 @@ pub struct ScrollAck {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum EventKind {
     Activate,
+    ColorSchemeChanged,
+    Keyboard,
+    Drag,
     ValueChanged,
     Commit,
     CheckedChanged,
@@ -315,6 +338,13 @@ impl EventKind {
     /// observations cannot. Recording a valid interest does not promise the host
     /// can produce it (SSR records handlers for later browser adoption).
     pub fn validate_target(self, node: &Descriptor) -> Result<(), Error> {
+        if matches!(self, Self::Drag | Self::ColorSchemeChanged)
+            && !matches!(node.props, Props::View)
+        {
+            return Err(Error::Unsupported(
+                "host observation requires a semantic View",
+            ));
+        }
         if matches!(self, Self::ValueChanged | Self::Commit | Self::Composition)
             && !matches!(node.props, Props::Input(_))
             || matches!(self, Self::CheckedChanged) && !matches!(node.props, Props::Check(_))
@@ -324,7 +354,7 @@ impl EventKind {
         if matches!(node.props, Props::Group)
             && matches!(
                 self,
-                Self::Resize | Self::Scroll | Self::Anchor | Self::FocusChanged
+                Self::Resize | Self::Scroll | Self::Anchor | Self::FocusChanged | Self::Drag
             )
         {
             return Err(Error::Unsupported("group has no physical event target"));
@@ -342,6 +372,10 @@ impl Event {
             Self::FocusChanged(false)
                 | Self::Composition { active: false }
                 | Self::FocusWithin { focused: false, .. }
+                | Self::Drag {
+                    phase: DragPhase::Cancel,
+                    ..
+                }
         )
     }
 
@@ -349,6 +383,8 @@ impl Event {
         match self {
             Self::FocusWithin { node, .. } => Some(*node),
             Self::Navigate { from, .. } => Some(*from),
+            Self::Keyboard { from, .. } => Some(*from),
+            Self::Drag { from, .. } => Some(*from),
             Self::Anchor { row, .. } => Some(*row),
             _ => None,
         }
@@ -374,6 +410,22 @@ impl Event {
                 && rect.height >= 0.0
         };
         match self {
+            Self::Drag { from, phase, x, y } => {
+                if !x.is_finite() || !y.is_finite() {
+                    return Err(Error::InvalidEvent("drag coordinates must be finite"));
+                }
+                if *phase != DragPhase::Drop && *from != target {
+                    return Err(Error::InvalidEvent("drag phase requires source target"));
+                }
+            }
+            Self::Keyboard { from, command } => {
+                if *from != target || matches!(node.props, Props::Group) {
+                    return Err(Error::InvalidEvent("keyboard requires its physical origin"));
+                }
+                if *command == KeyboardCommand::Submit && !matches!(node.props, Props::Input(_)) {
+                    return Err(Error::InvalidEvent("submit requires a text control"));
+                }
+            }
             Self::Navigate { from, .. } if *from != target => {
                 return Err(Error::InvalidEvent(
                     "navigation origin must match its event target",
@@ -437,6 +489,9 @@ impl Event {
     pub fn kind(&self) -> EventKind {
         match self {
             Self::Activate => EventKind::Activate,
+            Self::ColorSchemeChanged { .. } => EventKind::ColorSchemeChanged,
+            Self::Keyboard { .. } => EventKind::Keyboard,
+            Self::Drag { .. } => EventKind::Drag,
             Self::ValueChanged { .. } => EventKind::ValueChanged,
             Self::Commit { .. } => EventKind::Commit,
             Self::CheckedChanged(_) => EventKind::CheckedChanged,

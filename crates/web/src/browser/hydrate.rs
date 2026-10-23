@@ -367,6 +367,9 @@ pub fn hydrate_with<W: Widget>(root: Element, factory: impl FnOnce(&Scope) -> W)
             .map_err(backend)?;
     }
     for entry in plan.entries {
+        dom.parents
+            .borrow_mut()
+            .insert(entry.id, mapper.borrow().tree().node(entry.id)?.parent);
         dom.adopt(
             entry.id,
             entry.key,
