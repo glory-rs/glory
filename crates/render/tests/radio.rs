@@ -47,3 +47,29 @@ fn native_radio_group_names_are_finite_and_successful_names_cannot_conflict() {
     }));
     group.validate().unwrap();
 }
+
+#[test]
+fn checkbox_fieldsets_accept_group_error_relations_but_keep_control_states_on_controls() {
+    let mut descriptor = Descriptor::new(Props::View);
+    descriptor.semantics = Some(Box::new(Semantics {
+        field_part: Some(FieldPart::Fieldset),
+        invalid: true,
+        error_message: Some(SemanticId::new("group-error").unwrap()),
+        ..Default::default()
+    }));
+    descriptor.validate().unwrap();
+    let mut states = descriptor.semantics.clone().unwrap();
+    states.required = true;
+    assert!(
+        descriptor
+            .patched(Patch::Semantics(Change::Set(Some(states))))
+            .is_err()
+    );
+    let mut states = descriptor.semantics.clone().unwrap();
+    states.readonly = true;
+    assert!(
+        descriptor
+            .patched(Patch::Semantics(Change::Set(Some(states))))
+            .is_err()
+    );
+}

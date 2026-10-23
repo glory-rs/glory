@@ -109,7 +109,19 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
         count: Some(100_000_000),
     });
     bases.push(item);
+    let mut fieldset = Descriptor::new(Props::View);
+    fieldset.semantics = Some(Box::new(Semantics {
+        field_part: Some(FieldPart::Fieldset),
+        ..Default::default()
+    }));
+    bases.push(fieldset);
     let mut patches = vec![
+        Patch::Semantics(Change::Set(Some(Box::new(Semantics {
+            field_part: Some(FieldPart::Fieldset),
+            invalid: true,
+            error_message: Some(SemanticId::new("group-error").unwrap()),
+            ..Default::default()
+        })))),
         Patch::Semantics(Change::Set(Some(Box::new(Semantics {
             check_group: Some(SemanticId::new("radio-association").unwrap()),
             navigation_item: true,
