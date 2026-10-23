@@ -136,10 +136,11 @@ impl<T: Clone + 'static, K: Clone + Eq + Hash> RowHost for Rows<T, K> {
             let data = self.parent.upgrade().ok_or(Error::Gone)?.child()?;
             let item = data.cage(self.items[index].clone());
             let position = data.cage(index);
-            let mounted = data
-                .owner()
-                .enter(|| (self.render)(item, position))
-                .mount(&data)?;
+            // Construction reads belong to the row, not the enclosing structural
+            // observer. Explicit bindings created by the factory track themselves.
+            let widget =
+                glory_core::untracked(|| data.owner().enter(|| (self.render)(item, position)));
+            let mounted = widget.mount(&data)?;
             Ok(BoundRow {
                 mounted,
                 _data: data,

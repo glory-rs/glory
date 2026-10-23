@@ -305,6 +305,101 @@ fn eight_components_and_configuration_validation_are_backend_independent() {
 }
 
 #[test]
+fn each_factory_bare_row_reads_do_not_resubscribe_the_structural_observer() {
+    let app = App::memory();
+    let items = app.scope().cage(vec![(1_u64, String::from("first"))]);
+    let keys = Rc::new(Cell::new(0));
+    let keyed = keys.clone();
+    let made = Rc::new(Cell::new(0));
+    let builds = made.clone();
+    app.mount(each(
+        items,
+        move |item| {
+            keyed.set(keyed.get() + 1);
+            item.0
+        },
+        move |row, position| {
+            builds.set(builds.get() + 1);
+            assert_eq!(position.get(), 0);
+            text().content(row.get().1)
+        },
+    ))
+    .unwrap();
+    assert_eq!(made.get(), 1);
+    assert_eq!(keys.get(), 1);
+    for label in ["second", "third"] {
+        let before = keys.get();
+        items.revise(|items| items[0].1 = label.into());
+        app.flush().unwrap();
+        assert_eq!(
+            keys.get(),
+            before + 1,
+            "one reconciliation per source change"
+        );
+        assert_eq!(made.get(), 1, "same-key factory is retained");
+    }
+    let node = find(&app, |props| matches!(props, Props::Text(_)));
+    assert_eq!(text_at(&app, node), "first", "bare reads are snapshots");
+}
+
+#[test]
+fn each_factory_bare_external_reads_do_not_invalidate_the_list() {
+    let app = App::memory();
+    let items = app.scope().cage(vec![1_u64]);
+    let external = app.scope().cage(String::from("snapshot"));
+    let keys = Rc::new(Cell::new(0));
+    let keyed = keys.clone();
+    app.mount(each(
+        items,
+        move |item| {
+            keyed.set(keyed.get() + 1);
+            *item
+        },
+        move |_, _| text().content(external.get()),
+    ))
+    .unwrap();
+    let before = keys.get();
+    external.revise(|value| *value = "unrelated".into());
+    app.flush().unwrap();
+    assert_eq!(keys.get(), before);
+    let node = find(&app, |props| matches!(props, Props::Text(_)));
+    assert_eq!(text_at(&app, node), "snapshot");
+}
+
+#[test]
+fn each_factory_explicit_bindings_keep_row_ownership_and_reactivity() {
+    let app = App::memory();
+    let items = app.scope().cage(vec![(1_u64, String::from("first"))]);
+    let suffix = app.scope().cage(String::from("one"));
+    let captured = Rc::new(RefCell::new(None));
+    let save = captured.clone();
+    app.mount(each(
+        items,
+        |item| item.0,
+        move |row, position| {
+            // Creating a derived value here also proves factory Owner::enter survives.
+            let label =
+                row.map(move |item| format!("{}:{}:{}", item.1, position.get(), suffix.get()));
+            *save.borrow_mut() = Some(label);
+            text().content(label)
+        },
+    ))
+    .unwrap();
+    let node = find(&app, |props| matches!(props, Props::Text(_)));
+    assert_eq!(text_at(&app, node), "first:0:one");
+    items.revise(|items| items[0].1 = "second".into());
+    app.flush().unwrap();
+    assert_eq!(text_at(&app, node), "second:0:one");
+    suffix.revise(|value| *value = "two".into());
+    app.flush().unwrap();
+    assert_eq!(text_at(&app, node), "second:0:two");
+    items.revise(Vec::clear);
+    app.flush().unwrap();
+    assert!(!captured.borrow().unwrap().is_alive());
+    assert!(app.tree().node(node).is_err());
+}
+
+#[test]
 fn structural_phases_precede_props_and_each_reuses_row_state_on_reorder() {
     #[derive(Clone)]
     struct Item {
