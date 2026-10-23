@@ -373,6 +373,7 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
             dom.queue(id, Event::Composition { active: true });
         }
         "compositionend" if entry.edit == EditKind::RichText => {
+            super::rich_text::finish_compose(&entry.control()?, &event)?;
             let (document, selection) = super::rich_text::read(&entry.control()?)?;
             let revision = entry.editing.borrow().revision;
             dom.queue(id, Event::Composition { active: false });

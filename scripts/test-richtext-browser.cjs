@@ -9,7 +9,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
  const page=await browser.newPage();
  await page.setContent('<style>table{border-collapse:collapse}td{border:1px solid;padding:8px}#rich{width:500px;min-height:100px}p{white-space:pre-wrap}</style><div id="rich" contenteditable="true"></div>');
  const source=fs.readFileSync(path.join(__dirname,'../crates/web/src/browser/rich_text.js'),'utf8').replaceAll('export function ','function ');
- await page.addScriptTag({content:source+'\nglobalThis.richTest={writeRich,readRich,setSelectionRich,selectionRich,validateRich,pasteRich,taskRich,setMarksRich,beforeInputRich,compositionRich};'});
+ await page.addScriptTag({content:source+'\nglobalThis.richTest={writeRich,readRich,setSelectionRich,selectionRich,validateRich,pasteRich,taskRich,setMarksRich,beforeInputRich,compositionRich,finishCompositionRich};'});
  const initial=await page.evaluate(()=>{
   const root=document.getElementById('rich'),m={bold:false,italic:false,strike:false,code:false,link:null};
   const leaf=(id,text,kind=['paragraph'])=>({id,kind,spans:[{text,marks:{...m}}],children:[]});
@@ -31,7 +31,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
  const split=await page.evaluate(()=>{const root=document.getElementById('rich');const a=richTest.readRich(root),b=richTest.readRich(root);if(a!==b)throw Error('new DOM identities unstable');richTest.writeRich(root,JSON.stringify(JSON.parse(a).document));return JSON.parse(richTest.readRich(root));});
  if(split.document.root.children.filter(b=>b.kind[0]==='paragraph').length!==2)throw Error('Enter did not split the visual paragraph');
  await page.evaluate(()=>{
-  const root=document.getElementById('rich');root.addEventListener('beforeinput',e=>richTest.beforeInputRich(root,e));root.addEventListener('compositionstart',()=>richTest.compositionRich(root));root.addEventListener('click',e=>richTest.taskRich(root,e));
+  const root=document.getElementById('rich');root.addEventListener('beforeinput',e=>richTest.beforeInputRich(root,e));root.addEventListener('compositionstart',()=>richTest.compositionRich(root));root.addEventListener('compositionend',e=>richTest.finishCompositionRich(root,e));root.addEventListener('click',e=>richTest.taskRich(root,e));
   const doc=JSON.parse(richTest.readRich(root)).document,paragraph=doc.root.children.filter(b=>b.kind[0]==='paragraph')[1];
   root.focus();richTest.setSelectionRich(root,JSON.stringify({anchor:{block:paragraph.id,offset:0},focus:{block:paragraph.id,offset:0}}));richTest.setMarksRich(root,JSON.stringify({bold:true,italic:true,strike:false,code:false,link:null}));
  });
@@ -43,9 +43,31 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
  await cdp.send('Input.insertText',{text:'你好'});
  const committed=await page.evaluate(()=>JSON.parse(richTest.readRich(document.getElementById('rich'))));
  if(!committed.document.root.children[1].spans.some(s=>s.text?.includes('你好')&&s.marks.bold))throw Error('IME commit lost formatting');
+ // Regress the cold collapsed-caret path: no formatted character exists yet.
+ // Chromium has already captured its IME Range at compositionstart, so an empty
+ // strong inserted there is not a valid way to select typing attributes.
+ const coldIme=[];
+ for(const [initialBold,nextBold,cancel] of [[false,true,false],[true,false,false],[false,true,true]]) {
+  await page.evaluate(({initialBold,nextBold})=>{
+   const root=document.getElementById('rich'),marks={bold:initialBold,italic:false,strike:false,code:false,link:null};
+   richTest.writeRich(root,JSON.stringify({root:{id:'0',kind:['root'],spans:[],children:[{id:'20',kind:['paragraph'],spans:[{text:'A😀B',marks}],children:[]}]}}));
+   root.focus();richTest.setSelectionRich(root,JSON.stringify({anchor:{block:'20',offset:1},focus:{block:'20',offset:1}}));richTest.setMarksRich(root,JSON.stringify({...marks,bold:nextBold}));
+  },{initialBold,nextBold});
+  await cdp.send('Input.imeSetComposition',{text:'你',selectionStart:1,selectionEnd:1});
+  if(cancel) await cdp.send('Input.imeSetComposition',{text:'',selectionStart:0,selectionEnd:0});
+  else await cdp.send('Input.insertText',{text:'你好'});
+  const read=await page.evaluate(()=>JSON.parse(richTest.readRich(document.getElementById('rich'))));
+  const spans=read.document.root.children[0].spans;
+  if(cancel){if(spans.map(s=>s.text).join('')!=='A😀B')throw Error('Cancelled composition changed text');}
+  else {if(spans.map(s=>s.text).join('')!=='A你好😀B'||!spans.some(s=>s.text==='你好'&&s.marks.bold===nextBold))throw Error('Cold IME typing marks lost: '+JSON.stringify(read));
+   if(read.selection.focus.offset!==3)throw Error('Cold IME UTF16 caret moved');}
+  coldIme.push({initialBold,nextBold,cancel,spans});
+ }
+ // Restore the earlier task document for its independent control acceptance.
+ await page.evaluate(document=>richTest.writeRich(globalThis.document.getElementById('rich'),JSON.stringify(document)),committed.document);
  await page.locator('input[data-gly-task-control]').click();
  const task=await page.locator('li[data-gly-task]').getAttribute('data-gly-task');if(task!=='false')throw Error('task click did not change finite document');
  await page.screenshot({path:path.join(artifacts,'rich-text-host.png')});
- console.log(JSON.stringify({initial,typed:typed.document.root.children[0].spans,split:split.document.root.children.map(b=>b.id),typing,imeCommitted:true,taskToggled:true},null,2));
+ console.log(JSON.stringify({initial,typed:typed.document.root.children[0].spans,split:split.document.root.children.map(b=>b.id),typing,imeCommitted:true,coldIme,taskToggled:true},null,2));
  } finally {await browser.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

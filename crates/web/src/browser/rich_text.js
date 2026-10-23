@@ -217,8 +217,37 @@ export function beforeInputRich(root,event) {
  pending.selection=JSON.parse(selectionRich(root));return true;
 }
 export function compositionRich(root) {
- const pending=typing(root);if(!pending||root.contentEditable!=='true')return;
- const selection=root.ownerDocument.getSelection();if(!selection.rangeCount)return;
- const range=selection.getRangeAt(0),inserted=markedText(root,'',pending.marks);range.insertNode(inserted.fragment);
- range.setStart(inserted.node,0);range.collapse(true);selection.removeAllRanges();selection.addRange(range);
+ const pending=typing(root),s=state(root);s.composition=null;
+ if(!pending||root.contentEditable!=='true')return;
+ // Chromium has already captured its replacement Range before this callback.
+ // Inserting an empty style span or moving Selection here does not retarget
+ // the native IME; it writes outside that span. Preserve its DOM throughout
+ // preedit and apply the finite typing marks only to the verified commit range.
+ s.composition={marks:{...pending.marks},point:{...pending.selection.anchor}};
+}
+export function finishCompositionRich(root,event) {
+ const s=state(root),pending=s.composition;s.composition=null;
+ if(!pending||root.contentEditable!=='true')return;
+ const text=typeof event.data==='string'?canonical(event.data):'';
+ if(!text)return;
+ const model=readModel(root),selection=readSelection(root,model),start=pending.point.offset,end=start+text.length;
+ if(selection.anchor.block!==pending.point.block||selection.focus.block!==pending.point.block||selection.anchor.offset!==end||selection.focus.offset!==end)return;
+ const stack=[model.document.root];let block=null;
+ while(stack.length){const next=stack.pop();if(next.id===pending.point.block){block=next;break;}stack.push(...next.children);}
+ if(!block||block.kind[0]==='code')return;
+ const value=block.spans.map(span=>span.text??(span.break?'\n':'\ufffc')).join('');
+ // Selection relocation, cancellation, program replacement and cross-block
+ // changes must not apply stale marks to unrelated text.
+ if(value.slice(start,end)!==text)return;
+ const spans=[];let offset=0;
+ for(const span of block.spans){const length=span.text?.length??1,next=offset+length;
+  if(span.text===undefined||next<=start||offset>=end)spans.push(span);
+  else {const from=Math.max(0,start-offset),to=Math.min(length,end-offset);
+   spanText(spans,span.text.slice(0,from),span.marks);
+   spanText(spans,span.text.slice(from,to),pending.marks);
+   spanText(spans,span.text.slice(to),span.marks);
+  }offset=next;
+ }
+ block.spans=spans;writeRich(root,JSON.stringify(model.document));
+ setSelectionRich(root,JSON.stringify(selection));s.typing={marks:pending.marks,selection};
 }

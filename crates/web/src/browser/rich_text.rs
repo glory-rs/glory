@@ -14,6 +14,8 @@ extern "C" {
     fn before_js(root: &Element, event: &web_sys::Event) -> Result<bool, JsValue>;
     #[wasm_bindgen(catch, js_name = compositionRich)]
     fn compose_js(root: &Element) -> Result<(), JsValue>;
+    #[wasm_bindgen(catch, js_name = finishCompositionRich)]
+    fn finish_compose_js(root: &Element, event: &web_sys::Event) -> Result<(), JsValue>;
     #[wasm_bindgen(catch, js_name = readRich)]
     fn read_js(root: &Element) -> Result<String, JsValue>;
     #[wasm_bindgen(catch, js_name = writeRich)]
@@ -79,4 +81,8 @@ pub(super) fn before(root: &Element, event: &web_sys::Event) -> Result<bool, Err
 }
 pub(super) fn compose(root: &Element) -> Result<(), Error> {
     compose_js(root).map_err(backend)
+}
+
+pub(super) fn finish_compose(root: &Element, event: &web_sys::Event) -> Result<(), Error> {
+    finish_compose_js(root, event).map_err(backend)
 }

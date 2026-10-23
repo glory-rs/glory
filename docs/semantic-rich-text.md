@@ -45,7 +45,12 @@ alignment and task checkboxes are actual boxes/controls. Images are atomic Parle
 inline boxes with real provider-loaded image nodes (160×120 CSS-pixel contain box),
 not Markdown syntax or text placeholders. Cross-leaf selection, clipboard, caret
 navigation, paragraph splitting/joining, empty-item list exit, explicit typing
-marks and composition cancellation operate on the finite document. The active
+marks and composition cancellation operate on the finite document. Web pending
+marks do not insert an empty style span at `compositionstart`: Chromium has already
+captured its replacement Range at that point. The adapter preserves native preedit
+DOM, then verifies the committed text and UTF-16 range before formatting that
+range at `compositionend`. Cancelled or relocated compositions never format
+unrelated text; no zero-width characters enter the document. The active
 selection pointer is identity-bound and cancelled on disposal/window focus loss.
 Providers retain their normal explicit origin/resource budgets. Application blob
 URLs and authenticated assets remain application responsibilities.
@@ -65,7 +70,8 @@ Validation performed on Windows 2026-10-23:
   (including parallel construction), Blitz paint and Parley library tests.
 - `scripts/test-richtext-browser.cjs`: real Edge keyboard input, atomic UTF-16
   selection, controlled identity retention, pending marks, CDP Chinese preedit and
-  commit, table layout, task activation and unsafe-URL rejection.
+  commit (including a freshly toggled empty caret, removing inherited bold, and
+  cancellation), table layout, task activation and unsafe-URL rejection.
 - `scripts/test-richtext-stream.cjs`: real HTTP SSR/stream/WASM hydration, user draft
   preservation, live typed/Chinese input, paragraph splitting and Owner teardown;
   it also runs the existing full stream acceptance suite.
