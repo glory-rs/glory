@@ -1,6 +1,9 @@
 //! Browser-only entry points are target gated; enabling web never changes core.
 #[cfg(target_arch = "wasm32")]
 mod browser;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+#[path = "browser/templates.rs"]
+mod template_tests;
 #[cfg(target_arch = "wasm32")]
 pub use browser::*;
 #[cfg(feature = "stream")]

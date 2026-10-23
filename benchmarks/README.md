@@ -1,6 +1,36 @@
 # Glory / Leptos / Dioxus: current semantic browser benchmark
 
-The latest [Scope/unlink follow-up](../docs/performance.md#scope-cleanup-and-sibling-unlink--2026-10-23)
+最新优化及源码分析见 [2026-10-24 创建提交/Dioxus 报告](../docs/bulk-create-dioxus-2026-10-24.md)：
+独立构建、相同九项、正反顺序 1,080 样本；保留的 Glory 创建桥接将万行 Script 从
+702.08 降到 654.75 ms，当前三框架万行总耗时为 909.45 / 465.10 / 313.70 ms。
+历史结果和未保留实验均有明确边界，主计时 workload/harness 未改。
+
+The previous [three-framework rerun after DOM creation optimization](../docs/performance.md#three-framework-rerun-after-dom-creation-optimization--2026-10-23)
+freshly builds all three from a frozen 251-input snapshot and measures
+648 samples in opposite order under the same P-core affinity. Create-10k wall
+medians are 955.10 / 439.20 / 297.35 ms for Glory / Leptos / Dioxus.
+The report includes all nine operations, CPU counters, per-round variation,
+independent selection diagnostics and exact source/identity/geometry/pixel evidence.
+
+The earlier [HTML mapping/DOM creation optimization](../docs/performance.md#html-mapping-and-dom-creation--2026-10-23)
+compares fresh independent Glory before/after builds with 432 unchanged-workload
+samples. Script medians improve 17.0% for create-1k, 7.8% for replace-1k and
+11.4% for create-10k. Final attributes/identities remain intact: finite native
+prototypes reduce replacement setAttribute calls from 32k to 15k and UTF-8
+decodes from 78,006 to 34,006. The report records 25 browser suites, complete
+native regression, real-height cache checks, and the concurrent-source boundary.
+
+The previous [three-framework rerun after teardown optimizations](../docs/performance.md#three-framework-rerun-after-teardown-optimizations--2026-10-23)
+freshly builds Glory, Leptos 0.8.19 and Dioxus 0.7.9 independently from a frozen
+243-input snapshot. Two opposite-order rounds produce 648 samples, with the
+same P-core affinity for all three. Median create-10k wall time is
+1012.15 / 451.30 / 306.95 ms; clear-1k is 33.70 / 19.25 / 9.35 ms.
+Data, surviving DOM/Text identities, all 10k row rectangles and six viewport
+checkpoints agree. The report includes CPU counters, per-round variation,
+Leptos's history-sensitive selection diagnostic and the source boundary for
+concurrent changes. The host also ran other project builds; this is a local run.
+
+The earlier [Scope/unlink follow-up](../docs/performance.md#scope-cleanup-and-sibling-unlink--2026-10-23)
 compares independent builds under the same P-core affinity: 432 primary samples,
 with 1,296 earlier default-scheduling samples retained separately. Clear-1k script
 median improves 27.5%; replacement improves only 1.6%. See the report for variance,
@@ -14,8 +44,8 @@ The subsequent [DOM retirement follow-up](../docs/performance.md#dom-retirement-
 compares fresh Glory before/after builds with 432 unchanged-workload samples,
 removes repeated parent-table scans, and records complete regression evidence.
 
-The latest rerun independently rebuilt all three apps and measured two
-opposite-order rounds (648 samples). The current table, CPU counters, untimed
+The previous rerun independently rebuilt all three apps and measured two
+opposite-order rounds (648 samples). Its historical table, CPU counters, untimed
 node census, selection diagnostic and immutable evidence are in
 [Performance Notes](../docs/performance.md#current-three-framework-rerun--2026-10-23).
 The earlier one-round table below remains historical.

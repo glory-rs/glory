@@ -221,6 +221,18 @@ fn live_field_validation_matches_full_descriptor_validation_for_all_patch_varian
     });
     bases.push(item);
     let mut patches = vec![
+        Patch::Semantics(Change::Keep),
+        Patch::Semantics(Change::Clear),
+        Patch::Semantics(Change::Set(Some(Box::new(Semantics {
+            selected: Some(true),
+            tab: true,
+            controls: Some(SemanticId::new("panel").unwrap()),
+            ..Default::default()
+        })))),
+        Patch::Semantics(Change::Set(Some(Box::new(Semantics {
+            hidden: true,
+            ..Default::default()
+        })))),
         Patch::Text(Change::Set("new\r\n\0".into())),
         Patch::TextKind(Change::Set(TextKind::Heading(7))),
         Patch::TextKind(Change::Clear),

@@ -17,6 +17,68 @@ fn key(app: &mut WindowApp, key: &str, modifiers: Modifiers, composing: bool, re
 }
 
 #[test]
+fn native_composite_navigation_is_axis_specific_and_requires_a_registered_trigger() {
+    use glory_render::{Navigation, Orientation, Semantics};
+    let mut app = WindowApp::new();
+    let trigger = app.app.scope().cage(None);
+    let editor = app.app.scope().cage(None);
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let seen = events.clone();
+    app.mount(
+        view()
+            .semantics(Some(Box::new(Semantics {
+                navigation: Some(Orientation::Horizontal),
+                ..Default::default()
+            })))
+            .on(EventKind::Navigate, move |event| {
+                seen.borrow_mut().push(event)
+            })
+            .fill((
+                glory_ui::button()
+                    .label("Tab")
+                    .node_ref(trigger)
+                    .semantics(Some(Box::new(Semantics {
+                        navigation_item: true,
+                        ..Default::default()
+                    }))),
+                input().node_ref(editor).value("text"),
+            )),
+    )
+    .unwrap();
+    tick(&mut app);
+    let origin = trigger.get().unwrap();
+    native_focus(&mut app, origin);
+    key(&mut app, "ArrowRight", Modifiers::empty(), false, true);
+    assert!(
+        events.borrow().is_empty(),
+        "native callbacks must only queue"
+    );
+    tick(&mut app);
+    assert_eq!(
+        *events.borrow(),
+        [Event::Navigate {
+            from: origin,
+            command: Navigation::Next
+        }]
+    );
+    events.borrow_mut().clear();
+    for (name, modifiers) in [
+        ("ArrowDown", Modifiers::empty()),
+        ("Home", Modifiers::SHIFT),
+    ] {
+        key(&mut app, name, modifiers, false, false);
+        tick(&mut app);
+    }
+    native_focus(&mut app, editor.get().unwrap());
+    key(&mut app, "Home", Modifiers::empty(), false, false);
+    tick(&mut app);
+    assert!(
+        events.borrow().is_empty(),
+        "collection must preserve descendant editing keys"
+    );
+}
+
+#[test]
 fn native_keyboard_queues_real_commands_and_preserves_composition_and_shift_enter() {
     let mut app = WindowApp::new();
     let input_ref = app.app.scope().cage(None);

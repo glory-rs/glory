@@ -43,6 +43,24 @@ fn check_style(style: &glory_render::style::Style) -> Result<(), Error> {
         })
 }
 
+// beta.4 has no document top-layer/focus-scope implementation. Reject the
+// promise before mutation instead of displaying a modal as ordinary content.
+fn check_layer(
+    node: &glory_render::Descriptor,
+    patch: Option<&glory_render::Patch>,
+) -> Result<(), Error> {
+    use glory_render::{Change, Patch};
+    let value = match patch {
+        None => node.semantics.as_deref(),
+        Some(Patch::Semantics(Change::Set(value))) => value.as_deref(),
+        _ => None,
+    };
+    if value.is_some_and(|s| s.layer.is_some()) {
+        return Err(Error::Unsupported("native top layers"));
+    }
+    Ok(())
+}
+
 /// Native document configuration. No network/filesystem access is installed by
 /// default. A provider must queue work and honor cancel/close without UI reentry.
 #[derive(Clone)]
@@ -1113,6 +1131,7 @@ impl Render for Renderer {
         node: &glory_render::Descriptor,
         patch: Option<&glory_render::Patch>,
     ) -> Result<(), Error> {
+        check_layer(node, patch)?;
         match patch {
             None => check_style(&node.style)?,
             Some(glory_render::Patch::Style(glory_render::Change::Set(style))) => {
@@ -1166,6 +1185,13 @@ impl Render for Renderer {
         // field-only HTML lowering path and never inspect a large value payload.
         let result = (|| {
             for mutation in mutations {
+                match mutation {
+                    Mutation::Create { node, .. } => check_layer(node, None)?,
+                    Mutation::Patch { id, patch } => {
+                        check_layer(&mapper.tree().node(*id)?.descriptor, Some(patch))?
+                    }
+                    _ => {}
+                }
                 match mutation {
                     Mutation::Create { node, .. } => check_style(&node.style)?,
                     Mutation::Patch {

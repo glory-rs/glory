@@ -383,6 +383,34 @@ SSR Document的可选sheets按顺序输出并使用nonce；Blitz set_sheet先完
 
 文字导致行高改变沿用List的有界Resize反馈和锚点补偿，不增加全数据预排版、逐历史行字体缓存或第二布局树。运行时仍只持有当前窗口及有限测量记录。主题token、完整CSS、工具包resolver、实际OS IME/屏幕阅读器不由上述声明获得完成保证。
 
+## 浮层语义与宿主范围（2026-10-23）
+
+`Semantics::layer` 在具名、可程序聚焦的 `Role::Dialog` View 上声明有限浮层，
+`hidden` 决定其是否进入栈。Layer 包含 modal、Escape/外部关闭策略、有限位置、
+anchor/initial_focus/return_focus 符号关联。锚定位置必须有不同于自身的 anchor；
+其他位置不接受 anchor。`has_popup` 仅属于非 Tab Button；described_by 补充描述关联。
+字段事务继续验证角色、focus 和 metadata 的交叉约束并在失败时回滚；HTML 的字段
+差分 oracle 覆盖新状态的 Set/Clear/Keep，不改变原生 Input 值或选择。
+
+`Event::Dismiss(DismissReason::{Escape,Outside})` 是关闭请求，业务可拒绝；只接受
+活跃且允许对应关闭方式的浮层。原生监听器只入队，不调用业务代码。WebApp 内共享
+栈处理最上层，manual popover top layer 保留原有逻辑/DOM 祖先，modal 对外部兄弟
+分支施加 inert 并约束实际焦点。显式初始焦点失败则选择首个可用 Tab stop，再落到
+panel；关闭时恢复存活目标，非模态外部点击产生的新焦点不被覆盖。关闭/卸载清理
+宿主引入的 inert 与 top-layer 状态；组合输入不触发 Escape 关闭。
+
+Web 在构造时检测 top-layer API，并在不支持时于描述符预检及逐操作 apply 拒绝；
+支持时保留常规批量 mapper 路径。viewport scroll/resize 仅标记并唤醒，布局读在
+宿主观测边界合并。SSR 生成具名但未激活的浮层，成功 hydration 后才展示并管理
+焦点；失败验证不激活浮层。现有 HTML edits/stream 格式不变，WASM 接管前不提供
+浮层交互。当前每个 WebApp 管理自己的栈，多 App 文档应指定一个浮层所属 App；
+跨 App 栈、移动 visual viewport、动画与手势关闭仍未实现。
+
+Blitz beta.4 没有 top layer 的物理实现，因此在 preflight 和 direct apply 中明确
+拒绝 Layer；逐操作拒绝仍保留成功前缀的 receipt/query 水位。该范围不等于新增原生
+浮层、实际 OS IME 或屏幕阅读器验收。Sapid 的三个浮层组件共用这些语义，浏览器
+验收与复现入口在同级 sapid 的 scripts/check.ps1 和 overlay-acceptance.js。
+
 ## R0 尚未收口
 
 - 全部 props/后端扩展的错误分类与恢复范围；描述符局部检查与借用 staged tree 的父子预检已接通，当前保留 partial-prefix/fault 契约。

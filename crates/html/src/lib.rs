@@ -3,6 +3,7 @@ mod mapping;
 mod patch;
 #[cfg(test)]
 mod patch_tests;
+mod semantics;
 mod serialize;
 #[cfg(feature = "css")]
 mod sheets;
@@ -22,6 +23,16 @@ pub use styles::style;
 pub const FORMAT_VERSION: u32 = 3;
 
 pub const BASE_CSS: &str = concat!(
+    "[data-gly-layer]:not(:popover-open){display:none!important}",
+    "[data-gly-layer]{position:fixed;inset:auto;margin:0;max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);overflow:auto}",
+    "[data-gly-layer=center]{top:50%;left:50%;transform:translate(-50%,-50%)}",
+    "[data-gly-layer=left]{left:0;top:0;height:100dvh;max-height:100dvh}",
+    "[data-gly-layer=right]{right:0;top:0;height:100dvh;max-height:100dvh}",
+    "[data-gly-layer=top]{left:0;top:0;width:100vw;max-width:100vw}",
+    "[data-gly-layer=bottom]{left:0;bottom:0;width:100vw;max-width:100vw}",
+    "[data-gly-layer^=anchor-]{left:var(--gly-layer-x,12px);top:var(--gly-layer-y,12px)}",
+    "[data-gly-layer][aria-modal=true]::backdrop{background:rgba(0,0,0,.35)}",
+    "[data-gly-hidden]{display:none!important}",
     "[data-gly-kind]{box-sizing:border-box}[data-gly-kind=text]{margin:0;font:inherit}",
     "[data-gly-kind=button],[data-gly-kind=input],[data-gly-kind=check] input{font:inherit}",
     "[data-gly-virtual=surface]:not([data-gly-live]){height:auto!important;overflow:visible!important}",

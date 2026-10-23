@@ -79,6 +79,9 @@ pub enum Role {
     Cell,
     /// A named dialog. Modality and focus management belong to the host.
     Dialog,
+    TabList,
+    TabPanel,
+    Heading(u8),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -212,6 +215,7 @@ pub struct Descriptor {
     pub focus: FocusMode,
     pub item: Option<ItemPosition>,
     pub options: Options,
+    pub semantics: Option<Box<crate::Semantics>>,
 }
 
 /// Host-native default, programmatic focus only, or a normal tab stop.
@@ -232,6 +236,15 @@ pub struct ItemPosition {
 }
 
 impl Descriptor {
+    pub fn semantic_id(&self) -> Option<&crate::SemanticId> {
+        self.semantics.as_ref().and_then(|s| s.id.as_ref())
+    }
+    pub fn hidden(&self) -> bool {
+        self.semantics.as_ref().is_some_and(|s| s.hidden)
+    }
+    pub fn activation_enabled(&self) -> bool {
+        self.props.enabled() && !self.semantics.as_ref().is_some_and(|s| s.disabled)
+    }
     pub fn new(props: Props) -> Self {
         Self {
             props,
@@ -243,7 +256,13 @@ impl Descriptor {
     /// generic Views remain only layout boxes. Explicit structural roles win.
     pub fn effective_role(&self) -> Option<Role> {
         self.role.or_else(|| {
-            (matches!(self.props, Props::View) && self.name.is_some()).then_some(Role::Group)
+            (matches!(self.props, Props::View)
+                && (self.name.is_some()
+                    || self
+                        .semantics
+                        .as_ref()
+                        .is_some_and(|s| s.labelled_by.is_some())))
+            .then_some(Role::Group)
         })
     }
 
@@ -284,6 +303,12 @@ impl Descriptor {
     // Live descriptors are already canonical/validated. A field patch only
     // needs to rescan payloads it changes; cross-field constraints always run.
     fn validate_fields(&self, input: bool, style: bool, classes: bool) -> Result<(), Error> {
+        if let Some(semantics) = &self.semantics {
+            semantics.validate(self)?;
+        }
+        if matches!(self.role, Some(Role::Heading(level)) if !(1..=6).contains(&level)) {
+            return Err(Error::InvalidProps("heading level must be 1..=6"));
+        }
         if style {
             self.style.validate().map_err(Error::InvalidProps)?;
         }
@@ -418,6 +443,7 @@ impl Descriptor {
             (Patch::Name(change), _) => change.apply(&mut self.name),
             (Patch::Focus(change), _) => change.apply(&mut self.focus),
             (Patch::Item(change), _) => change.apply(&mut self.item),
+            (Patch::Semantics(change), _) => change.apply(&mut self.semantics),
             _ => {
                 return Err(Error::InvalidProps(
                     "property does not belong to this component",
@@ -453,4 +479,5 @@ pub enum Patch {
     Name(Change<Option<String>>),
     Focus(Change<FocusMode>),
     Item(Change<Option<ItemPosition>>),
+    Semantics(Change<Option<Box<crate::Semantics>>>),
 }

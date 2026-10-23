@@ -42,6 +42,7 @@ pub struct Stats {
 pub struct Memory {
     runtime: RuntimeId,
     nodes: HashMap<NodeId, Node>,
+    names: HashMap<SemanticId, NodeId>,
     generations: HashMap<u32, (u32, bool)>,
     roots: Children,
     inputs: Vec<Input>,
@@ -67,6 +68,20 @@ impl PreparedPatch<'_> {
         self.inverse.as_ref().expect("uncommitted patch")
     }
     fn accept(&mut self) {
+        if let Some(Patch::Semantics(Change::Set(old))) = &self.inverse {
+            let old = old.as_ref().and_then(|s| s.id.as_ref());
+            let new = self.descriptor().semantic_id();
+            if old != new {
+                let old = old.cloned();
+                let new = new.cloned();
+                if let Some(old) = old {
+                    self.tree.names.remove(&old);
+                }
+                if let Some(new) = new {
+                    self.tree.names.insert(new, self.id);
+                }
+            }
+        }
         self.inverse = None;
         self.tree.stats.patched += 1;
     }
@@ -98,6 +113,7 @@ impl Memory {
         Self {
             runtime,
             nodes: HashMap::new(),
+            names: HashMap::new(),
             generations: HashMap::new(),
             roots: Children::default(),
             inputs: Vec::new(),
@@ -109,6 +125,44 @@ impl Memory {
     pub fn node(&self, id: NodeId) -> Result<&Node, Error> {
         self.check_runtime(id)?;
         self.nodes.get(&id).ok_or(Error::NodeGone(id))
+    }
+
+    /// Resolve a symbolic relation to its live identity in O(1), without owning
+    /// the target or retaining names after disposal.
+    pub fn named(&self, name: &SemanticId) -> Option<NodeId> {
+        self.names.get(name).copied()
+    }
+
+    /// Nearest explicit collection boundary of a registered trigger. Walk only
+    /// semantic ancestors; never infer membership for descendant editors.
+    pub fn navigation(&self, id: NodeId) -> Option<(NodeId, Orientation)> {
+        let node = self.node(id).ok()?;
+        if !node.descriptor.semantics.as_ref()?.navigation_item {
+            return None;
+        }
+        let mut parent = node.parent;
+        while let Some(id) = parent {
+            let node = self.node(id).ok()?;
+            if let Some(axis) = node
+                .descriptor
+                .semantics
+                .as_ref()
+                .and_then(|s| s.navigation)
+            {
+                return Some((id, axis));
+            }
+            parent = node.parent;
+        }
+        None
+    }
+
+    fn validate_name(&self, descriptor: &Descriptor, own: Option<NodeId>) -> Result<(), Error> {
+        if let Some(name) = descriptor.semantic_id()
+            && self.names.get(name).is_some_and(|id| Some(*id) != own)
+        {
+            return Err(Error::InvalidProps("duplicate semantic id"));
+        }
+        Ok(())
     }
 
     pub fn roots(&self) -> &[NodeId] {
@@ -143,6 +197,11 @@ impl Memory {
             id,
             inverse: Some(inverse),
         };
+        if matches!(patch, Patch::Semantics(_)) {
+            prepared
+                .tree
+                .validate_name(prepared.descriptor(), Some(id))?;
+        }
         prepared
             .tree
             .validate_child(Subtree::Existing(id), prepared.tree.nodes[&id].parent)?;
@@ -161,7 +220,7 @@ impl Memory {
             let Some(node) = nodes.get(&id) else {
                 return false;
             };
-            if !node.placed || node.suspended {
+            if !node.placed || node.suspended || node.descriptor.hidden() {
                 return false;
             }
             cursor = node.parent;
@@ -245,6 +304,9 @@ impl Memory {
 
     pub fn push_event(&mut self, id: NodeId, event: Event) -> Result<(), Error> {
         let node = self.node(id)?;
+        if matches!(event, Event::Activate) && !node.descriptor.activation_enabled() {
+            return Err(Error::InvalidProps("activation is disabled"));
+        }
         if !self.validate_event(id, &event)? {
             return Ok(());
         }
@@ -343,6 +405,9 @@ impl Memory {
             cursor = node.parent;
         }
         // Most placements (including ordinary list moves) need no subtree scan.
+        if let Subtree::New(descriptor) = child {
+            self.validate_name(descriptor, None)?;
+        }
         if !interactive_ancestor && !button_ancestor {
             return Ok(());
         }
@@ -472,7 +537,11 @@ impl Memory {
                     }
                 }
                 let mut descriptor = node.as_ref().clone();
+                self.validate_name(node, None)?;
                 descriptor.normalize_input()?;
+                if let Some(name) = descriptor.semantic_id() {
+                    self.names.insert(name.clone(), *id);
+                }
                 self.generations.insert(id.slot(), (id.generation(), true));
                 self.nodes.insert(
                     *id,
@@ -509,6 +578,9 @@ impl Memory {
                 let mut pending = vec![*id];
                 while let Some(id) = pending.pop() {
                     let node = self.nodes.remove(&id).expect("owned subtree");
+                    if let Some(name) = node.descriptor.semantic_id() {
+                        self.names.remove(name);
+                    }
                     self.generations
                         .get_mut(&id.slot())
                         .expect("known identity")

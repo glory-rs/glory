@@ -7,11 +7,13 @@ mod id;
 pub mod memory;
 pub mod profile;
 mod props;
+mod semantics;
 mod text;
 
 pub use glory_style as style;
 pub use id::{NodeId, NodeIds, RuntimeId};
 pub use props::*;
+pub use semantics::{DismissReason, Layer, LayerPlacement, Orientation, SemanticId, Semantics};
 pub use text::normalize_text;
 mod keyboard;
 pub use keyboard::{KeyboardCommand, KeyboardInput};
@@ -236,6 +238,8 @@ pub enum QueryValue {
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
     Activate,
+    /// A request only: the application may keep controlled state open.
+    Dismiss(DismissReason),
     /// Host preference, independent of an application's explicit appearance.
     ColorSchemeChanged {
         dark: bool,
@@ -318,6 +322,7 @@ pub struct ScrollAck {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum EventKind {
     Activate,
+    Dismiss,
     ColorSchemeChanged,
     Keyboard,
     Drag,
@@ -338,6 +343,10 @@ impl EventKind {
     /// observations cannot. Recording a valid interest does not promise the host
     /// can produce it (SSR records handlers for later browser adoption).
     pub fn validate_target(self, node: &Descriptor) -> Result<(), Error> {
+        // Interests may be registered before layer metadata bindings run.
+        if self == Self::Dismiss && !matches!(node.props, Props::View) {
+            return Err(Error::InvalidProps("dismiss requires a view"));
+        }
         if matches!(self, Self::Drag | Self::ColorSchemeChanged)
             && !matches!(node.props, Props::View)
         {
@@ -394,6 +403,19 @@ impl Event {
     /// liveness/ancestry require a tree and are checked by Memory::validate_event.
     /// Scroll offsets may be negative; local geometry must have x/y=0.
     pub fn validate_payload(&self, target: NodeId, node: &Descriptor) -> Result<(), Error> {
+        if let Self::Dismiss(reason) = self {
+            let layer = node
+                .semantics
+                .as_ref()
+                .and_then(|s| s.layer.as_ref())
+                .ok_or(Error::InvalidEvent("dismiss requires a layer"))?;
+            if !match reason {
+                DismissReason::Escape => layer.escape,
+                DismissReason::Outside => layer.outside,
+            } {
+                return Err(Error::InvalidEvent("disabled layer dismissal"));
+            }
+        }
         if self
             .origin()
             .is_some_and(|id| id.runtime() != target.runtime())
@@ -489,6 +511,7 @@ impl Event {
     pub fn kind(&self) -> EventKind {
         match self {
             Self::Activate => EventKind::Activate,
+            Self::Dismiss(_) => EventKind::Dismiss,
             Self::ColorSchemeChanged { .. } => EventKind::ColorSchemeChanged,
             Self::Keyboard { .. } => EventKind::Keyboard,
             Self::Drag { .. } => EventKind::Drag,

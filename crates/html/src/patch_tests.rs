@@ -75,6 +75,9 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
     });
     bases.push(item);
     let mut patches = vec![
+        Patch::Semantics(Change::Keep),
+        Patch::Semantics(Change::Clear),
+        Patch::Semantics(Change::Set(None)),
         Patch::Text(Change::Keep),
         Patch::Text(Change::Set("old".into())),
         Patch::Text(Change::Set("new\r\n\0🙂".into())),
@@ -178,6 +181,94 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
         Patch::Purpose(Change::Keep),
         Patch::Purpose(Change::Clear),
     ];
+    for props in [
+        Props::Button(ButtonProps::default()),
+        Props::Check(CheckProps::default()),
+    ] {
+        let mut named = Descriptor::new(props);
+        named.name = Some("named control".into());
+        bases.push(named);
+    }
+    let semantic_cases = [
+        Semantics {
+            id: Some(SemanticId::new("layer").unwrap()),
+            described_by: Some(SemanticId::new("description").unwrap()),
+            layer: Some(Layer::default()),
+            ..Default::default()
+        },
+        Semantics {
+            has_popup: true,
+            ..Default::default()
+        },
+        Semantics::default(),
+        Semantics {
+            id: Some(SemanticId::new("node").unwrap()),
+            labelled_by: Some(SemanticId::new("label").unwrap()),
+            hidden: true,
+            ..Default::default()
+        },
+        Semantics {
+            expanded: Some(false),
+            controls: Some(SemanticId::new("panel").unwrap()),
+            navigation_item: true,
+            ..Default::default()
+        },
+        Semantics {
+            expanded: Some(true),
+            disabled: true,
+            ..Default::default()
+        },
+        Semantics {
+            tab: true,
+            selected: Some(false),
+            controls: Some(SemanticId::new("panel").unwrap()),
+            ..Default::default()
+        },
+        Semantics {
+            tab: true,
+            selected: Some(true),
+            ..Default::default()
+        },
+        Semantics {
+            navigation: Some(Orientation::Horizontal),
+            ..Default::default()
+        },
+        Semantics {
+            navigation: Some(Orientation::Vertical),
+            ..Default::default()
+        },
+    ];
+    for metadata in semantic_cases {
+        patches.push(Patch::Semantics(Change::Set(Some(Box::new(
+            metadata.clone(),
+        )))));
+        for props in [Props::View, Props::Button(ButtonProps::default())] {
+            let mut base = Descriptor::new(props);
+            if metadata.layer.is_some() && matches!(base.props, Props::View) {
+                base.role = Some(Role::Dialog);
+                base.focus = FocusMode::Programmatic;
+            }
+            base.semantics = Some(Box::new(metadata.clone()));
+            if base.validate().is_ok() {
+                bases.push(base);
+            }
+        }
+    }
+    for role in [
+        Role::TabList,
+        Role::TabPanel,
+        Role::Heading(1),
+        Role::Heading(6),
+        Role::Heading(0),
+        Role::Heading(7),
+    ] {
+        patches.push(Patch::Role(Change::Set(Some(role))));
+        let mut base = Descriptor::new(Props::View);
+        base.role = Some(role);
+        if base.validate().is_ok() {
+            bases.push(base);
+        }
+    }
     patches.extend(
         [
             Purpose::Text,

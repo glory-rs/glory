@@ -135,8 +135,29 @@ impl Tree {
             if let Some(name) = &d.name {
                 node.set_label(normalize_text(name, true).into_owned());
             }
-            if !d.props.enabled() {
+            if !d.activation_enabled() {
                 node.set_disabled();
+            }
+            if let Some(s) = &d.semantics {
+                if let Some(expanded) = s.expanded {
+                    node.set_expanded(expanded);
+                }
+                if let Some(selected) = s.selected {
+                    node.set_selected(selected);
+                }
+                if d.role == Some(Role::TabList)
+                    && let Some(axis) = s.navigation
+                {
+                    node.set_orientation(match axis {
+                        glory_render::Orientation::Horizontal => {
+                            ::accesskit::Orientation::Horizontal
+                        }
+                        glory_render::Orientation::Vertical => ::accesskit::Orientation::Vertical,
+                    });
+                }
+            }
+            if let Some(Role::Heading(level)) = d.role {
+                node.set_level(usize::from(level - 1));
             }
             if let Some(rect) = state.dom.doc.get_client_bounding_rect(physical) {
                 let own = *host.scroll_offset();
@@ -237,7 +258,7 @@ impl Tree {
                 {
                     node.add_action(AxAction::Focus);
                 }
-                if clickable(state, id) {
+                if d.activation_enabled() && clickable(state, id) {
                     node.add_action(AxAction::Click);
                 }
                 if matches!(d.props, Props::Input(_)) {
@@ -283,6 +304,40 @@ impl Tree {
                     .get_mut(&list)
                     .expect("list exists")
                     .set_size_of_set(count);
+            }
+        }
+        // All accessible target IDs now exist. Resolve only live, exported
+        // nodes; forward references and hidden targets allocate no AX history.
+        for (key, ax_id) in &self.ids {
+            let Key::Main(id) = key else { continue };
+            let Some(d) = state.mapper.tree().node(*id).ok().map(|n| &n.descriptor) else {
+                continue;
+            };
+            let Some(s) = &d.semantics else { continue };
+            let resolve = |name: &glory_render::SemanticId| {
+                state
+                    .mapper
+                    .tree()
+                    .named(name)
+                    .and_then(|target| self.ids.get(&Key::Main(target)).copied())
+                    .filter(|target| nodes.contains_key(target))
+            };
+            let controls = s.controls.as_ref().and_then(resolve);
+            let label = s.labelled_by.as_ref().and_then(resolve);
+            let description = s.described_by.as_ref().and_then(resolve);
+            if let Some(node) = nodes.get_mut(ax_id) {
+                if let Some(target) = controls {
+                    node.set_controls(vec![target]);
+                }
+                if let Some(target) = label {
+                    node.set_labelled_by(vec![target]);
+                }
+                if let Some(target) = description {
+                    node.set_described_by(vec![target]);
+                }
+                if s.has_popup {
+                    node.set_has_popup(accesskit::HasPopup::Dialog);
+                }
             }
         }
         self.ids.retain(|key, _| alive.contains(key));
@@ -487,6 +542,9 @@ fn clickable(state: &State, id: NodeId) -> bool {
     }) || state.subscriptions.contains(&(id, EventKind::Activate))
 }
 fn role(d: &glory_render::Descriptor) -> AxRole {
+    if d.semantics.as_ref().is_some_and(|s| s.tab) {
+        return AxRole::Tab;
+    }
     match &d.props {
         Props::View => match d.effective_role() {
             Some(Role::Group) => AxRole::Group,
@@ -502,6 +560,9 @@ fn role(d: &glory_render::Descriptor) -> AxRole {
             Some(Role::ColumnHeader) => AxRole::ColumnHeader,
             Some(Role::Cell) => AxRole::Cell,
             Some(Role::Dialog) => AxRole::Dialog,
+            Some(Role::TabList) => AxRole::TabList,
+            Some(Role::TabPanel) => AxRole::TabPanel,
+            Some(Role::Heading(_)) => AxRole::Heading,
             None => AxRole::GenericContainer,
         },
         Props::Text(p) => match p.kind {

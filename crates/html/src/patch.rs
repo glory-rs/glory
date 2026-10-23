@@ -74,6 +74,30 @@ fn position(item: Option<ItemPosition>) -> (Option<String>, Option<String>) {
     })
 }
 
+fn semantics(
+    edits: &mut Vec<Edit>,
+    part: Part,
+    old: Option<&glory_render::Semantics>,
+    new: Option<&glory_render::Semantics>,
+    old_role: Option<Role>,
+    new_role: Option<Role>,
+) {
+    let old = crate::semantics::attributes(old, old_role);
+    let new = crate::semantics::attributes(new, new_role);
+    for (name, value) in &new {
+        attribute(
+            edits,
+            part,
+            name,
+            old.get(name).map(String::as_str),
+            Some(value),
+        );
+    }
+    for name in old.keys().filter(|name| !new.contains_key(*name)) {
+        attribute(edits, part, name, old.get(name).map(String::as_str), None);
+    }
+}
+
 pub(crate) fn lower(next: &Descriptor, inverse: &Patch) -> Vec<Edit> {
     let mut edits = Vec::new();
     // Every accepted Group patch leaves its boxless shape empty.
@@ -165,22 +189,54 @@ pub(crate) fn lower(next: &Descriptor, inverse: &Patch) -> Vec<Edit> {
                     &mut edits,
                     Part::Main,
                     "role",
-                    role(next.role, old.is_some()),
+                    role(
+                        next.role,
+                        old.is_some()
+                            || next
+                                .semantics
+                                .as_ref()
+                                .is_some_and(|s| s.labelled_by.is_some()),
+                    ),
                     next.effective_role().map(crate::mapping::role_name),
                 );
             }
         }
         Patch::Role(change) => {
             let old = *old!(change);
-            if matches!(next.props, Props::View) {
-                attribute(
-                    &mut edits,
-                    Part::Main,
-                    "role",
-                    role(old, next.name.is_some()),
-                    next.effective_role().map(crate::mapping::role_name),
-                );
-            }
+            let old = old.or_else(|| {
+                (matches!(next.props, Props::View)
+                    && (next.name.is_some()
+                        || next
+                            .semantics
+                            .as_ref()
+                            .is_some_and(|s| s.labelled_by.is_some())))
+                .then_some(Role::Group)
+            });
+            semantics(
+                &mut edits,
+                control,
+                next.semantics.as_deref(),
+                next.semantics.as_deref(),
+                old,
+                next.effective_role(),
+            );
+        }
+        Patch::Semantics(change) => {
+            let old = old!(change);
+            let old_role = next.role.or_else(|| {
+                (matches!(next.props, Props::View)
+                    && (next.name.is_some()
+                        || old.as_ref().is_some_and(|s| s.labelled_by.is_some())))
+                .then_some(Role::Group)
+            });
+            semantics(
+                &mut edits,
+                control,
+                old.as_deref(),
+                next.semantics.as_deref(),
+                old_role,
+                next.effective_role(),
+            );
         }
         Patch::Focus(change) => {
             let old = *old!(change);

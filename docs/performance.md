@@ -1,5 +1,373 @@
 # Performance Notes
 
+## Bulk creation and Dioxus design analysis — 2026-10-24
+
+保留固定参数的同步 Web 创建桥接：原型克隆、class/style、身份/live 一次提交，其他属性与受控输入保留通用路径。
+六个全新独立构建、相同九项 benchmark、正反顺序共 **1,080 样本**：Glory 千行创建 Script
+**57.33→55.61 ms（-3.0%）**、千行替换 **83.03→79.87 ms（-3.8%）**、万行创建
+**702.08→654.75 ms（-6.7%）**。属性打包与 Memory 间接存储实验均未保留。
+
+当前万行总耗时 Glory **909.45 ms**、Leptos **465.10 ms**、Dioxus **313.70 ms**。
+Dioxus 千行替换约 1,000 次深模板克隆/3,000 次属性写入/2 次 UTF-8 解码；Glory 为
+8,000 次浅克隆/15,000 次属性写入/20,006 次解码。差距主要仍在结构构造、运行时对象和宿主提交粒度。
+双平台各 452 工作区/289 fork、25 浏览器、64/1024 真实行高、实窗/UIA/stream 完整回归通过。
+流式 fixture 已补齐生成 JS 模块服务。
+
+完整九项前后/三框架表、80 个独立 CPU profile、失败实验、Dioxus 源码分析及后续优先级，见
+[专项报告](bulk-create-dioxus-2026-10-24.md)。[原始证据](/D:/BuildCache/glory-bulk-bridge-20261024/evidence-index.json)。
+
+## Three-framework rerun after DOM creation optimization — 2026-10-23
+
+本轮重新独立构建 **Glory / Leptos 0.8.19 / Dioxus 0.7.9**，包括 Glory 上轮的
+DOM 创建优化和本轮冻结时已有的 Layer/语义改动。源码冻结于
+**2026-10-23T15:42:48.062060+00:00**，共 **251 个输入**，Git 基点
+`945c077b6a3f167c9e79cbc75f726b1d6316e34d`（含未提交改动）。15 个 benchmark 应用/共享输入与上次
+三框架比较逐字节一致，包括源码、锁文件、数据生成器、CSS 和计时 harness；另有
+22 个公共库文件变化、8 个新增，完整差异保留在 source-history.json/.diff。
+冻结后并行修改未混入二进制，summary.json 的 post_snapshot 字段记录其边界。
+
+三个全新独立 D: target，cargo metadata 验证实际输出目录，编译 artifact 确认 fresh=false。
+release opt-level=3、LTO、一个 codegen unit，wasm-bindgen 库/CLI 0.2.129，无 wasm-opt。
+三个应用的严格 WASM all-target Clippy 和格式检查均通过。
+环境 Windows 11、Rust 1.98.0/MSVC、i7-14700KF、Chrome **155.0.8059.84**，
+1280×900、scale 1。P 核逻辑 CPU 0–15（mask 0xffff）、AboveNormal 对三个框架一致，
+每个上下文在计时外设置并读回验证；CPU 拓扑和进程记录已归档。
+
+两轮使用独立 Chrome、每框架新上下文，顺序 **Leptos→Glory→Dioxus**，再
+**Dioxus→Glory→Leptos**。每项 3 次不计时热身、每轮 12 个样本，每格合计
+**24 个，主表共 648 个**。本机并非独占，轮次开始的其他 Cargo/rustc 活动已记录；
+固定核心不消除温度、频率、运行历史和系统负载的影响。
+
+以下为**点击到两次前台 RAF 的中位耗时，ms，越低越好**。数据准备和验证在计时外；
+全部行实际挂载，未使用虚拟列表。该指标不证明实际显示完成/FPS，也不是官方 HTML-table 分数。
+
+| 操作 | Glory | Leptos | Dioxus |
+|---|---:|---:|---:|
+| 创建千行 | 83.10 | 40.15 | 29.75 |
+| 替换千行 | 110.65 | 43.70 | 32.30 |
+| 更新每十行 | 8.85 | 11.25 | 10.80 |
+| 选行（混合流程） | 7.75 | 176.40 | 9.25 |
+| 交换两行 | 9.85 | 9.25 | 9.85 |
+| 删除一行 | 10.00 | 8.95 | 11.60 |
+| 追加千行 | 94.00 | 43.75 | 34.45 |
+| 创建万行 | 955.10 | 439.20 | 297.35 |
+| 清空千行 | 32.90 | 17.65 | 10.05 |
+
+相同区间 CDP **ScriptDuration 增量中位数，ms**。包含公共 harness/绑定桥开销，
+各包含式 CPU 指标不能相加；Layout/RecalcStyle/Task 的完整原始值与中位数亦已保留。
+
+| 操作 | Glory | Leptos | Dioxus |
+|---|---:|---:|---:|
+| 创建千行 | 57.26 | 14.58 | 4.43 |
+| 替换千行 | 82.06 | 20.50 | 7.67 |
+| 更新每十行 | 0.64 | 0.34 | 0.90 |
+| 选行（混合流程） | 1.04 | 172.12 | 0.73 |
+| 交换两行 | 0.56 | 0.17 | 0.91 |
+| 删除一行 | 0.62 | 0.26 | 0.80 |
+| 追加千行 | 62.30 | 15.75 | 5.60 |
+| 创建万行 | 684.82 | 176.92 | 45.79 |
+| 清空千行 | 30.49 | 15.98 | 2.75 |
+
+Glory 的主要差距仍是批量操作。创建万行总耗时约为 Leptos 的 **2.17 倍**、
+Dioxus 的 **3.21 倍**；替换千行为 **2.53/3.43 倍**。
+局部操作总耗时需结合较小的 Script 成本与 RAF 等待理解，不从微小差值推导稳定排名。
+
+逐轮总耗时/Script 中位数，ms：
+
+| 框架/操作 | 第 1 轮 | 第 2 轮 |
+|---|---:|---:|
+| glory 创建万行 | 970.50 / 689.04 | 938.75 / 681.68 |
+| leptos 创建万行 | 439.20 / 176.80 | 431.85 / 178.40 |
+| dioxus 创建万行 | 302.30 / 48.36 | 296.85 / 45.79 |
+| glory 替换千行 | 110.80 / 81.78 | 110.65 / 83.80 |
+| leptos 替换千行 | 43.10 / 20.35 | 44.00 / 20.75 |
+| dioxus 替换千行 | 31.60 / 7.64 | 33.20 / 8.14 |
+| glory 清空千行 | 34.75 / 31.31 | 31.90 / 30.06 |
+| leptos 清空千行 | 19.20 / 15.95 | 17.40 / 16.22 |
+| dioxus 清空千行 | 9.60 / 2.78 | 10.20 / 2.66 |
+
+选行主表保留完整混合流程的实际结果。另用新上下文测首次千行列表与连续 30 次建表
+（首次创建加 29 次替换）后选行，
+每格 3 次热身、12 个样本，以下 **72 个诊断样本不混入主表**：
+
+| 框架 | 首次列表 总耗时 / Script | 连续 30 次建表后 总耗时 / Script |
+|---|---:|---:|
+| glory | 11.70 / 1.20 | 11.80 / 1.20 |
+| leptos | 11.55 / 1.20 | 11.85 / 6.16 |
+| dioxus | 11.90 / 0.69 | 11.85 / 0.76 |
+
+本轮 Leptos 混合流程的 Script 中位数为 172.12 ms，独立首次列表仅 1.20 ms。这个显著差距说明运行历史敏感；不能把主表异常泛化为 Leptos 的普遍选行成本。本轮未进一步定位其内部原因。
+
+验收结果：全部 648 样本行数/摘要跨框架跨轮一致；三者通过独立种子 oracle、九项操作、
+keyed 交换/替换和清理。补充检查更新/选择/交换/删除/追加保留存续 Element 与 Text Node，
+Glory 同时保留 data-gly-node 身份，替换后旧后代断开。10,000 行真实矩形摘要一致；
+创建千行、替换千行、追加千行、创建万行、万行中部、清空六个视口检查点，三框架两轮
+**36 张 PNG** 逐字节一致。
+
+万行 DOM 计数：
+
+| 框架 | Elements | Text | Comments | Attributes |
+|---|---:|---:|---:|---:|
+| glory | 80,008 | 30,006 | 4 | 320,037 |
+| leptos | 80,008 | 30,006 | 1 | 120,009 |
+| dioxus | 80,008 | 30,006 | 0 | 140,015 |
+
+Glory 清理回到 0 行/label、10 语义节点、3 图节点、13 Owners。属性数与之前一致，
+原型优化减少调用和字符串转换，保留最终属性；计数不表示 RSS。
+本轮只重新构建和比较 benchmark，没有修改框架实现，也没有重复原生/窗口/64/1024/
+流式全回归。Layer 代码进入此普通列表的执行路径不等于其交互功能已经得到验收。
+
+与上一次三框架运行的 Glory 历史值对照，两个会话均固定 P 核，但源码与运行条件仍有变化，
+**不能用这个跨会话差值替代单项优化的因果 A/B**：
+
+| 操作 | 上次→本次总耗时 ms | 上次→本次 Script ms |
+|---|---:|---:|
+| 创建千行 | 90.40→83.10 | 64.49→57.26 |
+| 替换千行 | 116.10→110.65 | 89.17→82.06 |
+| 追加千行 | 98.05→94.00 | 66.47→62.30 |
+| 创建万行 | 1012.15→955.10 | 741.00→684.82 |
+| 清空千行 | 33.70→32.90 | 31.52→30.49 |
+
+DOM 创建优化的独立 432 样本前后对照仍见[专项报告](#html-mapping-and-dom-creation--2026-10-23)。
+完整本轮证据：[evidence-index.json](/D:/BuildCache/glory-framework-after-create-20261023/evidence-index.json)。
+同目录 verify.py 重算中位数、核验冻结源码/独立构建、648 样本、身份/几何/36 张截图及 CPU 设置；
+run.ps1 和 driver 记录复现顺序、辅助脚本及服务清理。重跑须换新 D: 输出目录，保留原始结果。
+
+## HTML mapping and DOM creation — 2026-10-23
+
+本轮针对批量创建/替换，保留 semantic-rows-v1 的业务实现、全部最终属性和节点身份。
+最终独立构建对照共 **432 个样本**：Glory 千行创建 Script 中位数 **69.34→57.58 ms
+（降低 17.0%）**，千行替换 **91.13→84.04 ms（降低 7.8%）**，万行创建
+**764.40→677.15 ms（降低 11.4%）**。清空变化较小，不把这轮当作退休优化。
+
+基线源码/诊断发现三个成本：
+
+- shape 已有自己的 String，却对每个文本/属性/文本属性调用 normalize().into_owned()，
+  规范字符串仍会重新分配。现在只在 normalize_text 返回 Owned 时替换，保留规范字符串
+  的原分配；非规范 CR/CRLF/NUL 仍执行相同转换。HTML shape/序列化结果保持原契约。
+- 每个活 DOM Entry 用 BTreeMap 保存有限的 Main/Control/Content 句柄。现在是内联
+  `[Option<Node>; 3]`，保留原 Part 顺序/查询；adoption 的验证计划仍使用原映射，
+  验证成功后转入内联句柄。没有删除 Entry、token 表、父表或代际校验。
+- 每个新元素都重复写 kind、role、type 和 enabled/disabled 的有限静态属性，产生
+  大量 WASM→JS 字符串解码。现在由文档拥有最多 **64 个**浅元素原型，键为五个
+  u8 字段，只表示有限 tag/kind/role/type/状态，使用 cloneNode 创建全新节点。
+  class、style、name、内容、值、URL、id、data-gly-node 和用户语义关系不进入原型。
+  未知词汇/满表走原 createElement 路径，close/clear 释放原型。没有跨 App/文档共享。
+
+新鲜原生控件的 disabled 属性已由 attribute 反射，创建时不再重复 Reflect.set。
+value/checked、composition、属性 patch 和 adoption 的写屏障保持原样。SSR/流式 wire
+格式、shape 的有序 BTreeMap 和所有最终 DOM 属性不变；CSS 状态标记独立于 feature。
+本轮没有使用 innerHTML、字符串模板、业务行缓存或第三方 vendor。
+
+单独计数探针验证千行操作的实际调用变化（探针开销排除在主计时之外）：
+
+| 调用/计数 | 基线创建 | 优化创建（本探针首次计时） | 基线替换 | 优化替换 |
+|---|---:|---:|---:|---:|
+| createElement | 8,000 | 3 | 8,000 | 0 |
+| cloneNode | 0 | 8,000 | 0 | 8,000 |
+| setAttribute | 32,000 | 15,005 | 32,000 | 15,000 |
+| UTF-8 decode | 78,006 | 34,019 | 78,006 | 34,006 |
+| disabled Reflect.set | 2,000 | 0 | 2,000 | 0 |
+| createTextNode | 3,000 | 3,000 | 3,000 | 3,000 |
+| insertBefore | 8,000 | 8,000 | 8,000 | 8,000 |
+
+该新页面已有外层 App 原型，创建案例还需建 3 个原型并写 5 个静态属性；这些少量冷成本
+计入该案例，主 benchmark 的热身也保持原样。克隆仍然分配新 DOM 元素，不能把
+createElement 次数减少解释为元素数量减少。万行最终仍为 **80,008 Elements、30,006
+Text、4 Comments、320,037 Attributes**；live graph/Owner 数及清理基线也一致。
+
+最终测量版本冻结于 **2026-10-23 22:47:22 +08:00**，248 个输入，Git 基点
+`945c077b6a3f167c9e79cbc75f726b1d6316e34d`，包含当时未提交的并行语义工作。
+为隔离优化，从最终公共源码派生 before-ready，仅撤回 mapping 规范化、内联 Part、
+原型创建及其单元测试入口。sources/inputs.json 验证四个差异路径，其他代码和工作负载
+逐字节一致；没有使用先前较老的 before 二进制作最终基线。
+
+before-ready/final 使用两个全新独立 D: Cargo target，metadata 验证输出路径，编译日志
+确认应用 artifact fresh=false。release opt-level=3、LTO、一个 codegen unit，
+wasm-bindgen 库/CLI 0.2.129，无 wasm-opt；两个应用严格 WASM Clippy 通过。
+Windows 11 / Rust 1.98.0 MSVC / i7-14700KF / Chrome 155.0.8059.84，
+1280×900、scale 1；同一独立 Chrome、每版每轮新上下文，固定 P 核逻辑 CPU 0–15、
+AboveNormal，进入回调前读回核对。顺序 before-ready→final，再 final→before-ready；
+每项 3 次热身、12 个样本，每格合计 24 个。计时 harness/CDP meter 与此前相同，
+准备、数据验证、截图、CPU 采样和 DOM 包装全部在主计时外。仍是本机观测，非独占实验室。
+
+| 操作 | 总耗时前→后 ms | Script 前→后 ms | Script 降幅 |
+|---|---:|---:|---:|
+| 创建千行 | 96.70→84.85 | 69.34→57.58 | 17.0% |
+| 替换千行 | 116.20→112.50 | 91.13→84.04 | 7.8% |
+| 更新每十行 | 11.10→13.00 | 0.66→0.67 | -0.7% |
+| 选行 | 8.05→8.40 | 1.06→1.05 | 1.1% |
+| 交换两行 | 10.10→9.85 | 0.56→0.59 | -5.3% |
+| 删除一行 | 10.70→11.65 | 0.60→0.65 | -6.8% |
+| 追加千行 | 102.90→94.85 | 72.51→62.81 | 13.4% |
+| 创建万行 | 1036.20→944.40 | 764.40→677.15 | 11.4% |
+| 清空千行 | 34.65→34.40 | 31.97→30.96 | 3.2% |
+
+总耗时为点击至两次前台 RAF，不证明真实显示完成/FPS。短操作 Script 仅有数十微秒差异，
+总耗时受 RAF 等待影响，包含不利结果，不将这些小差值解释为稳定收益或退化。
+两轮关键 Script 中位数分别为：创建千行 **68.22→58.52 / 69.95→55.34**，
+替换 **92.97→87.53 / 89.79→81.32**，万行创建 **733.98→663.46 / 843.62→693.64**。
+初版原型键尚未压缩的 432 个候选样本也保留在 paired，不与最终样本混合或择优。
+
+另跑 **32 个未包装 DOM 方法的替换 CPU profile**，保持反向顺序，排除在主表之外。
+包含式采样中位数：DOM Sink **43.36→35.84 ms**，UTF-8 decode **16.14→11.09 ms**，
+Element build **14.92→15.77 ms**，Memory apply **13.55→13.34 ms**，
+HTML mapping::shape **3.74→3.69 ms**，Owner dispose **12.37→12.49 ms**。
+这些函数族相互包含，不能相加；profile 本身有开销，内联/未采到的帧不等于零成本。
+这组证据支持 DOM 创建/桥接成本下降，不支持声称 HTML shape 或 Owner 单独明显变快。
+本轮三项实现一起对照，没有把总收益任意分摊到每一项。
+
+千行替换仍要退休旧 Owner、分配/构建完整新树、映射、创建 8,000 个全新元素并写
+15,000 次动态属性，最终 Script 仍约 84 ms。后续优先研究动态元数据/类型化 DOM
+提交减少字符串转换，其次才是 shape 的小集合表示和构造分配；保留可验证代际身份、
+原生属性反射、前缀失败及 IME/选区契约。原型最多增加 64 个离线元素，WASM 原始体积
+**868,675→872,899 bytes（+4,224）**，没有测量 RSS，不声称内存字节下降。
+
+完整验证：
+
+- 全部 432 样本行数/摘要一致；更新/选择/交换/删除/追加保留存续 Element、Text Node、
+  data-gly-node；替换旧后代断开，万行矩形摘要与六个视口前后 **12 张 PNG** 一致。
+- Windows/Linux 各 **448** 项工作区测试、各 **289** 项 fork 测试，fmt、严格原生/WASM
+  Clippy 通过；Linux no-default/paint 通过，双平台各两张 CPU raster PNG 输出成功。
+- Windows shell/accesskit 真实窗口、双窗口真实 UIA，以及 Linux X11/Wayland×
+  shell/accesskit 四组真实窗口通过。此处不替代 Unix AT-SPI/屏幕阅读器验收。
+- 浏览器 **25/25** 通过。新增创建隔离探针覆盖文本/属性/身份污染后重建、输入 value/
+  purpose/disabled/checked/label 污染后的新行，18 个观察到的原型、161 次克隆，零泄漏。
+  原有 24 个脚本与上轮全回归逐字节一致；SSR adoption/受控输入/选区/composition 均通过。
+- 变高列表 **64/1024** 各 70 次真实小数行高变化、原有 0.1/0.15 容差和 **73 张截图**
+  通过，锚点均 -15.125→-15.125，最终滚动位置/几何/画面一致。
+- SSR fixture 四项测试、真实 Shell/Patch/End 和两个资源交接、断开取消/慢消费者背压通过。
+
+验证快照首次遇到并行新增的 AccessKit 测试使用 NodeId 查询 FullNodeId 接口而编译失败；
+仅同步工作树已有的测试修正后重跑。新隔离测试首次误把 outside-focus 哨兵输入算作行，
+修正列表内选择器并另外验证哨兵后重跑全部 25 项，未放宽原断言。原文件和失败日志均归档。
+期间另有 render::Memory 验名快路径及 HTML Role lowering 修正：integration/source 单独
+冻结这四个变化文件，双平台各 448 工作区/289 fork、原生/WASM Clippy、Windows 窗口/UIA
+与 Linux raster 补验通过。本轮性能和完整浏览器矩阵仍对应 final，未冒称并行改动已经重测性能。
+收尾时工作树又出现 Layer/top-layer、described_by 等新实现，包含 Dom 的层管理钩子；
+这些新增保持原样，未纳入上述冻结版本的性能/回归结论。最终源码差异和新增路径随证据记录，
+不通过不断变更被测快照来替换已经完成的本轮结果。
+
+完整证据：[evidence-index.json](/D:/BuildCache/glory-create-map-20261023/evidence-index.json)。
+同目录 evidence.py 核验冻结输入/测试 overlay、独立构建、全部样本、身份/画面、CPU 设置及
+回归日志；summarize-final.py 重算主表。重现需使用归档 driver/bulk-compare.cjs 与
+pin-browser.ps1、D: TEMP/TMP，服务目录根，分别构建 before-ready/final，使用新的输出目录。
+final-paired 是最终主表，final-integrity 是深身份探针，decode-profile/unwrapped 是独立诊断；
+最早 before/baseline/release/paired 和中途 before-final 构建仅保留为过程记录，不充当最终基线。
+
+## Three-framework rerun after teardown optimizations — 2026-10-23
+
+本节保留 DOM 创建优化前的三框架运行；最新结果见[创建提交与 Dioxus 分析](#bulk-creation-and-dioxus-design-analysis--2026-10-24)。
+
+本轮重新比较 Glory、**Leptos 0.8.19**、**Dioxus 0.7.9**。三者均从冻结源码在
+D: 上使用新的独立 target 构建 release；opt-level=3、LTO、一个 codegen unit，
+wasm-bindgen 库/CLI 0.2.129，不使用 wasm-opt。严格 WASM all-target Clippy 和
+应用格式检查均通过。15 个 benchmark 应用/共享输入与上一轮三框架比较逐字节一致，
+包括应用实现、锁文件、数据生成器、CSS 和计时脚本；本次只重新构建和测量。
+
+冻结时间为 **2026-10-23 22:12:36 +08:00**，共 **243 个输入**，包含当时尚未提交的
+Scope/unlink 优化和输入辅助/Check 修改，Git 基点为
+`7874f2c39bd3e40ac1945ba34455192cc5511afc`。构建/测量期间工作树有并行提交和语义相关
+修改，未混入本轮二进制；精确差异路径见 summary.json 的 post_snapshot 字段。
+本节描述这份冻结版本，不把结果扩展为随后工作树的性能或回归证明。
+
+环境为 Windows 11、Rust 1.98.0/MSVC、i7-14700KF、Chrome **155.0.8059.84**，
+1280×900、scale 1。三者浏览器进程统一固定逻辑 CPU 0–15（P 核，mask 0xffff）、
+AboveNormal 优先级；每个新上下文进入验收/热身前设置并读回核对，计时区间没有这些操作。
+每轮独立 Chrome、每个框架独立上下文：**Leptos→Glory→Dioxus**，再
+**Dioxus→Glory→Leptos**。每项 3 次不计时热身、每轮 12 个样本，合并后每格
+**24 个样本，共 648 个**。本机另有项目编译，两轮开始时的 Cargo/rustc 活动已归档；
+固定核心不代表独占机器，小幅差异仍需结合逐轮数据判断。
+
+下面是点击到两次前台 RAF 回调的**中位耗时，ms，越低越好**。准备数据、数据摘要、
+身份、几何和截图验证在计时区间外；完整 keyed 列表所有行均挂载，未使用虚拟列表。
+该指标不等于实际显示完成、FPS 或官方 HTML-table 分数。
+
+| 操作 | Glory | Leptos | Dioxus |
+|---|---:|---:|---:|
+| 创建千行 | 90.40 | 39.55 | 30.05 |
+| 替换千行 | 116.10 | 45.45 | 33.45 |
+| 更新每十行 | 10.60 | 11.20 | 11.70 |
+| 选行（混合流程） | 7.90 | 175.80 | 8.40 |
+| 交换两行 | 9.15 | 10.15 | 9.75 |
+| 删除一行 | 9.55 | 10.20 | 11.10 |
+| 追加千行 | 98.05 | 48.10 | 36.50 |
+| 创建万行 | 1012.15 | 451.30 | 306.95 |
+| 清空千行 | 33.70 | 19.25 | 9.35 |
+
+相同区间 CDP **ScriptDuration 增量中位数，ms**，包括共享 harness/绑定桥开销。
+各包含式 CPU 指标不能直接相加；Layout/RecalcStyle/Task 原始值和中位数保留在证据中。
+
+| 操作 | Glory | Leptos | Dioxus |
+|---|---:|---:|---:|
+| 创建千行 | 64.49 | 14.43 | 4.51 |
+| 替换千行 | 89.17 | 21.82 | 8.30 |
+| 更新每十行 | 0.64 | 0.35 | 0.87 |
+| 选行（混合流程） | 1.05 | 173.97 | 0.76 |
+| 交换两行 | 0.55 | 0.18 | 0.97 |
+| 删除一行 | 0.59 | 0.30 | 0.80 |
+| 追加千行 | 66.47 | 16.91 | 5.62 |
+| 创建万行 | 741.00 | 185.25 | 48.63 |
+| 清空千行 | 31.52 | 16.17 | 3.05 |
+
+Glory 的主要差距仍在批量创建、替换、追加、清空。万行创建的总耗时约为 Leptos
+**2.24 倍**、Dioxus **3.30 倍**；千行替换约为 **2.55/3.47 倍**。
+局部更新、交换和删除的总耗时接近，短操作受 RAF 等待影响，不能从零点几毫秒差值
+推出稳定排名。小更新的 Script 更能区分计算成本：本轮 Leptos 较低，Glory 和
+Dioxus 在不同操作上各有差异。
+
+两轮关键操作的总耗时/Script 中位数如下，供检查合并中位数的稳定性：
+
+| 框架/操作 | 第 1 轮 总耗时 / Script | 第 2 轮 总耗时 / Script |
+|---|---:|---:|
+| Glory 创建万行 | 1022.80 / 755.12 | 996.00 / 733.46 |
+| Leptos 创建万行 | 451.30 / 186.77 | 445.50 / 185.25 |
+| Dioxus 创建万行 | 306.95 / 48.98 | 300.55 / 48.44 |
+| Glory 替换千行 | 115.15 / 90.17 | 116.25 / 88.95 |
+| Leptos 替换千行 | 46.90 / 21.94 | 44.20 / 20.99 |
+| Dioxus 替换千行 | 40.65 / 8.95 | 31.40 / 7.64 |
+| Glory 清空千行 | 35.30 / 32.36 | 32.70 / 31.39 |
+| Leptos 清空千行 | 19.55 / 17.01 | 17.00 / 15.78 |
+| Dioxus 清空千行 | 9.45 / 3.24 | 9.20 / 2.90 |
+
+**Leptos 选行仍明显受运行历史影响。**主流程保留原样，两个方向的 Script 分别为
+172.40/175.19 ms。另用全新上下文比较首次千行列表与 30 次替换后选行，
+每格 3 次热身和 12 个样本，72 个诊断样本不混入主表：
+
+| 框架 | 首次千行列表 总耗时 / Script | 30 次替换后 总耗时 / Script |
+|---|---:|---:|
+| Glory | 11.75 / 1.25 | 11.80 / 1.25 |
+| Leptos | 11.75 / 1.21 | 11.70 / 6.09 |
+| Dioxus | 11.55 / 0.70 | 11.65 / 0.76 |
+
+这说明主流程异常不能当作 Leptos 普遍的单次选行成本；单独的 30 次替换也没有
+复现完整混合流程的幅度。本轮没有进一步定位其内部原因。
+
+验收结果：
+
+- 三者通过独立种子 oracle、九项操作、keyed 交换/替换和清理检查；全部 648 个样本
+  的行数/数据摘要跨框架、跨轮一致。
+- 补充身份探针确认更新、选择、交换、删除、追加保留存续行的 Element 和 Text Node；
+  Glory 还核对 data-gly-node 身份。替换后旧后代全部断开。
+- 全部 10,000 行有真实布局盒，矩形摘要一致；创建千行、替换千行、追加千行、
+  创建万行、万行中部、清空六个视口检查点，三框架两轮共 **36 张 PNG** 逐字节一致。
+- 万行 DOM 计数保持 Elements 80,008 / Text 30,006；Glory/Leptos/Dioxus 的
+  Comments 为 4/1/0，Attributes 为 320,037/120,009/140,015。
+  Glory 清空后回到 0 行/label、10 语义节点、3 图节点、13 Owners。
+- 三个独立 WASM 应用的严格 Clippy/格式检查通过。本次没有重跑原生/窗口/流式或
+  64/1024 变高列表全回归；这些不属于此完整 DOM 三框架 benchmark 的覆盖范围。
+
+历史三框架表采用默认 CPU 调度，不能把其绝对差值归因于本轮或某一个优化。
+销毁优化的因果对照仍见下方各自的 before/after 实验。当前 DOM 元数据计数较高是
+后续创建/提交优化的调查方向，计数本身不证明耗时占比或 RSS。
+
+完整证据保存在
+[evidence-index.json](/D:/BuildCache/glory-framework-recompare-20261023/evidence-index.json)，
+含冻结输入、独立 target 元数据、fresh 编译证明、构建/站点/驱动/样本/截图哈希、
+逐轮结果、CPU 设置及独立选行诊断。同目录 verify.py 重算所有中位数并核验数据、身份、
+几何、像素和来源；run.ps1 记录本轮服务、顺序和进程清理，重跑须使用新输出目录。
+driver 下仅增加计时外验收/CPU 设置和归档；bench-harness.js/browser-run.js 保持原字节。
+
 ## Scope cleanup and sibling unlink — 2026-10-23
 
 本轮继续优化 UI Scope 的逐节点清理及 `Memory::unlink`。普通 keyed `each`
@@ -366,6 +734,9 @@ verifies sources, independent output directories, data/geometry/picture hashes,
 method counts, accepted regressions and retained failed attempts.
 
 ## Current three-framework rerun — 2026-10-23
+
+This section retains the run before the DOM/Owner/Scope retirement fixes. The
+latest comparison is [the creation bridge/Dioxus analysis](#bulk-creation-and-dioxus-design-analysis--2026-10-24).
 
 The current Glory snapshot was rebuilt alongside **Leptos 0.8.19** and
 **Dioxus 0.7.9**, using fresh independent release targets on D:, opt-level=3,

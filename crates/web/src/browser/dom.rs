@@ -9,6 +9,46 @@ use web_sys::{Document, DocumentFragment, Element, HtmlElement, Node, ResizeObse
 
 use super::{backend, frame::Frame};
 
+#[path = "templates.rs"]
+mod templates;
+use templates::Templates;
+
+// HTML has exactly three typed parts. Keep live DOM handles inline rather
+// than allocating a BTreeMap node for each semantic node.
+#[derive(Default)]
+pub(super) struct Parts([Option<Node>; 3]);
+impl Parts {
+    fn index(part: Part) -> usize {
+        match part {
+            Part::Main => 0,
+            Part::Control => 1,
+            Part::Content => 2,
+        }
+    }
+    pub fn get(&self, part: &Part) -> Option<&Node> {
+        self.0[Self::index(*part)].as_ref()
+    }
+    fn insert(&mut self, part: Part, node: Node) {
+        self.0[Self::index(part)] = Some(node);
+    }
+    pub fn values(&self) -> impl Iterator<Item = &Node> {
+        self.0.iter().flatten()
+    }
+    fn is_empty(&self) -> bool {
+        self.0.iter().all(Option::is_none)
+    }
+}
+#[cfg(feature = "hydrate")]
+impl From<BTreeMap<Part, Node>> for Parts {
+    fn from(parts: BTreeMap<Part, Node>) -> Self {
+        let mut result = Self::default();
+        for (part, node) in parts {
+            result.insert(part, node);
+        }
+        result
+    }
+}
+
 #[cfg(feature = "hydrate")]
 pub(super) fn preload_composing(element: &Element) -> bool {
     js_sys::Reflect::get(
@@ -31,7 +71,7 @@ pub(super) struct Entry {
     token: String,
     #[cfg(feature = "hydrate")]
     is_virtual: bool,
-    pub parts: BTreeMap<Part, Node>,
+    pub parts: Parts,
     pub first: Node,
     pub last: Node,
     pub fragment: RefCell<Option<DocumentFragment>>,
@@ -140,12 +180,15 @@ pub(super) struct DragSession {
     pub started: bool,
 }
 pub(super) struct Dom {
+    pub layers: RefCell<super::layers::Layers>,
+    pub layer_layout: Cell<bool>,
     pub drag: RefCell<Option<DragSession>>,
     pub suppress_click: Cell<bool>,
     pub document: Document,
     pub root: Element,
     pub frame: Rc<Frame>,
     pub entries: RefCell<HashMap<NodeId, Rc<Entry>>>,
+    templates: Templates,
     pub tokens: RefCell<HashMap<String, NodeId>>,
     pub parents: RefCell<HashMap<NodeId, Option<NodeId>>>,
     pub inputs: RefCell<Vec<Input>>,
@@ -167,12 +210,15 @@ impl Dom {
     pub fn new(document: Document, root: Element, frame: Rc<Frame>) -> Rc<Self> {
         let error = root.set_attribute("data-gly-app", "").err().map(backend);
         Rc::new(Self {
+            layers: RefCell::new(super::layers::Layers::default()),
+            layer_layout: Cell::new(false),
             drag: RefCell::new(None),
             suppress_click: Cell::new(false),
             document,
             root,
             frame,
             entries: RefCell::new(HashMap::new()),
+            templates: Templates::default(),
             tokens: RefCell::new(HashMap::new()),
             parents: RefCell::new(HashMap::new()),
             inputs: RefCell::new(Vec::new()),
@@ -230,7 +276,7 @@ impl Dom {
             token: token.clone(),
             #[cfg(feature = "hydrate")]
             is_virtual: virtual_shape(shape),
-            parts,
+            parts: parts.into(),
             first,
             last,
             fragment: RefCell::new(None),
@@ -270,6 +316,7 @@ impl Dom {
             }
         }
         self.live.set(true);
+        super::layers::sync(self)?;
         Ok(())
     }
     pub fn listen(&self, id: NodeId, kind: EventKind, enabled: bool) -> Result<(), Error> {
@@ -433,10 +480,16 @@ impl Dom {
             };
             inputs.push(Input::Event { node: id, event });
         }
+        drop(inputs);
+        if self.layer_layout.replace(false)
+            && let Err(error) = super::layers::layout(self)
+        {
+            self.error.borrow_mut().get_or_insert(error);
+        }
     }
     pub fn create(&self, id: NodeId, key: u64, shape: Shape) -> Result<(), Error> {
         let token = format!("{}.{}.{}", id.runtime().value(), id.slot(), id.generation());
-        let mut parts = BTreeMap::<Part, Node>::new();
+        let mut parts = Parts::default();
         let is_virtual = virtual_shape(&shape);
         // Parsed HTML needs key/part attributes and text markers to recover
         // identity. Fresh DOM already has typed part references; only Groups
@@ -451,18 +504,13 @@ impl Dom {
                 Kind::Element {
                     tag, attributes, ..
                 } => {
-                    let element = self.document.create_element(tag).map_err(backend)?;
-                    for (name, value) in attributes {
-                        element.set_attribute(name, value).map_err(backend)?;
-                    }
-                    element
-                        .set_attribute("data-gly-node", &token)
-                        .map_err(backend)?;
-                    if self.live.get() && is_virtual {
-                        element
-                            .set_attribute("data-gly-live", "")
-                            .map_err(backend)?;
-                    }
+                    let element = self.templates.element(
+                        &self.document,
+                        tag,
+                        attributes,
+                        &token,
+                        self.live.get() && is_virtual,
+                    )?;
                     element.into()
                 }
             };
@@ -508,8 +556,21 @@ impl Dom {
             prevent_default: shape.prevent_activate_default,
         });
         for piece in &shape.pieces {
-            if let Kind::Element { properties, .. } = &piece.kind {
+            if let Kind::Element {
+                attributes,
+                properties,
+                ..
+            } = &piece.kind
+            {
                 for (name, value) in properties {
+                    // On a fresh native control, disabled is reflected by its
+                    // attribute already. Patches/adoption retain their property
+                    // barriers; never skip value/checked/composition writes.
+                    if *name == "disabled"
+                        && matches!(value, Property::Bool(disabled) if *disabled == attributes.contains_key("disabled"))
+                    {
+                        continue;
+                    }
                     entry.property(piece.part, name, value)?;
                 }
             }
@@ -674,7 +735,9 @@ impl Dom {
         if let Some(observer) = self.viewport_observer.borrow_mut().take() {
             observer.disconnect();
         }
+        super::layers::clear(self);
         let entries = std::mem::take(&mut *self.entries.borrow_mut());
+        self.templates.clear();
         self.tokens.borrow_mut().clear();
         self.parents.borrow_mut().clear();
         self.drag.borrow_mut().take();

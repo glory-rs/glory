@@ -335,6 +335,22 @@ mod native {
         )?;
         socket.write_all(bytes)
     }
+    // wasm-bindgen emits imported modules alongside its main JS/WASM. Serve
+    // only this generated namespace/filename shape, never arbitrary paths.
+    fn snippet(path: &str) -> Option<PathBuf> {
+        let relative = path.strip_prefix("/snippets/")?;
+        let (namespace, file) = relative.split_once('/')?;
+        let hash = namespace.strip_prefix("glory-web-")?;
+        let index = file.strip_prefix("inline")?.strip_suffix(".js")?;
+        if hash.is_empty()
+            || !hash.bytes().all(|byte| byte.is_ascii_hexdigit())
+            || index.is_empty()
+            || !index.bytes().all(|byte| byte.is_ascii_digit())
+        {
+            return None;
+        }
+        Some(Path::new("snippets").join(namespace).join(file))
+    }
     fn connection(
         mut socket: TcpStream,
         metrics: Arc<Metrics>,
@@ -390,6 +406,17 @@ mod native {
                 return asset(&mut socket, mime, &std::fs::read(directory.join(name))?);
             }
         }
+        if let Some(name) = std::str::from_utf8(&request)
+            .ok()
+            .and_then(|request| request.strip_prefix("GET ")?.split(' ').next())
+            .and_then(snippet)
+        {
+            return asset(
+                &mut socket,
+                "text/javascript",
+                &std::fs::read(directory.join(name))?,
+            );
+        }
         let reverse = request.starts_with(b"GET /reverse ");
         let broken = request.starts_with(b"GET /broken ");
         let pressure = request.starts_with(b"GET /pressure ");
@@ -438,5 +465,33 @@ mod native {
             });
         }
         Ok(())
+    }
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn generated_snippets_do_not_open_arbitrary_fixture_files() {
+            assert_eq!(
+                snippet("/snippets/glory-web-ab12/inline0.js"),
+                Some(
+                    Path::new("snippets")
+                        .join("glory-web-ab12")
+                        .join("inline0.js")
+                )
+            );
+            for path in [
+                "/snippets/glory-web-/inline0.js",
+                "/snippets/glory-web-ab12/inline.js",
+                "/snippets/glory-web-ab12/../../Cargo.toml",
+                "/snippets/../inline0.js",
+                "/snippets/glory-web-ab12/inline0.js/other",
+                "/snippets/glory-web-ab12/inline0.js?x",
+                "/snippets/glory-web-ab12\\other/inline0.js",
+                "/snippets/glory-web-ab12/inline%30.js",
+            ] {
+                assert!(snippet(path).is_none(), "{path}");
+            }
+        }
     }
 }

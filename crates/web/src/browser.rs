@@ -3,6 +3,7 @@ mod events;
 mod frame;
 #[cfg(feature = "hydrate")]
 mod hydrate;
+mod layers;
 #[cfg(feature = "hydrate")]
 pub use hydrate::*;
 
@@ -33,16 +34,39 @@ pub struct Renderer {
     dom: Rc<Dom>,
     receipt: Receipt,
     _events: events::Listeners,
+    supports_layers: bool,
 }
 impl Renderer {
     fn new(runtime: RuntimeId, dom: Rc<Dom>) -> Self {
+        let supports_layers =
+            js_sys::Reflect::get(&dom.root, &"showPopover".into()).is_ok_and(|v| v.is_function());
         let events = events::Listeners::new(dom.clone());
         Self {
             mapper: Rc::new(RefCell::new(Mapper::new(runtime))),
             dom,
             receipt: Receipt::default(),
             _events: events,
+            supports_layers,
         }
+    }
+    fn check_layers(
+        &self,
+        node: &glory_render::Descriptor,
+        patch: Option<&glory_render::Patch>,
+    ) -> Result<(), Error> {
+        use glory_render::{Change, Patch};
+        if self.supports_layers {
+            return Ok(());
+        }
+        let value = match patch {
+            None => node.semantics.as_deref(),
+            Some(Patch::Semantics(Change::Set(value))) => value.as_deref(),
+            _ => None,
+        };
+        if value.is_some_and(|s| s.layer.is_some()) {
+            return Err(Error::Unsupported("browser top layer"));
+        }
+        Ok(())
     }
 }
 impl Render for Renderer {
@@ -51,6 +75,7 @@ impl Render for Renderer {
         node: &glory_render::Descriptor,
         patch: Option<&glory_render::Patch>,
     ) -> Result<(), Error> {
+        self.check_layers(node, patch)?;
         glory_html::preflight(node, patch)
     }
     fn preflight_place(
@@ -77,8 +102,36 @@ impl Render for Renderer {
             return Err(error);
         }
         let mut mapper = self.mapper.borrow_mut();
-        let result = mapper.apply(mutations, &mut dom::Sink(self.dom.clone()));
+        let result = if self.supports_layers {
+            mapper.apply(mutations, &mut dom::Sink(self.dom.clone()))
+        } else {
+            // Legacy hosts reject per operation and retain accepted prefixes.
+            (|| {
+                for mutation in mutations {
+                    match mutation {
+                        Mutation::Create { node, .. } => self.check_layers(node, None)?,
+                        Mutation::Patch { id, patch } => {
+                            self.check_layers(&mapper.tree().node(*id)?.descriptor, Some(patch))?
+                        }
+                        _ => {}
+                    }
+                    mapper.apply(
+                        std::slice::from_ref(mutation),
+                        &mut dom::Sink(self.dom.clone()),
+                    )?;
+                }
+                Ok(mapper.receipt())
+            })()
+        };
         self.receipt = mapper.receipt();
+        self.dom
+            .layers
+            .borrow_mut()
+            .update(mapper.tree(), mutations);
+        drop(mapper);
+        if !self.dom.staging.get() && self.dom.live.get() {
+            layers::sync(&self.dom)?;
+        }
         result
     }
     fn listen(&mut self, node: NodeId, kind: EventKind, enabled: bool) -> Result<(), Error> {

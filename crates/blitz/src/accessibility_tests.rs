@@ -53,6 +53,108 @@ fn nodes(tree: &Consumer) -> Vec<NodeRef<'_>> {
 }
 
 #[test]
+fn composite_roles_states_and_live_named_relations_reach_accesskit() {
+    use glory_render::{Change, Orientation, Patch, SemanticId, Semantics};
+    let app = WindowApp::new();
+    let trigger = app.app.scope().cage(None);
+    let panel = app.app.scope().cage(None);
+    let trigger_name = SemanticId::new("native-tab").unwrap();
+    let panel_name = SemanticId::new("native-panel").unwrap();
+    app.mount(
+        view().fill((
+            view()
+                .role(Role::TabList)
+                .name("Pages")
+                .semantics(Some(Box::new(Semantics {
+                    navigation: Some(Orientation::Horizontal),
+                    ..Default::default()
+                })))
+                .fill(
+                    button()
+                        .label("Profile")
+                        .node_ref(trigger)
+                        .semantics(Some(Box::new(Semantics {
+                            id: Some(trigger_name.clone()),
+                            controls: Some(panel_name.clone()),
+                            tab: true,
+                            selected: Some(true),
+                            navigation_item: true,
+                            ..Default::default()
+                        }))),
+                ),
+            view()
+                .role(Role::TabPanel)
+                .node_ref(panel)
+                .semantics(Some(Box::new(Semantics {
+                    id: Some(panel_name.clone()),
+                    labelled_by: Some(trigger_name.clone()),
+                    described_by: Some(trigger_name),
+                    ..Default::default()
+                })))
+                .fill(text().content("Panel body")),
+            view()
+                .role(Role::Heading(2))
+                .fill(
+                    button()
+                        .label("Disclosure")
+                        .semantics(Some(Box::new(Semantics {
+                            expanded: Some(true),
+                            has_popup: true,
+                            ..Default::default()
+                        }))),
+                ),
+        )),
+    )
+    .unwrap();
+    let mut consumer = Consumer::new(build(&app, true), true);
+    let trigger_id = id(&app, trigger.get().unwrap());
+    let panel_id = id(&app, panel.get().unwrap());
+    let tab_full = nodes(&consumer)
+        .into_iter()
+        .find(|node| node.role() == AxRole::Tab)
+        .unwrap()
+        .id();
+    let panel_full = nodes(&consumer)
+        .into_iter()
+        .find(|node| node.role() == AxRole::TabPanel)
+        .unwrap()
+        .id();
+    let tab = consumer.state().node_by_id(tab_full).unwrap();
+    assert_eq!(tab.role(), AxRole::Tab);
+    assert_eq!(tab.data().is_selected(), Some(true));
+    assert_eq!(tab.data().controls(), &[panel_id]);
+    let panel_node = consumer.state().node_by_id(panel_full).unwrap();
+    assert_eq!(panel_node.role(), AxRole::TabPanel);
+    assert_eq!(panel_node.data().labelled_by(), &[trigger_id]);
+    assert_eq!(panel_node.data().described_by(), &[trigger_id]);
+    assert!(nodes(&consumer).iter().any(|n| n.role() == AxRole::Button
+        && n.data().is_expanded() == Some(true)
+        && n.data().has_popup() == Some(accesskit::HasPopup::Dialog)));
+    app.app
+        .scope()
+        .patch(
+            panel.get().unwrap(),
+            Patch::Semantics(Change::Set(Some(Box::new(Semantics {
+                id: Some(panel_name),
+                hidden: true,
+                ..Default::default()
+            })))),
+        )
+        .unwrap();
+    consumer.update_and_process_changes(build(&app, false), &mut Changes);
+    assert!(consumer.state().node_by_id(panel_full).is_none());
+    assert!(
+        consumer
+            .state()
+            .node_by_id(tab_full)
+            .unwrap()
+            .data()
+            .controls()
+            .is_empty()
+    );
+}
+
+#[test]
 fn semantic_roles_labels_passwords_and_list_totals_form_a_valid_consumer_tree() {
     let app = WindowApp::new();
     app.mount(

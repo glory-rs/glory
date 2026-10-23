@@ -20,6 +20,7 @@ enum Slot {
     Role,
     Focus,
     Item,
+    Semantics,
     Text,
     Kind,
     Selectable,
@@ -238,7 +239,11 @@ macro_rules! common {
             pub fn name(mut self, value: impl Into<Lotus<String>>) -> Self {
                 self.inner.set(Slot::Name, value, |value| Patch::Name(Change::Set(Some(value)))); self
             }
-            pub fn focus(mut self, mode: FocusMode) -> Self { self.inner.set(Slot::Focus, mode, |value| Patch::Focus(Change::Set(value))); self }
+            pub fn focus(mut self, mode: impl Into<Lotus<FocusMode>>) -> Self { self.inner.set(Slot::Focus, mode, |value| Patch::Focus(Change::Set(value))); self }
+            /// Finite composite-widget state and document-scoped relations.
+            pub fn semantics(mut self, value: impl Into<Lotus<Option<Box<glory_render::Semantics>>>>) -> Self {
+                self.inner.set(Slot::Semantics, value, |value| Patch::Semantics(Change::Set(value))); self
+            }
             pub fn on(mut self, kind: EventKind, handler: impl FnMut(Event) + 'static) -> Self { self.inner.handlers.insert(kind, Box::new(handler)); self }
             /// Publish the mounted semantic identity and clear it on retirement.
             pub fn node_ref(mut self, reference: Cage<Option<NodeId>>) -> Self { self.inner.node_ref = Some(reference); self }

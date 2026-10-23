@@ -646,6 +646,23 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
     let Ok(node) = state.mapper.tree().node(origin) else {
         return false;
     };
+    if state.dom.control(origin).ok() == Some(target)
+        && let Some((root, axis)) = state.mapper.tree().navigation(origin)
+        && state.subscriptions.contains(&(root, EventKind::Navigate))
+        && let Some(command) = axis.key(glory_render::KeyboardInput {
+            key: &key.key.to_string(),
+            ..Default::default()
+        })
+    {
+        state.inputs.push(Input::Event {
+            node: origin,
+            event: Event::Navigate {
+                from: origin,
+                command,
+            },
+        });
+        return true;
+    }
     if !matches!(
         node.descriptor.options.get::<glory_render::VirtualPart>(),
         Some(glory_render::VirtualPart::Root | glory_render::VirtualPart::Row)

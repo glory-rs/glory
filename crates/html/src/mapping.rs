@@ -2,6 +2,12 @@ use crate::*;
 use glory_render::{Change, Descriptor, Error, FocusMode, Patch, Props, Purpose, Role, TextKind};
 use std::collections::BTreeMap;
 
+fn normalize_in_place(value: &mut String) {
+    if let std::borrow::Cow::Owned(normalized) = glory_render::normalize_text(value, true) {
+        *value = normalized;
+    }
+}
+
 fn element(part: Part, parent: Option<Part>, tag: &'static str) -> Piece {
     Piece {
         part,
@@ -88,6 +94,9 @@ pub(crate) fn role_name(role: Role) -> &'static str {
         Role::ColumnHeader => "columnheader",
         Role::Cell => "cell",
         Role::Dialog => "dialog",
+        Role::TabList => "tablist",
+        Role::TabPanel => "tabpanel",
+        Role::Heading(_) => "heading",
     }
 }
 pub(crate) fn input_type(purpose: Purpose) -> &'static str {
@@ -290,6 +299,13 @@ pub fn shape(descriptor: &Descriptor) -> Result<Shape, Error> {
     if let Some(role) = descriptor.effective_role() {
         attrs(&mut shape, Part::Main).insert("role", role_name(role).into());
     }
+    if let Some(Role::Heading(level)) = descriptor.role {
+        attrs(&mut shape, Part::Main).insert("aria-level", level.to_string());
+    }
+    attrs(&mut shape, control).extend(crate::semantics::attributes(
+        descriptor.semantics.as_deref(),
+        descriptor.effective_role(),
+    ));
     match descriptor.focus {
         FocusMode::Auto => {}
         FocusMode::Programmatic => {
@@ -309,22 +325,45 @@ pub fn shape(descriptor: &Descriptor) -> Result<Shape, Error> {
     }
     for piece in &mut shape.pieces {
         match &mut piece.kind {
-            Kind::Text(value) => *value = normalize(value),
+            Kind::Text(value) => normalize_in_place(value),
             Kind::Element {
                 attributes,
                 properties,
                 ..
             } => {
                 for value in attributes.values_mut() {
-                    *value = normalize(value);
+                    normalize_in_place(value);
                 }
                 for value in properties.values_mut() {
                     if let Property::Text(value) = value {
-                        *value = normalize(value);
+                        normalize_in_place(value);
                     }
                 }
             }
         }
     }
     Ok(shape)
+}
+
+#[cfg(test)]
+mod normalization_tests {
+    use super::normalize_in_place;
+
+    #[test]
+    fn canonical_allocations_are_kept_and_html_parser_aliases_are_repaired() {
+        for original in ["row 123", "Unicode 🙂 末尾", "a\nb", ""] {
+            let mut value = original.to_owned();
+            let allocation = value.as_ptr();
+            let capacity = value.capacity();
+            normalize_in_place(&mut value);
+            assert_eq!(value, original);
+            assert_eq!(value.as_ptr(), allocation);
+            assert_eq!(value.capacity(), capacity);
+        }
+        for (original, expected) in [("a\r\nb\rc\0🙂", "a\nb\nc�🙂"), ("\0\r", "�\n")] {
+            let mut value = original.to_owned();
+            normalize_in_place(&mut value);
+            assert_eq!(value, expected);
+        }
+    }
 }

@@ -84,6 +84,7 @@ impl Listeners {
             "pointercancel",
             "lostpointercapture",
             "blur",
+            "resize",
         ] {
             let weak = Rc::downgrade(&dom);
             let callback = Closure::new(move |event: web_sys::Event| {
@@ -93,14 +94,21 @@ impl Listeners {
                     dom.frame.input();
                 }
             });
-            let target: EventTarget = if name == "blur" {
+            let target: EventTarget = if matches!(name, "blur" | "resize") {
                 dom.document
                     .default_view()
                     .map(Into::into)
                     .unwrap_or_else(|| dom.document.clone().into())
             } else if matches!(
                 name,
-                "keydown" | "pointermove" | "pointerup" | "pointercancel"
+                "keydown"
+                    | "pointerdown"
+                    | "click"
+                    | "focusin"
+                    | "pointermove"
+                    | "pointerup"
+                    | "pointercancel"
+                    | "scroll"
             ) {
                 dom.document.clone().into()
             } else {
@@ -210,6 +218,9 @@ pub(super) fn target(dom: &Dom, element: &Element) -> Option<(NodeId, Element)> 
     Some((id, target))
 }
 fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_render::Error> {
+    if super::layers::receive(dom, name, &event)? {
+        return Ok(());
+    }
     if matches!(
         name,
         "pointerdown"
@@ -407,6 +418,38 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
                     );
                 }
                 return Ok(());
+            }
+            // Explicit composite collections opt in per trigger; their nested
+            // editors and ordinary buttons keep native keyboard behavior.
+            if element.has_attribute("data-gly-navigation-item")
+                && node == Node::from(entry.control()?)
+                && let Some(root) = element.closest("[data-gly-navigation]").map_err(backend)?
+                && let Some((root_id, _)) = target(dom, &root)
+                && dom
+                    .entry(root_id)?
+                    .interests
+                    .borrow()
+                    .contains(&EventKind::Navigate)
+            {
+                let axis = match root.get_attribute("data-gly-navigation").as_deref() {
+                    Some("horizontal") => glory_render::Orientation::Horizontal,
+                    Some("vertical") => glory_render::Orientation::Vertical,
+                    _ => return Ok(()),
+                };
+                if let Some(command) = axis.key(KeyboardInput {
+                    key: &key.key(),
+                    control: key.ctrl_key(),
+                    meta: key.meta_key(),
+                    alt: key.alt_key(),
+                    shift: key.shift_key(),
+                    repeat: key.repeat(),
+                    composing: false,
+                    editable,
+                }) {
+                    event.prevent_default();
+                    dom.queue(id, Event::Navigate { from: id, command });
+                    return Ok(());
+                }
             }
             // Navigation belongs to the list/row shell only. Descendant inputs,
             // buttons and links keep native cursor/activation/Tab behavior.

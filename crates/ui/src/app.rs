@@ -447,6 +447,11 @@ impl Session {
                 return Ok(false);
             }
             let props = &present.tree.node(node)?.descriptor.props;
+            if matches!(event, Event::Activate)
+                && !present.tree.node(node)?.descriptor.activation_enabled()
+            {
+                return Ok(false);
+            }
             if let Event::ValueChanged { revision, .. } | Event::Commit { revision, .. } = &event
                 && let glory_render::Props::Input(input) = props
                 && *revision < input.revision

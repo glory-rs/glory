@@ -66,6 +66,7 @@ impl Descriptor {
             (Patch::Name(change), _) => exchange(change, &mut self.name, None),
             (Patch::Focus(change), _) => exchange(change, &mut self.focus, FocusMode::default()),
             (Patch::Item(change), _) => exchange(change, &mut self.item, None),
+            (Patch::Semantics(change), _) => exchange(change, &mut self.semantics, None),
             _ => {
                 return Err(Error::InvalidProps(
                     "property does not belong to this component",

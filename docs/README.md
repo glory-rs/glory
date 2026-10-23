@@ -15,6 +15,10 @@ Start here when evaluating or extending Glory:
   explicit remaining R0 work.
 - [Current browser framework comparison](performance.md): semantic Glory/Leptos/Dioxus
   full-row workloads, independent builds, actual results and explicit historical boundaries.
+- [Bulk creation and Dioxus design](bulk-create-dioxus-2026-10-24.md): fixed DOM creation bridge,
+  independent paired/cross-framework results, rejected experiments, full regression and static-plan priorities.
+- [HTML mapping and DOM creation](performance.md#html-mapping-and-dom-creation--2026-10-23):
+  finite native prototypes, inline Part handles, independent paired timings and full regression.
 - [Scope cleanup and sibling unlink](performance.md#scope-cleanup-and-sibling-unlink--2026-10-23):
   bounded front retirement, fused indices, controlled paired results and full regression.
 - [Owner/Binding retirement follow-up](performance.md#owner-and-binding-retirement-follow-up--2026-10-23):
