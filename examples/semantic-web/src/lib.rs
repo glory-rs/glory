@@ -6,6 +6,9 @@ mod adaptive;
 mod css_client;
 pub mod css_form;
 #[cfg(target_arch = "wasm32")]
+mod disclosure_client;
+pub mod disclosure_form;
+#[cfg(target_arch = "wasm32")]
 mod entries_client;
 pub mod entries_form;
 #[cfg(target_arch = "wasm32")]
@@ -199,6 +202,7 @@ mod browser {
     }
     #[wasm_bindgen]
     pub fn unmount() {
+        crate::disclosure_client::clear();
         crate::css_client::clear();
         crate::entries_client::clear();
         crate::fields_client::clear();

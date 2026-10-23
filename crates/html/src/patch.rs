@@ -95,6 +95,28 @@ pub(crate) fn lower(next: &Descriptor, inverse: &Patch) -> Vec<Edit> {
         };
     }
     match inverse {
+        Patch::Disclosure(change) => {
+            let old = old!(change);
+            let next = next.disclosure();
+            attribute(
+                &mut edits,
+                Part::Main,
+                "aria-expanded",
+                old.map(|value| value.expanded)
+                    .map(|v| if v { "true" } else { "false" }),
+                next.map(|value| value.expanded)
+                    .map(|v| if v { "true" } else { "false" }),
+            );
+            let old = old.map(|value| crate::element_id(value.controls, crate::Namespace::Local));
+            let next = next.map(|value| crate::element_id(value.controls, crate::Namespace::Local));
+            attribute(
+                &mut edits,
+                Part::Main,
+                "aria-controls",
+                old.as_deref(),
+                next.as_deref(),
+            );
+        }
         Patch::RichValue { document, revision } => {
             let old = old!(document);
             let Props::RichText(value) = &next.props else {

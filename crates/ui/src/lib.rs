@@ -9,7 +9,7 @@ pub use app::{App, Error, Mounted, Result, Scope, Settle, UiStats, WeakScope, Wi
 pub use builders::*;
 pub use control::{Each, When, each, when};
 pub use glory_render::{
-    Event, EventKind, FocusMode, ItemPosition, Navigation, Purpose, Role, TextKind,
+    Disclosure, Event, EventKind, FocusMode, ItemPosition, Navigation, Purpose, Role, TextKind,
 };
 pub use list::{List, list};
 

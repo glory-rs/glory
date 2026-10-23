@@ -35,7 +35,7 @@ pub struct Renderer(Rc<RefCell<State>>);
 impl Renderer {
     pub fn new(runtime: RuntimeId) -> Self {
         Self(Rc::new(RefCell::new(State {
-            mapper: Mapper::new(runtime),
+            mapper: Mapper::new_in(runtime, glory_html::Namespace::Server),
             receipt: Receipt::default(),
             inputs: Vec::new(),
         })))

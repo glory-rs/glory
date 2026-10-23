@@ -565,3 +565,56 @@ fn html_escaping_expansion_obeys_the_transport_frame_limit() {
         Err(Error::Limit("HTML frame bytes"))
     ));
 }
+#[test]
+fn stream_disclosure_uses_shared_cross_target_preflight_and_serializes_actual_relations() {
+    use glory_render::{
+        ButtonProps, Change, Descriptor, Disclosure, NodeIds, Patch, Props, RuntimeId,
+    };
+    let foreign = NodeIds::new(RuntimeId::new()).allocate();
+    let mut stream = stream_with(Resources::default(), Config::default(), move |_, _| {
+        component(move |scope| {
+            let target = scope.create(Descriptor::new(Props::View))?;
+            let button = scope.create(Descriptor::new(Props::Button(ButtonProps {
+                disclosure: Some(Disclosure {
+                    controls: target,
+                    expanded: false,
+                }),
+                ..Default::default()
+            })))?;
+            assert!(
+                scope
+                    .patch(
+                        button,
+                        Patch::Disclosure(Change::Set(Some(Disclosure {
+                            controls: foreign,
+                            expanded: true
+                        })))
+                    )
+                    .is_err()
+            );
+            scope.patch(
+                button,
+                Patch::Disclosure(Change::Set(Some(Disclosure {
+                    controls: target,
+                    expanded: true,
+                }))),
+            )?;
+            Ok(())
+        })
+    })
+    .unwrap();
+    assert_eq!(stream.app.as_ref().unwrap().stats().nodes, 2);
+    let shell = frame(&mut stream);
+    assert!(shell.body().contains("aria-expanded=\"true\""));
+    let data = shell
+        .to_html(&Bootstrap {
+            root_id: "app".into(),
+            data_id: "seed".into(),
+            script_url: "/stream.js".into(),
+            nonce: None,
+        })
+        .unwrap();
+    assert!(data.contains("aria-controls"));
+    assert!(data.contains("gly-server-"));
+    assert!(matches!(frame(&mut stream).kind, FrameKind::End));
+}

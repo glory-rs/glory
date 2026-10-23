@@ -208,6 +208,14 @@ pub fn shape(descriptor: &Descriptor) -> Result<Shape, Error> {
             attrs(&mut shape, Part::Main).insert("type", "button".into());
             text(&mut shape, &value.label);
             enabled(&mut shape, Part::Main, value.enabled);
+            if let Some(disclosure) = value.disclosure {
+                attrs(&mut shape, Part::Main)
+                    .insert("aria-expanded", disclosure.expanded.to_string());
+                attrs(&mut shape, Part::Main).insert(
+                    "aria-controls",
+                    crate::element_id(disclosure.controls, crate::Namespace::Local),
+                );
+            }
             "button"
         }
         Props::RichText(value) => {

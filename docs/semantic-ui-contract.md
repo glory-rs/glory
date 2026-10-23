@@ -9,7 +9,7 @@
 | view | 样式盒、role/name/focus/item | 接受；继续校验交互祖先约束 | div；有 name 的默认 group；Main/Navigation/Section 分别 main/nav/section |
 | group | 无盒子的逻辑范围、身份与寿命 | 接受，保持逻辑祖先；不产生样式或可访问性 wrapper | 注释范围 |
 | text | content，Inline/Paragraph/Heading(1–6)，selectable；Heading 可设置 name | 不接受 | span/p/h1–h6 |
-| button | label、enabled | 仅 inline text、image、group；不能包含交互控件或显式 focus 节点 | button，type=button |
+| button | label、enabled、可选 Disclosure(expanded, controls: NodeId) | 仅 inline text、image、group；不能包含交互控件或显式 focus 节点 | button，type=button |
 | input | 字符串 value/revision、purpose、multiline、enabled | 不接受 | input / textarea |
 | rich_text | 有限 Document/revision、enabled、read_only、placeholder；UTF-16 block selection | 不接受应用子节点；文档结构由类型表达 | 有限 contenteditable document |
 | check | bool checked、label、enabled | 不接受；label 是独立的受控文字部分 | label + checkbox + 文字 |
@@ -395,3 +395,6 @@ SSR Document的可选sheets按顺序输出并使用nonce；Blitz set_sheet先完
 ## 有限富文档
 
 RichText 的数据、事件、选区、输入法与版本 4 HTML/stream 契约及验证范围见[有限富文档](semantic-rich-text.md)。它使用实际 Web contenteditable 和原生 Parley attributed editor；应用负责存储 codec、格式事务与撤销历史。
+
+
+展开控件的有限类型、身份验证、目标撤销以及 HTML v5 / SSR / stream / hydration / AccessKit 合同见[Disclosure](semantic-disclosure.md)。样式 profile 版本未改变。

@@ -677,3 +677,65 @@ fn row_reveal_scrolls_native_ancestors_and_the_document_viewport_after_logical_l
     build(&app, false);
     assert!(app.accessibility.borrow().pending_reveals.is_empty());
 }
+#[test]
+fn disclosure_expanded_and_controls_follow_live_semantic_targets_without_expand_actions() {
+    let app = WindowApp::new();
+    let target = view()
+        .name("Drawer")
+        .fill(text().content("Contents"))
+        .mount(app.app.scope())
+        .unwrap();
+    let target_id = target.roots()[0];
+    let expanded = app.app.scope().cage(false);
+    let button = button()
+        .label("Menu")
+        .disclosure(expanded.map(move |expanded| {
+            Some(glory_render::Disclosure {
+                expanded: *expanded,
+                controls: target_id,
+            })
+        }))
+        .on(EventKind::Activate, move |_| {
+            expanded.revise(|value| *value = !*value)
+        })
+        .mount(app.app.scope())
+        .unwrap();
+    let button_id = button.roots()[0];
+    let mut tree = Consumer::new(build(&app, true), true);
+    let ax_button = id(&app, button_id);
+    let ax_target = id(&app, target_id);
+    {
+        let all = nodes(&tree);
+        let node = all
+            .iter()
+            .find(|node| node.role() == AxRole::Button)
+            .unwrap();
+        assert_eq!(node.data().is_expanded(), Some(false));
+        assert_eq!(node.data().controls(), &[ax_target]);
+        assert!(node.data().supports_action(AxAction::Click));
+        assert!(!node.data().supports_action(AxAction::Expand));
+        assert!(!node.data().supports_action(AxAction::Collapse));
+    }
+    assert!(action(&app, &request(ax_button, AxAction::Click, None)).unwrap());
+    app.app.pump().unwrap();
+    tree.update_and_process_changes(build(&app, false), &mut Changes);
+    assert_eq!(
+        nodes(&tree)
+            .iter()
+            .find(|node| node.role() == AxRole::Button)
+            .unwrap()
+            .data()
+            .is_expanded(),
+        Some(true)
+    );
+    drop(target);
+    app.app.flush().unwrap();
+    tree.update_and_process_changes(build(&app, false), &mut Changes);
+    let all = nodes(&tree);
+    let node = all
+        .iter()
+        .find(|node| node.role() == AxRole::Button)
+        .unwrap();
+    assert_eq!(node.data().is_expanded(), None);
+    assert!(node.data().controls().is_empty());
+}

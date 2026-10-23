@@ -20,7 +20,55 @@ use std::collections::{BTreeMap, HashMap};
 pub use mapping::{preflight, shape};
 pub use serialize::{escape, serialize};
 pub use styles::style;
-pub const FORMAT_VERSION: u32 = 4;
+pub const FORMAT_VERSION: u32 = 5;
+
+/// Finite host domains keep server nodes distinct from newly adopted browser
+/// identities. Runtime identities are unique and never recycled in each host.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Namespace {
+    #[default]
+    Local,
+    Server,
+    Browser(u64),
+}
+
+pub fn element_id(id: NodeId, namespace: Namespace) -> String {
+    let domain = match namespace {
+        Namespace::Local => "local".to_owned(),
+        Namespace::Server => "server".to_owned(),
+        Namespace::Browser(document) => format!("browser-{document}"),
+    };
+    format!(
+        "gly-{domain}-{}-{}-{}",
+        id.runtime().value(),
+        id.slot(),
+        id.generation()
+    )
+}
+
+pub fn identified_shape(
+    descriptor: &glory_render::Descriptor,
+    id: NodeId,
+    namespace: Namespace,
+) -> Result<Shape, Error> {
+    let mut result = shape(descriptor)?;
+    if let Some(Piece {
+        kind: Kind::Element { attributes, .. },
+        ..
+    }) = result
+        .pieces
+        .iter_mut()
+        .find(|piece| piece.part == Part::Main)
+    {
+        if matches!(descriptor.props, glory_render::Props::View) {
+            attributes.insert("id", element_id(id, namespace));
+        }
+        if let Some(disclosure) = descriptor.disclosure() {
+            attributes.insert("aria-controls", element_id(disclosure.controls, namespace));
+        }
+    }
+    Ok(result)
+}
 
 pub const BASE_CSS: &str = concat!(
     "[data-gly-kind]{box-sizing:border-box}[data-gly-kind=text]{margin:0;font:inherit}",
@@ -185,6 +233,7 @@ impl HtmlEventOptions {
 }
 
 pub struct Mapper {
+    namespace: Namespace,
     tree: Memory,
     keys: HashMap<NodeId, u64>,
     next_key: u64,
@@ -192,12 +241,19 @@ pub struct Mapper {
 }
 impl Mapper {
     pub fn new(runtime: RuntimeId) -> Self {
+        Self::new_in(runtime, Namespace::Local)
+    }
+    pub fn new_in(runtime: RuntimeId, namespace: Namespace) -> Self {
         Self {
+            namespace,
             tree: Memory::new(runtime),
             keys: HashMap::new(),
             next_key: 0,
             receipt: Receipt::default(),
         }
+    }
+    pub fn shape(&self, id: NodeId) -> Result<Shape, Error> {
+        identified_shape(&self.tree.node(id)?.descriptor, id, self.namespace)
     }
     pub fn tree(&self) -> &Memory {
         &self.tree
@@ -210,7 +266,7 @@ impl Mapper {
         self.receipt
     }
     pub fn html(&self) -> Result<String, Error> {
-        serialize(&self.tree, |id| self.key(id))
+        serialize::serialize_in(&self.tree, |id| self.key(id), self.namespace)
     }
     /// Final snapshot keys follow the logical tree, independent of asynchronous
     /// completion/creation order. Hidden/unplaced nodes get unique trailing
@@ -258,13 +314,14 @@ impl Mapper {
         for mutation in mutations {
             let op = match mutation {
                 Mutation::Create { id, node } => {
-                    let shape = shape(node)?;
+                    let shape = identified_shape(node, *id, self.namespace)?;
                     let key = self.next_key;
-                    self.next_key = self
+                    let next_key = self
                         .next_key
                         .checked_add(1)
                         .ok_or(Error::InvalidProps("HTML key space exhausted"))?;
                     receipt = self.tree.apply(std::slice::from_ref(mutation))?;
+                    self.next_key = next_key;
                     self.keys.insert(*id, key);
                     Op::Create {
                         id: *id,
@@ -276,7 +333,19 @@ impl Mapper {
                     let descriptor = &self.tree.node(*id)?.descriptor;
                     preflight(descriptor, Some(patch))?;
                     let prepared = self.tree.prepare_patch(*id, patch)?;
-                    let edits = patch::lower(prepared.descriptor(), prepared.previous());
+                    let mut edits = patch::lower(prepared.descriptor(), prepared.previous());
+                    if let Some(disclosure) = prepared.descriptor().disclosure() {
+                        for edit in &mut edits {
+                            if let Edit::Attribute {
+                                name: "aria-controls",
+                                value,
+                                ..
+                            } = edit
+                            {
+                                *value = Some(element_id(disclosure.controls, self.namespace));
+                            }
+                        }
+                    }
                     receipt = prepared.commit();
                     Op::Patch { id: *id, edits }
                 }
@@ -320,7 +389,29 @@ impl Mapper {
                         pending.extend(self.tree.node(id)?.children.iter().copied());
                         subtree.push(id);
                     }
+                    let retired: std::collections::HashSet<_> = subtree.iter().copied().collect();
+                    let mut referrers = std::collections::BTreeSet::new();
+                    for target in &subtree {
+                        referrers.extend(
+                            self.tree
+                                .disclosure_referrers(*target)
+                                .filter(|id| !retired.contains(id)),
+                        );
+                    }
                     receipt = self.tree.apply(std::slice::from_ref(mutation))?;
+                    for id in referrers {
+                        sink.apply(Op::Patch {
+                            id,
+                            edits: ["aria-controls", "aria-expanded"]
+                                .into_iter()
+                                .map(|name| Edit::Attribute {
+                                    part: Part::Main,
+                                    name,
+                                    value: None,
+                                })
+                                .collect(),
+                        })?;
+                    }
                     for id in &subtree {
                         self.keys.remove(id);
                     }

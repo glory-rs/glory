@@ -168,6 +168,9 @@ impl Tree {
             } else {
                 list
             };
+            if let Some(disclosure) = d.disclosure() {
+                node.set_expanded(disclosure.expanded);
+            }
             match &d.props {
                 Props::Text(p) => {
                     if p.kind == TextKind::Inline {
@@ -289,6 +292,26 @@ impl Tree {
                     .get_mut(&list)
                     .expect("list exists")
                     .set_size_of_set(count);
+            }
+        }
+        // Resolve only semantic relations whose two endpoints survived the
+        // normal visibility walk. No dangling AX IDs or new AT action promise.
+        for (key, ax_id) in &self.ids {
+            let Key::Main(id) = key else {
+                continue;
+            };
+            if !alive.contains(key) {
+                continue;
+            }
+            if let Some(disclosure) = state.mapper.tree().node(*id)?.descriptor.disclosure() {
+                let target = Key::Main(disclosure.controls);
+                if alive.contains(&target) {
+                    if let (Some(node), Some(target)) =
+                        (nodes.get_mut(ax_id), self.ids.get(&target))
+                    {
+                        node.push_controlled(*target);
+                    }
+                }
             }
         }
         self.ids.retain(|key, _| alive.contains(key));

@@ -65,7 +65,7 @@ reduced workspace check as proof that those adapters/platforms work.
   Optional css lowers Sheet selectors with zero-specificity main-node guards;
   Check focus maps to its internal control, enabled/disabled/checked to semantic
   main-node state attributes. Keep full shape, field lowering and classic stream
-  HTML format v4 in agreement. State attributes exist independently of css flags
+  HTML format v5 in agreement. State attributes exist independently of css flags
   so SSR and CSR builds do not acquire different mapping shapes.
   Patch lowering reads the prepared field/inverse, not two complete Shapes;
   full shaping remains for create/snapshot/hydration. Keep the cfg(test) full
@@ -739,4 +739,16 @@ selection, bounded validation, typed value/read-only/placeholder patches and
 Changed/Commit/Command events. It is not raw HTML or Markdown. Keep canonical
 echo identity/caret/composition, deferred program values and explicit pending
 typing marks consistent across Web/stream/SSR and native attributed editors.
-HTML/stream format is v4; style profile versions remain HTML/record v3, native v4.
+HTML/stream format is v5; style profile versions remain HTML/record v3, native v4.
+
+
+## Finite disclosure
+
+Disclosure belongs only to Button and contains expanded plus a same-Runtime,
+live generational View target. Keep field-only rollback and bounded live reverse
+indices; target disposal clears surviving relations without scanning unrelated
+nodes. HTML v5 reserves automatic View IDs; stream key reordering never changes
+identity. Hydration validates the complete real relationship before rebasing
+server IDs to client identities. Browser document tokens are shared across WASM
+modules. No arbitrary attrs or Expand/Collapse AT action promise; AccessKit
+controls includes only visible live endpoints. See docs/semantic-disclosure.md.

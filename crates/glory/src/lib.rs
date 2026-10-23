@@ -50,8 +50,8 @@ pub mod prelude {
     };
     pub use glory_ui::events::*;
     pub use glory_ui::{
-        App, FocusMode, ItemPosition, Navigation, Purpose, Result, Role, Scope, TextKind, Widget,
-        button, check, col, component, each, group, image, input, link, list, rich_text, row, text,
-        view, when,
+        App, Disclosure, FocusMode, ItemPosition, Navigation, Purpose, Result, Role, Scope,
+        TextKind, Widget, button, check, col, component, each, group, image, input, link, list,
+        rich_text, row, text, view, when,
     };
 }

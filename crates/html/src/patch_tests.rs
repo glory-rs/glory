@@ -384,3 +384,64 @@ fn mapper_metadata_keeps_large_unrelated_payloads_and_emits_no_value_property() 
         }
     }
 }
+
+#[test]
+fn disclosure_deltas_match_full_shape_for_retarget_clear_keep_and_equal() {
+    let runtime = RuntimeId::new();
+    let mut ids = NodeIds::new(runtime);
+    let a = ids.allocate();
+    let b = ids.allocate();
+    let id = ids.allocate();
+    let mut mapper = Mapper::new(runtime);
+    let mut sink = Record::default();
+    for target in [a, b] {
+        mapper
+            .apply(
+                &[Mutation::Create {
+                    id: target,
+                    node: Box::new(Descriptor::new(Props::View)),
+                }],
+                &mut sink,
+            )
+            .unwrap();
+    }
+    mapper
+        .apply(
+            &[Mutation::Create {
+                id,
+                node: Box::new(Descriptor::new(Props::Button(Default::default()))),
+            }],
+            &mut sink,
+        )
+        .unwrap();
+    for patch in [
+        Patch::Disclosure(Change::Keep),
+        Patch::Disclosure(Change::Set(Some(Disclosure {
+            controls: a,
+            expanded: false,
+        }))),
+        Patch::Disclosure(Change::Set(Some(Disclosure {
+            controls: a,
+            expanded: true,
+        }))),
+        Patch::Disclosure(Change::Set(Some(Disclosure {
+            controls: b,
+            expanded: true,
+        }))),
+        Patch::Disclosure(Change::Set(Some(Disclosure {
+            controls: b,
+            expanded: true,
+        }))),
+        Patch::Disclosure(Change::Clear),
+    ] {
+        let old = shape(&mapper.tree().node(id).unwrap().descriptor).unwrap();
+        mapper
+            .apply(&[Mutation::Patch { id, patch }], &mut sink)
+            .unwrap();
+        let new = shape(&mapper.tree().node(id).unwrap().descriptor).unwrap();
+        let Op::Patch { edits, .. } = sink.0.last().unwrap() else {
+            panic!()
+        };
+        assert_eq!(*edits, difference(&old, &new).unwrap());
+    }
+}

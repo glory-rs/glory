@@ -24,6 +24,9 @@ impl Descriptor {
             (Patch::Selectable(change), Props::Text(p)) => {
                 exchange(change, &mut p.selectable, true)
             }
+            (Patch::Disclosure(change), Props::Button(p)) => {
+                exchange(change, &mut p.disclosure, None)
+            }
             (Patch::Label(change), Props::Button(p)) => {
                 exchange(change, &mut p.label, String::new())
             }

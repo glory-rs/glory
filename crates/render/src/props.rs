@@ -97,6 +97,16 @@ impl Default for TextProps {
 pub struct ButtonProps {
     pub label: String,
     pub enabled: bool,
+    pub disclosure: Option<Disclosure>,
+}
+
+/// A button's finite expanded state and its controlled live View.
+/// The target is generational and belongs to the same Runtime. Retiring it
+/// clears the relation; a reused slot never becomes its replacement.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Disclosure {
+    pub expanded: bool,
+    pub controls: crate::NodeId,
 }
 
 impl Default for ButtonProps {
@@ -104,6 +114,7 @@ impl Default for ButtonProps {
         Self {
             label: String::new(),
             enabled: true,
+            disclosure: None,
         }
     }
 }
@@ -249,6 +260,14 @@ pub struct ItemPosition {
 }
 
 impl Descriptor {
+    pub fn disclosure(&self) -> Option<Disclosure> {
+        if let Props::Button(button) = &self.props {
+            button.disclosure
+        } else {
+            None
+        }
+    }
+
     pub fn new(props: Props) -> Self {
         Self {
             props,
@@ -489,6 +508,7 @@ pub enum Patch {
     TextKind(Change<TextKind>),
     Selectable(Change<bool>),
     Label(Change<String>),
+    Disclosure(Change<Option<Disclosure>>),
     Enabled(Change<bool>),
     Value {
         value: Change<String>,

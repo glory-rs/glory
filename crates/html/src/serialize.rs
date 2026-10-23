@@ -1,4 +1,4 @@
-use crate::{Kind, Part, Property, Shape, shape};
+use crate::{Kind, Namespace, Part, Property, Shape, identified_shape};
 use glory_render::memory::Memory;
 use glory_render::{Error, NodeId};
 
@@ -18,9 +18,17 @@ pub fn escape(value: &str) -> String {
     out
 }
 pub fn serialize(tree: &Memory, key: impl Fn(NodeId) -> Option<u64>) -> Result<String, Error> {
+    serialize_in(tree, key, Namespace::Local)
+}
+pub(crate) fn serialize_in(
+    tree: &Memory,
+    key: impl Fn(NodeId) -> Option<u64>,
+    namespace: Namespace,
+) -> Result<String, Error> {
     fn node(
         tree: &Memory,
         id: NodeId,
+        namespace: Namespace,
         key: &impl Fn(NodeId) -> Option<u64>,
         out: &mut String,
     ) -> Result<(), Error> {
@@ -29,17 +37,17 @@ pub fn serialize(tree: &Memory, key: impl Fn(NodeId) -> Option<u64>) -> Result<S
             return Ok(());
         }
         let key_value = key(id).ok_or(Error::NodeGone(id))?;
-        let shape = shape(&model.descriptor)?;
+        let shape = identified_shape(&model.descriptor, id, namespace)?;
         if shape.pieces.is_empty() {
             out.push_str(&format!("<!--gly:s:{key_value}-->"));
             for child in &model.children {
-                node(tree, *child, key, out)?;
+                node(tree, *child, namespace, key, out)?;
             }
             out.push_str(&format!("<!--gly:e:{key_value}-->"));
         } else {
             piece(&shape, Part::Main, key_value, out, &mut |out| {
                 for child in &model.children {
-                    node(tree, *child, key, out)?;
+                    node(tree, *child, namespace, key, out)?;
                 }
                 Ok(())
             })?;
@@ -116,7 +124,7 @@ pub fn serialize(tree: &Memory, key: impl Fn(NodeId) -> Option<u64>) -> Result<S
     }
     let mut out = String::new();
     for root in tree.roots() {
-        node(tree, *root, &key, &mut out)?;
+        node(tree, *root, namespace, &key, &mut out)?;
     }
     Ok(out)
 }

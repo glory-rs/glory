@@ -84,7 +84,7 @@ impl Validator<'_> {
         }
         let key = self.mapper.key(id).expect("live HTML key");
         let children = model.children.clone();
-        let shape = glory_html::shape(&model.descriptor)?;
+        let shape = self.mapper.shape(id)?;
         let mut parts = BTreeMap::new();
         let (first, last) = if shape.pieces.is_empty() {
             let first = self.comment(cursor, &format!("gly:s:{key}"), key)?;
@@ -264,6 +264,11 @@ impl Validator<'_> {
                     return Err(mismatch(Some(key), "unexpected attributes"));
                 }
                 for (name, expected) in attributes {
+                    // Node identity belongs to the new client runtime. Validate
+                    // the complete server relation below before rebasing any ID.
+                    if matches!(*name, "id" | "aria-controls") {
+                        continue;
+                    }
                     if element.get_attribute(name).as_ref() != Some(expected) {
                         return Err(mismatch(Some(key), "attribute"));
                     }
@@ -336,6 +341,7 @@ pub fn hydrate_with<W: Widget>(root: Element, factory: impl FnOnce(&Scope) -> W)
     let user_focus = document
         .active_element()
         .is_some_and(|active| root.contains(Some(active.as_ref())));
+    let document_id = super::reserve_document_id(&document)?;
     let frame = Frame::new(window);
     let dom = dom::Dom::new(document, root, frame.clone());
     dom.staging.set(true);
@@ -344,7 +350,7 @@ pub fn hydrate_with<W: Widget>(root: Element, factory: impl FnOnce(&Scope) -> W)
     dom.hold_actions.set(true);
     let mut mapper = None;
     let app = Rc::new(App::with_host(frame.clone(), |runtime| {
-        let renderer = Renderer::new(runtime, dom.clone());
+        let renderer = Renderer::new(runtime, dom.clone(), document_id);
         mapper = Some(renderer.mapper.clone());
         renderer
     }));
@@ -373,6 +379,7 @@ pub fn hydrate_with<W: Widget>(root: Element, factory: impl FnOnce(&Scope) -> W)
         }
         validator.plan
     };
+    validate_disclosures(&dom, &mapper.borrow(), &plan.entries)?;
     let anchors = flow_anchors(&mapper.borrow(), &plan.entries)?;
     let anchored: HashSet<_> = anchors
         .iter()
@@ -394,6 +401,27 @@ pub fn hydrate_with<W: Widget>(root: Element, factory: impl FnOnce(&Scope) -> W)
             .map_err(backend)?;
     }
     for entry in plan.entries {
+        if let Some(element) = entry
+            .parts
+            .get(&Part::Main)
+            .and_then(|node| node.dyn_ref::<Element>())
+        {
+            if let Some(glory_html::Piece {
+                kind: Kind::Element { attributes, .. },
+                ..
+            }) = entry
+                .shape
+                .pieces
+                .iter()
+                .find(|piece| piece.part == Part::Main)
+            {
+                for name in ["id", "aria-controls"] {
+                    if let Some(value) = attributes.get(name) {
+                        element.set_attribute(name, value).map_err(backend)?;
+                    }
+                }
+            }
+        }
         dom.parents
             .borrow_mut()
             .insert(entry.id, mapper.borrow().tree().node(entry.id)?.parent);
@@ -458,11 +486,7 @@ fn missing(dom: &Rc<dom::Dom>, mapper: &Mapper, id: NodeId) -> Result {
     let model = mapper.tree().node(id)?;
     let absent = dom.entry(id).is_err();
     if absent {
-        dom.create(
-            id,
-            mapper.key(id).expect("HTML key"),
-            glory_html::shape(&model.descriptor)?,
-        )?;
+        dom.create(id, mapper.key(id).expect("HTML key"), mapper.shape(id)?)?;
     }
     for child in &model.children {
         missing(dom, mapper, *child)?;
@@ -628,4 +652,65 @@ fn flow_anchors(mapper: &Mapper, entries: &[Candidate]) -> Result<Vec<Input>> {
         }
     }
     Ok(inputs)
+}
+
+// This pass only reads the candidate subtree. Cross-root/stale/malformed IDs
+// reject adoption before input, ID or DOM ownership changes.
+fn validate_disclosures(dom: &dom::Dom, mapper: &Mapper, entries: &[Candidate]) -> Result {
+    let elements: HashMap<_, _> = entries
+        .iter()
+        .filter_map(|entry| {
+            entry
+                .parts
+                .get(&Part::Main)
+                .and_then(|node| node.dyn_ref::<Element>())
+                .map(|element| (entry.id, element))
+        })
+        .collect();
+    let mut ids = HashSet::new();
+    for entry in entries {
+        let descriptor = &mapper.tree().node(entry.id)?.descriptor;
+        if matches!(descriptor.props, glory_render::Props::View) {
+            let element = elements[&entry.id];
+            let id = element.id();
+            if !valid_server_id(&id)
+                || !ids.insert(id.clone())
+                || dom.document.get_element_by_id(&id).as_ref() != Some(element)
+            {
+                return Err(mismatch(Some(entry.key), "view identity"));
+            }
+        }
+        if let Some(disclosure) = descriptor.disclosure() {
+            let target = elements
+                .get(&disclosure.controls)
+                .ok_or_else(|| mismatch(Some(entry.key), "disclosure target not in snapshot"))?;
+            if elements[&entry.id]
+                .get_attribute("aria-controls")
+                .as_deref()
+                != Some(target.id().as_str())
+            {
+                return Err(mismatch(Some(entry.key), "disclosure target"));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn valid_server_id(value: &str) -> bool {
+    let Some(value) = value.strip_prefix("gly-server-") else {
+        return false;
+    };
+    let mut fields = value.split('-');
+    let valid = |value: Option<&str>, maximum: u64| {
+        value.is_some_and(|value| {
+            !value.is_empty()
+                && (value == "0" || !value.starts_with('0'))
+                && value.bytes().all(|ch| ch.is_ascii_digit())
+                && value.parse::<u64>().is_ok_and(|value| value <= maximum)
+        })
+    };
+    valid(fields.next(), u64::MAX)
+        && valid(fields.next(), u32::MAX as u64)
+        && valid(fields.next(), u32::MAX as u64)
+        && fields.next().is_none()
 }

@@ -1,7 +1,7 @@
 //! Reference semantics for adapters. This interpreter performs no layout/paint.
 //! It stores only live objects and at most one tombstone per allocated slot.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::*;
 
@@ -37,6 +37,7 @@ pub struct Memory {
     runtime: RuntimeId,
     nodes: HashMap<NodeId, Node>,
     generations: HashMap<u32, (u32, bool)>,
+    disclosures: HashMap<NodeId, HashSet<NodeId>>,
     roots: Vec<NodeId>,
     inputs: Vec<Input>,
     receipt: Receipt,
@@ -61,6 +62,11 @@ impl PreparedPatch<'_> {
         self.inverse.as_ref().expect("uncommitted patch")
     }
     fn accept(&mut self) {
+        if let Some(Patch::Disclosure(Change::Set(old))) = &self.inverse {
+            let old = *old;
+            let next = self.tree.nodes[&self.id].descriptor.disclosure();
+            self.tree.reindex_disclosure(self.id, old, next);
+        }
         self.inverse = None;
         self.tree.stats.patched += 1;
     }
@@ -93,6 +99,7 @@ impl Memory {
             runtime,
             nodes: HashMap::new(),
             generations: HashMap::new(),
+            disclosures: HashMap::new(),
             roots: Vec::new(),
             inputs: Vec::new(),
             receipt: Receipt::default(),
@@ -140,7 +147,50 @@ impl Memory {
         prepared
             .tree
             .validate_child(Subtree::Existing(id), prepared.tree.nodes[&id].parent)?;
+        prepared.tree.validate_disclosure(prepared.descriptor())?;
         Ok(prepared)
+    }
+
+    /// Only live referrers of this exact generation. Empty buckets are retired.
+    pub fn disclosure_referrers(&self, target: NodeId) -> impl Iterator<Item = NodeId> + '_ {
+        self.disclosures.get(&target).into_iter().flatten().copied()
+    }
+
+    pub fn validate_disclosure(&self, descriptor: &Descriptor) -> Result<(), Error> {
+        if let Some(disclosure) = descriptor.disclosure() {
+            let target = self.node(disclosure.controls)?;
+            if !matches!(target.descriptor.props, Props::View) {
+                return Err(Error::InvalidProps(
+                    "disclosure controls must target a live View",
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    fn reindex_disclosure(
+        &mut self,
+        id: NodeId,
+        old: Option<Disclosure>,
+        next: Option<Disclosure>,
+    ) {
+        if old.map(|v| v.controls) == next.map(|v| v.controls) {
+            return;
+        }
+        if let Some(old) = old {
+            if let Some(referrers) = self.disclosures.get_mut(&old.controls) {
+                referrers.remove(&id);
+                if referrers.is_empty() {
+                    self.disclosures.remove(&old.controls);
+                }
+            }
+        }
+        if let Some(next) = next {
+            self.disclosures
+                .entry(next.controls)
+                .or_default()
+                .insert(id);
+        }
     }
 
     /// Suspension is inherited, but each node retains its own logical owner
@@ -294,6 +344,10 @@ impl Memory {
     /// modifying state. Ordinary moves visit ancestors only; only restricted
     /// interactive/button contexts require examining the child's live subtree.
     pub fn validate_child(&self, child: Subtree<'_>, parent: Option<NodeId>) -> Result<(), Error> {
+        self.validate_disclosure(match child {
+            Subtree::New(descriptor) => descriptor,
+            Subtree::Existing(id) => &self.node(id)?.descriptor,
+        })?;
         if let Subtree::Existing(id) = child {
             self.node(id)?;
         }
@@ -421,6 +475,7 @@ impl Memory {
             Mutation::Create { id, node } => {
                 self.check_runtime(*id)?;
                 node.validate()?;
+                self.validate_disclosure(node)?;
                 if self.nodes.contains_key(id) {
                     return Err(Error::DuplicateNode(*id));
                 }
@@ -445,6 +500,7 @@ impl Memory {
                         suspended: false,
                     },
                 );
+                self.reindex_disclosure(*id, None, node.disclosure());
                 self.stats.created += 1;
             }
             Mutation::Patch { id, patch } => {
@@ -469,6 +525,22 @@ impl Memory {
                 let mut pending = vec![*id];
                 while let Some(id) = pending.pop() {
                     let node = self.nodes.remove(&id).expect("owned subtree");
+                    self.reindex_disclosure(id, node.descriptor.disclosure(), None);
+                    if let Some(referrers) = self.disclosures.remove(&id) {
+                        for referrer in referrers {
+                            if let Some(Node {
+                                descriptor:
+                                    Descriptor {
+                                        props: Props::Button(button),
+                                        ..
+                                    },
+                                ..
+                            }) = self.nodes.get_mut(&referrer)
+                            {
+                                button.disclosure = None;
+                            }
+                        }
+                    }
                     self.generations
                         .get_mut(&id.slot())
                         .expect("known identity")

@@ -276,7 +276,10 @@ pub fn stream_with<W: Widget>(
     let edits = Rc::new(RefCell::new(edits::Edits::new(config.chunk_bytes)));
     let mut mapper = None;
     let app = App::with_host(executor.clone(), |runtime: RuntimeId| {
-        let model = Rc::new(RefCell::new(Mapper::new(runtime)));
+        let model = Rc::new(RefCell::new(Mapper::new_in(
+            runtime,
+            glory_html::Namespace::Server,
+        )));
         mapper = Some(model.clone());
         Renderer {
             mapper: model,
@@ -297,7 +300,7 @@ pub fn stream_with<W: Widget>(
         ids.sort_by_key(|id| model.key(*id));
         let nodes = ids.into_iter().map(|id| {
             let node = model.tree().node(id)?;
-            Ok(json!({"key":model.key(id).expect("key").to_string(),"shape":edits::shape(glory_html::shape(&node.descriptor)?),"parent":node.parent.and_then(|id|model.key(id)).map(|key|key.to_string()),"children":node.children.iter().map(|id|model.key(*id).expect("key").to_string()).collect::<Vec<_>>(),"placed":node.placed,"suspended":node.suspended}))
+            Ok(json!({"key":model.key(id).expect("key").to_string(),"shape":edits::shape(model.shape(id)?),"parent":node.parent.and_then(|id|model.key(id)).map(|key|key.to_string()),"children":node.children.iter().map(|id|model.key(*id).expect("key").to_string()).collect::<Vec<_>>(),"placed":node.placed,"suspended":node.suspended}))
         }).collect::<Result<Vec<_>,glory_render::Error>>()?;
         serde_json::to_string(&nodes)?
     };

@@ -3,9 +3,9 @@ use std::rc::Rc;
 
 use glory_core::{Cage, Lotus};
 use glory_render::{
-    ButtonProps, Change, CheckProps, Descriptor, Event, EventKind, FocusMode, ImageProps,
-    InputProps, ItemPosition, LinkProps, NodeId, Patch, Props, Purpose, RichTextProps, Role,
-    TextKind, TextProps,
+    ButtonProps, Change, CheckProps, Descriptor, Disclosure, Event, EventKind, FocusMode,
+    ImageProps, InputProps, ItemPosition, LinkProps, NodeId, Patch, Props, Purpose, RichTextProps,
+    Role, TextKind, TextProps,
 };
 use glory_style::{Display, FlexDirection, Style};
 
@@ -25,6 +25,7 @@ enum Slot {
     Kind,
     Selectable,
     Label,
+    Disclosure,
     Enabled,
     Value,
     RichValue,
@@ -289,6 +290,14 @@ macro_rules! label {
     )+};
 }
 label!(Button, Check, Link);
+impl Button {
+    pub fn disclosure(mut self, value: impl Into<Lotus<Option<Disclosure>>>) -> Self {
+        self.inner.set(Slot::Disclosure, value, |value| {
+            Patch::Disclosure(Change::Set(value))
+        });
+        self
+    }
+}
 macro_rules! enabled {
     ($($name:ident),+) => {$ (
         impl $name { pub fn enabled(mut self, value: impl Into<Lotus<bool>>) -> Self { self.inner.set(Slot::Enabled, value, |value| Patch::Enabled(Change::Set(value))); self } }

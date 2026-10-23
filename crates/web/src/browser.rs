@@ -36,10 +36,13 @@ pub struct Renderer {
     _events: events::Listeners,
 }
 impl Renderer {
-    fn new(runtime: RuntimeId, dom: Rc<Dom>) -> Self {
+    fn new(runtime: RuntimeId, dom: Rc<Dom>, document_id: u64) -> Self {
         let events = events::Listeners::new(dom.clone());
         Self {
-            mapper: Rc::new(RefCell::new(Mapper::new(runtime))),
+            mapper: Rc::new(RefCell::new(Mapper::new_in(
+                runtime,
+                glory_html::Namespace::Browser(document_id),
+            ))),
             dom,
             receipt: Receipt::default(),
             _events: events,
@@ -231,10 +234,11 @@ pub fn launch_with<W: Widget>(
         .default_view()
         .ok_or(Error::Unsupported("document has no window"))?;
     base_style(&document)?;
+    let document_id = reserve_document_id(&document)?;
     let frame = Frame::new(window);
     let dom = Dom::new(document, root, frame.clone());
     let app = Rc::new(App::with_host(frame.clone(), |runtime| {
-        Renderer::new(runtime, dom)
+        Renderer::new(runtime, dom, document_id)
     }));
     frame.attach(&app);
     let guard = WebApp { app, frame };
@@ -260,4 +264,28 @@ fn base_style(document: &web_sys::Document) -> Result<(), Error> {
             .map_err(backend)?;
     }
     Ok(())
+}
+
+// Shared across independent WASM modules in this document. RuntimeId alone is
+// process/module-local and must not create duplicate HTML IDs across bundles.
+fn reserve_document_id(document: &web_sys::Document) -> Result<u64, Error> {
+    let key = js_sys::Symbol::for_("glory.document.identity");
+    let previous = js_sys::Reflect::get(document, &key).map_err(backend)?;
+    let previous = if previous.is_undefined() {
+        0
+    } else {
+        previous
+            .as_string()
+            .and_then(|value| value.parse::<u64>().ok())
+            .ok_or(Error::InvalidProps("invalid document identity counter"))?
+    };
+    let next = previous
+        .checked_add(1)
+        .ok_or(Error::InvalidProps("document identity exhausted"))?;
+    if !js_sys::Reflect::set(document, &key, &JsValue::from_str(&next.to_string()))
+        .map_err(backend)?
+    {
+        return Err(Error::InvalidProps("document identity is read-only"));
+    }
+    Ok(next)
 }
