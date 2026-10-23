@@ -441,6 +441,8 @@ pub enum Patch {
     },
     Purpose(Change<Purpose>),
     Multiline(Change<bool>),
+    /// An explicit Set/Clear also synchronizes the host control property when
+    /// the semantic value is equal (for example a rejected native toggle).
     Checked(Change<bool>),
     Source(Change<String>),
     Alternative(Change<Option<String>>),

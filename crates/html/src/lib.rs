@@ -385,7 +385,7 @@ pub fn preflight_place(
 }
 
 #[cfg(test)]
-fn difference(old: &Shape, new: &Shape) -> Result<Vec<Edit>, Error> {
+fn difference(old: &Shape, new: &Shape, checked_write: bool) -> Result<Vec<Edit>, Error> {
     if old.pieces.len() != new.pieces.len()
         || old.control != new.control
         || old.edit != new.edit
@@ -446,7 +446,10 @@ fn difference(old: &Shape, new: &Shape) -> Result<Vec<Edit>, Error> {
                     }
                 }
                 for (name, value) in properties {
-                    if old_props.get(name) != Some(value) || revision && *name == "value" {
+                    if old_props.get(name) != Some(value)
+                        || revision && *name == "value"
+                        || checked_write && *name == "checked"
+                    {
                         edits.push(Edit::Property {
                             part: new.part,
                             name,

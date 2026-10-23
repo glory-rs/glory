@@ -1,15 +1,19 @@
 //! Reference semantics for adapters. This interpreter performs no layout/paint.
-//! It stores only live objects and at most one tombstone per allocated slot.
+//! It stores live objects and one generation watermark per allocated slot.
+//! Child sequences separately bound their unread numeric prefixes.
 
 use std::collections::HashMap;
 
 use crate::*;
 
+mod children;
+pub use children::Children;
+
 #[derive(Clone, Debug)]
 pub struct Node {
     pub descriptor: Descriptor,
     pub parent: Option<NodeId>,
-    pub children: Vec<NodeId>,
+    pub children: Children,
     pub placed: bool,
     pub suspended: bool,
     // Logical adjacency, including suspended siblings. No historical identities.
@@ -39,7 +43,7 @@ pub struct Memory {
     runtime: RuntimeId,
     nodes: HashMap<NodeId, Node>,
     generations: HashMap<u32, (u32, bool)>,
-    roots: Vec<NodeId>,
+    roots: Children,
     inputs: Vec<Input>,
     receipt: Receipt,
     stats: Stats,
@@ -95,7 +99,7 @@ impl Memory {
             runtime,
             nodes: HashMap::new(),
             generations: HashMap::new(),
-            roots: Vec::new(),
+            roots: Children::default(),
             inputs: Vec::new(),
             receipt: Receipt::default(),
             stats: Stats::default(),
@@ -277,6 +281,7 @@ impl Memory {
         if !node.placed {
             return;
         }
+        let next = node.next;
         let siblings = if let Some(parent) = node.parent {
             &mut self
                 .nodes
@@ -286,7 +291,9 @@ impl Memory {
         } else {
             &mut self.roots
         };
-        let index = if siblings.last() == Some(&id) {
+        let index = if siblings.first() == Some(&id) {
+            0
+        } else if siblings.last() == Some(&id) {
             siblings.len() - 1
         } else {
             siblings
@@ -300,7 +307,7 @@ impl Memory {
             self.nodes
                 .get_mut(&previous)
                 .expect("previous sibling")
-                .next = self.nodes[&id].next;
+                .next = next;
         }
     }
 
@@ -422,6 +429,9 @@ impl Memory {
         };
         let index = before
             .map(|before| {
+                if siblings.first() == Some(&before) {
+                    return 0;
+                }
                 siblings
                     .iter()
                     .position(|child| *child == before)
@@ -469,7 +479,7 @@ impl Memory {
                     Node {
                         descriptor,
                         parent: None,
-                        children: Vec::new(),
+                        children: Children::default(),
                         placed: false,
                         suspended: false,
                         next: None,

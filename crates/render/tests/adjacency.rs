@@ -90,3 +90,57 @@ fn adjacency_survives_moves_suspension_rejection_removal_and_identity_reuse() {
     check(&tree, None);
     assert_eq!(tree.next_sibling(replacement).unwrap(), Some(nodes[0]));
 }
+
+#[test]
+fn front_retirement_compaction_preserves_live_order_and_rejects_retired_generations() {
+    let runtime = RuntimeId::new();
+    let mut ids = NodeIds::new(runtime);
+    let mut tree = Memory::new(runtime);
+    let parent = ids.allocate();
+    let children: Vec<_> = (0..1_024).map(|_| ids.allocate()).collect();
+    for id in std::iter::once(&parent).chain(&children) {
+        tree.apply(&[
+            Mutation::Create {
+                id: *id,
+                node: Box::new(Descriptor::new(Props::View)),
+            },
+            Mutation::Place {
+                id: *id,
+                parent: (*id != parent).then_some(parent),
+                before: None,
+            },
+        ])
+        .unwrap();
+    }
+    for (index, id) in children.iter().take(800).enumerate() {
+        tree.apply(&[Mutation::Dispose { id: *id }]).unwrap();
+        ids.release(*id);
+        assert_eq!(tree.node(parent).unwrap().children, children[index + 1..]);
+        if index % 64 == 0 {
+            check(&tree, Some(parent));
+        }
+    }
+    let snapshot = tree.node(parent).unwrap().children.clone();
+    let fresh = ids.allocate();
+    tree.apply(&[
+        Mutation::Create {
+            id: fresh,
+            node: Box::new(Descriptor::new(Props::View)),
+        },
+        Mutation::Place {
+            id: fresh,
+            parent: Some(parent),
+            before: snapshot.first().copied(),
+        },
+    ])
+    .unwrap();
+    assert_eq!(snapshot, children[800..]);
+    for id in children.iter().take(800) {
+        assert!(tree.apply(&[Mutation::Dispose { id: *id }]).is_err());
+    }
+    assert_eq!(tree.node(parent).unwrap().children[0], fresh);
+    check(&tree, Some(parent));
+    tree.apply(&[Mutation::Dispose { id: parent }]).unwrap();
+    assert!(tree.is_empty());
+    assert!(tree.roots().is_empty());
+}

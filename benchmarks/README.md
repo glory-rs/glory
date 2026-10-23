@@ -1,5 +1,11 @@
 # Glory / Leptos / Dioxus: current semantic browser benchmark
 
+The latest [Scope/unlink follow-up](../docs/performance.md#scope-cleanup-and-sibling-unlink--2026-10-23)
+compares independent builds under the same P-core affinity: 432 primary samples,
+with 1,296 earlier default-scheduling samples retained separately. Clear-1k script
+median improves 27.5%; replacement improves only 1.6%. See the report for variance,
+node/pixel checks and full regression.
+
 The [Owner/Binding retirement follow-up](../docs/performance.md#owner-and-binding-retirement-follow-up--2026-10-23)
 records the next 432-sample paired run, identity/pixel checks and full regression.
 Clear-1k script median improves 6.7%; replacement has no demonstrated gain.

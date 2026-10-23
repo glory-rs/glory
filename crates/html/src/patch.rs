@@ -262,12 +262,15 @@ pub(crate) fn lower(next: &Descriptor, inverse: &Patch) -> Vec<Edit> {
                     old.then_some(""),
                     value.checked.then_some(""),
                 );
-                edits.push(Edit::Property {
-                    part: control,
-                    name: "checked",
-                    value: Property::Bool(value.checked),
-                });
             }
+            // Native interaction can diverge from the committed model. An
+            // explicit write must restore the control even when the semantic
+            // value is unchanged; Keep returned above without touching it.
+            edits.push(Edit::Property {
+                part: control,
+                name: "checked",
+                value: Property::Bool(value.checked),
+            });
         }
         Patch::Value { value, revision } => {
             let old = old!(value);

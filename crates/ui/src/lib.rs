@@ -4,6 +4,7 @@
 mod app;
 mod builders;
 mod control;
+mod input;
 pub mod list;
 pub use app::{App, Error, Mounted, Result, Scope, Settle, UiStats, WeakScope, Widget};
 pub use builders::*;

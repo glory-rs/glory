@@ -51,3 +51,58 @@ fn filled_content_keeps_component_owners_and_moves_only_the_container_root() {
     app.flush().unwrap();
     assert_eq!(app.stats().nodes, 0);
 }
+
+#[test]
+fn subtree_cleanup_unlinks_local_and_foreign_listener_owners_before_dropping_captures() {
+    use glory_render::{Descriptor, EventKind};
+
+    struct Capture(std::rc::Weak<App>, Rc<RefCell<Vec<usize>>>, usize);
+    impl Drop for Capture {
+        fn drop(&mut self) {
+            let app = self.0.upgrade().unwrap();
+            // Neither the presentation nor graph borrow survives into user Drop.
+            assert_eq!(app.stats().nodes, 1);
+            app.runtime_stats();
+            self.1.borrow_mut().push(self.2);
+        }
+    }
+    let app = Rc::new(App::memory());
+    let parent = app.scope().child().unwrap();
+    let root = parent.create(Descriptor::new(Props::View)).unwrap();
+    let inner = parent.child_in(root).unwrap();
+    let a = inner
+        .create(Descriptor::new(Props::Button(Default::default())))
+        .unwrap();
+    let b = inner
+        .create(Descriptor::new(Props::Button(Default::default())))
+        .unwrap();
+    let foreign = app.scope().child().unwrap();
+    let outside = foreign
+        .create(Descriptor::new(Props::Button(Default::default())))
+        .unwrap();
+    let dropped = Rc::new(RefCell::new(Vec::new()));
+    for (owner, node, index) in [(&inner, b, 1), (&foreign, a, 2), (&parent, outside, 3)] {
+        let capture = Capture(Rc::downgrade(&app), dropped.clone(), index);
+        owner
+            .on(node, EventKind::Activate, move |_| {
+                std::hint::black_box(&capture);
+            })
+            .unwrap();
+    }
+    app.flush().unwrap();
+    parent.dispose();
+    app.flush().unwrap();
+    let mut actual = dropped.borrow().clone();
+    actual.sort();
+    assert_eq!(actual, [1, 2, 3]);
+    assert_eq!(
+        (app.stats().nodes, app.stats().owners, app.stats().handlers),
+        (1, 1, 0)
+    );
+    assert!(foreign.is_alive());
+    assert_eq!(app.tree().roots(), [outside]);
+    assert!(
+        !app.dispatch(outside, glory_render::Event::Activate)
+            .unwrap()
+    );
+}

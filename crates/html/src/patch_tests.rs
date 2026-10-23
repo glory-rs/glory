@@ -233,9 +233,13 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
             };
         }
         for update in &patches {
-            let expected = base
-                .patched(update.clone())
-                .and_then(|next| difference(&shape(&base)?, &shape(&next)?));
+            let expected = base.patched(update.clone()).and_then(|next| {
+                difference(
+                    &shape(&base)?,
+                    &shape(&next)?,
+                    matches!(update, Patch::Checked(Change::Set(_) | Change::Clear)),
+                )
+            });
             let runtime = RuntimeId::new();
             let id = NodeIds::new(runtime).allocate();
             let mut mapper = Mapper::new(runtime);

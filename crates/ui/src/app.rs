@@ -296,32 +296,55 @@ impl Session {
                     }
                     id = parent;
                 }
-                let mut all = Vec::new();
                 let mut pending = vec![id];
-                while let Some(id) = pending.pop() {
-                    if let Ok(node) = present.tree.node(id) {
-                        pending.extend(node.children.iter().copied());
-                        all.push(id);
-                    }
-                }
-                for child in all {
+                while let Some(child) = pending.pop() {
+                    pending.extend(
+                        present
+                            .tree
+                            .node(child)
+                            .expect("owned subtree")
+                            .children
+                            .iter()
+                            .copied(),
+                    );
                     present.ids.release(child);
-                    if let Some(owner) = present.node_owners.remove(&child)
-                        && let Some(owned) = present.owners.get_mut(&owner)
+                    let node_owner = present.node_owners.remove(&child);
+                    let handlers = present.handlers.remove(&child);
+                    // This callback already extracted its entire Owned record.
+                    // Avoid entry() on that missing key: a vacant std entry
+                    // reserves insertion capacity even though cleanup won't insert.
+                    if let Some(node_owner) = node_owner
+                        && node_owner != owner
+                        && let std::collections::hash_map::Entry::Occupied(mut entry) =
+                            present.owners.entry(node_owner)
                     {
+                        let owned = entry.get_mut();
                         owned.nodes.remove(&child);
                         let empty_nodes = owned.nodes.is_empty();
+                        // Node-local listeners usually have the same Owner.
+                        // Remove their interests with the node in one lookup.
+                        if let Some(handlers) = &handlers {
+                            for (kind, subscription) in handlers {
+                                if subscription.owner == node_owner {
+                                    owned.subscriptions.remove(&(child, *kind));
+                                }
+                            }
+                        }
                         if owned.is_empty() {
-                            present.owners.remove(&owner);
+                            entry.remove();
                         }
                         present.node_owner_count -= usize::from(empty_nodes);
                     }
-                    if let Some(handlers) = present.handlers.remove(&child) {
+                    if let Some(handlers) = handlers {
                         for (kind, subscription) in handlers {
-                            if let Some(owned) = present.owners.get_mut(&subscription.owner) {
+                            if Some(subscription.owner) != node_owner
+                                && let std::collections::hash_map::Entry::Occupied(mut entry) =
+                                    present.owners.entry(subscription.owner)
+                            {
+                                let owned = entry.get_mut();
                                 owned.subscriptions.remove(&(child, kind));
                                 if owned.is_empty() {
-                                    present.owners.remove(&subscription.owner);
+                                    entry.remove();
                                 }
                             }
                             discarded.push(subscription.callback);

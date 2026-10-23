@@ -775,7 +775,7 @@ fn root(app: &App) -> NodeId {
 fn rows(app: &App) -> Vec<NodeId> {
     let tree = app.tree();
     let body = tree.node(root(app)).unwrap().children[0];
-    tree.node(body).unwrap().children.clone()
+    tree.node(body).unwrap().children.to_vec()
 }
 fn row_index(app: &App, id: NodeId) -> usize {
     let tree = app.tree();

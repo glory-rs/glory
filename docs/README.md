@@ -15,6 +15,8 @@ Start here when evaluating or extending Glory:
   explicit remaining R0 work.
 - [Current browser framework comparison](performance.md): semantic Glory/Leptos/Dioxus
   full-row workloads, independent builds, actual results and explicit historical boundaries.
+- [Scope cleanup and sibling unlink](performance.md#scope-cleanup-and-sibling-unlink--2026-10-23):
+  bounded front retirement, fused indices, controlled paired results and full regression.
 - [Owner/Binding retirement follow-up](performance.md#owner-and-binding-retirement-follow-up--2026-10-23):
   unified live Owner interests, paired timings, remaining costs and complete regression.
 - [DOM retirement follow-up](performance.md#dom-retirement-follow-up--2026-10-23):
