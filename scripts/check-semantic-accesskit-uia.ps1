@@ -1,7 +1,10 @@
-param([int]$TestProcessId, [string]$FirstTitle, [string]$SecondTitle, [string]$Report)
+﻿param([int]$TestProcessId, [string]$FirstTitle, [string]$SecondTitle, [string]$Report)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
+$taskScriptRoot = $PSScriptRoot
+if ($taskScriptRoot.StartsWith('\\?\')) { $taskScriptRoot = $taskScriptRoot.Substring(4) }
+Add-Type -IgnoreWarnings -Path ([IO.Path]::Combine($taskScriptRoot, 'semantic-uia-relations.cs'))
 function Wait-For([scriptblock]$Read) {
     $taskDeadline = [DateTime]::UtcNow.AddSeconds(12)
     do {
@@ -104,7 +107,35 @@ try {
     Assert ($taskRowValue.Current.Value -eq $taskDraft) 'ScrollIntoView reset the editor draft'
     Assert $taskRowEditor.Current.HasKeyboardFocus 'ScrollIntoView moved keyboard focus'
     Assert (($taskRow.GetRuntimeId() -join ',') -eq $taskRowIdentity) 'ScrollIntoView replaced the row identity'
-    $taskResult = [ordered]@{ok=$true;processId=$TestProcessId;windows=2;counter=1;isolated=$true;toggle='On';value=$taskText;focused=$true;disabledRefused=$taskRefused;passwordProtected=$true;listItems=$taskItems.Count;farIndex=$taskFarIndex;rowReveal=$true;rowIdentity=$true;rowFocus=$true;rowDraft=$true;bounds=@{width=$taskBounds.Width;height=$taskBounds.Height};runtime=[Environment]::Version.ToString()}
+    $taskStage = 'disclosure system properties and actions'
+    $taskDisclosure = Wait-For { Find-Name $taskFirst 'Disclosure control' }
+    $taskDisclosureTarget = Wait-For { Find-Name $taskFirst 'Disclosure target' }
+    $taskDisclosureIdentity = $taskDisclosure.GetRuntimeId() -join ','
+    $taskTargetIdentity = $taskDisclosureTarget.GetRuntimeId() -join ','
+    $taskRelations = [GloryUiaRelations]::ControlledRuntimeIds($taskFirst.Current.NativeWindowHandle, 'Disclosure control')
+    Assert ($taskRelations.Length -eq 1 -and $taskRelations[0] -eq $taskTargetIdentity) 'ControllerFor does not reference the actual drawer UIA element'
+    $taskExpand = $taskDisclosure.GetCurrentPattern([System.Windows.Automation.ExpandCollapsePattern]::Pattern)
+    Assert ($taskExpand.Current.ExpandCollapseState -eq [System.Windows.Automation.ExpandCollapseState]::Collapsed) 'Disclosure did not start collapsed'
+    $taskExpand.Expand()
+    $null = Wait-For { $taskExpand.Current.ExpandCollapseState -eq [System.Windows.Automation.ExpandCollapseState]::Expanded }
+    $null = Wait-For { Find-Name $taskFirst 'Disclosure activations 1' }
+    # AccessKit Windows rejects an already-satisfied Expand at its provider boundary.
+    # Either a no-op or this explicit UIA InvalidOperation is acceptable; no second activation is.
+    $taskDuplicateExpandRefused = $false
+    try { $taskExpand.Expand() } catch [System.InvalidOperationException] { $taskDuplicateExpandRefused = $true }
+    $taskExpand.Collapse()
+    $null = Wait-For { $taskExpand.Current.ExpandCollapseState -eq [System.Windows.Automation.ExpandCollapseState]::Collapsed }
+    $null = Wait-For { Find-Name $taskFirst 'Disclosure activations 2' }
+    $taskDuplicateCollapseRefused = $false
+    try { $taskExpand.Collapse() } catch [System.InvalidOperationException] { $taskDuplicateCollapseRefused = $true }
+    Assert (($taskDisclosure.GetRuntimeId() -join ',') -eq $taskDisclosureIdentity) 'Disclosure actions replaced the control'
+    Assert ($null -ne (Find-Name $taskSecond 'Disclosure activations 0')) 'Disclosure action crossed window boundaries'
+    (Find-Name $taskFirst 'Retire disclosure target').GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+    $null = Wait-For { $null -eq (Find-Name $taskFirst 'Disclosure target') }
+    $null = Wait-For { ([GloryUiaRelations]::ControlledRuntimeIds($taskFirst.Current.NativeWindowHandle, 'Disclosure control')).Length -eq 0 }
+    $null = Wait-For { -not $taskDisclosure.GetCurrentPropertyValue([System.Windows.Automation.AutomationElement]::IsExpandCollapsePatternAvailableProperty) }
+    Assert ($null -ne (Find-Name $taskFirst 'Disclosure activations 2')) 'Duplicate state requests triggered another business activation'
+    $taskResult = [ordered]@{ok=$true;disclosure=@{expanded=$true;collapsed=$true;controllerFor=$taskTargetIdentity;identity=$taskDisclosureIdentity;retiredRelation=$true;activations=2;duplicateExpandRefused=$taskDuplicateExpandRefused;duplicateCollapseRefused=$taskDuplicateCollapseRefused};processId=$TestProcessId;windows=2;counter=1;isolated=$true;toggle='On';value=$taskText;focused=$true;disabledRefused=$taskRefused;passwordProtected=$true;listItems=$taskItems.Count;farIndex=$taskFarIndex;rowReveal=$true;rowIdentity=$true;rowFocus=$true;rowDraft=$true;bounds=@{width=$taskBounds.Width;height=$taskBounds.Height};runtime=[Environment]::Version.ToString()}
     $taskResult | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $Report -Encoding UTF8
     exit 0
 } catch {
@@ -123,3 +154,4 @@ try {
     $taskFailure | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $Report -Encoding UTF8
     exit 1
 }
+

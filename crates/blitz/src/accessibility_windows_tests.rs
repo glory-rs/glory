@@ -1,5 +1,6 @@
 //! The client runs in a separate process; the event loop keeps servicing UIA.
 use super::*;
+use glory_ui::when;
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use winit::application::ApplicationHandler;
@@ -38,10 +39,39 @@ fn real_accesskit_windows_ui_automation() {
         let checked = app.app.scope().cage(false);
         let position = app.app.scope().cage(0.0);
         let seek = app.app.scope().cage(false);
+        let expanded = app.app.scope().cage(false);
+        let activations = app.app.scope().cage(0u32);
+        let target = app.app.scope().cage(None);
+        let present = app.app.scope().cage(true);
+        let disclosure = app.app.scope().bond(move || {
+            target.get().map(|controls| glory_render::Disclosure {
+                expanded: expanded.get(),
+                controls,
+            })
+        });
         let source_reads = Rc::new(Cell::new(0));
         let observed = source_reads.clone();
         app.mount(
             view().name("Controls").fill((
+                group().fill((
+                    button()
+                        .label("Disclosure control")
+                        .disclosure(disclosure)
+                        .on(EventKind::Activate, move |_| {
+                            expanded.revise(|v| *v = !*v);
+                            activations.revise(|n| *n += 1);
+                        }),
+                    text().content(activations.map(|n| format!("Disclosure activations {n}"))),
+                    when(present, move || {
+                        view()
+                            .name("Disclosure target")
+                            .node_ref(target)
+                            .fill(text().content("Drawer contents"))
+                    }),
+                    button()
+                        .label("Retire disclosure target")
+                        .on(EventKind::Activate, move |_| present.revise(|v| *v = false)),
+                )),
                 button()
                     .label("Increment")
                     .on(EventKind::Activate, move |_| count.revise(|n| *n += 1)),
@@ -118,7 +148,7 @@ fn real_accesskit_windows_ui_automation() {
             app,
             WindowAttributes::default()
                 .with_title(title)
-                .with_surface_size(winit::dpi::PhysicalSize::new(480, 460)),
+                .with_surface_size(winit::dpi::PhysicalSize::new(480, 660)),
         );
     }
     let report = std::path::PathBuf::from(format!(
@@ -134,6 +164,7 @@ fn real_accesskit_windows_ui_automation() {
     let pid = std::process::id();
     let helper = std::thread::spawn(move || {
         use std::os::windows::process::CommandExt;
+        let diagnostics = std::fs::File::create(report.with_extension("client.log")).unwrap();
         let mut child = Command::new("powershell.exe")
             .args([
                 "-NoProfile",
@@ -152,8 +183,8 @@ fn real_accesskit_windows_ui_automation() {
             .arg("-Report")
             .arg(report)
             .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
+            .stdout(diagnostics.try_clone().unwrap())
+            .stderr(diagnostics)
             .creation_flags(0x08000000)
             .spawn()
             .unwrap();
@@ -220,6 +251,6 @@ fn real_accesskit_windows_ui_automation() {
     assert!(renderers.iter().all(|r| r.stats().nodes == 0));
     assert!(reads.iter().all(|r| r.get() < 100));
     eprintln!(
-        "Native UIA: two isolated windows, Invoke/Toggle/SetValue/Focus/password/list bounds, distant row reveal and owner cleanup passed"
+        "Native UIA: two isolated windows, Invoke/Toggle/SetValue/Focus/password/list bounds, distant row reveal, Disclosure Expanded/ControllerFor/actions/retirement and owner cleanup passed"
     );
 }

@@ -43,9 +43,19 @@ closed drawers mounted and hide them using style, as in the application.
 
 Blitz lowers the same HTML edits. AccessKit exposes expanded/collapsed state and
 controls referring only to targets present in its live visible tree. Hidden
-endpoints do not introduce dangling AX IDs. The existing Activate/Click path is
-unchanged. This does **not** add or advertise Expand/Collapse actions, or claim
-screen-reader announcement or UIA client acceptance for this new relation.
+endpoints do not introduce dangling AX IDs. Enabled, visible disclosure buttons
+advertise Expand when collapsed and Collapse when expanded. Foreign callbacks
+still only enqueue; the UI loop validates window/runtime, live identity,
+visibility and enabled state, then compares the current committed expanded state.
+Only a requested state change uses the existing Activate path once. The platform
+polls the app before and after every request; duplicate requests cannot toggle
+back. Applications remain responsible for updating controlled state in Activate.
+
+The Windows UIA provider exposes ExpandCollapsePattern from expanded state and
+suppresses InvokePattern on that control. Its already-satisfied Expand/Collapse
+calls return InvalidOperation; the Glory action bridge itself treats duplicates
+as no-ops. Actual OS-client acceptance covers state, ControllerFor, actions,
+identity and retirement. Screen-reader announcements remain unverified.
 
 ## Verification
 
@@ -55,9 +65,16 @@ screen-reader announcement or UIA client acceptance for this new relation.
 - HTML: field-only lowering against the full-shape differential oracle,
   canonicalization and clearing surviving references before target removal.
 - SSR: snapshots and independent stream preflight/real relation serialization.
-- Blitz: native WindowApp → AccessKit consumer; real Activate changes expanded,
-  controls points to the actual target, retirement removes state/relationship,
-  Expand/Collapse are not advertised. The existing accessibility suite also runs.
+- Blitz: native WindowApp → AccessKit consumer; state-directed Expand/Collapse,
+  duplicate requests, disabled/retired rejection and exact controls identity.
+- Windows: the ignored `real_accesskit_windows_ui_automation` test opens two
+  dedicated windows and runs a separate real .NET/COM UIA client. It checks
+  Expanded/Collapsed, ControllerFor against the drawer's OS RuntimeId, exactly
+  two activations across Expand/duplicate/Collapse/duplicate, window isolation,
+  and removal of both ControllerFor and ExpandCollapsePattern after retirement.
+  Original Invoke/Toggle/SetValue/focus/password/virtual-row tests remain intact.
+  `scripts/semantic-uia-relations.cs` only supplies public COM interface prefixes
+  because the .NET Framework UIA wrapper predates ControllerFor.
 - `scripts/test-disclosure-browser.cjs`: real Edge CSR, SSR, classic stream and
   hydration using `examples/semantic-web` compiled WASM; preserves typed draft,
   UTF-16 selection and element identity; multiple apps and an independent WASM

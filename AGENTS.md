@@ -750,5 +750,11 @@ indices; target disposal clears surviving relations without scanning unrelated
 nodes. HTML v5 reserves automatic View IDs; stream key reordering never changes
 identity. Hydration validates the complete real relationship before rebasing
 server IDs to client identities. Browser document tokens are shared across WASM
-modules. No arbitrary attrs or Expand/Collapse AT action promise; AccessKit
-controls includes only visible live endpoints. See docs/semantic-disclosure.md.
+modules. No arbitrary attrs. AccessKit controls includes only visible live
+endpoints. Native Expand/Collapse revalidates live enabled Disclosure state on the
+UI loop and uses Activate only when the requested state differs; poll before and
+after each request so duplicates never blindly toggle. The Windows provider may
+reject already-satisfied operations; this must not trigger another activation.
+Actual Windows UIA verifies ControllerFor identity, state transitions and target
+retirement; screen-reader announcements remain unverified.
+See docs/semantic-disclosure.md.

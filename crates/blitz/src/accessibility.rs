@@ -248,6 +248,13 @@ impl Tree {
                 }
                 if clickable(state, id) {
                     node.add_action(AxAction::Click);
+                    if let Some(disclosure) = d.disclosure() {
+                        node.add_action(if disclosure.expanded {
+                            AxAction::Collapse
+                        } else {
+                            AxAction::Expand
+                        });
+                    }
                 }
                 if matches!(d.props, Props::Input(_)) {
                     node.add_action(AxAction::SetValue);
@@ -295,7 +302,7 @@ impl Tree {
             }
         }
         // Resolve only semantic relations whose two endpoints survived the
-        // normal visibility walk. No dangling AX IDs or new AT action promise.
+        // normal visibility walk. Never export dangling AX IDs.
         for (key, ax_id) in &self.ids {
             let Key::Main(id) = key else {
                 continue;
@@ -377,6 +384,19 @@ impl Tree {
             }
             (AxAction::Focus, None) => state.focus(id)?,
             (AxAction::Click, None) if clickable(state, id) => activate_control(state, id),
+            (AxAction::Expand | AxAction::Collapse, None) if clickable(state, id) => {
+                let Some(disclosure) = d.disclosure() else {
+                    return Ok(false);
+                };
+                let desired = request.action == AxAction::Expand;
+                // Platform callbacks only enqueue. Platform::event polls the
+                // application before and after each request, so this reads the
+                // latest committed controlled state, including earlier requests.
+                // A duplicate must never turn an idempotent request into toggle.
+                if disclosure.expanded != desired {
+                    activate_control(state, id);
+                }
+            }
             (AxAction::SetValue, Some(ActionData::Value(value)))
                 if matches!(d.props, Props::Input(_)) =>
             {

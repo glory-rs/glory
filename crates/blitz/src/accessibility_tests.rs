@@ -678,7 +678,7 @@ fn row_reveal_scrolls_native_ancestors_and_the_document_viewport_after_logical_l
     assert!(app.accessibility.borrow().pending_reveals.is_empty());
 }
 #[test]
-fn disclosure_expanded_and_controls_follow_live_semantic_targets_without_expand_actions() {
+fn disclosure_expanded_and_controls_follow_live_targets_and_idempotent_actions() {
     let app = WindowApp::new();
     let target = view()
         .name("Drawer")
@@ -687,8 +687,11 @@ fn disclosure_expanded_and_controls_follow_live_semantic_targets_without_expand_
         .unwrap();
     let target_id = target.roots()[0];
     let expanded = app.app.scope().cage(false);
+    let enabled = app.app.scope().cage(true);
+    let activations = app.app.scope().cage(0u32);
     let button = button()
         .label("Menu")
+        .enabled(enabled)
         .disclosure(expanded.map(move |expanded| {
             Some(glory_render::Disclosure {
                 expanded: *expanded,
@@ -696,7 +699,8 @@ fn disclosure_expanded_and_controls_follow_live_semantic_targets_without_expand_
             })
         }))
         .on(EventKind::Activate, move |_| {
-            expanded.revise(|value| *value = !*value)
+            expanded.revise(|value| *value = !*value);
+            activations.revise(|value| *value += 1);
         })
         .mount(app.app.scope())
         .unwrap();
@@ -713,10 +717,22 @@ fn disclosure_expanded_and_controls_follow_live_semantic_targets_without_expand_
         assert_eq!(node.data().is_expanded(), Some(false));
         assert_eq!(node.data().controls(), &[ax_target]);
         assert!(node.data().supports_action(AxAction::Click));
-        assert!(!node.data().supports_action(AxAction::Expand));
+        assert!(node.data().supports_action(AxAction::Expand));
         assert!(!node.data().supports_action(AxAction::Collapse));
     }
-    assert!(action(&app, &request(ax_button, AxAction::Click, None)).unwrap());
+    assert!(action(&app, &request(ax_button, AxAction::Expand, None)).unwrap());
+    app.app.pump().unwrap();
+    assert!(expanded.get());
+    assert!(action(&app, &request(ax_button, AxAction::Expand, None)).unwrap());
+    app.app.pump().unwrap();
+    assert!(expanded.get());
+    assert!(action(&app, &request(ax_button, AxAction::Collapse, None)).unwrap());
+    app.app.pump().unwrap();
+    assert!(!expanded.get());
+    assert!(action(&app, &request(ax_button, AxAction::Collapse, None)).unwrap());
+    app.app.pump().unwrap();
+    assert!(!expanded.get());
+    assert!(action(&app, &request(ax_button, AxAction::Expand, None)).unwrap());
     app.app.pump().unwrap();
     tree.update_and_process_changes(build(&app, false), &mut Changes);
     assert_eq!(
@@ -728,6 +744,15 @@ fn disclosure_expanded_and_controls_follow_live_semantic_targets_without_expand_
             .is_expanded(),
         Some(true)
     );
+    assert_eq!(activations.get(), 3);
+    enabled.revise(|value| *value = false);
+    app.app.flush().unwrap();
+    assert!(!action(&app, &request(ax_button, AxAction::Collapse, None)).unwrap());
+    app.app.pump().unwrap();
+    assert!(expanded.get());
+    assert_eq!(activations.get(), 3);
+    enabled.revise(|value| *value = true);
+    app.app.flush().unwrap();
     drop(target);
     app.app.flush().unwrap();
     tree.update_and_process_changes(build(&app, false), &mut Changes);
@@ -738,4 +763,9 @@ fn disclosure_expanded_and_controls_follow_live_semantic_targets_without_expand_
         .unwrap();
     assert_eq!(node.data().is_expanded(), None);
     assert!(node.data().controls().is_empty());
+    assert!(!action(&app, &request(ax_button, AxAction::Collapse, None)).unwrap());
+    assert_eq!(activations.get(), 3);
+    drop(button);
+    app.app.flush().unwrap();
+    assert!(!action(&app, &request(ax_button, AxAction::Expand, None)).unwrap());
 }
