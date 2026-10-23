@@ -2,6 +2,26 @@
 
 Start here when evaluating or extending Glory:
 
+- [Semantic UI architecture report](semantic-ui-rendering-architecture-report-2026-10-21.md):
+  breaking rewrite decisions, short component names, crate boundaries, CSS/Blitz/Taffy,
+  toolkit tradeoffs, concrete platform/crate organization and implementation priorities.
+  Start with §0 for the adopted names and decisions; §13.4 defines legacy retirement.
+- [Semantic UI implementation evidence](semantic-ui-implementation.md):
+  delivered behavior, reproducible checks and remaining release requirements.
+- [Windowed-list baseline](semantic-ui-list-baseline-2026-10-21.md):
+  bounded large-list behavior and the scope of browser/native evidence.
+- [Semantic component contract audit](semantic-ui-contract.md):
+  eight-component content, event/query/action targets, adapter conformance and
+  explicit remaining R0 work.
+- [Engine forks](engine-forks.md): immutable glory-rs Blitz/Taffy Git dependencies,
+  source provenance, fork tests and the prohibition on vendoring.
+
+The documents above describe the active rewrite. The guides below retain
+material from the previous architecture; check the implementation evidence before
+using their API or platform-support claims.
+
+- [Project completion and improvement report](project-improvement-report-2026-10-13.md):
+  assessment dated 2026-10-13, verified gaps, priorities, and release criteria.
 - [API guide](api-guide.md): builder API, reactivity, widgets, SSR, server
   functions, styling, and runnable example commands.
 - [Fullstack notes](fullstack.md): server functions, request context, server

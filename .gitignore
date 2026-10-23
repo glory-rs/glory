@@ -5,6 +5,8 @@ debug.log
 *.log
 /**/dist
 **/Cargo.lock
+!/Cargo.lock
+!/examples/semantic-web/Cargo.lock
 
 **/node_modules
 **/package-lock.json

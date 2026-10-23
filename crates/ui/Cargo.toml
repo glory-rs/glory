@@ -1,0 +1,23 @@
+[package]
+name = "glory-ui"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Pure Rust semantic components and windowed lists for Glory"
+
+[dependencies]
+glory-core = { path = "../core", version = "0.3.1" }
+glory-render = { path = "../render", version = "0.3.1" }
+glory-style = { path = "../style", version = "0.3.1" }
+
+[[bench]]
+name = "virtual_list"
+harness = false
+
+[[bench]]
+name = "semantic_frames"
+harness = false
+
+[lints]
+workspace = true

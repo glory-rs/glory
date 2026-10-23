@@ -1,0 +1,18 @@
+[package]
+name = "glory-html"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Shared semantic to HTML mapping for Glory rendering hosts"
+
+[features]
+default = []
+css = ["glory-style/css"]
+
+[dependencies]
+glory-render = { path = "../render", version = "0.3.1" }
+glory-style = { path = "../style", version = "0.3.1" }
+
+[lints]
+workspace = true

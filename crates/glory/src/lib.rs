@@ -1,140 +1,57 @@
-//! Glory — an experimental Rust web framework.
-//!
-//! This crate is the public front door. Components, signals, and the
-//! widget lifecycle live in [`glory_core`] (re-exported); the optional
-//! `glory_routing` is re-exported as `glory::routing` when the
-//! `routing` feature is enabled.
-//!
-//! See the crate-level rustdoc on [`glory_core`] for the architecture
-//! diagram and the type-by-type rundown.
-
-#[macro_use]
-mod cfg;
-
-pub use glory_core::asset;
-#[doc(no_inline)]
-pub use glory_core::*;
-#[doc(hidden)]
-pub use glory_macros::__asset_folder;
-#[doc(hidden)]
-pub use glory_macros::__css_module;
-/// The `#[derive(Store)]` macro: generate typed field-accessor stores that
-/// project a root [`Cage`](glory_core::reflow::Cage) into per-field
-/// [`CageLens`](glory_core::reflow::CageLens) handles. See the macro docs
-/// for the generated API and subscription-granularity notes.
-#[doc(no_inline)]
-pub use glory_macros::Store;
-
-#[macro_export]
-macro_rules! asset_folder {
-    ($path:literal) => {
-        $crate::__asset_folder!($crate, $path)
-    };
-}
-
-#[macro_export]
-macro_rules! css_module {
-    ($path:literal) => {
-        $crate::__css_module!($crate, $path)
-    };
-}
-
-cfg_feature! {
-    #![feature ="routing"]
-    /// The `#[derive(Routable)]` macro for enum-backed typed routes. The
-    /// generated impl targets [`glory::routing::Routable`].
-    #[doc(no_inline)]
-    pub use glory_macros::Routable;
-    #[doc(no_inline)]
-    pub use glory_routing as routing;
-}
-
-cfg_feature! {
-    #![feature = "server-fn"]
-    /// The `#[server]` attribute: write a function once, run its body on
-    /// the server, call it from any client transparently. App crates must
-    /// also depend on `glory-serverfn` directly (the macro expands to
-    /// `glory_serverfn::` paths).
-    #[doc(no_inline)]
-    pub use glory_macros::server;
-    #[doc(no_inline)]
-    pub use glory_serverfn as serverfn;
-}
-
-/// Mount a root widget into the browser body and return the running
-/// holder.
-///
-/// This is the convenience entry point that replaces the explicit
-/// `BrowserHolder::new().mount(widget)` boilerplate. Only available
-/// when building for `wasm32` with the `web-csr` feature.
-///
-/// ```ignore
-/// fn main() {
-///     glory::launch(MyApp::new());
-/// }
-/// ```
-///
-/// Use [`launch_with_host`] when you need to mount under a specific
-/// element instead of `<body>`.
-#[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
-pub fn launch<W>(widget: W) -> glory_core::web::holders::BrowserHolder
-where
-    W: glory_core::Widget,
-{
-    use glory_core::Holder;
-    glory_core::web::holders::BrowserHolder::new().mount(widget)
-}
-
-/// Mount a root widget under a specific host element.
-///
-/// Useful when the page is already partially rendered and the Glory
-/// app should live inside a particular `<div id="...">` rather than
-/// take over the whole `<body>`.
-///
-/// `host` is anything that `AsRef`s into the CSR `Node` (which is
-/// re-exported from `glory_core` as the WASM/`web-sys` element type).
-#[cfg(all(target_arch = "wasm32", feature = "web-csr"))]
-pub fn launch_with_host<W>(host: impl AsRef<glory_core::Node>, widget: W) -> glory_core::web::holders::BrowserHolder
-where
-    W: glory_core::Widget,
-{
-    use glory_core::Holder;
-    glory_core::web::holders::BrowserHolder::with_host_node(host).mount(widget)
-}
-
-/// Server-side launch is intentionally not a single function: the
-/// `ServerHolder` needs the request URL and renders into a per-request
-/// `Truck`, so it's constructed inside the HTTP handler rather than
-/// at app startup. With the `salvo` feature, use
-/// [`glory_core::web::holders::SalvoHandler`] (a ready-made
-/// `salvo::Handler`) and pass a factory closure that returns a freshly
-/// configured `ServerHolder` per request. Manual integrations follow
-/// the same pattern — see the `ssr-simple-salvo` and
-/// `hackernews-salvo` examples.
-#[cfg(all(not(target_arch = "wasm32"), feature = "web-ssr"))]
-pub mod ssr {
-    pub use glory_core::web::holders::ServerHolder;
-}
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn asset_folder_macro_enumerates_front_door_sources() {
-        let folder = crate::asset_folder!("src");
-
-        assert!(folder.len() >= 2);
-        assert!(folder.get("src/lib.rs").is_some());
-        assert!(folder.iter().all(|asset| asset.public_path().starts_with("/src/")));
+//! Glory's semantic Rust UI facade.
+#[cfg(all(feature = "blitz", not(target_arch = "wasm32")))]
+pub use glory_blitz as blitz;
+pub use glory_core as core;
+pub use glory_core::{Bond, Cage, Lotus, Owner, Resource, ResourceSeed, ResourceState, Runtime};
+pub use glory_render as render;
+#[cfg(feature = "resources")]
+pub use glory_resource as resources;
+#[cfg(feature = "ssr")]
+pub use glory_ssr as ssr;
+pub use glory_style as style;
+pub use glory_ui as ui;
+#[cfg(feature = "web")]
+pub use glory_web as web;
+#[cfg(feature = "html")]
+pub mod html {
+    pub use glory_html::*;
+    pub trait HtmlTextExt {
+        fn html_options(self, configure: impl FnOnce(HtmlTextOptions) -> HtmlTextOptions) -> Self;
     }
-
-    #[test]
-    fn css_module_macro_generates_typed_class_methods() {
-        let styles = crate::css_module!("src/test_styles.module.css");
-
-        assert!(styles.primary_button().starts_with("primary-button__gly_"));
-        assert!(styles.card().starts_with("card__gly_"));
-        assert!(styles.css().contains(styles.primary_button()));
-        assert!(styles.css().contains(styles.card()));
-        assert!(!styles.css().contains(".primary-button {"));
+    impl HtmlTextExt for glory_ui::Text {
+        fn html_options(self, configure: impl FnOnce(HtmlTextOptions) -> HtmlTextOptions) -> Self {
+            self.backend_options(configure(HtmlTextOptions::default()))
+        }
     }
+    pub trait HtmlLinkExt {
+        fn html_options(self, configure: impl FnOnce(HtmlEventOptions) -> HtmlEventOptions)
+        -> Self;
+    }
+    impl HtmlLinkExt for glory_ui::Link {
+        fn html_options(
+            self,
+            configure: impl FnOnce(HtmlEventOptions) -> HtmlEventOptions,
+        ) -> Self {
+            self.backend_options(configure(HtmlEventOptions::default()))
+        }
+    }
+}
+pub use glory_ui::{App, Scope, Widget};
+
+pub mod prelude {
+    pub use glory_core::{
+        Bond, Cage, Lotus, Owner, Resource, ResourceSeed, ResourceState, Runtime,
+    };
+    #[cfg(feature = "resources")]
+    pub use glory_resource::Resources;
+    pub use glory_style::{
+        Align, BorderStyle, Color, Display, Edges, Family, FlexDirection, Justify, Length, Limit,
+        Overflow, Position, Style, WhiteSpace,
+    };
+    pub use glory_ui::events::*;
+    pub use glory_ui::{
+        App, FocusMode, ItemPosition, Navigation, Purpose, Result, Role, Scope, TextKind, Widget,
+        button, check, col, component, each, group, image, input, link, list, row, text, view,
+        when,
+    };
 }

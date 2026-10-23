@@ -1,0 +1,17 @@
+[package]
+name = "glory-render"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Semantic rendering contracts and reference interpreter for Glory"
+
+[features]
+default = []
+conformance = []
+
+[dependencies]
+glory-style = { path = "../style", version = "0.3.1" }
+
+[lints]
+workspace = true

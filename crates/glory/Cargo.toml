@@ -1,56 +1,49 @@
 [package]
 name = "glory"
-version = { workspace = true }
-authors = { workspace = true }
-edition = { workspace = true }
-description = { workspace = true }
-homepage = { workspace = true }
-repository = { workspace = true }
-documentation = "https://docs.rs/glory/"
-readme = { workspace = true }
-keywords = { workspace = true }
-license = { workspace = true }
-categories = { workspace = true }
-
-[package.metadata.docs.rs]
-no-default-features = true
-features = ["web-ssr", "backend-command", "routing", "server-fn"]
-
-[badges]
-codecov = { repository = "glory-rs/glory", branch = "main", service = "github" }
-
-[lib]
-name = "glory"
-path = "src/lib.rs"
-
-[[test]]
-name = "routable_derive"
-path = "tests/routable_derive.rs"
-required-features = ["routing"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Pure Rust semantic UI with replaceable rendering hosts"
+autotests = false
 
 [features]
 default = []
-web-csr = ["glory-core/web-csr", "glory-routing?/web-csr"]
-web-ssr = ["glory-core/web-ssr", "glory-routing?/web-ssr"]
-# Command-stream extras for desktop / native / TUI hosts (CommandHolder,
-# EventData-typed listeners). Combines with web-ssr; not with web-csr on wasm.
-backend-command = ["glory-core/backend-command"]
-salvo = ["web-ssr", "glory-core/salvo", "routing", "glory-routing?/salvo"]
-routing = ["dep:glory-routing"]
-# `#[server]` functions. NOTE: the macro expands to `glory_serverfn::...`
-# paths, so app crates must also list `glory-serverfn` as a direct
-# dependency (same pattern as serde + serde_json).
-server-fn = ["dep:glory-serverfn"]
+css = ["glory-style/css", "glory-html?/css", "glory-ssr?/css", "glory-blitz?/css"]
+html = ["dep:glory-html"]
+web = ["html", "dep:glory-web"]
+ssr = ["html", "dep:glory-ssr"]
+hydrate = ["web", "glory-web/hydrate"]
+resources = ["dep:glory-resource", "glory-web?/resources", "glory-ssr?/resources"]
+stream = ["ssr", "resources", "glory-ssr/stream", "glory-web?/stream"]
+blitz = ["html", "dep:glory-blitz"]
+blitz-assets = ["blitz", "glory-blitz/assets"]
+blitz-paint = ["blitz", "glory-blitz/paint"]
+blitz-raster = ["blitz-paint", "glory-blitz/raster"]
+blitz-shell = ["blitz-paint", "glory-blitz/shell"]
+blitz-accesskit = ["blitz-shell", "glory-blitz/accesskit"]
 
 [dependencies]
-glory-core = { workspace = true }
-glory-routing = { workspace = true, optional = true }
-glory-macros = { workspace = true }
-glory-serverfn = { workspace = true, optional = true }
+glory-core = { path = "../core", version = "0.3.1" }
+glory-ui = { path = "../ui", version = "0.3.1" }
+glory-render = { path = "../render", version = "0.3.1" }
+glory-style = { path = "../style", version = "0.3.1" }
+glory-html = { path = "../html", version = "0.3.1", optional = true }
+glory-web = { path = "../web", version = "0.3.1", optional = true }
+glory-ssr = { path = "../ssr", version = "0.3.1", optional = true }
+glory-resource = { path = "../resource", version = "0.3.1", optional = true }
 
-# [package.metadata.cargo-all-features]
-# denylist = ["stable"]
-# skip_feature_sets = [["web-ssr"]]
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+glory-blitz = { path = "../blitz", version = "0.3.1", optional = true }
 
 [lints]
 workspace = true
+
+[[test]]
+name = "semantic_html"
+path = "tests/semantic_html.rs"
+required-features = ["ssr"]
+
+[[example]]
+name = "semantic_blitz"
+required-features = ["blitz"]

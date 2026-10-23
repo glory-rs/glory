@@ -1,0 +1,400 @@
+use std::collections::BTreeMap;
+use std::rc::Rc;
+
+use glory_core::Lotus;
+use glory_render::{
+    ButtonProps, Change, CheckProps, Descriptor, Event, EventKind, FocusMode, ImageProps,
+    InputProps, ItemPosition, LinkProps, NodeId, Patch, Props, Purpose, Role, TextKind, TextProps,
+};
+use glory_style::{Display, FlexDirection, Style};
+
+use crate::app::{Result, Scope, Widget};
+
+type Bind = Box<dyn FnOnce(&Scope, NodeId) -> Result>;
+type Handler = Box<dyn FnMut(Event)>;
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum Slot {
+    Classes,
+    Style,
+    Name,
+    Role,
+    Focus,
+    Item,
+    Text,
+    Kind,
+    Selectable,
+    Label,
+    Enabled,
+    Value,
+    Purpose,
+    Multiline,
+    Checked,
+    Source,
+    Alternative,
+    Target,
+}
+
+struct Element {
+    descriptor: Option<Descriptor>,
+    initial: BTreeMap<Slot, Patch>,
+    bindings: BTreeMap<Slot, Bind>,
+    handlers: BTreeMap<EventKind, Handler>,
+    children: Vec<Box<dyn Widget>>,
+    needs_alt: bool,
+}
+impl Element {
+    fn new(props: Props) -> Self {
+        let needs_alt = matches!(props, Props::Image(_));
+        Self {
+            descriptor: Some(Descriptor::new(props)),
+            initial: BTreeMap::new(),
+            bindings: BTreeMap::new(),
+            handlers: BTreeMap::new(),
+            children: Vec::new(),
+            needs_alt,
+        }
+    }
+    fn set<T: Clone + PartialEq + 'static>(
+        &mut self,
+        slot: Slot,
+        value: impl Into<Lotus<T>>,
+        mut patch: impl FnMut(T) -> Patch + 'static,
+    ) {
+        self.initial.remove(&slot);
+        self.bindings.remove(&slot);
+        match value.into() {
+            Lotus::Value(value) => {
+                self.initial.insert(slot, patch(value));
+            }
+            value => {
+                self.bindings.insert(
+                    slot,
+                    Box::new(move |scope, node| {
+                        let session = Rc::downgrade(&scope.session()?);
+                        let mut previous = None;
+                        scope.binding(move || {
+                            let Some(session) = session.upgrade() else {
+                                return;
+                            };
+                            let value = match value.try_get() {
+                                Ok(value) => value,
+                                Err(error) => {
+                                    session.report(error.into());
+                                    return;
+                                }
+                            };
+                            if previous.as_ref() == Some(&value) {
+                                return;
+                            }
+                            let update = patch(value.clone());
+                            let result = match update {
+                                Patch::Value {
+                                    value: Change::Set(value),
+                                    ..
+                                } => session.input_value(node, value),
+                                update => session.patch(node, update),
+                            };
+                            match result {
+                                Ok(()) => previous = Some(value),
+                                Err(error) => session.report(error),
+                            }
+                        });
+                        Ok(())
+                    }),
+                );
+            }
+        }
+    }
+    fn build(&mut self, scope: &Scope) -> Result {
+        if self.needs_alt {
+            return Err(glory_render::Error::InvalidProps(
+                "image requires alt text or explicit decorative()",
+            )
+            .into());
+        }
+        let mut descriptor = self.descriptor.take().ok_or(crate::app::Error::Gone)?;
+        descriptor.patches(std::mem::take(&mut self.initial).into_values())?;
+        let node = scope.create(descriptor)?;
+        for bind in std::mem::take(&mut self.bindings).into_values() {
+            bind(scope, node)?;
+        }
+        for (kind, handler) in std::mem::take(&mut self.handlers) {
+            scope.on(node, kind, handler)?;
+        }
+        if !self.children.is_empty() {
+            let content = scope.child_in(node)?;
+            for child in self.children.drain(..) {
+                child.show_in(&content)?;
+            }
+            scope.retain(content)?;
+        }
+        Ok(())
+    }
+    fn options<T: 'static>(&mut self, value: T) {
+        self.descriptor
+            .as_mut()
+            .expect("unmounted builder")
+            .options
+            .insert(value);
+    }
+}
+
+pub struct Children(Vec<Box<dyn Widget>>);
+pub trait IntoChildren {
+    fn into_children(self) -> Children;
+}
+impl<W: Widget> IntoChildren for W {
+    fn into_children(self) -> Children {
+        Children(vec![Box::new(self)])
+    }
+}
+impl<W: Widget> IntoChildren for Vec<W> {
+    fn into_children(self) -> Children {
+        Children(
+            self.into_iter()
+                .map(|value| Box::new(value) as Box<dyn Widget>)
+                .collect(),
+        )
+    }
+}
+impl IntoChildren for () {
+    fn into_children(self) -> Children {
+        Children(Vec::new())
+    }
+}
+macro_rules! children_tuple {
+    ($($name:ident),+) => {
+        impl<$($name: Widget),+> IntoChildren for ($($name,)+) {
+            #[allow(non_snake_case)]
+            fn into_children(self) -> Children { let ($($name,)+) = self; Children(vec![$(Box::new($name)),+]) }
+        }
+    };
+}
+children_tuple!(A, B);
+children_tuple!(A, B, C);
+children_tuple!(A, B, C, D);
+children_tuple!(A, B, C, D, E);
+children_tuple!(A, B, C, D, E, F);
+children_tuple!(A, B, C, D, E, F, G);
+children_tuple!(A, B, C, D, E, F, G, H);
+children_tuple!(A, B, C, D, E, F, G, H, I);
+children_tuple!(A, B, C, D, E, F, G, H, I, J);
+children_tuple!(A, B, C, D, E, F, G, H, I, J, K);
+children_tuple!(A, B, C, D, E, F, G, H, I, J, K, L);
+
+macro_rules! element {
+    ($name:ident, $factory:ident, $props:expr) => {
+        pub struct $name {
+            inner: Element,
+        }
+        pub fn $factory() -> $name {
+            $name {
+                inner: Element::new($props),
+            }
+        }
+        impl Widget for $name {
+            fn build(&mut self, scope: &Scope) -> Result {
+                self.inner.build(scope)
+            }
+        }
+        impl $name {
+            pub fn backend_options<T: 'static>(mut self, value: T) -> Self {
+                self.inner.options(value);
+                self
+            }
+        }
+    };
+}
+element!(View, view, Props::View);
+element!(Group, group, Props::Group);
+element!(Text, text, Props::Text(TextProps::default()));
+element!(Button, button, Props::Button(ButtonProps::default()));
+element!(Input, input, Props::Input(InputProps::default()));
+element!(Check, check, Props::Check(CheckProps::default()));
+element!(Image, image, Props::Image(ImageProps::default()));
+element!(Link, link, Props::Link(LinkProps::default()));
+
+macro_rules! common {
+    ($($name:ident),+) => {$ (
+        impl $name {
+            /// Set the complete whitespace-separated class list (last call wins).
+            pub fn class(mut self, value: impl Into<Lotus<String>>) -> Self {
+                self.inner.set(Slot::Classes, value, |value: String| Patch::Classes(Change::Set(value.split_whitespace().map(str::to_owned).collect()))); self
+            }
+            pub fn style(mut self, value: impl Into<Lotus<Style>>) -> Self {
+                self.inner.set(Slot::Style, value, |value| Patch::Style(Change::Set(Box::new(value)))); self
+            }
+            /// Accessible name. Plain inline/paragraph text uses content;
+            /// decorative images have no accessible name. A named generic View
+            /// becomes an accessible group without changing its layout box.
+            pub fn name(mut self, value: impl Into<Lotus<String>>) -> Self {
+                self.inner.set(Slot::Name, value, |value| Patch::Name(Change::Set(Some(value)))); self
+            }
+            pub fn focus(mut self, mode: FocusMode) -> Self { self.inner.set(Slot::Focus, mode, |value| Patch::Focus(Change::Set(value))); self }
+            pub fn on(mut self, kind: EventKind, handler: impl FnMut(Event) + 'static) -> Self { self.inner.handlers.insert(kind, Box::new(handler)); self }
+        }
+    )+};
+}
+common!(View, Text, Button, Input, Check, Image, Link);
+impl View {
+    /// Structural role; controls, text and images retain their own semantics.
+    pub fn role(mut self, role: Role) -> Self {
+        self.inner.set(Slot::Role, Some(role), |value| {
+            Patch::Role(Change::Set(value))
+        });
+        self
+    }
+    pub fn item(mut self, value: impl Into<Lotus<Option<ItemPosition>>>) -> Self {
+        self.inner
+            .set(Slot::Item, value, |value| Patch::Item(Change::Set(value)));
+        self
+    }
+}
+macro_rules! fill {
+    ($($name:ident),+) => {$ (
+        impl $name { pub fn fill(mut self, children: impl IntoChildren) -> Self { self.inner.children.extend(children.into_children().0); self } }
+    )+};
+}
+fill!(View, Group, Button, Link);
+macro_rules! label {
+    ($($name:ident),+) => {$ (
+        impl $name { pub fn label(mut self, value: impl Into<Lotus<String>>) -> Self { self.inner.set(Slot::Label, value, |value| Patch::Label(Change::Set(value))); self } }
+    )+};
+}
+label!(Button, Check, Link);
+macro_rules! enabled {
+    ($($name:ident),+) => {$ (
+        impl $name { pub fn enabled(mut self, value: impl Into<Lotus<bool>>) -> Self { self.inner.set(Slot::Enabled, value, |value| Patch::Enabled(Change::Set(value))); self } }
+    )+};
+}
+enabled!(Button, Input, Check);
+impl Text {
+    pub fn content(mut self, value: impl Into<Lotus<String>>) -> Self {
+        self.inner
+            .set(Slot::Text, value, |value| Patch::Text(Change::Set(value)));
+        self
+    }
+    pub fn kind(mut self, value: TextKind) -> Self {
+        self.inner.set(Slot::Kind, value, |value| {
+            Patch::TextKind(Change::Set(value))
+        });
+        self
+    }
+    pub fn selectable(mut self, value: impl Into<Lotus<bool>>) -> Self {
+        self.inner.set(Slot::Selectable, value, |value| {
+            Patch::Selectable(Change::Set(value))
+        });
+        self
+    }
+}
+impl Input {
+    pub fn value(mut self, value: impl Into<Lotus<String>>) -> Self {
+        // Static configuration starts at one; bound writes allocate from the
+        // live node so explicit Scope patches cannot make this producer regress.
+        self.inner.set(Slot::Value, value, |value| Patch::Value {
+            value: Change::Set(value),
+            revision: 1,
+        });
+        self
+    }
+    pub fn purpose(mut self, value: Purpose) -> Self {
+        self.inner.set(Slot::Purpose, value, |value| {
+            Patch::Purpose(Change::Set(value))
+        });
+        self
+    }
+    pub fn multiline(mut self, value: bool) -> Self {
+        self.inner.set(Slot::Multiline, value, |value| {
+            Patch::Multiline(Change::Set(value))
+        });
+        self
+    }
+}
+impl Check {
+    pub fn checked(mut self, value: impl Into<Lotus<bool>>) -> Self {
+        self.inner.set(Slot::Checked, value, |value| {
+            Patch::Checked(Change::Set(value))
+        });
+        self
+    }
+}
+impl Image {
+    pub fn source(mut self, value: impl Into<Lotus<String>>) -> Self {
+        self.inner.set(Slot::Source, value, |value| {
+            Patch::Source(Change::Set(value))
+        });
+        self
+    }
+    pub fn alt(mut self, value: impl Into<Lotus<String>>) -> Self {
+        self.inner.needs_alt = false;
+        self.inner.set(Slot::Alternative, value, |value| {
+            Patch::Alternative(Change::Set(Some(value)))
+        });
+        self
+    }
+    pub fn decorative(mut self) -> Self {
+        self.inner.needs_alt = false;
+        self.inner.set(Slot::Alternative, None::<String>, |value| {
+            Patch::Alternative(Change::Set(value))
+        });
+        self
+    }
+}
+impl Link {
+    pub fn target(mut self, value: impl Into<Lotus<String>>) -> Self {
+        self.inner.set(Slot::Target, value, |value| {
+            Patch::Target(Change::Set(value))
+        });
+        self
+    }
+}
+
+pub fn row() -> View {
+    view().style(
+        Style::new()
+            .display(Display::Flex)
+            .flex_direction(FlexDirection::Row),
+    )
+}
+pub fn col() -> View {
+    view().style(
+        Style::new()
+            .display(Display::Flex)
+            .flex_direction(FlexDirection::Column),
+    )
+}
+
+pub struct Component<F>(F);
+pub fn component<F: FnMut(&Scope) -> Result + 'static>(build: F) -> Component<F> {
+    Component(build)
+}
+impl<F: FnMut(&Scope) -> Result + 'static> Widget for Component<F> {
+    fn build(&mut self, scope: &Scope) -> Result {
+        (self.0)(scope)
+    }
+}
+
+pub mod events {
+    pub use glory_render::Event;
+    use glory_render::EventKind;
+    #[allow(non_upper_case_globals)]
+    pub const activate: EventKind = EventKind::Activate;
+    #[allow(non_upper_case_globals)]
+    pub const value_changed: EventKind = EventKind::ValueChanged;
+    #[allow(non_upper_case_globals)]
+    pub const checked_changed: EventKind = EventKind::CheckedChanged;
+    #[allow(non_upper_case_globals)]
+    pub const commit: EventKind = EventKind::Commit;
+    #[allow(non_upper_case_globals)]
+    pub const focus_changed: EventKind = EventKind::FocusChanged;
+    #[allow(non_upper_case_globals)]
+    pub const focus_within: EventKind = EventKind::FocusWithin;
+    #[allow(non_upper_case_globals)]
+    pub const navigate: EventKind = EventKind::Navigate;
+    #[allow(non_upper_case_globals)]
+    pub const composition: EventKind = EventKind::Composition;
+    #[allow(non_upper_case_globals)]
+    pub const scroll: EventKind = EventKind::Scroll;
+    #[allow(non_upper_case_globals)]
+    pub const resize: EventKind = EventKind::Resize;
+}

@@ -1,6 +1,7 @@
 [workspace]
-members = ["crates/*"]
-# members = ["crates/core", "crates/glory", "examples/counter", "examples/counters", "examples/todo"]
+# Rebuild the semantic architecture without legacy feature aliases. Older
+# adapter/tool sources rejoin once migrated; see docs/semantic-ui-implementation.md.
+members = ["crates/style", "crates/render", "crates/core", "crates/resource", "crates/ui", "crates/html", "crates/web", "crates/ssr", "crates/blitz", "crates/glory"]
 exclude = ["examples", "benchmarks"]
 resolver = "2"
 

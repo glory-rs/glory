@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "forks": [
+    {
+      "name": "taffy",
+      "git": "https://github.com/glory-rs/taffy",
+      "rev": "dd7914fba2e6e0b5d8a2c8854d764a2ade817efd",
+      "upstream": "https://github.com/DioxusLabs/taffy",
+      "upstream_rev": "eb6450694f33e2b7413e40677f230ff63f0fc194",
+      "packages": [
+        "taffy"
+      ],
+      "tests": [
+        "-p",
+        "taffy",
+        "--lib"
+      ]
+    },
+    {
+      "name": "blitz",
+      "git": "https://github.com/glory-rs/blitz",
+      "rev": "b40cdfc2c9b5a000759275b673e4ed8aadd68f78",
+      "upstream": "https://github.com/DioxusLabs/blitz",
+      "upstream_rev": "92b11f1bd8ab7975411328b0406a95a09445b4e7",
+      "packages": [
+        "blitz-dom",
+        "blitz-traits",
+        "blitz-paint",
+        "blitz-shell",
+        "stylo_taffy"
+      ],
+      "tests": [
+        "-p",
+        "blitz-dom",
+        "--no-default-features",
+        "--features",
+        "system-fonts,complex-scripts",
+        "--lib"
+      ],
+      "extra_tests": [
+        [
+          "-p",
+          "blitz-dom",
+          "--no-default-features",
+          "--features",
+          "system-fonts,complex-scripts,parallel-construct",
+          "--lib",
+          "profile::tests"
+        ],
+        [
+          "-p",
+          "blitz-dom",
+          "--no-default-features",
+          "--features",
+          "system-fonts,complex-scripts,parallel-construct",
+          "--lib",
+          "style_damage_tests"
+        ]
+      ]
+    }
+  ]
+}
