@@ -14,6 +14,17 @@ impl Sink for Record {
 fn every_field_delta_matches_full_shape_difference_including_resets_and_normalization() {
     let mut bases = vec![
         Props::View,
+        Props::RichText(RichTextProps {
+            revision: 10,
+            ..Default::default()
+        }),
+        Props::RichText(RichTextProps {
+            revision: 10,
+            enabled: false,
+            read_only: true,
+            placeholder: "old".into(),
+            ..Default::default()
+        }),
         Props::Group,
         Props::Text(TextProps {
             content: "old".into(),
@@ -74,7 +85,34 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
         count: Some(100_000_000),
     });
     bases.push(item);
+    let mut rich = glory_render::rich_text::Document::default();
+    rich.root.children[0].push(glory_render::rich_text::Inline::Text {
+        text: "new😀".into(),
+        marks: Default::default(),
+    });
     let mut patches = vec![
+        Patch::RichValue {
+            document: Change::Keep,
+            revision: 0,
+        },
+        Patch::RichValue {
+            document: Change::Set(Box::new(rich.clone())),
+            revision: 10,
+        },
+        Patch::RichValue {
+            document: Change::Set(Box::new(rich)),
+            revision: 11,
+        },
+        Patch::RichValue {
+            document: Change::Clear,
+            revision: 11,
+        },
+        Patch::RichReadOnly(Change::Keep),
+        Patch::RichReadOnly(Change::Set(true)),
+        Patch::RichReadOnly(Change::Clear),
+        Patch::RichPlaceholder(Change::Keep),
+        Patch::RichPlaceholder(Change::Set("new".into())),
+        Patch::RichPlaceholder(Change::Clear),
         Patch::Text(Change::Keep),
         Patch::Text(Change::Set("old".into())),
         Patch::Text(Change::Set("new\r\n\0🙂".into())),

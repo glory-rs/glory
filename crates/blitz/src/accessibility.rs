@@ -186,6 +186,12 @@ impl Tree {
                         node.set_value(state.dom.text_value(id)?);
                     }
                 }
+                Props::RichText(p) => {
+                    node.set_value(p.document.plain_text());
+                    if p.read_only {
+                        node.set_read_only();
+                    }
+                }
                 Props::Check(p) => {
                     if d.name.is_none() {
                         node.set_label(normalize_text(&p.label, true).into_owned());
@@ -516,6 +522,7 @@ fn role(d: &glory_render::Descriptor) -> AxRole {
             Purpose::Text | Purpose::Number => AxRole::TextInput,
         },
         Props::Check(_) => AxRole::CheckBox,
+        Props::RichText(_) => AxRole::MultilineTextInput,
         Props::Image(_) => AxRole::Image,
         Props::Link(_) => AxRole::Link,
         Props::Group => unreachable!("transparent group"),

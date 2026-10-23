@@ -11,6 +11,8 @@ mod accessibility;
 #[cfg(feature = "accesskit")]
 #[path = "accesskit_platform.rs"]
 mod accesskit_platform;
+#[path = "rich_input.rs"]
+mod rich_input;
 use std::cell::{Cell, Ref, RefMut};
 use std::sync::Arc;
 use std::task::Context;
@@ -185,6 +187,21 @@ impl EventHandler for Events {
         event_state: &mut EventState,
     ) {
         let mut state = self.0.0.borrow_mut();
+        // One active document selection follows its pointer outside the editor.
+        // This stores identities only and is retired with the owning range.
+        if let Some((rich, pointer)) = state.dom.rich_drag {
+            if !state.mapper.tree().active(rich) {
+                state.dom.rich_drag = None;
+            } else if matches!(&event.data,DomEventData::PointerMove(p)|DomEventData::PointerUp(p)|DomEventData::PointerCancel(p) if p.id==pointer)
+            {
+                match rich_input::event(&mut state, rich, event.target, &event.data) {
+                    Ok(_) => {}
+                    Err(error) => state.input_error = Some(error),
+                }
+                event_state.prevent_default();
+                return;
+            }
+        }
         // The event chain starts at the target. Do not copy the whole node map
         // for each input: work is proportional to event ancestry, not list size.
         let node = chain
@@ -218,12 +235,24 @@ impl EventHandler for Events {
                 event_state.prevent_default();
                 return;
             }
+            match rich_input::event(&mut state, node, event.target, &event.data) {
+                Ok(true) => {
+                    event_state.prevent_default();
+                    return;
+                }
+                Err(error) => {
+                    state.input_error = Some(error);
+                    event_state.prevent_default();
+                    return;
+                }
+                Ok(false) => {}
+            }
             if let DomEventData::Ime(ime) = &event.data
                 && state
                     .dom
                     .ranges
                     .get(&node)
-                    .is_some_and(|range| range.edit == EditKind::Text)
+                    .is_some_and(|range| matches!(range.edit, EditKind::Text | EditKind::RichText))
             {
                 event_state.prevent_default();
                 if let Err(error) = ime_event(&mut state, node, ime) {
@@ -234,13 +263,15 @@ impl EventHandler for Events {
             if let DomEventData::Input(input) = &event.data {
                 let edit = state.dom.ranges.get(&node).expect("mapped input").edit;
                 let value = match edit {
-                    EditKind::Text => match editing::text_event(&mut state, node, &input.value) {
-                        Ok(event) => Some(event),
-                        Err(error) => {
-                            state.input_error = Some(error);
-                            None
+                    EditKind::Text | EditKind::RichText => {
+                        match editing::text_event(&mut state, node, &input.value) {
+                            Ok(event) => Some(event),
+                            Err(error) => {
+                                state.input_error = Some(error);
+                                None
+                            }
                         }
-                    },
+                    }
                     EditKind::Check => state
                         .dom
                         .doc
@@ -295,6 +326,12 @@ fn drag_observer(state: &State, mut node: NodeId) -> Option<NodeId> {
     }
 }
 fn cancel_drag(state: &mut State) {
+    if let Some((id, _)) = state.dom.rich_drag.take() {
+        if let Some(rich) = state.dom.ranges.get_mut(&id).and_then(|r| r.rich.as_mut()) {
+            rich.drag = None;
+        }
+    }
+
     if let Some(drag) = state.drag.take() {
         if drag.started {
             state.inputs.push(Input::Event {
@@ -468,11 +505,12 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
         })
     });
     if let Some(origin) = origin {
-        let editable = state
-            .mapper
-            .tree()
-            .node(origin)
-            .is_ok_and(|node| matches!(node.descriptor.props, glory_render::Props::Input(_)));
+        let editable = state.mapper.tree().node(origin).is_ok_and(|node| {
+            matches!(
+                node.descriptor.props,
+                glory_render::Props::Input(_) | glory_render::Props::RichText(_)
+            )
+        });
         let key_name = key.key.to_string();
         let command = glory_render::KeyboardInput {
             key: &key_name,

@@ -10,7 +10,7 @@ description = "HTML snapshot rendering for Glory semantic UI"
 default = []
 css = ["glory-html/css"]
 resources = ["dep:glory-resource"]
-stream = ["resources", "dep:futures-core", "dep:futures-util", "dep:serde_json"]
+stream = ["resources", "glory-html/wire", "dep:futures-core", "dep:futures-util", "dep:serde_json"]
 
 [dependencies]
 glory-core = { path = "../core", version = "0.3.1" }

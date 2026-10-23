@@ -7,6 +7,7 @@ mod id;
 pub mod memory;
 pub mod profile;
 mod props;
+pub mod rich_text;
 mod text;
 
 pub use glory_style as style;
@@ -99,6 +100,7 @@ pub enum Query {
     Bounds(NodeId),
     Scroll(NodeId),
     Selection(NodeId),
+    RichSelection(NodeId),
     /// Whether this node's actual control owns document focus at the request
     /// barrier. This is neither FocusWithin nor OS/window activation.
     Focus(NodeId),
@@ -107,7 +109,11 @@ pub enum Query {
 impl Query {
     pub fn node(self) -> NodeId {
         match self {
-            Self::Bounds(id) | Self::Scroll(id) | Self::Selection(id) | Self::Focus(id) => id,
+            Self::Bounds(id)
+            | Self::Scroll(id)
+            | Self::Selection(id)
+            | Self::RichSelection(id)
+            | Self::Focus(id) => id,
         }
     }
 
@@ -116,6 +122,11 @@ impl Query {
     pub fn validate_target(self, node: &Descriptor) -> Result<(), Error> {
         if matches!(node.props, Props::Group) {
             return Err(Error::Unsupported("group has no physical query target"));
+        }
+        if matches!(self, Self::RichSelection(_)) && !matches!(node.props, Props::RichText(_)) {
+            return Err(Error::Unsupported(
+                "rich selection requires a rich-text control",
+            ));
         }
         if matches!(self, Self::Selection(_)) && !matches!(node.props, Props::Input(_)) {
             return Err(Error::Unsupported("selection requires a text input"));
@@ -127,6 +138,9 @@ impl Query {
     /// use logical pixels; selection offsets use UTF-16 code units on all hosts.
     pub fn validate_response(self, value: &QueryValue) -> Result<(), Error> {
         match (self, value) {
+            (Self::RichSelection(_), QueryValue::RichSelection(selection)) => {
+                selection.validate_bounds()?
+            }
             (Self::Bounds(_), QueryValue::Bounds(rect)) => {
                 if ![rect.x, rect.y, rect.width, rect.height]
                     .into_iter()
@@ -155,8 +169,16 @@ impl Query {
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Action {
+    RichSelection {
+        node: NodeId,
+        selection: rich_text::Selection,
+    },
+    RichMarks {
+        node: NodeId,
+        marks: Box<rich_text::Marks>,
+    },
     /// Request focus without scrolling. Ok means the host processed the intent;
     /// it may decline because of current layout/platform state. Query::Focus
     /// reads the actual result; FocusChanged reports actual transitions only.
@@ -168,15 +190,37 @@ pub enum Action {
     },
 }
 impl Action {
-    pub fn node(self) -> NodeId {
+    pub fn node(&self) -> NodeId {
         match self {
-            Self::Focus(node) | Self::ScrollTo { node, .. } => node,
+            Self::Focus(node)
+            | Self::ScrollTo { node, .. }
+            | Self::RichSelection { node, .. }
+            | Self::RichMarks { node, .. } => *node,
         }
     }
     /// Validate after checking identity, before capability checks or queuing.
-    pub fn validate_target(self, node: &Descriptor) -> Result<(), Error> {
+    pub fn validate_target(&self, node: &Descriptor) -> Result<(), Error> {
+        if let Self::RichMarks { marks, .. } = self {
+            let Props::RichText(rich) = &node.props else {
+                return Err(Error::Unsupported("typing marks require rich text"));
+            };
+            if !rich.enabled || rich.read_only {
+                return Err(Error::Unsupported(
+                    "typing marks require editable rich text",
+                ));
+            }
+            marks.validate()?;
+        }
+        if let Self::RichSelection { selection, .. } = self {
+            let Props::RichText(rich) = &node.props else {
+                return Err(Error::Unsupported(
+                    "rich selection requires a rich-text control",
+                ));
+            };
+            rich.document.validate_selection(*selection)?;
+        }
         if let Self::ScrollTo { x, y, .. } = self
-            && (!x.is_finite() || !y.is_finite() || x < 0.0 || y < 0.0)
+            && (!x.is_finite() || !y.is_finite() || *x < 0.0 || *y < 0.0)
         {
             return Err(Error::InvalidProps("invalid scroll position"));
         }
@@ -219,6 +263,7 @@ pub enum Navigation {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum QueryValue {
+    RichSelection(rich_text::Selection),
     Focus(bool),
     Bounds(Rect),
     Scroll {
@@ -235,6 +280,23 @@ pub enum QueryValue {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
+    RichTextChanged {
+        document: rich_text::Document,
+        revision: u64,
+        selection: rich_text::Selection,
+        composing: bool,
+    },
+    RichTextCommand {
+        document: rich_text::Document,
+        revision: u64,
+        selection: rich_text::Selection,
+        command: rich_text::Command,
+    },
+    RichTextCommit {
+        document: rich_text::Document,
+        revision: u64,
+        selection: rich_text::Selection,
+    },
     Activate,
     /// Host preference, independent of an application's explicit appearance.
     ColorSchemeChanged {
@@ -317,6 +379,9 @@ pub struct ScrollAck {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum EventKind {
+    RichTextChanged,
+    RichTextCommit,
+    RichTextCommand,
     Activate,
     ColorSchemeChanged,
     Keyboard,
@@ -345,7 +410,23 @@ impl EventKind {
                 "host observation requires a semantic View",
             ));
         }
-        if matches!(self, Self::ValueChanged | Self::Commit | Self::Composition)
+        if matches!(
+            self,
+            Self::RichTextChanged | Self::RichTextCommit | Self::RichTextCommand
+        ) && !matches!(node.props, Props::RichText(_))
+        {
+            return Err(Error::InvalidProps(
+                "rich event requires a rich-text control",
+            ));
+        }
+        if matches!(self, Self::Composition)
+            && !matches!(node.props, Props::Input(_) | Props::RichText(_))
+        {
+            return Err(Error::InvalidProps(
+                "composition requires an editable control",
+            ));
+        }
+        if matches!(self, Self::ValueChanged | Self::Commit)
             && !matches!(node.props, Props::Input(_))
             || matches!(self, Self::CheckedChanged) && !matches!(node.props, Props::Check(_))
         {
@@ -410,6 +491,39 @@ impl Event {
                 && rect.height >= 0.0
         };
         match self {
+            Self::RichTextChanged {
+                document,
+                revision,
+                selection,
+                ..
+            }
+            | Self::RichTextCommit {
+                document,
+                revision,
+                selection,
+            }
+            | Self::RichTextCommand {
+                document,
+                revision,
+                selection,
+                ..
+            } => {
+                document.validate()?;
+                document.validate_selection(*selection)?;
+                if let Props::RichText(input) = &node.props {
+                    if input.read_only {
+                        return Err(Error::InvalidEvent(
+                            "read-only rich-text control cannot edit",
+                        ));
+                    }
+                    if *revision > input.revision {
+                        return Err(Error::InputRevision {
+                            current: input.revision,
+                            incoming: *revision,
+                        });
+                    }
+                }
+            }
             Self::Drag { from, phase, x, y } => {
                 if !x.is_finite() || !y.is_finite() {
                     return Err(Error::InvalidEvent("drag coordinates must be finite"));
@@ -488,6 +602,9 @@ impl Event {
 
     pub fn kind(&self) -> EventKind {
         match self {
+            Self::RichTextChanged { .. } => EventKind::RichTextChanged,
+            Self::RichTextCommit { .. } => EventKind::RichTextCommit,
+            Self::RichTextCommand { .. } => EventKind::RichTextCommand,
             Self::Activate => EventKind::Activate,
             Self::ColorSchemeChanged { .. } => EventKind::ColorSchemeChanged,
             Self::Keyboard { .. } => EventKind::Keyboard,

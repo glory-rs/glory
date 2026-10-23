@@ -95,6 +95,63 @@ pub(crate) fn lower(next: &Descriptor, inverse: &Patch) -> Vec<Edit> {
         };
     }
     match inverse {
+        Patch::RichValue { document, revision } => {
+            let old = old!(document);
+            let Props::RichText(value) = &next.props else {
+                unreachable!()
+            };
+            if *revision != value.revision {
+                edits.push(Edit::Revision(value.revision));
+            }
+            if old.as_ref() != &value.document {
+                edits.push(Edit::Property {
+                    part: Part::Main,
+                    name: "richDocument",
+                    value: Property::RichDocument(value.document.clone()),
+                });
+            }
+        }
+        Patch::RichPlaceholder(change) => {
+            let old = old!(change);
+            let Props::RichText(value) = &next.props else {
+                unreachable!()
+            };
+            attribute(
+                &mut edits,
+                Part::Main,
+                "data-gly-placeholder",
+                Some(old),
+                Some(&value.placeholder),
+            );
+        }
+        Patch::RichReadOnly(change) => {
+            let old = *old!(change);
+            let Props::RichText(value) = &next.props else {
+                unreachable!()
+            };
+            attribute(
+                &mut edits,
+                Part::Main,
+                "aria-readonly",
+                Some(if old { "true" } else { "false" }),
+                Some(if value.read_only { "true" } else { "false" }),
+            );
+            attribute(
+                &mut edits,
+                Part::Main,
+                "contenteditable",
+                Some(if value.enabled && !old {
+                    "true"
+                } else {
+                    "false"
+                }),
+                Some(if value.enabled && !value.read_only {
+                    "true"
+                } else {
+                    "false"
+                }),
+            );
+        }
         Patch::Text(change) => {
             let old = old!(change);
             let Props::Text(value) = &next.props else {
@@ -228,18 +285,43 @@ pub(crate) fn lower(next: &Descriptor, inverse: &Patch) -> Vec<Edit> {
                     (!old).then_some(""),
                     (!new).then_some(""),
                 );
-                attribute(
-                    &mut edits,
-                    control,
-                    "disabled",
-                    (!old).then_some(""),
-                    (!new).then_some(""),
-                );
-                edits.push(Edit::Property {
-                    part: control,
-                    name: "disabled",
-                    value: Property::Bool(!new),
-                });
+                if let Props::RichText(value) = &next.props {
+                    attribute(
+                        &mut edits,
+                        Part::Main,
+                        "aria-disabled",
+                        Some(if old { "false" } else { "true" }),
+                        Some(if new { "false" } else { "true" }),
+                    );
+                    attribute(
+                        &mut edits,
+                        Part::Main,
+                        "contenteditable",
+                        Some(if old && !value.read_only {
+                            "true"
+                        } else {
+                            "false"
+                        }),
+                        Some(if new && !value.read_only {
+                            "true"
+                        } else {
+                            "false"
+                        }),
+                    );
+                } else {
+                    attribute(
+                        &mut edits,
+                        control,
+                        "disabled",
+                        (!old).then_some(""),
+                        (!new).then_some(""),
+                    );
+                    edits.push(Edit::Property {
+                        part: control,
+                        name: "disabled",
+                        value: Property::Bool(!new),
+                    });
+                }
             }
         }
         Patch::Checked(change) => {

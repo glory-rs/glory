@@ -71,9 +71,12 @@ impl Listeners {
         for name in [
             "click",
             "input",
+            "beforeinput",
             "change",
             "compositionstart",
             "compositionend",
+            "paste",
+            "drop",
             "keydown",
             "focusin",
             "focusout",
@@ -263,7 +266,31 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
         return Ok(());
     };
     let entry = dom.entry(id)?;
+    if entry.edit == EditKind::RichText
+        && entry.control()?.get_attribute("contenteditable").as_deref() != Some("true")
+        && matches!(
+            name,
+            "keydown" | "input" | "beforeinput" | "compositionstart" | "paste" | "drop"
+        )
+    {
+        return Ok(());
+    }
     match name {
+        "click"
+            if entry.edit == EditKind::RichText
+                && super::rich_text::task(&entry.control()?, &event)? =>
+        {
+            let (document, selection) = super::rich_text::read(&entry.control()?)?;
+            dom.queue(
+                id,
+                Event::RichTextChanged {
+                    document,
+                    selection,
+                    revision: entry.editing.borrow().revision,
+                    composing: entry.editing.borrow().composing,
+                },
+            );
+        }
         "click" => {
             if dom.suppress_click.replace(false) {
                 event.prevent_default();
@@ -293,6 +320,72 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
             // Logical Group ancestors have no DOM element. Always deliver the
             // origin; App resolves semantic bubbling and disabled ancestors.
             dom.queue(id, Event::Activate);
+        }
+        "paste" | "drop" if entry.edit == EditKind::RichText => {
+            if super::rich_text::paste(&entry.control()?, &event)? {
+                let (document, selection) = super::rich_text::read(&entry.control()?)?;
+                dom.queue(
+                    id,
+                    Event::RichTextChanged {
+                        document,
+                        selection,
+                        revision: entry.editing.borrow().revision,
+                        composing: false,
+                    },
+                );
+            }
+        }
+        "beforeinput" if entry.edit == EditKind::RichText => {
+            if super::rich_text::before(&entry.control()?, &event)? {
+                let (document, selection) = super::rich_text::read(&entry.control()?)?;
+                dom.queue(
+                    id,
+                    Event::RichTextChanged {
+                        document,
+                        selection,
+                        revision: entry.editing.borrow().revision,
+                        composing: false,
+                    },
+                );
+            }
+        }
+        "input" if entry.edit == EditKind::RichText => {
+            if event
+                .dyn_ref::<web_sys::InputEvent>()
+                .is_some_and(|event| event.is_composing())
+            {
+                entry.editing.borrow_mut().composing = true;
+            }
+            let (document, selection) = super::rich_text::read(&entry.control()?)?;
+            let edit = entry.editing.borrow();
+            let event = Event::RichTextChanged {
+                document,
+                selection,
+                revision: edit.revision,
+                composing: edit.composing,
+            };
+            drop(edit);
+            dom.queue(id, event);
+        }
+        "compositionstart" if entry.edit == EditKind::RichText => {
+            super::rich_text::compose(&entry.control()?)?;
+            entry.editing.borrow_mut().composing = true;
+            dom.queue(id, Event::Composition { active: true });
+        }
+        "compositionend" if entry.edit == EditKind::RichText => {
+            let (document, selection) = super::rich_text::read(&entry.control()?)?;
+            let revision = entry.editing.borrow().revision;
+            dom.queue(id, Event::Composition { active: false });
+            dom.queue(
+                id,
+                Event::RichTextChanged {
+                    document,
+                    selection,
+                    revision,
+                    composing: false,
+                },
+            );
+            entry.composition_end()?;
         }
         "input" if entry.edit == EditKind::Text => {
             if event
@@ -341,6 +434,48 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
                 },
             );
             entry.composition_end()?;
+        }
+        "keydown" if entry.edit == EditKind::RichText => {
+            let Some(key) = event.dyn_ref::<KeyboardEvent>() else {
+                return Ok(());
+            };
+            if !key.is_composing() && !entry.editing.borrow().composing {
+                if let Some(command) = glory_render::rich_text::Command::shortcut(
+                    &key.key(),
+                    key.ctrl_key() || key.meta_key(),
+                    key.shift_key(),
+                    key.alt_key(),
+                ) {
+                    event.prevent_default();
+                    let (document, selection) = super::rich_text::read(&entry.control()?)?;
+                    dom.queue(
+                        id,
+                        Event::RichTextCommand {
+                            document,
+                            selection,
+                            revision: entry.editing.borrow().revision,
+                            command,
+                        },
+                    );
+                    return Ok(());
+                }
+            }
+            if !key.is_composing()
+                && !entry.editing.borrow().composing
+                && key.key() == "Enter"
+                && (key.ctrl_key() || key.meta_key())
+            {
+                event.prevent_default();
+                let (document, selection) = super::rich_text::read(&entry.control()?)?;
+                dom.queue(
+                    id,
+                    Event::RichTextCommit {
+                        document,
+                        selection,
+                        revision: entry.editing.borrow().revision,
+                    },
+                );
+            }
         }
         "keydown" => {
             let Some(key) = event.dyn_ref::<KeyboardEvent>() else {

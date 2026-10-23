@@ -2,7 +2,7 @@
 
 日期：2026-10-23。对应破坏兼容重构的 R0；本页记录当前实现及明确的剩余审计，不将基础矩阵通过当作 R0 全部完成。架构与实施证据分别见[架构报告](semantic-ui-rendering-architecture-report-2026-10-21.md)和[实施记录](semantic-ui-implementation.md)。
 
-## 八组件及内容
+## 语义组件及内容
 
 | 名称 | 内容与配置 | 子节点 | 当前 HTML 默认 |
 |---|---|---|---|
@@ -11,6 +11,7 @@
 | text | content，Inline/Paragraph/Heading(1–6)，selectable；Heading 可设置 name | 不接受 | span/p/h1–h6 |
 | button | label、enabled | 仅 inline text、image、group；不能包含交互控件或显式 focus 节点 | button，type=button |
 | input | 字符串 value/revision、purpose、multiline、enabled | 不接受 | input / textarea |
+| rich_text | 有限 Document/revision、enabled、read_only、placeholder；UTF-16 block selection | 不接受应用子节点；文档结构由类型表达 | 有限 contenteditable document |
 | check | bool checked、label、enabled | 不接受；label 是独立的受控文字部分 | label + checkbox + 文字 |
 | image | source、alternative | 不接受 | img |
 | link | target、label | 接受；不能嵌套交互控件或显式 focus 节点 | a |
@@ -390,3 +391,7 @@ SSR Document的可选sheets按顺序输出并使用nonce；Blitz set_sheet先完
 - 受限Sheet核心及上述文字/装饰域已有实现；更广文字/视觉语法、主题与非HTML解析/级联后端继续推进。完整CSS、RTL、transforms/writing modes不因采用Blitz就成为跨后端保证。
 
 实际 OS IME、辅助技术与 Android 设备属于 R3/R5/R6，继续独立验收。上述未完成项不能以本页或绿色基础矩阵勾选完成。
+
+## 有限富文档
+
+RichText 的数据、事件、选区、输入法与版本 4 HTML/stream 契约及验证范围见[有限富文档](semantic-rich-text.md)。它使用实际 Web contenteditable 和原生 Parley attributed editor；应用负责存储 codec、格式事务与撤销历史。

@@ -80,7 +80,7 @@ def main():
                 if package["name"] in fork["packages"]:
                     assert package.get("source") == expected, (lockfile, package)
     assert not (root / "vendor").exists(), "Engine sources belong in the organization forks"
-    print("Verified two immutable glory-rs Git forks, six engine/layout packages, one shared type identity per package; ten Glory workspace crates.")
+    print(f"Verified {len(record['forks'])} immutable glory-rs Git forks, {sum(len(fork['packages']) for fork in record['forks'])} engine/layout packages, one shared type identity per package; ten Glory workspace crates.")
 
 
 if __name__ == "__main__":

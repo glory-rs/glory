@@ -41,6 +41,7 @@ fn property(value: Property) -> Value {
     match value {
         Property::Text(value) => json!(value),
         Property::Bool(value) => json!(value),
+        Property::RichDocument(value) => glory_html::rich_text::wire::encode(&value),
     }
 }
 pub(super) fn shape(shape: Shape) -> Value {

@@ -1194,7 +1194,7 @@ fn segmented_scroll_seeks_huge_offsets_without_scaling_wheel_motion_or_rebase_lo
     let id = root(&app);
     position.revise(|value| *value = 12_000_000_000.0);
     app.flush().unwrap();
-    let Action::ScrollTo { y: physical, .. } = observed.borrow().actions.last().copied().unwrap()
+    let Action::ScrollTo { y: physical, .. } = observed.borrow().actions.last().cloned().unwrap()
     else {
         panic!()
     };
@@ -1258,7 +1258,7 @@ fn component_owners_tasks_handlers_and_model_slots_stay_bounded_across_far_jumps
     for index in (0..1_000_000).step_by(10007) {
         position.revise(|position| *position = index as f64 * 24.0);
         app.flush().unwrap();
-        let requested = observed.borrow().actions.last().copied();
+        let requested = observed.borrow().actions.last().cloned();
         if let Some(Action::ScrollTo { y, .. }) = requested {
             app.dispatch(id, scroll_event(y)).unwrap();
         }

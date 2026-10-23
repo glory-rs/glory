@@ -130,6 +130,26 @@ impl Default for InputProps {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RichTextProps {
+    pub document: crate::rich_text::Document,
+    pub revision: u64,
+    pub enabled: bool,
+    pub read_only: bool,
+    pub placeholder: String,
+}
+impl Default for RichTextProps {
+    fn default() -> Self {
+        Self {
+            document: Default::default(),
+            revision: 0,
+            enabled: true,
+            read_only: false,
+            placeholder: String::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CheckProps {
     pub checked: bool,
     pub label: String,
@@ -167,6 +187,7 @@ pub enum Props {
     Text(TextProps),
     Button(ButtonProps),
     Input(InputProps),
+    RichText(RichTextProps),
     Check(CheckProps),
     Image(ImageProps),
     Link(LinkProps),
@@ -176,7 +197,7 @@ impl Props {
     pub fn interactive(&self) -> bool {
         matches!(
             self,
-            Self::Button(_) | Self::Input(_) | Self::Check(_) | Self::Link(_)
+            Self::Button(_) | Self::Input(_) | Self::RichText(_) | Self::Check(_) | Self::Link(_)
         )
     }
 
@@ -184,6 +205,7 @@ impl Props {
         match self {
             Self::Button(p) => p.enabled,
             Self::Input(p) => p.enabled,
+            Self::RichText(p) => p.enabled,
             Self::Check(p) => p.enabled,
             _ => true,
         }
@@ -259,6 +281,15 @@ impl Descriptor {
     }
 
     fn validate_input_revision(&self, next: &Self) -> Result<(), Error> {
+        if let (Props::RichText(old), Props::RichText(next)) = (&self.props, &next.props)
+            && (next.revision < old.revision
+                || next.revision == old.revision && old.document != next.document)
+        {
+            return Err(Error::InputRevision {
+                current: old.revision,
+                incoming: next.revision,
+            });
+        }
         if let (Props::Input(old), Props::Input(next)) = (&self.props, &next.props)
             && (next.revision < old.revision
                 || next.revision == old.revision
@@ -279,6 +310,14 @@ impl Descriptor {
     // Live descriptors are already canonical/validated. A field patch only
     // needs to rescan payloads it changes; cross-field constraints always run.
     fn validate_fields(&self, input: bool, style: bool, classes: bool) -> Result<(), Error> {
+        if input && let Props::RichText(rich) = &self.props {
+            rich.document.validate()?;
+        }
+        if let Props::RichText(rich) = &self.props
+            && (rich.placeholder.len() > 8192 || rich.placeholder.contains(['\r', '\0']))
+        {
+            return Err(Error::InvalidProps("invalid rich-text placeholder"));
+        }
         if style {
             self.style.validate().map_err(Error::InvalidProps)?;
         }
@@ -391,6 +430,21 @@ impl Descriptor {
             (Patch::Enabled(change), Props::Button(p)) => change.apply_or(&mut p.enabled, true),
             (Patch::Enabled(change), Props::Check(p)) => change.apply_or(&mut p.enabled, true),
             (Patch::Enabled(change), Props::Input(p)) => change.apply_or(&mut p.enabled, true),
+            (Patch::Enabled(change), Props::RichText(p)) => change.apply_or(&mut p.enabled, true),
+            (Patch::RichReadOnly(change), Props::RichText(p)) => change.apply(&mut p.read_only),
+            (Patch::RichPlaceholder(change), Props::RichText(p)) => {
+                change.apply(&mut p.placeholder)
+            }
+            (Patch::RichValue { document, revision }, Props::RichText(p)) => {
+                if !matches!(document, Change::Keep) {
+                    match document {
+                        Change::Set(value) => p.document = *value,
+                        Change::Clear => p.document = Default::default(),
+                        Change::Keep => {}
+                    }
+                    p.revision = revision;
+                }
+            }
             (Patch::Value { value, revision }, Props::Input(p)) => {
                 if !matches!(value, Change::Keep) {
                     value.apply(&mut p.value);
@@ -425,6 +479,12 @@ impl Descriptor {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Patch {
+    RichValue {
+        document: Change<Box<crate::rich_text::Document>>,
+        revision: u64,
+    },
+    RichReadOnly(Change<bool>),
+    RichPlaceholder(Change<String>),
     Text(Change<String>),
     TextKind(Change<TextKind>),
     Selectable(Change<bool>),

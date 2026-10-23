@@ -4,6 +4,7 @@
   'use strict';
   if (!globalThis.GloryStream) {
     const controllers = new Map(), notes = new WeakMap();
+    const rich = globalThis[Symbol.for('glory.richtext.stream')];
     const MAX_BYTES = 8 * 1024 * 1024, MAX_NODES = 100000;
     const tags = new Set(['div', 'main', 'nav', 'section', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'button', 'input', 'textarea', 'label', 'img', 'a']);
     const fail = message => { throw new Error(`Glory stream: ${message}`); };
@@ -19,21 +20,30 @@
     // Installed by the head bootstrap before shell parsing: composition that
     // starts before the first data block is not lost while WASM is loading.
     const editEvent = event => {
-      const element = event.target;
+      let element = event.target;
       if (!(element instanceof Element)) return;
+      element=element.closest('[data-gly-kind="richtext"]')||element;
       const root = element.closest('[data-gly-stream-pending],[data-gly-stream-state="ready"]');
-      if (!root || !['INPUT', 'TEXTAREA'].includes(element.tagName)) return;
+      if (!root || !['INPUT', 'TEXTAREA'].includes(element.tagName) && element.dataset.glyKind!=='richtext') return;
       if (root.hasAttribute('data-gly-root') && !event.type.startsWith('composition')) return;
       const state = note(element);
       if (event.type === 'compositionstart') state.composing = true;
-      else if (event.type === 'compositionend') { state.composing = false; state.dirty.add('value'); }
+      else if (event.type === 'compositionend') { state.composing = false; state.dirty.add(element.dataset.glyKind==='richtext'?'richDocument':'value'); }
       else {
-        state.dirty.add(element.type === 'checkbox' ? 'checked' : 'value');
+        state.dirty.add(element.dataset.glyKind==='richtext'?'richDocument':element.type === 'checkbox' ? 'checked' : 'value');
         if (event.isComposing) state.composing = true;
       }
       element[Symbol.for('glory.preload.composition')] = state.composing;
       controllers.get(root)?.settle(element);
     };
+    const richBeforeWasm = event => {
+      const editor=event.target instanceof Element?event.target.closest('[data-gly-kind="richtext"]'):null;
+      const root=editor?.closest('[data-gly-stream-pending],[data-gly-stream-state="ready"]');
+      if(!root||root.hasAttribute('data-gly-root'))return;
+      const changed=event.type==='click'?rich.taskRich(editor,event):rich.pasteRich(editor,event);
+      if(changed)editEvent(event);
+    };
+    for(const type of ['paste','drop','click'])document.addEventListener(type,richBeforeWasm,true);
     for (const type of ['input', 'change', 'compositionstart', 'compositionend']) document.addEventListener(type, editEvent, true);
     function focusState() {
       const element = document.activeElement;
@@ -148,13 +158,14 @@
         if (shape.children !== null && !seen.has(shape.children)) fail('child slot');
       }
       attributeName(name, value) { if (typeof value !== 'string' && value !== null || !/^[a-z][a-z0-9-]*$/.test(name) || name.startsWith('on') || ['srcdoc', 'data-gly-key', 'data-gly-part', 'data-gly-node', 'data-gly-live'].includes(name)) fail('attribute'); }
-      propertyName(name, value) { if (!['value', 'checked', 'disabled'].includes(name) || (name === 'value' ? typeof value !== 'string' : typeof value !== 'boolean')) fail('property'); }
+      propertyName(name, value) { if(name==='richDocument'){rich.validateRich(value);return;} if (!['value', 'checked', 'disabled'].includes(name) || (name === 'value' ? typeof value !== 'string' : typeof value !== 'boolean')) fail('property'); }
       baseline(entry, piece, element) {
         for (const [name, value] of Object.entries(piece.properties)) {
           let expected = value;
           if (name === 'value') { const probe = element.cloneNode(false); probe.value = value; expected = probe.value; }
           entry.expected[`${piece.part}/${name}`] = expected;
-          if (['value', 'checked'].includes(name) && element[name] !== expected) note(element).dirty.add(name);
+          if(name==='richDocument'){if(JSON.stringify(JSON.parse(rich.readRich(element)).document)!==JSON.stringify(value))note(element).dirty.add(name);}
+          else if (['value', 'checked'].includes(name) && element[name] !== expected) note(element).dirty.add(name);
         }
       }
       createParts(entry) {
@@ -167,7 +178,7 @@
             node = document.createElement(piece.tag);
             for (const [name, value] of Object.entries(piece.attributes)) node.setAttribute(name, value);
             node.setAttribute('data-gly-key', entry.key); node.setAttribute('data-gly-part', piece.part);
-            for (const [name, value] of Object.entries(piece.properties)) node[name] = value;
+            for (const [name, value] of Object.entries(piece.properties)) {if(name==='richDocument')rich.writeRich(node,JSON.stringify(value));else node[name] = value;}
             this.baseline(entry, piece, node);
           }
           parent.append(node); entry.parts[piece.part] = node;
@@ -211,11 +222,12 @@
           } else if (edit.edit === 'property') {
             this.propertyName(edit.name, edit.value);
             const slot = `${edit.part}/${edit.name}`, state = note(node);
-            const dirty = ['value', 'checked'].includes(edit.name) && (state.dirty.has(edit.name) || state.composing || node[edit.name] !== entry.expected[slot]);
+            const dirty = ['value', 'checked', 'richDocument'].includes(edit.name) && (state.dirty.has(edit.name) || state.composing || (edit.name==='richDocument'?JSON.stringify(JSON.parse(rich.readRich(node)).document)!==JSON.stringify(entry.expected[slot]):node[edit.name] !== entry.expected[slot]));
             let expected = edit.value;
             if (edit.name === 'value') { const probe = node.cloneNode(false); probe.value = edit.value; expected = probe.value; }
             entry.expected[slot] = expected;
-            if (!dirty && node[edit.name] !== expected) node[edit.name] = expected;
+            if(edit.name==='richDocument'){if(!dirty)rich.writeRich(node,JSON.stringify(expected));}
+            else if (!dirty && node[edit.name] !== expected) node[edit.name] = expected;
           } else fail('edit kind');
         }
       }
@@ -261,7 +273,7 @@
         this.root.dispatchEvent(new CustomEvent('glory:stream-patch', { detail: { sequence: frame.sequence, nodes: this.entries.size } }));
       }
       validateEnd(frame) {
-        if (frame.html_version !== 3 || !Array.isArray(frame.rekey) || frame.rekey.length !== this.entries.size) fail('end keys/version');
+        if (frame.html_version !== 4 || !Array.isArray(frame.rekey) || frame.rekey.length !== this.entries.size) fail('end keys/version');
         const old = new Set(), next = new Set();
         for (const pair of frame.rekey) { if (!Array.isArray(pair) || pair.length !== 2 || old.has(key(pair[0])) || next.has(key(pair[1])) || !this.entries.has(pair[0])) fail('rekey'); old.add(pair[0]); next.add(pair[1]); }
         if (document.getElementById(this.dataId) || !frame.resources || frame.resources.version !== 1 || !Array.isArray(frame.resources.records) || frame.resources.records.length > 4096) fail('resource envelope/data id');
@@ -289,7 +301,7 @@
           if (!entry.shape.pieces.length) { entry.first.nodeValue = `gly:s:${next}`; entry.last.nodeValue = `gly:e:${next}`; }
         }
         const data = document.createElement('script'); data.id = this.dataId; data.type = 'application/json'; data.setAttribute('data-gly-resources', '1'); data.textContent = JSON.stringify(frame.resources);
-        this.root.after(data); this.first.nodeValue = 'gly:v:3'; this.last.nodeValue = 'gly:/v:3';
+        this.root.after(data); this.first.nodeValue = 'gly:v:4'; this.last.nodeValue = 'gly:/v:4';
         this.phase = 'ready'; this.root.removeAttribute('data-gly-stream-pending'); this.root.dataset.glyStreamState = 'ready';
         this.release(); this.root.dispatchEvent(new CustomEvent('glory:stream-ready', { detail: { dataId: this.dataId, peak: this.peak } }));
       }

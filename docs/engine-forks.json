@@ -19,7 +19,7 @@
     {
       "name": "blitz",
       "git": "https://github.com/glory-rs/blitz",
-      "rev": "b40cdfc2c9b5a000759275b673e4ed8aadd68f78",
+      "rev": "695af0bc5e7f628fab42d153ab61a7399114cf80",
       "upstream": "https://github.com/DioxusLabs/blitz",
       "upstream_rev": "92b11f1bd8ab7975411328b0406a95a09445b4e7",
       "packages": [
@@ -55,7 +55,33 @@
           "system-fonts,complex-scripts,parallel-construct",
           "--lib",
           "style_damage_tests"
+        ],
+        [
+          "-p",
+          "blitz-paint",
+          "--no-default-features",
+          "--lib"
         ]
+      ]
+    },
+    {
+      "name": "parley",
+      "git": "https://github.com/glory-rs/parley",
+      "rev": "3e267c1f887cdf30d0efd2363a9ecffa265c95b7",
+      "upstream": "https://github.com/linebender/parley",
+      "upstream_rev": "6e1143dda817360dd3a2a64f9133c6e5dfabd881",
+      "packages": [
+        "fontique",
+        "parlance",
+        "parley",
+        "parley_data",
+        "parley_emoji",
+        "parley_engine"
+      ],
+      "tests": [
+        "-p",
+        "parley",
+        "--lib"
       ]
     }
   ]

@@ -9,6 +9,7 @@ pub type Load =
     Rc<dyn Fn(u64) -> Pin<Box<dyn Future<Output = std::result::Result<String, String>>>>>;
 pub struct State {
     pub draft: Cage<Option<String>>,
+    pub rich: Cage<Option<glory::render::rich_text::Document>>,
     pub checked: Cage<Option<bool>>,
     pub count: Cage<u64>,
     pub first: Resource<u64, String, String>,
@@ -63,6 +64,25 @@ pub fn widget(
                 glory::ui::Error::Render(glory::render::Error::Backend(error.to_string()))
             })?;
         let draft = scope.cage(None::<String>);
+        let rich = scope.cage(None::<glory::render::rich_text::Document>);
+        let rich_value = scope.bond(move || {
+            rich.get().unwrap_or_else(|| {
+                use glory::render::rich_text::{Document, Inline, Marks};
+                let mut doc = Document::default();
+                doc.root.children[0].spans = vec![Inline::Text {
+                    text: if ready(&second.get()) {
+                        "rich server new".into()
+                    } else {
+                        "rich server initial".into()
+                    },
+                    marks: Marks {
+                        bold: true,
+                        ..Marks::default()
+                    },
+                }];
+                doc
+            })
+        });
         let checked = scope.cage(None::<bool>);
         let count = scope.cage(0_u64);
         let value = scope.bond(move || {
@@ -86,7 +106,17 @@ pub fn widget(
         view()
             .class("stream-app")
             .fill((
-                text().class("stream-title").content("shell now"),
+                group().fill((
+                    text().class("stream-title").content("shell now"),
+                    rich_text().class("stream-rich").document(rich_value).on(
+                        rich_text_changed,
+                        move |event| {
+                            if let Event::RichTextChanged { document, .. } = event {
+                                rich.revise(|old| *old = Some(document));
+                            }
+                        },
+                    ),
+                )),
                 input()
                     .class("stream-editor")
                     .value(value)
@@ -184,6 +214,7 @@ pub fn widget(
             .show_in(scope)?;
         *state.borrow_mut() = Some(State {
             draft,
+            rich,
             checked,
             count,
             first,

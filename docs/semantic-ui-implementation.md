@@ -2053,3 +2053,8 @@ D:/BuildCache/glory-semantic-ui/measurement-evidence-2026-10-23.json。
 后续先用固定聚合计数分清宿主几何读取与业务依赖，再建立不丢scroll ack、
 query、hover、资源/viewport变化的失效条件。OS IME/辅助技术、Android宿主、
 主题和其他架构任务仍按原范围未完成。
+
+
+## 2026-10-23 finite RichText host
+
+新增真实 finite rich document 节点、typed patches/events/query/actions、Web/SSR/stream v4 与原生 Parley attributed editor。原应用编辑 codec 不进入框架。表格、列表、任务、图片和选区是实际 DOM/引擎结构，非 Markdown 预览。变更、全 SHA fork 来源、实测范围及明确未覆盖的 OS 验收见 [semantic-rich-text.md](semantic-rich-text.md)。

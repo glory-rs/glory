@@ -177,6 +177,7 @@ pub fn shape(descriptor: &Descriptor) -> Result<Shape, Error> {
         Props::View => view_tag(descriptor.role),
         Props::Text(text) => text_tag(text.kind, descriptor.options.get::<HtmlTextOptions>())?,
         Props::Button(_) => "button",
+        Props::RichText(_) => "div",
         Props::Input(input) if input.multiline => "textarea",
         Props::Input(_) => "input",
         Props::Check(_) => "label",
@@ -208,6 +209,33 @@ pub fn shape(descriptor: &Descriptor) -> Result<Shape, Error> {
             text(&mut shape, &value.label);
             enabled(&mut shape, Part::Main, value.enabled);
             "button"
+        }
+        Props::RichText(value) => {
+            shape.edit = EditKind::RichText;
+            shape.revision = value.revision;
+            let attributes = attrs(&mut shape, Part::Main);
+            attributes.insert("role", "textbox".into());
+            attributes.insert("aria-multiline", "true".into());
+            attributes.insert(
+                "contenteditable",
+                (value.enabled && !value.read_only).to_string(),
+            );
+            attributes.insert("aria-readonly", value.read_only.to_string());
+            attributes.insert("aria-disabled", (!value.enabled).to_string());
+            attributes.insert(
+                if value.enabled {
+                    "data-gly-enabled"
+                } else {
+                    "data-gly-disabled"
+                },
+                String::new(),
+            );
+            attributes.insert("data-gly-placeholder", value.placeholder.clone());
+            props(&mut shape, Part::Main).insert(
+                "richDocument",
+                Property::RichDocument(value.document.clone()),
+            );
+            "richtext"
         }
         Props::Input(value) => {
             shape.edit = EditKind::Text;

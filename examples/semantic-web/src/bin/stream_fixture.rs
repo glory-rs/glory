@@ -390,6 +390,31 @@ mod native {
                 return asset(&mut socket, mime, &std::fs::read(directory.join(name))?);
             }
         }
+        // wasm-bindgen's statically bundled ES modules are generated below snippets/.
+        // Serve only that bounded asset subtree, never arbitrary request paths.
+        if let Some(path) = std::str::from_utf8(&request)
+            .ok()
+            .and_then(|line| line.split_whitespace().nth(1))
+            .and_then(|path| path.strip_prefix("/snippets/"))
+        {
+            if path.ends_with(".js")
+                && path.split('/').all(|segment| {
+                    !segment.is_empty()
+                        && segment != "."
+                        && segment != ".."
+                        && segment
+                            .bytes()
+                            .all(|b| b.is_ascii_alphanumeric() || b"_- .".contains(&b))
+                        && !segment.contains(' ')
+                })
+            {
+                return asset(
+                    &mut socket,
+                    "text/javascript",
+                    &std::fs::read(directory.join("snippets").join(path))?,
+                );
+            }
+        }
         let reverse = request.starts_with(b"GET /reverse ");
         let broken = request.starts_with(b"GET /broken ");
         let pressure = request.starts_with(b"GET /pressure ");
@@ -418,14 +443,19 @@ mod native {
         result
     }
     pub fn serve() -> std::io::Result<()> {
-        let listener = TcpListener::bind("127.0.0.1:8789")?;
+        let port: u16 = std::env::args()
+            .nth(2)
+            .unwrap_or_else(|| "8789".into())
+            .parse()
+            .map_err(std::io::Error::other)?;
+        let listener = TcpListener::bind(("127.0.0.1", port))?;
         let metrics = Arc::new(Metrics::default());
         let directory = PathBuf::from(
             std::env::args()
                 .nth(1)
                 .unwrap_or_else(|| "D:/BuildCache/glory-semantic-ui/web-demo".into()),
         );
-        println!("Stream transport fixture at http://127.0.0.1:8789/stream");
+        println!("Stream transport fixture at http://127.0.0.1:{port}/stream");
         for socket in listener.incoming() {
             let socket = socket?;
             let metrics = metrics.clone();

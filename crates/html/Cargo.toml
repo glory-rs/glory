@@ -9,8 +9,10 @@ description = "Shared semantic to HTML mapping for Glory rendering hosts"
 [features]
 default = []
 css = ["glory-style/css"]
+wire = ["dep:serde_json"]
 
 [dependencies]
+serde_json = { version = "1", optional = true }
 glory-render = { path = "../render", version = "0.3.1" }
 glory-style = { path = "../style", version = "0.3.1" }
 

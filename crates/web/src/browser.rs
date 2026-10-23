@@ -3,6 +3,7 @@ mod events;
 mod frame;
 #[cfg(feature = "hydrate")]
 mod hydrate;
+mod rich_text;
 #[cfg(feature = "hydrate")]
 pub use hydrate::*;
 
@@ -121,6 +122,9 @@ impl Render for Renderer {
                         y: dom::number(&element, "scrollTop"),
                     })
                 }
+                Query::RichSelection(_) => Ok(QueryValue::RichSelection(rich_text::selection(
+                    &entry.control()?,
+                )?)),
                 Query::Selection(_) => {
                     let element = entry.control()?;
                     let start = js_sys::Reflect::get(&element, &"selectionStart".into())
@@ -154,6 +158,12 @@ impl Render for Renderer {
 fn perform(dom: &Dom, action: Action) -> Result<(), Error> {
     match action {
         Action::Focus(node) => dom::focus(&dom.entry(node)?.control()?)?,
+        Action::RichMarks { node, marks } => {
+            rich_text::set_marks(&dom.entry(node)?.control()?, &marks)?
+        }
+        Action::RichSelection { node, selection } => {
+            rich_text::set_selection(&dom.entry(node)?.control()?, selection)?
+        }
         Action::ScrollTo { node, x, y } => {
             let entry = dom.entry(node)?;
             let element = entry.element()?;

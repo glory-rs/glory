@@ -3,6 +3,7 @@ mod mapping;
 mod patch;
 #[cfg(test)]
 mod patch_tests;
+pub mod rich_text;
 mod serialize;
 #[cfg(feature = "css")]
 mod sheets;
@@ -19,11 +20,12 @@ use std::collections::{BTreeMap, HashMap};
 pub use mapping::{preflight, shape};
 pub use serialize::{escape, serialize};
 pub use styles::style;
-pub const FORMAT_VERSION: u32 = 3;
+pub const FORMAT_VERSION: u32 = 4;
 
 pub const BASE_CSS: &str = concat!(
     "[data-gly-kind]{box-sizing:border-box}[data-gly-kind=text]{margin:0;font:inherit}",
     "[data-gly-kind=button],[data-gly-kind=input],[data-gly-kind=check] input{font:inherit}",
+    "[data-gly-kind=richtext]{min-height:2em;overflow-wrap:anywhere;white-space:pre-wrap}[data-gly-kind=richtext] p{margin:0 0 .5em}[data-gly-kind=richtext] table{border-collapse:collapse;width:100%}[data-gly-kind=richtext] td{border:1px solid #929baa;padding:.4em;vertical-align:top}[data-gly-kind=richtext] img{max-width:100%;height:auto}[data-gly-kind=richtext] pre{white-space:pre-wrap;background:#eef0f4;padding:.5em}[data-gly-kind=richtext] blockquote{border-left:3px solid #8892a0;padding-left:1em;margin-left:0}[data-gly-kind=richtext] li[data-gly-task]{list-style:none;position:relative;padding-left:1.5em}[data-gly-kind=richtext] input[data-gly-task-control]{position:absolute;left:0;top:.2em;margin:0}",
     "[data-gly-virtual=surface]:not([data-gly-live]){height:auto!important;overflow:visible!important}",
     "[data-gly-virtual=row]:not([data-gly-live]){display:flow-root!important;position:relative!important;top:auto!important;left:auto!important}",
 );
@@ -69,6 +71,7 @@ impl Part {
 pub enum Property {
     Text(String),
     Bool(bool),
+    RichDocument(glory_render::rich_text::Document),
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Kind {
@@ -90,6 +93,7 @@ pub enum EditKind {
     #[default]
     None,
     Text,
+    RichText,
     Check,
 }
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

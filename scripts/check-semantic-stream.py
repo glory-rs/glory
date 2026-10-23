@@ -53,7 +53,7 @@ assert "ready second" in frames[2][0]["body"]
 assert frames[1][1] - frames[0][1] >= 60, frames
 assert frames[2][1] - frames[0][1] >= 350, frames
 terminal = json.loads(frames[-1][0]["body"])
-assert terminal["html_version"] == 3
+assert terminal["html_version"] == 4
 assert len(terminal["resources"]["records"]) == 2
 wait_for(lambda s: s["active"] == 0 and s["timers"] == 0)
 

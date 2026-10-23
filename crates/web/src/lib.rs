@@ -4,7 +4,10 @@ mod browser;
 #[cfg(target_arch = "wasm32")]
 pub use browser::*;
 #[cfg(feature = "stream")]
-pub const STREAM_SCRIPT: &str = include_str!("stream.js");
+pub const STREAM_SCRIPT: &str = concat!(
+    include_str!(concat!(env!("OUT_DIR"), "/rich_text_stream.js")),
+    include_str!("stream.js")
+);
 
 /// Read a snapshot without modifying/consuming the data block. A failed
 /// hydration can create a fresh Resources context from the same payload.

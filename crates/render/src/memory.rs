@@ -252,6 +252,9 @@ impl Memory {
                 | Event::CheckedChanged(_)
                 | Event::ValueChanged { .. }
                 | Event::Commit { .. }
+                | Event::RichTextChanged { .. }
+                | Event::RichTextCommit { .. }
+                | Event::RichTextCommand { .. }
         ) && !node.descriptor.props.enabled()
         {
             return Err(Error::InvalidProps(

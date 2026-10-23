@@ -94,6 +94,9 @@ pub fn serialize(tree: &Memory, key: impl Fn(NodeId) -> Option<u64>) -> Result<S
                     }
                     out.push_str(&escape(value));
                 }
+                if let Some(Property::RichDocument(document)) = properties.get("richDocument") {
+                    out.push_str(&crate::rich_text::markup(document));
+                }
                 for child in shape
                     .pieces
                     .iter()

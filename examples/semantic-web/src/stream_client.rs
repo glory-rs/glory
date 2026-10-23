@@ -71,3 +71,14 @@ pub fn stream_program(value: &str) -> std::result::Result<(), JsValue> {
         web.app().flush().map_err(js)
     })
 }
+
+#[wasm_bindgen]
+pub fn stream_rich_text() -> String {
+    APP.with(|app| {
+        app.borrow()
+            .as_ref()
+            .and_then(|(_, state, _)| state.rich.get())
+            .map(|doc| doc.plain_text())
+            .unwrap_or_default()
+    })
+}

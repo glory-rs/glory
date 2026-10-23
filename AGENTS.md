@@ -65,12 +65,12 @@ reduced workspace check as proof that those adapters/platforms work.
   Optional css lowers Sheet selectors with zero-specificity main-node guards;
   Check focus maps to its internal control, enabled/disabled/checked to semantic
   main-node state attributes. Keep full shape, field lowering and classic stream
-  HTML format v3 in agreement. State attributes exist independently of css flags
+  HTML format v4 in agreement. State attributes exist independently of css flags
   so SSR and CSR builds do not acquire different mapping shapes.
   Patch lowering reads the prepared field/inverse, not two complete Shapes;
   full shaping remains for create/snapshot/hydration. Keep the cfg(test) full
   shape difference as a differential oracle when extending any Patch variant.
-  All eighteen variants, default resets, canonicalization, property barriers and
+  All patch variants, default resets, canonicalization, property barriers and
   controlled inputs must agree. Lowering is pure while the guard is borrowed;
   host sink work follows commit and retains the existing prefix/fault contract.
 - `glory-web`: wasm32 DOM interpreter and RAF/async host; no business reentry
@@ -371,7 +371,7 @@ reduced workspace check as proof that those adapters/platforms work.
   genuine forks under the glory-rs GitHub organization, retaining upstream
   package names, repository structure and licenses. Pin full Git commit SHAs;
   do not use moving branch dependencies or application-level global patches.
-- The six engine/layout packages use glory-rs/blitz and glory-rs/taffy Git
+- The engine/layout packages use glory-rs/blitz, glory-rs/taffy and glory-rs/parley Git
   revisions recorded in docs/engine-forks.json. They stay outside the ten-package
   workspace. Run python scripts/check-engine-forks.py --test to verify Cargo's
   resolved sources/lock and run fork-owned tests in separate clean Git checkouts
@@ -731,3 +731,12 @@ lifetime. The default runtime does not allocate this optional test matrix.
 - Use body files/heredocs for multiline GitHub text; attach any created PR.
 - Report remaining report/goal requirements honestly; do not mark the full
   objective complete based only on the new leaf crates or a green unit suite.
+
+## Finite rich document addition
+
+Follow docs/semantic-rich-text.md. RichText has a finite Document and UTF-16 block
+selection, bounded validation, typed value/read-only/placeholder patches and
+Changed/Commit/Command events. It is not raw HTML or Markdown. Keep canonical
+echo identity/caret/composition, deferred program values and explicit pending
+typing marks consistent across Web/stream/SSR and native attributed editors.
+HTML/stream format is v4; style profile versions remain HTML/record v3, native v4.

@@ -623,7 +623,7 @@ fn ordinary_focus_refusal_continues_but_backend_failures_still_fault() {
         } else {
             Action::ScrollTo { node, x: 0., y: 0. }
         };
-        app.scope().action(action).unwrap();
+        app.scope().action(action.clone()).unwrap();
         app.scope().action(action).unwrap();
         assert_eq!(
             app.flush(),

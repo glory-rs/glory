@@ -67,7 +67,7 @@ async (hostPage) => {
         if (mutation === 'version') root.firstChild.nodeValue = 'gly:v:999';
         if (mutation === 'class') root.querySelector('.hydrated').className = 'wrong';
         if (mutation === 'marker') root.querySelector('.h-paragraph').firstChild.remove();
-        if (mutation === 'parser') { const html = root.innerHTML; root.innerHTML = html.replace('<div ', '<p ').replace('</div><!--gly:/v:3-->', '</p><!--gly:/v:3-->'); }
+        if (mutation === 'parser') { const html = root.innerHTML; root.innerHTML = html.replace('<div ', '<p ').replace('</div><!--gly:/v:4-->', '</p><!--gly:/v:4-->'); }
         const before = root.innerHTML; const controls = [...root.querySelectorAll('input,textarea')]; let error = '';
         try { window.demo.hydrate_fixture(); } catch (caught) { error = String(caught); }
         return { error, preserved: before === root.innerHTML, controls: controls.every(element => element.isConnected), claimed: root.hasAttribute('data-gly-app') };

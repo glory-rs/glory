@@ -149,6 +149,29 @@ impl Validator<'_> {
                         });
                     }
                 }
+                EditKind::RichText => {
+                    let (document, selection) = super::rich_text::read(control)?;
+                    let composing = dom::preload_composing(control);
+                    if properties.get("richDocument")
+                        != Some(&Property::RichDocument(document.clone()))
+                    {
+                        self.plan.inputs.push(Input::Event {
+                            node: id,
+                            event: Event::RichTextChanged {
+                                document,
+                                selection,
+                                composing,
+                                revision: shape.revision,
+                            },
+                        });
+                    }
+                    if composing {
+                        self.plan.inputs.push(Input::Event {
+                            node: id,
+                            event: Event::Composition { active: true },
+                        });
+                    }
+                }
                 EditKind::Check => {
                     let actual = js_sys::Reflect::get(control, &"checked".into())
                         .map_err(backend)?
@@ -253,6 +276,10 @@ impl Validator<'_> {
                     if element.text_content().as_deref() != Some(value) {
                         return Err(mismatch(Some(key), "textarea default"));
                     }
+                    inner = None;
+                }
+                if properties.contains_key("richDocument") {
+                    super::rich_text::read(&element)?;
                     inner = None;
                 }
                 for child in shape

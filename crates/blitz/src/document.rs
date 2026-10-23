@@ -91,7 +91,11 @@ fn invariant(message: &'static str) -> Error {
     Error::Backend(format!("Blitz range: {message}"))
 }
 
+#[path = "rich_text.rs"]
+mod rich_text;
+
 struct Range {
+    rich: Option<rich_text::Rich>,
     first: EngineId,
     last: EngineId,
     parts: BTreeMap<Part, EngineId>,
@@ -130,6 +134,8 @@ struct Dom {
     body: EngineId,
     css: EngineId,
     ranges: HashMap<NodeId, Range>,
+    rich_layout: BTreeSet<NodeId>,
+    rich_drag: Option<(NodeId, blitz_traits::events::BlitzPointerId)>,
     owners: HashMap<EngineId, NodeId>,
     controls: HashMap<EngineId, NodeId>,
     dirty: bool,
@@ -224,6 +230,8 @@ impl Dom {
             body,
             css,
             ranges: HashMap::new(),
+            rich_layout: BTreeSet::new(),
+            rich_drag: None,
             owners: HashMap::new(),
             controls: HashMap::new(),
             dirty: true,
@@ -337,6 +345,7 @@ impl Dom {
         self.ranges.insert(
             id,
             Range {
+                rich: None,
                 first,
                 last,
                 parts,
@@ -364,6 +373,9 @@ impl Dom {
         name: &'static str,
         value: &Property,
     ) -> Result<(), Error> {
+        if let Property::RichDocument(document) = value {
+            return self.rich_write(id, document);
+        }
         let node = self.range(id)?.part(part)?;
         let value_seed = self.range(id)?.value_seed;
         let normalized = if name == "value"
@@ -466,6 +478,32 @@ impl Dom {
                 });
             }
             self.invalidate();
+        }
+        let backup = self
+            .ranges
+            .get_mut(&id)
+            .and_then(|r| r.rich.as_mut())
+            .and_then(|r| r.composition_backup.take());
+        if !committed && let Some((document, selection)) = backup {
+            let pending = self
+                .ranges
+                .get_mut(&id)
+                .unwrap()
+                .rich
+                .as_mut()
+                .unwrap()
+                .pending
+                .take();
+            self.rich_write(id, &document)?;
+            self.resolve();
+            self.rich_set_selection(id, selection)?;
+            self.ranges
+                .get_mut(&id)
+                .unwrap()
+                .rich
+                .as_mut()
+                .unwrap()
+                .pending = pending;
         }
         let terminal = if composing {
             Some((self.text_value(id)?, revision))
@@ -583,6 +621,13 @@ impl Dom {
         // Explicitly reclaim every range, including empty/offline Group parks.
         for child in subtree {
             if let Some(range) = self.ranges.remove(&child) {
+                self.rich_layout.remove(&child);
+                if self.rich_drag.is_some_and(|(node, _)| node == child) {
+                    self.rich_drag = None;
+                }
+                if let Some(rich) = &range.rich {
+                    rich.retire_controls(&mut self.controls);
+                }
                 if let Some(control) = range.control.and_then(|part| range.parts.get(&part)) {
                     self.controls.remove(control);
                 }
@@ -623,6 +668,7 @@ impl Dom {
                 }
             });
             self.doc.resolve(self.time);
+            self.rich_layout();
             self.dirty = false;
             self.layouts += 1;
         }
@@ -652,6 +698,9 @@ impl Dom {
             .ok_or(Error::Unsupported("Blitz Group has no physical box"))
     }
     fn control(&self, id: NodeId) -> Result<EngineId, Error> {
+        if let Some(control) = self.rich_control(id) {
+            return Ok(control);
+        }
         let range = self.range(id)?;
         range.part(
             range
@@ -846,12 +895,41 @@ struct State {
     space: Option<NodeId>,
 }
 impl State {
+    fn changed_event(
+        &mut self,
+        node: NodeId,
+        value: String,
+        composing: bool,
+        revision: u64,
+    ) -> Result<Event, Error> {
+        if self.dom.range(node)?.edit == EditKind::RichText {
+            self.dom.rich_event(node, composing, revision)
+        } else {
+            Ok(Event::ValueChanged {
+                value,
+                composing,
+                revision,
+            })
+        }
+    }
+    fn flush_rich_pending(&mut self, node: NodeId) -> Result<(), Error> {
+        let pending = self
+            .dom
+            .ranges
+            .get_mut(&node)
+            .and_then(|r| r.rich.as_mut())
+            .and_then(|r| r.pending.take());
+        if let Some(document) = pending {
+            self.dom.rich_write(node, &document)?;
+        }
+        Ok(())
+    }
     fn end_editing(&mut self, node: NodeId) -> Result<(), Error> {
         if !self
             .dom
             .ranges
             .get(&node)
-            .is_some_and(|range| range.edit == EditKind::Text)
+            .is_some_and(|range| matches!(range.edit, EditKind::Text | EditKind::RichText))
         {
             return Ok(());
         }
@@ -866,14 +944,9 @@ impl State {
                 node,
                 event: Event::Composition { active: false },
             });
-            self.inputs.push(Input::Event {
-                node,
-                event: Event::ValueChanged {
-                    value,
-                    composing: false,
-                    revision,
-                },
-            });
+            let event = self.changed_event(node, value, false, revision)?;
+            self.inputs.push(Input::Event { node, event });
+            self.flush_rich_pending(node)?;
         }
         Ok(())
     }
@@ -1013,6 +1086,13 @@ impl Renderer {
         }
         if state.dom.doc.viewport() != &viewport {
             state.dom.doc.set_viewport(viewport);
+            let rich: Vec<_> = state
+                .dom
+                .ranges
+                .iter()
+                .filter_map(|(id, r)| r.rich.as_ref().map(|_| *id))
+                .collect();
+            state.dom.rich_layout.extend(rich);
             state.dom.invalidate();
         }
         Ok(())
@@ -1235,6 +1315,15 @@ impl Render for Renderer {
         }
         match action {
             glory_render::Action::Focus(id) => state.focus(id),
+            glory_render::Action::RichMarks { node, marks } if state.interactive => {
+                state.dom.rich_set_marks(node, *marks)
+            }
+            glory_render::Action::RichSelection { node, selection } if state.interactive => {
+                state.dom.rich_set_selection(node, selection)
+            }
+            glory_render::Action::RichMarks { .. } | glory_render::Action::RichSelection { .. } => {
+                Err(Error::Unsupported("headless Blitz editing action"))
+            }
             glory_render::Action::ScrollTo { node, x, y } => {
                 let semantic = node;
                 let node = state.dom.main(node)?;
@@ -1337,6 +1426,10 @@ impl Render for Renderer {
                 }
                 Query::Selection(id) if state.interactive => state.dom.selection(id),
                 Query::Selection(_) => Err(Error::Unsupported("headless Blitz selection")),
+                Query::RichSelection(id) if state.interactive => {
+                    state.dom.rich_selection(id).map(QueryValue::RichSelection)
+                }
+                Query::RichSelection(_) => Err(Error::Unsupported("headless Blitz rich selection")),
             }
         })();
         let applied = state.receipt.applied;

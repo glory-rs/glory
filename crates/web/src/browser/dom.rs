@@ -26,6 +26,7 @@ pub(super) struct Editing {
     pub revision: u64,
     requested: u64,
     pending: Option<String>,
+    pending_rich: Option<glory_render::rich_text::Document>,
 }
 pub(super) struct Entry {
     token: String,
@@ -90,6 +91,23 @@ impl Entry {
     }
     fn property(&self, part: Part, name: &str, value: &Property) -> Result<(), Error> {
         let node = self.part(part)?;
+        if let Property::RichDocument(document) = value {
+            let element: Element = node
+                .dyn_into()
+                .map_err(|value: Node| backend(value.into()))?;
+            let current = super::rich_text::read(&element).ok().map(|value| value.0);
+            let mut edit = self.editing.borrow_mut();
+            if edit.composing && current.as_ref() != Some(document) {
+                edit.pending_rich = Some(document.clone());
+                return Ok(());
+            }
+            if current.as_ref() != Some(document) {
+                super::rich_text::write(&element, document)?;
+            }
+            edit.revision = edit.requested;
+            edit.pending_rich = None;
+            return Ok(());
+        }
         if name == "value"
             && let Property::Text(value) = value
         {
@@ -109,6 +127,7 @@ impl Entry {
         let value: JsValue = match value {
             Property::Text(value) => value.into(),
             Property::Bool(value) => (*value).into(),
+            Property::RichDocument(_) => unreachable!(),
         };
         js_sys::Reflect::set(&node, &name.into(), &value).map_err(backend)?;
         Ok(())
@@ -124,6 +143,14 @@ impl Entry {
                 self.control.expect("input control"),
                 "value",
                 &Property::Text(pending),
+            )?;
+        }
+        let pending = self.editing.borrow_mut().pending_rich.take();
+        if let Some(document) = pending {
+            self.property(
+                self.control.expect("rich control"),
+                "richDocument",
+                &Property::RichDocument(document),
             )?;
         }
         Ok(())

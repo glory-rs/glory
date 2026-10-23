@@ -34,6 +34,25 @@ impl Descriptor {
             (Patch::Enabled(change), Props::Button(p)) => exchange(change, &mut p.enabled, true),
             (Patch::Enabled(change), Props::Check(p)) => exchange(change, &mut p.enabled, true),
             (Patch::Enabled(change), Props::Input(p)) => exchange(change, &mut p.enabled, true),
+            (Patch::Enabled(change), Props::RichText(p)) => exchange(change, &mut p.enabled, true),
+            (Patch::RichReadOnly(change), Props::RichText(p)) => {
+                exchange(change, &mut p.read_only, false)
+            }
+            (Patch::RichPlaceholder(change), Props::RichText(p)) => {
+                exchange(change, &mut p.placeholder, String::new())
+            }
+            (Patch::RichValue { document, revision }, Props::RichText(p)) => {
+                if !matches!(document, Change::Keep) {
+                    match document {
+                        Change::Set(value) => std::mem::swap(value.as_mut(), &mut p.document),
+                        Change::Clear => {
+                            *document = Change::Set(Box::new(std::mem::take(&mut p.document)))
+                        }
+                        Change::Keep => {}
+                    }
+                    std::mem::swap(revision, &mut p.revision);
+                }
+            }
             (Patch::Value { value, revision }, Props::Input(p)) => {
                 if !matches!(value, Change::Keep) {
                     exchange(value, &mut p.value, String::new());
@@ -77,6 +96,7 @@ impl Descriptor {
 
     pub(crate) fn patch_live(&mut self, inverse: &mut Patch) -> Result<(), Error> {
         let value = matches!(inverse, Patch::Value { value, .. } if !matches!(value, Change::Keep));
+        let rich = matches!(inverse, Patch::RichValue { document, .. } if !matches!(document, Change::Keep));
         let style = matches!(inverse, Patch::Style(change) if !matches!(change, Change::Keep));
         let classes = matches!(inverse, Patch::Classes(change) if !matches!(change, Change::Keep));
         self.swap_patch(inverse)?;
@@ -100,6 +120,25 @@ impl Descriptor {
                     current: *revision,
                     incoming: input.revision,
                 });
+            }
+            if rich
+                && let (
+                    Props::RichText(input),
+                    Patch::RichValue {
+                        document: Change::Set(old),
+                        revision,
+                    },
+                ) = (&self.props, &inverse)
+            {
+                if input.revision < *revision
+                    || input.revision == *revision && input.document != **old
+                {
+                    return Err(Error::InputRevision {
+                        current: *revision,
+                        incoming: input.revision,
+                    });
+                }
+                input.document.validate()?;
             }
             self.validate_fields(false, style, classes)
         })();

@@ -14,6 +14,12 @@ pub fn verify(mut renderer: impl Render, runtime: RuntimeId, geometry: bool) {
         (Props::Text(TextProps::default()), true, false, false),
         (Props::Button(ButtonProps::default()), true, false, false),
         (Props::Input(InputProps::default()), true, true, false),
+        (
+            Props::RichText(RichTextProps::default()),
+            true,
+            false,
+            false,
+        ),
         (Props::Check(CheckProps::default()), true, false, true),
         (Props::Image(ImageProps::default()), true, false, false),
         (Props::Link(LinkProps::default()), true, false, false),
@@ -59,7 +65,22 @@ pub fn verify(mut renderer: impl Render, runtime: RuntimeId, geometry: bool) {
             (EventKind::Anchor, boxed),
             (EventKind::ValueChanged, edits),
             (EventKind::Commit, edits),
-            (EventKind::Composition, edits),
+            (
+                EventKind::Composition,
+                edits || matches!(props, Props::RichText(_)),
+            ),
+            (
+                EventKind::RichTextChanged,
+                matches!(props, Props::RichText(_)),
+            ),
+            (
+                EventKind::RichTextCommit,
+                matches!(props, Props::RichText(_)),
+            ),
+            (
+                EventKind::RichTextCommand,
+                matches!(props, Props::RichText(_)),
+            ),
             (EventKind::CheckedChanged, checks),
             (EventKind::Drag, matches!(props, Props::View)),
             (EventKind::ColorSchemeChanged, matches!(props, Props::View)),
@@ -73,6 +94,7 @@ pub fn verify(mut renderer: impl Render, runtime: RuntimeId, geometry: bool) {
             Query::Bounds(id),
             Query::Scroll(id),
             Query::Selection(id),
+            Query::RichSelection(id),
             Query::Focus(id),
         ]
         .into_iter()
@@ -102,6 +124,9 @@ pub fn verify(mut renderer: impl Render, runtime: RuntimeId, geometry: bool) {
             let expected = match query {
                 Query::Focus(_) => capabilities.focus && boxed,
                 Query::Selection(_) => capabilities.input && edits,
+                Query::RichSelection(_) => {
+                    capabilities.input && matches!(props, Props::RichText(_))
+                }
                 Query::Bounds(_) | Query::Scroll(_) => geometry && boxed,
             };
             assert_eq!(result.is_ok(), expected, "{props:?}/{query:?}: {result:?}");

@@ -4,7 +4,8 @@ use std::rc::Rc;
 use glory_core::{Cage, Lotus};
 use glory_render::{
     ButtonProps, Change, CheckProps, Descriptor, Event, EventKind, FocusMode, ImageProps,
-    InputProps, ItemPosition, LinkProps, NodeId, Patch, Props, Purpose, Role, TextKind, TextProps,
+    InputProps, ItemPosition, LinkProps, NodeId, Patch, Props, Purpose, RichTextProps, Role,
+    TextKind, TextProps,
 };
 use glory_style::{Display, FlexDirection, Style};
 
@@ -26,6 +27,9 @@ enum Slot {
     Label,
     Enabled,
     Value,
+    RichValue,
+    RichReadOnly,
+    RichPlaceholder,
     Purpose,
     Multiline,
     Checked,
@@ -94,6 +98,10 @@ impl Element {
                                     value: Change::Set(value),
                                     ..
                                 } => session.input_value(node, value),
+                                Patch::RichValue {
+                                    document: Change::Set(document),
+                                    ..
+                                } => session.rich_value(node, *document),
                                 update => session.patch(node, update),
                             };
                             match result {
@@ -222,6 +230,11 @@ element!(Group, group, Props::Group);
 element!(Text, text, Props::Text(TextProps::default()));
 element!(Button, button, Props::Button(ButtonProps::default()));
 element!(Input, input, Props::Input(InputProps::default()));
+element!(
+    RichText,
+    rich_text,
+    Props::RichText(RichTextProps::default())
+);
 element!(Check, check, Props::Check(CheckProps::default()));
 element!(Image, image, Props::Image(ImageProps::default()));
 element!(Link, link, Props::Link(LinkProps::default()));
@@ -249,7 +262,7 @@ macro_rules! common {
         }
     )+};
 }
-common!(View, Text, Button, Input, Check, Image, Link);
+common!(View, Text, Button, Input, RichText, Check, Image, Link);
 impl View {
     /// Structural role; controls, text and images retain their own semantics.
     pub fn role(mut self, role: Role) -> Self {
@@ -281,7 +294,7 @@ macro_rules! enabled {
         impl $name { pub fn enabled(mut self, value: impl Into<Lotus<bool>>) -> Self { self.inner.set(Slot::Enabled, value, |value| Patch::Enabled(Change::Set(value))); self } }
     )+};
 }
-enabled!(Button, Input, Check);
+enabled!(Button, Input, RichText, Check);
 impl Text {
     pub fn content(mut self, value: impl Into<Lotus<String>>) -> Self {
         self.inner
@@ -320,6 +333,31 @@ impl Input {
     pub fn multiline(mut self, value: bool) -> Self {
         self.inner.set(Slot::Multiline, value, |value| {
             Patch::Multiline(Change::Set(value))
+        });
+        self
+    }
+}
+impl RichText {
+    pub fn document(
+        mut self,
+        document: impl Into<Lotus<glory_render::rich_text::Document>>,
+    ) -> Self {
+        self.inner
+            .set(Slot::RichValue, document, |document| Patch::RichValue {
+                document: Change::Set(Box::new(document)),
+                revision: 1,
+            });
+        self
+    }
+    pub fn read_only(mut self, value: impl Into<Lotus<bool>>) -> Self {
+        self.inner.set(Slot::RichReadOnly, value, |value| {
+            Patch::RichReadOnly(Change::Set(value))
+        });
+        self
+    }
+    pub fn placeholder(mut self, value: impl Into<Lotus<String>>) -> Self {
+        self.inner.set(Slot::RichPlaceholder, value, |value| {
+            Patch::RichPlaceholder(Change::Set(value))
         });
         self
     }
@@ -395,6 +433,12 @@ pub mod events {
     pub const activate: EventKind = EventKind::Activate;
     #[allow(non_upper_case_globals)]
     pub const value_changed: EventKind = EventKind::ValueChanged;
+    #[allow(non_upper_case_globals)]
+    pub const rich_text_changed: EventKind = EventKind::RichTextChanged;
+    #[allow(non_upper_case_globals)]
+    pub const rich_text_commit: EventKind = EventKind::RichTextCommit;
+    #[allow(non_upper_case_globals)]
+    pub const rich_text_command: EventKind = EventKind::RichTextCommand;
     #[allow(non_upper_case_globals)]
     pub const checked_changed: EventKind = EventKind::CheckedChanged;
     #[allow(non_upper_case_globals)]

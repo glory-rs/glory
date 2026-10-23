@@ -6,7 +6,7 @@ fn multiline(state: &State, node: NodeId) -> bool {
         .mapper
         .tree()
         .node(node)
-        .is_ok_and(|node| matches!(&node.descriptor.props, glory_render::Props::Input(input) if input.multiline))
+        .is_ok_and(|node| matches!(&node.descriptor.props, glory_render::Props::RichText(_)) || matches!(&node.descriptor.props, glory_render::Props::Input(input) if input.multiline))
 }
 
 pub(super) fn sanitize_ime(state: &State, event: &mut UiEvent) {
@@ -71,11 +71,9 @@ pub(super) fn text_event(state: &mut State, node: NodeId, text: &str) -> Result<
         }
     }
     let range = state.dom.range(node)?;
-    Ok(Event::ValueChanged {
-        value: value.into_owned(),
-        composing: range.editing.composing,
-        revision: range.editing.revision,
-    })
+    let composing = range.editing.composing;
+    let revision = range.editing.revision;
+    state.changed_event(node, value.into_owned(), composing, revision)
 }
 
 // IME preedit offsets are UTF-8 bytes (the native protocol). Query::Selection
@@ -86,6 +84,14 @@ pub(super) fn ime_event(
     event: &BlitzImeEvent,
 ) -> Result<(), Error> {
     use std::num::NonZeroUsize;
+    if state.dom.range(node)?.edit == EditKind::RichText
+        && !state.dom.range(node)?.editing.composing
+        && matches!(event,BlitzImeEvent::Preedit(text,_)|BlitzImeEvent::Commit(text) if !text.is_empty())
+    {
+        state
+            .dom
+            .rich_prepare_ime(node, matches!(event, BlitzImeEvent::Preedit(..)))?;
+    }
     let control = state.dom.control(node)?;
     state.dom.resolve();
     if !state
@@ -153,14 +159,9 @@ pub(super) fn ime_event(
                     node,
                     event: Event::Composition { active: false },
                 });
-                state.inputs.push(Input::Event {
-                    node,
-                    event: Event::ValueChanged {
-                        value,
-                        composing: false,
-                        revision,
-                    },
-                });
+                let event = state.changed_event(node, value, false, revision)?;
+                state.inputs.push(Input::Event { node, event });
+                state.flush_rich_pending(node)?;
             }
         }
         BlitzImeEvent::Commit(text) => {
@@ -188,14 +189,9 @@ pub(super) fn ime_event(
                         event: Event::Composition { active: false },
                     });
                 }
-                state.inputs.push(Input::Event {
-                    node,
-                    event: Event::ValueChanged {
-                        value,
-                        composing: false,
-                        revision,
-                    },
-                });
+                let event = state.changed_event(node, value, false, revision)?;
+                state.inputs.push(Input::Event { node, event });
+                state.flush_rich_pending(node)?;
             }
         }
         BlitzImeEvent::Disabled => {
@@ -250,11 +246,10 @@ pub(super) fn ime_event(
 
 fn native_value(state: &mut State, node: NodeId) -> Result<(), Error> {
     let range = state.dom.range(node)?;
-    let event = Event::ValueChanged {
-        value: state.dom.text_value(node)?,
-        composing: range.editing.composing,
-        revision: range.editing.revision,
-    };
+    let composing = range.editing.composing;
+    let revision = range.editing.revision;
+    let value = state.dom.text_value(node)?;
+    let event = state.changed_event(node, value, composing, revision)?;
     state.inputs.push(Input::Event { node, event });
     Ok(())
 }

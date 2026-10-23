@@ -200,6 +200,33 @@ impl Session {
         )
     }
 
+    pub(crate) fn rich_value(
+        &self,
+        id: NodeId,
+        document: glory_render::rich_text::Document,
+    ) -> Result {
+        let revision = {
+            let present = self.present.borrow();
+            let glory_render::Props::RichText(input) = &present.tree.node(id)?.descriptor.props
+            else {
+                return Err(
+                    RenderError::InvalidProps("rich value requires a rich-text control").into(),
+                );
+            };
+            input
+                .revision
+                .checked_add(1)
+                .ok_or(RenderError::InputRevisionExhausted)?
+        };
+        self.patch(
+            id,
+            Patch::RichValue {
+                document: glory_render::Change::Set(Box::new(document)),
+                revision,
+            },
+        )
+    }
+
     fn place(&self, id: NodeId, parent: Option<NodeId>, before: Option<NodeId>) -> Result {
         let mut present = self.present.borrow_mut();
         let node = present.tree.node(id)?;
@@ -363,15 +390,14 @@ impl Session {
                 .runtime
                 .profile()
                 .map(|profile| profile.span(Phase::Action));
+            let focus_action = matches!(action, Action::Focus(_));
             if let Err(error) = self.renderer.borrow_mut().action(action) {
                 // Focus can become unavailable after queuing (CSS/layout,
                 // disabling, host policy). That ordinary refusal does not
                 // desynchronize the semantic tree. Focus is a best-effort
                 // intent; Query::Focus observes the actual result. Retain later
                 // intents; actual backend failures remain fatal.
-                if matches!(action, Action::Focus(_))
-                    && matches!(error, RenderError::Unsupported(_))
-                {
+                if focus_action && matches!(error, RenderError::Unsupported(_)) {
                     continue;
                 }
                 self.faulted.set(true);
@@ -398,6 +424,14 @@ impl Session {
             {
                 return Ok(false);
             }
+            if let Event::RichTextChanged { revision, .. }
+            | Event::RichTextCommit { revision, .. }
+            | Event::RichTextCommand { revision, .. } = &event
+                && let glory_render::Props::RichText(input) = props
+                && *revision < input.revision
+            {
+                return Ok(false);
+            }
             if !present.tree.validate_event(node, &event)? {
                 return Ok(false);
             }
@@ -410,6 +444,9 @@ impl Session {
                         | Event::ValueChanged { .. }
                         | Event::CheckedChanged(_)
                         | Event::Commit { .. }
+                        | Event::RichTextChanged { .. }
+                        | Event::RichTextCommit { .. }
+                        | Event::RichTextCommand { .. }
                 )
             {
                 return Ok(false);
@@ -744,6 +781,9 @@ impl Scope {
         match action {
             Action::Focus(_) if !capabilities.focus => {
                 return Err(RenderError::Unsupported("focus").into());
+            }
+            Action::RichSelection { .. } | Action::RichMarks { .. } if !capabilities.input => {
+                return Err(RenderError::Unsupported("rich selection").into());
             }
             Action::ScrollTo { .. } if !capabilities.scroll => {
                 return Err(RenderError::Unsupported("scroll").into());
