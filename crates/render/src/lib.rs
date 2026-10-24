@@ -1,12 +1,16 @@
 //! A finite semantic UI contract. No HTML tags, engine types or reactive handles.
 //! Rendering adapters translate this contract into their own objects and ranges.
 
+mod anchor;
 #[cfg(feature = "conformance")]
 pub mod conformance;
 mod id;
+pub use anchor::{AnchorAlign, AnchorPlacement, AnchorPosition, AnchorSide};
 mod node_map;
 pub use node_map::NodeMap;
+mod collapse;
 mod document;
+pub use collapse::{CollapseConfig, MAX_COLLAPSE_MILLIS};
 mod graphic;
 mod graphic_transition;
 pub use graphic::{
@@ -16,8 +20,12 @@ pub use graphic::{
 pub use graphic_transition::GraphicTransition;
 mod choice;
 pub use choice::{ChoiceCommand, ComboboxKind, OptionSemantics};
+mod context_menu;
 mod tags;
-pub use tags::{MAX_TAG_INPUT_BYTES, MAX_TAG_PASTE_BYTES, TagKey, TagSeparators, TagsCommand};
+pub use context_menu::{ContextEditPolicy, ContextPoint, ContextSource};
+pub use tags::{
+    MAX_TAG_INPUT_BYTES, MAX_TAG_PASTE_BYTES, TagHostRejection, TagKey, TagSeparators, TagsCommand,
+};
 mod select;
 pub use select::{
     MAX_SELECT_BYTES, MAX_SELECT_GROUPS, MAX_SELECT_OPTIONS, SelectEntry, SelectGroup,
@@ -57,12 +65,14 @@ mod sheet;
 pub use sheet::{MAX_SHEET_SNAPS, SheetCommand, SheetConfig};
 mod slider;
 pub use slider::SliderValue;
+mod spinbutton;
+pub use spinbutton::SpinValue;
 mod splitter;
 pub use splitter::RangeCommand;
 mod typeahead;
 pub use typeahead::{MAX_TYPEAHEAD_MILLIS, validate_typeahead};
 mod drag;
-pub use drag::DragPhase;
+pub use drag::{DragCapture, DragPhase};
 mod menu;
 pub use menu::{MenuCommand, PointerPhase};
 
@@ -143,6 +153,8 @@ pub struct Capabilities {
     pub scroll: bool,
     pub focus: bool,
     pub input: bool,
+    /// Emits a terminal observation for each finite collapse configuration.
+    pub collapse_completion: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -251,6 +263,14 @@ impl Action {
     /// Validate after checking identity, before capability checks or queuing.
     pub fn validate_target<'a>(self, node: impl Into<DescriptorView<'a>>) -> Result<(), Error> {
         let node = node.into();
+        if matches!(self, Self::Focus(_))
+            && node.semantics.as_ref().is_some_and(|s| s.menubar_item)
+            && node.focus != FocusMode::TabStop
+        {
+            return Err(Error::Unsupported(
+                "menubar focus intent no longer names the current root",
+            ));
+        }
         if matches!(self, Self::RevealOption { .. })
             && !node.semantics.as_ref().is_some_and(|s| s.option.is_some())
         {
@@ -272,7 +292,12 @@ impl Action {
                     .semantics
                     .as_ref()
                     .and_then(|s| s.layer.as_ref())
-                    .is_some_and(|layer| !layer.modal && layer.return_focus.is_some()))
+                    .is_some_and(|layer| {
+                        !layer.modal
+                            && (layer.return_focus.is_some()
+                                || matches!(layer.placement, LayerPlacement::ContextPoint(_))
+                                    && layer.anchor.is_some())
+                    }))
         {
             return Err(Error::Unsupported(
                 "menu exit requires a named nonmodal menu with a return target",
@@ -359,6 +384,16 @@ pub enum QueryValue {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
+    /// Terminal presentation observation; valid while the closing subtree is
+    /// logically hidden/inert, without admitting business input there.
+    CollapseComplete {
+        revision: u64,
+    },
+    ContextMenu {
+        from: NodeId,
+        point: ContextPoint,
+        source: ContextSource,
+    },
     Sheet {
         from: NodeId,
         revision: u64,
@@ -367,6 +402,10 @@ pub enum Event {
     NavigationPanel {
         from: NodeId,
         command: NavigationPanelCommand,
+    },
+    Spin {
+        from: NodeId,
+        command: RangeCommand,
     },
     Range {
         from: NodeId,
@@ -413,6 +452,10 @@ pub enum Event {
     Keyboard {
         from: NodeId,
         command: KeyboardCommand,
+    },
+    /// Only the explicit palette chord; other application commands stay native.
+    Palette {
+        from: NodeId,
     },
     /// Start/Move/Cancel target the source. Drop targets a live accepting node.
     Drag {
@@ -504,9 +547,12 @@ pub struct ScrollAck {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum EventKind {
+    CollapseComplete,
+    ContextMenu,
     Tags,
     Sheet,
     NavigationPanel,
+    Spin,
     Range,
     ScrollKeyboard,
     ImageStatus,
@@ -519,6 +565,7 @@ pub enum EventKind {
     Dismiss,
     ColorSchemeChanged,
     Keyboard,
+    Palette,
     Drag,
     ValueChanged,
     Commit,
@@ -541,6 +588,28 @@ impl EventKind {
     /// can produce it (SSR records handlers for later browser adoption).
     pub fn validate_target<'a>(self, node: impl Into<DescriptorView<'a>>) -> Result<(), Error> {
         let node = node.into();
+        if self == Self::CollapseComplete
+            && (!matches!(node.props, Props::View)
+                || !node
+                    .semantics
+                    .as_ref()
+                    .is_some_and(|s| s.collapse.is_some()))
+        {
+            return Err(Error::InvalidProps(
+                "collapse completion requires a collapse View",
+            ));
+        }
+        if self == Self::ContextMenu
+            && (!matches!(node.props, Props::View)
+                || !node
+                    .semantics
+                    .as_ref()
+                    .is_some_and(|s| s.context_menu.is_some()))
+        {
+            return Err(Error::InvalidProps(
+                "context requests require an opted-in region view",
+            ));
+        }
         if self == Self::Tags
             && !matches!(node.props,Props::Input(input) if !input.multiline && node.semantics.as_ref().is_some_and(|s|s.tags_input.is_some()))
         {
@@ -556,6 +625,13 @@ impl EventKind {
         {
             return Err(Error::InvalidProps(
                 "navigation panel commands require a physical navigation control or content view",
+            ));
+        }
+        if self == Self::Spin
+            && !matches!(node.props, Props::Input(p) if !p.multiline && node.semantics.as_ref().is_some_and(|s| s.spinbutton.is_some()))
+        {
+            return Err(Error::InvalidProps(
+                "spin commands require an opted-in single-line input",
             ));
         }
         if self == Self::Range
@@ -596,6 +672,7 @@ impl EventKind {
             self,
             Self::Activate
                 | Self::Keyboard
+                | Self::Palette
                 | Self::ScrollKeyboard
                 | Self::Drag
                 | Self::Navigate
@@ -621,6 +698,16 @@ impl EventKind {
         {
             return Err(Error::Unsupported(
                 "host observation requires a semantic View",
+            ));
+        }
+        if self == Self::Palette
+            && matches!(
+                node.props,
+                Props::Group | Props::Input(_) | Props::Select(_)
+            )
+        {
+            return Err(Error::Unsupported(
+                "palette shortcut requires a non-editor physical scope or origin",
             ));
         }
         if matches!(self, Self::ValueChanged | Self::Commit | Self::Composition)
@@ -665,7 +752,8 @@ impl Event {
     pub fn is_terminal_loss(&self) -> bool {
         matches!(
             self,
-            Self::FocusChanged(false)
+            Self::CollapseComplete { .. }
+                | Self::FocusChanged(false)
                 | Self::Composition { active: false }
                 | Self::FocusWithin { focused: false, .. }
                 | Self::Drag {
@@ -685,6 +773,7 @@ impl Event {
 
     pub(crate) fn origin(&self) -> Option<NodeId> {
         match self {
+            Self::ContextMenu { from, .. } => Some(*from),
             Self::Tags { from, .. } => Some(*from),
             Self::Submit { submitter } => *submitter,
             Self::FocusWithin { node, .. } => Some(*node),
@@ -693,9 +782,11 @@ impl Event {
             | Self::Pointer { from, .. }
             | Self::PointerWithin { from, .. } => Some(*from),
             Self::Typeahead { from, .. } => Some(*from),
-            Self::Choice { from, .. } | Self::Keyboard { from, .. } => Some(*from),
+            Self::Choice { from, .. } | Self::Keyboard { from, .. } | Self::Palette { from } => {
+                Some(*from)
+            }
             Self::ScrollKeyboard { from, .. } => Some(*from),
-            Self::Range { from, .. } => Some(*from),
+            Self::Spin { from, .. } | Self::Range { from, .. } => Some(*from),
             Self::Sheet { from, .. } => Some(*from),
             Self::NavigationPanel { from, .. } => Some(*from),
             Self::Drag { from, .. } => Some(*from),
@@ -713,6 +804,21 @@ impl Event {
         node: impl Into<DescriptorView<'a>>,
     ) -> Result<(), Error> {
         let node = node.into();
+        if let Self::CollapseComplete { revision } = self {
+            let config = node
+                .semantics
+                .as_ref()
+                .and_then(|s| s.collapse.as_ref())
+                .ok_or(Error::InvalidEvent(
+                    "collapse completion requires a collapse View",
+                ))?;
+            if *revision > config.revision {
+                return Err(Error::CollapseRevision {
+                    current: config.revision,
+                    incoming: *revision,
+                });
+            }
+        }
         if let Self::Sheet {
             from,
             revision,
@@ -762,6 +868,7 @@ impl Event {
                 }
                 DismissReason::Escape => layer.escape,
                 DismissReason::Outside => layer.outside,
+                DismissReason::AnchorLost => layer.anchor.is_some(),
             } {
                 return Err(Error::InvalidEvent("disabled layer dismissal"));
             }
@@ -795,6 +902,37 @@ impl Event {
                 && rect.height >= 0.0
         };
         match self {
+            Self::ContextMenu { from, point, .. } => {
+                if from.runtime() != target.runtime() {
+                    return Err(Error::ForeignRuntime);
+                }
+                point.validate()?;
+                EventKind::ContextMenu.validate_target(node)?;
+            }
+            Self::Spin { from, command } => {
+                EventKind::Spin.validate_target(node)?;
+                if *from != target {
+                    return Err(Error::InvalidEvent(
+                        "spin command requires its physical origin",
+                    ));
+                }
+                let spin = node
+                    .semantics
+                    .as_ref()
+                    .filter(|s| !s.disabled && !s.readonly && node.props.enabled())
+                    .and_then(|s| s.spinbutton.as_ref())
+                    .ok_or(Error::InvalidEvent(
+                        "spin command requires an enabled writable input",
+                    ))?;
+                spin.validate_command(*command)?;
+                if matches!(command, RangeCommand::Increase | RangeCommand::PageIncrease)
+                    && !spin.can_increase
+                    || matches!(command, RangeCommand::Decrease | RangeCommand::PageDecrease)
+                        && !spin.can_decrease
+                {
+                    return Err(Error::InvalidEvent("spin direction is unavailable"));
+                }
+            }
             Self::Range { from, command } => {
                 let range = node
                     .semantics
@@ -913,6 +1051,17 @@ impl Event {
                     return Err(Error::InvalidEvent("submit requires a text control"));
                 }
             }
+            Self::Palette { from } => {
+                if from.runtime() != target.runtime() {
+                    return Err(Error::ForeignRuntime);
+                }
+                if *from != target {
+                    return Err(Error::InvalidEvent(
+                        "palette shortcut requires its physical origin",
+                    ));
+                }
+                EventKind::Palette.validate_target(node)?;
+            }
             Self::Navigate { from, .. } if *from != target => {
                 return Err(Error::InvalidEvent(
                     "navigation origin must match its event target",
@@ -1016,7 +1165,10 @@ impl Event {
 
     pub fn kind(&self) -> EventKind {
         match self {
+            Self::CollapseComplete { .. } => EventKind::CollapseComplete,
+            Self::ContextMenu { .. } => EventKind::ContextMenu,
             Self::Tags { .. } => EventKind::Tags,
+            Self::Spin { .. } => EventKind::Spin,
             Self::Range { .. } => EventKind::Range,
             Self::Sheet { .. } => EventKind::Sheet,
             Self::NavigationPanel { .. } => EventKind::NavigationPanel,
@@ -1031,6 +1183,7 @@ impl Event {
             Self::Dismiss(_) => EventKind::Dismiss,
             Self::ColorSchemeChanged { .. } => EventKind::ColorSchemeChanged,
             Self::Keyboard { .. } => EventKind::Keyboard,
+            Self::Palette { .. } => EventKind::Palette,
             Self::Drag { .. } => EventKind::Drag,
             Self::ValueChanged { .. } => EventKind::ValueChanged,
             Self::Commit { .. } => EventKind::Commit,
@@ -1108,6 +1261,11 @@ pub enum Error {
         incoming: u64,
     },
     SheetRevisionExhausted,
+    CollapseRevision {
+        current: u64,
+        incoming: u64,
+    },
+    CollapseRevisionExhausted,
 }
 
 impl std::fmt::Display for Error {

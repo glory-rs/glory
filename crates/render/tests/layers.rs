@@ -29,9 +29,21 @@ fn layer_contract_rejects_invalid_targets_and_relations() {
         assert!(invalid.validate().is_err());
     }
     for (placement, anchor) in [
-        (LayerPlacement::AnchorStart, None),
+        (
+            LayerPlacement::Anchor(glory_render::AnchorPlacement::new(
+                glory_render::AnchorSide::Bottom,
+                glory_render::AnchorAlign::Start,
+            )),
+            None,
+        ),
         (LayerPlacement::Center, Some("other")),
-        (LayerPlacement::AnchorEnd, Some("dialog")),
+        (
+            LayerPlacement::Anchor(glory_render::AnchorPlacement::new(
+                glory_render::AnchorSide::Bottom,
+                glory_render::AnchorAlign::End,
+            )),
+            Some("dialog"),
+        ),
     ] {
         let mut invalid = d.clone();
         let l = invalid.semantics.as_mut().unwrap().layer.as_mut().unwrap();

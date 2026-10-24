@@ -212,17 +212,7 @@ pub(crate) fn lower(next: glory_render::DescriptorView<'_>, inverse: &Patch) -> 
         }
         Patch::Role(change) => {
             let old = *old!(change);
-            let old = old.or_else(|| {
-                (matches!(next.props, Props::View)
-                    && next.document_part().is_none()
-                    && next.field_part() != Some(glory_render::FieldPart::Form)
-                    && (next.name.is_some()
-                        || next
-                            .semantics
-                            .as_ref()
-                            .is_some_and(|s| s.labelled_by.is_some())))
-                .then_some(Role::Group)
-            });
+            let old = glory_render::DescriptorView { role: old, ..next }.effective_role();
             semantics(
                 &mut edits,
                 control,
@@ -234,14 +224,11 @@ pub(crate) fn lower(next: glory_render::DescriptorView<'_>, inverse: &Patch) -> 
         }
         Patch::Semantics(change) => {
             let old = old!(change);
-            let old_role = next.role.or_else(|| {
-                (matches!(next.props, Props::View)
-                    && next.document_part().is_none()
-                    && next.field_part() != Some(glory_render::FieldPart::Form)
-                    && (next.name.is_some()
-                        || old.as_ref().is_some_and(|s| s.labelled_by.is_some())))
-                .then_some(Role::Group)
-            });
+            let old_role = glory_render::DescriptorView {
+                semantics: old,
+                ..next
+            }
+            .effective_role();
             semantics(
                 &mut edits,
                 control,

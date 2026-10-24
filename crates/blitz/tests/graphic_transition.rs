@@ -94,6 +94,22 @@ fn real_pixels_interrupt_equal_keep_completion_reduction_and_retirement_are_curr
     assert!(!renderer.inspect(|d| d.is_animating()));
     renderer.set_motion_preference(MotionPreference::NoPreference);
     assert!(!renderer.inspect(|d| d.is_animating()));
+    source.revise(|g| *g = drawing(4.));
+    app.flush().unwrap();
+    renderer.advance_time(1.15).unwrap();
+    source.revise(|g| g.transition = None);
+    app.flush().unwrap();
+    raster.draw(&renderer).unwrap();
+    assert_eq!(pixel(&raster, 12, 4), [0, 255, 0, 255]);
+    assert!(!renderer.inspect(|d| d.is_animating()));
+    source.revise(|g| {
+        *g = drawing(20.);
+        g.transition.as_mut().unwrap().duration_millis = 0;
+    });
+    app.flush().unwrap();
+    raster.draw(&renderer).unwrap();
+    assert_eq!(pixel(&raster, 12, 20), [0, 255, 0, 255]);
+    assert!(!renderer.inspect(|d| d.is_animating()));
     assert_eq!(
         renderer.engine_id(id, glory_html::Part::Main).unwrap(),
         engine
@@ -145,5 +161,50 @@ fn actual_group_clip_opacity_and_hidden_cancel_preserve_accepted_endpoint() {
     app.flush().unwrap();
     raster.draw(&renderer).unwrap();
     assert_eq!(pixel(&raster, 6, 20), [0, 128, 0, 128]);
+    assert!(!renderer.inspect(|d| d.is_animating()));
+    hidden.revise(|v| *v = true);
+    app.flush().unwrap();
+    // A fresh visible target must not replay the endpoint accepted while hidden.
+    hidden.revise(|v| *v = false);
+    source.revise(|g| *g = drawing(4.));
+    app.flush().unwrap();
+    raster.draw(&renderer).unwrap();
+    assert_eq!(pixel(&raster, 6, 4), [0, 128, 0, 128]);
+    assert_eq!(pixel(&raster, 6, 20), [0, 0, 0, 0]);
+    assert!(!renderer.inspect(|d| d.is_animating()));
+}
+#[test]
+fn enabling_transition_on_a_newly_shown_graphic_starts_at_the_accepted_endpoint() {
+    let (app, renderer) = host();
+    let mut initial = drawing(4.);
+    initial.transition = None;
+    let source = app.scope().cage(initial);
+    let hidden = app.scope().cage(false);
+    app.mount(
+        view()
+            .semantics(hidden.map(|hidden| {
+                Some(Box::new(Semantics {
+                    hidden: *hidden,
+                    ..Default::default()
+                }))
+            }))
+            .fill(
+                graphic()
+                    .drawing(source)
+                    .style(Style::new().width(Length::Px(24.)).height(Length::Px(24.))),
+            ),
+    )
+    .unwrap();
+    let mut raster = Raster::new();
+    raster.draw(&renderer).unwrap();
+    hidden.revise(|v| *v = true);
+    app.flush().unwrap();
+    raster.draw(&renderer).unwrap();
+    hidden.revise(|v| *v = false);
+    source.revise(|g| *g = drawing(20.));
+    app.flush().unwrap();
+    raster.draw(&renderer).unwrap();
+    assert_eq!(pixel(&raster, 12, 20), [0, 255, 0, 255]);
+    assert_eq!(pixel(&raster, 12, 4), [0, 0, 0, 0]);
     assert!(!renderer.inspect(|d| d.is_animating()));
 }

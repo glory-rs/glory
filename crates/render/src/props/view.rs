@@ -58,6 +58,14 @@ impl<'a> DescriptorView<'a> {
         if self.field_part() == Some(crate::FieldPart::Form) {
             return None;
         }
+        if matches!(self.props, Props::Input(_))
+            && self
+                .semantics
+                .as_ref()
+                .is_some_and(|s| s.spinbutton.is_some())
+        {
+            return Some(Role::SpinButton);
+        }
         self.role.or_else(|| {
             (matches!(self.props, Props::View)
                 && (self.name.is_some()
@@ -81,6 +89,16 @@ impl<'a> DescriptorView<'a> {
         style: bool,
         classes: bool,
     ) -> Result<(), Error> {
+        if self.role == Some(Role::SpinButton) {
+            return Err(Error::InvalidProps(
+                "spinbutton is intrinsic to numeric Input metadata",
+            ));
+        }
+        if self.role == Some(Role::Menubar) && self.semantics.is_none() {
+            return Err(Error::InvalidProps(
+                "menubar role requires finite navigation metadata",
+            ));
+        }
         if self.role == Some(Role::Slider)
             && self.semantics.as_ref().is_none_or(|s| s.slider.is_none())
         {

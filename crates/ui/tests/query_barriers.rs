@@ -25,6 +25,7 @@ impl Render for Delayed {
             scroll: true,
             focus: true,
             input: true,
+            collapse_completion: false,
         }
     }
     fn apply(&mut self, mutations: &[Mutation]) -> Result<Receipt, Error> {

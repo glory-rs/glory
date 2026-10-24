@@ -83,15 +83,19 @@ pub(super) fn receive(
             && let Some(from) = interested(dom, id)
         {
             let slider = dom.entry(from)?.element()?.has_attribute("data-gly-slider");
-            if slider {
-                let control = dom.entry(from)?.element()?;
-                if control.get_attribute("aria-disabled").as_deref() == Some("true")
+            let control = dom.entry(from)?.element()?;
+            let capture = control.get_attribute("data-gly-drag-capture");
+            let immediate = slider || matches!(capture.as_deref(), Some("press" | "press-focus"));
+            if immediate {
+                if control.closest("[hidden],[data-gly-hidden],[inert],[aria-disabled=true],fieldset[disabled]").map_err(backend)?.is_some()
                     || control.get_attribute("aria-readonly").as_deref() == Some("true")
                 {
                     return Ok(false);
                 }
                 event.prevent_default();
-                super::super::dom::focus(&control)?;
+                if slider || capture.as_deref() == Some("press-focus") {
+                    super::super::dom::focus(&control)?;
+                }
                 dom.queue(
                     from,
                     Event::Drag {
@@ -107,7 +111,8 @@ pub(super) fn receive(
                 pointer: pointer.pointer_id(),
                 x,
                 y,
-                started: slider,
+                started: immediate,
+                captured: immediate || control.has_attribute("data-gly-splitter"),
             });
             let _ = element.set_pointer_capture(pointer.pointer_id());
         }
@@ -120,7 +125,26 @@ pub(super) fn receive(
         *dom.drag.borrow_mut() = Some(drag);
         return Ok(false);
     }
-    if matches!(name, "pointercancel" | "lostpointercapture") {
+    let live = dom
+        .entry(drag.from)
+        .ok()
+        .and_then(|entry| entry.element().ok());
+    let unavailable = if let Some(control) = live.as_ref() {
+        !control.is_connected()
+            || control
+                .closest(
+                    "[hidden],[data-gly-hidden],[inert],[aria-disabled=true],fieldset[disabled]",
+                )
+                .map_err(backend)?
+                .is_some()
+            || drag.captured
+                && !(control.has_attribute("data-gly-slider")
+                    || control.has_attribute("data-gly-splitter")
+                    || control.has_attribute("data-gly-drag-capture"))
+    } else {
+        true
+    };
+    if matches!(name, "pointercancel" | "lostpointercapture") || unavailable {
         if drag.started {
             dom.queue(
                 drag.from,
@@ -171,15 +195,7 @@ pub(super) fn receive(
         if drag.started {
             event.prevent_default();
             dom.suppress_click.set(true);
-            let captured = dom
-                .entry(drag.from)
-                .ok()
-                .and_then(|entry| entry.element().ok())
-                .is_some_and(|element| {
-                    element.has_attribute("data-gly-splitter")
-                        || element.has_attribute("data-gly-slider")
-                });
-            let (to, phase) = (if captured {
+            let (to, phase) = (if drag.captured {
                 Some(drag.from)
             } else {
                 hit(dom, x, y)

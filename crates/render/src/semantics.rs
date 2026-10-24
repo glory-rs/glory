@@ -41,6 +41,7 @@ pub enum LinkOpen {
 pub enum Current {
     Page,
     Step,
+    Location,
 }
 /// The popup role is one typed value, never an independent boolean flag.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -107,7 +108,7 @@ impl Default for Layer {
         }
     }
 }
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum LayerPlacement {
     #[default]
     Center,
@@ -115,10 +116,9 @@ pub enum LayerPlacement {
     Right,
     Top,
     Bottom,
-    AnchorStart,
-    AnchorEnd,
-    AnchorRight,
-    AnchorLeft,
+    Anchor(crate::AnchorPlacement),
+    /// A context request in viewport CSS pixels, belonging to `Layer::anchor`.
+    ContextPoint(crate::ContextPoint),
 }
 impl LayerPlacement {
     pub fn as_str(self) -> &'static str {
@@ -128,10 +128,8 @@ impl LayerPlacement {
             Self::Right => "right",
             Self::Top => "top",
             Self::Bottom => "bottom",
-            Self::AnchorStart => "anchor-start",
-            Self::AnchorEnd => "anchor-end",
-            Self::AnchorRight => "anchor-right",
-            Self::AnchorLeft => "anchor-left",
+            Self::Anchor(_) => "anchor",
+            Self::ContextPoint(_) => "context-point",
         }
     }
 }
@@ -140,6 +138,8 @@ pub enum DismissReason {
     Gesture,
     Escape,
     Outside,
+    /// The declared anchor is no longer a live visible semantic box.
+    AnchorLost,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -234,11 +234,18 @@ impl Orientation {
 /// live names in their document. Removing a target retains no owning reference.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Semantics {
+    /// Optional intrinsic-height presentation with immediate logical hiding.
+    pub collapse: Option<crate::CollapseConfig>,
+    /// Immediate primary-pointer capture, in viewport CSS pixels.
+    pub drag_capture: Option<crate::DragCapture>,
+    /// An explicit context region. Touch long-press remains host-native.
+    pub context_menu: Option<crate::ContextEditPolicy>,
     /// Opted-in free tag entry policy; retains the Input's intrinsic textbox.
     pub tags_input: Option<crate::TagSeparators>,
     pub progress: Option<crate::ProgressValue>,
     pub splitter: Option<crate::RangeValue>,
     pub slider: Option<crate::SliderValue>,
+    pub spinbutton: Option<crate::SpinValue>,
     /// Opt-in keyboard commands only while this viewport itself owns focus.
     pub scroll_keyboard: Option<crate::ScrollAxes>,
     /// An application-owned pending state on a boxed semantic node.
@@ -267,6 +274,8 @@ pub struct Semantics {
     pub active_descendant: Option<SemanticId>,
     pub listbox_multiple: bool,
     pub menu_item: Option<MenuItemSemantics>,
+    /// An intrinsic action trigger belonging to a structural Menubar.
+    pub menubar_item: bool,
     pub layer: Option<Layer>,
     /// Passive grip hit area; the nearest live sheet owns pointer gestures.
     pub sheet_grip: bool,
@@ -297,6 +306,77 @@ pub struct Semantics {
 }
 impl Semantics {
     pub(crate) fn validate(&self, d: crate::DescriptorView<'_>) -> Result<(), Error> {
+        if let Some(collapse) = &self.collapse {
+            collapse.validate()?;
+            collapse.validate_style(d.style)?;
+            if !matches!(d.props, Props::View)
+                || self.layer.is_some()
+                || self.document_part.is_some()
+                || self.field_part.is_some()
+                || self.hidden == collapse.open
+                || self.inert == collapse.open
+            {
+                return Err(Error::InvalidProps(
+                    "collapse requires an independent View and hidden/inert opposite to open",
+                ));
+            }
+        }
+        if self.drag_capture.is_some()
+            && (!matches!(d.props, Props::View)
+                || self.slider.is_some()
+                || self.splitter.is_some()
+                || self.sheet_grip)
+        {
+            return Err(Error::InvalidProps(
+                "press drag capture requires an independent boxed View",
+            ));
+        }
+        if self.drag_capture == Some(crate::DragCapture::PressFocus)
+            && d.focus == crate::FocusMode::Auto
+        {
+            return Err(Error::InvalidProps(
+                "focus capture requires an explicit View focus mode",
+            ));
+        }
+        if d.role == Some(Role::Menubar)
+            && (self.id.is_none()
+                || self.navigation != Some(Orientation::Horizontal)
+                || d.focus != crate::FocusMode::Auto
+                || self.layer.is_some())
+        {
+            return Err(Error::InvalidProps(
+                "menubar requires a named horizontal container with roving child focus",
+            ));
+        }
+        if self.menubar_item
+            && (!matches!(d.props, Props::Button(_))
+                || !self
+                    .menu_item
+                    .as_ref()
+                    .is_some_and(|item| item.kind == MenuItemKind::Action)
+                || self.popup != Some(PopupKind::Menu)
+                || self.controls.is_none()
+                || self.id.is_none()
+                || !self.navigation_item
+                || d.focus == crate::FocusMode::Auto)
+        {
+            return Err(Error::InvalidProps(
+                "menubar root requires an intrinsic menuitem popup button with explicit roving focus",
+            ));
+        }
+        if self.context_menu.is_some()
+            && (!matches!(d.props, Props::View)
+                || d.effective_role() != Some(Role::Group)
+                || self.id.is_none()
+                || self.layer.is_some()
+                || self.popup.is_some()
+                || self.expanded.is_some()
+                || self.navigation.is_some())
+        {
+            return Err(Error::InvalidProps(
+                "context policy requires an independent named group region",
+            ));
+        }
         if self.tags_input.is_some()
             && (!matches!(d.props,crate::Props::Input(input) if !input.multiline)
                 || self.combobox.is_some()
@@ -378,8 +458,44 @@ impl Semantics {
                 ));
             }
         }
+        if let Some(spin) = &self.spinbutton {
+            spin.validate()?;
+            if !matches!(d.props, Props::Input(p) if !p.multiline && matches!(p.purpose, crate::Purpose::Text | crate::Purpose::Number))
+                || self.combobox.is_some()
+                || self.tags_input.is_some()
+                || self.popup.is_some()
+                || self.navigation.is_some()
+                || self.option.is_some()
+                || self.slider.is_some()
+                || self.splitter.is_some()
+            {
+                return Err(Error::InvalidProps(
+                    "spinbutton requires an independent single-line numeric text input",
+                ));
+            }
+            if (self.disabled || self.readonly || !d.props.enabled())
+                && (spin.can_increase || spin.can_decrease)
+            {
+                return Err(Error::InvalidProps(
+                    "disabled or readonly spinbuttons cannot advertise adjustment",
+                ));
+            }
+            if spin.value.is_some_and(|v| {
+                spin.min.is_some_and(|min| v < min) || spin.max.is_some_and(|max| v > max)
+            }) && !self.invalid
+            {
+                return Err(Error::InvalidProps(
+                    "outside spinbutton coordinates require invalid metadata",
+                ));
+            }
+        }
         if let Some(slider) = &self.slider {
             slider.validate()?;
+            if slider.range.min == slider.range.max && !self.readonly {
+                return Err(Error::InvalidProps(
+                    "a fixed slider interval requires readonly semantics",
+                ));
+            }
             if !matches!(d.props, Props::View)
                 || d.role != Some(Role::Slider)
                 || d.focus == crate::FocusMode::Auto
@@ -577,6 +693,19 @@ impl Semantics {
             ));
         }
         if let Some(layer) = &self.layer {
+            if let LayerPlacement::Anchor(placement) = layer.placement {
+                placement.validate()?;
+            }
+            if let LayerPlacement::ContextPoint(point) = layer.placement {
+                point
+                    .validate()
+                    .map_err(|_| Error::InvalidProps("context layer point must be finite"))?;
+                if d.role != Some(Role::Menu) {
+                    return Err(Error::InvalidProps(
+                        "context point positioning requires a menu",
+                    ));
+                }
+            }
             if let Some(sheet) = &layer.sheet {
                 sheet.validate()?;
                 if d.style
@@ -648,10 +777,7 @@ impl Semantics {
             }
             if matches!(
                 layer.placement,
-                LayerPlacement::AnchorStart
-                    | LayerPlacement::AnchorEnd
-                    | LayerPlacement::AnchorRight
-                    | LayerPlacement::AnchorLeft
+                LayerPlacement::Anchor(_) | LayerPlacement::ContextPoint(_)
             ) != layer.anchor.is_some()
                 || layer
                     .anchor
@@ -673,6 +799,9 @@ impl Semantics {
             || (self.disabled
                 && self.splitter.is_none()
                 && self.slider.is_none()
+                && self.context_menu.is_none()
+                && self.drag_capture.is_none()
+                && d.role != Some(Role::Menubar)
                 && !matches!(self.field_part, Some(FieldPart::Fieldset | FieldPart::Form))))
             && !matches!(d.props, Props::Button(_))
             && self.combobox.is_none()
@@ -731,6 +860,7 @@ impl Semantics {
                         | Role::RadioGroup
                         | Role::Toolbar
                         | Role::Menu
+                        | Role::Menubar
                         | Role::Listbox
                 )
             )

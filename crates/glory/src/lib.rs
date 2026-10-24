@@ -54,7 +54,7 @@ pub mod prelude {
         Layer, LayerPlacement, LinkOpen, Navigation, NavigationPanel, NavigationPanelCommand,
         Orientation, Plan, PlanInstance, PlanPart, Purpose, RangeCommand, RangeValue, Result, Role,
         Scope, ScrollAxes, ScrollCommand, ScrollMetrics, ScrollMovement, SemanticId, Semantics,
-        SliderValue, TextKind, Widget, button, check, col, component, each, group, image, input,
-        link, list, plan, row, text, view, when,
+        SliderValue, SpinValue, TextKind, Widget, button, check, col, component, each, group,
+        image, input, link, list, plan, row, text, view, when,
     };
 }

@@ -6,6 +6,8 @@ use wasm_bindgen::{JsCast, closure::Closure};
 use web_sys::{Element, EventTarget, KeyboardEvent, Node, ResizeObserver};
 
 use super::{backend, dom::Dom};
+#[path = "context_menu.rs"]
+mod context_menu;
 #[path = "drag.rs"]
 mod drag;
 #[path = "tags.rs"]
@@ -76,6 +78,7 @@ impl Listeners {
             "click",
             "input",
             "paste",
+            "contextmenu",
             "change",
             "compositionstart",
             "compositionend",
@@ -308,6 +311,9 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
         return Ok(());
     };
     let entry = dom.entry(id)?;
+    if context_menu::receive(dom, name, &event, id, &element)? {
+        return Ok(());
+    }
     if matches!(name, "submit" | "reset") {
         if !element.has_attribute("data-gly-form") {
             return Ok(());
@@ -349,7 +355,8 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
         return Ok(());
     }
     if name == "pointerdown"
-        && element.has_attribute("data-gly-option-owner")
+        && (element.has_attribute("data-gly-option-owner")
+            || element.has_attribute("data-gly-menubar-item"))
         && let Some(pointer) = event.dyn_ref::<web_sys::PointerEvent>()
         && pointer.is_primary()
         && pointer.button() == 0
@@ -545,6 +552,44 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
             }
             if node == Node::from(entry.element()?)
                 && dom.document.active_element().as_ref() == Some(&element)
+                && element.has_attribute("data-gly-spinbutton")
+                && entry.interests.borrow().contains(&EventKind::Spin)
+                && element.get_attribute("aria-disabled").as_deref() != Some("true")
+                && element.get_attribute("aria-readonly").as_deref() != Some("true")
+                && let Some(command) = glory_render::RangeCommand::spin_key(
+                    element.has_attribute("aria-valuemin"),
+                    element.has_attribute("aria-valuemax"),
+                    glory_render::KeyboardInput {
+                        key: &key.key(),
+                        control: key.ctrl_key(),
+                        meta: key.meta_key(),
+                        alt: key.alt_key(),
+                        shift: key.shift_key(),
+                        repeat: key.repeat(),
+                        composing: key.is_composing(),
+                        editable: true,
+                    },
+                )
+            {
+                event.prevent_default();
+                let available = match command {
+                    glory_render::RangeCommand::Increase
+                    | glory_render::RangeCommand::PageIncrease => {
+                        element.get_attribute("data-gly-spin-increase").as_deref() == Some("true")
+                    }
+                    glory_render::RangeCommand::Decrease
+                    | glory_render::RangeCommand::PageDecrease => {
+                        element.get_attribute("data-gly-spin-decrease").as_deref() == Some("true")
+                    }
+                    _ => true,
+                };
+                if available {
+                    dom.queue(id, Event::Spin { from: id, command });
+                }
+                return Ok(());
+            }
+            if node == Node::from(entry.element()?)
+                && dom.document.active_element().as_ref() == Some(&element)
                 && element.has_attribute("data-gly-slider")
                 && entry.interests.borrow().contains(&EventKind::Range)
             {
@@ -662,9 +707,20 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
                         .map_err(backend)?
                         .is_some();
                 let own_interest = entry.interests.borrow().contains(&EventKind::Keyboard);
+                let palette = command == glory_render::KeyboardCommand::Palette;
                 let mut cursor = Some(id);
                 let mut interested = false;
+                let mut palette_interest = false;
                 while let Some(node) = cursor {
+                    if palette
+                        && dom.entry(node).is_ok_and(|entry| {
+                            entry.interests.borrow().contains(&EventKind::Palette)
+                        })
+                    {
+                        interested = true;
+                        palette_interest = true;
+                        break;
+                    }
                     if dom
                         .entry(node)
                         .is_ok_and(|entry| entry.interests.borrow().contains(&EventKind::Keyboard))
@@ -676,17 +732,29 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
                 }
                 if interested && (!editable || own_interest) || form_submit {
                     if command == KeyboardCommand::Submit {
+                        let value = entry.value()?;
+                        let revision = entry.editing.borrow().revision;
                         dom.queue(
                             id,
                             Event::ValueChanged {
-                                value: entry.value()?,
+                                value: value.clone(),
                                 composing: false,
-                                revision: entry.editing.borrow().revision,
+                                revision,
                             },
                         );
+                        if entry.control()?.tag_name() != "TEXTAREA" {
+                            dom.queue(id, Event::Commit { value, revision });
+                        }
                     }
                     event.prevent_default();
-                    dom.queue(id, Event::Keyboard { from: id, command });
+                    dom.queue(
+                        id,
+                        if palette_interest {
+                            Event::Palette { from: id }
+                        } else {
+                            Event::Keyboard { from: id, command }
+                        },
+                    );
                     return Ok(());
                 }
             }
@@ -769,7 +837,8 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
                 }
             }
             let menu_trigger = element.get_attribute("aria-haspopup").as_deref() == Some("menu")
-                && !element.has_attribute("data-gly-menu-item");
+                && (!element.has_attribute("data-gly-menu-item")
+                    || element.has_attribute("data-gly-menubar-item"));
             if entry.edit == EditKind::Check
                 && matches!(
                     element.get_attribute("role").as_deref(),
@@ -796,9 +865,11 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
                 return Ok(());
             }
             let menu_root = element.closest("[role=menu]").map_err(backend)?;
+            let menubar_root = element.closest("[role=menubar]").map_err(backend)?;
             if menu_trigger || menu_root.is_some() {
                 let direction = if menu_root
                     .as_ref()
+                    .or(menubar_root.as_ref())
                     .and_then(|root| root.get_attribute("dir"))
                     .as_deref()
                     == Some("rtl")

@@ -24,7 +24,10 @@ fn content(layer: bool) -> Descriptor {
         layer: layer.then(|| Layer {
             modal: false,
             focus: LayerFocus::Preserve,
-            placement: LayerPlacement::AnchorStart,
+            placement: LayerPlacement::Anchor(glory_render::AnchorPlacement::new(
+                glory_render::AnchorSide::Bottom,
+                glory_render::AnchorAlign::Start,
+            )),
             anchor: Some(SemanticId::new("trigger").unwrap()),
             ..Default::default()
         }),

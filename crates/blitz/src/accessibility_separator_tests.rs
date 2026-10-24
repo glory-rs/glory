@@ -228,3 +228,97 @@ fn slider_accesskit_has_its_own_role_steps_value_text_and_readonly_adjustment_po
     assert!(!node.data().supports_action(AxAction::SetValue));
     assert!(action(&app, &request(target, AxAction::Increment, None)).is_err());
 }
+
+#[test]
+fn spinbutton_accesskit_preserves_exact_text_optional_coordinates_and_queues_numeric_requests() {
+    use glory_render::{EventKind, RangeCommand, SpinValue};
+    let app = WindowApp::new();
+    let reference = app.app.scope().cage(None);
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let output = events.clone();
+    let metadata = Semantics {
+        spinbutton: Some(SpinValue {
+            min: Some(0.),
+            max: Some(10.),
+            value: Some(1.),
+            value_text: Some("1.00 exact".into()),
+            can_decrease: false,
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    app.mount(
+        glory_ui::input()
+            .name("Quantity")
+            .value("1.00")
+            .node_ref(reference)
+            .style(Style::new().width(Length::Px(200.)).height(Length::Px(30.)))
+            .semantics(Some(Box::new(metadata.clone())))
+            .on(EventKind::Spin, move |event| {
+                output.borrow_mut().push(event)
+            }),
+    )
+    .unwrap();
+    let mut tree = Consumer::new(build(&app, true), true);
+    let target = id(&app, reference.get().unwrap());
+    let full = nodes(&tree)
+        .into_iter()
+        .find(|n| n.role() == AxRole::SpinButton)
+        .unwrap()
+        .id();
+    let node = tree.state().node_by_id(full).unwrap();
+    assert_eq!(node.data().numeric_value(), Some(1.));
+    assert_eq!(node.data().value(), Some("1.00 exact"));
+    assert!(node.data().supports_action(AxAction::Increment));
+    assert!(!node.data().supports_action(AxAction::Decrement));
+    assert!(action(&app, &request(target, AxAction::Increment, None)).unwrap());
+    assert!(
+        action(
+            &app,
+            &request(
+                target,
+                AxAction::SetValue,
+                Some(ActionData::NumericValue(2.5))
+            )
+        )
+        .unwrap()
+    );
+    assert!(events.borrow().is_empty());
+    app.app.pump().unwrap();
+    assert!(matches!(
+        events.borrow().as_slice(),
+        [
+            Event::Spin {
+                command: RangeCommand::Increase,
+                ..
+            },
+            Event::Spin {
+                command: RangeCommand::Set(2.5),
+                ..
+            }
+        ]
+    ));
+    let mut empty = metadata;
+    empty.spinbutton.as_mut().unwrap().value = None;
+    empty.spinbutton.as_mut().unwrap().min = None;
+    empty.spinbutton.as_mut().unwrap().max = None;
+    empty.spinbutton.as_mut().unwrap().value_text = Some("-".into());
+    empty.spinbutton.as_mut().unwrap().can_increase = false;
+    empty.readonly = true;
+    app.app
+        .scope()
+        .patch(
+            reference.get().unwrap(),
+            glory_render::Patch::Semantics(glory_render::Change::Set(Some(Box::new(empty)))),
+        )
+        .unwrap();
+    tree.update_and_process_changes(build(&app, false), &mut Changes);
+    let node = tree.state().node_by_id(full).unwrap();
+    assert_eq!(node.role(), AxRole::SpinButton);
+    assert_eq!(node.data().numeric_value(), None);
+    assert_eq!(node.data().min_numeric_value(), None);
+    assert_eq!(node.data().value(), Some("-"));
+    assert!(!node.data().supports_action(AxAction::Increment));
+    assert!(!node.data().supports_action(AxAction::SetValue));
+    assert!(!action(&app, &request(target, AxAction::Increment, None)).unwrap());
+}

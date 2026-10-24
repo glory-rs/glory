@@ -39,7 +39,12 @@ fn tooltip_stream_preserves_description_relation_and_passive_layer_through_end()
                             layer: Some(Layer {
                                 modal: false,
                                 focus: LayerFocus::Preserve,
-                                placement: LayerPlacement::AnchorStart,
+                                placement: LayerPlacement::Anchor(
+                                    glory_render::AnchorPlacement::new(
+                                        glory_render::AnchorSide::Bottom,
+                                        glory_render::AnchorAlign::Start,
+                                    ),
+                                ),
                                 anchor: Some(anchor.clone()),
                                 initial_focus: None,
                                 return_focus: None,

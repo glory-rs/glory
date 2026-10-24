@@ -8,10 +8,18 @@ use glory_core::{AccessError, Resource, ResourceState};
 use glory_ui::{Widget, component, group, list, text, view, when};
 
 use super::*;
+#[path = "anchor_tests.rs"]
+mod anchor;
 #[path = "choice_tests.rs"]
 mod choice;
+#[path = "collapse_tests.rs"]
+mod collapse;
+#[path = "command_tests.rs"]
+mod command;
 #[path = "document_tests.rs"]
 mod document;
+#[path = "drag_capture_tests.rs"]
+mod drag_capture;
 #[path = "graphic_tests.rs"]
 mod graphic;
 #[path = "graphic_transition_tests.rs"]

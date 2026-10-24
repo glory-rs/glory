@@ -105,6 +105,11 @@ fn current_page_and_step_are_accesskit_locations_independent_of_selection() {
     );
     assert!(all.iter().any(|node| node.role() == AxRole::Navigation));
     drop(all);
+    page.revise(|value| *value = Some(Current::Location));
+    tree.update_and_process_changes(build(&app, false), &mut Changes);
+    assert!(nodes(&tree).iter().any(|node| node.role() == AxRole::Link
+        && node.data().aria_current() == Some(accesskit::AriaCurrent::Location)
+        && node.data().is_selected().is_none()));
     page.revise(|value| *value = None);
     tree.update_and_process_changes(build(&app, false), &mut Changes);
     assert!(

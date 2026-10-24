@@ -380,6 +380,13 @@ impl Storage {
         self.swap_patch(inverse)?;
         let result = (|| {
             if let Patch::Semantics(Change::Set(previous)) = &inverse {
+                crate::collapse::revision(
+                    previous.as_ref().and_then(|s| s.collapse.as_ref()),
+                    self.view()
+                        .semantics
+                        .as_ref()
+                        .and_then(|s| s.collapse.as_ref()),
+                )?;
                 crate::sheet::revision(
                     previous.as_ref().and_then(|s| s.layer.as_ref()),
                     self.view()

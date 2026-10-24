@@ -832,7 +832,10 @@ fn native_navigation_panel_keys_queue_only_for_opted_in_controls_and_layer_open_
     metadata.layer = Some(Layer {
         modal: false,
         focus: LayerFocus::Preserve,
-        placement: LayerPlacement::AnchorStart,
+        placement: LayerPlacement::Anchor(glory_render::AnchorPlacement::new(
+            glory_render::AnchorSide::Bottom,
+            glory_render::AnchorAlign::Start,
+        )),
         anchor: Some(SemanticId::new("nav-trigger").unwrap()),
         ..Default::default()
     });
@@ -965,4 +968,231 @@ fn native_slider_queues_axis_rtl_page_keys_and_captures_mouse_and_touch_release_
             ..
         }
     )));
+}
+
+#[test]
+fn native_view_press_capture_preserves_editor_focus_and_queues_mouse_touch_and_cancel() {
+    use glory_render::style::{Length, Style};
+    use glory_render::{DragCapture, FocusMode, Semantics};
+    for policy in [DragCapture::Press, DragCapture::PressFocus] {
+        let mut app = WindowApp::new();
+        app.renderer.set_viewport(500, 400, 1.).unwrap();
+        let editor = app.app.scope().cage(None);
+        let target = app.app.scope().cage(None);
+        let events = Rc::new(RefCell::new(Vec::new()));
+        let seen = events.clone();
+        app.mount(
+            view().fill((
+                input().value("preserve editor").node_ref(editor),
+                view()
+                    .node_ref(target)
+                    .focus(FocusMode::Programmatic)
+                    .semantics(Some(Box::new(Semantics {
+                        drag_capture: Some(policy),
+                        ..Default::default()
+                    })))
+                    .style(
+                        Style::new()
+                            .width(Length::Px(200.))
+                            .height(Length::Px(100.)),
+                    )
+                    .on(EventKind::Drag, move |event| seen.borrow_mut().push(event)),
+            )),
+        )
+        .unwrap();
+        tick(&mut app);
+        let editor = editor.get().unwrap();
+        let target = target.get().unwrap();
+        native_focus(&mut app, editor);
+        tick(&mut app);
+        let rect = bounds_now(&app, target);
+        let x = (rect.x + 30.) as f32;
+        let y = (rect.y + 20.) as f32;
+        for touch in [false, true] {
+            events.borrow_mut().clear();
+            let sample = |x, y, down| {
+                let mut event = pointer(x, y, down);
+                if touch {
+                    event.id = blitz_traits::events::BlitzPointerId::Finger(12);
+                }
+                event
+            };
+            app.handle_ui_event(UiEvent::PointerDown(sample(x, y, true)));
+            assert!(events.borrow().is_empty());
+            tick(&mut app);
+            assert!(
+                matches!(&events.borrow()[0], Event::Drag { from, phase: DragPhase::Start, .. } if *from == target)
+            );
+            let state = app.renderer.0.borrow();
+            let focused = state
+                .dom
+                .owner(state.dom.doc.get_focussed_node_id().unwrap())
+                .unwrap();
+            assert_eq!(
+                focused,
+                if policy == DragCapture::Press {
+                    editor
+                } else {
+                    target
+                }
+            );
+            drop(state);
+            events.borrow_mut().clear();
+            app.handle_ui_event(UiEvent::PointerMove(sample(380., 300., true)));
+            app.handle_ui_event(UiEvent::PointerUp(sample(380., 300., false)));
+            assert!(events.borrow().is_empty());
+            tick(&mut app);
+            assert!(events.borrow().iter().any(|event| matches!(event, Event::Drag { from, phase: DragPhase::Drop, .. } if *from == target)));
+            events.borrow_mut().clear();
+            app.handle_ui_event(UiEvent::PointerDown(sample(x, y, true)));
+            app.handle_ui_event(UiEvent::PointerCancel(sample(380., 300., false)));
+            tick(&mut app);
+            assert!(events.borrow().iter().any(|event| matches!(
+                event,
+                Event::Drag {
+                    phase: DragPhase::Cancel,
+                    ..
+                }
+            )));
+            assert!(!events.borrow().iter().any(|event| matches!(
+                event,
+                Event::Drag {
+                    phase: DragPhase::Drop,
+                    ..
+                }
+            )));
+        }
+    }
+}
+
+#[test]
+fn native_spinbutton_queues_own_focused_keys_without_changing_editor_or_ordinary_inputs() {
+    use glory_render::{RangeCommand, Semantics, SpinValue};
+    let mut app = WindowApp::new();
+    app.renderer.set_viewport(500, 300, 1.).unwrap();
+    let reference = app.app.scope().cage(None);
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let output = events.clone();
+    app.mount(
+        input()
+            .value("1.00")
+            .name("Quantity")
+            .node_ref(reference)
+            .semantics(Some(Box::new(Semantics {
+                spinbutton: Some(SpinValue {
+                    min: Some(0.),
+                    max: Some(10.),
+                    value: Some(1.),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            })))
+            .on(EventKind::Spin, move |e| output.borrow_mut().push(e)),
+    )
+    .unwrap();
+    tick(&mut app);
+    let id = reference.get().unwrap();
+    native_focus(&mut app, id);
+    key(&mut app, "ArrowUp", Modifiers::empty(), false, false);
+    key(&mut app, "PageDown", Modifiers::empty(), false, false);
+    key(&mut app, "Home", Modifiers::empty(), false, false);
+    key(&mut app, "End", Modifiers::empty(), false, false);
+    key(&mut app, "ArrowUp", Modifiers::SHIFT, false, false);
+    key(&mut app, "ArrowUp", Modifiers::empty(), true, false);
+    assert!(events.borrow().is_empty());
+    tick(&mut app);
+    assert_eq!(
+        events
+            .borrow()
+            .iter()
+            .filter_map(|e| if let Event::Spin { command, .. } = e {
+                Some(*command)
+            } else {
+                None
+            })
+            .collect::<Vec<_>>(),
+        vec![
+            RangeCommand::Increase,
+            RangeCommand::PageDecrease,
+            RangeCommand::Minimum,
+            RangeCommand::Maximum
+        ]
+    );
+    assert_eq!(app.renderer.0.borrow().dom.text_value(id).unwrap(), "1.00");
+    let ordinary = app.app.scope().cage(None);
+    app.mount(input().value("plain").node_ref(ordinary))
+        .unwrap();
+    tick(&mut app);
+    native_focus(&mut app, ordinary.get().unwrap());
+    events.borrow_mut().clear();
+    key(&mut app, "ArrowUp", Modifiers::empty(), false, false);
+    tick(&mut app);
+    assert!(events.borrow().is_empty());
+}
+
+#[test]
+fn native_single_line_enter_queues_commit_before_form_submit_and_keeps_textarea_and_ime_policy() {
+    use glory_render::{FieldPart, Semantics};
+    let mut app = WindowApp::new();
+    let reference = app.app.scope().cage(None);
+    let source = app.app.scope().cage("20".to_owned());
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let input_events = events.clone();
+    let form_events = events.clone();
+    let output = source;
+    app.mount(
+        view()
+            .field_part(FieldPart::Form)
+            .on(EventKind::Submit, move |_| {
+                form_events
+                    .borrow_mut()
+                    .push(format!("submit:{}", source.get()))
+            })
+            .fill(
+                input()
+                    .value(source)
+                    .node_ref(reference)
+                    .on(EventKind::Commit, move |event| {
+                        if let Event::Commit { value, .. } = event {
+                            input_events.borrow_mut().push(format!("commit:{value}"));
+                            output.revise(|v| *v = "10".into());
+                        }
+                    }),
+            ),
+    )
+    .unwrap();
+    tick(&mut app);
+    let id = reference.get().unwrap();
+    native_focus(&mut app, id);
+    key(&mut app, "Enter", Modifiers::empty(), false, false);
+    assert!(events.borrow().is_empty());
+    tick(&mut app);
+    assert_eq!(events.borrow().as_slice(), ["commit:20", "submit:10"]);
+    events.borrow_mut().clear();
+    key(&mut app, "Enter", Modifiers::empty(), true, false);
+    tick(&mut app);
+    assert!(events.borrow().is_empty());
+    let textarea = app.app.scope().cage(None);
+    let out = events.clone();
+    app.mount(
+        view()
+            .semantics(Some(Box::new(Semantics {
+                field_part: Some(FieldPart::Form),
+                ..Default::default()
+            })))
+            .fill(
+                input()
+                    .multiline(true)
+                    .node_ref(textarea)
+                    .on(EventKind::Commit, move |_| {
+                        out.borrow_mut().push("textarea commit".into())
+                    }),
+            ),
+    )
+    .unwrap();
+    tick(&mut app);
+    native_focus(&mut app, textarea.get().unwrap());
+    key(&mut app, "Enter", Modifiers::empty(), false, false);
+    tick(&mut app);
+    assert!(events.borrow().is_empty());
 }

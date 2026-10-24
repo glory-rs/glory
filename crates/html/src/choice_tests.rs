@@ -142,7 +142,10 @@ fn every_choice_semantics_delta_matches_the_full_shape_oracle_with_option_owners
             next.layer = Some(Layer {
                 modal: false,
                 focus: LayerFocus::Preserve,
-                placement: LayerPlacement::AnchorStart,
+                placement: LayerPlacement::Anchor(glory_render::AnchorPlacement::new(
+                    glory_render::AnchorSide::Bottom,
+                    glory_render::AnchorAlign::Start,
+                )),
                 anchor: Some(name("future-trigger")),
                 ..Default::default()
             });

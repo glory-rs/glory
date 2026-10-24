@@ -3,6 +3,8 @@
 use crate::*;
 mod flex;
 pub use flex::{FlexCase, flex_cases};
+mod collapse;
+pub use collapse::verify_collapse;
 
 /// The same behavioral matrix runs through reference, SSR and real native DOM.
 /// Browser acceptance uses the public App and real DOM for the equivalent cases.

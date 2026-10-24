@@ -59,7 +59,12 @@ fn choice_stream_retains_focus_preserving_intrinsics_and_live_active_descendant(
                             layer: Some(Layer {
                                 modal: false,
                                 focus: LayerFocus::Preserve,
-                                placement: LayerPlacement::AnchorStart,
+                                placement: LayerPlacement::Anchor(
+                                    glory_render::AnchorPlacement::new(
+                                        glory_render::AnchorSide::Bottom,
+                                        glory_render::AnchorAlign::Start,
+                                    ),
+                                ),
                                 anchor: Some(panel_trigger.clone()),
                                 initial_focus: None,
                                 return_focus: None,
@@ -140,6 +145,27 @@ fn choice_stream_retains_focus_preserving_intrinsics_and_live_active_descendant(
                         ..Default::default()
                     }))),
                 glory_ui::input()
+                    .name("Stream free tags")
+                    .value(scope.bond(move || {
+                        if ready.get() {
+                            "Tagged draft".to_owned()
+                        } else {
+                            "Draft".to_owned()
+                        }
+                    }))
+                    .semantics(scope.bond(move || {
+                        Some(Box::new(Semantics {
+                            id: Some(SemanticId::new("stream-tags-editor").unwrap()),
+                            tags_input: Some(if ready.get() {
+                                glory_render::TagSeparators::EnterCommaSemicolon
+                            } else {
+                                glory_render::TagSeparators::Enter
+                            }),
+                            required: true,
+                            ..Default::default()
+                        }))
+                    })),
+                glory_ui::input()
                     .name("Stream multiple choice")
                     .semantics(scope.bond(move || {
                         Some(Box::new(Semantics {
@@ -193,6 +219,7 @@ fn choice_stream_retains_focus_preserving_intrinsics_and_live_active_descendant(
         "data-gly-combobox=\"autocomplete\"",
         "data-gly-combobox=\"multiple\"",
         "aria-multiselectable=\"true\"",
+        "data-gly-tags=\"enter\"",
         "tabindex=\"-1\"",
     ] {
         assert!(shell.body().contains(marker), "missing {marker}");
@@ -210,7 +237,10 @@ fn choice_stream_retains_focus_preserving_intrinsics_and_live_active_descendant(
         assert!(patch.body().contains(marker), "missing {marker}");
     }
     let end = frame(&mut stream);
-    assert!(end.body().contains("\"html_version\":4"));
+    assert!(
+        end.body()
+            .contains(&format!("\"html_version\":{}", glory_html::FORMAT_VERSION))
+    );
     if let Some(path) = std::env::var_os("GLORY_CHOICE_STREAM_FIXTURE") {
         let bootstrap = Bootstrap {
             root_id: "choice-stream-root".into(),

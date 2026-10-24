@@ -70,6 +70,11 @@ fn check_layer<'a>(
     if value.is_some_and(|s| s.sheet_grip) {
         return Err(Error::Unsupported("native sheet gestures"));
     }
+    if value.is_some_and(|s| s.collapse.is_some()) {
+        return Err(Error::Unsupported(
+            "native intrinsic-height collapse motion",
+        ));
+    }
     if value.is_some_and(|s| s.layer.is_some()) {
         return Err(Error::Unsupported("native top layers"));
     }
@@ -92,8 +97,19 @@ fn check_mode<'a>(
         Some(Patch::Semantics(Change::Clear)) => None,
         _ => node.semantics.as_ref(),
     };
+    let role = match patch {
+        Some(Patch::Role(Change::Set(role))) => *role,
+        Some(Patch::Role(Change::Clear)) => None,
+        _ => node.role,
+    };
+    if role == Some(glory_render::Role::Menubar) || semantics.is_some_and(|s| s.menubar_item) {
+        return Err(Error::Unsupported("native menubar controls"));
+    }
     if semantics.is_some_and(|semantics| semantics.tags_input.is_some()) {
         return Err(Error::Unsupported("native tags input policy"));
+    }
+    if semantics.is_some_and(|semantics| semantics.context_menu.is_some()) {
+        return Err(Error::Unsupported("native context menu input"));
     }
     if semantics.is_some_and(|semantics| semantics.combobox.is_some() || semantics.option.is_some())
     {
@@ -931,6 +947,7 @@ struct DragSession {
     x: f64,
     y: f64,
     started: bool,
+    captured: bool,
 }
 struct State {
     color_scheme: Option<bool>,
@@ -1270,6 +1287,7 @@ impl Render for Renderer {
             scroll: true,
             focus: self.0.borrow().interactive,
             input: self.0.borrow().interactive,
+            collapse_completion: false,
         }
     }
     fn apply(&mut self, mutations: &[Mutation]) -> Result<Receipt, Error> {
@@ -1419,12 +1437,18 @@ impl Render for Renderer {
             kind.validate_target(descriptor)?;
             if matches!(
                 kind,
-                EventKind::Menu | EventKind::Pointer | EventKind::PointerWithin
+                EventKind::Menu
+                    | EventKind::Pointer
+                    | EventKind::PointerWithin
+                    | EventKind::ContextMenu
             ) {
                 return Err(Error::Unsupported("native menu input"));
             }
             if kind == EventKind::Typeahead {
                 return Err(Error::Unsupported("native typeahead input"));
+            }
+            if kind == EventKind::Palette {
+                return Err(Error::Unsupported("native palette shortcut input"));
             }
         }
         if enabled && matches!(kind, EventKind::Scroll | EventKind::Resize) {

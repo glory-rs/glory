@@ -1,3 +1,4 @@
+mod collapse;
 mod dom;
 mod events;
 mod frame;
@@ -41,6 +42,9 @@ pub struct Renderer {
 }
 impl Renderer {
     fn new(runtime: RuntimeId, dom: Rc<Dom>) -> Self {
+        if let Err(error) = dom.configure_collapse() {
+            dom.error.borrow_mut().get_or_insert(error);
+        }
         let supports_layers =
             js_sys::Reflect::get(&dom.root, &"showPopover".into()).is_ok_and(|v| v.is_function());
         dom.frame.attach_dom(&dom);
@@ -100,6 +104,7 @@ impl Render for Renderer {
             scroll: true,
             focus: true,
             input: true,
+            collapse_completion: true,
         }
     }
     fn apply(&mut self, mutations: &[Mutation]) -> Result<Receipt, Error> {
@@ -145,6 +150,7 @@ impl Render for Renderer {
             .layers
             .borrow_mut()
             .update(mapper.tree(), mutations);
+        self.dom.update_collapses(mapper.tree(), mutations);
         drop(mapper);
         if !self.dom.staging.get() && self.dom.live.get() {
             sheet::sync_accepted(&self.dom)?;
@@ -157,6 +163,9 @@ impl Render for Renderer {
         let descriptor = mapper.tree().node(node)?.descriptor.view();
         if enabled {
             kind.validate_target(descriptor)?;
+            if kind == EventKind::CollapseComplete {
+                self.dom.admit_collapse(mapper.tree(), node);
+            }
         }
         self.dom.listen(node, kind, enabled)
     }
@@ -240,6 +249,9 @@ impl Render for Renderer {
         Ok(())
     }
     fn drain(&mut self, inputs: &mut Vec<Input>) {
+        if let Err(error) = self.dom.read_collapses(self.mapper.borrow().tree()) {
+            self.dom.error.borrow_mut().get_or_insert(error);
+        }
         if let Err(error) = self.dom.read_images(self.mapper.borrow().tree()) {
             self.dom.error.borrow_mut().get_or_insert(error);
         }

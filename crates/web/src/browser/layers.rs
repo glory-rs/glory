@@ -19,6 +19,8 @@ pub(super) struct Layers {
     stack: Vec<Open>,
     inert: Vec<Element>,
     blocked: BTreeSet<NodeId>,
+    anchors: BTreeMap<NodeId, bool>,
+    lost_anchors: BTreeSet<NodeId>,
 }
 #[derive(Clone)]
 struct Open {
@@ -78,6 +80,23 @@ impl Layers {
             }
         }
         self.declarations.retain(|id, _| tree.node(*id).is_ok());
+        self.anchors
+            .retain(|id, _| self.declarations.contains_key(id));
+        self.lost_anchors
+            .retain(|id| self.declarations.contains_key(id));
+        for (id, layer) in &self.declarations {
+            let live = tree.layer_anchor_live(*id);
+            if self.anchors.insert(*id, live) == Some(true)
+                && !live
+                && layer.anchor.is_some()
+                && tree.active(*id)
+            {
+                self.lost_anchors.insert(*id);
+            }
+            if live {
+                self.lost_anchors.remove(id);
+            }
+        }
         self.blocked.clear();
         self.blocked.extend(
             self.declarations
@@ -214,44 +233,40 @@ fn position(dom: &Dom, open: &Open, offset: (f64, f64)) -> Result<Option<Positio
         .map_err(backend)?
         .as_f64()
         .unwrap_or(0.0);
-    let side = matches!(
-        open.config.placement,
-        LayerPlacement::AnchorLeft | LayerPlacement::AnchorRight
-    );
-    let right = anchor.right() + offset.0 + 4.0;
-    let left_edge = anchor.left() + offset.0 - bounds.width() - 4.0;
-    let left = match open.config.placement {
-        LayerPlacement::AnchorEnd => anchor.right() + offset.0 - bounds.width(),
-        LayerPlacement::AnchorRight => {
-            if right + bounds.width() <= width - 8.0 {
-                right
-            } else {
-                left_edge
-            }
-        }
-        LayerPlacement::AnchorLeft => {
-            if left_edge >= 8.0 {
-                left_edge
-            } else {
-                right
-            }
-        }
-        _ => anchor.left() + offset.0,
+    if let LayerPlacement::ContextPoint(point) = open.config.placement {
+        return Ok(Some(Position {
+            element: open.element.clone(),
+            x: point.x.clamp(8.0, (width - bounds.width() - 8.0).max(8.0)),
+            y: point
+                .y
+                .clamp(8.0, (height - bounds.height() - 8.0).max(8.0)),
+        }));
+    }
+    let LayerPlacement::Anchor(placement) = open.config.placement else {
+        return Ok(None);
     };
-    let below = anchor.bottom() + offset.1 + 6.0;
-    let top = if side {
-        anchor.top() + offset.1
-    } else if below + bounds.height() > height - 8.0
-        && anchor.top() + offset.1 >= bounds.height() + 6.0
-    {
-        anchor.top() + offset.1 - bounds.height() - 6.0
-    } else {
-        below
-    };
+    let resolved = placement.resolve(
+        glory_render::Rect {
+            x: anchor.x() + offset.0,
+            y: anchor.y() + offset.1,
+            width: anchor.width(),
+            height: anchor.height(),
+        },
+        glory_render::Rect {
+            width: bounds.width(),
+            height: bounds.height(),
+            ..Default::default()
+        },
+        glory_render::Rect {
+            width,
+            height,
+            ..Default::default()
+        },
+    )?;
     Ok(Some(Position {
         element: open.element.clone(),
-        x: left.clamp(8.0, (width - bounds.width() - 8.0).max(8.0)),
-        y: top.clamp(8.0, (height - bounds.height() - 8.0).max(8.0)),
+        x: resolved.x,
+        y: resolved.y,
     }))
 }
 fn place(position: Position) -> Result<(), Error> {
@@ -336,6 +351,9 @@ pub(super) fn sync(dom: &Dom) -> Result<(), Error> {
         layers: std::mem::take(&mut *dom.layers.borrow_mut()),
     };
     let layers = &mut *state;
+    for id in std::mem::take(&mut layers.lost_anchors) {
+        dom.queue(id, Event::Dismiss(DismissReason::AnchorLost));
+    }
     restore_inert(layers);
     // Top-layer elements must carry effective inert themselves. The live
     // semantic index also covers boxless ancestry and inherited inert changes.
@@ -354,7 +372,9 @@ pub(super) fn sync(dom: &Dom) -> Result<(), Error> {
     let mut retained = Vec::new();
     for mut open in layers.stack.iter().rev().cloned() {
         let live = layers.declarations.get(&open.id).filter(|_| {
-            open.element.is_connected() && open.element.closest("[hidden]").ok().flatten().is_none()
+            layers.anchors.get(&open.id) != Some(&false)
+                && open.element.is_connected()
+                && open.element.closest("[hidden]").ok().flatten().is_none()
         });
         if let Some(config) = live {
             open.config = config.clone();
@@ -375,6 +395,9 @@ pub(super) fn sync(dom: &Dom) -> Result<(), Error> {
     layers.stack = retained;
     let mut autofocus = None;
     for (id, config) in &layers.declarations {
+        if layers.anchors.get(id) == Some(&false) {
+            continue;
+        }
         if layers.stack.iter().any(|open| open.id == *id) {
             continue;
         }
@@ -436,8 +459,21 @@ pub(super) fn exit_menu(dom: &Dom, id: NodeId, backwards: bool) -> Result<(), Er
         .get(&id)
         .cloned()
         .ok_or(Error::Unsupported("menu exit target"))?;
+    let context = matches!(config.placement, LayerPlacement::ContextPoint(_));
     let trigger = named_control(dom, config.return_focus.as_ref())
+        .or_else(|| {
+            context
+                .then(|| named_control(dom, config.anchor.as_ref()))
+                .flatten()
+        })
         .ok_or(Error::Unsupported("menu exit return target"))?;
+    let bar = if trigger.has_attribute("data-gly-menubar-item") {
+        trigger.closest("[role=menubar]").map_err(backend)?
+    } else {
+        None
+    };
+    let trigger = bar.clone().unwrap_or(trigger);
+    let boundary = context || bar.is_some();
     let scope = dom
         .layers
         .borrow()
@@ -477,10 +513,17 @@ pub(super) fn exit_menu(dom: &Dom, id: NodeId, backwards: bool) -> Result<(), Er
             pending.push(node);
         }
     }
-    let index = values
+    let mut positions = values
         .iter()
-        .position(|value| value == &trigger)
-        .ok_or(Error::Unsupported("menu exit trigger is not a tab stop"))?;
+        .enumerate()
+        .filter(|(_, value)| *value == &trigger || boundary && trigger.contains(Some(value)))
+        .map(|(index, _)| index);
+    let index = if backwards {
+        positions.next()
+    } else {
+        positions.next_back()
+    }
+    .ok_or(Error::Unsupported("menu exit trigger is not a tab stop"))?;
     let next = if backwards {
         index.checked_sub(1)
     } else {

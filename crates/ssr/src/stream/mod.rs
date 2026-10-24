@@ -107,7 +107,8 @@ impl Frame {
             // The manifest is already trusted serialized JSON. Avoid parsing
             // and rebuilding its complete node tree only to wrap it for HTML.
             std::borrow::Cow::Owned(format!(
-                "{{\"version\":2,\"kind\":\"start\",\"sequence\":0,\"data_id\":{},\"nodes\":{}}}",
+                "{{\"version\":2,\"kind\":\"start\",\"sequence\":0,\"html_version\":{},\"data_id\":{},\"nodes\":{}}}",
+                glory_html::FORMAT_VERSION,
                 serde_json::to_string(&bootstrap.data_id)?,
                 self.initial.as_deref().expect("shell manifest")
             ))

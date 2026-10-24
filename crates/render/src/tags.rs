@@ -46,6 +46,8 @@ pub enum TagKey {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TagsCommand {
+    /// A host budget refusal contains no rejected clipboard/editor body.
+    Reject(TagHostRejection),
     Commit {
         value: String,
     },
@@ -56,6 +58,11 @@ pub enum TagsCommand {
         start: u32,
         end: u32,
     },
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TagHostRejection {
+    InputBudget,
+    ClipboardBudget,
 }
 impl TagsCommand {
     pub fn validate(&self) -> Result<(), Error> {
@@ -70,7 +77,7 @@ impl TagsCommand {
         };
         match self {
             Self::Commit { value } => check(value),
-            Self::RemoveLast => Ok(()),
+            Self::RemoveLast | Self::Reject(_) => Ok(()),
             Self::Paste {
                 value,
                 text,

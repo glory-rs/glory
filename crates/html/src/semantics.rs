@@ -14,6 +14,23 @@ pub(crate) fn attributes(
         attrs.insert("aria-level", level.to_string());
     }
     let Some(value) = value else { return attrs };
+    if let Some(collapse) = value.collapse {
+        attrs.insert(
+            "data-gly-collapse",
+            if collapse.open { "open" } else { "closed" }.into(),
+        );
+        attrs.insert(
+            "data-gly-collapse-duration",
+            format!("{}ms", collapse.duration_millis),
+        );
+        attrs.insert("data-gly-collapse-revision", collapse.revision.to_string());
+        if !collapse.open {
+            attrs.insert("aria-hidden", "true".into());
+        }
+    }
+    if let Some(capture) = value.drag_capture {
+        attrs.insert("data-gly-drag-capture", capture.as_str().into());
+    }
     if let Some(policy) = value.tags_input {
         attrs.insert("data-gly-tags", policy.as_str().into());
     }
@@ -65,12 +82,30 @@ pub(crate) fn attributes(
             match current {
                 glory_render::Current::Page => "page",
                 glory_render::Current::Step => "step",
+                glory_render::Current::Location => "location",
             }
             .into(),
         );
     }
     if let Some(axis) = value.separator_axis {
         attrs.insert("aria-orientation", axis.as_str().into());
+    }
+    if let Some(spin) = &value.spinbutton {
+        attrs.insert("data-gly-spinbutton", String::new());
+        if let Some(min) = spin.min {
+            attrs.insert("aria-valuemin", min.to_string());
+        }
+        if let Some(max) = spin.max {
+            attrs.insert("aria-valuemax", max.to_string());
+        }
+        if let Some(now) = spin.value {
+            attrs.insert("aria-valuenow", now.to_string());
+        }
+        if let Some(text) = &spin.value_text {
+            attrs.insert("aria-valuetext", text.clone());
+        }
+        attrs.insert("data-gly-spin-increase", spin.can_increase.to_string());
+        attrs.insert("data-gly-spin-decrease", spin.can_decrease.to_string());
     }
     if let Some(slider) = &value.slider {
         attrs.insert("aria-valuemin", slider.range.min.to_string());
@@ -212,6 +247,21 @@ pub(crate) fn attributes(
         attrs.insert("data-gly-sheet-grip", String::new());
     }
     if let Some(layer) = &value.layer {
+        if let glory_render::LayerPlacement::Anchor(placement) = layer.placement {
+            attrs.insert("data-gly-anchor-side", placement.side.as_str().into());
+            attrs.insert("data-gly-anchor-align", placement.align.as_str().into());
+            attrs.insert("data-gly-anchor-gap", placement.gap.to_string());
+            attrs.insert(
+                "data-gly-anchor-padding",
+                placement.viewport_padding.to_string(),
+            );
+            attrs.insert("data-gly-anchor-flip", placement.flip.to_string());
+            attrs.insert("data-gly-anchor-shift", placement.shift.to_string());
+        }
+        if let glory_render::LayerPlacement::ContextPoint(point) = layer.placement {
+            attrs.insert("data-gly-context-x", point.x.to_string());
+            attrs.insert("data-gly-context-y", point.y.to_string());
+        }
         if let Some(sheet) = &layer.sheet {
             attrs.insert(
                 "data-gly-sheet",
@@ -256,7 +306,9 @@ pub(crate) fn attributes(
         attrs.insert("data-gly-pressed", String::new());
     }
     if value.hidden {
-        attrs.insert("hidden", String::new());
+        if value.collapse.is_none() {
+            attrs.insert("hidden", String::new());
+        }
         attrs.insert("data-gly-hidden", String::new());
     }
     if let Some(axis) = value.navigation {
@@ -269,12 +321,21 @@ pub(crate) fn attributes(
             }
             .into(),
         );
-        if matches!(role, Some(Role::TabList | Role::RadioGroup | Role::Toolbar)) {
+        if matches!(
+            role,
+            Some(Role::TabList | Role::RadioGroup | Role::Toolbar | Role::Menubar)
+        ) {
             attrs.insert("aria-orientation", axis.as_str().into());
         }
     }
     if value.typeahead {
         attrs.insert("data-gly-typeahead", String::new());
+    }
+    if let Some(policy) = value.context_menu {
+        attrs.insert("data-gly-context", policy.as_str().into());
+    }
+    if value.menubar_item {
+        attrs.insert("data-gly-menubar-item", String::new());
     }
     if value.navigation_item {
         attrs.insert("data-gly-navigation-item", String::new());

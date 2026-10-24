@@ -108,6 +108,7 @@ pub(crate) fn role_name(role: Role) -> &'static str {
     match role {
         Role::ProgressBar => "progressbar",
         Role::Slider => "slider",
+        Role::SpinButton => "spinbutton",
         Role::Separator => "separator",
         Role::Group => "group",
         Role::Main => "main",
@@ -131,6 +132,7 @@ pub(crate) fn role_name(role: Role) -> &'static str {
         Role::RadioGroup => "radiogroup",
         Role::Toolbar => "toolbar",
         Role::Menu => "menu",
+        Role::Menubar => "menubar",
         Role::Listbox => "listbox",
         Role::Heading(_) => "heading",
     }

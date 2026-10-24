@@ -5,7 +5,17 @@ mod patch;
 mod plan;
 pub use plan::PlanShape;
 #[cfg(test)]
+mod anchor_tests;
+#[cfg(test)]
 mod choice_tests;
+#[cfg(test)]
+mod collapse_tests;
+#[cfg(test)]
+mod context_menu_tests;
+#[cfg(test)]
+mod drag_capture_tests;
+#[cfg(test)]
+mod menubar_tests;
 #[cfg(test)]
 mod patch_tests;
 mod semantics;
@@ -27,7 +37,7 @@ use std::collections::{BTreeMap, HashMap};
 pub use mapping::{preflight, shape};
 pub use serialize::{escape, select_options, serialize};
 pub use styles::style;
-pub const FORMAT_VERSION: u32 = 4;
+pub const FORMAT_VERSION: u32 = 6;
 /// Namespace is determined solely by the mapper's finite element vocabulary.
 pub fn element_namespace(tag: &str) -> &'static str {
     if matches!(tag, "svg" | "path") {
@@ -44,7 +54,7 @@ pub const BASE_CSS: &str = concat!(
     "@keyframes gly-rotate{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}",
     "[data-gly-rotate]{animation-name:gly-rotate;animation-timing-function:linear;animation-iteration-count:infinite;transform-box:view-box;transform-origin:50% 50%}",
     "@media(prefers-reduced-motion:reduce){[data-gly-rotate]{animation-name:none;transform:none}}",
-    "[data-gly-splitter],[data-gly-slider],[data-gly-sheet-grip]{touch-action:none}",
+    "[data-gly-splitter],[data-gly-slider],[data-gly-sheet-grip],[data-gly-drag-capture]{touch-action:none}",
     "[data-gly-sheet][data-gly-layer=left],[data-gly-sheet][data-gly-layer=right]{width:var(--gly-sheet-extent,100vw)!important;min-width:0!important;max-width:100vw!important}",
     "[data-gly-sheet][data-gly-layer=top],[data-gly-sheet][data-gly-layer=bottom]{height:var(--gly-sheet-extent,100dvh)!important;min-height:0!important;max-height:100dvh!important}",
     "[data-gly-sheet][data-gly-layer=left]{left:var(--gly-sheet-x,0px);top:var(--gly-sheet-y,0px);height:var(--gly-sheet-height,100dvh)!important}",
@@ -66,9 +76,15 @@ pub const BASE_CSS: &str = concat!(
     "[data-gly-layer=right]{right:0;top:0;height:100dvh;max-height:100dvh}",
     "[data-gly-layer=top]{left:0;top:0;width:100vw;max-width:100vw}",
     "[data-gly-layer=bottom]{left:0;bottom:0;width:100vw;max-width:100vw}",
-    "[data-gly-layer^=anchor-]{left:var(--gly-layer-x,12px);top:var(--gly-layer-y,12px)}",
+    "[data-gly-layer=anchor],[data-gly-layer=context-point]{left:var(--gly-layer-x,12px);top:var(--gly-layer-y,12px)}",
     "[data-gly-layer][aria-modal=true]::backdrop{background:rgba(0,0,0,.35)}",
-    "[data-gly-hidden]{display:none!important}",
+    "[data-gly-hidden]:not([data-gly-collapse]){display:none!important}",
+    "[data-gly-collapse]{interpolate-size:allow-keywords;overflow:hidden!important;transition:height attr(data-gly-collapse-duration type(<time>),0ms) linear}",
+    "[data-gly-collapse=open]{height:auto!important}",
+    "[data-gly-collapse=closed]{height:0!important}",
+    "[data-gly-collapse-duration=\"0ms\"]{transition:none}",
+    "@media(prefers-reduced-motion:reduce){[data-gly-collapse]{transition:none!important}}",
+    "[data-gly-app][data-gly-collapse-static] [data-gly-collapse]{transition:none!important}",
     "[data-gly-kind]{box-sizing:border-box}[data-gly-kind=text]{margin:0;font:inherit}",
     "[data-gly-kind=select],[data-gly-kind=button],[data-gly-kind=input],[data-gly-kind=check] input{font:inherit}",
     "[data-gly-virtual=surface]:not([data-gly-live]){height:auto!important;overflow:visible!important}",

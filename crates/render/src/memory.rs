@@ -294,6 +294,54 @@ impl Memory {
     pub fn active(&self, id: NodeId) -> bool {
         Self::active_in(&self.nodes, id)
     }
+    /// Resolve one current named anchor and its ancestry. Missing or late-bound
+    /// relations remain valid configuration, but cannot open a physical layer.
+    pub fn layer_anchor_live(&self, id: NodeId) -> bool {
+        Self::layer_anchor_live_in(&self.nodes, &self.names, id)
+    }
+    fn layer_anchor_live_in(
+        nodes: &NodeMap<Node>,
+        names: &HashMap<SemanticId, NodeId>,
+        id: NodeId,
+    ) -> bool {
+        let Some(node) = nodes.get(&id) else {
+            return false;
+        };
+        let Some(anchor) = (|| {
+            node.descriptor
+                .view()
+                .semantics
+                .as_ref()?
+                .layer
+                .as_ref()?
+                .anchor
+                .as_ref()
+        })() else {
+            return true;
+        };
+        let Some(anchor) = names.get(anchor).copied() else {
+            return false;
+        };
+        if !Self::active_in(nodes, anchor)
+            || Self::inert_in(nodes, anchor)
+            || !nodes
+                .get(&anchor)
+                .is_some_and(|node| !matches!(node.descriptor.view().props, crate::Props::Group))
+        {
+            return false;
+        }
+        let mut cursor = Some(anchor);
+        while let Some(id) = cursor {
+            let Some(node) = nodes.get(&id) else {
+                return false;
+            };
+            if node.descriptor.view().style.display == Some(crate::style::Display::None) {
+                return false;
+            }
+            cursor = node.parent;
+        }
+        true
+    }
     /// Logical group disabling also applies before a host has committed markup.
     /// No source scan: only the live target and its ancestors are inspected.
     pub fn enabled(&self, id: NodeId) -> bool {
@@ -309,7 +357,12 @@ impl Memory {
                             s.field_part,
                             Some(crate::FieldPart::Fieldset | crate::FieldPart::Form)
                         ) && s.disabled
-                        || (s.splitter.is_some() || s.slider.is_some()) && s.disabled
+                        || (s.splitter.is_some()
+                            || s.slider.is_some()
+                            || s.context_menu.is_some()
+                            || s.drag_capture.is_some()
+                            || node.descriptor.view().role == Some(crate::Role::Menubar))
+                            && s.disabled
                 })
             {
                 return false;
@@ -359,9 +412,10 @@ impl Memory {
 
     fn prune_events(&mut self) {
         let nodes = &self.nodes;
+        let names = &self.names;
         let runtime = self.runtime;
         self.inputs.retain(|input| {
-            !matches!(input, Input::Event { node, event } if (!Self::active_in(nodes, *node) && !event.is_terminal_loss()) || !Self::event_in(nodes, runtime, *node, event).unwrap_or(false))
+            !matches!(input, Input::Event { node, event } if (!Self::active_in(nodes, *node) && !event.is_terminal_loss()) || !Self::event_in(nodes, runtime, *node, event).unwrap_or(false) || matches!(event, Event::Dismiss(DismissReason::AnchorLost)) && Self::layer_anchor_live_in(nodes,names,*node))
         });
     }
 
@@ -370,6 +424,10 @@ impl Memory {
     pub fn validate_event(&self, id: NodeId, event: &Event) -> Result<bool, Error> {
         if !Self::event_in(&self.nodes, self.runtime, id, event)? {
             return Ok(false);
+        }
+        if matches!(event, Event::Dismiss(crate::DismissReason::AnchorLost)) {
+            event.validate_payload(id, &self.node(id)?.descriptor)?;
+            return Ok(self.active(id) && !self.layer_anchor_live(id));
         }
         if matches!(
             event,
@@ -415,6 +473,19 @@ impl Memory {
             nodes.get(&id).ok_or(Error::NodeGone(id))
         };
         let target = get(id)?;
+        if let Event::CollapseComplete { revision } = event {
+            event.validate_payload(id, &target.descriptor)?;
+            if target
+                .descriptor
+                .view()
+                .semantics
+                .as_ref()
+                .and_then(|s| s.collapse.as_ref())
+                .is_some_and(|config| *revision < config.revision)
+            {
+                return Ok(false);
+            }
+        }
         let interactive = || {
             !event.is_user_interaction()
                 || !(Self::inert_in(nodes, id)
@@ -502,6 +573,7 @@ impl Memory {
                     | Event::CheckedChanged(_)
                     | Event::SelectChanged { .. }
                     | Event::Range { .. }
+                    | Event::Spin { .. }
                     | Event::Drag {
                         phase: crate::DragPhase::Start
                             | crate::DragPhase::Move
@@ -564,8 +636,10 @@ impl Memory {
             event,
             Event::Navigate { .. }
                 | Event::Keyboard { .. }
+                | Event::Palette { .. }
                 | Event::ScrollKeyboard { .. }
                 | Event::Range { .. }
+                | Event::Spin { .. }
                 | Event::Typeahead { .. }
                 | Event::Menu { .. }
                 | Event::NavigationPanel { .. }
@@ -573,7 +647,8 @@ impl Memory {
                 | Event::Tags { .. }
         ) {
             event.validate_payload(id, &target.descriptor)?;
-            return Ok(interactive());
+            return Ok(interactive()
+                && (!matches!(event, Event::Palette { .. }) || Self::active_in(nodes, id)));
         }
         if let Some(origin) = event.origin() {
             let source = match get(origin) {
@@ -584,11 +659,43 @@ impl Memory {
             if matches!(source.descriptor.view().props, Props::Group) {
                 return Err(Error::InvalidEvent("event origin has no physical box"));
             }
+            if matches!(event, Event::ContextMenu { .. }) {
+                if !Self::active_in(nodes, origin) {
+                    return Ok(false);
+                }
+                if target
+                    .descriptor
+                    .view()
+                    .semantics
+                    .as_ref()
+                    .and_then(|s| s.context_menu)
+                    == Some(crate::ContextEditPolicy::Native)
+                    && matches!(
+                        source.descriptor.view().props,
+                        Props::Input(_) | Props::Select(_)
+                    )
+                {
+                    return Ok(false);
+                }
+            }
             if matches!(event, Event::Anchor { .. }) && origin == id {
                 return Err(Error::InvalidEvent("anchor must originate in a descendant"));
             }
             let mut cursor = Some(origin);
             while cursor != Some(id) {
+                if matches!(event, Event::ContextMenu { .. })
+                    && cursor.and_then(|id| nodes.get(&id)).is_some_and(|node| {
+                        node.descriptor
+                            .view()
+                            .semantics
+                            .as_ref()
+                            .is_some_and(|s| s.context_menu.is_some())
+                    })
+                {
+                    return Err(Error::InvalidEvent(
+                        "context origin belongs to a nearer region",
+                    ));
+                }
                 if matches!(event, Event::Submit { .. })
                     && cursor.and_then(|id| nodes.get(&id)).is_some_and(|node| {
                         node.descriptor.view().field_part() == Some(crate::FieldPart::Fieldset)
@@ -634,13 +741,22 @@ impl Memory {
                 | Event::Submit { .. }
                 | Event::Reset
                 | Event::Keyboard { .. }
+                | Event::Palette { .. }
                 | Event::ScrollKeyboard { .. }
                 | Event::Range { .. }
+                | Event::Spin { .. }
                 | Event::Typeahead { .. }
                 | Event::Menu { .. }
                 | Event::NavigationPanel { .. }
                 | Event::Choice { .. }
                 | Event::Tags { .. }
+                | Event::ContextMenu { .. }
+                | Event::Drag {
+                    phase: crate::DragPhase::Start
+                        | crate::DragPhase::Move
+                        | crate::DragPhase::Drop,
+                    ..
+                }
                 | Event::CheckedChanged(_)
                 | Event::SelectChanged { .. }
                 | Event::ValueChanged { .. }

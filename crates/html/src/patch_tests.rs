@@ -524,6 +524,25 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
     }
     let semantic_cases = [
         Semantics {
+            spinbutton: Some(glory_render::SpinValue {
+                min: Some(-10.),
+                max: Some(10.),
+                value: Some(2.),
+                value_text: Some("2.00 exact".into()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+        Semantics {
+            spinbutton: Some(glory_render::SpinValue {
+                can_increase: false,
+                can_decrease: false,
+                ..Default::default()
+            }),
+            readonly: true,
+            ..Default::default()
+        },
+        Semantics {
             slider: Some(SliderValue {
                 range: RangeValue {
                     min: -10.,
@@ -593,7 +612,12 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
             layer: Some(Layer {
                 modal: false,
                 focus: glory_render::LayerFocus::Preserve,
-                placement: glory_render::LayerPlacement::AnchorStart,
+                placement: glory_render::LayerPlacement::Anchor(
+                    glory_render::AnchorPlacement::new(
+                        glory_render::AnchorSide::Bottom,
+                        glory_render::AnchorAlign::Start,
+                    ),
+                ),
                 anchor: Some(SemanticId::new("description-target").unwrap()),
                 ..Default::default()
             }),
@@ -614,7 +638,13 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
             typeahead: true,
             layer: Some(Layer {
                 modal: false,
-                placement: glory_render::LayerPlacement::AnchorRight,
+                placement: glory_render::LayerPlacement::Anchor(
+                    glory_render::AnchorPlacement::new(
+                        glory_render::AnchorSide::Right,
+                        glory_render::AnchorAlign::Start,
+                    )
+                    .gap(4.0),
+                ),
                 anchor: Some(SemanticId::new("menu-trigger").unwrap()),
                 return_focus: Some(SemanticId::new("menu-trigger").unwrap()),
                 ..Default::default()
@@ -654,6 +684,10 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
         },
         Semantics {
             current: Some(glory_render::Current::Step),
+            ..Default::default()
+        },
+        Semantics {
+            current: Some(glory_render::Current::Location),
             ..Default::default()
         },
         Semantics {
@@ -784,7 +818,12 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
             layer: Some(glory_render::Layer {
                 modal: false,
                 focus: glory_render::LayerFocus::Preserve,
-                placement: glory_render::LayerPlacement::AnchorStart,
+                placement: glory_render::LayerPlacement::Anchor(
+                    glory_render::AnchorPlacement::new(
+                        glory_render::AnchorSide::Bottom,
+                        glory_render::AnchorAlign::Start,
+                    ),
+                ),
                 anchor: Some(SemanticId::new("navigation-trigger").unwrap()),
                 ..Default::default()
             }),

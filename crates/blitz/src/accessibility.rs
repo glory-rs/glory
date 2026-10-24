@@ -173,6 +173,21 @@ impl Tree {
                 node.set_disabled();
             }
             if let Some(s) = &d.semantics {
+                if let Some(spin) = &s.spinbutton {
+                    if let Some(min) = spin.min {
+                        node.set_min_numeric_value(min);
+                    }
+                    if let Some(max) = spin.max {
+                        node.set_max_numeric_value(max);
+                    }
+                    if let Some(value) = spin.value {
+                        node.set_numeric_value(value);
+                    }
+                    node.set_numeric_value_step(spin.step);
+                    if let Some(text) = &spin.value_text {
+                        node.set_value(normalize_text(text, true).into_owned());
+                    }
+                }
                 if let Some(slider) = &s.slider {
                     node.set_min_numeric_value(slider.range.min);
                     node.set_max_numeric_value(slider.range.max);
@@ -209,6 +224,7 @@ impl Tree {
                     node.set_aria_current(match current {
                         glory_render::Current::Page => accesskit::AriaCurrent::Page,
                         glory_render::Current::Step => accesskit::AriaCurrent::Step,
+                        glory_render::Current::Location => accesskit::AriaCurrent::Location,
                     });
                 }
                 if s.required {
@@ -293,7 +309,13 @@ impl Tree {
                 }
                 Props::Input(p) => {
                     // Do not even copy raw password bytes into the accessibility cache.
-                    if p.purpose != Purpose::Password {
+                    if p.purpose != Purpose::Password
+                        && !d.semantics.as_ref().is_some_and(|s| {
+                            s.spinbutton
+                                .as_ref()
+                                .is_some_and(|s| s.value_text.is_some())
+                        })
+                    {
                         node.set_value(state.dom.text_value(id)?);
                     }
                 }
@@ -367,6 +389,16 @@ impl Tree {
                     node.add_action(AxAction::Increment);
                     node.add_action(AxAction::Decrement);
                     node.add_action(AxAction::SetValue);
+                }
+                if let Some(spin) = d.semantics.as_ref().and_then(|s| s.spinbutton.as_ref())
+                    && !d.readonly()
+                {
+                    if spin.can_increase {
+                        node.add_action(AxAction::Increment);
+                    }
+                    if spin.can_decrease {
+                        node.add_action(AxAction::Decrement);
+                    }
                 }
                 if matches!(d.props, Props::Input(_)) && !d.readonly() {
                     node.add_action(AxAction::SetValue);
@@ -552,6 +584,26 @@ impl Tree {
             return Ok(false);
         }
         match (&request.action, &request.data) {
+            (AxAction::Increment, None)
+            | (AxAction::Decrement, None)
+            | (AxAction::SetValue, Some(ActionData::NumericValue(_)))
+                if d.semantics.as_ref().is_some_and(|s| s.spinbutton.is_some()) =>
+            {
+                if d.readonly() {
+                    return Ok(false);
+                }
+                let command = match (&request.action, &request.data) {
+                    (AxAction::Increment, _) => glory_render::RangeCommand::Increase,
+                    (AxAction::Decrement, _) => glory_render::RangeCommand::Decrease,
+                    (_, Some(ActionData::NumericValue(value))) => {
+                        glory_render::RangeCommand::Set(*value)
+                    }
+                    _ => unreachable!(),
+                };
+                let event = Event::Spin { from: id, command };
+                event.validate_payload(id, d)?;
+                state.inputs.push(Input::Event { node: id, event });
+            }
             (AxAction::Increment, None)
             | (AxAction::Decrement, None)
             | (AxAction::SetValue, Some(ActionData::NumericValue(_)))
@@ -791,6 +843,7 @@ fn role(d: glory_render::DescriptorView<'_>) -> AxRole {
             Some(Role::Group) => AxRole::Group,
             Some(Role::ProgressBar) => AxRole::ProgressIndicator,
             Some(Role::Slider) => AxRole::Slider,
+            Some(Role::SpinButton) => AxRole::SpinButton,
             Some(Role::Separator) => AxRole::Splitter,
             Some(Role::Main) => AxRole::Main,
             Some(Role::Navigation) => AxRole::Navigation,
@@ -813,6 +866,7 @@ fn role(d: glory_render::DescriptorView<'_>) -> AxRole {
             Some(Role::Banner) => AxRole::Banner,
             Some(Role::ContentInfo) => AxRole::ContentInfo,
             Some(Role::Menu) => AxRole::Menu,
+            Some(Role::Menubar) => AxRole::MenuBar,
             Some(Role::Listbox) => AxRole::ListBox,
             Some(Role::Heading(_)) => AxRole::Heading,
             None => AxRole::GenericContainer,
@@ -827,6 +881,9 @@ fn role(d: glory_render::DescriptorView<'_>) -> AxRole {
         },
         Props::Button(_) => AxRole::Button,
         Props::Select(_) => AxRole::ComboBox,
+        Props::Input(_) if d.semantics.as_ref().is_some_and(|s| s.spinbutton.is_some()) => {
+            AxRole::SpinButton
+        }
         Props::Input(p) if p.multiline => AxRole::MultilineTextInput,
         Props::Input(p) => match p.purpose {
             Purpose::Password => AxRole::PasswordInput,

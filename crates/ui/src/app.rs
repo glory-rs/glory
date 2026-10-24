@@ -564,19 +564,23 @@ impl Session {
                 return Ok(false);
             }
             if !present.tree.enabled(node)
+                && !event.is_terminal_loss()
                 && matches!(
                     event,
                     Event::Activate
                         | Event::Submit { .. }
                         | Event::Reset
                         | Event::Keyboard { .. }
+                        | Event::Palette { .. }
                         | Event::Typeahead { .. }
                         | Event::Menu { .. }
+                        | Event::ContextMenu { .. }
                         | Event::NavigationPanel { .. }
                         | Event::Sheet { .. }
                         | Event::Choice { .. }
                         | Event::Drag { .. }
                         | Event::Range { .. }
+                        | Event::Spin { .. }
                         | Event::ValueChanged { .. }
                         | Event::CheckedChanged(_)
                         | Event::SelectChanged { .. }
@@ -593,6 +597,7 @@ impl Session {
                     event,
                     Event::Activate
                         | Event::Keyboard { .. }
+                        | Event::Palette { .. }
                         | Event::Typeahead { .. }
                         | Event::Menu { .. }
                         | Event::NavigationPanel { .. }
@@ -613,6 +618,7 @@ impl Session {
                     Event::Activate
                         | Event::Navigate { .. }
                         | Event::Keyboard { .. }
+                        | Event::Palette { .. }
                         | Event::Typeahead { .. }
                         | Event::Menu { .. }
                         | Event::NavigationPanel { .. }

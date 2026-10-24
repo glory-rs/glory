@@ -70,6 +70,7 @@ pub(super) struct Editing {
     pending: Option<String>,
 }
 pub(super) struct Entry {
+    pub(super) collapse: RefCell<Option<Box<super::collapse::Observer>>>,
     pub(super) image: RefCell<Option<Box<super::images::Observer>>>,
     pub parent: Cell<Option<NodeId>>,
     #[cfg(feature = "hydrate")]
@@ -192,8 +193,10 @@ pub(super) struct DragSession {
     pub x: f64,
     pub y: f64,
     pub started: bool,
+    pub captured: bool,
 }
 pub(super) struct Dom {
+    pub(super) collapses: RefCell<super::collapse::Collapses>,
     pub(super) images: RefCell<super::images::Images>,
     pub layers: RefCell<super::layers::Layers>,
     pub(super) sheets: RefCell<super::sheet::Sheets>,
@@ -225,6 +228,7 @@ impl Dom {
     pub fn new(document: Document, root: Element, frame: Rc<Frame>) -> Rc<Self> {
         let error = root.set_attribute("data-gly-app", "").err().map(backend);
         Rc::new(Self {
+            collapses: RefCell::new(super::collapse::Collapses::default()),
             images: RefCell::new(super::images::Images::default()),
             layers: RefCell::new(super::layers::Layers::default()),
             sheets: RefCell::new(super::sheet::Sheets::default()),
@@ -296,6 +300,7 @@ impl Dom {
             }
         }
         let entry = Rc::new(Entry {
+            collapse: RefCell::new(None),
             image: RefCell::new(None),
             parent: Cell::new(parent),
             #[cfg(feature = "hydrate")]
@@ -381,6 +386,9 @@ impl Dom {
         }
         if kind == EventKind::ImageStatus {
             self.queue_image(id, &entry, enabled);
+        }
+        if kind == EventKind::CollapseComplete {
+            self.queue_collapse(id, &entry, enabled);
         }
         if enabled
             && kind == EventKind::ColorSchemeChanged
@@ -596,6 +604,7 @@ impl Dom {
         #[cfg(feature = "hydrate")]
         let is_virtual = virtual_shape(shape);
         let entry = Rc::new(Entry {
+            collapse: RefCell::new(None),
             image: RefCell::new(None),
             parent: Cell::new(None),
             #[cfg(feature = "hydrate")]
@@ -778,6 +787,7 @@ impl Dom {
             for id in &subtree {
                 sizes.remove(id);
                 self.images.borrow_mut().retire(*id);
+                self.collapses.borrow_mut().retire(*id);
             }
         }
         self.layout
@@ -806,6 +816,7 @@ impl Dom {
         Ok(())
     }
     pub fn clear(&self) {
+        *self.collapses.borrow_mut() = super::collapse::Collapses::default();
         *self.sheets.borrow_mut() = super::sheet::Sheets::default();
         if self.cleared.replace(true) {
             return;

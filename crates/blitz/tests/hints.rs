@@ -16,7 +16,10 @@ fn native_hint_layers_and_pointer_within_are_explicitly_rejected_with_prefix_wat
         layer: Some(Layer {
             modal: false,
             focus: LayerFocus::Preserve,
-            placement: LayerPlacement::AnchorStart,
+            placement: LayerPlacement::Anchor(glory_render::AnchorPlacement::new(
+                glory_render::AnchorSide::Bottom,
+                glory_render::AnchorAlign::Start,
+            )),
             anchor: Some(SemanticId::new("native-anchor").unwrap()),
             ..Default::default()
         }),

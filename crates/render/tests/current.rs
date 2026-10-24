@@ -2,7 +2,7 @@ use glory_render::*;
 
 #[test]
 fn current_is_finite_location_metadata_with_atomic_target_validation_and_reset() {
-    for value in [Current::Page, Current::Step] {
+    for value in [Current::Page, Current::Step, Current::Location] {
         for props in [
             Props::Link(LinkProps::default()),
             Props::Button(ButtonProps::default()),

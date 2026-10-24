@@ -77,6 +77,8 @@ pub enum Purpose {
 pub enum Role {
     /// Interactive numeric range control; finite configuration is required.
     Slider,
+    /// Intrinsic editable numeric input; use spinbutton metadata on Input.
+    SpinButton,
     /// Read-only numeric or indeterminate progress, never a range input.
     ProgressBar,
     /// Passive document boundary; resizing/focus belongs to a future splitter.
@@ -107,6 +109,7 @@ pub enum Role {
     RadioGroup,
     Toolbar,
     Menu,
+    Menubar,
     Listbox,
     Heading(u8),
 }
@@ -345,6 +348,10 @@ impl Descriptor {
     }
 
     fn validate_input_revision(&self, next: &Self) -> Result<(), Error> {
+        crate::collapse::revision(
+            self.semantics.as_ref().and_then(|s| s.collapse.as_ref()),
+            next.semantics.as_ref().and_then(|s| s.collapse.as_ref()),
+        )?;
         if let (Props::Graphic(old), Props::Graphic(new)) = (&self.props, &next.props) {
             new.transition_from(old)?;
         }

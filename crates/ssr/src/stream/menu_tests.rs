@@ -51,6 +51,72 @@ fn menu_stream_retains_intrinsic_roles_and_lowers_popup_layer_and_controlled_pro
                     ..Default::default()
                 })));
             view().fill((
+                view()
+                    .role(Role::Menubar)
+                    .name("Stream application")
+                    .semantics(Some(Box::new(Semantics {
+                        id: Some(SemanticId::new("stream-menubar").unwrap()),
+                        navigation: Some(Orientation::Horizontal),
+                        ..Default::default()
+                    })))
+                    .fill(
+                        glory_ui::button()
+                            .label("Stream File")
+                            .focus(FocusMode::TabStop)
+                            .semantics(scope.bond(move || {
+                                Some(Box::new(Semantics {
+                                    id: Some(SemanticId::new("stream-menubar-file").unwrap()),
+                                    menu_item: Some(MenuItemSemantics {
+                                        kind: MenuItemKind::Action,
+                                        owner: SemanticId::new("stream-menubar").unwrap(),
+                                    }),
+                                    menubar_item: true,
+                                    navigation_item: true,
+                                    popup: Some(PopupKind::Menu),
+                                    controls: Some(SemanticId::new("stream-menu").unwrap()),
+                                    expanded: Some(ready.get()),
+                                    ..Default::default()
+                                }))
+                            })),
+                    ),
+                view()
+                    .role(Role::Group)
+                    .name("Stream context area")
+                    .focus(FocusMode::TabStop)
+                    .semantics(scope.bond(move || {
+                        Some(Box::new(Semantics {
+                            id: Some(SemanticId::new("stream-context-region").unwrap()),
+                            context_menu: Some(if ready.get() {
+                                glory_render::ContextEditPolicy::Override
+                            } else {
+                                glory_render::ContextEditPolicy::Native
+                            }),
+                            ..Default::default()
+                        }))
+                    })),
+                view()
+                    .role(Role::Menu)
+                    .name("Stream context actions")
+                    .focus(FocusMode::Programmatic)
+                    .semantics(scope.bond(move || {
+                        Some(Box::new(Semantics {
+                            id: Some(SemanticId::new("stream-context-panel").unwrap()),
+                            hidden: true,
+                            navigation: Some(Orientation::Vertical),
+                            layer: Some(Layer {
+                                modal: false,
+                                anchor: Some(SemanticId::new("stream-context-region").unwrap()),
+                                placement: LayerPlacement::ContextPoint(
+                                    glory_render::ContextPoint {
+                                        x: if ready.get() { 125.5 } else { 30.0 },
+                                        y: if ready.get() { 211.25 } else { 40.0 },
+                                    },
+                                ),
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        }))
+                    })),
                 glory_ui::button()
                     .label("Stream trigger")
                     .semantics(scope.bond(move || {
@@ -77,7 +143,13 @@ fn menu_stream_retains_intrinsic_roles_and_lowers_popup_layer_and_controlled_pro
                             navigation: Some(Orientation::Vertical),
                             layer: Some(Layer {
                                 modal: false,
-                                placement: LayerPlacement::AnchorRight,
+                                placement: LayerPlacement::Anchor(
+                                    glory_render::AnchorPlacement::new(
+                                        glory_render::AnchorSide::Right,
+                                        glory_render::AnchorAlign::Start,
+                                    )
+                                    .gap(4.0),
+                                ),
                                 anchor: Some(trigger.clone()),
                                 return_focus: Some(trigger.clone()),
                                 ..Default::default()
@@ -100,13 +172,21 @@ fn menu_stream_retains_intrinsic_roles_and_lowers_popup_layer_and_controlled_pro
     .unwrap();
     let shell = frame(&mut stream);
     assert!(shell.body().contains("role=\"menuitemcheckbox\""));
+    assert!(shell.body().contains("role=\"menubar\""));
+    assert!(shell.body().contains("data-gly-menubar-item"));
+    assert!(shell.body().contains("aria-orientation=\"horizontal\""));
     assert!(shell.body().contains("role=\"menuitemradio\""));
     assert!(shell.body().contains("aria-haspopup=\"dialog\""));
+    assert!(shell.body().contains("data-gly-context=\"native-editors\""));
+    assert!(shell.body().contains("data-gly-context-x=\"30\""));
     assert!(poll(&mut stream).is_pending());
     gate.resolve(Ok("ready".into()));
     let patch = frame(&mut stream);
     assert_eq!(patch.kind(), FrameKind::Patch);
     for marker in ["aria-haspopup", "menu", "hidden", "checked"] {
+        assert!(patch.body().contains(marker), "missing {marker}");
+    }
+    for marker in ["override-editors", "data-gly-context-x", "125.5", "211.25"] {
         assert!(patch.body().contains(marker), "missing {marker}");
     }
     let end = frame(&mut stream);

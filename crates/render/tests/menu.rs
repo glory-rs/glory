@@ -10,7 +10,13 @@ fn panel() -> Descriptor {
         typeahead: true,
         layer: Some(Layer {
             modal: false,
-            placement: LayerPlacement::AnchorRight,
+            placement: LayerPlacement::Anchor(
+                glory_render::AnchorPlacement::new(
+                    glory_render::AnchorSide::Right,
+                    glory_render::AnchorAlign::Start,
+                )
+                .gap(4.0),
+            ),
             anchor: Some(SemanticId::new("trigger").unwrap()),
             return_focus: Some(SemanticId::new("trigger").unwrap()),
             ..Default::default()

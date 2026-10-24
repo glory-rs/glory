@@ -3,7 +3,7 @@ use super::super::dom::{Dom, Entry};
 use super::backend;
 use glory_render::{
     Error, Event, EventKind, KeyboardInput, MAX_TAG_INPUT_BYTES, MAX_TAG_PASTE_BYTES, NodeId,
-    TagKey, TagSeparators, TagsCommand,
+    TagHostRejection, TagKey, TagSeparators, TagsCommand,
 };
 use wasm_bindgen::{JsCast, JsValue};
 use web_sys::{Element, KeyboardEvent, Node};
@@ -36,10 +36,25 @@ fn text(value: JsValue, limit: usize) -> Result<String, Error> {
     Ok(value)
 }
 fn value(entry: &Entry) -> Result<String, Error> {
-    text(
+    let raw = text(
         js_sys::Reflect::get(entry.control()?.as_ref(), &"value".into()).map_err(backend)?,
         MAX_TAG_INPUT_BYTES,
-    )
+    )?;
+    let value = glory_render::normalize_text(&raw, false).into_owned();
+    if value.len() > MAX_TAG_INPUT_BYTES {
+        return Err(Error::InvalidEvent("tags canonical host input budget"));
+    }
+    Ok(value)
+}
+fn reject(dom: &Dom, id: NodeId, entry: &Entry, reason: TagHostRejection) {
+    dom.queue(
+        id,
+        Event::Tags {
+            from: id,
+            revision: entry.editing.borrow().revision,
+            command: TagsCommand::Reject(reason),
+        },
+    );
 }
 fn available(dom: &Dom, entry: &Entry, element: &Element) -> Result<bool, Error> {
     Ok(entry.interests.borrow().contains(&EventKind::Tags)
@@ -82,8 +97,10 @@ pub(super) fn key(
     };
     event.prevent_default();
     let command = match command {
-        TagKey::Commit => TagsCommand::Commit {
-            value: text(raw, MAX_TAG_INPUT_BYTES)?,
+        TagKey::Commit => match value(entry) {
+            Ok(value) => TagsCommand::Commit { value },
+            Err(Error::InvalidEvent(_)) => TagsCommand::Reject(TagHostRejection::InputBudget),
+            Err(error) => return Err(error),
         },
         TagKey::RemoveLast => TagsCommand::RemoveLast,
     };
@@ -129,17 +146,23 @@ pub(super) fn paste(
     // Reject oversized clipboard text before UTF-8 copying or native insertion.
     if js_sys::JsString::from(raw.clone()).length() as usize > MAX_TAG_PASTE_BYTES {
         event.prevent_default();
-        return Err(Error::InvalidEvent(
-            "tags clipboard exceeds its finite budget",
-        ));
+        reject(dom, id, entry, TagHostRejection::ClipboardBudget);
+        return Ok(());
     }
     let pasted = match text(raw, MAX_TAG_PASTE_BYTES) {
         Ok(text) => text,
-        Err(error) => {
+        Err(_) => {
             event.prevent_default();
-            return Err(error);
+            reject(dom, id, entry, TagHostRejection::ClipboardBudget);
+            return Ok(());
         }
     };
+    let pasted = glory_render::normalize_text(&pasted, true).into_owned();
+    if pasted.len() > MAX_TAG_PASTE_BYTES {
+        event.prevent_default();
+        reject(dom, id, entry, TagHostRejection::ClipboardBudget);
+        return Ok(());
+    }
     if !pasted.chars().any(|character| policy.contains(character)) {
         return Ok(());
     }
@@ -157,8 +180,16 @@ pub(super) fn paste(
         }
         Ok(value as u32)
     };
+    let current = match value(entry) {
+        Ok(value) => value,
+        Err(Error::InvalidEvent(_)) => {
+            reject(dom, id, entry, TagHostRejection::InputBudget);
+            return Ok(());
+        }
+        Err(error) => return Err(error),
+    };
     let command = TagsCommand::Paste {
-        value: value(entry)?,
+        value: current,
         text: pasted,
         start: selection("selectionStart")?,
         end: selection("selectionEnd")?,

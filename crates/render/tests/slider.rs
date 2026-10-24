@@ -306,3 +306,66 @@ fn sliders_reject_interactive_children_before_placement_and_keep_passive_visuals
     assert_eq!(memory.node(button).unwrap().parent, None);
     assert_eq!(memory.node(child).unwrap().parent, Some(id));
 }
+
+#[test]
+fn a_neighbour_fixed_slider_can_expose_a_readonly_closed_interval_without_relaxing_range_value() {
+    let mut node = slider();
+    let semantics = node.semantics.as_mut().unwrap();
+    let value = semantics.slider.as_mut().unwrap();
+    value.range = RangeValue {
+        min: 30.,
+        max: 30.,
+        value: 30.,
+    };
+    semantics.readonly = true;
+    node.validate().unwrap();
+    let mut editable = node.clone();
+    editable.semantics.as_mut().unwrap().readonly = false;
+    assert!(editable.validate().is_err());
+    assert!(
+        node.semantics
+            .as_ref()
+            .unwrap()
+            .slider
+            .as_ref()
+            .unwrap()
+            .range
+            .validate()
+            .is_err()
+    );
+    let mut ids = NodeIds::new(RuntimeId::new());
+    let id = ids.allocate();
+    let mut memory = memory::Memory::new(id.runtime());
+    memory
+        .apply(&[
+            Mutation::Create {
+                id,
+                node: Box::new(node),
+            },
+            Mutation::Place {
+                id,
+                parent: None,
+                before: None,
+            },
+        ])
+        .unwrap();
+    assert!(
+        !memory
+            .validate_event(
+                id,
+                &Event::Range {
+                    from: id,
+                    command: RangeCommand::Increase
+                }
+            )
+            .unwrap()
+    );
+    assert!(
+        Event::Range {
+            from: id,
+            command: RangeCommand::Set(31.)
+        }
+        .validate_payload(id, &memory.node(id).unwrap().descriptor)
+        .is_err()
+    );
+}

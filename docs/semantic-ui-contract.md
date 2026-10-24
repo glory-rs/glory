@@ -417,7 +417,7 @@ SSR Document的可选sheets按顺序输出并使用nonce；Blitz set_sheet先完
 `hidden` 决定其是否进入栈。Layer 包含 modal、Escape/外部关闭策略、有限位置、
 anchor/initial_focus/return_focus 符号关联。锚定位置必须有不同于自身的 anchor；
 其他位置不接受 anchor。`popup: Option<PopupKind>` 仅属于非 Tab Button，目前有限值为
-Dialog/Menu；它是 popup 角色的单一真值。described_by 补充描述关联。
+Dialog/Menu/Listbox；它是 popup 角色的单一真值。described_by 补充描述关联。
 字段事务继续验证角色、focus 和 metadata 的交叉约束并在失败时回滚；HTML 的字段
 差分 oracle 覆盖新状态的 Set/Clear/Keep，不改变原生 Input 值或选择。
 
@@ -481,7 +481,7 @@ readonly input 配合宿主事件保护；readonly Check 在默认切换前阻�
 
 ## NativeSelect 与当前 HTML/stream 格式（2026-10-24）
 
-当前 HTML 映射/SSR Snapshot 为 **v4**，classic stream envelope 为 **v2**；上文 v3 段落记录此前状态。资源种子 envelope 仍独立为 v1。旧 Snapshot v3 和 stream v1 不提供兼容别名：采用/启动首先拒绝旧版本，不修改根子树。
+当前 HTML 映射/SSR Snapshot 为 **v6**，classic stream envelope 为 **v2**；上文 v3 与下述 NativeSelect v4 段落记录此前格式扩展。资源种子 envelope 仍独立为 v1。旧 Snapshot v3 和 stream v1 不提供兼容别名：采用/启动首先拒绝旧版本，不修改根子树。
 
 `Props::Select(SelectProps)` 是真正原生选择控件，不是给 View 增加角色。静态选项声明通过 Rc 共享：最多 1024 options、32 optgroups（不嵌套）、单 key 64 ASCII 字节、label 256 字节、业务 value 4096 字节，总声明 128KiB。keys 与成功表单 values 分开；业务 values 可以重复或为空。选项接收端应在收集前限制为预算加一，外部受控状态必须先借用校验再克隆。
 
@@ -489,7 +489,7 @@ readonly input 配合宿主事件保护；readonly Check 在默认切换前阻�
 
 HTML v4 Shape 新增 nullable `select_options`（wire 为 `options`），只用于 create/snapshot，包含有限 option/group 和单选的禁用隐藏空值占位项。主节点是真实 select，内部 option/optgroup 不分配语义 NodeId。Property::SelectedKeys/`selectedKeys`、EditKind::Select 独立于 Text/Check，写入同时同步默认 selected attributes 与实际 properties。空 single 选择依赖内部占位项，避免解析器自动选中首个业务项；该禁用项不进入 FormData。Select 的 FormControl.value 非法，成功值来自原生 options；readonly 明确拒绝。
 
-classic v2 保留有限 piece/edit 结构并增加上述 options/selectedKeys，必须通过 key/count/byte/target 验证，且 End 的 html_version 为 4。SVG Graphic 沿用有限 svg/path tag、viewBox/preserveAspectRatio 和已验证路径属性，不新增任意标签或字符串执行口。dirty 选择与既有 value/checked 一样保留，仍更新 selected defaults，使后续采用能校验完整结构。采用先检查全部静态选项和结构再修复 disabled/inactive 选择；活跃用户选择经 SelectChanged 正常回放。
+classic v2 保留有限 piece/edit 结构并增加上述 options/selectedKeys，必须通过 key/count/byte/target 验证，且当前 End 的 html_version 为 5。SVG Graphic 沿用有限 svg/path tag、viewBox/preserveAspectRatio 和已验证路径属性，不新增任意标签或字符串执行口。dirty 选择与既有 value/checked 一样保留，仍更新 selected defaults，使后续采用能校验完整结构。采用先检查全部静态选项和结构再修复 disabled/inactive 选择；活跃用户选择经 SelectChanged 正常回放。
 
 Blitz 当前显式拒绝 Select，创建 preflight/direct apply 在注册引擎 facet 前拒绝，已接受前缀和 query watermark 保留。有限模型与 HTML 证据不代表原生 Select/平台读屏验收。
 
@@ -521,3 +521,75 @@ editable descendants and ordinary non-opted-in controls do not acquire these
 commands. Event origin identities and mounted Content ancestry are checked by
 Memory before routing. Native queues the same finite protocol, while unsupported
 floating Group Layers continue to fail preflight before changing the model.
+
+Menubar uses the structural `Role::Menubar` on a horizontal View with a stable
+semantic id and child roving focus. Its roots remain intrinsic Buttons refined
+by `menu_item: Action`, `popup: Menu`, `controls`, `navigation_item` and the
+finite `menubar_item` marker. An explicit TabStop/Programmatic focus mode is
+required. A delayed Focus action for a root which is no longer the current
+TabStop is rejected before physical focus. The host preserves pointer focus
+until the controller accepts switching, and ExitMenu crosses the complete
+Menubar boundary in either direction. HTML/SSR and classic stream transport
+these finite attributes; they do not supply a pre-WASM menu input driver.
+Native currently rejects both the Menubar role and root refinement before
+facet registration, including direct apply and successful-prefix boundaries.
+
+Palette shortcuts use a separate finite `EventKind::Palette` and
+`Event::Palette { from }`. The physical origin must agree with the event target;
+Group, text editors and native Select are rejected. Web opts in through one
+explicit live ancestor interest and routes to the nearest matching listener.
+Only Ctrl/Cmd+K uses this interest; Search/Help and unrelated native shortcuts
+are not cancelled. Editing, composition, modifiers and repeat retain the shared
+KeyboardInput guards. App and reference validation preserve inactive/inert and
+Owner-retirement boundaries. SSR may record the legal interest without an input
+driver. Native currently rejects enabling this interest explicitly while
+retaining accepted nodes and query watermarks; disabling it is valid cleanup.
+
+ContextMenu uses `Semantics.context_menu: Option<ContextEditPolicy>` on a named
+Group View region, independent from popup-trigger metadata. The nearest declared
+region is the request boundary. `Event::ContextMenu { from, point, source }`
+requires a live boxed physical origin at that region or a descendant; runtime,
+generation, active placement, ancestry, inert and nearer-region checks are shared
+by Memory and direct App dispatch. Native editor origins remain native under the
+default policy; `Override` explicitly admits them. Touch long-press is native.
+Keyboard ContextMenu/Shift+F10 uses the actual focused origin's box, and composition,
+repeats or unrelated modifiers do not become context requests. Coordinates are
+finite viewport CSS pixels. `LayerPlacement::ContextPoint` is restricted to a
+nonmodal managed Menu Layer with a distinct named anchor. Web clamps its point
+to the viewport; Escape restores the actual prior focus. Host ExitMenu uses the
+context region boundary for forward/backward Tab. The existing v4 HTML/classic v2
+finite attribute schema carries policy/point/default resets without another wire
+format. Prepared-field lowering retains the full-shape oracle. Blitz rejects
+context policy before facet creation, including preflight and direct apply, while
+retaining accepted prefixes and query watermarks.
+
+
+Slider 是独立的 `Role::Slider` View，而非 Separator。`Semantics.slider` 携带经验证的 `RangeValue`、方向轴、文本方向、正有限 step/page_step 和可选的非空 1024B 值文本；Slider 需要显式 focus，不能丢失其数值语义。被动视觉子节点允许，交互子孙在 placement 前拒绝；HTML 和原生 AX 均把 Slider 子孙视作 presentation，不暴露轨道/滑块盒子为独立控件。
+
+`RangeCommand::slider_key` 在水平轴遵循 LTR/RTL，在垂直轴以 Up 增加/Down 减少，支持 PageUp/PageDown/Home/End；组合输入、编辑器源、修饰键和另一轴方向键不转换。没有扩大原有 Splitter 键映射。宿主输入只排队；Range 的 from 必须为实际滑块，Set 必须在当前接受的有限区间内。禁用的手工 Range payload 拒绝；readonly 不发布修改而保留终止取消。PointerDown 即捕获原 Slider，PointerUp/Cancel 回到原身份。Web typed Slider 默认 touch-action:none；native Mouse/Finger 驱动为队列协议证据，不等同于实际设备。
+
+Field 的 required/readonly/invalid、标签/描述/error 关系可应用到 Slider。`FormControl` 在此是显式成功控件 snapshot 元数据：HTML 使用 data-gly-control-name/value，不能将自定义 div 冒充原生 HTML 成功 input。应用通过自己的 FormState 序列化策略提交；组件不隐式联网或补 hidden input。
+
+
+## 有限 intrinsic-height Collapse（2026-10-24）
+
+HTML v5 增加 `Semantics.collapse: Option<CollapseConfig>` 的完整映射，classic envelope 保持 v2。配置为 open、0..=500ms duration 与非回绕 revision；只允许独立 View，hidden/inert 必须与 open 相反，不能同时声明 Layer、文档或表单结构。第一次声明后不能移除 facet，停用动画使用 duration=0。回退版本及同版本不同配置在 construction、live guard、direct apply、stream 内一致拒绝；失败不推进统计或查询水位。裁剪壳不能声明自身高度/min/max/aspect-ratio、非零 padding/border、shadow、grow 或定位；内层内容承担这些装饰和布局。
+
+关闭时立即输出 aria-hidden/inert，保留高度裁剪盒，不使用浏览器 hidden 的 display:none 截断过渡。Web 在 host read 阶段观察唯一当前 height transition 的 finished Promise；每节点只保留当前 revision 的可撤销观察，终态只发布一次，旧配置和 Owner 退休撤销未来接受。generated transition 只有一条；宿主超过八条动画明确拒绝，不无界扫描。零时长、Reduce、能力不足与无过渡即时 settle；能力探针失败同时禁用物理过渡，不能仅提前宣称完成。
+
+`Capabilities.collapse_completion` 明确区分可观察物理完成的宿主。`Event::CollapseComplete { revision }` 是可到达 hidden/inert/suspended 活身份的终态观察；旧版本静默丢弃，未来版本拒绝，已退休身份无回调。SSR/Memory 不声明该能力；Blitz 在创建/patch preflight 与 direct apply 显式拒绝 optional motion facet，普通折叠仍可使用。Sapid Unmount 仅在匹配关闭终态后退休内容 Owner；重开会使迟到关闭不能卸载新内容。
+
+classic End 保留完整有限配置，WASM 接管开始新的 Node/version 生命周期。采用仅容许规范 u64 的 collapse revision 与新客户端计数不同，并在整个子树验证成功后原地重置；其他结构与 open/duration 仍须一致，失败不能修复先前节点。dirty editor、焦点与选择继续按原采用契约保留。
+
+验证：render/tests/collapse.rs、HTML full-shape oracle、SSR 同步与 stream conformance、Blitz 显式拒绝/prefix-query 测试，以及同级 Sapid tests/collapse_motion.rs 与 examples/web/collapse-motion-acceptance.js。浏览器 AX 省略与 Web 动画完成不替代 OS 读屏或原生物理动画验收。
+
+
+HTML v6 将锚点定位统一为 `LayerPlacement::Anchor(AnchorPlacement)`。四个物理
+`AnchorSide`、三种 `AnchorAlign`、gap、viewport_padding、flip、shift 是唯一配置；
+gap/padding 独立限制在有限的 0..=4096 CSS px。默认 Bottom/Start、gap=6、padding=8、
+flip/shift=true；所有六项独立映射为 data-gly-anchor-* 属性，构造、prepared patch、
+SSR/CSR/adoption 与 classic stream 形状一致。旧 AnchorStart/End/Left/Right 不保留别名。
+纯几何 resolver 在 requested/opposite 两侧比较溢出，只有更少溢出才翻转；shift=true
+将两轴限制在视口内边距，超大浮层靠近起始边界。它不扫描业务源、不移动焦点。
+Classic envelope 仍为 v2，Start 和 End 均携带且严格检查 html_version=6；旧 Start 在
+创建控制器或写 DOM 前失败。旧 Snapshot 也在采用前失败。

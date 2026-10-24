@@ -81,6 +81,7 @@ impl Motion {
                 *old != commands
                     && config.duration_millis > 0
                     && self.preference == MotionPreference::NoPreference
+                    && previous.as_ref().is_none_or(|state| state.allowed.get())
             })
             .map(|old| {
                 previous

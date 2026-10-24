@@ -11,7 +11,10 @@ fn navigation_disclosure_and_group_popup_keep_actual_roles_without_menu_claims()
         layer: Some(Layer {
             modal: false,
             focus: LayerFocus::Preserve,
-            placement: LayerPlacement::AnchorStart,
+            placement: LayerPlacement::Anchor(glory_render::AnchorPlacement::new(
+                glory_render::AnchorSide::Bottom,
+                glory_render::AnchorAlign::Start,
+            )),
             anchor: Some(SemanticId::new("trigger").unwrap()),
             ..Default::default()
         }),

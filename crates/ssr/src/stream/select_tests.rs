@@ -61,7 +61,10 @@ fn select_stream_uses_v4_shape_v2_envelope_and_preserves_native_selection_throug
     let patch = frame(&mut stream);
     assert!(patch.body().contains("selectedKeys") && patch.body().contains("\"version\":2"));
     let end = frame(&mut stream);
-    assert!(end.body().contains("\"html_version\":4"));
+    assert!(
+        end.body()
+            .contains(&format!("\"html_version\":{}", glory_html::FORMAT_VERSION))
+    );
     if let Some(path) = std::env::var_os("GLORY_SELECT_STREAM_FIXTURE") {
         let bootstrap = Bootstrap {
             root_id: "select-stream-root".into(),

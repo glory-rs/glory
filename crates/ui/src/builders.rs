@@ -540,6 +540,8 @@ pub mod events {
     #[allow(non_upper_case_globals)]
     pub const tags_command: EventKind = EventKind::Tags;
     #[allow(non_upper_case_globals)]
+    pub const context_menu: EventKind = EventKind::ContextMenu;
+    #[allow(non_upper_case_globals)]
     pub const commit: EventKind = EventKind::Commit;
     #[allow(non_upper_case_globals)]
     pub const focus_changed: EventKind = EventKind::FocusChanged;

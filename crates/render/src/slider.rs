@@ -13,7 +13,18 @@ pub struct SliderValue {
 }
 impl SliderValue {
     pub fn validate(&self) -> Result<(), Error> {
-        self.range.validate()?;
+        // A multi-thumb slider can have one temporarily fixed thumb when
+        // its neighbour reaches the minimum gap. This is a closed interval;
+        // RangeValue's general strict interval contract stays unchanged.
+        if !self.range.min.is_finite()
+            || !self.range.max.is_finite()
+            || !self.range.value.is_finite()
+            || self.range.min > self.range.max
+            || self.range.value < self.range.min
+            || self.range.value > self.range.max
+        {
+            return Err(Error::InvalidProps("slider requires a finite closed range"));
+        }
         if [self.step, self.page_step]
             .into_iter()
             .any(|value| !value.is_finite() || value <= 0.0)
