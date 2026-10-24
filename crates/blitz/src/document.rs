@@ -23,6 +23,10 @@ mod graphic;
 #[cfg(feature = "paint")]
 #[path = "graphic_motion.rs"]
 mod graphic_motion;
+#[path = "layers.rs"]
+mod layers;
+#[path = "translation.rs"]
+mod translation;
 use style::computed_values::visibility::T as Visibility;
 
 /// Typed inline acceptance for the pinned native engine. HTML-family CSS still
@@ -33,7 +37,7 @@ use style::computed_values::visibility::T as Visibility;
 /// Re-audit these exclusions against real geometry/paint before widening them.
 pub const STYLE_PROFILE: glory_render::style::Profile = glory_render::style::Profile {
     name: "blitz",
-    version: 10,
+    version: 11,
     inline: glory_render::style::Support::ALL
         .without_value(glory_render::style::Value::Sticky)
         .without_value(glory_render::style::Value::AnchorAuto)
@@ -54,8 +58,8 @@ fn check_style(style: &glory_render::style::Style) -> Result<(), Error> {
         })
 }
 
-// beta.4 has no document top-layer/focus-scope implementation. Reject the
-// promise before mutation instead of displaying a modal as ordinary content.
+// The pinned organization fork provides real viewport layout/paint/hit roots.
+// Widen only the Layer kinds whose focus/input driver is implemented here.
 fn check_layer<'a>(
     node: impl Into<glory_render::DescriptorView<'a>>,
     patch: Option<&glory_render::Patch>,
@@ -65,7 +69,8 @@ fn check_layer<'a>(
     let value = match patch {
         None => node.semantics.as_deref(),
         Some(Patch::Semantics(Change::Set(value))) => value.as_deref(),
-        _ => None,
+        Some(Patch::Semantics(Change::Clear)) => None,
+        _ => node.semantics.as_deref(),
     };
     if value.is_some_and(|s| s.sheet_grip) {
         return Err(Error::Unsupported("native sheet gestures"));
@@ -75,8 +80,34 @@ fn check_layer<'a>(
             "native intrinsic-height collapse motion",
         ));
     }
-    if value.is_some_and(|s| s.layer.is_some()) {
-        return Err(Error::Unsupported("native top layers"));
+    if let Some(layer) = value.and_then(|s| s.layer.as_ref()) {
+        let role = match patch {
+            Some(Patch::Role(Change::Set(role))) => *role,
+            Some(Patch::Role(Change::Clear)) => None,
+            _ => node.role,
+        };
+        let style = match patch {
+            Some(Patch::Style(Change::Set(style))) => style,
+            Some(Patch::Style(Change::Clear)) => &glory_render::style::Style::default(),
+            _ => node.style,
+        };
+        if !matches!(
+            role,
+            Some(glory_render::Role::Dialog | glory_render::Role::AlertDialog)
+        ) || layer.sheet.is_some()
+            || !matches!(
+                layer.placement,
+                glory_render::LayerPlacement::Center
+                    | glory_render::LayerPlacement::Anchor(_)
+                    | glory_render::LayerPlacement::Viewport(_)
+            )
+            || value.is_some_and(|s| s.translation.is_some())
+            || style
+                .position
+                .is_some_and(|position| position != glory_render::style::Position::Fixed)
+        {
+            return Err(Error::Unsupported("native top layers"));
+        }
     }
     if value.is_some_and(|s| s.link_open == Some(glory_render::LinkOpen::NewContext)) {
         return Err(Error::Unsupported("native separate link contexts"));
@@ -205,6 +236,12 @@ struct Range {
 }
 #[derive(Default)]
 struct Editing {
+    #[cfg(feature = "shell")]
+    input_before: Option<(
+        u64,
+        glory_render::TextSelection,
+        glory_render::InputEditIntent,
+    )>,
     composing: bool,
     revision: u64,
     requested: u64,
@@ -224,6 +261,7 @@ impl Range {
     }
 }
 struct Dom {
+    translations: translation::Translations,
     #[cfg(feature = "paint")]
     motion: graphic_motion::Motion,
     doc: BaseDocument,
@@ -302,26 +340,30 @@ impl Dom {
         doc.set_resource_limits(config.resources)
             .expect("new document has no resources");
         let root = doc.root_node().id;
-        let (body, css) = {
+        let (body, css, translation_sheet) = {
             let mut m = doc.mutate();
             let html = m.create_element(tag("html"), Vec::new());
             let head = m.create_element(tag("head"), Vec::new());
             let body = m.create_element(tag("body"), Vec::new());
             let base = m.create_element(tag("style"), Vec::new());
             let baseline = m.create_text_node(&format!(
-                "html,body{{margin:0;padding:0}}{}[data-gly-rotate]{{animation:none!important;transform:none!important}}[data-gly-path-transition]{{transition:none!important}}",
+                "html,body{{margin:0;padding:0}}{}[data-gly-layer=center]{{left:var(--gly-layer-x,0px);top:var(--gly-layer-y,0px);transform:none}}[data-gly-rotate]{{animation:none!important;transform:none!important}}[data-gly-path-transition]{{transition:none!important}}",
                 glory_html::BASE_CSS
             ));
             let sheet = m.create_element(tag("style"), Vec::new());
             let css = m.create_text_node("");
+            let translations = m.create_element(tag("style"), Vec::new());
+            let translation_sheet = m.create_text_node("");
             m.append_children(root, &[html]);
             m.append_children(html, &[head, body]);
-            m.append_children(head, &[base, sheet]);
+            m.append_children(head, &[base, sheet, translations]);
             m.append_children(base, &[baseline]);
             m.append_children(sheet, &[css]);
-            (body, css)
+            m.append_children(translations, &[translation_sheet]);
+            (body, css, translation_sheet)
         };
         Self {
+            translations: translation::Translations::new(translation_sheet, config.motion),
             #[cfg(feature = "paint")]
             motion: graphic_motion::Motion::new(config.motion),
             doc,
@@ -581,7 +623,28 @@ impl Dom {
             self.invalidate();
         }
         let terminal = if composing {
-            Some((self.text_value(id)?, revision))
+            let too_long = self
+                .doc
+                .get_node(control)
+                .and_then(|n| n.element_data())
+                .is_some_and(|element| {
+                    element
+                        .attr(attr("data-gly-input-edit").local)
+                        .and_then(|v| v.parse::<usize>().ok())
+                        .is_some_and(|max| {
+                            element
+                                .text_input_data()
+                                .is_some_and(|i| i.editor.raw_text().len() > max)
+                        })
+                });
+            Some((
+                if too_long {
+                    String::new()
+                } else {
+                    self.text_value(id)?
+                },
+                revision,
+            ))
         } else {
             None
         };
@@ -950,6 +1013,7 @@ struct DragSession {
     captured: bool,
 }
 struct State {
+    layers: layers::Layers,
     color_scheme: Option<bool>,
     #[cfg(feature = "shell")]
     drag: Option<DragSession>,
@@ -972,6 +1036,107 @@ struct State {
     space: Option<NodeId>,
 }
 impl State {
+    #[cfg(feature = "shell")]
+    fn captured_text_value(&self, node: NodeId) -> Result<String, Error> {
+        if let Some(max) = self
+            .mapper
+            .tree()
+            .node(node)?
+            .descriptor
+            .view()
+            .semantics
+            .as_ref()
+            .and_then(|s| s.input_edit)
+            .map(|c| c.max_bytes)
+        {
+            let control = self.dom.control(node)?;
+            if self
+                .dom
+                .doc
+                .get_node(control)
+                .and_then(|n| n.element_data())
+                .and_then(|e| e.text_input_data())
+                .is_some_and(|i| i.editor.raw_text().len() > max)
+            {
+                return Ok(String::new());
+            }
+        }
+        self.dom.text_value(node)
+    }
+    fn terminal_input_event(
+        &self,
+        node: NodeId,
+        value: String,
+        revision: u64,
+    ) -> Result<Event, Error> {
+        let Some(capture) = self.mapper.tree().node(node).ok().and_then(|n| {
+            n.descriptor
+                .view()
+                .semantics
+                .as_ref()
+                .and_then(|s| s.input_edit)
+        }) else {
+            return Ok(Event::ValueChanged {
+                value,
+                revision,
+                composing: false,
+            });
+        };
+        let reject =
+            |reason| Event::InputEdit(glory_render::InputEdit::Rejected { revision, reason });
+        if self.dom.range(node)?.editing.revision != revision {
+            return Ok(reject(
+                glory_render::InputEditRejection::SelectionUnavailable,
+            ));
+        }
+        let control = self.dom.control(node)?;
+        let Some(input) = self
+            .dom
+            .doc
+            .get_node(control)
+            .and_then(|n| n.element_data())
+            .and_then(|e| e.text_input_data())
+        else {
+            return Ok(reject(
+                glory_render::InputEditRejection::SelectionUnavailable,
+            ));
+        };
+        let text = input.editor.raw_text();
+        if text.len() > capture.max_bytes {
+            return Ok(reject(glory_render::InputEditRejection::TooLong));
+        }
+        let selected = input.editor.raw_selection();
+        let a = selected.anchor().index();
+        let f = selected.focus().index();
+        let start = text
+            .get(..a.min(f))
+            .ok_or(Error::InvalidEvent("invalid native selection"))?
+            .encode_utf16()
+            .count();
+        let end = text
+            .get(..a.max(f))
+            .ok_or(Error::InvalidEvent("invalid native selection"))?
+            .encode_utf16()
+            .count();
+        Ok(Event::InputEdit(glory_render::InputEdit::Value {
+            value,
+            revision,
+            composing: false,
+            before: None,
+            intent: glory_render::InputEditIntent::Replace,
+            selection: glory_render::TextSelection {
+                start,
+                end,
+                direction: if a > f {
+                    glory_render::SelectionDirection::Backward
+                } else if a < f {
+                    glory_render::SelectionDirection::Forward
+                } else {
+                    glory_render::SelectionDirection::None
+                },
+            },
+        }))
+    }
     fn end_editing(&mut self, node: NodeId) -> Result<(), Error> {
         if !self
             .dom
@@ -992,14 +1157,8 @@ impl State {
                 node,
                 event: Event::Composition { active: false },
             });
-            self.inputs.push(Input::Event {
-                node,
-                event: Event::ValueChanged {
-                    value,
-                    composing: false,
-                    revision,
-                },
-            });
+            let event = self.terminal_input_event(node, value, revision)?;
+            self.inputs.push(Input::Event { node, event });
         }
         Ok(())
     }
@@ -1029,6 +1188,7 @@ impl State {
         if !self.interactive {
             return;
         }
+        layers::repair_focus(self);
         let physical = self.dom.doc.get_focussed_node_id();
         let next = physical.and_then(|node| self.dom.owner(node));
         if let Some(next) = next
@@ -1040,6 +1200,10 @@ impl State {
             self.dom.invalidate();
             self.focus_changed(None);
         } else {
+            #[cfg(feature = "shell")]
+            if self.focused != next {
+                layers::outside_focus(self, next);
+            }
             self.focus_changed(next);
         }
     }
@@ -1048,7 +1212,7 @@ impl State {
             return Err(Error::Unsupported("headless Blitz focus"));
         }
         let descriptor = self.mapper.tree().node(id)?.descriptor.view();
-        if !self.mapper.tree().enabled(id) {
+        if !self.mapper.tree().enabled(id) || !self.layers.allowed(self.mapper.tree(), id) {
             return Err(Error::Unsupported("focus on disabled control"));
         }
         let explicit = descriptor.focus != glory_render::FocusMode::Auto;
@@ -1102,6 +1266,7 @@ impl Renderer {
     }
     fn configured_with(runtime: RuntimeId, interactive: bool, config: Config) -> Self {
         Self(Rc::new(RefCell::new(State {
+            layers: layers::Layers::default(),
             #[cfg(feature = "paint")]
             runtime,
             mapper: Mapper::new(runtime),
@@ -1138,6 +1303,8 @@ impl Renderer {
         if state.dom.doc.viewport() != &viewport {
             state.dom.doc.set_viewport(viewport);
             state.dom.invalidate();
+            let State { mapper, dom, .. } = &mut *state;
+            dom.sync_translations(mapper.tree(), &[])?;
         }
         Ok(())
     }
@@ -1407,12 +1574,23 @@ impl Render for Renderer {
             Ok(mapper.receipt())
         })();
         state.receipt = state.mapper.receipt();
+        let translated = {
+            let State { mapper, dom, .. } = &mut *state;
+            dom.sync_translations(mapper.tree(), mutations)
+        };
+        if result.is_ok() {
+            translated?;
+        }
         #[cfg(feature = "paint")]
         {
             state.dom.motion.permissions(state.mapper.tree());
             state.dom.refresh_graphic_motion();
         }
         state.dom.doc.prune_resource_interests();
+        let layered = layers::sync(&mut state, mutations);
+        if result.is_ok() {
+            layered?;
+        }
         let State {
             mapper,
             scroll_requests,
@@ -1493,6 +1671,59 @@ impl Render for Renderer {
             return Err(Error::Unsupported("action on disconnected Blitz range"));
         }
         match action {
+            glory_render::Action::RaiseLayer(id) => layers::raise(&mut state,id),
+            glory_render::Action::SelectText {
+                node,
+                revision,
+                selection,
+            } => {
+                if !state.interactive {
+                    return Err(Error::Unsupported("headless Blitz text selection"));
+                }
+                let range = state.dom.range(node)?;
+                if range.editing.revision != revision || range.editing.composing {
+                    return Err(Error::Unsupported(
+                        "text selection revision or composition changed",
+                    ));
+                }
+                let control = state.dom.control(node)?;
+                {
+                    let input = state
+                        .dom
+                        .doc
+                        .get_node(control)
+                        .and_then(|n| n.element_data())
+                        .and_then(|e| e.text_input_data())
+                        .ok_or(Error::Unsupported("Blitz text editor unavailable"))?;
+                    let text = input.editor.raw_text();
+                    if !text.is_ascii() {
+                        return Err(Error::Unsupported(
+                            "exact selection currently requires ASCII input text",
+                        ));
+                    }
+                    let glory_render::Props::Input(expected) =
+                        state.mapper.tree().node(node)?.descriptor.view().props
+                    else {
+                        unreachable!()
+                    };
+                    if text != expected.value {
+                        return Err(Error::Unsupported("text selection value changed"));
+                    }
+                    selection.validate(text.len())?;
+                }
+                let (anchor, focus) =
+                    if selection.direction == glory_render::SelectionDirection::Backward {
+                        (selection.end, selection.start)
+                    } else {
+                        (selection.start, selection.end)
+                    };
+                state.dom.doc.with_text_input(control, |mut driver| {
+                    driver.select_byte_range(anchor, focus)
+                });
+                state.dom.invalidate_pixels();
+                state.observation_pending = true;
+                Ok(())
+            }
             glory_render::Action::RevealOption { .. } => {
                 Err(Error::Unsupported("native combobox controls"))
             }
@@ -1549,6 +1780,7 @@ impl Render for Renderer {
         let mut state = self.0.borrow_mut();
         state.mapper.tree().node(query.node())?;
         let result = (|| {
+            layers::sync(&mut state, &[])?;
             query.validate_target(&state.mapper.tree().node(query.node())?.descriptor)?;
             if !state.mapper.tree().active(query.node()) {
                 return Err(Error::Unsupported("query on disconnected Blitz range"));
@@ -1581,9 +1813,14 @@ impl Render for Renderer {
                         .get_node(node)
                         .ok_or(Error::NodeGone(query.node()))?
                         .scroll_offset();
+                    let translation = state.dom.translations.offset(
+                        state.mapper.tree(),
+                        query.node(),
+                        state.dom.time,
+                    )?;
                     Ok(QueryValue::Bounds(Rect {
-                        x: rect.x + own_scroll.x,
-                        y: rect.y + own_scroll.y,
+                        x: rect.x + own_scroll.x + translation.x,
+                        y: rect.y + own_scroll.y + translation.y,
                         width: rect.width,
                         height: rect.height,
                     }))
@@ -1630,6 +1867,9 @@ impl Render for Renderer {
     }
     fn drain(&mut self, inputs: &mut Vec<Input>) {
         let mut state = self.0.borrow_mut();
+        if let Err(error) = layers::sync(&mut state, &[]) {
+            state.input_error = Some(error);
+        }
         state.dom.resolve();
         state.collect_image_inputs();
         state.sync_focus();
@@ -1669,6 +1909,7 @@ impl Render for Renderer {
             }
         }
         inputs.append(queued);
+        layers::drained(&mut state);
         state.observed_revision = state.dom.revision;
         state.observation_pending = false;
     }

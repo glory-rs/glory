@@ -116,7 +116,7 @@ fn native_profile_distinguishes_unimplemented_values_from_the_html_dialect() {
     }
     assert_eq!(
         (profile.name, profile.version, profile.css),
-        ("blitz", 10, Css::Html)
+        ("blitz", 11, Css::Html)
     );
     assert!(
         glory_render::style::Profile::HTML

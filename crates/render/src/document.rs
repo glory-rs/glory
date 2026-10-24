@@ -12,6 +12,15 @@ pub enum DocumentPart {
     DescriptionList,
     Term,
     Definition,
+    Table,
+    TableCaption,
+    TableHead,
+    TableBody,
+    TableFoot,
+    TableRow,
+    ColumnHeader,
+    RowHeader,
+    TableCell,
 }
 
 /// The parent is the nearest boxed parent, crossing only boxless Groups. A
@@ -27,6 +36,43 @@ pub(crate) fn validate_child(
     let part = child.document_part();
     let parent = parent.and_then(|d| d.document_part());
     let valid = match (parent, part) {
+        (
+            Some(DocumentPart::Table),
+            Some(
+                DocumentPart::TableCaption
+                | DocumentPart::TableHead
+                | DocumentPart::TableBody
+                | DocumentPart::TableFoot,
+            ),
+        ) => true,
+        (Some(DocumentPart::Table), _) => false,
+        (
+            Some(DocumentPart::TableHead | DocumentPart::TableBody | DocumentPart::TableFoot),
+            Some(DocumentPart::TableRow),
+        ) => true,
+        (Some(DocumentPart::TableHead | DocumentPart::TableBody | DocumentPart::TableFoot), _) => {
+            false
+        }
+        (
+            Some(DocumentPart::TableRow),
+            Some(DocumentPart::ColumnHeader | DocumentPart::RowHeader | DocumentPart::TableCell),
+        ) => true,
+        (Some(DocumentPart::TableRow), _) => false,
+        (Some(DocumentPart::TableCaption), _) => matches!(child.props, Props::Text(_)),
+        (
+            _,
+            Some(
+                DocumentPart::TableCaption
+                | DocumentPart::TableHead
+                | DocumentPart::TableBody
+                | DocumentPart::TableFoot
+                | DocumentPart::TableRow
+                | DocumentPart::ColumnHeader
+                | DocumentPart::RowHeader
+                | DocumentPart::TableCell,
+            ),
+        ) => detached,
+
         (
             Some(DocumentPart::OrderedList | DocumentPart::UnorderedList),
             Some(DocumentPart::ListItem),

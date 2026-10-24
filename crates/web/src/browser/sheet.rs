@@ -8,6 +8,31 @@ use web_sys::{Element, HtmlElement, PointerEvent};
 
 use super::{backend, dom::Dom};
 
+pub(super) fn cancel_outside_document_modal(dom: &Dom) -> Result<(), Error> {
+    let current = dom
+        .sheets
+        .borrow()
+        .gesture
+        .as_ref()
+        .map(|gesture| (gesture.id, gesture.pointer));
+    if let Some((id, pointer)) = current
+        && let Ok(element) = dom.entry(id).and_then(|entry| entry.element())
+        && !dom.document_layers.allows(Some(element.as_ref()))
+    {
+        if let Some(gesture) = dom.sheets.borrow_mut().gesture.as_mut() {
+            gesture.cancelled = true;
+        }
+        if let Some(grip) = element
+            .query_selector("[data-gly-sheet-grip]")
+            .map_err(backend)?
+        {
+            let _ = grip.release_pointer_capture(pointer);
+        }
+        dom.frame.input();
+    }
+    Ok(())
+}
+
 #[derive(Clone, PartialEq)]
 struct Accepted {
     config: SheetConfig,

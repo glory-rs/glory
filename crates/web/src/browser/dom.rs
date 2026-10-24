@@ -64,6 +64,11 @@ pub(super) fn preload_composing(element: &Element) -> bool {
 
 #[derive(Default)]
 pub(super) struct Editing {
+    pub input_before: Option<(
+        u64,
+        glory_render::TextSelection,
+        glory_render::InputEditIntent,
+    )>,
     pub composing: bool,
     pub revision: u64,
     requested: u64,
@@ -196,9 +201,11 @@ pub(super) struct DragSession {
     pub captured: bool,
 }
 pub(super) struct Dom {
+    pub(super) translations: RefCell<super::translation::Translations>,
     pub(super) collapses: RefCell<super::collapse::Collapses>,
     pub(super) images: RefCell<super::images::Images>,
     pub layers: RefCell<super::layers::Layers>,
+    pub document_layers: Rc<super::layers::DocumentLayers>,
     pub(super) sheets: RefCell<super::sheet::Sheets>,
     pub layer_layout: Cell<bool>,
     pub drag: RefCell<Option<DragSession>>,
@@ -225,12 +232,15 @@ pub(super) struct Dom {
     pub root_end: RefCell<Option<Node>>,
 }
 impl Dom {
-    pub fn new(document: Document, root: Element, frame: Rc<Frame>) -> Rc<Self> {
+    pub fn new(document: Document, root: Element, frame: Rc<Frame>) -> Result<Rc<Self>, Error> {
+        let document_layers = super::layers::DocumentLayers::acquire(&document)?;
         let error = root.set_attribute("data-gly-app", "").err().map(backend);
-        Rc::new(Self {
+        let dom = Rc::new(Self {
+            translations: RefCell::new(super::translation::Translations::default()),
             collapses: RefCell::new(super::collapse::Collapses::default()),
             images: RefCell::new(super::images::Images::default()),
             layers: RefCell::new(super::layers::Layers::default()),
+            document_layers: document_layers.clone(),
             sheets: RefCell::new(super::sheet::Sheets::default()),
             layer_layout: Cell::new(false),
             drag: RefCell::new(None),
@@ -255,7 +265,9 @@ impl Dom {
             listeners: RefCell::new(BTreeMap::new()),
             actions: RefCell::new(Vec::new()),
             root_end: RefCell::new(None),
-        })
+        });
+        document_layers.register(&dom);
+        Ok(dom)
     }
     pub fn entry(&self, id: NodeId) -> Result<Rc<Entry>, Error> {
         self.entries
@@ -788,6 +800,7 @@ impl Dom {
                 sizes.remove(id);
                 self.images.borrow_mut().retire(*id);
                 self.collapses.borrow_mut().retire(*id);
+                self.translations.borrow_mut().retire(*id);
             }
         }
         self.layout
@@ -817,6 +830,7 @@ impl Dom {
     }
     pub fn clear(&self) {
         *self.collapses.borrow_mut() = super::collapse::Collapses::default();
+        *self.translations.borrow_mut() = super::translation::Translations::default();
         *self.sheets.borrow_mut() = super::sheet::Sheets::default();
         if self.cleared.replace(true) {
             return;
@@ -852,6 +866,9 @@ impl Dom {
         }
         let _ = self.root.remove_attribute("data-gly-app");
         drop(entries);
+        // Clearing this root may physically disconnect another independently
+        // owned App. Its detached top layers must release document leases now.
+        let _ = self.document_layers.sync(None);
     }
 }
 pub(super) struct Sink(pub Rc<Dom>);

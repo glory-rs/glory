@@ -461,6 +461,9 @@ impl Session {
         }
         for action in actions {
             let present = self.present.borrow();
+            if let Action::SelectText {node,revision,..}=action
+                && !present.tree.node(node).is_ok_and(|node|matches!(node.descriptor.view().props,glory_render::Props::Input(p) if p.revision==revision))
+            { continue; }
             // Menu close and exit commit together. The retained panel may now
             // be hidden, but the host must still move focus past its trigger.
             if present.tree.node(action.node()).is_err()
@@ -469,8 +472,10 @@ impl Session {
             {
                 continue;
             }
-            if matches!(action, Action::Focus(_) | Action::ExitMenu { .. })
-                && present.tree.inert(action.node())
+            if matches!(
+                action,
+                Action::Focus(_) | Action::RaiseLayer(_) | Action::ExitMenu { .. }
+            ) && present.tree.inert(action.node())
             {
                 continue;
             }
@@ -485,8 +490,10 @@ impl Session {
                 // desynchronize the semantic tree. Focus is a best-effort
                 // intent; Query::Focus observes the actual result. Retain later
                 // intents; actual backend failures remain fatal.
-                if matches!(action, Action::Focus(_))
-                    && matches!(error, RenderError::Unsupported(_))
+                if matches!(
+                    action,
+                    Action::Focus(_) | Action::RaiseLayer(_) | Action::SelectText { .. }
+                ) && matches!(error, RenderError::Unsupported(_))
                 {
                     continue;
                 }
@@ -534,6 +541,12 @@ impl Session {
             {
                 return Ok(false);
             }
+            if let Event::InputEdit(edit) = &event
+                && let glory_render::Props::Input(input) = props
+                && edit.revision() < input.revision
+            {
+                return Ok(false);
+            }
             if let Event::Sheet { revision, .. } = &event
                 && present
                     .tree
@@ -576,12 +589,14 @@ impl Session {
                         | Event::Menu { .. }
                         | Event::ContextMenu { .. }
                         | Event::NavigationPanel { .. }
+                        | Event::GridNavigate { .. }
                         | Event::Sheet { .. }
                         | Event::Choice { .. }
                         | Event::Drag { .. }
                         | Event::Range { .. }
                         | Event::Spin { .. }
                         | Event::ValueChanged { .. }
+                        | Event::InputEdit(_)
                         | Event::CheckedChanged(_)
                         | Event::SelectChanged { .. }
                         | Event::Commit { .. }
@@ -1046,6 +1061,26 @@ impl Scope {
         }
         Ok(false)
     }
+    /// Whether the current staged semantic subtree rooted at `ancestor`
+    /// contains `node`, including the ancestor itself. Both identities and
+    /// this requesting Scope must still be live. Hidden, suspended and boxless
+    /// nodes keep their logical ancestry; use `is_active` separately before a
+    /// physical observation. No flush, host lookup or construction-parent
+    /// assumption is involved, so explicit Place is visible immediately.
+    pub fn contains_node(&self, ancestor: NodeId, node: NodeId) -> Result<bool> {
+        let session = self.session()?;
+        let present = session.present.borrow();
+        present.tree.node(ancestor)?;
+        present.tree.node(node)?;
+        let mut cursor = Some(node);
+        while let Some(current) = cursor {
+            if current == ancestor {
+                return Ok(true);
+            }
+            cursor = present.tree.node(current)?.parent;
+        }
+        Ok(false)
+    }
     pub fn retain(&self, resource: impl Any) -> Result {
         self.session()?;
         self.0.resources.borrow_mut().push(Box::new(resource));
@@ -1135,7 +1170,12 @@ impl Scope {
         }
         let capabilities = session.renderer.borrow().capabilities();
         match action {
-            Action::Focus(_) | Action::ExitMenu { .. } if !capabilities.focus => {
+            Action::SelectText { .. } if !capabilities.input => {
+                return Err(RenderError::Unsupported("text selection").into());
+            }
+            Action::Focus(_) | Action::RaiseLayer(_) | Action::ExitMenu { .. }
+                if !capabilities.focus =>
+            {
                 return Err(RenderError::Unsupported("focus").into());
             }
             Action::ScrollTo { .. } | Action::RevealOption { .. } if !capabilities.scroll => {
@@ -1147,6 +1187,29 @@ impl Scope {
         present.tree.node(action.node())?;
         present.actions.push(action);
         Ok(())
+    }
+    /// Queue an exact ASCII selection using this Input's current program
+    /// revision. Call after set_input_value when formatting changed the value.
+    pub fn set_input_selection(
+        &self,
+        node: NodeId,
+        selection: glory_render::TextSelection,
+    ) -> Result {
+        let session = self.session()?;
+        let revision = {
+            let present = session.present.borrow();
+            let glory_render::Props::Input(input) =
+                present.tree.node(node)?.descriptor.view().props
+            else {
+                return Err(RenderError::Unsupported("text selection requires an Input").into());
+            };
+            input.revision
+        };
+        self.action(Action::SelectText {
+            node,
+            revision,
+            selection,
+        })
     }
     /// Flush before observing a host value. The reply executes under this
     /// Scope's Owner, independent of the target's Owner or the pump caller.

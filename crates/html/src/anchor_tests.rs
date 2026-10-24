@@ -29,6 +29,29 @@ fn descriptor(placement: LayerPlacement) -> Descriptor {
 #[test]
 fn every_anchor_field_and_reset_matches_the_full_shape_differential_oracle() {
     let mut placements = vec![LayerPlacement::Center];
+    let viewport = ViewportPlacement::default();
+    placements.extend(
+        [
+            viewport,
+            ViewportPlacement {
+                x: 173.5,
+                ..viewport
+            },
+            ViewportPlacement {
+                y: -23.25,
+                ..viewport
+            },
+            ViewportPlacement {
+                viewport_padding: 43.,
+                ..viewport
+            },
+            ViewportPlacement {
+                constrain: false,
+                ..viewport
+            },
+        ]
+        .map(LayerPlacement::Viewport),
+    );
     for side in [
         AnchorSide::Top,
         AnchorSide::Bottom,

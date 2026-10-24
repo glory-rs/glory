@@ -85,6 +85,16 @@ fn view_tag(
             glory_render::DocumentPart::DescriptionList => "dl",
             glory_render::DocumentPart::Term => "dt",
             glory_render::DocumentPart::Definition => "dd",
+            glory_render::DocumentPart::Table => "table",
+            glory_render::DocumentPart::TableCaption => "caption",
+            glory_render::DocumentPart::TableHead => "thead",
+            glory_render::DocumentPart::TableBody => "tbody",
+            glory_render::DocumentPart::TableFoot => "tfoot",
+            glory_render::DocumentPart::TableRow => "tr",
+            glory_render::DocumentPart::ColumnHeader | glory_render::DocumentPart::RowHeader => {
+                "th"
+            }
+            glory_render::DocumentPart::TableCell => "td",
         };
     }
     if let Some(part) = part {
@@ -121,6 +131,8 @@ pub(crate) fn role_name(role: Role) -> &'static str {
         Role::Status => "status",
         Role::Alert => "alert",
         Role::Table => "table",
+        Role::Grid => "grid",
+        Role::GridCell => "gridcell",
         Role::Row => "row",
         Role::ColumnHeader => "columnheader",
         Role::Cell => "cell",
@@ -413,7 +425,10 @@ pub fn shape<'a>(descriptor: impl Into<glory_render::DescriptorView<'a>>) -> Res
     if !descriptor.classes.is_empty() {
         attrs(&mut shape, Part::Main).insert("class", descriptor.classes.join(" "));
     }
-    let css = style(descriptor.style);
+    let mut css = style(descriptor.style);
+    css.push_str(&crate::semantics::translation_style(
+        descriptor.semantics.as_deref().and_then(|s| s.translation),
+    ));
     if !css.is_empty() {
         attrs(&mut shape, Part::Main)
             .entry("style")

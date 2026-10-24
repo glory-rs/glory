@@ -25,6 +25,8 @@ mod sheets;
 mod styles;
 #[cfg(test)]
 mod tags_tests;
+#[cfg(test)]
+mod translation_tests;
 #[cfg(feature = "css")]
 pub use glory_style::Sheet;
 #[cfg(feature = "css")]
@@ -37,7 +39,7 @@ use std::collections::{BTreeMap, HashMap};
 pub use mapping::{preflight, shape};
 pub use serialize::{escape, select_options, serialize};
 pub use styles::style;
-pub const FORMAT_VERSION: u32 = 6;
+pub const FORMAT_VERSION: u32 = 8;
 /// Namespace is determined solely by the mapper's finite element vocabulary.
 pub fn element_namespace(tag: &str) -> &'static str {
     if matches!(tag, "svg" | "path") {
@@ -70,13 +72,13 @@ pub const BASE_CSS: &str = concat!(
     "[data-gly-sheet][data-gly-layer=right]>[data-gly-sheet-grip]{left:0;top:0;bottom:0;width:24px}",
     "[data-gly-sheet][data-gly-layer=left]>[data-gly-sheet-grip]>*,[data-gly-sheet][data-gly-layer=right]>[data-gly-sheet-grip]>*{width:4px!important;height:48px!important}",
     "[data-gly-layer]:not(:popover-open){display:none!important}",
-    "[data-gly-layer]{position:fixed;inset:auto;margin:0;max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);overflow:auto}",
+    "[data-gly-layer]{position:fixed;inset:auto;margin:0;max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);overflow:auto;overscroll-behavior:contain}",
     "[data-gly-layer=center]{top:50%;left:50%;transform:translate(-50%,-50%)}",
     "[data-gly-layer=left]{left:0;top:0;height:100dvh;max-height:100dvh}",
     "[data-gly-layer=right]{right:0;top:0;height:100dvh;max-height:100dvh}",
     "[data-gly-layer=top]{left:0;top:0;width:100vw;max-width:100vw}",
     "[data-gly-layer=bottom]{left:0;bottom:0;width:100vw;max-width:100vw}",
-    "[data-gly-layer=anchor],[data-gly-layer=context-point]{left:var(--gly-layer-x,12px);top:var(--gly-layer-y,12px)}",
+    "[data-gly-layer=anchor],[data-gly-layer=context-point],[data-gly-layer=viewport]{left:var(--gly-layer-x,12px);top:var(--gly-layer-y,12px)}",
     "[data-gly-layer][aria-modal=true]::backdrop{background:rgba(0,0,0,.35)}",
     "[data-gly-hidden]:not([data-gly-collapse]){display:none!important}",
     "[data-gly-collapse]{interpolate-size:allow-keywords;overflow:hidden!important;transition:height attr(data-gly-collapse-duration type(<time>),0ms) linear}",
@@ -609,3 +611,6 @@ fn difference(
     }
     Ok(edits)
 }
+
+#[cfg(test)]
+mod table_tests;

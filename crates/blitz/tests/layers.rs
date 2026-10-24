@@ -4,17 +4,20 @@ use glory_render::*;
 
 fn layer() -> Descriptor {
     let mut d = Descriptor::new(Props::View);
-    d.role = Some(Role::Dialog);
-    d.focus = FocusMode::Programmatic;
+    d.role = Some(Role::Tooltip);
     d.semantics = Some(Box::new(Semantics {
         id: Some(SemanticId::new("layer").unwrap()),
-        layer: Some(Layer::default()),
+        layer: Some(Layer {
+            modal: false,
+            focus: LayerFocus::Preserve,
+            ..Default::default()
+        }),
         ..Default::default()
     }));
     d
 }
 #[test]
-fn native_layers_reject_in_preflight_and_direct_apply_without_losing_prefix() {
+fn native_unimplemented_tooltip_layers_reject_before_mutation_and_keep_prefix() {
     let runtime = RuntimeId::new();
     let mut renderer = Renderer::new(runtime);
     let error = Error::Unsupported("native top layers");

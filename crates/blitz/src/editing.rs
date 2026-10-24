@@ -45,6 +45,21 @@ pub(super) fn sanitize_ime(state: &State, event: &mut UiEvent) {
 }
 
 pub(super) fn text_event(state: &mut State, node: NodeId, text: &str) -> Result<Event, Error> {
+    let capture = state
+        .mapper
+        .tree()
+        .node(node)?
+        .descriptor
+        .view()
+        .semantics
+        .as_ref()
+        .and_then(|s| s.input_edit);
+    if capture.is_some_and(|c| text.len() > c.max_bytes) {
+        return Ok(Event::InputEdit(glory_render::InputEdit::Rejected {
+            revision: state.dom.range(node)?.editing.revision,
+            reason: glory_render::InputEditRejection::TooLong,
+        }));
+    }
     let multiline = multiline(state, node);
     let value = normalize_text(text, multiline);
     if let Cow::Owned(value) = &value {
@@ -70,12 +85,196 @@ pub(super) fn text_event(state: &mut State, node: NodeId, text: &str) -> Result<
             });
         }
     }
+    if let Some(capture) = capture {
+        let range = state
+            .dom
+            .ranges
+            .get_mut(&node)
+            .ok_or(Error::NodeGone(node))?;
+        let revision = range.editing.revision;
+        let composing = range.editing.composing;
+        let before = range
+            .editing
+            .input_before
+            .take()
+            .filter(|(r, _, _)| *r == revision)
+            .map(|(_, s, i)| (s, i));
+        if value.len() > capture.max_bytes {
+            return Ok(Event::InputEdit(glory_render::InputEdit::Rejected {
+                revision,
+                reason: glory_render::InputEditRejection::TooLong,
+            }));
+        }
+        let Some(selection) = capture_selection(state, node, capture.max_bytes) else {
+            return Ok(Event::InputEdit(glory_render::InputEdit::Rejected {
+                revision,
+                reason: glory_render::InputEditRejection::SelectionUnavailable,
+            }));
+        };
+        let (before, intent) = before
+            .map_or((None, glory_render::InputEditIntent::Replace), |(s, i)| {
+                (Some(s), i)
+            });
+        return Ok(Event::InputEdit(glory_render::InputEdit::Value {
+            value: value.into_owned(),
+            revision,
+            composing,
+            selection,
+            before,
+            intent,
+        }));
+    }
     let range = state.dom.range(node)?;
     Ok(Event::ValueChanged {
         value: value.into_owned(),
         composing: range.editing.composing,
         revision: range.editing.revision,
     })
+}
+fn capture_selection(
+    state: &State,
+    node: NodeId,
+    max: usize,
+) -> Option<glory_render::TextSelection> {
+    let control = state.dom.control(node).ok()?;
+    let input = state
+        .dom
+        .doc
+        .get_node(control)?
+        .element_data()?
+        .text_input_data()?;
+    let text = input.editor.raw_text();
+    if text.len() > max {
+        return None;
+    }
+    let selection = input.editor.raw_selection();
+    let a = selection.anchor().index();
+    let f = selection.focus().index();
+    let start = text.get(..a.min(f))?.encode_utf16().count();
+    let end = text.get(..a.max(f))?.encode_utf16().count();
+    Some(glory_render::TextSelection {
+        start,
+        end,
+        direction: if a > f {
+            glory_render::SelectionDirection::Backward
+        } else if a < f {
+            glory_render::SelectionDirection::Forward
+        } else {
+            glory_render::SelectionDirection::None
+        },
+    })
+}
+pub(super) fn capture_before(state: &mut State, event: &UiEvent) {
+    let UiEvent::KeyDown(key) = event else { return };
+    let Some(node) = state
+        .dom
+        .doc
+        .get_focussed_node_id()
+        .and_then(|id| state.dom.owner(id))
+    else {
+        return;
+    };
+    let Some(capture) = state.mapper.tree().node(node).ok().and_then(|n| {
+        n.descriptor
+            .view()
+            .semantics
+            .as_ref()
+            .and_then(|s| s.input_edit)
+    }) else {
+        return;
+    };
+    let before = capture_selection(state, node, capture.max_bytes);
+    let intent = match key.key {
+        Key::Named(NamedKey::Backspace) => glory_render::InputEditIntent::DeleteBackward,
+        Key::Named(NamedKey::Delete) => glory_render::InputEditIntent::DeleteForward,
+        Key::Character(_)
+            if !key
+                .modifiers
+                .intersects(Modifiers::CONTROL | Modifiers::META) =>
+        {
+            glory_render::InputEditIntent::Insert
+        }
+        _ => glory_render::InputEditIntent::Replace,
+    };
+    if let Some(range) = state.dom.ranges.get_mut(&node) {
+        range.editing.input_before = before.map(|s| (range.editing.revision, s, intent));
+    }
+}
+pub(super) fn current_event(state: &mut State, node: NodeId) -> Result<Event, Error> {
+    if let Some(max) = state
+        .mapper
+        .tree()
+        .node(node)?
+        .descriptor
+        .view()
+        .semantics
+        .as_ref()
+        .and_then(|s| s.input_edit)
+        .map(|c| c.max_bytes)
+    {
+        let control = state.dom.control(node)?;
+        let len = state
+            .dom
+            .doc
+            .get_node(control)
+            .and_then(|n| n.element_data())
+            .and_then(|e| e.text_input_data())
+            .map(|i| i.editor.raw_text().len())
+            .unwrap_or(0);
+        if len > max {
+            return Ok(Event::InputEdit(glory_render::InputEdit::Rejected {
+                revision: state.dom.range(node)?.editing.revision,
+                reason: glory_render::InputEditRejection::TooLong,
+            }));
+        }
+    }
+    let value = state.dom.text_value(node)?;
+    text_event(state, node, &value)
+}
+pub(super) fn queue_commit(state: &mut State, node: NodeId, sync_value: bool) -> Result<(), Error> {
+    let revision = state.dom.range(node)?.editing.revision;
+    if state
+        .mapper
+        .tree()
+        .node(node)?
+        .descriptor
+        .view()
+        .semantics
+        .as_ref()
+        .is_some_and(|s| s.input_edit.is_some())
+    {
+        let event = current_event(state, node)?;
+        let value = match &event {
+            Event::InputEdit(glory_render::InputEdit::Value { value, .. }) => Some(value.clone()),
+            _ => None,
+        };
+        state.inputs.push(Input::Event { node, event });
+        if let Some(value) = value {
+            state.inputs.push(Input::Event {
+                node,
+                event: Event::Commit { value, revision },
+            });
+        }
+    } else {
+        let value = state.dom.text_value(node)?;
+        if sync_value {
+            state.inputs.push(Input::Event {
+                node,
+                event: Event::ValueChanged {
+                    value: value.clone(),
+                    revision,
+                    composing: false,
+                },
+            });
+        }
+        if !multiline(state, node) {
+            state.inputs.push(Input::Event {
+                node,
+                event: Event::Commit { value, revision },
+            });
+        }
+    }
+    Ok(())
 }
 
 // IME preedit offsets are UTF-8 bytes (the native protocol). Query::Selection
@@ -153,14 +352,8 @@ pub(super) fn ime_event(
                     node,
                     event: Event::Composition { active: false },
                 });
-                state.inputs.push(Input::Event {
-                    node,
-                    event: Event::ValueChanged {
-                        value,
-                        composing: false,
-                        revision,
-                    },
-                });
+                let event = state.terminal_input_event(node, value, revision)?;
+                state.inputs.push(Input::Event { node, event });
             }
         }
         BlitzImeEvent::Commit(text) => {
@@ -181,21 +374,15 @@ pub(super) fn ime_event(
                     driver.insert_or_replace_selection(text);
                 });
                 let revision = state.dom.range(node)?.editing.revision;
-                let value = state.dom.text_value(node)?;
+                let value = state.captured_text_value(node)?;
                 if state.dom.finish_composition(node, true)?.is_some() {
                     state.inputs.push(Input::Event {
                         node,
                         event: Event::Composition { active: false },
                     });
                 }
-                state.inputs.push(Input::Event {
-                    node,
-                    event: Event::ValueChanged {
-                        value,
-                        composing: false,
-                        revision,
-                    },
-                });
+                let event = state.terminal_input_event(node, value, revision)?;
+                state.inputs.push(Input::Event { node, event });
             }
         }
         BlitzImeEvent::Disabled => {
@@ -249,12 +436,7 @@ pub(super) fn ime_event(
 }
 
 fn native_value(state: &mut State, node: NodeId) -> Result<(), Error> {
-    let range = state.dom.range(node)?;
-    let event = Event::ValueChanged {
-        value: state.dom.text_value(node)?,
-        composing: range.editing.composing,
-        revision: range.editing.revision,
-    };
+    let event = current_event(state, node)?;
     state.inputs.push(Input::Event { node, event });
     Ok(())
 }

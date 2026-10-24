@@ -136,34 +136,56 @@ impl Validator<'_> {
                             event: Event::Composition { active: true },
                         });
                     }
-                    let raw = js_sys::Reflect::get(control, &"value".into())
-                        .map_err(backend)?
-                        .as_string()
-                        .unwrap_or_default();
-                    // Validation must not mutate the existing document. The
-                    // adopted Entry repairs only noncanonical host text later.
-                    let actual =
-                        glory_render::normalize_text(&raw, control.tag_name() == "TEXTAREA")
-                            .into_owned();
-                    let probe = control.clone_node().map_err(backend)?;
-                    let Property::Text(initial) = &properties["value"] else {
-                        unreachable!()
-                    };
-                    js_sys::Reflect::set(&probe, &"value".into(), &initial.into())
-                        .map_err(backend)?;
-                    let initial = js_sys::Reflect::get(&probe, &"value".into())
-                        .map_err(backend)?
-                        .as_string()
-                        .unwrap_or_default();
-                    if actual != initial {
-                        self.plan.inputs.push(Input::Event {
-                            node: id,
-                            event: Event::ValueChanged {
-                                value: actual,
-                                composing,
-                                revision: shape.revision,
-                            },
-                        });
+                    if let Some(max) = super::input_edit::budget(control) {
+                        let event = super::input_edit::capture(
+                            control,
+                            max,
+                            shape.revision,
+                            composing,
+                            None,
+                        )?;
+                        let changed = match &event {
+                            glory_render::InputEdit::Value { value, .. } => {
+                                !matches!(&properties["value"],Property::Text(initial) if value==initial)
+                            }
+                            glory_render::InputEdit::Rejected { .. } => true,
+                        };
+                        if changed {
+                            self.plan.inputs.push(Input::Event {
+                                node: id,
+                                event: Event::InputEdit(event),
+                            });
+                        }
+                    } else {
+                        let raw = js_sys::Reflect::get(control, &"value".into())
+                            .map_err(backend)?
+                            .as_string()
+                            .unwrap_or_default();
+                        // Validation must not mutate the existing document. The
+                        // adopted Entry repairs only noncanonical host text later.
+                        let actual =
+                            glory_render::normalize_text(&raw, control.tag_name() == "TEXTAREA")
+                                .into_owned();
+                        let probe = control.clone_node().map_err(backend)?;
+                        let Property::Text(initial) = &properties["value"] else {
+                            unreachable!()
+                        };
+                        js_sys::Reflect::set(&probe, &"value".into(), &initial.into())
+                            .map_err(backend)?;
+                        let initial = js_sys::Reflect::get(&probe, &"value".into())
+                            .map_err(backend)?
+                            .as_string()
+                            .unwrap_or_default();
+                        if actual != initial {
+                            self.plan.inputs.push(Input::Event {
+                                node: id,
+                                event: Event::ValueChanged {
+                                    value: actual,
+                                    composing,
+                                    revision: shape.revision,
+                                },
+                            });
+                        }
                     }
                 }
                 EditKind::Check => {
@@ -410,7 +432,7 @@ pub fn hydrate_with<W: Widget>(root: Element, factory: impl FnOnce(&Scope) -> W)
         .active_element()
         .is_some_and(|active| root.contains(Some(active.as_ref())));
     let frame = Frame::new(window);
-    let dom = dom::Dom::new(document, root, frame.clone());
+    let dom = dom::Dom::new(document, root, frame.clone())?;
     dom.staging.set(true);
     dom.live.set(false);
     dom.owned.set(false);

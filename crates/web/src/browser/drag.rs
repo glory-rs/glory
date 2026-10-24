@@ -24,6 +24,11 @@ fn hit(dom: &Dom, x: f64, y: f64) -> Option<NodeId> {
 }
 pub(super) fn cancel(dom: &Dom) {
     let drag = dom.drag.borrow_mut().take();
+    if let Some(drag) = &drag
+        && let Ok(control) = dom.entry(drag.from).and_then(|entry| entry.element())
+    {
+        let _ = control.release_pointer_capture(drag.pointer);
+    }
     if let Some(drag) = drag
         && drag.started
     {

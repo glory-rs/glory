@@ -8,7 +8,7 @@ use glory_core::{Cage, Lotus, untracked};
 use glory_render::profile::Phase;
 use glory_render::{
     Action, Descriptor, Event, EventKind, FocusMode, ItemPosition, Navigation, NodeId, Props, Rect,
-    Role, VirtualPart,
+    Role, Semantics, TableMetadata, VirtualPart,
 };
 use glory_style::{Edges, Length, Overflow, Position, Style};
 
@@ -21,6 +21,18 @@ use crate::{events, view};
 type KeyAt<K> = Rc<dyn Fn(usize) -> K>;
 type Locate<K> = Rc<dyn Fn(&K) -> Option<usize>>;
 type RenderRow<K> = Box<dyn FnMut(Cage<usize>, K) -> Box<dyn Widget>>;
+
+fn check_table_rows(count: usize, offset: Option<&Lotus<u32>>) -> Result {
+    if let Some(offset) = offset {
+        let offset = offset.try_get()?;
+        if count > (u32::MAX - offset) as usize {
+            return Err(
+                glory_render::Error::InvalidProps("virtual table coordinates exhausted").into(),
+            );
+        }
+    }
+    Ok(())
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ListStats {
@@ -42,6 +54,7 @@ pub struct ListStats {
 /// mounted outside that window; blur releases it. Ordinary each intentionally
 /// renders everything.
 pub struct List<K: Clone + Eq + Hash + 'static> {
+    table_offset: Option<Lotus<u32>>,
     count: Option<Lotus<usize>>,
     name: Option<Lotus<String>>,
     key: Option<KeyAt<K>>,
@@ -65,6 +78,7 @@ pub fn list<K: Clone + Eq + Hash + 'static, W: Widget>(
     mut render: impl FnMut(Cage<usize>, K) -> W + 'static,
 ) -> List<K> {
     List {
+        table_offset: None,
         count: Some(count.into()),
         name: None,
         key: Some(Rc::new(key)),
@@ -84,6 +98,13 @@ pub fn list<K: Clone + Eq + Hash + 'static, W: Widget>(
     }
 }
 impl<K: Clone + Eq + Hash> List<K> {
+    /// Windowed structural rows inside an application's semantic Table. The
+    /// scroll root/surface stay generic; callers supply ColumnHeader/Cell content.
+    /// Coordinates include an explicit offset (for example one header row).
+    pub fn table_rows(mut self, offset: impl Into<Lotus<u32>>) -> Self {
+        self.table_offset = Some(offset.into());
+        self
+    }
     pub fn name(mut self, value: impl Into<Lotus<String>>) -> Self {
         self.name = Some(value.into());
         self
@@ -195,6 +216,7 @@ struct Row {
     item: ItemPosition,
 }
 struct Rows<K> {
+    table_offset: Option<Lotus<u32>>,
     parent: WeakScope,
     keys: Vec<K>,
     start: usize,
@@ -255,12 +277,22 @@ impl<K: Clone + Eq + Hash + 'static> RowHost for Rows<K> {
                 count: Some(self.count),
             };
             let mut wrapper = view()
-                .role(Role::ListItem)
                 .focus(FocusMode::Programmatic)
-                .item(Some(item))
                 .backend_options(VirtualPart::Row)
                 .style(style)
                 .fill(body);
+            if let Some(offset) = self.table_offset.clone() {
+                wrapper = wrapper.role(Role::Row).semantics(data.bond(move || {
+                    Some(Box::new(Semantics {
+                        table: Some(TableMetadata::Row {
+                            index: offset.get() + index.get() as u32,
+                        }),
+                        ..Default::default()
+                    }))
+                }));
+            } else {
+                wrapper = wrapper.role(Role::ListItem).item(Some(item));
+            }
             if adaptive {
                 let measurements = self.measurements.clone();
                 let measured = self.measured;
@@ -308,7 +340,7 @@ impl<K: Clone + Eq + Hash + 'static> RowHost for Rows<K> {
                 index,
                 count: Some(self.count),
             };
-            if row.item != item {
+            if row.item != item && self.table_offset.is_none() {
                 if let Err(error) = row.data.patch(
                     row.mounted.roots()[0],
                     glory_render::Patch::Item(glory_render::Change::Set(Some(item))),
@@ -338,6 +370,13 @@ impl<K: Clone + Eq + Hash + 'static> Widget for List<K> {
     fn build(&mut self, scope: &Scope) -> Result {
         let count = self.count.take().ok_or(UiError::Gone)?;
         let initial = untracked(|| count.try_get())?;
+        let table_offset = self.table_offset.take();
+        check_table_rows(initial, table_offset.as_ref())?;
+        // Only accepted coordinates reach row bindings. An invalid future
+        // offset/count must not overflow a binding after structure reports it.
+        let accepted_table_offset = table_offset
+            .as_ref()
+            .map(|source| scope.cage(untracked(|| source.get())));
         let height = self.height;
         let row_height = self.row_height;
         let overscan = self.overscan;
@@ -390,7 +429,11 @@ impl<K: Clone + Eq + Hash + 'static> Widget for List<K> {
                 .overflow_y(Overflow::Auto)
                 .scroll_anchor(false)
         };
-        descriptor.role = Some(Role::List);
+        descriptor.role = if table_offset.is_some() {
+            None
+        } else {
+            Some(Role::List)
+        };
         descriptor.focus = FocusMode::TabStop;
         descriptor.options.insert(VirtualPart::Root);
         let root = scope.create(descriptor)?;
@@ -464,6 +507,7 @@ impl<K: Clone + Eq + Hash + 'static> Widget for List<K> {
             })
             .with_partial_eq();
         let mut rows = Rows {
+            table_offset: accepted_table_offset.map(Into::into),
             parent: row_parent.weak(),
             keys: Vec::new(),
             start: 0,
@@ -518,6 +562,13 @@ impl<K: Clone + Eq + Hash + 'static> Widget for List<K> {
             let result = (|| -> Result {
                 let logical_before = state.logical;
                 let len = count.try_get()?;
+                check_table_rows(len, table_offset.as_ref())?;
+                if let (Some(source), Some(accepted)) = (&table_offset, accepted_table_offset) {
+                    let offset = source.try_get()?;
+                    if accepted.get_untracked() != offset {
+                        accepted.try_revise(|current| *current = offset)?;
+                    }
+                }
                 let input = viewport.get();
                 navigation_revision.get();
                 let requests = std::mem::take(&mut *navigation.borrow_mut());

@@ -117,7 +117,70 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
     .into_iter()
     .map(Descriptor::new)
     .collect::<Vec<_>>();
+    for direction in [glory_render::Direction::Ltr, glory_render::Direction::Rtl] {
+        let mut grid = Descriptor::new(Props::View);
+        grid.role = Some(Role::Grid);
+        grid.semantics = Some(Box::new(Semantics {
+            grid_navigation: Some(direction),
+            table: Some(TableMetadata::Table {
+                rows: Some(6),
+                columns: Some(7),
+            }),
+            ..Default::default()
+        }));
+        bases.push(grid);
+    }
+    for selected in [None, Some(false), Some(true)] {
+        let mut cell = Descriptor::new(Props::View);
+        cell.role = Some(Role::GridCell);
+        cell.semantics = Some(Box::new(Semantics {
+            selected,
+            table: Some(TableMetadata::Cell {
+                row: 3,
+                column: 5,
+                row_span: 1,
+                column_span: 1,
+                headers: vec![],
+            }),
+            ..Default::default()
+        }));
+        bases.push(cell);
+    }
+    for purpose in [
+        Purpose::Text,
+        Purpose::Number,
+        Purpose::Password,
+        Purpose::Email,
+        Purpose::Url,
+    ] {
+        for mode in [None, Some(InputMode::Text), Some(InputMode::Numeric)] {
+            let mut input = Descriptor::new(Props::Input(InputProps {
+                purpose,
+                value: "old".into(),
+                revision: 10,
+                ..Default::default()
+            }));
+            input.semantics = Some(Box::new(Semantics {
+                input_assist: Some(InputAssist {
+                    autofill: Some(InputAutofill::OneTimeCode),
+                    mode,
+                }),
+                ..Default::default()
+            }));
+            bases.push(input);
+        }
+    }
     let mut sheet = Descriptor::new(Props::View);
+    let mut captured = Descriptor::new(Props::Input(InputProps {
+        value: "old".into(),
+        revision: 10,
+        ..Default::default()
+    }));
+    captured.semantics = Some(Box::new(Semantics {
+        input_edit: Some(InputEditCapture { max_bytes: 256 }),
+        ..Default::default()
+    }));
+    bases.push(captured);
     sheet.role = Some(Role::Dialog);
     sheet.focus = FocusMode::Programmatic;
     sheet.semantics = Some(Box::new(Semantics {
@@ -691,6 +754,18 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
             ..Default::default()
         },
         Semantics {
+            current: Some(glory_render::Current::Date),
+            ..Default::default()
+        },
+        Semantics {
+            grid_navigation: Some(glory_render::Direction::Ltr),
+            ..Default::default()
+        },
+        Semantics {
+            grid_navigation: Some(glory_render::Direction::Rtl),
+            ..Default::default()
+        },
+        Semantics {
             link_open: Some(glory_render::LinkOpen::NewContext),
             ..Default::default()
         },
@@ -946,6 +1021,8 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
             Role::Status,
             Role::Alert,
             Role::Table,
+            Role::Grid,
+            Role::GridCell,
             Role::Row,
             Role::ColumnHeader,
             Role::Cell,
@@ -978,7 +1055,35 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
         sheet_grip: true,
         ..Default::default()
     })))));
+    for autofill in [
+        None,
+        Some(InputAutofill::Off),
+        Some(InputAutofill::OneTimeCode),
+    ] {
+        for mode in [None, Some(InputMode::Text), Some(InputMode::Numeric)] {
+            patches.push(Patch::Semantics(Change::Set(Some(Box::new(Semantics {
+                input_assist: Some(InputAssist { autofill, mode }),
+                ..Default::default()
+            })))));
+        }
+    }
+    for style in [
+        style::Style::new().width(style::Length::Ch(6.)),
+        style::Style::new().height(style::Length::Ch(1.5)),
+        style::Style::new().min_width(style::Length::Ch(2.)),
+        style::Style::new().min_height(style::Length::Ch(0.)),
+        style::Style::new().top(style::Length::Ch(-1.)),
+        style::Style::new().left(style::Length::Ch(2.)),
+        style::Style::new().right(style::Length::Ch(3.)),
+        style::Style::new().bottom(style::Length::Ch(4.)),
+    ] {
+        patches.push(Patch::Style(Change::Set(Box::new(style))));
+    }
     let (mut accepted, mut rejected) = (0, 0);
+    patches.push(Patch::Semantics(Change::Set(Some(Box::new(Semantics {
+        input_edit: Some(InputEditCapture { max_bytes: 256 }),
+        ..Default::default()
+    })))));
     for limit in [
         style::Limit::None,
         style::Limit::Px(25.0),

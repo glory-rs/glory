@@ -95,6 +95,8 @@ pub enum Role {
     Alert,
     /// Read-only tabular data; rows contain column headers or cells.
     Table,
+    Grid,
+    GridCell,
     Row,
     ColumnHeader,
     Cell,

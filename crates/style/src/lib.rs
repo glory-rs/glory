@@ -23,13 +23,15 @@ pub enum Length {
     Auto,
     Px(f64),
     Percent(f64),
+    /// Advance of the current font's zero glyph, resolved by the host font engine.
+    Ch(f64),
 }
 
 impl Length {
     pub fn is_finite(self) -> bool {
         match self {
             Self::Auto => true,
-            Self::Px(value) | Self::Percent(value) => value.is_finite(),
+            Self::Px(value) | Self::Percent(value) | Self::Ch(value) => value.is_finite(),
         }
     }
 
@@ -37,7 +39,7 @@ impl Length {
         self.is_finite()
             && match self {
                 Self::Auto => true,
-                Self::Px(value) | Self::Percent(value) => value >= 0.0,
+                Self::Px(value) | Self::Percent(value) | Self::Ch(value) => value >= 0.0,
             }
     }
 }

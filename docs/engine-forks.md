@@ -5,7 +5,7 @@ vendor、副本补丁树或子模块；应用无需添加全局 Cargo patch。
 
 | Fork | 上游基线 | Glory 固定提交 | 维护范围 |
 |---|---|---|---|
-| [glory-rs/blitz](https://github.com/glory-rs/blitz) | `92b11f1b` / beta.4 | [fa10341f](https://github.com/glory-rs/blitz/commit/fa10341fd05899041079b30ab66363f89ccf0404) | 资源生命周期、增量失效、焦点、密码显示、IME、阶段计时、inline 样式差分失效及隐藏子树销毁缓存回收 |
+| [glory-rs/blitz](https://github.com/glory-rs/blitz) | `92b11f1b` / beta.4 | [7e0b5f85](https://github.com/glory-rs/blitz/commit/7e0b5f85727da016285028f656a437d89ca10c46) | 资源生命周期、增量失效、焦点、密码显示、IME、阶段计时、inline 样式差分失效、隐藏子树销毁缓存回收及真正的文档顶层 |
 | [glory-rs/taffy](https://github.com/glory-rs/taffy) | `eb645069` / 0.15.0 | [dd7914fb](https://github.com/glory-rs/taffy/commit/dd7914fba2e6e0b5d8a2c8854d764a2ade817efd) | 小数 flex 因子的 gap 计算与回归测试 |
 
 恢复上游包名 blitz-dom/traits/paint/shell、stylo_taffy、taffy；Glory 自己的
@@ -62,3 +62,12 @@ URL 共享 fetch。只有实际消费、缓存命中或明确 admission/no-provi
 图像消费/ABA/共享请求/预算/退休/FIFO/重复完成回归。对应日志：
 `D:/BuildCache/sapid/engine-image-observation.log`、`engine-image-observation-parallel.log`。
 宿主事件、Web decode Promise 和 Sapid fallback 仍由各自的实际验收确认。
+
+原生浮层扩展的当前完整提交为
+`7e0b5f85727da016285028f656a437d89ca10c46`。保留逻辑 DOM/Stylo 继承父链，
+引擎独立进行 viewport 布局、最后绘制和逆序命中，modal backdrop 参与真实绘制；
+不使用 portal。当前 lease 上限为 1024，detach/drop 退休，connected move 保留。
+显式 `contain_scroll` 复用 wheel/touch/fling/editor 的原生滚动链。
+`native-top-layer-final-provenance.log` 的独立干净检出验证通过 Taffy185、Blitz113、
+parallel/writing-mode114、既有 focused 及 CPU actual paint1；focused 与全库重叠，
+不合并为独立用例数。宿主焦点/AX/组件验收见 [native-top-layers.md](native-top-layers.md)。

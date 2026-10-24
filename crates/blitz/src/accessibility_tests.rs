@@ -13,12 +13,18 @@ mod document;
 mod hints;
 #[path = "accessibility_inert_tests.rs"]
 mod inert;
+#[path = "accessibility_layer_tests.rs"]
+mod layers;
 #[path = "accessibility_menu_tests.rs"]
 mod menu;
 #[path = "accessibility_progress_tests.rs"]
 mod progress;
 #[path = "accessibility_separator_tests.rs"]
 mod separator;
+#[path = "accessibility_table_tests.rs"]
+mod tables;
+#[path = "accessibility_translation_tests.rs"]
+mod translation;
 #[cfg(target_os = "windows")]
 #[path = "accessibility_windows_tests.rs"]
 mod windows;

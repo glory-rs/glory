@@ -70,7 +70,7 @@ values! {
     TextClip, TextEllipsis,
     Grid, TrackList, Fr, PlacementSpan, PlacementAt, Ratio,
     FitFill, FitContain, FitCover, FitNone, FitScaleDown,
-    Fixed,
+    Fixed, Ch,
 }
 macro_rules! convert {
     ($ty:ty, $($from:ident => $to:ident),+ $(,)?) => {
@@ -111,6 +111,7 @@ impl From<Length> for Value {
             Length::Auto => Self::Auto,
             Length::Px(_) => Self::Px,
             Length::Percent(_) => Self::Percent,
+            Length::Ch(_) => Self::Ch,
         }
     }
 }
@@ -373,7 +374,7 @@ impl Profile {
     /// Reference storage accepts typed declarations but performs no CSS/layout.
     pub const RECORD: Self = Self {
         name: "record",
-        version: 9,
+        version: 10,
         inline: Support::ALL,
         css: Css::None,
     };
@@ -381,7 +382,7 @@ impl Profile {
     /// remains engine-specific; this is not a complete stylesheet validator.
     pub const HTML: Self = Self {
         name: "html",
-        version: 9,
+        version: 10,
         inline: Support::ALL,
         css: Css::Html,
     };
@@ -421,7 +422,7 @@ mod tests {
                 );
             }
         }
-        assert_eq!((Profile::HTML.version, Profile::RECORD.version), (9, 9));
+        assert_eq!((Profile::HTML.version, Profile::RECORD.version), (10, 10));
     }
 
     #[test]
@@ -586,6 +587,7 @@ mod tests {
                 ),
                 Value::Sticky => (Property::Position, Style::new().position(Position::Sticky)),
                 Value::Fixed => (Property::Position, Style::new().position(Position::Fixed)),
+                Value::Ch => (Property::Width, Style::new().width(Length::Ch(1.0))),
                 Value::Visible => (
                     Property::OverflowY,
                     Style::new().overflow_y(Overflow::Visible),

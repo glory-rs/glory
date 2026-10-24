@@ -42,6 +42,7 @@ pub enum Current {
     Page,
     Step,
     Location,
+    Date,
 }
 /// The popup role is one typed value, never an independent boolean flag.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -119,6 +120,7 @@ pub enum LayerPlacement {
     Anchor(crate::AnchorPlacement),
     /// A context request in viewport CSS pixels, belonging to `Layer::anchor`.
     ContextPoint(crate::ContextPoint),
+    Viewport(crate::ViewportPlacement),
 }
 impl LayerPlacement {
     pub fn as_str(self) -> &'static str {
@@ -130,6 +132,7 @@ impl LayerPlacement {
             Self::Bottom => "bottom",
             Self::Anchor(_) => "anchor",
             Self::ContextPoint(_) => "context-point",
+            Self::Viewport(_) => "viewport",
         }
     }
 }
@@ -234,6 +237,14 @@ impl Orientation {
 /// live names in their document. Removing a target retains no owning reference.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Semantics {
+    /// Present only on a structural column header; actions remain intrinsic buttons.
+    pub sort: Option<crate::SortDirection>,
+    /// Replace ordinary host ValueChanged with one bounded post-edit path.
+    pub input_edit: Option<crate::InputEditCapture>,
+    /// Finite paint-only motion on an inert, independently boxed View.
+    pub translation: Option<crate::TranslationMotion>,
+    /// Finite single-line input hints; no automatic code or credential retrieval.
+    pub input_assist: Option<crate::InputAssist>,
     /// Optional intrinsic-height presentation with immediate logical hiding.
     pub collapse: Option<crate::CollapseConfig>,
     /// Immediate primary-pointer capture, in viewport CSS pixels.
@@ -256,6 +267,7 @@ pub struct Semantics {
     /// Capture activation as an application request before default navigation.
     pub link_request: bool,
     pub document_part: Option<crate::DocumentPart>,
+    pub table: Option<crate::TableMetadata>,
     pub form_action: Option<FormAction>,
     pub form_control: Option<FormControl>,
     pub field_part: Option<FieldPart>,
@@ -295,6 +307,9 @@ pub struct Semantics {
     pub inert: bool,
     /// Explicit collection boundary, independent of virtual-list navigation.
     pub navigation: Option<Orientation>,
+    /// A two-dimensional physical Button navigation boundary, independent of
+    /// the linear collection navigation protocol.
+    pub grid_navigation: Option<Direction>,
     pub navigation_item: bool,
     pub navigation_panel: Option<crate::NavigationPanel>,
     /// Native radio association; not an accessible name or a submission value.
@@ -306,6 +321,52 @@ pub struct Semantics {
 }
 impl Semantics {
     pub(crate) fn validate(&self, d: crate::DescriptorView<'_>) -> Result<(), Error> {
+        if self.grid_navigation.is_some()
+            && (d.role != Some(Role::Grid)
+                || !matches!(d.props, Props::View)
+                || self.navigation.is_some()
+                || self.navigation_item
+                || self.typeahead)
+        {
+            return Err(Error::InvalidProps(
+                "grid navigation requires an independent Grid View",
+            ));
+        }
+        if let Some(capture) = self.input_edit {
+            capture.validate()?;
+            if !matches!(d.props,Props::Input(p) if !p.multiline&&p.value.len()<=capture.max_bytes)
+                || self.tags_input.is_some()
+                || self.spinbutton.is_some()
+                || self.combobox.is_some()
+            {
+                return Err(Error::InvalidProps(
+                    "input edit capture requires an independent bounded single-line Input",
+                ));
+            }
+        }
+        if let Some(translation) = self.translation {
+            translation.validate()?;
+            if !matches!(d.props, Props::View)
+                || !self.inert
+                || d.role.is_some()
+                || d.name.is_some()
+                || d.focus != crate::FocusMode::Auto
+                || self.collapse.is_some()
+                || self.layer.is_some()
+                || self.drag_capture.is_some()
+                || self.document_part.is_some()
+                || self.field_part.is_some()
+            {
+                return Err(Error::InvalidProps(
+                    "translation requires an independent inert unnamed View without role, focus, layer, collapse or drag capture",
+                ));
+            }
+        }
+        if self.input_assist.is_some() && !matches!(d.props, Props::Input(p) if !p.multiline) {
+            return Err(Error::InvalidProps(
+                "input assist requires a single-line Input",
+            ));
+        }
         if let Some(collapse) = &self.collapse {
             collapse.validate()?;
             collapse.validate_style(d.style)?;
@@ -594,6 +655,18 @@ impl Semantics {
         if (self.link_open.is_some() || self.link_request) && !matches!(d.props, Props::Link(_)) {
             return Err(Error::InvalidProps("link context requires a link"));
         }
+        if let Some(table) = &self.table {
+            table.validate(d)?;
+        }
+        if self.sort.is_some()
+            && (!matches!(d.props, Props::View)
+                || !(self.document_part == Some(crate::DocumentPart::ColumnHeader)
+                    || d.role == Some(Role::ColumnHeader)))
+        {
+            return Err(Error::InvalidProps(
+                "sort direction requires a structural column header",
+            ));
+        }
         if self.document_part.is_some()
             && (!matches!(d.props, Props::View)
                 || d.role.is_some()
@@ -669,7 +742,8 @@ impl Semantics {
                 Props::Input(_) | Props::Select(_) | Props::Check(_)
             )
             || matches!(d.role, Some(Role::RadioGroup | Role::Slider));
-        if ((self.required || self.readonly) && !input_field)
+        if (self.required && !input_field)
+            || (self.readonly && !input_field && d.role != Some(Role::Grid))
             || ((self.invalid || self.error_message.is_some())
                 && !input_field
                 && self.field_part != Some(FieldPart::Fieldset))
@@ -693,6 +767,14 @@ impl Semantics {
             ));
         }
         if let Some(layer) = &self.layer {
+            if let LayerPlacement::Viewport(placement) = layer.placement {
+                placement.validate()?;
+                if d.role != Some(Role::Dialog) || layer.anchor.is_some() || layer.sheet.is_some() {
+                    return Err(Error::InvalidProps(
+                        "viewport positioning requires an unanchored dialog",
+                    ));
+                }
+            }
             if let LayerPlacement::Anchor(placement) = layer.placement {
                 placement.validate()?;
             }
@@ -819,7 +901,10 @@ impl Semantics {
                 "navigation items require a button, link or radio",
             ));
         }
-        if self.selected.is_some() && !self.tab && self.option.is_none()
+        if self.selected.is_some()
+            && !self.tab
+            && self.option.is_none()
+            && d.role != Some(Role::GridCell)
             || self.tab && (self.expanded.is_some() || self.selected.is_none())
         {
             return Err(Error::InvalidProps(

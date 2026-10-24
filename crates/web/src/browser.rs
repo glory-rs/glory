@@ -5,9 +5,11 @@ mod frame;
 #[cfg(feature = "hydrate")]
 mod hydrate;
 mod images;
+mod input_edit;
 mod layers;
 mod select;
 mod sheet;
+mod translation;
 #[cfg(feature = "hydrate")]
 pub use hydrate::*;
 
@@ -21,7 +23,7 @@ use glory_render::{
     Receipt, Render, RuntimeId,
 };
 use glory_ui::{App, Widget};
-use wasm_bindgen::JsValue;
+use wasm_bindgen::{JsCast, JsValue};
 use web_sys::Element;
 
 use dom::Dom;
@@ -39,6 +41,7 @@ pub struct Renderer {
     receipt: Receipt,
     _events: events::Listeners,
     supports_layers: bool,
+    supports_translations: bool,
 }
 impl Renderer {
     fn new(runtime: RuntimeId, dom: Rc<Dom>) -> Self {
@@ -47,6 +50,8 @@ impl Renderer {
         }
         let supports_layers =
             js_sys::Reflect::get(&dom.root, &"showPopover".into()).is_ok_and(|v| v.is_function());
+        let supports_translations =
+            js_sys::Reflect::get(&dom.root, &"animate".into()).is_ok_and(|v| v.is_function());
         dom.frame.attach_dom(&dom);
         let events = events::Listeners::new(dom.clone());
         Self {
@@ -55,6 +60,7 @@ impl Renderer {
             receipt: Receipt::default(),
             _events: events,
             supports_layers,
+            supports_translations,
         }
     }
     fn check_layers<'a>(
@@ -64,14 +70,17 @@ impl Renderer {
     ) -> Result<(), Error> {
         let node = node.into();
         use glory_render::{Change, Patch};
-        if self.supports_layers {
-            return Ok(());
-        }
         let value = match patch {
             None => node.semantics.as_deref(),
             Some(Patch::Semantics(Change::Set(value))) => value.as_deref(),
             _ => None,
         };
+        if !self.supports_translations && value.is_some_and(|s| s.translation.is_some()) {
+            return Err(Error::Unsupported("browser finite translation motion"));
+        }
+        if self.supports_layers {
+            return Ok(());
+        }
         if value.is_some_and(|s| s.layer.is_some()) {
             return Err(Error::Unsupported("browser top layer"));
         }
@@ -112,7 +121,7 @@ impl Render for Renderer {
             return Err(error);
         }
         let mut mapper = self.mapper.borrow_mut();
-        let result = if self.supports_layers {
+        let result = if self.supports_layers && self.supports_translations {
             mapper.apply(mutations, &mut dom::Sink(self.dom.clone()))
         } else {
             // Legacy hosts reject per operation and retain accepted prefixes.
@@ -151,6 +160,7 @@ impl Render for Renderer {
             .borrow_mut()
             .update(mapper.tree(), mutations);
         self.dom.update_collapses(mapper.tree(), mutations);
+        self.dom.update_translations(mapper.tree(), mutations);
         drop(mapper);
         if !self.dom.staging.get() && self.dom.live.get() {
             sheet::sync_accepted(&self.dom)?;
@@ -171,8 +181,26 @@ impl Render for Renderer {
     }
     fn action(&mut self, action: Action) -> Result<(), Error> {
         action.validate_target(&self.mapper.borrow().tree().node(action.node())?.descriptor)?;
-        if matches!(action, Action::Focus(_) | Action::ExitMenu { .. })
-            && self.mapper.borrow().tree().inert(action.node())
+        if let Action::SelectText { node, .. } = action {
+            let mapper = self.mapper.borrow();
+            let glory_render::Props::Input(expected) =
+                mapper.tree().node(node)?.descriptor.view().props
+            else {
+                unreachable!()
+            };
+            let target = self.dom.entry(node)?.control()?;
+            let current = js_sys::Reflect::get(&target, &"value".into()).map_err(backend)?;
+            if !current.is_string()
+                || js_sys::JsString::from(current.clone()).length() as usize != expected.value.len()
+                || current.as_string().as_deref() != Some(expected.value.as_str())
+            {
+                return Err(Error::Unsupported("text selection value changed"));
+            }
+        }
+        if matches!(
+            action,
+            Action::Focus(_) | Action::RaiseLayer(_) | Action::ExitMenu { .. }
+        ) && self.mapper.borrow().tree().inert(action.node())
         {
             return Err(Error::Unsupported("focus in an inert region"));
         }
@@ -194,6 +222,7 @@ impl Render for Renderer {
             return Err(Error::Unsupported("physical query before adoption"));
         }
         let result = (|| {
+            self.dom.read_translations(self.mapper.borrow().tree())?;
             query.validate_target(&self.mapper.borrow().tree().node(query.node())?.descriptor)?;
             let entry = self.dom.entry(query.node())?;
             if !entry.first.is_connected() {
@@ -249,6 +278,9 @@ impl Render for Renderer {
         Ok(())
     }
     fn drain(&mut self, inputs: &mut Vec<Input>) {
+        if let Err(error) = self.dom.read_translations(self.mapper.borrow().tree()) {
+            self.dom.error.borrow_mut().get_or_insert(error);
+        }
         if let Err(error) = self.dom.read_collapses(self.mapper.borrow().tree()) {
             self.dom.error.borrow_mut().get_or_insert(error);
         }
@@ -261,9 +293,56 @@ impl Render for Renderer {
 }
 fn perform(dom: &Dom, action: Action) -> Result<(), Error> {
     match action {
+        Action::SelectText {
+            node,
+            revision,
+            selection,
+        } => {
+            let entry = dom.entry(node)?;
+            if entry.editing.borrow().revision != revision || entry.editing.borrow().composing {
+                return Err(Error::Unsupported(
+                    "text selection revision or composition changed",
+                ));
+            }
+            let target = entry.control()?;
+            if !dom.document_layers.allows(Some(target.as_ref())) {
+                return Err(Error::Unsupported(
+                    "text selection outside document modal scope",
+                ));
+            }
+            let raw = js_sys::Reflect::get(&target, &"value".into())
+                .map_err(backend)?
+                .as_string()
+                .ok_or(Error::Unsupported("selection on this node"))?;
+            if !raw.is_ascii() {
+                return Err(Error::Unsupported(
+                    "exact selection currently requires ASCII input text",
+                ));
+            }
+            selection.validate(raw.len())?;
+            let method = js_sys::Reflect::get(&target, &"setSelectionRange".into())
+                .map_err(backend)?
+                .dyn_into::<js_sys::Function>()
+                .map_err(backend)?;
+            method
+                .call3(
+                    &target,
+                    &(selection.start as f64).into(),
+                    &(selection.end as f64).into(),
+                    &selection.direction.as_str().into(),
+                )
+                .map_err(backend)?;
+        }
         Action::RevealOption { node } => select::reveal(dom, node)?,
+        Action::RaiseLayer(node) => layers::raise(dom, node)?,
         Action::ExitMenu { node, backwards } => layers::exit_menu(dom, node, backwards)?,
-        Action::Focus(node) => dom::focus(&dom.entry(node)?.control()?)?,
+        Action::Focus(node) => {
+            let target = dom.entry(node)?.control()?;
+            if !dom.document_layers.allows(Some(target.as_ref())) {
+                return Err(Error::Unsupported("focus outside document modal scope"));
+            }
+            dom::focus(&target)?;
+        }
         Action::ScrollTo { node, x, y } => {
             let entry = dom.entry(node)?;
             let element = entry.element()?;
@@ -332,7 +411,7 @@ pub fn launch_with<W: Widget>(
         .ok_or(Error::Unsupported("document has no window"))?;
     base_style(&document)?;
     let frame = Frame::new(window);
-    let dom = Dom::new(document, root, frame.clone());
+    let dom = Dom::new(document, root, frame.clone())?;
     let app = Rc::new(App::with_host(frame.clone(), |runtime| {
         Renderer::new(runtime, dom)
     }));

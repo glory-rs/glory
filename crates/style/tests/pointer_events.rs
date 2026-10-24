@@ -33,7 +33,7 @@ fn pointer_targeting_property_and_both_values_reject_independently() {
             })
         );
     }
-    assert_eq!((Profile::HTML.version, Profile::RECORD.version), (9, 9));
+    assert_eq!((Profile::HTML.version, Profile::RECORD.version), (10, 10));
 }
 #[cfg(feature = "css")]
 #[test]

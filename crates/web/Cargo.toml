@@ -24,7 +24,7 @@ wasm-bindgen = "=0.2.129"
 js-sys = "=0.3.106"
 wasm-bindgen-futures = "=0.4.79"
 futures-util = { version = "0.3", default-features = false, features = ["std", "async-await"] }
-web-sys = { version = "=0.3.106", features = ["Window", "VisualViewport", "Document", "Node", "Element", "HtmlElement", "HtmlImageElement", "SvgElement", "HtmlInputElement", "HtmlTextAreaElement", "DocumentFragment", "Comment", "Text", "Event", "EventTarget", "SubmitEvent", "InputEvent", "KeyboardEvent", "MediaQueryList", "MediaQueryListEvent", "PointerEvent", "MouseEvent", "FocusEvent", "FocusOptions", "CompositionEvent", "DomRect", "Range", "ResizeObserver", "ResizeObserverEntry", "ResizeObserverOptions", "ResizeObserverBoxOptions", "CssStyleDeclaration", "Performance", "console"] }
+web-sys = { version = "=0.3.106", features = ["Window", "VisualViewport", "Document", "Node", "Element", "HtmlElement", "HtmlImageElement", "SvgElement", "HtmlInputElement", "HtmlTextAreaElement", "DocumentFragment", "Comment", "Text", "Event", "EventTarget", "AddEventListenerOptions", "SubmitEvent", "InputEvent", "KeyboardEvent", "MediaQueryList", "MediaQueryListEvent", "PointerEvent", "MouseEvent", "FocusEvent", "FocusOptions", "CompositionEvent", "DomRect", "Range", "ResizeObserver", "ResizeObserverEntry", "ResizeObserverOptions", "ResizeObserverBoxOptions", "CssStyleDeclaration", "Performance", "console"] }
 
 [lints]
 workspace = true

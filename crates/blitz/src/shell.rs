@@ -115,7 +115,10 @@ impl WindowApp {
     pub fn mount_with<W: Widget>(&self, factory: impl FnOnce() -> W) -> glory_ui::Result {
         self.app.mount_with(factory)
     }
-    fn tick(&self, context: &Context<'_>) -> glory_ui::Result<bool> {
+    /// Observe one bounded native host turn: poll ready tasks, ingest resources
+    /// and settle semantic work. The caller supplies its event-loop waker; this
+    /// does not create an OS window or confirm that pixels were displayed.
+    pub fn observe(&self, context: &Context<'_>) -> glory_ui::Result<bool> {
         self.renderer.observe_resources(context.waker());
         self.executor.observe(context.waker());
         self.executor.dirty();
@@ -151,11 +154,13 @@ impl Document for WindowApp {
         }))
     }
     fn handle_ui_event(&mut self, mut event: UiEvent) {
+        editing::capture_before(&mut self.renderer.0.borrow_mut(), &event);
         editing::sanitize_ime(&self.renderer.0.borrow(), &mut event);
         self.renderer.invalidate();
         let collector = Events(self.renderer.clone());
         EventDriver::new(self, collector).handle_ui_event(event);
         let mut state = self.renderer.0.borrow_mut();
+        layers::lock_viewport(&mut state);
         state.sync_focus();
         if let Some(error) = state.input_error.take() {
             self.error = Some(error.into());
@@ -166,7 +171,7 @@ impl Document for WindowApp {
             return false;
         }
         let Some(context) = context else { return false };
-        match self.tick(&context) {
+        match self.observe(&context) {
             Ok(changed) => changed,
             Err(error) => {
                 self.error = Some(error);
@@ -185,6 +190,15 @@ impl EventHandler for Events {
         event_state: &mut EventState,
     ) {
         let mut state = self.0.0.borrow_mut();
+        if matches!(event.data, DomEventData::Click(_)) && std::mem::take(&mut state.suppress_click)
+        {
+            event_state.prevent_default();
+            return;
+        }
+        if layers::receive(&mut state, event.target, &event.data) {
+            event_state.prevent_default();
+            return;
+        }
         // The event chain starts at the target. Do not copy the whole node map
         // for each input: work is proportional to event ancestry, not list size.
         let node = chain
@@ -323,10 +337,19 @@ impl EventHandler for Events {
                 let node = node.expect("mapped click");
                 let mut cursor = Some(node);
                 let mut label_for = None;
+                let mut button = None;
                 while let Some(id) = cursor {
                     let Ok(current) = state.mapper.tree().node(id) else {
                         break;
                     };
+                    if button.is_none()
+                        && matches!(
+                            current.descriptor.view().props,
+                            glory_render::Props::Button(_)
+                        )
+                    {
+                        button = Some(id);
+                    }
                     label_for = current
                         .descriptor
                         .view()
@@ -361,6 +384,16 @@ impl EventHandler for Events {
                 }) {
                     event_state.prevent_default();
                     return;
+                }
+                if let Some(button) = button
+                    && state.mapper.tree().enabled(button)
+                    && state.layers.allowed(state.mapper.tree(), button)
+                {
+                    // beta.4 otherwise treats a Button click as selectable text
+                    // and clears focus. Keep the actual intrinsic control as
+                    // the pointer focus/return target, including visual slots.
+                    event_state.prevent_default();
+                    let _ = state.focus(button);
                 }
                 state.inputs.push(Input::Event {
                     node,
@@ -625,6 +658,64 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
         });
         let key_name = key.key.to_string();
         if state.focused == Some(origin)
+            && !editable
+            && state.mapper.tree().enabled(origin)
+            && state.mapper.tree().node(origin).is_ok_and(|node| {
+                matches!(node.descriptor.view().props, glory_render::Props::Button(_))
+            })
+        {
+            let mut cursor = state
+                .mapper
+                .tree()
+                .node(origin)
+                .ok()
+                .and_then(|node| node.parent);
+            while let Some(grid) = cursor {
+                let Ok(root) = state.mapper.tree().node(grid) else {
+                    break;
+                };
+                if root.descriptor.view().role == Some(glory_render::Role::Grid) {
+                    let command = root
+                        .descriptor
+                        .view()
+                        .semantics
+                        .as_ref()
+                        .and_then(|s| s.grid_navigation)
+                        .and_then(|direction| {
+                            glory_render::GridCommand::key(
+                                direction,
+                                glory_render::KeyboardInput {
+                                    key: &key_name,
+                                    control: key.modifiers.contains(Modifiers::CONTROL),
+                                    meta: key.modifiers.contains(Modifiers::META),
+                                    alt: key.modifiers.contains(Modifiers::ALT),
+                                    shift: key.modifiers.contains(Modifiers::SHIFT),
+                                    repeat: key.is_auto_repeating,
+                                    composing: false,
+                                    editable,
+                                },
+                            )
+                        });
+                    if state
+                        .subscriptions
+                        .contains(&(grid, EventKind::GridNavigate))
+                        && let Some(command) = command
+                    {
+                        state.inputs.push(Input::Event {
+                            node: grid,
+                            event: Event::GridNavigate {
+                                from: origin,
+                                command,
+                            },
+                        });
+                        return true;
+                    }
+                    break;
+                }
+                cursor = root.parent;
+            }
+        }
+        if state.focused == Some(origin)
             && state.dom.control(origin).ok() == Some(target)
             && state.mapper.tree().enabled(origin)
             && state.mapper.tree().node(origin).is_ok_and(|node| {
@@ -738,23 +829,13 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
                 },
             )
         {
-            let available =
-                match command {
-                    glory_render::RangeCommand::Increase
-                    | glory_render::RangeCommand::PageIncrease => spin.can_increase,
-                    glory_render::RangeCommand::Decrease
-                    | glory_render::RangeCommand::PageDecrease => spin.can_decrease,
-                    _ => true,
-                };
-            if available {
-                state.inputs.push(Input::Event {
-                    node: origin,
-                    event: Event::Spin {
-                        from: origin,
-                        command,
-                    },
-                });
-            }
+            state.inputs.push(Input::Event {
+                node: origin,
+                event: Event::Spin {
+                    from: origin,
+                    command,
+                },
+            });
             return true;
         }
         if state.focused == Some(origin)
@@ -903,31 +984,11 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
             let form_submit=in_form && command==glory_render::KeyboardCommand::Submit
                 && state.mapper.tree().node(origin).is_ok_and(|node| matches!(&node.descriptor.view().props,glory_render::Props::Input(input) if !input.multiline));
             if interested && (!editable || own_interest) || form_submit {
-                if command == glory_render::KeyboardCommand::Submit {
-                    let revision = state
-                        .dom
-                        .ranges
-                        .get(&origin)
-                        .expect("input range")
-                        .editing
-                        .revision;
-                    match state.dom.text_value(origin) {
-                        Ok(value) => {
-                            state.inputs.push(Input::Event {
-                                node: origin,
-                                event: Event::ValueChanged {
-                                    value: value.clone(),
-                                    composing: false,
-                                    revision,
-                                },
-                            });
-                            if state.mapper.tree().node(origin).is_ok_and(|n|matches!(n.descriptor.view().props,glory_render::Props::Input(p) if !p.multiline)) {state.inputs.push(Input::Event{node:origin,event:Event::Commit{value,revision}});}
-                        }
-                        Err(error) => {
-                            state.input_error = Some(error);
-                            return true;
-                        }
-                    }
+                if command == glory_render::KeyboardCommand::Submit
+                    && let Err(error) = editing::queue_commit(state, origin, true)
+                {
+                    state.input_error = Some(error);
+                    return true;
                 }
                 state.inputs.push(Input::Event {
                     node: origin,
@@ -976,14 +1037,7 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
                 .node(id)
                 .is_ok_and(|node| matches!(&node.descriptor.view().props, glory_render::Props::Input(input) if !input.multiline))
         {
-            let revision = range.editing.revision;
-            match state.dom.text_value(id) {
-                Ok(value) => state.inputs.push(Input::Event {
-                    node: id,
-                    event: Event::Commit { value, revision },
-                }),
-                Err(error) => state.input_error = Some(error),
-            }
+            if let Err(error)=editing::queue_commit(state,id,false){state.input_error=Some(error);}
             return true;
         }
     }
@@ -1018,7 +1072,9 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
                             .is_none()
                     })
                     && state.dom.owner(id).is_some_and(|owner| {
-                        state.mapper.tree().active(owner) && state.mapper.tree().enabled(owner)
+                        state.mapper.tree().active(owner)
+                            && state.mapper.tree().enabled(owner)
+                            && state.layers.allowed(state.mapper.tree(), owner)
                     })
             })
         };
@@ -1502,6 +1558,9 @@ mod editing_tests;
 #[cfg(test)]
 #[path = "focus_tests.rs"]
 mod focus_tests;
+#[cfg(test)]
+#[path = "layer_tests.rs"]
+mod layer_tests;
 #[cfg(test)]
 #[path = "shell_tests.rs"]
 mod tests;

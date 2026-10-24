@@ -2,6 +2,8 @@
 //! Rendering adapters translate this contract into their own objects and ranges.
 
 mod anchor;
+mod viewport_layer;
+pub use viewport_layer::ViewportPlacement;
 #[cfg(feature = "conformance")]
 pub mod conformance;
 mod id;
@@ -37,6 +39,11 @@ mod progress;
 pub use progress::ProgressValue;
 mod motion;
 pub use motion::{GraphicAnimation, MotionPreference};
+mod translation;
+pub use translation::{
+    MAX_TRANSLATION_COORDINATE, TranslationKind, TranslationMotion, TranslationOffset,
+    TranslationPhase,
+};
 pub mod memory;
 mod plan;
 pub mod profile;
@@ -59,6 +66,8 @@ mod keyboard;
 pub use keyboard::{KeyboardCommand, KeyboardInput};
 mod navigation_panel;
 pub use navigation_panel::{NavigationPanel, NavigationPanelCommand};
+mod grid;
+pub use grid::GridCommand;
 mod scroll;
 pub use scroll::{ScrollAxes, ScrollCommand, ScrollMetrics, ScrollMovement};
 mod sheet;
@@ -67,6 +76,14 @@ mod slider;
 pub use slider::SliderValue;
 mod spinbutton;
 pub use spinbutton::SpinValue;
+mod input_assist;
+pub use input_assist::{InputAssist, InputAutofill, InputMode};
+mod text_selection;
+pub use text_selection::{SelectionDirection, TextSelection};
+mod input_edit;
+pub use input_edit::{
+    InputEdit, InputEditCapture, InputEditIntent, InputEditRejection, MAX_INPUT_EDIT_BYTES,
+};
 mod splitter;
 pub use splitter::RangeCommand;
 mod typeahead;
@@ -230,6 +247,16 @@ impl Query {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Action {
+    /// Bring a current nonmodal Dialog layer forward without moving its DOM,
+    /// editor identity or actual focus. The host's current modal still applies.
+    RaiseLayer(NodeId),
+    /// Select an exact range in the current ASCII Input value. A stale revision
+    /// is rejected; Unicode/surrogate/grapheme addressing is explicitly deferred.
+    SelectText {
+        node: NodeId,
+        revision: u64,
+        selection: TextSelection,
+    },
     /// Reveal a mounted option inside its nearest owning listbox, preserving
     /// actual combobox focus and the outer document scroll position.
     RevealOption {
@@ -255,14 +282,51 @@ impl Action {
     pub fn node(self) -> NodeId {
         match self {
             Self::Focus(node)
+            | Self::RaiseLayer(node)
             | Self::ScrollTo { node, .. }
             | Self::ExitMenu { node, .. }
             | Self::RevealOption { node } => node,
+            Self::SelectText { node, .. } => node,
         }
     }
     /// Validate after checking identity, before capability checks or queuing.
     pub fn validate_target<'a>(self, node: impl Into<DescriptorView<'a>>) -> Result<(), Error> {
         let node = node.into();
+        if matches!(self, Self::RaiseLayer(_))
+            && (node.role != Some(Role::Dialog)
+                || node.hidden()
+                || !node
+                    .semantics
+                    .as_ref()
+                    .and_then(|s| s.layer.as_ref())
+                    .is_some_and(|layer| !layer.modal))
+        {
+            return Err(Error::Unsupported(
+                "raise requires an open nonmodal dialog layer",
+            ));
+        }
+        if let Self::SelectText {
+            revision,
+            selection,
+            ..
+        } = self
+        {
+            let Props::Input(input) = node.props else {
+                return Err(Error::Unsupported("text selection requires an Input"));
+            };
+            if revision != input.revision {
+                return Err(Error::InputRevision {
+                    current: input.revision,
+                    incoming: revision,
+                });
+            }
+            if !input.value.is_ascii() {
+                return Err(Error::Unsupported(
+                    "exact selection currently requires ASCII input text",
+                ));
+            }
+            selection.validate(input.value.len())?;
+        }
         if matches!(self, Self::Focus(_))
             && node.semantics.as_ref().is_some_and(|s| s.menubar_item)
             && node.focus != FocusMode::TabStop
@@ -384,6 +448,11 @@ pub enum QueryValue {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
+    GridNavigate {
+        from: NodeId,
+        command: GridCommand,
+    },
+    InputEdit(InputEdit),
     /// Terminal presentation observation; valid while the closing subtree is
     /// logically hidden/inert, without admitting business input there.
     CollapseComplete {
@@ -547,6 +616,8 @@ pub struct ScrollAck {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum EventKind {
+    GridNavigate,
+    InputEdit,
     CollapseComplete,
     ContextMenu,
     Tags,
@@ -588,6 +659,25 @@ impl EventKind {
     /// can produce it (SSR records handlers for later browser adoption).
     pub fn validate_target<'a>(self, node: impl Into<DescriptorView<'a>>) -> Result<(), Error> {
         let node = node.into();
+        if self == Self::GridNavigate
+            && (node.role != Some(Role::Grid)
+                || !matches!(node.props, Props::View)
+                || !node
+                    .semantics
+                    .as_ref()
+                    .is_some_and(|s| s.grid_navigation.is_some()))
+        {
+            return Err(Error::InvalidProps(
+                "grid navigation requires an opted-in Grid View",
+            ));
+        }
+        if self == Self::InputEdit
+            && !matches!(node.props,Props::Input(p) if !p.multiline&&node.semantics.as_ref().is_some_and(|s|s.input_edit.is_some()))
+        {
+            return Err(Error::Unsupported(
+                "InputEdit requires an opted-in single-line Input",
+            ));
+        }
         if self == Self::CollapseComplete
             && (!matches!(node.props, Props::View)
                 || !node
@@ -773,6 +863,7 @@ impl Event {
 
     pub(crate) fn origin(&self) -> Option<NodeId> {
         match self {
+            Self::GridNavigate { from, .. } => Some(*from),
             Self::ContextMenu { from, .. } => Some(*from),
             Self::Tags { from, .. } => Some(*from),
             Self::Submit { submitter } => *submitter,
@@ -804,6 +895,34 @@ impl Event {
         node: impl Into<DescriptorView<'a>>,
     ) -> Result<(), Error> {
         let node = node.into();
+        if let Self::GridNavigate { from, .. } = self {
+            EventKind::GridNavigate.validate_target(node)?;
+            if from.runtime() != target.runtime() {
+                return Err(Error::ForeignRuntime);
+            }
+            if *from == target {
+                return Err(Error::InvalidEvent(
+                    "grid navigation requires a real descendant Button",
+                ));
+            }
+        }
+        if let Self::InputEdit(edit) = self {
+            EventKind::InputEdit.validate_target(node)?;
+            let capture = node
+                .semantics
+                .as_ref()
+                .and_then(|s| s.input_edit)
+                .ok_or(Error::InvalidEvent("input edit capture is absent"))?;
+            edit.validate(capture)?;
+            if let Props::Input(input) = node.props
+                && edit.revision() > input.revision
+            {
+                return Err(Error::InputRevision {
+                    current: input.revision,
+                    incoming: edit.revision(),
+                });
+            }
+        }
         if let Self::CollapseComplete { revision } = self {
             let config = node
                 .semantics
@@ -925,13 +1044,6 @@ impl Event {
                         "spin command requires an enabled writable input",
                     ))?;
                 spin.validate_command(*command)?;
-                if matches!(command, RangeCommand::Increase | RangeCommand::PageIncrease)
-                    && !spin.can_increase
-                    || matches!(command, RangeCommand::Decrease | RangeCommand::PageDecrease)
-                        && !spin.can_decrease
-                {
-                    return Err(Error::InvalidEvent("spin direction is unavailable"));
-                }
             }
             Self::Range { from, command } => {
                 let range = node
@@ -1165,6 +1277,8 @@ impl Event {
 
     pub fn kind(&self) -> EventKind {
         match self {
+            Self::GridNavigate { .. } => EventKind::GridNavigate,
+            Self::InputEdit(_) => EventKind::InputEdit,
             Self::CollapseComplete { .. } => EventKind::CollapseComplete,
             Self::ContextMenu { .. } => EventKind::ContextMenu,
             Self::Tags { .. } => EventKind::Tags,
@@ -1349,3 +1463,6 @@ pub trait Render {
     /// Return queued inputs, never synchronously reenter business closures.
     fn drain(&mut self, inputs: &mut Vec<Input>);
 }
+
+mod table;
+pub use table::{MAX_CELL_HEADERS, MAX_TABLE_SPAN, SortDirection, TableMetadata};

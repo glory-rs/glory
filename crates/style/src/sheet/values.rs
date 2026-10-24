@@ -13,8 +13,11 @@ fn length<'i>(input: &mut Parser<'i>) -> Result<Length> {
         Token::Dimension { value, unit, .. } if unit.eq_ignore_ascii_case("px") => {
             Ok(Length::Px(value.into()))
         }
+        Token::Dimension { value, unit, .. } if unit.eq_ignore_ascii_case("ch") => {
+            Ok(Length::Ch(value.into()))
+        }
         Token::Number { value: 0.0, .. } => Ok(Length::Px(0.0)),
-        _ => Err(invalid(input, "expected px, %, auto or unitless zero")),
+        _ => Err(invalid(input, "expected px, ch, %, auto or unitless zero")),
     }
 }
 fn limit<'i>(input: &mut Parser<'i>) -> Result<Limit> {
@@ -24,7 +27,7 @@ fn limit<'i>(input: &mut Parser<'i>) -> Result<Limit> {
     match length(input)? {
         Length::Px(v) => Ok(Limit::Px(v)),
         Length::Percent(v) => Ok(Limit::Percent(v)),
-        Length::Auto => Err(invalid(input, "max sizes do not accept auto")),
+        Length::Auto | Length::Ch(_) => Err(invalid(input, "max sizes require px, % or none")),
     }
 }
 fn px<'i>(input: &mut Parser<'i>) -> Result<f64> {

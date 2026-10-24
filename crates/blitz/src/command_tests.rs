@@ -1,7 +1,7 @@
 use super::tests::{bounds_now, native_focus, pointer, tick};
 use super::*;
 use glory_render::{DragPhase, KeyboardCommand};
-use glory_ui::{input, view};
+use glory_ui::{button, input, view};
 
 fn key(app: &mut WindowApp, key: &str, modifiers: Modifiers, composing: bool, repeat: bool) {
     app.handle_ui_event(UiEvent::KeyDown(BlitzKeyEvent {
@@ -14,6 +14,349 @@ fn key(app: &mut WindowApp, key: &str, modifiers: Modifiers, composing: bool, re
         state: blitz_traits::events::KeyState::Pressed,
         text: None,
     }));
+}
+
+#[test]
+fn native_grid_navigation_is_queued_two_dimensional_and_preserves_nested_editor_and_modified_keys()
+{
+    use super::focus_tests::{focus, settle};
+    use glory_render::{GridCommand, Semantics};
+    let mut host = WindowApp::new();
+    let day = host.app.scope().cage(None);
+    let editor = host.app.scope().cage(None);
+    let calls = Rc::new(RefCell::new(Vec::new()));
+    let out = calls.clone();
+    host.mount(
+        view()
+            .role(glory_render::Role::Grid)
+            .name("February 2024")
+            .semantics(Some(Box::new(Semantics {
+                grid_navigation: Some(glory_render::Direction::Ltr),
+                ..Default::default()
+            })))
+            .on(EventKind::GridNavigate, move |event| {
+                if let Event::GridNavigate { command, .. } = event {
+                    out.borrow_mut().push(command);
+                }
+            })
+            .fill((
+                button().label("29").node_ref(day),
+                input().value("12").node_ref(editor),
+            )),
+    )
+    .unwrap();
+    let id = day.get().unwrap();
+    focus(&mut host, id);
+    key(&mut host, "ArrowDown", Modifiers::empty(), false, false);
+    assert!(calls.borrow().is_empty());
+    tick(&mut host);
+    assert_eq!(calls.borrow().as_slice(), [GridCommand::Down]);
+    key(&mut host, "PageUp", Modifiers::SHIFT, false, false);
+    tick(&mut host);
+    assert_eq!(calls.borrow().last(), Some(&GridCommand::PreviousYear));
+    for modifiers in [Modifiers::CONTROL, Modifiers::ALT, Modifiers::META] {
+        key(&mut host, "ArrowLeft", modifiers, false, false);
+        tick(&mut host);
+    }
+    key(&mut host, "ArrowRight", Modifiers::empty(), true, false);
+    tick(&mut host);
+    assert_eq!(calls.borrow().len(), 2);
+    focus(&mut host, editor.get().unwrap());
+    key(&mut host, "ArrowLeft", Modifiers::empty(), false, false);
+    settle(&mut host);
+    assert_eq!(calls.borrow().len(), 2);
+    host.app.clear().unwrap();
+    assert!(day.get().is_none());
+}
+
+#[test]
+fn native_opt_in_edit_captures_current_selection_intent_and_ime_without_the_legacy_value_path() {
+    use super::focus_tests::{focus, key as editor_key, settle};
+    use glory_render::{
+        InputEdit, InputEditCapture, InputEditIntent, InputEditRejection, TextSelection,
+    };
+    let mut app = WindowApp::new();
+    let r = app.app.scope().cage(None);
+    let edits = Rc::new(RefCell::new(Vec::new()));
+    let out = edits.clone();
+    let legacy = Rc::new(Cell::new(0));
+    let seen = legacy.clone();
+    let commits = Rc::new(Cell::new(0));
+    let committed = commits.clone();
+    app.mount(
+        input()
+            .value("12-34")
+            .node_ref(r)
+            .semantics(Some(Box::new(glory_render::Semantics {
+                input_edit: Some(InputEditCapture { max_bytes: 8 }),
+                ..Default::default()
+            })))
+            .on(EventKind::InputEdit, move |event| {
+                if let Event::InputEdit(edit) = event {
+                    out.borrow_mut().push(edit);
+                }
+            })
+            .on(EventKind::ValueChanged, move |_| seen.set(seen.get() + 1))
+            .on(EventKind::Commit, move |_| {
+                committed.set(committed.get() + 1)
+            }),
+    )
+    .unwrap();
+    let id = r.get().unwrap();
+    focus(&mut app, id);
+    app.app
+        .scope()
+        .set_input_selection(
+            id,
+            TextSelection {
+                start: 3,
+                end: 3,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    app.app.flush().unwrap();
+    settle(&mut app);
+    editor_key(
+        &mut app,
+        Key::Named(NamedKey::Backspace),
+        Modifiers::empty(),
+    );
+    assert_eq!(legacy.get(), 0);
+    assert_eq!(edits.borrow().len(), 1);
+    assert!(
+        matches!(&edits.borrow()[0],InputEdit::Value{intent:InputEditIntent::DeleteBackward,before:Some(TextSelection{start:3,end:3,..}),selection:TextSelection{start:2,end:2,..},composing:false,value,..} if value.len()==4)
+    );
+    editor_key(&mut app, Key::Character("5".into()), Modifiers::empty());
+    assert!(matches!(
+        edits.borrow().last(),
+        Some(InputEdit::Value {
+            intent: InputEditIntent::Insert,
+            before: Some(TextSelection { start: 2, .. }),
+            selection: TextSelection { start: 3, .. },
+            ..
+        })
+    ));
+    editor_key(&mut app, Key::Named(NamedKey::Enter), Modifiers::empty());
+    assert_eq!(commits.get(), 1);
+    assert_eq!(legacy.get(), 0);
+    app.handle_ui_event(UiEvent::Ime(BlitzImeEvent::Preedit(
+        "xx".into(),
+        Some((2, 2)),
+    )));
+    settle(&mut app);
+    assert!(matches!(
+        edits.borrow().last(),
+        Some(InputEdit::Value {
+            composing: true,
+            ..
+        })
+    ));
+    app.handle_ui_event(UiEvent::Ime(BlitzImeEvent::Commit("000".into())));
+    settle(&mut app);
+    assert!(
+        matches!(edits.borrow().last(),Some(InputEdit::Value{composing:false,value,..})if value.len()==8)
+    );
+    assert_eq!(legacy.get(), 0);
+    let physical = app.renderer.engine_id(id, Part::Main).unwrap();
+    let renderer = app.renderer.clone();
+    EventDriver::new(&mut app, Events(renderer)).handle_dom_event(DomEvent::new(
+        physical,
+        DomEventData::Input(blitz_traits::events::BlitzInputEvent {
+            value: "0".repeat(1_000_000),
+        }),
+    ));
+    settle(&mut app);
+    assert!(matches!(
+        edits.borrow().last(),
+        Some(InputEdit::Rejected {
+            reason: InputEditRejection::TooLong,
+            ..
+        })
+    ));
+    assert_eq!(legacy.get(), 0);
+}
+
+#[test]
+fn native_select_text_preserves_direction_and_revision_and_explicitly_refuses_unicode_boundaries() {
+    use super::focus_tests::{focus, selection, settle};
+    use glory_render::{Action, SelectionDirection, TextSelection};
+    for masked in [false, true] {
+        let mut app = WindowApp::new();
+        let r = app.app.scope().cage(None);
+        app.mount(
+            input()
+                .value("000001")
+                .purpose(if masked {
+                    glory_render::Purpose::Password
+                } else {
+                    glory_render::Purpose::Text
+                })
+                .node_ref(r),
+        )
+        .unwrap();
+        let id = r.get().unwrap();
+        focus(&mut app, id);
+        app.app
+            .scope()
+            .set_input_selection(
+                id,
+                TextSelection {
+                    start: 1,
+                    end: 4,
+                    direction: SelectionDirection::Backward,
+                },
+            )
+            .unwrap();
+        app.app.flush().unwrap();
+        settle(&mut app);
+        assert_eq!(selection(&mut app, id), (1, 4));
+        let physical = app.renderer.engine_id(id, Part::Main).unwrap();
+        app.renderer.inspect(|doc| {
+            let editor = &doc
+                .get_node(physical)
+                .unwrap()
+                .element_data()
+                .unwrap()
+                .text_input_data()
+                .unwrap()
+                .editor;
+            assert_eq!(editor.raw_selection().anchor().index(), 4);
+            assert_eq!(editor.raw_selection().focus().index(), 1);
+        });
+        let stale = Action::SelectText {
+            node: id,
+            revision: 0,
+            selection: TextSelection::default(),
+        };
+        app.app.scope().set_input_value(id, "000002").unwrap();
+        app.app
+            .scope()
+            .set_input_selection(
+                id,
+                TextSelection {
+                    start: 2,
+                    end: 2,
+                    direction: SelectionDirection::None,
+                },
+            )
+            .unwrap();
+        app.app.flush().unwrap();
+        settle(&mut app);
+        assert_eq!(selection(&mut app, id), (2, 2));
+        let before = app.renderer.stats();
+        assert!(app.renderer.clone().action(stale).is_err());
+        assert_eq!(app.renderer.stats(), before);
+        app.app.scope().set_input_value(id, "e\u{301}").unwrap();
+        app.app.flush().unwrap();
+        let before = app.app.stats();
+        assert!(
+            app.app
+                .scope()
+                .set_input_selection(
+                    id,
+                    TextSelection {
+                        start: 1,
+                        end: 1,
+                        ..Default::default()
+                    }
+                )
+                .is_err()
+        );
+        assert_eq!(app.app.stats(), before);
+    }
+}
+
+#[test]
+fn native_ch_input_assist_preserves_real_pointer_caret_keyboard_editing_and_whole_replacement() {
+    use super::focus_tests::{focus, key as editor_key, selection, settle};
+    use glory_render::style::{Edges, Family, Length, Style};
+    use glory_render::{InputAssist, InputAutofill, InputMode, Purpose, Semantics};
+    for masked in [false, true] {
+        let mut app = WindowApp::new();
+        let model = app.app.scope().cage("000000".to_owned());
+        let reference = app.app.scope().cage(None);
+        app.mount(
+            input()
+                .value(model)
+                .purpose(if masked {
+                    Purpose::Password
+                } else {
+                    Purpose::Text
+                })
+                .node_ref(reference)
+                .style(
+                    Style {
+                        font_size: Some(24.),
+                        ..Style::new()
+                    }
+                    .font_family([Family::Mono])
+                    .width(Length::Ch(6.))
+                    .height(Length::Px(48.))
+                    .padding(Edges::all(0.))
+                    .border_width(Edges::all(0.)),
+                )
+                .semantics(Some(Box::new(Semantics {
+                    input_assist: Some(InputAssist {
+                        autofill: Some(InputAutofill::OneTimeCode),
+                        mode: Some(InputMode::Numeric),
+                    }),
+                    ..Default::default()
+                })))
+                .on(EventKind::ValueChanged, move |e| {
+                    if let Event::ValueChanged { value, .. } = e {
+                        model.revise(|v| *v = value);
+                    }
+                }),
+        )
+        .unwrap();
+        let id = reference.get().unwrap();
+        focus(&mut app, id);
+        let rect = bounds_now(&app, id);
+        let physical = app.renderer.engine_id(id, Part::Main).unwrap();
+        editor_key(&mut app, Key::Named(NamedKey::End), Modifiers::empty());
+        let x = (rect.x + rect.width * 2.01 / 6.) as f32;
+        let y = (rect.y + rect.height / 2.) as f32;
+        app.handle_ui_event(UiEvent::PointerDown(pointer(x, y, true)));
+        app.handle_ui_event(UiEvent::PointerUp(pointer(x, y, false)));
+        settle(&mut app);
+        assert_eq!(selection(&mut app, id), (2, 2));
+        editor_key(
+            &mut app,
+            Key::Named(NamedKey::Backspace),
+            Modifiers::empty(),
+        );
+        assert_eq!(model.get().len(), 5);
+        assert_eq!(selection(&mut app, id), (1, 1));
+        editor_key(&mut app, Key::Named(NamedKey::Home), Modifiers::empty());
+        editor_key(
+            &mut app,
+            Key::Named(NamedKey::ArrowRight),
+            Modifiers::empty(),
+        );
+        assert_eq!(selection(&mut app, id), (1, 1));
+        // Explicitly exercise the editor operation and native Input dispatch
+        // used after a host clipboard insertion. This is not an OS clipboard claim.
+        app.renderer
+            .0
+            .borrow_mut()
+            .dom
+            .doc
+            .with_text_input(physical, |mut driver| {
+                driver.select_byte_range(0, 5);
+                driver.insert_or_replace_selection("000001");
+            });
+        let raw = app.renderer.0.borrow().dom.text_value(id).unwrap();
+        let renderer = app.renderer.clone();
+        EventDriver::new(&mut app, Events(renderer)).handle_dom_event(DomEvent::new(
+            physical,
+            DomEventData::Input(blitz_traits::events::BlitzInputEvent { value: raw }),
+        ));
+        settle(&mut app);
+        assert_eq!(model.get().len(), 6);
+        assert_eq!(selection(&mut app, id), (6, 6));
+        assert_eq!(app.renderer.engine_id(id, Part::Main).unwrap(), physical);
+    }
 }
 
 #[test]
@@ -1075,14 +1418,15 @@ fn native_spinbutton_queues_own_focused_keys_without_changing_editor_or_ordinary
     let output = events.clone();
     app.mount(
         input()
-            .value("1.00")
+            .value("0.00")
             .name("Quantity")
             .node_ref(reference)
             .semantics(Some(Box::new(Semantics {
                 spinbutton: Some(SpinValue {
                     min: Some(0.),
                     max: Some(10.),
-                    value: Some(1.),
+                    value: Some(0.),
+                    can_decrease: false,
                     ..Default::default()
                 }),
                 ..Default::default()
@@ -1118,7 +1462,7 @@ fn native_spinbutton_queues_own_focused_keys_without_changing_editor_or_ordinary
             RangeCommand::Maximum
         ]
     );
-    assert_eq!(app.renderer.0.borrow().dom.text_value(id).unwrap(), "1.00");
+    assert_eq!(app.renderer.0.borrow().dom.text_value(id).unwrap(), "0.00");
     let ordinary = app.app.scope().cage(None);
     app.mount(input().value("plain").node_ref(ordinary))
         .unwrap();

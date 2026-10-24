@@ -2,6 +2,13 @@
 use glory_render::{Role, Semantics};
 use std::collections::BTreeMap;
 
+pub(crate) fn translation_style(motion: Option<glory_render::TranslationMotion>) -> String {
+    motion.map_or_else(String::new, |motion| {
+        let offset = motion.resting_offset();
+        format!("transform:translate({}px,{}px);", offset.x, offset.y)
+    })
+}
+
 pub(crate) fn attributes(
     value: Option<&Semantics>,
     role: Option<Role>,
@@ -14,6 +21,116 @@ pub(crate) fn attributes(
         attrs.insert("aria-level", level.to_string());
     }
     let Some(value) = value else { return attrs };
+    if let Some(capture) = value.input_edit {
+        attrs.insert("data-gly-input-edit", capture.max_bytes.to_string());
+    }
+    if let Some(translation) = value.translation {
+        use glory_render::TranslationKind;
+        let resting = translation.resting_offset();
+        attrs.insert("data-gly-translation-x", format!("{}px", resting.x));
+        attrs.insert("data-gly-translation-y", format!("{}px", resting.y));
+        let (kind, from, to, millis) = match translation.kind {
+            TranslationKind::Loop {
+                from,
+                to,
+                period_millis,
+            } => ("loop", from, to, period_millis),
+            TranslationKind::To {
+                target,
+                duration_millis,
+            } => ("to", target, target, u32::from(duration_millis)),
+        };
+        attrs.insert("data-gly-translation", kind.into());
+        attrs.insert("data-gly-translation-from-x", from.x.to_string());
+        attrs.insert("data-gly-translation-from-y", from.y.to_string());
+        attrs.insert("data-gly-translation-to-x", to.x.to_string());
+        attrs.insert("data-gly-translation-to-y", to.y.to_string());
+        attrs.insert("data-gly-translation-duration", millis.to_string());
+        attrs.insert(
+            "data-gly-translation-paused",
+            translation.paused.to_string(),
+        );
+    }
+    match value.document_part {
+        Some(glory_render::DocumentPart::ColumnHeader) => {
+            attrs.insert("scope", "col".into());
+        }
+        Some(glory_render::DocumentPart::RowHeader) => {
+            attrs.insert("scope", "row".into());
+        }
+        _ => {}
+    }
+    if let Some(sort) = value.sort {
+        attrs.insert(
+            "aria-sort",
+            match sort {
+                glory_render::SortDirection::None => "none",
+                glory_render::SortDirection::Ascending => "ascending",
+                glory_render::SortDirection::Descending => "descending",
+            }
+            .into(),
+        );
+    }
+    if let Some(table) = &value.table {
+        use glory_render::TableMetadata;
+        match table {
+            TableMetadata::Table { rows, columns } => {
+                if let Some(rows) = rows {
+                    attrs.insert("aria-rowcount", rows.to_string());
+                }
+                if let Some(columns) = columns {
+                    attrs.insert("aria-colcount", columns.to_string());
+                }
+            }
+            TableMetadata::Row { index } => {
+                attrs.insert("aria-rowindex", (u64::from(*index) + 1).to_string());
+            }
+            TableMetadata::Cell {
+                row,
+                column,
+                row_span,
+                column_span,
+                headers,
+            } => {
+                attrs.insert("aria-rowindex", (u64::from(*row) + 1).to_string());
+                attrs.insert("aria-colindex", (u32::from(*column) + 1).to_string());
+                attrs.insert(
+                    if value.document_part.is_some() {
+                        "rowspan"
+                    } else {
+                        "aria-rowspan"
+                    },
+                    row_span.to_string(),
+                );
+                attrs.insert(
+                    if value.document_part.is_some() {
+                        "colspan"
+                    } else {
+                        "aria-colspan"
+                    },
+                    column_span.to_string(),
+                );
+                if !headers.is_empty() {
+                    attrs.insert(
+                        "headers",
+                        headers
+                            .iter()
+                            .map(|id| id.as_str())
+                            .collect::<Vec<_>>()
+                            .join(" "),
+                    );
+                }
+            }
+        }
+    }
+    if let Some(assist) = value.input_assist {
+        if let Some(autofill) = assist.autofill {
+            attrs.insert("autocomplete", autofill.as_str().into());
+        }
+        if let Some(mode) = assist.mode {
+            attrs.insert("inputmode", mode.as_str().into());
+        }
+    }
     if let Some(collapse) = value.collapse {
         attrs.insert(
             "data-gly-collapse",
@@ -83,6 +200,7 @@ pub(crate) fn attributes(
                 glory_render::Current::Page => "page",
                 glory_render::Current::Step => "step",
                 glory_render::Current::Location => "location",
+                glory_render::Current::Date => "date",
             }
             .into(),
         );
@@ -133,6 +251,17 @@ pub(crate) fn attributes(
     }
     if let Some(axes) = value.scroll_keyboard {
         attrs.insert("data-gly-scroll-keyboard", axes.as_str().into());
+    }
+    if let Some(direction) = value.grid_navigation {
+        attrs.insert(
+            "data-gly-grid-navigation",
+            if direction == glory_render::Direction::Rtl {
+                "rtl"
+            } else {
+                "ltr"
+            }
+            .into(),
+        );
     }
     if value.link_request {
         attrs.insert("data-gly-link-request", String::new());
@@ -247,6 +376,12 @@ pub(crate) fn attributes(
         attrs.insert("data-gly-sheet-grip", String::new());
     }
     if let Some(layer) = &value.layer {
+        if let glory_render::LayerPlacement::Viewport(placement) = layer.placement {
+            attrs.insert("data-gly-viewport-x", placement.x.to_string());
+            attrs.insert("data-gly-viewport-y", placement.y.to_string());
+            attrs.insert("data-gly-viewport-padding", placement.viewport_padding.to_string());
+            attrs.insert("data-gly-viewport-constrain", placement.constrain.to_string());
+        }
         if let glory_render::LayerPlacement::Anchor(placement) = layer.placement {
             attrs.insert("data-gly-anchor-side", placement.side.as_str().into());
             attrs.insert("data-gly-anchor-align", placement.align.as_str().into());

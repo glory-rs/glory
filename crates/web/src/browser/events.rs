@@ -13,6 +13,42 @@ mod drag;
 #[path = "tags.rs"]
 mod tags;
 
+fn queue_commit(
+    dom: &Dom,
+    id: NodeId,
+    entry: &super::dom::Entry,
+    element: &Element,
+    sync_value: bool,
+) -> Result<(), glory_render::Error> {
+    let revision = entry.editing.borrow().revision;
+    if let Some(event) = super::input_edit::event(entry, element, false)? {
+        let value = match &event {
+            Event::InputEdit(glory_render::InputEdit::Value { value, .. }) => Some(value.clone()),
+            _ => None,
+        };
+        dom.queue(id, event);
+        if let Some(value) = value {
+            dom.queue(id, Event::Commit { value, revision });
+        }
+    } else {
+        let value = entry.value()?;
+        if sync_value {
+            dom.queue(
+                id,
+                Event::ValueChanged {
+                    value: value.clone(),
+                    composing: false,
+                    revision,
+                },
+            );
+        }
+        if entry.control()?.tag_name() != "TEXTAREA" {
+            dom.queue(id, Event::Commit { value, revision });
+        }
+    }
+    Ok(())
+}
+
 struct Listener {
     target: EventTarget,
     name: &'static str,
@@ -77,6 +113,7 @@ impl Listeners {
             "reset",
             "click",
             "input",
+            "beforeinput",
             "paste",
             "contextmenu",
             "change",
@@ -86,6 +123,8 @@ impl Listeners {
             "focusin",
             "focusout",
             "scroll",
+            "wheel",
+            "touchmove",
             "pointerdown",
             "pointermove",
             "pointerup",
@@ -119,16 +158,30 @@ impl Listeners {
                     | "pointerup"
                     | "pointercancel"
                     | "scroll"
+                    | "wheel"
+                    | "touchmove"
             ) {
                 dom.document.clone().into()
             } else {
                 dom.root.clone().into()
             };
-            if let Err(error) = target.add_event_listener_with_callback_and_bool(
-                name,
-                callback.as_ref().unchecked_ref(),
-                true,
-            ) {
+            let registration = if matches!(name, "wheel" | "touchmove") {
+                let options = web_sys::AddEventListenerOptions::new();
+                options.set_capture(true);
+                options.set_passive(false);
+                target.add_event_listener_with_callback_and_add_event_listener_options(
+                    name,
+                    callback.as_ref().unchecked_ref(),
+                    &options,
+                )
+            } else {
+                target.add_event_listener_with_callback_and_bool(
+                    name,
+                    callback.as_ref().unchecked_ref(),
+                    true,
+                )
+            };
+            if let Err(error) = registration {
                 dom.error.borrow_mut().get_or_insert(backend(error));
             }
             listeners.push(Listener {
@@ -252,10 +305,10 @@ pub(super) fn target(dom: &Dom, element: &Element) -> Option<(NodeId, Element)> 
     Some((id, target))
 }
 fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_render::Error> {
-    if super::sheet::receive(dom, name, &event)? {
+    if super::layers::receive(dom, name, &event)? {
         return Ok(());
     }
-    if super::layers::receive(dom, name, &event)? {
+    if super::sheet::receive(dom, name, &event)? {
         return Ok(());
     }
     if matches!(
@@ -419,6 +472,11 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
             {
                 entry.editing.borrow_mut().composing = true;
             }
+            let composing = entry.editing.borrow().composing;
+            if let Some(event) = super::input_edit::event(&entry, &element, composing)? {
+                dom.queue(id, event);
+                return Ok(());
+            }
             let edit = entry.editing.borrow();
             let event = Event::ValueChanged {
                 value: entry.value()?,
@@ -427,6 +485,9 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
             };
             drop(edit);
             dom.queue(id, event);
+        }
+        "beforeinput" if entry.edit == EditKind::Text => {
+            super::input_edit::before(&entry, &element, &event)?;
         }
         "change" if entry.edit == EditKind::Select => {
             let keys = super::select::read(&entry.control()?)?;
@@ -455,17 +516,21 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
                 &false.into(),
             )
             .map_err(backend)?;
-            let revision = entry.editing.borrow().revision;
-            let value = entry.value()?;
             dom.queue(id, Event::Composition { active: false });
-            dom.queue(
-                id,
-                Event::ValueChanged {
-                    value,
-                    composing: false,
-                    revision,
-                },
-            );
+            if let Some(event) = super::input_edit::event(&entry, &element, false)? {
+                dom.queue(id, event);
+            } else {
+                let revision = entry.editing.borrow().revision;
+                let value = entry.value()?;
+                dom.queue(
+                    id,
+                    Event::ValueChanged {
+                        value,
+                        composing: false,
+                        revision,
+                    },
+                );
+            }
             entry.composition_end()?;
         }
         "keydown" => {
@@ -550,6 +615,55 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
                     }
                 }
             }
+            if element.tag_name() == "BUTTON"
+                && dom.document.active_element().as_ref() == Some(&element)
+                && !editable
+            {
+                let mut cursor = dom.parent(id);
+                while let Some(grid) = cursor {
+                    let root = dom.entry(grid)?;
+                    // Logical component/when/each Groups have no Main part.
+                    // They do not terminate the nearest boxed Grid search.
+                    if root.parts.get(&glory_html::Part::Main).is_none() {
+                        cursor = dom.parent(grid);
+                        continue;
+                    }
+                    let grid_element = root.element()?;
+                    if grid_element.get_attribute("role").as_deref() == Some("grid") {
+                        let direction = match grid_element
+                            .get_attribute("data-gly-grid-navigation")
+                            .as_deref()
+                        {
+                            Some("ltr") => Some(glory_render::Direction::Ltr),
+                            Some("rtl") => Some(glory_render::Direction::Rtl),
+                            _ => None,
+                        };
+                        if root.interests.borrow().contains(&EventKind::GridNavigate)
+                            && let Some(command) = direction.and_then(|direction| {
+                                glory_render::GridCommand::key(
+                                    direction,
+                                    KeyboardInput {
+                                        key: &key.key(),
+                                        control: key.ctrl_key(),
+                                        meta: key.meta_key(),
+                                        alt: key.alt_key(),
+                                        shift: key.shift_key(),
+                                        repeat: key.repeat(),
+                                        composing: false,
+                                        editable,
+                                    },
+                                )
+                            })
+                        {
+                            event.prevent_default();
+                            dom.queue(grid, Event::GridNavigate { from: id, command });
+                            return Ok(());
+                        }
+                        break;
+                    }
+                    cursor = dom.parent(grid);
+                }
+            }
             if node == Node::from(entry.element()?)
                 && dom.document.active_element().as_ref() == Some(&element)
                 && element.has_attribute("data-gly-spinbutton")
@@ -572,20 +686,7 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
                 )
             {
                 event.prevent_default();
-                let available = match command {
-                    glory_render::RangeCommand::Increase
-                    | glory_render::RangeCommand::PageIncrease => {
-                        element.get_attribute("data-gly-spin-increase").as_deref() == Some("true")
-                    }
-                    glory_render::RangeCommand::Decrease
-                    | glory_render::RangeCommand::PageDecrease => {
-                        element.get_attribute("data-gly-spin-decrease").as_deref() == Some("true")
-                    }
-                    _ => true,
-                };
-                if available {
-                    dom.queue(id, Event::Spin { from: id, command });
-                }
+                dom.queue(id, Event::Spin { from: id, command });
                 return Ok(());
             }
             if node == Node::from(entry.element()?)
@@ -732,19 +833,7 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
                 }
                 if interested && (!editable || own_interest) || form_submit {
                     if command == KeyboardCommand::Submit {
-                        let value = entry.value()?;
-                        let revision = entry.editing.borrow().revision;
-                        dom.queue(
-                            id,
-                            Event::ValueChanged {
-                                value: value.clone(),
-                                composing: false,
-                                revision,
-                            },
-                        );
-                        if entry.control()?.tag_name() != "TEXTAREA" {
-                            dom.queue(id, Event::Commit { value, revision });
-                        }
+                        queue_commit(dom, id, &entry, &element, true)?;
                     }
                     event.prevent_default();
                     dom.queue(
@@ -760,14 +849,7 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
             }
             if entry.edit == EditKind::Text {
                 if key.key() == "Enter" && entry.control()?.tag_name() != "TEXTAREA" {
-                    let revision = entry.editing.borrow().revision;
-                    dom.queue(
-                        id,
-                        Event::Commit {
-                            value: entry.value()?,
-                            revision,
-                        },
-                    );
+                    queue_commit(dom, id, &entry, &element, false)?;
                 }
                 return Ok(());
             }
@@ -1074,4 +1156,15 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
         _ => {}
     }
     Ok(())
+}
+
+pub(super) fn cancel_blocked_capture(dom: &Dom) -> Result<(), glory_render::Error> {
+    let from = dom.drag.borrow().as_ref().map(|drag| drag.from);
+    if let Some(from) = from
+        && let Ok(element) = dom.entry(from).and_then(|entry| entry.element())
+        && !dom.document_layers.allows(Some(element.as_ref()))
+    {
+        drag::cancel(dom);
+    }
+    super::sheet::cancel_outside_document_modal(dom)
 }

@@ -12,12 +12,14 @@ use super::{
     backend,
     dom::{self, Dom},
 };
+#[path = "layer_document.rs"]
+mod document;
+pub(super) use document::DocumentLayers;
 
 #[derive(Default)]
 pub(super) struct Layers {
     declarations: BTreeMap<NodeId, Layer>,
     stack: Vec<Open>,
-    inert: Vec<Element>,
     blocked: BTreeSet<NodeId>,
     anchors: BTreeMap<NodeId, bool>,
     lost_anchors: BTreeSet<NodeId>,
@@ -175,49 +177,12 @@ fn first(dom: &Dom, open: &Open) -> Element {
         .or_else(|| candidates(&open.element).into_iter().next())
         .unwrap_or_else(|| open.element.clone())
 }
-fn restore_inert(layers: &mut Layers) {
-    for element in layers.inert.drain(..) {
-        if !element.has_attribute("data-gly-inert") {
-            let _ = element.remove_attribute("inert");
-        }
-    }
-}
-fn modal_inert(layers: &mut Layers) -> Result<(), Error> {
-    let Some(open) = layers
-        .stack
-        .iter()
-        .rev()
-        .find(|open| open.config.modal && !open.element.has_attribute("inert"))
-    else {
-        return Ok(());
-    };
-    let mut branch = open.element.clone();
-    while let Some(parent) = branch.parent_element() {
-        let mut child = parent.first_element_child();
-        while let Some(sibling) = child {
-            child = sibling.next_element_sibling();
-            if sibling != branch && !sibling.has_attribute("inert") {
-                sibling.set_attribute("inert", "").map_err(backend)?;
-                layers.inert.push(sibling);
-            }
-        }
-        if parent.tag_name() == "BODY" {
-            break;
-        }
-        branch = parent;
-    }
-    Ok(())
-}
 struct Position {
     element: Element,
     x: f64,
     y: f64,
 }
 fn position(dom: &Dom, open: &Open, offset: (f64, f64)) -> Result<Option<Position>, Error> {
-    let Some(anchor) = named(dom, open.config.anchor.as_ref()) else {
-        return Ok(None);
-    };
-    let anchor = anchor.get_bounding_client_rect();
     let bounds = open.element.get_bounding_client_rect();
     let window = dom
         .document
@@ -233,6 +198,29 @@ fn position(dom: &Dom, open: &Open, offset: (f64, f64)) -> Result<Option<Positio
         .map_err(backend)?
         .as_f64()
         .unwrap_or(0.0);
+    if let LayerPlacement::Viewport(placement) = open.config.placement {
+        let resolved = placement.resolve(
+            glory_render::Rect {
+                width: bounds.width(),
+                height: bounds.height(),
+                ..Default::default()
+            },
+            glory_render::Rect {
+                width,
+                height,
+                ..Default::default()
+            },
+        )?;
+        return Ok(Some(Position {
+            element: open.element.clone(),
+            x: resolved.x,
+            y: resolved.y,
+        }));
+    }
+    let Some(anchor) = named(dom, open.config.anchor.as_ref()) else {
+        return Ok(None);
+    };
+    let anchor = anchor.get_bounding_client_rect();
     if let LayerPlacement::ContextPoint(point) = open.config.placement {
         return Ok(Some(Position {
             element: open.element.clone(),
@@ -343,7 +331,18 @@ fn positions(dom: &Dom, stack: &[Open]) -> Result<(), Error> {
 pub(super) fn layout(dom: &Dom) -> Result<(), Error> {
     positions(dom, &dom.layers.borrow().stack)
 }
+pub(super) fn raise(dom: &Dom, id: NodeId) -> Result<(), Error> {
+    dom.document_layers.raise(dom, id)?;
+    let mut layers = dom.layers.borrow_mut();
+    if let Some(index) = layers.stack.iter().position(|entry| entry.id == id) {
+        let entry = layers.stack.remove(index);
+        layers.stack.push(entry);
+    }
+    drop(layers);
+    layout(dom)
+}
 pub(super) fn sync(dom: &Dom) -> Result<(), Error> {
+    dom.document_layers.prepare();
     // Native focus events may fire synchronously. Do not hold this borrow while
     // invoking a browser method; event callbacks see an empty temporary stack.
     let mut state = Working {
@@ -354,7 +353,6 @@ pub(super) fn sync(dom: &Dom) -> Result<(), Error> {
     for id in std::mem::take(&mut layers.lost_anchors) {
         dom.queue(id, Event::Dismiss(DismissReason::AnchorLost));
     }
-    restore_inert(layers);
     // Top-layer elements must carry effective inert themselves. The live
     // semantic index also covers boxless ancestry and inherited inert changes.
     for id in layers.declarations.keys() {
@@ -419,18 +417,14 @@ pub(super) fn sync(dom: &Dom) -> Result<(), Error> {
         }
         layers.stack.push(open);
     }
-    modal_inert(layers)?;
     positions(dom, &layers.stack)?;
-    let target = autofocus.or(restore).filter(focusable);
+    let target = autofocus.or(restore);
     drop(state);
-    if let Some(target) = target {
-        dom::focus(&target)?;
-    }
-    Ok(())
+    dom.document_layers.sync(target)
 }
 pub(super) fn clear(dom: &Dom) {
-    let mut layers = std::mem::take(&mut *dom.layers.borrow_mut());
-    restore_inert(&mut layers);
+    dom.document_layers.prepare();
+    let layers = std::mem::take(&mut *dom.layers.borrow_mut());
     let mut restore = None;
     let active = dom.document.active_element();
     for open in layers.stack.into_iter().rev() {
@@ -445,9 +439,8 @@ pub(super) fn clear(dom: &Dom) {
             let _ = popover(&open.element, "hidePopover");
         }
     }
-    if let Some(target) = restore.filter(focusable) {
-        let _ = dom::focus(&target);
-    }
+    dom.document_layers.unregister(dom);
+    let _ = dom.document_layers.sync(restore);
 }
 /// Actual mounted document traversal belongs to the host. Bound the physical
 /// walk, exclude the complete Menu tree, and never touch a business collection.
@@ -475,13 +468,17 @@ pub(super) fn exit_menu(dom: &Dom, id: NodeId, backwards: bool) -> Result<(), Er
     let trigger = bar.clone().unwrap_or(trigger);
     let boundary = context || bar.is_some();
     let scope = dom
-        .layers
-        .borrow()
-        .stack
-        .iter()
-        .rev()
-        .find(|open| open.config.modal && open.element.contains(Some(&trigger)))
-        .map(|open| open.element.clone())
+        .document_layers
+        .modal_scope()
+        .or_else(|| {
+            dom.layers
+                .borrow()
+                .stack
+                .iter()
+                .rev()
+                .find(|open| open.config.modal && open.element.contains(Some(&trigger)))
+                .map(|open| open.element.clone())
+        })
         .or_else(|| dom.document.body().map(Into::into))
         .ok_or(Error::Unsupported("menu exit document"))?;
     let mut pending = vec![scope];
@@ -543,13 +540,23 @@ pub(super) fn exit_menu(dom: &Dom, id: NodeId, backwards: bool) -> Result<(), Er
 pub(super) fn receive(dom: &Dom, name: &str, event: &web_sys::Event) -> Result<bool, Error> {
     if !matches!(
         name,
-        "keydown" | "focusin" | "pointerdown" | "click" | "scroll" | "resize"
+        "keydown"
+            | "focusin"
+            | "pointerdown"
+            | "click"
+            | "scroll"
+            | "resize"
+            | "wheel"
+            | "touchmove"
     ) {
         return Ok(false);
     }
     if !dom.live.get() || event.default_prevented() {
         return Ok(false);
     }
+    dom.document_layers.receive(name, event)
+}
+fn receive_local(dom: &Dom, name: &str, event: &web_sys::Event) -> Result<bool, Error> {
     let stack: Vec<_> = dom
         .layers
         .borrow()
@@ -595,16 +602,7 @@ pub(super) fn receive(dom: &Dom, name: &str, event: &web_sys::Event) -> Result<b
         .as_ref()
         .is_some_and(|node| top.element.contains(Some(node)));
     let modal = stack.iter().rev().find(|open| open.config.modal);
-    let inside_modal = modal.is_none_or(|modal| {
-        stack
-            .iter()
-            .skip_while(|open| open.id != modal.id)
-            .any(|open| {
-                target
-                    .as_ref()
-                    .is_some_and(|node| open.element.contains(Some(node)))
-            })
-    });
+    let inside_modal = dom.document_layers.allows(target.as_ref());
     let managed = stack
         .iter()
         .rev()
@@ -658,7 +656,7 @@ pub(super) fn receive(dom: &Dom, name: &str, event: &web_sys::Event) -> Result<b
             return Ok(true);
         }
         if key.key() == "Tab"
-            && modal.is_some()
+            && dom.document_layers.modal_scope().is_some()
             && !key.alt_key()
             && !key.ctrl_key()
             && !key.meta_key()

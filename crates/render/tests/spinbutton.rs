@@ -105,7 +105,7 @@ fn spin_events_are_independent_finite_exact_origin_commands_with_availability() 
             command: RangeCommand::Increase
         }
         .validate_payload(id, &node)
-        .is_err()
+        .is_ok()
     );
     node.semantics.as_mut().unwrap().readonly = true;
     assert!(node.validate().is_err());

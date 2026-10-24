@@ -19,7 +19,7 @@
     {
       "name": "blitz",
       "git": "https://github.com/glory-rs/blitz",
-      "rev": "fa10341fd05899041079b30ab66363f89ccf0404",
+      "rev": "7e0b5f85727da016285028f656a437d89ca10c46",
       "upstream": "https://github.com/DioxusLabs/blitz",
       "upstream_rev": "92b11f1bd8ab7975411328b0406a95a09445b4e7",
       "packages": [
@@ -73,6 +73,21 @@
           "system-fonts,complex-scripts,parallel-construct",
           "--lib",
           "image_observation_tests"
+        ],
+        [
+          "-p",
+          "blitz-dom",
+          "--no-default-features",
+          "--features",
+          "system-fonts,complex-scripts,parallel-construct,writing-mode",
+          "--lib"
+        ],
+        [
+          "-p",
+          "blitz-paint",
+          "--no-default-features",
+          "--test",
+          "top_layers"
         ]
       ]
     }

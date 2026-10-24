@@ -36,6 +36,9 @@ impl Renderer {
     pub fn paint(&self, scene: &mut impl anyrender::PaintScene) -> FrameInfo {
         scene.reset();
         let mut state = self.0.borrow_mut();
+        if let Err(error) = layers::sync(&mut state, &[]) {
+            state.input_error = Some(error);
+        }
         state.dom.resolve();
         let info = frame_info(&state);
         if info.width > 0 && info.height > 0 {

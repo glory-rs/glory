@@ -9,6 +9,17 @@ use crate::*;
 mod children;
 pub use children::Children;
 
+/// Current live Layer facets, including hidden/detached declarations. Physical
+/// hosts may open fewer; this shared admission bound prevents late host failure.
+pub const MAX_LAYERS: usize = 1024;
+
+fn layer(descriptor: DescriptorView<'_>) -> bool {
+    descriptor
+        .semantics
+        .as_ref()
+        .is_some_and(|s| s.layer.is_some())
+}
+
 #[derive(Clone, Debug)]
 pub struct Node {
     pub descriptor: LiveDescriptor,
@@ -49,6 +60,7 @@ pub struct Memory {
     inputs: Vec<Input>,
     receipt: Receipt,
     stats: Stats,
+    layers: usize,
 }
 
 /// One validated field update. Its descriptor is a borrowed view of the staged
@@ -70,6 +82,11 @@ impl PreparedPatch<'_> {
         self.inverse.as_ref().expect("uncommitted patch")
     }
     fn accept(&mut self) {
+        if let Some(Patch::Semantics(Change::Set(old))) = &self.inverse {
+            let old = old.as_ref().is_some_and(|s| s.layer.is_some());
+            let new = layer(self.descriptor());
+            self.tree.layers = self.tree.layers + usize::from(new) - usize::from(old);
+        }
         if let Some(Patch::Semantics(Change::Set(old))) = &self.inverse {
             let old = old.as_ref().and_then(|s| s.id.as_ref());
             let new = self.descriptor().semantic_id();
@@ -127,6 +144,7 @@ impl Memory {
             inputs: Vec::new(),
             receipt: Receipt::default(),
             stats: Stats::default(),
+            layers: 0,
         }
     }
 
@@ -192,6 +210,16 @@ impl Memory {
     pub fn retained_slots(&self) -> usize {
         self.generations.len()
     }
+    /// Numeric current declaration count; no source or historical layer scan.
+    pub fn layers(&self) -> usize {
+        self.layers
+    }
+    fn admit_layers(&self, additional: usize) -> Result<(), Error> {
+        if additional > MAX_LAYERS - self.layers {
+            return Err(Error::InvalidProps("live Layer budget exceeded"));
+        }
+        Ok(())
+    }
     pub fn stats(&self) -> Stats {
         self.stats
     }
@@ -218,6 +246,11 @@ impl Memory {
             inverse: Some(inverse),
             fields_before,
         };
+        if matches!(prepared.previous(), Patch::Semantics(Change::Set(old)) if !old.as_ref().is_some_and(|s| s.layer.is_some()))
+            && layer(prepared.descriptor())
+        {
+            prepared.tree.admit_layers(1)?;
+        }
         if matches!(patch, Patch::Role(_))
             && prepared.descriptor().role == Some(Role::Separator)
             && !prepared.tree.nodes[&id].children.is_empty()
@@ -345,9 +378,12 @@ impl Memory {
     /// Logical group disabling also applies before a host has committed markup.
     /// No source scan: only the live target and its ancestors are inspected.
     pub fn enabled(&self, id: NodeId) -> bool {
+        Self::enabled_in(&self.nodes, id)
+    }
+    fn enabled_in(nodes: &NodeMap<Node>, id: NodeId) -> bool {
         let mut cursor = Some(id);
         while let Some(id) = cursor {
-            let Ok(node) = self.node(id) else {
+            let Some(node) = nodes.get(&id) else {
                 return false;
             };
             if !node.descriptor.view().props.enabled()
@@ -494,6 +530,36 @@ impl Memory {
                         .filter(|origin| *origin != id)
                         .is_some_and(|origin| Self::inert_in(nodes, origin)))
         };
+        if let Event::GridNavigate { from, .. } = event {
+            let source = match get(*from) {
+                Ok(source) => source,
+                Err(Error::NodeGone(_)) => return Ok(false),
+                Err(error) => return Err(error),
+            };
+            event.validate_payload(id, &target.descriptor)?;
+            if !matches!(source.descriptor.view().props, Props::Button(_)) {
+                return Err(Error::InvalidEvent("grid origin must be a physical Button"));
+            }
+            if !Self::active_in(nodes, *from)
+                || !Self::active_in(nodes, id)
+                || !Self::enabled_in(nodes, *from)
+            {
+                return Ok(false);
+            }
+            let mut cursor = source.parent;
+            while let Some(current) = cursor {
+                let ancestor = get(current)?;
+                if ancestor.descriptor.view().role == Some(crate::Role::Grid) {
+                    return if current == id {
+                        Ok(interactive())
+                    } else {
+                        Err(Error::InvalidEvent("grid origin belongs to a nearer Grid"))
+                    };
+                }
+                cursor = ancestor.parent;
+            }
+            return Err(Error::InvalidEvent("grid origin is outside its target"));
+        }
         if let Event::Sheet { revision, .. } = event {
             event.validate_payload(id, &target.descriptor)?;
             if target
@@ -569,6 +635,7 @@ impl Memory {
             && matches!(
                 event,
                 Event::ValueChanged { .. }
+                    | Event::InputEdit(_)
                     | Event::Commit { .. }
                     | Event::CheckedChanged(_)
                     | Event::SelectChanged { .. }
@@ -899,6 +966,16 @@ impl Memory {
                 self.validate_name(&node.descriptor, None)?;
             }
         }
+        match child {
+            Subtree::New(descriptor) => self.admit_layers(usize::from(layer(descriptor)))?,
+            Subtree::Plan(plan) => self.admit_layers(
+                plan.nodes()
+                    .iter()
+                    .filter(|node| layer(node.descriptor.view()))
+                    .count(),
+            )?,
+            Subtree::Existing(_) => {}
+        }
         if form_ancestor && descriptor.field_part() == Some(crate::FieldPart::Form) {
             return Err(Error::InvalidPlacement("forms cannot be nested"));
         }
@@ -1094,12 +1171,19 @@ impl Memory {
                     }
                     self.validate_name(&node.descriptor, None)?;
                 }
+                self.admit_layers(
+                    plan.nodes()
+                        .iter()
+                        .filter(|node| layer(node.descriptor.view()))
+                        .count(),
+                )?;
                 for (index, node) in plan.nodes().iter().enumerate() {
                     // The immutable declaration checked content/topology once;
                     // the complete identity/name check above precedes mutation.
                     // Fresh nodes need no unlink, ancestor walk or temporary Box.
                     let id = ids[index];
                     let descriptor = LiveDescriptor::plan(plan, index);
+                    self.layers += usize::from(layer(descriptor.view()));
                     if let Some(name) = descriptor.view().semantic_id() {
                         self.names.insert(name.clone(), id);
                     }
@@ -1147,7 +1231,9 @@ impl Memory {
                 }
                 let mut descriptor = node.as_ref().clone();
                 self.validate_name(node.as_ref(), None)?;
+                self.admit_layers(usize::from(layer(node.view())))?;
                 descriptor.normalize_input()?;
+                self.layers += usize::from(layer(descriptor.view()));
                 if let Some(name) = descriptor.view().semantic_id() {
                     self.names.insert(name.clone(), *id);
                 }
@@ -1187,6 +1273,7 @@ impl Memory {
                 let mut pending = vec![*id];
                 while let Some(id) = pending.pop() {
                     let node = self.nodes.remove(&id).expect("owned subtree");
+                    self.layers -= usize::from(layer(node.descriptor.view()));
                     if let Some(name) = node.descriptor.view().semantic_id() {
                         self.names.remove(name);
                     }

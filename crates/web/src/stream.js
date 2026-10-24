@@ -5,7 +5,7 @@
   if (!globalThis.GloryStream) {
     const controllers = new Map(), notes = new WeakMap();
     const MAX_BYTES = 8 * 1024 * 1024, MAX_NODES = 100000;
-    const tags = new Set(['div', 'main', 'header', 'footer', 'nav', 'section', 'form', 'fieldset', 'legend', 'span', 'code', 'kbd', 'mark', 'blockquote', 'ol', 'ul', 'li', 'dl', 'dt', 'dd', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'button', 'input', 'textarea', 'select', 'label', 'img', 'a', 'svg', 'path']);
+    const tags = new Set(['div', 'main', 'header', 'footer', 'nav', 'section', 'form', 'fieldset', 'legend', 'span', 'code', 'kbd', 'mark', 'blockquote', 'ol', 'ul', 'li', 'dl', 'dt', 'dd', 'table', 'caption', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'button', 'input', 'textarea', 'select', 'label', 'img', 'a', 'svg', 'path']);
     const fail = message => { throw new Error(`Glory stream: ${message}`); };
     const key = value => {
       if (typeof value !== 'string' || !/^(0|[1-9][0-9]{0,19})$/.test(value) || BigInt(value) > 18446744073709551615n) fail('invalid key');
@@ -98,9 +98,10 @@
     class Controller {
       constructor(root, initial) {
         if (!(root instanceof Element) || root.namespaceURI !== 'http://www.w3.org/1999/xhtml' || !root.isConnected || controllers.has(root) || root.hasAttribute('data-gly-root') || !root.hasAttribute('data-gly-stream-pending')) fail('root already claimed or unavailable');
-        if (initial.version !== 2 || initial.html_version !== 6 || initial.kind !== 'start' || initial.sequence !== 0 || !Array.isArray(initial.nodes) || initial.nodes.length > MAX_NODES) fail('start envelope');
+        if (initial.version !== 2 || initial.html_version !== 8 || initial.kind !== 'start' || initial.sequence !== 0 || !Array.isArray(initial.nodes) || initial.nodes.length > MAX_NODES) fail('start envelope');
         if (typeof initial.data_id !== 'string' || !initial.data_id || initial.data_id === root.id) fail('data id');
         this.root = root; this.dataId = initial.data_id; this.entries = new Map(); this.layers = new Set(); this.composing = new Set(); this.sequence = 1; this.phase = 'active'; this.peak = 0;
+        this.translations = new Map(); this.translationFrame = null; this.translationMedia = null;
         this.first = root.firstChild; this.last = root.lastChild;
         if (this.first?.nodeValue !== 'gly:stream:2' || this.last?.nodeValue !== 'gly:/stream:2') fail('pending boundaries');
         const parts = new Map(), comments = new Map();
@@ -147,6 +148,7 @@
           } else this.createParts(entry);
           this.entries.set(id, entry);
           if (entry.parts.main?.hasAttribute('data-gly-layer')) this.layers.add(id);
+          this.trackTranslation(entry);
         }
         // Build only detached missing trees. Never replay Place/value setters
         // over the already parsed visible shell.
@@ -172,11 +174,56 @@
         }
         this.syncInert();
         this.peak = this.entries.size; controllers.set(root, this);
-        this.observer = new MutationObserver(() => { if (!root.isConnected) this.cancel(); });
-        this.observer.observe(document, { childList: true, subtree: true });
+        this.observer = new MutationObserver(() => { if (this.phase === 'ready' && (!root.isConnected || root.hasAttribute('data-gly-root'))) { this.releaseTranslations(); this.observer?.disconnect(); } else if (!root.isConnected) this.cancel(); });
+        this.observer.observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-gly-root'] });
         root.dataset.glyStreamState = 'active';
       }
       entry(id) { const entry = this.entries.get(key(id)); if (!entry) fail(`missing node ${id}`); return entry; }
+      trackTranslation(entry) {
+        const element=entry.parts.main, old=this.translations.get(entry.key);
+        if (!(element instanceof Element) || !element.hasAttribute('data-gly-translation')) {old?.animation?.cancel();if(old)delete old.element[Symbol.for('glory.preload.translation')];this.translations.delete(entry.key);return;}
+        const number=name=>{const text=element.getAttribute(`data-gly-translation-${name}`);const value=Number(text);if(text===null||text.trim()===''||!Number.isFinite(value)||Math.abs(value)>1000000)fail('translation coordinates');return value;};
+        const config={kind:element.getAttribute('data-gly-translation'),from:[number('from-x'),number('from-y')],to:[number('to-x'),number('to-y')],millis:number('duration'),paused:element.getAttribute('data-gly-translation-paused')};
+        if(!['loop','to'].includes(config.kind)||!['true','false'].includes(config.paused)||!Number.isInteger(config.millis)||(config.kind==='loop'?(config.millis<16||config.millis>60000):(config.millis<0||config.millis>2000))||!element.hasAttribute('inert'))fail('translation configuration');
+        config.paused=config.paused==='true';
+        if(old)old.config=config;else this.translations.set(entry.key,{element,config,accepted:null,animation:null});
+        this.scheduleTranslations();
+      }
+      scheduleTranslations() {
+        if(!this.translations.size)return;
+        if(!this.translationMedia){this.translationMedia=matchMedia('(prefers-reduced-motion: reduce)');this.translationChanged=()=>this.scheduleTranslations();this.translationMedia.addEventListener('change',this.translationChanged);}
+        if(this.translationFrame!==null)return;
+        this.translationFrame=requestAnimationFrame(()=>{this.translationFrame=null;try{this.readTranslations();}catch(error){this.phase='failed';this.release();throw error;}});
+      }
+      readTranslations() {
+        const reads=[];
+        for(const current of this.translations.values()) {
+          let enabled=!this.translationMedia.matches&&this.root.isConnected&&current.element.isConnected;
+          for(let node=current.element;enabled&&node&&node!==this.root;node=node.parentElement)enabled=!node.hasAttribute('data-gly-hidden')&&node.style.display!=='none';
+          const config=current.config,key=JSON.stringify(config);
+          if(current.accepted?.key===key&&current.accepted.enabled===enabled)continue;
+          const computed=getComputedStyle(current.element).transform;
+          reads.push({current,enabled,key,from:current.animation?computed:(current.accepted?.resting||computed),completed:config.kind==='to'&&current.animation?.currentTime>=config.millis});
+        }
+        for(const {current,enabled,key,from,completed} of reads) {
+          const previous=current.accepted,config=current.config;
+          const kind=JSON.stringify({...config,paused:false}),rest=config.kind==='loop'?config.from:config.to;current.accepted={key,kind,enabled,resting:`translate(${rest[0]}px,${rest[1]}px)`};
+          if(!enabled){current.animation?.cancel();current.animation=null;delete current.element[Symbol.for('glory.preload.translation')];continue;}
+          if(previous?.kind===kind&&previous.enabled){if(current.animation){if(config.paused)current.animation.pause();else if(!completed)current.animation.play();}continue;}
+          current.animation?.cancel();current.animation=null;
+          const transform=point=>`translate(${point[0]}px,${point[1]}px)`;
+          if(config.kind==='loop'&&(config.from[0]!==config.to[0]||config.from[1]!==config.to[1])||config.kind==='to'&&config.millis>0&&previous?.enabled){
+            current.animation=current.element.animate([{transform:config.kind==='loop'?transform(config.from):from},{transform:transform(config.to)}],{duration:config.millis,iterations:config.kind==='loop'?Infinity:1,fill:'both',easing:'linear'});
+            if(config.paused)current.animation.pause();
+            current.element[Symbol.for('glory.preload.translation')]=current.animation;
+          }
+        }
+      }
+      releaseTranslations() {
+        if(this.translationFrame!==null)cancelAnimationFrame(this.translationFrame);this.translationFrame=null;
+        if(this.translationMedia)this.translationMedia.removeEventListener('change',this.translationChanged);this.translationMedia=null;
+        for(const current of this.translations.values()){current.animation?.cancel();delete current.element[Symbol.for('glory.preload.translation')];}this.translations.clear();
+      }
       syncInert() {
         // Only current layer declarations and their semantic ancestors. Group
         // ranges are transparent; there is no visited-node or business history.
@@ -263,6 +310,7 @@
         }
         if (!entry.shape.pieces.length) entry.fragment.append(document.createComment(`gly:s:${entry.key}`), document.createComment(`gly:e:${entry.key}`));
         entry.first = entry.fragment.firstChild; entry.last = entry.fragment.lastChild;
+        this.trackTranslation(entry);
       }
       container(entry) {
         if (entry === null) return [this.root, this.last];
@@ -308,6 +356,7 @@
             else if (!dirty && !same(get(node,edit.name), expected)) put(node,edit.name,expected);
           } else fail('edit kind');
         }
+        this.trackTranslation(entry);
         if(entry.parts.main?.hasAttribute('data-gly-layer')) this.layers.add(entry.key); else this.layers.delete(entry.key);
       }
       apply(frame) {
@@ -344,15 +393,15 @@
               const actual = new Set(); const collect = node => { actual.add(node.key); for (const id of node.children) collect(this.entry(id)); }; collect(entry);
               if (!Array.isArray(op.subtree) || op.subtree.length !== actual.size || op.subtree.some(id => !actual.has(key(id)))) fail('dispose subtree');
               this.unlink(entry); for (const node of this.range(entry)) node.remove();
-              for (const id of actual) { for (const node of Object.values(this.entry(id).parts)) this.composing.delete(node); this.entries.delete(id); this.layers.delete(id); }
+              for (const id of actual) { for (const node of Object.values(this.entry(id).parts)) this.composing.delete(node); this.entries.delete(id); this.layers.delete(id); const motion=this.translations.get(id);motion?.animation?.cancel();this.translations.delete(id); }
             } else fail('operation');
           }
         }
-        this.syncInert(); this.sequence++;
+        this.syncInert(); this.scheduleTranslations(); this.sequence++;
         this.root.dispatchEvent(new CustomEvent('glory:stream-patch', { detail: { sequence: frame.sequence, nodes: this.entries.size } }));
       }
       validateEnd(frame) {
-        if (frame.html_version !== 6 || !Array.isArray(frame.rekey) || frame.rekey.length !== this.entries.size) fail('end keys/version');
+        if (frame.html_version !== 8 || !Array.isArray(frame.rekey) || frame.rekey.length !== this.entries.size) fail('end keys/version');
         const old = new Set(), next = new Set();
         for (const pair of frame.rekey) { if (!Array.isArray(pair) || pair.length !== 2 || old.has(key(pair[0])) || next.has(key(pair[1])) || !this.entries.has(pair[0])) fail('rekey'); old.add(pair[0]); next.add(pair[1]); }
         if (document.getElementById(this.dataId) || !frame.resources || frame.resources.version !== 1 || !Array.isArray(frame.resources.records) || frame.resources.records.length > 4096) fail('resource envelope/data id');
@@ -380,11 +429,11 @@
           if (!entry.shape.pieces.length) { entry.first.nodeValue = `gly:s:${next}`; entry.last.nodeValue = `gly:e:${next}`; }
         }
         const data = document.createElement('script'); data.id = this.dataId; data.type = 'application/json'; data.setAttribute('data-gly-resources', '1'); data.textContent = JSON.stringify(frame.resources);
-        this.root.after(data); this.first.nodeValue = 'gly:v:6'; this.last.nodeValue = 'gly:/v:6';
+        this.root.after(data); this.first.nodeValue = 'gly:v:8'; this.last.nodeValue = 'gly:/v:8';
         this.phase = 'ready'; this.root.removeAttribute('data-gly-stream-pending'); this.root.dataset.glyStreamState = 'ready';
         this.release(); this.root.dispatchEvent(new CustomEvent('glory:stream-ready', { detail: { dataId: this.dataId, peak: this.peak } }));
       }
-      release() { controllers.delete(this.root); this.observer?.disconnect(); if (this.eof) document.removeEventListener('DOMContentLoaded', this.eof); this.eof = null; this.entries.clear(); this.layers.clear(); this.composing.clear(); this.pendingEnd = null; }
+      release() { controllers.delete(this.root); if(this.phase!=='ready'||!this.translations.size){this.observer?.disconnect();this.releaseTranslations();} if (this.eof) document.removeEventListener('DOMContentLoaded', this.eof); this.eof = null; this.entries.clear(); this.layers.clear(); this.composing.clear(); this.pendingEnd = null; }
       cancel() { if (!['active'].includes(this.phase)) return; this.phase = 'cancelled'; this.root.dataset.glyStreamState = 'cancelled'; this.release(); }
     }
     globalThis.GloryStream = Object.freeze({

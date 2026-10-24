@@ -271,6 +271,7 @@ fn spinbutton_accesskit_preserves_exact_text_optional_coordinates_and_queues_num
     assert_eq!(node.data().value(), Some("1.00 exact"));
     assert!(node.data().supports_action(AxAction::Increment));
     assert!(!node.data().supports_action(AxAction::Decrement));
+    assert!(!action(&app, &request(target, AxAction::Decrement, None)).unwrap());
     assert!(action(&app, &request(target, AxAction::Increment, None)).unwrap());
     assert!(
         action(

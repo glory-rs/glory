@@ -36,13 +36,18 @@ fn text(edits: &mut Vec<Edit>, old: &str, new: &str) {
         });
     }
 }
-fn inline_style(style: &glory_render::style::Style, selectable: bool) -> String {
+fn inline_style(
+    style: &glory_render::style::Style,
+    selectable: bool,
+    translation: Option<glory_render::TranslationMotion>,
+) -> String {
     let mut value = if selectable {
         String::new()
     } else {
         "user-select:none;".to_owned()
     };
     value.push_str(&crate::style(style));
+    value.push_str(&crate::semantics::translation_style(translation));
     value
 }
 fn nonempty(value: &str) -> Option<&str> {
@@ -79,9 +84,14 @@ fn semantics(
     new: Option<&glory_render::Semantics>,
     old_role: Option<Role>,
     new_role: Option<Role>,
+    purpose: Option<glory_render::Purpose>,
 ) {
     let mut old = crate::semantics::attributes(old, old_role);
     let mut new = crate::semantics::attributes(new, new_role);
+    if let Some(mode) = purpose.and_then(crate::mapping::input_mode) {
+        old.entry("inputmode").or_insert_with(|| mode.into());
+        new.entry("inputmode").or_insert_with(|| mode.into());
+    }
     if old.contains_key("type") || new.contains_key("type") {
         old.entry("type").or_insert_with(|| "button".into());
         new.entry("type").or_insert_with(|| "button".into());
@@ -152,8 +162,9 @@ pub(crate) fn lower(next: glory_render::DescriptorView<'_>, inverse: &Patch) -> 
         Patch::Style(change) => {
             let old = old!(change);
             let selectable = !matches!(&next.props, Props::Text(text) if !text.selectable);
-            let old = inline_style(old, selectable);
-            let new = inline_style(next.style, selectable);
+            let translation = next.semantics.as_deref().and_then(|s| s.translation);
+            let old = inline_style(old, selectable, translation);
+            let new = inline_style(next.style, selectable, translation);
             attribute(
                 &mut edits,
                 Part::Main,
@@ -167,8 +178,9 @@ pub(crate) fn lower(next: glory_render::DescriptorView<'_>, inverse: &Patch) -> 
             let Props::Text(value) = &next.props else {
                 unreachable!()
             };
-            let old = inline_style(next.style, old);
-            let new = inline_style(next.style, value.selectable);
+            let translation = next.semantics.as_deref().and_then(|s| s.translation);
+            let old = inline_style(next.style, old, translation);
+            let new = inline_style(next.style, value.selectable, translation);
             attribute(
                 &mut edits,
                 Part::Main,
@@ -220,10 +232,36 @@ pub(crate) fn lower(next: glory_render::DescriptorView<'_>, inverse: &Patch) -> 
                 next.semantics.as_deref(),
                 old,
                 next.effective_role(),
+                match next.props {
+                    Props::Input(p) if !p.multiline => Some(p.purpose),
+                    _ => None,
+                },
             );
         }
         Patch::Semantics(change) => {
             let old = old!(change);
+            if old.as_deref().and_then(|s| s.translation)
+                != next.semantics.as_deref().and_then(|s| s.translation)
+            {
+                let selectable = !matches!(next.props, Props::Text(text) if !text.selectable);
+                let before = inline_style(
+                    next.style,
+                    selectable,
+                    old.as_deref().and_then(|s| s.translation),
+                );
+                let after = inline_style(
+                    next.style,
+                    selectable,
+                    next.semantics.as_deref().and_then(|s| s.translation),
+                );
+                attribute(
+                    &mut edits,
+                    Part::Main,
+                    "style",
+                    nonempty(&before),
+                    nonempty(&after),
+                );
+            }
             let old_role = glory_render::DescriptorView {
                 semantics: old,
                 ..next
@@ -236,6 +274,10 @@ pub(crate) fn lower(next: glory_render::DescriptorView<'_>, inverse: &Patch) -> 
                 next.semantics.as_deref(),
                 old_role,
                 next.effective_role(),
+                match next.props {
+                    Props::Input(p) if !p.multiline => Some(p.purpose),
+                    _ => None,
+                },
             );
         }
         Patch::Focus(change) => {
@@ -447,8 +489,18 @@ pub(crate) fn lower(next: glory_render::DescriptorView<'_>, inverse: &Patch) -> 
                     &mut edits,
                     control,
                     "inputmode",
-                    crate::mapping::input_mode(old),
-                    crate::mapping::input_mode(input.purpose),
+                    next.semantics
+                        .as_ref()
+                        .and_then(|s| s.input_assist)
+                        .and_then(|a| a.mode)
+                        .map(|m| m.as_str())
+                        .or_else(|| crate::mapping::input_mode(old)),
+                    next.semantics
+                        .as_ref()
+                        .and_then(|s| s.input_assist)
+                        .and_then(|a| a.mode)
+                        .map(|m| m.as_str())
+                        .or_else(|| crate::mapping::input_mode(input.purpose)),
                 );
             }
         }

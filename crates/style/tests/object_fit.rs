@@ -35,7 +35,7 @@ fn image_fit_values_have_independent_acceptance_and_valid_defaults() {
             })
         );
     }
-    assert_eq!((Profile::HTML.version, Profile::RECORD.version), (9, 9));
+    assert_eq!((Profile::HTML.version, Profile::RECORD.version), (10, 10));
 }
 
 #[cfg(feature = "css")]

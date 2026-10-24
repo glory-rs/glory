@@ -96,6 +96,7 @@ impl Tree {
         while let Some((id, parent, list)) = pending.pop() {
             let semantic = state.mapper.tree().node(id)?;
             if semantic.suspended
+                || !state.layers.ax_branch(state.mapper.tree(), id)
                 || semantic
                     .descriptor
                     .view()
@@ -106,6 +107,16 @@ impl Tree {
                 continue;
             }
             let d = semantic.descriptor.view();
+            if !state.layers.allowed(state.mapper.tree(), id) {
+                pending.extend(
+                    semantic
+                        .children
+                        .iter()
+                        .rev()
+                        .map(|child| (*child, parent, list)),
+                );
+                continue;
+            }
             if matches!(d.props, Props::Group) {
                 pending.extend(
                     semantic
@@ -173,6 +184,53 @@ impl Tree {
                 node.set_disabled();
             }
             if let Some(s) = &d.semantics {
+                if s.layer.as_ref().is_some_and(|layer| layer.modal) {
+                    node.set_modal();
+                }
+                if let Some(sort) = s.sort {
+                    use glory_render::SortDirection;
+                    match sort {
+                        SortDirection::None => {}
+                        SortDirection::Ascending => {
+                            node.set_sort_direction(accesskit::SortDirection::Ascending)
+                        }
+                        SortDirection::Descending => {
+                            node.set_sort_direction(accesskit::SortDirection::Descending)
+                        }
+                    }
+                }
+                if let Some(table) = &s.table {
+                    use glory_render::TableMetadata;
+                    match table {
+                        TableMetadata::Table { rows, columns } => {
+                            if let Some(rows) = rows.filter(|rows| *rows <= i32::MAX as u32) {
+                                node.set_row_count(rows as usize);
+                            }
+                            if let Some(columns) = columns {
+                                node.set_column_count(usize::from(*columns));
+                            }
+                        }
+                        TableMetadata::Row { index } => {
+                            if *index < i32::MAX as u32 {
+                                node.set_row_index(*index as usize);
+                            }
+                        }
+                        TableMetadata::Cell {
+                            row,
+                            column,
+                            row_span,
+                            column_span,
+                            ..
+                        } => {
+                            if *row < i32::MAX as u32 {
+                                node.set_row_index(*row as usize);
+                            }
+                            node.set_column_index(usize::from(*column));
+                            node.set_row_span(usize::from(*row_span));
+                            node.set_column_span(usize::from(*column_span));
+                        }
+                    }
+                }
                 if let Some(spin) = &s.spinbutton {
                     if let Some(min) = spin.min {
                         node.set_min_numeric_value(min);
@@ -225,6 +283,7 @@ impl Tree {
                         glory_render::Current::Page => accesskit::AriaCurrent::Page,
                         glory_render::Current::Step => accesskit::AriaCurrent::Step,
                         glory_render::Current::Location => accesskit::AriaCurrent::Location,
+                        glory_render::Current::Date => accesskit::AriaCurrent::Date,
                     });
                 }
                 if s.required {
@@ -475,7 +534,39 @@ impl Tree {
                     .filter(|target| nodes.contains_key(target))
             };
             let controls = s.controls.as_ref().and_then(resolve);
-            let label = s.labelled_by.as_ref().and_then(resolve);
+            let label = s.labelled_by.as_ref().and_then(resolve).or_else(|| {
+                if d.name.is_some() || d.document_part() != Some(glory_render::DocumentPart::Table)
+                {
+                    return None;
+                }
+                // HTML tables receive their intrinsic name from a live caption.
+                // Cross only transparent Groups; row contents are not captions.
+                let mut pending = state
+                    .mapper
+                    .tree()
+                    .node(*id)
+                    .ok()?
+                    .children
+                    .iter()
+                    .copied()
+                    .collect::<Vec<_>>();
+                while let Some(child) = pending.pop() {
+                    let child_node = state.mapper.tree().node(child).ok()?;
+                    let descriptor = child_node.descriptor.view();
+                    if matches!(descriptor.props, Props::Group) {
+                        pending.extend(child_node.children.iter().rev().copied());
+                    } else if descriptor.document_part()
+                        == Some(glory_render::DocumentPart::TableCaption)
+                    {
+                        return self
+                            .ids
+                            .get(&Key::Main(child))
+                            .copied()
+                            .filter(|target| nodes.contains_key(target));
+                    }
+                }
+                None
+            });
             let description = s.described_by.as_ref().and_then(resolve);
             let error = s
                 .error_message
@@ -485,7 +576,25 @@ impl Tree {
             // Consumer naming does not recurse through a structural Label or
             // a generic description wrapper. Derive text from exported live
             // content only; never read editor values (especially passwords).
-            let label_text = label.and_then(|target| relation_text(&nodes, target));
+            let label_text = label
+                .and_then(|target| relation_text(&nodes, target))
+                .or_else(|| {
+                    if matches!(
+                        d.role,
+                        Some(Role::Cell | Role::ColumnHeader | Role::GridCell)
+                    ) || matches!(
+                        d.document_part(),
+                        Some(
+                            glory_render::DocumentPart::ColumnHeader
+                                | glory_render::DocumentPart::RowHeader
+                                | glory_render::DocumentPart::TableCell
+                        )
+                    ) {
+                        relation_text(&nodes, *ax_id)
+                    } else {
+                        None
+                    }
+                });
             let mut description_text = description.and_then(|target| relation_text(&nodes, target));
             if let Some(error) = error.and_then(|target| relation_text(&nodes, target)) {
                 if let Some(description) = &mut description_text {
@@ -515,9 +624,9 @@ impl Tree {
                 }
                 if let Some(target) = relation.label {
                     node.set_labelled_by(vec![target]);
-                    if let Some(text) = relation.label_text {
-                        node.set_label(text);
-                    }
+                }
+                if let Some(text) = relation.label_text {
+                    node.set_label(text);
                 }
                 if let Some(target) = relation.description {
                     node.set_described_by(vec![target]);
@@ -574,6 +683,7 @@ impl Tree {
         }
         let d = state.mapper.tree().node(id)?.descriptor.view();
         if !state.mapper.tree().enabled(id)
+            || !state.layers.allowed(state.mapper.tree(), id)
             || d.readonly() && matches!(request.action, AxAction::SetValue | AxAction::Click)
         {
             return Ok(false);
@@ -600,6 +710,16 @@ impl Tree {
                     }
                     _ => unreachable!(),
                 };
+                let spin = d
+                    .semantics
+                    .as_ref()
+                    .and_then(|s| s.spinbutton.as_ref())
+                    .expect("spin action branch");
+                if matches!(command, glory_render::RangeCommand::Increase) && !spin.can_increase
+                    || matches!(command, glory_render::RangeCommand::Decrease) && !spin.can_decrease
+                {
+                    return Ok(false);
+                }
                 let event = Event::Spin { from: id, command };
                 event.validate_payload(id, d)?;
                 state.inputs.push(Input::Event { node: id, event });
@@ -813,6 +933,15 @@ fn role(d: glory_render::DescriptorView<'_>) -> AxRole {
             glory_render::DocumentPart::DescriptionList => AxRole::DescriptionList,
             glory_render::DocumentPart::Term => AxRole::Term,
             glory_render::DocumentPart::Definition => AxRole::Definition,
+            glory_render::DocumentPart::Table => AxRole::Table,
+            glory_render::DocumentPart::TableCaption => AxRole::Caption,
+            glory_render::DocumentPart::TableHead
+            | glory_render::DocumentPart::TableBody
+            | glory_render::DocumentPart::TableFoot => AxRole::RowGroup,
+            glory_render::DocumentPart::TableRow => AxRole::Row,
+            glory_render::DocumentPart::ColumnHeader => AxRole::ColumnHeader,
+            glory_render::DocumentPart::RowHeader => AxRole::RowHeader,
+            glory_render::DocumentPart::TableCell => AxRole::Cell,
         };
     }
     if let Some(part) = d.field_part() {
@@ -853,6 +982,8 @@ fn role(d: glory_render::DescriptorView<'_>) -> AxRole {
             Some(Role::Status) => AxRole::Status,
             Some(Role::Alert) => AxRole::Alert,
             Some(Role::Table) => AxRole::Table,
+            Some(Role::Grid) => AxRole::Grid,
+            Some(Role::GridCell) => AxRole::GridCell,
             Some(Role::Row) => AxRole::Row,
             Some(Role::ColumnHeader) => AxRole::ColumnHeader,
             Some(Role::Cell) => AxRole::Cell,

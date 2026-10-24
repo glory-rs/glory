@@ -210,8 +210,16 @@ impl Renderer {
                 return;
             }
             state.dom.motion.preference = preference;
+            state.dom.translations.preference = preference;
+            let State { mapper, dom, .. } = &mut *state;
+            if let Err(error) = dom.sync_translations(mapper.tree(), &[]) {
+                state.input_error.get_or_insert(error);
+            }
             state.dom.resolve();
-            if state.dom.motion.candidates.is_empty() && state.dom.motion.transitions.is_empty() {
+            if state.dom.motion.candidates.is_empty()
+                && state.dom.motion.transitions.is_empty()
+                && state.dom.translations.is_empty()
+            {
                 None
             } else {
                 state.dom.invalidate_pixels();

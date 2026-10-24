@@ -121,6 +121,75 @@ fn current_page_and_step_are_accesskit_locations_independent_of_selection() {
 }
 
 #[test]
+fn grid_cells_expose_real_grid_selection_coordinates_and_today_independently() {
+    use glory_render::{Direction, TableMetadata};
+    let host = WindowApp::new();
+    let selected = host.app.scope().cage(true);
+    host.mount(
+        view()
+            .role(Role::Grid)
+            .name("February 2024")
+            .semantics(Some(Box::new(Semantics {
+                grid_navigation: Some(Direction::Ltr),
+                table: Some(TableMetadata::Table {
+                    rows: Some(6),
+                    columns: Some(7),
+                }),
+                ..Default::default()
+            })))
+            .fill(
+                view().role(Role::Row).fill(
+                    view()
+                        .role(Role::GridCell)
+                        .semantics(host.app.scope().bond(move || {
+                            Some(Box::new(Semantics {
+                                selected: Some(selected.get()),
+                                table: Some(TableMetadata::Cell {
+                                    row: 4,
+                                    column: 3,
+                                    row_span: 1,
+                                    column_span: 1,
+                                    headers: vec![],
+                                }),
+                                ..Default::default()
+                            }))
+                        }))
+                        .fill(
+                            button()
+                                .label("29")
+                                .name("Thursday, February 29, 2024")
+                                .semantics(Some(Box::new(Semantics {
+                                    current: Some(Current::Date),
+                                    ..Default::default()
+                                }))),
+                        ),
+                ),
+            ),
+    )
+    .unwrap();
+    let mut tree = Consumer::new(build(&host, true), true);
+    let all = nodes(&tree);
+    let grid = all.iter().find(|n| n.role() == AxRole::Grid).unwrap();
+    assert_eq!(grid.data().row_count(), Some(6));
+    assert_eq!(grid.data().column_count(), Some(7));
+    let cell = all.iter().find(|n| n.role() == AxRole::GridCell).unwrap();
+    assert_eq!(cell.data().is_selected(), Some(true));
+    assert_eq!(cell.data().row_index(), Some(4));
+    assert_eq!(cell.data().column_index(), Some(3));
+    assert!(all.iter().any(|n| n.role() == AxRole::Button
+        && n.data().aria_current() == Some(accesskit::AriaCurrent::Date)
+        && n.data().is_selected().is_none()));
+    drop(all);
+    selected.revise(|v| *v = false);
+    tree.update_and_process_changes(build(&host, false), &mut Changes);
+    assert!(
+        nodes(&tree)
+            .iter()
+            .any(|n| n.role() == AxRole::GridCell && n.data().is_selected() == Some(false))
+    );
+}
+
+#[test]
 fn clipped_zero_sized_text_remains_an_accessible_description_and_button_name() {
     use glory_render::{
         SemanticId,

@@ -4,6 +4,13 @@
 
 第三方代码维护已按2026-10-23用户要求改为glory-rs组织fork及完整Git revision，见[引擎依赖维护](engine-forks.md)。仓库中不保留vendor。下文早期本地源码目录、包名和校验脚本是当时的历史记录，已被当前Git依赖及scripts/check-engine-forks.py替代，不是当前复现入口。
 
+2026-10-24 原生 viewport top-layer 扩展已由 genuine Blitz fork、driver 和独立实际
+consumer 验证：Dialog/AlertDialog Manage、非 modal Dialog Preserve、十二种锚点定位、
+modal 焦点/AX/滚动及关闭清理均有证据。全部 native targets 195 通过计数/45 结果报告
+（含零测试 examples；库 93 通过/2 忽略）及严格 Clippy 通过，记录在
+`D:/BuildCache/sapid/native-layers-final-all.log` 和 `native-layer-final-clippy.log`。
+有限能力边界、完整 fork SHA 和复现见 [native-top-layers.md](native-top-layers.md)。
+
 ## 完整交付范围
 
 - [ ] R0：八组件、内容模型、类型化 Patch、生命周期、事件、查询屏障与能力错误契约。样式profile、基础目标/内容扩展、事件几何/来源、批处理恢复，以及输入版本/规范值已接入；原生Password呈现、其余props、焦点回读和结构预检等审计仍待完成，见组件契约审计。Portable stylesheet尚未提供；按报告v4，在声明该能力前完成文本校验，不作为HTML首发的隐含能力。
@@ -2172,3 +2179,16 @@ glory-web 当前仍有 validate_children 的既有 dead_code warning。Windows �
 新增真实 Props::Select、不可变有界 options/optgroups、独立选择 key/revision 补丁与事件；UI setter 从 live revision 分配，Memory guard 只交换 selection，HTML full-shape differential oracle 覆盖默认/Keep/Clear/相等写入。业务 value 与 key 分离，空 single 用内部禁用隐藏占位项，readonly 和 FormControl.value 对 Select 明确拒绝。Web 构造原生子节点并读写真实 selectedness；采用先验证全部子树再回放 dirty 状态。Blitz preflight/direct 明确拒绝并保留成功前缀/query 水位。
 
 这是有意破坏的格式升级：HTML FORMAT_VERSION=4，classic stream start/patch/end envelope=2、边界 stream:2、End 回交 v4；资源 envelope 维持1。新增 typed options/selectedKeys wire，旧版先拒绝、不兼容。现有手写 choices/menu/hints、Glory semantic-web/snapshot/transport 的当前格式常量同步迁移。Graphic 的 svg/path 与两个显式 camelCase 属性共同进入当前有限格式。具体 API/预算/证据见 Sapid docs/native-select-implementation.md；浏览器最终结果在该文档记录。
+
+### 2026-10-24：Popover 有限锚点定位与 HTML v6
+
+当前 FORMAT_VERSION=6；此前 v4/v5 记录保留为历史。AnchorPlacement 用显式物理
+side、align、gap、viewport_padding、flip、shift 取代四个旧 Anchor 枚举，不保留别名。
+纯几何 resolver 由 Web 宿主复用，并保留嵌套浮层的父位移拓扑计算。六项 HTML 属性
+与 prepared-field lowering/full-shape oracle 一致。Classic envelope 保持2，Start/End
+都严格携带 HTML6，旧 Start 在控制器注册及 DOM 写入前失败。
+Memory 通过活 name index 与祖先判断锚点可用性；缺失关系允许晚绑定，失效后的
+AnchorLost 请求在直达 App/参考队列中重新校验。Web 抑制失效锚点的实际层，受控
+拒绝不保留悬空可交互浮层。Sapid trigger/close slots 保持真实 Button；不扩大
+native 能力声明。十三组 Chromium148 实际几何/AX/adoption/stream 验收见
+Sapid docs/popover.md；跨 App modal 协调和原生引擎浮层仍继续实施。

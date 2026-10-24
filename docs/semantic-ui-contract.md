@@ -67,6 +67,7 @@ Password preedit 只在圆点区间标记组合状态/下划线；不将原始 p
 |---|---|---|
 | Activate | 所有节点，含 group | 最近逻辑 handler；disabled 祖先阻止激活 |
 | ValueChanged / Commit / Composition | input | 直接输入控件 |
+| InputEdit | 显式配置 input_edit 的单行 input | 有界值/真实选区/有限编辑意图；与宿主 ValueChanged 路径二选一 |
 | CheckedChanged | check | 直接复选控件 |
 | FocusChanged | 有物理表示的节点；不含 group | 直接焦点来源 |
 | FocusWithin | 所有节点，含 group | App 从 FocusChanged 沿逻辑祖先派生 |
@@ -104,6 +105,40 @@ App对主目标已失效的迟到事件仍直接丢弃；Memory显式push_event�
 ValueChanged和Commit { value, revision }都携带产生输入时的程序屏障：小于当前版本丢弃，大于当前版本报InputRevision，等于当前版本才可进入回调。Commit不再使用无版本tuple。终止composition/focus清理不因旧程序值而被屏蔽。SSR接管创建新Runtime/NodeId与版本，不能把服务器计数器当客户端身份；dirty输入带客户端接受时的版本。
 
 Web读值时修复非规范主机文本并保留UTF-16选区；正常规范值不写回DOM。hydration验证阶段只计算规范观察，整个形状验证成功后才修复值，不让后续节点错误破坏先前输入。规范等价程序回写只确认版本，保留选区/preedit；原生输入的UTF-8游标偏移由共用规则转换。
+
+### 可选有界编辑与精确 ASCII 选区
+
+`Semantics.input_edit: Option<InputEditCapture>` 是单行 Input 的显式 opt-in，
+`max_bytes` 必须为 1..=4096，当前程序值也受同一预算约束。它拒绝与
+combobox、tags_input 或 spinbutton 编辑协议叠加。未配置的普通 Input 保持
+ValueChanged/Commit 协议，配置后每个宿主编辑只产生 InputEdit，不先产生
+旧 ValueChanged。上层控件内部映射和 typed 回调应先于其 generic 观察者。
+
+`InputEdit::Value` 携带规范单行文本、当前 revision、UTF-16 after selection
+及 None/Forward/Backward direction、可选 immediately-before selection 和
+Insert/DeleteBackward/DeleteForward/Replace 意图，以及 composing 状态。
+只保留当前 before 记录；没有输入历史。超过预算或无法读到真实选区时，
+宿主发送不带原文的有限 Rejected 原因；Web 在从 JS 转换字符串之前先检查
+长度，原生在复制编辑器文本之前检查预算。小于当前 revision 静默丢弃，
+未来版本报错；Owner 退休不能恢复旧编辑。
+
+单行 Enter 在普通表单同步需要时排 ValueChanged，再排 Commit，最后排
+祖先 Form 的 Keyboard::Submit。opt-in 输入对应排 InputEdit、Commit、Submit，
+不会截断 Form 默认路由。多行、组合状态及 modifier 策略不因此改变。
+
+`Action::SelectText { node, revision, selection }` 与
+`Scope::set_input_selection` 只接受真实 Input，并要求 input capability、
+存活身份、精确当前程序 revision 和有序范围。当前 Web/Blitz 实现明确仅接受
+ASCII 程序值（因此 UTF-8/UTF-16 边界一致）；非 ASCII 选区返回 Unsupported，
+不把近似字素边界当精确支持。readonly 输入仍可选择。SSR/无输入驱动的
+参考宿主明确拒绝。执行时再次校验当前物理值/组合状态及宿主能力；已被
+较新程序值替代的 queued action 被跳过，不能改变新输入的光标。
+
+Sapid MaskInput 在这一有限协议上实现 raw/display 映射、同 tick 当前物理
+草稿、受控拒绝和终止 composition 一次映射。普通规范编辑的等值确认不重写
+物理文本；只有实际格式变化才写文本并恢复映射选区。原生实际 key/IME
+协议、ASCII 双向选区、36 项既有输入回归及 Chromium148 四主题 CSR/水合
+Mask 12 项已验收；这些不证明实际 OS IME 或 Unicode 字素选择能力。
 
 ## 查询、动作与能力
 
@@ -432,15 +467,31 @@ Web 在构造时检测 top-layer API，并在不支持时于描述符预检及�
 支持时保留常规批量 mapper 路径。viewport scroll/resize 仅标记并唤醒，布局读在
 宿主观测边界合并。SSR 生成具名但未激活的浮层，成功 hydration 后才展示并管理
 焦点；失败验证不激活浮层。现有 HTML edits/stream 格式不变，WASM 接管前不提供
-浮层交互。当前每个 WebApp 管理自己的栈，多 App 文档应指定一个浮层所属 App；
-跨 App 栈、移动 visual viewport、动画与手势关闭仍未实现。
+浮层交互。Document 级弱 registry 统一最多 64 个存活 App 的当前浮层 lease，
+跨 App modal 焦点、Escape/Tab、背景 inert 和 viewport 滚动锁同属当前最上层。
+关闭较低 modal 不打断上层焦点；最后关闭时按原值和优先级恢复滚动样式，同时保留
+期间作者的新写入。registry 不持有 App，也不保留已关闭浮层历史。
 
-Blitz beta.4 没有 top layer 的物理实现，因此在 preflight 和 direct apply 中明确
-拒绝 Layer；逐操作拒绝仍保留成功前缀的 receipt/query 水位。该范围不等于新增原生
-浮层、实际 OS IME 或屏幕阅读器验收。Sapid 的三个浮层组件共用这些语义，浏览器
-验收与复现入口在同级 sapid 的 scripts/check.ps1 和 overlay-acceptance.js。
+Blitz genuine fork 的 viewport top layer 保留 DOM/Stylo 祖先，独立布局并最后绘制、
+逆序命中；不通过 portal 或改变逻辑父链模拟。适配器已支持 Dialog/AlertDialog 的
+Manage modal/nonmodal，以及非 modal Dialog 的 Preserve。Center 和全部十二种
+AnchorPlacement 使用相同有限几何策略。Preserve 不自动聚焦、圈定 Tab 或返回焦点。
+modal 允许自身与由当前 live anchor 关联的后续 popup，阻止其他背景操作和 AX action；
+非 modal outside 关闭保留用户实际点击的焦点。原生当前仍明确拒绝 Menu/Tooltip/
+Listbox/Group Layer、sheet、ContextPoint 和 Layer 自身 Translation；预检与逐操作
+apply 一致，失败保留成功前缀 receipt/query 水位。引擎、driver 和真实 Sapid consumer
+测试分别记录在 [native-top-layers.md](native-top-layers.md)。这不等于 OS 屏幕阅读器验收。
 
 ## 字段与原生标签（2026-10-24）
+
+HTML format v8 adds `LayerPlacement::Viewport(ViewportPlacement)` with four
+independently serialized fields: finite x/y within ±1,000,000 CSS px, viewport
+padding within 0..=4096 CSS px, and an explicit constrain boolean. It belongs
+only to an unanchored Dialog. A shared pure resolver preserves panel dimensions,
+optionally clamps its position and starts oversized panels at the padded edge.
+Web and native use that same policy. Classic envelope remains v2; Start and End
+both require HTML8. Version7 and missing-version data fail before registration or
+DOM mutation, and failed snapshot adoption leaves the original root intact.
 
 `Semantics::field_part` 提供有限的 Label、Fieldset、Legend；它们只属于无显式 role、
 无 focus 的结构 View。HTML 对应真实 label/fieldset/legend，节点生命周期内不可通过
@@ -481,7 +532,7 @@ readonly input 配合宿主事件保护；readonly Check 在默认切换前阻�
 
 ## NativeSelect 与当前 HTML/stream 格式（2026-10-24）
 
-当前 HTML 映射/SSR Snapshot 为 **v6**，classic stream envelope 为 **v2**；上文 v3 与下述 NativeSelect v4 段落记录此前格式扩展。资源种子 envelope 仍独立为 v1。旧 Snapshot v3 和 stream v1 不提供兼容别名：采用/启动首先拒绝旧版本，不修改根子树。
+当前 HTML 映射/SSR Snapshot 为 **v7**，classic stream envelope 为 **v2**；上文 v3 与下述 NativeSelect v4、Anchor v6 段落记录此前格式扩展。资源种子 envelope 仍独立为 v1。旧 Snapshot v3 和 stream v1 不提供兼容别名：采用/启动首先拒绝旧版本，不修改根子树。
 
 `Props::Select(SelectProps)` 是真正原生选择控件，不是给 View 增加角色。静态选项声明通过 Rc 共享：最多 1024 options、32 optgroups（不嵌套）、单 key 64 ASCII 字节、label 256 字节、业务 value 4096 字节，总声明 128KiB。keys 与成功表单 values 分开；业务 values 可以重复或为空。选项接收端应在收集前限制为预算加一，外部受控状态必须先借用校验再克隆。
 
@@ -591,5 +642,41 @@ flip/shift=true；所有六项独立映射为 data-gly-anchor-* 属性，构造�
 SSR/CSR/adoption 与 classic stream 形状一致。旧 AnchorStart/End/Left/Right 不保留别名。
 纯几何 resolver 在 requested/opposite 两侧比较溢出，只有更少溢出才翻转；shift=true
 将两轴限制在视口内边距，超大浮层靠近起始边界。它不扫描业务源、不移动焦点。
-Classic envelope 仍为 v2，Start 和 End 均携带且严格检查 html_version=6；旧 Start 在
+Classic envelope 仍为 v2，Start 和 End 均携带且严格检查 html_version=7；旧 Start 在
 创建控制器或写 DOM 前失败。旧 Snapshot 也在采用前失败。
+
+## 有限 paint-only Translation（HTML v7）
+
+`Semantics.translation: Option<TranslationMotion>` 是独立的有限 presentation 声明，
+不占 Style support bit，也不新增业务输入或完成事件。它只允许 inert、无名称、
+无显式 role/focus 的独立 View，不能同时声明 Layer、Collapse、Drag 或文档/表单结构。
+两轴端点各限定 ±1,000,000 CSS px；Loop 周期为 16..=60,000ms，To 时长为
+0..=2,000ms。所有端点、时间和组合关系由 construction、prepared patch 与 direct
+apply 共用验证；旧/未知结构不保留兼容别名。
+
+静态 HTML 的 inline transform 直接输出 Loop 的 from 或 To 的 target，不依赖 CSS
+attr() 支持；finite 配置另有完整 data 属性。Semantics 和 Style 字段补丁共同保留
+静态 transform，与 full-shape oracle 一致。第一次 To 静态呈现，随后改变目标从当前
+物理位置采样；Loop 更换端点从新 from 开始。同值声明不重启，paused 保留当前相位。
+Clear 取消当前动画并交还普通样式控制；隐藏、退休和 Reduce 取消当前接受，To 归 target、
+Loop 归 from。重现不补放 To 进入动画；恢复 Loop 从 from 开始。
+
+Web 每个 live 声明仅持有一个当前 WAAPI 对象，所有 computed-style 读取先于该批
+animation 写入。MediaQueryList 回调只请求 host 观察，不调用业务代码。classic stream
+拥有等价的当前控制器；End 后可在当前物理根上继续运动，采用/根退休撤销当前对象、
+RAF 和偏好监听器，不保留旧路径或已访问节点。WASM 经完整采用验证后释放对应 preload
+动画。此协议没有可迟到的业务终态，因此不暴露 revision，也不保留 revision 历史。
+
+Blitz 用文档私有、仅含当前规则的 stylesheet 驱动真实 CSS transform 动画，复用
+Renderer.advance_time 的宿主时钟和 visual revision；不逐帧写 Cage 或重建 App 树。
+beta.4 的原始 get_client_bounding_rect 不含 CSS transform；typed 查询针对自身及当前
+平移祖先加上同一时刻的有限 offset，祖先 scroll 保持由引擎计算，不重复补偿。
+返回未裁剪的 translated border box，与 Web Bounds 定义一致；不扩大任意 author CSS
+transform 的承诺。默认 native Reduce 仍由显式 Config 偏好决定，无 OS 自动同步声明。
+
+已通过 pure phase、render guard/rollback、HTML oracle、同步/stream SSR，以及 native
+真实像素、嵌套 Bounds、scroll 单次补偿、clip、opacity、pause/interrupt/Clear/Reduce
+与静态文本唯一 AX 回归。Chromium148 同源 web26 九项 actual 已通过：四主题 CSR/
+adoption、真实中间位移、当前 Bounds、暂停/中断/Clear、动态 Reduce、焦点/选择保留，
+以及 Rust classic stream End 后继续运动、偏好变化与根退休。原始报告位于
+`D:/BuildCache/sapid/translation-browser-web26.json`。这些证据不替代 OS 读屏验收。

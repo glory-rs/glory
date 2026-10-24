@@ -205,6 +205,29 @@ fn named_anchor_loss_and_late_binding_use_current_ancestry_not_slot_or_history()
         }])
         .unwrap();
     assert!(memory.layer_anchor_live(panel));
+    memory
+        .apply(&[Mutation::Patch {
+            id: anchor,
+            patch: Patch::Style(Change::Set(Box::new(
+                style::Style::new().display(style::Display::None),
+            ))),
+        }])
+        .unwrap();
+    assert!(!memory.layer_anchor_live(panel));
+    memory.push_event(panel, loss.clone()).unwrap();
+    memory
+        .apply(&[Mutation::Patch {
+            id: anchor,
+            patch: Patch::Style(Change::Clear),
+        }])
+        .unwrap();
+    let mut queued = Vec::new();
+    memory.drain(&mut queued);
+    assert!(
+        queued.is_empty(),
+        "restoring an anchor revokes an already queued loss"
+    );
+    assert!(memory.layer_anchor_live(panel));
     let mut hidden = Descriptor::new(Props::View);
     hidden.semantics = Some(Box::new(Semantics {
         hidden: true,
@@ -227,6 +250,16 @@ fn named_anchor_loss_and_late_binding_use_current_ancestry_not_slot_or_history()
                 before: None,
             },
         ])
+        .unwrap();
+    assert!(!memory.layer_anchor_live(panel));
+    memory
+        .apply(&[Mutation::Patch {
+            id: group,
+            patch: Patch::Semantics(Change::Set(Some(Box::new(Semantics {
+                inert: true,
+                ..Default::default()
+            })))),
+        }])
         .unwrap();
     assert!(!memory.layer_anchor_live(panel));
     memory

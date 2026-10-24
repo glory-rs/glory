@@ -38,6 +38,10 @@ mod motion;
 mod progress;
 #[path = "sheet_tests.rs"]
 mod sheet;
+#[path = "table_tests.rs"]
+mod table;
+#[path = "translation_tests.rs"]
+mod translation;
 
 #[test]
 fn stream_preflight_rejects_structural_and_grouped_child_changes_before_model_or_queue_updates() {

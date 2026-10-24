@@ -56,12 +56,37 @@ fn finite_anchor_policy_fields_survive_classic_patch_and_versioned_start_end() {
                         }))
                     }))
                     .fill(text().content("Finite placement")),
+                view()
+                    .role(Role::Dialog)
+                    .focus(FocusMode::Programmatic)
+                    .name("Stream viewport window")
+                    .semantics(scope.bond(move || {
+                        Some(Box::new(Semantics {
+                            id: Some(SemanticId::new("stream-viewport-window").unwrap()),
+                            layer: Some(Layer {
+                                modal: false,
+                                placement: LayerPlacement::Viewport(if ready.get() {
+                                    glory_render::ViewportPlacement {
+                                        x: 175.5,
+                                        y: -23.25,
+                                        viewport_padding: 43.,
+                                        constrain: false,
+                                    }
+                                } else {
+                                    glory_render::ViewportPlacement::default()
+                                }),
+                                ..Default::default()
+                            }),
+                            ..Default::default()
+                        }))
+                    })),
             ))
         },
     )
     .unwrap();
     let shell = frame(&mut stream);
     assert!(shell.body().contains("data-gly-anchor-side=\"bottom\""));
+    assert!(shell.body().contains("data-gly-viewport-x=\"48\""));
     assert!(poll(&mut stream).is_pending());
     gate.resolve(Ok("ready".into()));
     let patch = frame(&mut stream);
@@ -73,6 +98,10 @@ fn finite_anchor_policy_fields_survive_classic_patch_and_versioned_start_end() {
         "data-gly-anchor-padding",
         "data-gly-anchor-flip",
         "data-gly-anchor-shift",
+        "data-gly-viewport-x",
+        "data-gly-viewport-y",
+        "data-gly-viewport-padding",
+        "data-gly-viewport-constrain",
     ] {
         assert!(patch.body().contains(field), "{field}");
     }

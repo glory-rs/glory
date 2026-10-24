@@ -6,6 +6,7 @@ fn length(value: Length) -> String {
         Length::Auto => "auto".into(),
         Length::Px(value) => format!("{value}px"),
         Length::Percent(value) => format!("{value}%"),
+        Length::Ch(value) => format!("{value}ch"),
     }
 }
 fn limit(value: Limit) -> String {

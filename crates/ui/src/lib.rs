@@ -13,10 +13,11 @@ pub use builders::*;
 pub use control::{Each, When, each, when};
 pub use glory_render::{
     Current, DismissReason, Event, EventKind, FieldPart, FocusMode, FormAction, FormControl,
-    ItemPosition, Layer, LayerPlacement, LinkOpen, Navigation, NavigationPanel,
-    NavigationPanelCommand, Orientation, Purpose, RangeCommand, RangeValue, Role, ScrollAxes,
-    ScrollCommand, ScrollMetrics, ScrollMovement, SemanticId, Semantics, SliderValue, SpinValue,
-    TextKind,
+    GridCommand, InputAssist, InputAutofill, InputEdit, InputEditCapture, InputEditIntent,
+    InputEditRejection, InputMode, ItemPosition, Layer, LayerPlacement, LinkOpen, Navigation,
+    NavigationPanel, NavigationPanelCommand, Orientation, Purpose, RangeCommand, RangeValue, Role,
+    ScrollAxes, ScrollCommand, ScrollMetrics, ScrollMovement, SelectionDirection, SemanticId,
+    Semantics, SliderValue, SpinValue, TextKind, TextSelection,
 };
 pub use list::{List, list};
 
