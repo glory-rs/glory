@@ -67,7 +67,7 @@ fn ui(
     ))
 }
 pub fn widget(resources: Resources, state: Rc<RefCell<Option<State>>>) -> impl Widget + use<> {
-    widget(move |scope| {
+    glory::ui::widget(move |scope| {
         let (widget, source) = ui(scope, &resources).map_err(|error| {
             glory::ui::Error::Render(glory::render::Error::Backend(error.to_string()))
         })?;

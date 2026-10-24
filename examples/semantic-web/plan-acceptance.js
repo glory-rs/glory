@@ -17,10 +17,10 @@ async (hostPage) => {
     const rememberFile = root => page.evaluate(root => {
       const button = document.querySelector(`${root} .plan-0 .plan-file`);
       const wrapper = button.parentElement, picker = wrapper.querySelector('input[type=file]');
-      if (wrapper.dataset.glyPart !== 'control' || !picker || picker.dataset.glyNode !== button.dataset.glyNode) throw new Error('plan File physical parts');
+      if (wrapper.localName !== 'span' || wrapper.style.display !== 'contents' || !picker || wrapper.firstElementChild !== button || wrapper.lastElementChild !== picker || wrapper.dataset.glyNode !== button.dataset.glyNode || picker.dataset.glyNode !== button.dataset.glyNode) throw new Error('plan File physical parts');
       window.planFile = { button, wrapper, picker, token: button.dataset.glyNode };
       const standalone = document.querySelector(`${root} .plan-file-root`);
-      if (standalone.parentElement.dataset.glyPart !== 'control' || !standalone.parentElement.isConnected) throw new Error('plan File root placement');
+      if (standalone.parentElement.localName !== 'span' || standalone.parentElement.style.display !== 'contents' || standalone.parentElement.dataset.glyNode !== standalone.dataset.glyNode || !standalone.parentElement.isConnected) throw new Error('plan File root placement');
     }, root);
     const verifyFile = root => page.evaluate(root => {
       const {button, wrapper, picker, token} = window.planFile;

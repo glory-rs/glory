@@ -9,7 +9,7 @@ publish = false
 # dev-server runtime and prevent mounting under a plain trunk build) and
 # `document` (pulls history/router needing web-sys Location). We only need the
 # rsx/signals/hooks stack plus the web renderer and launch entrypoint.
-dioxus = { version = "=0.7.9", default-features = false, features = [
+dioxus = { version = "=0.7.10", default-features = false, features = [
   "web", "launch", "macro", "html", "signals", "hooks",
 ] }
 wasm-bindgen = { version = "=0.2.129", features = ["enable-interning"] }

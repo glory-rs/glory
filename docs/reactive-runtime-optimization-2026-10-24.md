@@ -1,5 +1,7 @@
 # 核心响应图与提交优化：实施与实测
 
+后续 HTML / DOM 优化与当前工作区回归已完成，见 [2026-10-25 专项报告](html-dom-bridge-optimization-2026-10-25.md)。本报告的响应图数据保留为独立历史批次，不与新数据混算。
+
 测量日期：2026-10-24；报告更新：2026-10-25 / Asia/Shanghai。实施、独立计时、文档复核及最终合并回归均已完成。
 
 本报告执行 [核心优化评估](../vibe/core-reactivity-rendering-optimization-2026-10-24.md)。保留 Cage/Bond/Lotus、属性 Binding、Owner、两份独立 Memory 和完整节点身份。主要收益来自响应式传播/求值，不是批量构造的数量级突破。
