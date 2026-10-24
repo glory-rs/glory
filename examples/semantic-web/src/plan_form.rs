@@ -16,6 +16,7 @@ pub fn ui(scope: &Scope) -> (impl Widget + use<>, State) {
         text().mark("caption"),
         input().class("plan-editor").mark("editor"),
         check().class("plan-check").label("check").mark("check"),
+        glory::ui::file().class("plan-file").label("Pick"),
     )))
     .unwrap();
     let root = declaration.part("row").unwrap();
@@ -23,6 +24,16 @@ pub fn ui(scope: &Scope) -> (impl Widget + use<>, State) {
     let editor = declaration.part("editor").unwrap();
     let check = declaration.part("check").unwrap();
     let fallback = plan(group().fill(text_builder())).unwrap();
+    // File's physical root is Control, while its public button is Main.
+    let file_root = plan(glory::ui::file().class("plan-file-root").label("Root pick")).unwrap();
+    let wide = plan(
+        view().class("plan-wide").fill(
+            (0..17)
+                .map(|index| glory::ui::text().content(format!("wide {index}")))
+                .collect::<Vec<_>>(),
+        ),
+    )
+    .unwrap();
     let widget = view().class("plan-form").fill((
         each(
             rows,
@@ -35,7 +46,7 @@ pub fn ui(scope: &Scope) -> (impl Widget + use<>, State) {
                     editor.clone(),
                     check.clone(),
                 );
-                component(move |scope| {
+                widget(move |scope| {
                     let id = id.get_untracked();
                     let instance = scope.instantiate(&declaration)?;
                     instance.class(&root, format!("plan-row plan-{id}"))?;
@@ -67,8 +78,10 @@ pub fn ui(scope: &Scope) -> (impl Widget + use<>, State) {
                 })
             },
         ),
-        component(move |scope| {
+        widget(move |scope| {
             scope.instantiate(&fallback)?;
+            scope.instantiate(&file_root)?;
+            scope.instantiate(&wide)?;
             Ok(())
         }),
     ));

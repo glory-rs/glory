@@ -371,7 +371,7 @@ impl Render for Renderer {
             self.dom.read_translations(self.mapper.borrow().tree())?;
             query.validate_target(&self.mapper.borrow().tree().node(query.node())?.descriptor)?;
             let entry = self.dom.entry(query.node())?;
-            if !entry.first.is_connected() {
+            if !entry.first().is_connected() {
                 return Err(Error::Unsupported("query on a disconnected range"));
             }
             match query {

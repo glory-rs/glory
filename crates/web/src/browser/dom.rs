@@ -75,6 +75,13 @@ pub(super) struct Editing {
     pub(super) requested: u64,
     pending: Option<String>,
 }
+// Boxed nodes already own their physical root in Parts. Only boxless Groups
+// need separate boundary handles; retaining aliases costs externref slots and
+// clone/drop bookkeeping for every instance.
+enum Boundary {
+    Part(Part),
+    Range(Node, Node),
+}
 pub(super) struct Entry {
     pub(super) rich: RefCell<Option<Box<super::rich::Editing>>>,
     pub(super) collapse: RefCell<Option<Box<super::collapse::Observer>>>,
@@ -83,8 +90,7 @@ pub(super) struct Entry {
     #[cfg(feature = "hydrate")]
     is_virtual: bool,
     pub parts: Parts,
-    pub first: Node,
-    pub last: Node,
+    boundary: Boundary,
     pub fragment: RefCell<Option<DocumentFragment>>,
     pub children: Option<Part>,
     control: Option<Part>,
@@ -95,6 +101,18 @@ pub(super) struct Entry {
     pub prevent_default: bool,
 }
 impl Entry {
+    pub(super) fn first(&self) -> &Node {
+        match &self.boundary {
+            Boundary::Part(part) => self.parts.get(part).expect("physical root part"),
+            Boundary::Range(first, _) => first,
+        }
+    }
+    fn last(&self) -> &Node {
+        match &self.boundary {
+            Boundary::Part(part) => self.parts.get(part).expect("physical root part"),
+            Boundary::Range(_, last) => last,
+        }
+    }
     pub(super) fn image_revision(&self) -> u64 {
         self.editing.borrow().requested
     }
@@ -104,10 +122,14 @@ impl Entry {
             .map_err(|_| Error::Unsupported("Group has no element"))
     }
     pub fn part(&self, part: Part) -> Result<Node, Error> {
-        self.parts
-            .get(&part)
-            .cloned()
-            .ok_or(Error::Unsupported("HTML part"))
+        self.node(part).cloned()
+    }
+    fn node(&self, part: Part) -> Result<&Node, Error> {
+        self.parts.get(&part).ok_or(Error::Unsupported("HTML part"))
+    }
+    fn element_part(&self, part: Part) -> Result<&Element, Error> {
+        let node = self.node(part)?;
+        node.dyn_ref().ok_or_else(|| backend(node.clone().into()))
     }
     pub fn control(&self) -> Result<Element, Error> {
         self.part(
@@ -145,7 +167,7 @@ impl Entry {
         }
     }
     fn property(&self, part: Part, name: &str, value: &Property) -> Result<(), Error> {
-        let node = self.part(part)?;
+        let node = self.node(part)?;
         if name == "value"
             && let Property::Text(value) = value
         {
@@ -156,15 +178,14 @@ impl Entry {
                 return Ok(());
             }
             if current != *value {
-                js_sys::Reflect::set(&node, &name.into(), &value.into()).map_err(backend)?;
+                js_sys::Reflect::set(node, &name.into(), &value.into()).map_err(backend)?;
             }
             edit.revision = edit.requested;
             edit.pending = None;
             return Ok(());
         }
         if let Property::SelectedKeys(keys) = value {
-            let element: Element = node.dyn_into().map_err(|node: Node| backend(node.into()))?;
-            super::select::write(&element, keys)?;
+            super::select::write(self.element_part(part)?, keys)?;
             let mut editing = self.editing.borrow_mut();
             editing.revision = editing.requested;
             return Ok(());
@@ -178,7 +199,7 @@ impl Entry {
             Property::SelectedKeys(_) => unreachable!(),
             Property::RichDocument(_) => unreachable!(),
         };
-        js_sys::Reflect::set(&node, &name.into(), &value).map_err(backend)?;
+        js_sys::Reflect::set(node, &name.into(), &value).map_err(backend)?;
         Ok(())
     }
     pub fn composition_end(&self) -> Result<(), Error> {
@@ -336,8 +357,11 @@ impl Dom {
             #[cfg(feature = "hydrate")]
             is_virtual: virtual_shape(shape),
             parts: parts.into(),
-            first,
-            last,
+            boundary: if shape.pieces.is_empty() {
+                Boundary::Range(first, last)
+            } else {
+                Boundary::Part(shape.root_part()?)
+            },
             fragment: RefCell::new(None),
             children: shape.children,
             control: shape.control,
@@ -656,20 +680,20 @@ impl Dom {
     ) -> Result<Rc<Entry>, Error> {
         #[cfg(feature = "hydrate")]
         let is_virtual = virtual_shape(shape);
-        let (first, last) = if shape.pieces.is_empty() {
+        let boundary = if shape.pieces.is_empty() {
             let range = fragment.as_ref().ok_or(Error::Unsupported("Group range"))?;
-            (
+            Boundary::Range(
                 range
                     .first_child()
                     .ok_or(Error::Unsupported("Group start"))?,
                 range.last_child().ok_or(Error::Unsupported("Group end"))?,
             )
         } else {
-            let root = parts
-                .get(&shape.root_part()?)
-                .cloned()
-                .ok_or(Error::Unsupported("HTML physical root"))?;
-            (root.clone(), root)
+            let root = shape.root_part()?;
+            if parts.get(&root).is_none() {
+                return Err(Error::Unsupported("HTML physical root"));
+            }
+            Boundary::Part(root)
         };
         let entry = Rc::new(Entry {
             rich: RefCell::new(None),
@@ -678,8 +702,7 @@ impl Dom {
             parent: Cell::new(None),
             #[cfg(feature = "hydrate")]
             is_virtual,
-            first,
-            last,
+            boundary,
             fragment: RefCell::new(fragment),
             parts,
             children: shape.children,
@@ -746,10 +769,10 @@ impl Dom {
             } else if parent.parts.is_empty() {
                 (
                     parent
-                        .last
+                        .last()
                         .parent_node()
                         .ok_or(Error::InvalidPlacement("detached Group end"))?,
-                    Some(parent.last.clone()),
+                    Some(parent.last().clone()),
                 )
             } else {
                 return Err(Error::InvalidProps("node has no HTML child slot"));
@@ -758,14 +781,13 @@ impl Dom {
             (self.root.clone().into(), self.root_end.borrow().clone())
         };
         let before = if let Some(id) = before {
-            Some(self.entry(id)?.first.clone())
+            Some(self.entry(id)?.first().clone())
         } else {
             end
         };
-        let nodes = range(&entry)?;
         // A detached new/resumed range cannot own the document's focus. Avoid
         // selection property reads and moveBefore reflection for these inserts.
-        let connected = entry.first.is_connected();
+        let connected = entry.first().is_connected();
         let selection = connected.then(|| Selection::capture(&self.document));
         // moveBefore keeps focus, IME and element state on supporting engines.
         let mover = (connected && parent.is_connected())
@@ -775,20 +797,28 @@ impl Dom {
                     .and_then(|value| value.dyn_into::<js_sys::Function>().ok())
             })
             .flatten();
-        for node in nodes {
+        let place = |node: &Node| -> Result<(), Error> {
             let used = mover.as_ref().is_some_and(|mover| {
                 mover
                     .call2(
                         &parent,
-                        &node,
+                        node,
                         before.as_ref().map_or(&JsValue::NULL, |node| node.as_ref()),
                     )
                     .is_ok()
             });
             if !used {
                 parent
-                    .insert_before(&node, before.as_ref())
+                    .insert_before(node, before.as_ref())
                     .map_err(backend)?;
+            }
+            Ok(())
+        };
+        if let Boundary::Part(_) = entry.boundary {
+            place(entry.first())?;
+        } else {
+            for node in range(&entry)? {
+                place(&node)?;
             }
         }
         if let Some(selection) = selection {
@@ -807,13 +837,10 @@ impl Dom {
                         self.queue_image(id, &entry, true);
                     }
                 }
-                Edit::Text { part, value } => entry.part(part)?.set_node_value(Some(&value)),
+                Edit::Text { part, value } => entry.node(part)?.set_node_value(Some(&value)),
                 Edit::Property { part, name, value } => entry.property(part, name, &value)?,
                 Edit::Attribute { part, name, value } => {
-                    let element = entry
-                        .part(part)?
-                        .dyn_into::<Element>()
-                        .map_err(|value: Node| backend(value.into()))?;
+                    let element = entry.element_part(part)?;
                     if let Some(value) = value {
                         element.set_attribute(name, &value).map_err(backend)?;
                     } else {
@@ -975,14 +1002,14 @@ fn virtual_shape(shape: &Shape) -> bool {
     })
 }
 fn range(entry: &Entry) -> Result<Vec<Node>, Error> {
-    if entry.first == entry.last {
-        return Ok(vec![entry.first.clone()]);
+    if let Boundary::Part(_) = entry.boundary {
+        return Ok(vec![entry.first().clone()]);
     }
     let mut nodes = Vec::new();
-    let mut next = Some(entry.first.clone());
+    let mut next = Some(entry.first().clone());
     while let Some(node) = next {
         next = node.next_sibling();
-        let last = node.is_same_node(Some(&entry.last));
+        let last = node.is_same_node(Some(entry.last()));
         nodes.push(node);
         if last {
             return Ok(nodes);

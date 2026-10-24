@@ -94,7 +94,7 @@ impl TagsCommand {
                         "invalid bounded tags paste or UTF-16 selection",
                     ));
                 }
-                // Never split a surrogate pair when the component slices its
+                // Never split a surrogate pair when the widget slices its
                 // accepted String. Host selection offsets are UTF-16 units.
                 for offset in [*start, *end] {
                     let mut position = 0u32;

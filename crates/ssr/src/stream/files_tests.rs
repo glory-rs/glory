@@ -18,7 +18,7 @@ fn file_root_picker_siblings_config_patch_and_end_rekey_stay_in_one_current_shap
                 )
                 .unwrap();
             let ready = ready.map(|state| matches!(state, ResourceState::Ready { .. }));
-            component(move |scope| {
+            widget(move |scope| {
                 let reference = scope.cage(None);
                 glory_ui::file()
                     .label("Stream file picker")

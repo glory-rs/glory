@@ -7,7 +7,7 @@ fn shared_child_rules_reject_before_identity_allocation_and_leave_the_scope_usab
         (
             Props::Input(InputProps::default()),
             Props::View,
-            "leaf component cannot contain children",
+            "leaf widget cannot contain children",
         ),
         (
             Props::Button(ButtonProps::default()),

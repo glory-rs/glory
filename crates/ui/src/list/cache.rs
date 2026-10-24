@@ -15,7 +15,7 @@ pub trait RowHost {
     /// Refresh an existing row after a data revision or its index changes.
     fn update(&mut self, index: usize, key: &Self::Key, row: &mut Self::Row);
     fn place(&mut self, row: &Self::Row, before: Option<&Self::Row>);
-    /// Empty logical components do not provide a physical insertion anchor.
+    /// Empty logical widgets do not provide a physical insertion anchor.
     fn has_content(&self, _row: &Self::Row) -> bool {
         true
     }
@@ -47,7 +47,7 @@ struct Next<Key> {
 }
 
 /// Owns the mounted window plus an optional single pin. Other leaving rows are
-/// disposed immediately. The component adapter resolves the focused stable key;
+/// disposed immediately. The widget adapter resolves the focused stable key;
 /// this is not a keep-alive cache of every row ever visited.
 #[derive(Debug)]
 pub struct Cache<Key, Row> {

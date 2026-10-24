@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::task::{Wake, Waker};
 
 use glory_core::{AccessError, Resource, ResourceState};
-use glory_ui::{Widget, component, group, list, text, view, when};
+use glory_ui::{Widget, group, list, text, view, when, widget};
 
 use super::*;
 #[path = "anchor_tests.rs"]
@@ -59,7 +59,7 @@ mod translation;
 fn stream_preflight_rejects_structural_and_grouped_child_changes_before_model_or_queue_updates() {
     use glory_render::{ButtonProps, Change, Descriptor, Patch, Props, Role, TextProps};
     let mut stream = stream_with(Resources::default(), Config::default(), |_, _| {
-        component(|scope| {
+        widget(|scope| {
             let parent = scope.create(Descriptor::new(Props::View))?;
             assert!(
                 scope
@@ -498,7 +498,7 @@ fn huge_list_shell_and_owned_requests_remain_window_bounded() {
             move |_, key| {
                 let resources = resources.clone();
                 let gate = gate.clone();
-                component(move |scope| {
+                widget(move |scope| {
                     let gate = gate.clone();
                     let data = resources
                         .bind(
@@ -540,7 +540,7 @@ fn html_frames_describe_hidden_nodes_and_escape_the_complete_data_block() {
     let mut stream = stream_with(Resources::default(), Config::default(), |_, _| {
         view().fill((
             text().content("visible"),
-            component(|scope| {
+            widget(|scope| {
                 let hidden = group()
                     .fill(text().content("</script><script>bad()</script>"))
                     .mount(scope)?;

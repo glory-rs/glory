@@ -167,8 +167,8 @@ Key Bond 只读取当前窗口。窗口范围不变的像素滚动不重新取 k
 
 新增证据：
 
-- `crates/ui/tests/components.rs`：公开 counter 一事件一次 Patch、八组件/内容校验、Each 重排状态、空/多根节点、分支 500 次回收、过期输入、查询取消、外部 Scope clone 与失败工厂清理。
-- `crates/ui/tests/list_component.rs`：1 亿条惰性源，200 个同 tick scroll 输入只读取最终窗口的 33 个 key，并一次提交；同窗口后续像素不取 key/不提交 Patch；数据重排仍正确订阅并复用实例。
+- `crates/ui/tests/widgets.rs`：公开 counter 一事件一次 Patch、八组件/内容校验、Each 重排状态、空/多根节点、分支 500 次回收、过期输入、查询取消、外部 Scope clone 与失败工厂清理。
+- `crates/ui/tests/list_widget.rs`：1 亿条惰性源，200 个同 tick scroll 输入只读取最终窗口的 33 个 key，并一次提交；同窗口后续像素不取 key/不提交 Patch；数据重排仍正确订阅并复用实例。
 - 同上测试：10 亿条、240 亿逻辑像素的中间/末尾跳转与 1px 增量；远跳后语义节点/槽位不超过 70，事件处理器为 2，任务数与当前行数一致；全局来源的行 map 不积累到 app Owner。
 
 R2 完成时活动 workspace 验证为 64 项运行测试、1 项编译失败测试、fmt 和严格 Clippy；`cargo run -p glory --example semantic_counter` 输出 4 个语义节点。`cargo check --workspace --all-targets` 在 WASM、Android aarch64 和 Linux x86_64 目标均通过。它们仍是参考解释器和编译证据；新增真实 DOM 证据见下面的 R3 记录。
@@ -230,7 +230,7 @@ Resize 契约现在区分 border-box `size` 与 client `viewport`。Web 观察�
 验证：
 
 - `sparse_heights.rs`：6000 次随机小数高度/重置与密集参考模型逐项比 prefix、total、window，再验证 splice；10 亿行初始 0 槽位、20,000 次远点测量/还原后无历史节点，预留容量有界。
-- `list_component.rs`：1 亿行、199 次远跳，合批测量仅一次提交，前方行高度变化保持 anchor/NodeId；测量缓存、实际高度索引预留容量、UI 节点与处理器有界；过期事件忽略、非法估值/重复 key/错误 locate 为诊断，错误恢复不触发旧行越界 panic。
+- `list_widget.rs`：1 亿行、199 次远跳，合批测量仅一次提交，前方行高度变化保持 anchor/NodeId；测量缓存、实际高度索引预留容量、UI 节点与处理器有界；过期事件忽略、非法估值/重复 key/错误 locate 为诊断，错误恢复不触发旧行越界 panic。
 - 同上：无全量数据向量的索引源，prepend 1000 条保持同一个可见 key/NodeId 和行内偏移；锚点删除选择后继，缩至零不读取旧窗口下标。
 - Windows Chromium 155 运行 `adaptive-acceptance.js`：1 亿行，80 次远跳最多挂载 28 行、保留 64 条高度、164 个实际稀疏槽位、614 个预留条目，UI NodeId 槽位最多 105，响应式 arena 槽位最多 183。HashMap 顺序可能影响具体峰值，不将单次数字作为 API 保证；验收使用容量上限断言。
 - 同一浏览器运行：前方行增高 30.375px、prepend 1000 条保持可见锚点及节点身份，位置差约 0.031px、验收容差 0.1px；删除锚点落到后继。scale(1.25) 不放大行高索引；2,000,000.375px 单行仍保持物理 scrollHeight 约 100 万像素上限。
@@ -969,7 +969,7 @@ Anchor/FocusWithin的嵌入来源检查runtime、generation、存活、逻辑祖
 
 最终Windows为223项框架运行、1项!Send编译失败、77引擎和1实窗，passed合计302；Ubuntu WSL为224+1+77+2=304。workspace严格Clippy、Linux default/paint、WASM workspace/fixture严格检查和重建全部通过；Android workspace all-features/all-targets编译通过。实际窗口仍是既有编辑/生命周期fixture，峰值14tasks/77引擎节点，本次key Windows=673、X11/Wayland=669/674。没有新增OS输入/辅助技术/Android设备或release耗时结论。
 
-未新增依赖、改变锁文件或vendor，四包104文件来源检查继续通过。Cargo home/target/tmp、Linux loop0 backing及临时服务仍在D:，owned8788/8789按实际PID/命令核对后停止。复现为render/ui的events测试、ui list_component的invalid_geometry用例，完整Windows verifier -Web -Window及Linux --window；浏览器十三组另执行。
+未新增依赖、改变锁文件或vendor，四包104文件来源检查继续通过。Cargo home/target/tmp、Linux loop0 backing及临时服务仍在D:，owned8788/8789按实际PID/命令核对后停止。复现为render/ui的events测试、ui list_widget的invalid_geometry用例，完整Windows verifier -Web -Window及Linux --window；浏览器十三组另执行。
 
 原始记录在D:/BuildCache/glory-semantic-ui：event-contract-final-{windows,linux}.txt、event-contract-targeted.txt、event-contract-huge-list-r2.txt、event-contract-android-check.txt、event-contract-browser-2026-10-22.json、event-contract-stream-transport.txt；来源、源码、锁、二进制及日志哈希为event-contract-evidence-2026-10-22.json。R0继续输入版本/规范化、Focus结果回读、通用结构预检与其余props/无障碍映射；平台、Android、R7剩余观测/缓存及旧架构清理也仍在完整目标中。
 
@@ -1213,7 +1213,7 @@ Blitz可选桥只在有有效Root/Navigate的虚拟Row wrapper声明ScrollIntoVi
 
 依赖、workspace、全部manifest/lock与四包105文件vendor/补丁来源未变，无新增unsafe。生产Rust在最终gate开始前固定；之后仅补文档/证据。所有build/cache/临时服务、失败日志/源与结果保存在D:；8788/8789按PID/命令核对后停止，最终无监听。报告v23、契约、列表基线、README/AGENTS同步。新增显示功能不等于FPS/RSS提升，也不证明任意未物化行的系统检索、百分比滚动、文本接口或读屏器播报。
 
-复现：cargo test --locked -p glory-ui --test list_component；cargo test --locked -p glory-blitz --features accesskit --lib accessibility::tests；完整Windows scripts/check-semantic-ui.ps1 -Web -Window、Linux scripts/check-semantic-linux.sh --window；Android --workspace --all-features --all-targets --target aarch64-linux-android；17套examples/semantic-web/*acceptance.js及scripts/check-semantic-stream.py。D:/BuildCache/glory-semantic-ui/reveal-final-{windows,linux}.txt、reveal-android.txt、reveal-browser-2026-10-22.json、reveal-stream-transport.txt及accesskit-uia-1792674543841367.json记录最终结果，reveal-{render,navigation,widget,accessibility}-before.rs和reveal-uia-r*.txt保留前实现与诊断；完整哈希为reveal-evidence-2026-10-22.json。
+复现：cargo test --locked -p glory-ui --test list_widget；cargo test --locked -p glory-blitz --features accesskit --lib accessibility::tests；完整Windows scripts/check-semantic-ui.ps1 -Web -Window、Linux scripts/check-semantic-linux.sh --window；Android --workspace --all-features --all-targets --target aarch64-linux-android；17套examples/semantic-web/*acceptance.js及scripts/check-semantic-stream.py。D:/BuildCache/glory-semantic-ui/reveal-final-{windows,linux}.txt、reveal-android.txt、reveal-browser-2026-10-22.json、reveal-stream-transport.txt及accesskit-uia-1792674543841367.json记录最终结果，reveal-{render,navigation,widget,accessibility}-before.rs和reveal-uia-r*.txt保留前实现与诊断；完整哈希为reveal-evidence-2026-10-22.json。
 
 完整目标继续保留：R0全部字段/样式/上下文与扩展审计，Portable文本验证，真实OS IME、Unix AT-SPI客户端、读屏器/Live播报、完整文本行/选区和更多滚动/项目检索，Android Activity/Surface/资源/设备，R7字段依赖/性能细分/收益驱动缓存，以及旧工具/源码清理。不能把本次已挂载行显示链路作为整个R5或整体目标完成。
 

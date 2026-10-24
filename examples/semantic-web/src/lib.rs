@@ -169,7 +169,7 @@ mod browser {
                     },
                 )),
                 view().class("portal"),
-                component(move |scope| {
+                widget(move |scope| {
                     let mounted = group()
                         .fill((
                             input().class("range-editor").value("range"),

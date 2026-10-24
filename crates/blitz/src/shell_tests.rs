@@ -4,7 +4,7 @@ use blitz_traits::events::{
     MouseEventButtons, Point, PointerCoords,
 };
 use glory_core::{Cage, Host};
-use glory_ui::{Widget, button, component, events::activate, input, list, text, view};
+use glory_ui::{Widget, button, events::activate, input, list, text, view, widget};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::task::{Poll, Waker};
 use std::time::{Duration, Instant};
@@ -279,7 +279,7 @@ fn fixture(adaptive: bool) -> (WindowApp, Data) {
         },
         move |index, key| {
             let live = row_live.clone();
-            component(move |scope| {
+            widget(move |scope| {
                 let guard = Live::new(live.clone());
                 scope.owner().spawn(async move {
                     let _guard = guard;

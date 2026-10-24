@@ -1733,7 +1733,7 @@ impl std::ops::Deref for Scope {
     }
 }
 
-/// A component is built once; dynamic props/control flow install owned bindings.
+/// A widget is built once; dynamic props/control flow install owned bindings.
 pub trait Widget: 'static {
     #[doc(hidden)]
     fn static_plan(&mut self) -> Result<crate::Plan> {
@@ -1868,7 +1868,7 @@ impl App {
         let previous = self.session.renderer.borrow_mut().set_profile(profile);
         drop(previous);
     }
-    /// Construct maps/resources inside the mounted component's owner. Use this
+    /// Construct maps/resources inside the mounted widget's owner. Use this
     /// for repeated root mounting when input signals belong to the app scope.
     pub fn mount_with<W: Widget>(&self, factory: impl FnOnce() -> W) -> Result {
         let built = self.root.mount_with(factory);
@@ -2003,7 +2003,7 @@ impl App {
         self.flush()?;
         event_error.map_or(Ok(handled), Err)
     }
-    /// Application-lifetime observation. Use Scope::request for component/row
+    /// Application-lifetime observation. Use Scope::request for widget/row
     /// waiters that must be released when their requesting Scope is disposed.
     pub fn request(
         &self,

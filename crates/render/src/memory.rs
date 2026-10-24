@@ -1457,9 +1457,7 @@ impl Memory {
             }
             let node = self.node(ancestor)?;
             if cursor == parent && !node.descriptor.view().props.accepts_children() {
-                return Err(Error::InvalidProps(
-                    "leaf component cannot contain children",
-                ));
+                return Err(Error::InvalidProps("leaf widget cannot contain children"));
             }
             interactive_ancestor |= node.descriptor.view().props.interactive()
                 || matches!(

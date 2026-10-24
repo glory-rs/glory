@@ -6,7 +6,7 @@ use glory_render::{
     Action, Capabilities, Error, Event, Input as RenderInput, Mutation, NodeId, Props, Query,
     QueryToken, Receipt, Rect, Render, Role,
 };
-use glory_ui::{App, Widget, button, component, list, text};
+use glory_ui::{App, Widget, button, list, text, widget};
 
 #[test]
 fn list_stats_distinguish_user_movement_from_programmatic_and_measurement_commits() {
@@ -272,7 +272,7 @@ fn huge_list_row_queries_release_captures_before_late_replies_without_retaining_
             move |_, _| {
                 let data = data.clone();
                 let retired = retired.clone();
-                component(move |scope| {
+                widget(move |scope| {
                     let requester = scope.clone();
                     let data = data.clone();
                     let retired = retired.clone();
@@ -443,7 +443,7 @@ fn field_aliases_on_a_hundred_million_rows_follow_only_live_row_owners() {
             },
             move |_, key| {
                 let updates = updates.clone();
-                component(move |scope| {
+                widget(move |scope| {
                     let prefix = model.field("prefix", |m| &m.prefix, |m| &mut m.prefix);
                     let updates = updates.clone();
                     text()
@@ -538,7 +538,7 @@ fn keyed_collection_paths_on_sparse_huge_lists_reclaim_each_visited_key_and_upda
             },
             move |_, key| {
                 let runs = runs.clone();
-                component(move |scope| {
+                widget(move |scope| {
                     let row = source.entry(key);
                     let runs = runs.clone();
                     let label = scope
@@ -1315,7 +1315,7 @@ fn component_owners_tasks_handlers_and_model_slots_stay_bounded_across_far_jumps
             move |index, _| {
                 builds.set(builds.get() + 1);
                 let aborts = aborts.clone();
-                component(move |scope| {
+                widget(move |scope| {
                     let task = scope.task();
                     let aborts = aborts.clone();
                     task.on_cancel(move || aborts.set(aborts.get() + 1))?;
@@ -1405,7 +1405,7 @@ fn focused_virtual_rows_and_their_tasks_survive_far_scrolls_then_release_on_blur
             move |_, key| {
                 builds.set(builds.get() + 1);
                 let aborts = aborts.clone();
-                component(move |scope| {
+                widget(move |scope| {
                     let task = scope.task();
                     let aborts = aborts.clone();
                     task.on_cancel(move || aborts.set(aborts.get() + 1))?;
@@ -1501,7 +1501,7 @@ fn cached_keyed_editor_updates_a_distant_focus_pin_and_retires_its_target_on_blu
                 index
             },
             move |_, key| {
-                component(move |scope| {
+                widget(move |scope| {
                     let item = source.entry(key);
                     glory_ui::input()
                         .value(
@@ -2396,7 +2396,7 @@ fn an_oversized_resize_releases_rows_and_tasks_and_a_valid_resize_recovers() {
             move |_, _| {
                 builds.set(builds.get() + 1);
                 let aborts = aborts.clone();
-                component(move |scope| {
+                widget(move |scope| {
                     let task = scope.task();
                     let aborts = aborts.clone();
                     task.on_cancel(move || aborts.set(aborts.get() + 1))?;

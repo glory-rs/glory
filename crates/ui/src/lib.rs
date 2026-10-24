@@ -1,5 +1,5 @@
 //! Semantic UI construction and control flow. Builders mount through the runtime;
-//! layout engines and DOM objects are never created by configuring a component.
+//! layout engines and DOM objects are never created by configuring a widget.
 
 mod app;
 mod buffer;

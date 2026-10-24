@@ -16,24 +16,26 @@ const DEEP_CLONE: bool = true;
 
 #[wasm_bindgen(inline_js = "
 export function gloryPlan(root, parts, owners, virtualParts, fields) {
-    const paths = parts.map(part => {
-        const path = [];
-        for (let node = part; node !== root; node = node.parentNode) {
-            let index = 0;
-            for (let previous = node.previousSibling; previous; previous = previous.previousSibling) index++;
-            path.unshift(index);
-        }
-        return path;
+    const positions = new Map(parts.map((part, index) => [part, index]));
+    // Parts are registered in construction order. Each non-root part can be
+    // found from one earlier part, without retracing ancestors from the root
+    // or obtaining a live childNodes collection for every path segment.
+    const links = parts.map((part, index) => {
+        if (part === root) return null;
+        const previous = part.previousSibling;
+        const source = positions.get(previous || part.parentNode);
+        if (source === undefined || source >= index) throw new Error('Invalid physical plan order');
+        return [source, !!previous];
     });
-    return { root, paths, owners, virtualParts, fields };
+    return { root, links, owners, virtualParts, fields };
 }
 export function gloryClonePlan(plan, tokens, live) {
     const root = plan.root.cloneNode(true);
-    const parts = plan.paths.map(path => {
-        let node = root;
-        for (const index of path) node = node.childNodes[index];
-        return node;
-    });
+    const parts = new Array(plan.links.length);
+    for (let index = 0; index < parts.length; index++) {
+        const link = plan.links[index];
+        parts[index] = link === null ? root : link[1] ? parts[link[0]].nextSibling : parts[link[0]].firstChild;
+    }
     for (const [index, name, value] of plan.fields) parts[index].setAttribute(name, value);
     const identities = tokens.split('\\0');
     for (let index = 0; index < parts.length; index++) {

@@ -77,7 +77,7 @@ fn mount(adaptive: bool, controls: bool) -> Result {
             },
             move |index, key| {
                 let counts = rows.clone();
-                component(move |scope| {
+                widget(move |scope| {
                     counts.created.set(counts.created.get() + 1);
                     let cleanup = counts.clone();
                     scope

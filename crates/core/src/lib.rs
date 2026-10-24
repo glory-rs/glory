@@ -1,7 +1,7 @@
 //! The platform-independent, owned incremental runtime for Glory.
 //!
 //! Reactive values belong to a Runtime and an Owner. Reads track only their
-//! immediate consumer; creating a component does not implicitly subscribe it.
+//! immediate consumer; creating a widget does not implicitly subscribe it.
 //! Platform adapters supply execution services and consume semantic mutations.
 
 mod arena;

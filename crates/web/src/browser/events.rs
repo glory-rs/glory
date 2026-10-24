@@ -250,7 +250,7 @@ impl Listeners {
             }
             dom.frame.input();
         });
-        // A missing observer is diagnosed only if a component requests resize.
+        // A missing observer is diagnosed only if a widget requests resize.
         let resize = match ResizeObserver::new(resize.as_ref().unchecked_ref()) {
             Ok(observer) => {
                 *dom.observer.borrow_mut() = Some(observer);
@@ -730,7 +730,7 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
                 let mut cursor = dom.parent(id);
                 while let Some(grid) = cursor {
                     let root = dom.entry(grid)?;
-                    // Logical component/when/each Groups have no Main part.
+                    // Logical widget/when/each Groups have no Main part.
                     // They do not terminate the nearest boxed Grid search.
                     if root.parts.get(&glory_html::Part::Main).is_none() {
                         cursor = dom.parent(grid);

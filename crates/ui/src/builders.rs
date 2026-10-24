@@ -90,7 +90,7 @@ impl Element {
                 self.bindings.insert(
                     slot,
                     Box::new(move |_| {
-                        // Read without subscribing the surrounding component or
+                        // Read without subscribing the surrounding widget or
                         // structural observer. The binding registers its own
                         // dependencies when it first runs after construction.
                         let initial = glory_core::untracked(|| value.try_get())?;
@@ -605,11 +605,13 @@ pub fn col() -> View {
     )
 }
 
-pub struct Component<F>(F);
-pub fn component<F: FnMut(&Scope) -> Result + 'static>(build: F) -> Component<F> {
-    Component(build)
+/// An owner-scoped widget built by a handwritten Rust closure.
+pub struct WidgetFn<F>(F);
+/// Build once in the mounted scope; install bindings for reactive updates.
+pub fn widget<F: FnMut(&Scope) -> Result + 'static>(build: F) -> WidgetFn<F> {
+    WidgetFn(build)
 }
-impl<F: FnMut(&Scope) -> Result + 'static> Widget for Component<F> {
+impl<F: FnMut(&Scope) -> Result + 'static> Widget for WidgetFn<F> {
     fn build(&mut self, scope: &Scope) -> Result {
         (self.0)(scope)
     }

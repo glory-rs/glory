@@ -56,7 +56,7 @@ pub mod prelude {
         NavigationPanel, NavigationPanelCommand, Orientation, Plan, PlanInstance, PlanPart,
         Purpose, RangeCommand, RangeValue, Result, Role, Scope, ScrollAxes, ScrollCommand,
         ScrollMetrics, ScrollMovement, SelectionDirection, SemanticId, Semantics, SliderValue,
-        SpinValue, TextKind, TextSelection, Widget, button, check, col, component, each, group,
-        image, input, link, list, plan, row, text, view, when,
+        SpinValue, TextKind, TextSelection, Widget, button, check, col, each, group, image, input,
+        link, list, plan, row, text, view, when, widget,
     };
 }

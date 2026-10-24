@@ -184,7 +184,7 @@ pub struct Document {
     pub nonce: Option<String>,
 }
 pub fn render_document(widget: impl Widget, document: &Document) -> glory_ui::Result<String> {
-    // Validate all sheets before constructing components or executing business
+    // Validate all sheets before constructing widgets or executing business
     // factories. Compiling assets must not partially mount a failed request.
     #[cfg(feature = "css")]
     let css = document

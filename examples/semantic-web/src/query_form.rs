@@ -31,7 +31,7 @@ pub fn ui(scope: &glory::ui::Scope) -> (impl Widget + use<>, State) {
     let dropped = Rc::new(Cell::new(0));
     let drops = dropped.clone();
     let widget = view().fill((
-        component(move |scope| {
+        widget(move |scope| {
             let mut descriptor = Descriptor::new(Props::Input(Default::default()));
             descriptor.classes.push("query-target".into());
             input.set(Some(scope.create(descriptor)?));
@@ -53,7 +53,7 @@ pub fn ui(scope: &glory::ui::Scope) -> (impl Widget + use<>, State) {
                 drops.clone(),
                 target.clone(),
             );
-            component(move |scope| {
+            widget(move |scope| {
                 let requester = scope.clone();
                 let (out, sends, calls, drops) =
                     (out.clone(), sends.clone(), calls.clone(), drops.clone());

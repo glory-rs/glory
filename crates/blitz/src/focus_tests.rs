@@ -1,7 +1,7 @@
 use super::*;
 use blitz_traits::events::{BlitzKeyEvent, KeyState};
 use glory_render::{Action, FocusMode};
-use glory_ui::{Widget, button, check, component, events, group, input, list, view};
+use glory_ui::{Widget, button, check, events, group, input, list, view, widget};
 use keyboard_types::{Code, Location};
 use std::task::Waker;
 
@@ -438,7 +438,7 @@ fn huge_fixed_and_measured_lists_pin_native_editors_and_navigate_without_source_
             },
             move |_index, key| {
                 let live = rows_live.clone();
-                component(move |scope| {
+                widget(move |scope| {
                     let guard = Live::new(live.clone());
                     scope.owner().spawn(async move {
                         let _guard = guard;

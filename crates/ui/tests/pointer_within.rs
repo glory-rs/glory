@@ -1,5 +1,5 @@
 use glory_render::*;
-use glory_ui::{App, component};
+use glory_ui::{App, widget};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -11,7 +11,7 @@ fn raw_pointer_captures_within_only_groups_and_stops_at_common_ancestry() {
     let second = app.scope().cage(None);
     let values = Rc::new(RefCell::new(Vec::new()));
     let seen = values.clone();
-    app.mount(component(move |scope| {
+    app.mount(widget(move |scope| {
         let root = scope.create(Descriptor::new(Props::Group))?;
         group.revise(|id| *id = Some(root));
         let children = scope.child_in(root)?;

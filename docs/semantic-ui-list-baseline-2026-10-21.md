@@ -47,7 +47,7 @@
 
 ## 后续 R2 公开组件证据
 
-[list_component.rs](../crates/ui/tests/list_component.rs) 现在通过公开 `list(...)`、App 和真正的 Widget/Owner/Binding/事件接线验证：1 亿条源只访问当前窗口；200 次同 tick 滚动输入合并为最终窗口的一次提交；同窗口内后续像素滚动不访问 key、不提交节点 Patch。小数像素会多覆盖一行，因此上述 viewport/行高/overscan 的一般上限为 34 行，而表中按整行滚动的基线峰值是 33 行。
+[list_widget.rs](../crates/ui/tests/list_widget.rs) 现在通过公开 `list(...)`、App 和真正的 Widget/Owner/Binding/事件接线验证：1 亿条源只访问当前窗口；200 次同 tick 滚动输入合并为最终窗口的一次提交；同窗口内后续像素滚动不访问 key、不提交节点 Patch。小数像素会多覆盖一行，因此上述 viewport/行高/overscan 的一般上限为 34 行，而表中按整行滚动的基线峰值是 33 行。
 
 公开组件还验证了 10 亿条数据上的 240 亿逻辑像素、首尾跳转、1px 增量、分段 ScrollTo 确认无循环、key 重排复用、行任务取消，以及行工厂对全局来源创建的 map 归属当前行 Owner。参考场景的节点和槽位不超过 70，处理器为 2；清空后没有行任务或派生值遗留。
 

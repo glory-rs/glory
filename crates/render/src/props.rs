@@ -71,7 +71,7 @@ pub enum Purpose {
     Number,
 }
 
-/// Structural roles belong to View. Other components keep their intrinsic
+/// Structural roles belong to View. Other widgets keep their intrinsic
 /// control/text/image semantics rather than impersonating unrelated widgets.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Role {
@@ -536,7 +536,7 @@ impl Descriptor {
             (Patch::Semantics(change), _) => change.apply(&mut self.semantics),
             _ => {
                 return Err(Error::InvalidProps(
-                    "property does not belong to this component",
+                    "property does not belong to this widget",
                 ));
             }
         }

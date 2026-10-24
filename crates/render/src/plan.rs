@@ -62,9 +62,7 @@ impl Plan {
                         ));
                     }
                     if !nodes[parent].descriptor.view().props.accepts_children() {
-                        return Err(Error::InvalidProps(
-                            "leaf component cannot contain children",
-                        ));
+                        return Err(Error::InvalidProps("leaf widget cannot contain children"));
                     }
                     contexts[parent]
                 }

@@ -28,7 +28,7 @@ pub fn widget(
     load: Load,
     state: Rc<RefCell<Option<State>>>,
 ) -> impl Widget + use<> {
-    component(move |scope| {
+    widget(move |scope| {
         let loads = Rc::new(Cell::new(0));
         let loader = load.clone();
         let calls = loads.clone();
@@ -120,7 +120,7 @@ pub fn widget(
                     order,
                     |key| *key,
                     |item, _| {
-                        component(move |scope| {
+                        widget(move |scope| {
                             let key = item.get();
                             let draft = scope.cage(format!("row {key}"));
                             input()
@@ -135,7 +135,7 @@ pub fn widget(
                         })
                     },
                 )),
-                group().fill(component(move |scope| {
+                group().fill(widget(move |scope| {
                     let hidden = Rc::new(
                         group()
                             .fill((
@@ -153,7 +153,7 @@ pub fn widget(
                     });
                     scope.retain(hidden)
                 })),
-                group().fill(component(move |scope| {
+                group().fill(widget(move |scope| {
                     let middle = Rc::new(
                         group()
                             .fill((

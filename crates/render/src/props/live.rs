@@ -398,7 +398,7 @@ impl Storage {
             }
             _ => {
                 return Err(Error::InvalidProps(
-                    "property does not belong to this component",
+                    "property does not belong to this widget",
                 ));
             }
         }

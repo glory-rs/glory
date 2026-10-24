@@ -146,7 +146,7 @@ pub fn resource_mount() -> Result {
                 move |_, key| {
                     let jobs = jobs.clone();
                     let registered = registered.clone();
-                    component(move |scope| {
+                    widget(move |scope| {
                         let jobs = jobs.clone();
                         let resource = registered
                             .bind(

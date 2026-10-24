@@ -62,7 +62,7 @@ impl Heights {
     }
 
     /// Uniform estimates need no per-item allocation. Only measured deviations
-    /// and their Fenwick ancestors are stored. A component can bound retained
+    /// and their Fenwick ancestors are stored. A widget can bound retained
     /// measurements by resetting old ones to `estimate` with `measure`.
     pub fn sparse(len: usize, estimate: f64) -> Result<Self, Error> {
         if !positive(estimate) || !valid_extent(len as f64 * estimate) {

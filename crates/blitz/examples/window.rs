@@ -6,7 +6,7 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     app.renderer()
         .set_css("body { font: 16px sans-serif } .app { padding:16px } button { padding:8px }");
     app.mount_with(|| {
-        component(|scope| {
+        widget(|scope| {
             let count = scope.cage(0);
             view()
                 .class("app")

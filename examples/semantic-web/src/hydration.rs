@@ -1,4 +1,4 @@
-//! One pure Rust component factory for the native SSR generator and wasm app.
+//! One pure Rust widget factory for the native SSR generator and wasm app.
 use glory::prelude::*;
 use glory::ui::list::ListStats;
 use std::cell::RefCell;
@@ -62,7 +62,7 @@ pub fn ui(scope: &Scope) -> (glory::ui::View, State) {
                         checked.revise(|old| *old = value);
                     }
                 }),
-            component(|scope| {
+            widget(|scope| {
                 let mut descriptor =
                     glory::render::Descriptor::new(glory::render::Props::Input(Default::default()));
                 descriptor.classes.push("h-initial-focus".into());

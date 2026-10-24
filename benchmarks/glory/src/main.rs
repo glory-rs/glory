@@ -177,7 +177,7 @@ mod browser {
                     move |seed, _| {
                         let model = model.clone();
                         let declaration = declaration.clone();
-                        component(move |scope| row(scope, seed, model.clone(), &declaration))
+                        widget(move |scope| row(scope, seed, model.clone(), &declaration))
                     },
                 ))),
         ))

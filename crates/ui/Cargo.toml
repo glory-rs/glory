@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "Pure Rust semantic components and windowed lists for Glory"
+description = "Pure Rust semantic widgets and windowed lists for Glory"
 
 [dependencies]
 glory-core = { path = "../core", version = "0.3.1" }

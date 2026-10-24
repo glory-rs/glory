@@ -1008,7 +1008,7 @@ impl Owner {
             key: self.key,
         }
     }
-    /// Derived maps created by this component/factory belong to this owner,
+    /// Derived maps created by this widget/factory belong to this owner,
     /// even when their source is application-wide. The context never owns data.
     pub fn enter<R>(&self, f: impl FnOnce() -> R) -> R {
         assert!(self.is_alive(), "enter live owner");

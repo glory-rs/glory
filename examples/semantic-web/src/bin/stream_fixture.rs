@@ -216,7 +216,7 @@ mod native {
                     move |id, _| {
                         let resources = resources.clone();
                         let metrics = metrics.clone();
-                        component(move |scope| {
+                        widget(move |scope| {
                             let id = id.get();
                             let metrics = metrics.clone();
                             let value = resources

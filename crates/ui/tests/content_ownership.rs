@@ -12,7 +12,7 @@ fn filled_content_keeps_component_owners_and_moves_only_the_container_root() {
     let make = |index: usize| {
         let scopes = scopes.clone();
         let cleaned = cleaned.clone();
-        component(move |scope| {
+        widget(move |scope| {
             scopes.borrow_mut().push(scope.clone());
             let cleaned = cleaned.clone();
             scope.on_cleanup(move || cleaned.borrow_mut().push(index))?;

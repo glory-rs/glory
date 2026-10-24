@@ -23,7 +23,7 @@ fn focus_observations_cross_groups_without_stealing_direct_control_events() {
             .on(focus_within, move |event| {
                 outer.borrow_mut().push(("outer", event))
             })
-            .fill(component(move |scope| {
+            .fill(widget(move |scope| {
                 let range = group()
                     .fill(input().on(focus_changed, {
                         let calls = input_calls.clone();
@@ -376,7 +376,7 @@ fn structural_phases_precede_props_and_each_reuses_row_state_on_reorder() {
         move |item, index| {
             calls.set(calls.get() + 1);
             let state = state.clone();
-            component(move |scope| {
+            widget(move |scope| {
                 let count = scope.cage(0);
                 state.borrow_mut().insert(item.with(|item| item.id), count);
                 view()
@@ -436,7 +436,7 @@ fn when_does_not_subscribe_to_its_child_props_and_reclaims_every_branch() {
     app.mount(when(show, move || {
         builds.set(builds.get() + 1);
         let aborts = aborts.clone();
-        component(move |scope| {
+        widget(move |scope| {
             let task = scope.task();
             let aborts = aborts.clone();
             task.on_cancel(move || aborts.set(aborts.get() + 1))?;
@@ -578,7 +578,7 @@ fn keyed_empty_and_multi_root_components_keep_rendered_order() {
         source,
         |value| *value,
         |item, _| {
-            component(move |scope| {
+            widget(move |scope| {
                 if item.get() != 0 {
                     text()
                         .content(item.map(|item| format!("{item}:a")))
