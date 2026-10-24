@@ -1,7 +1,7 @@
 //! Current native layer leases. The engine owns viewport layout, paint and hit
 //! testing; this adapter owns finite semantic placement and queued input policy.
 use super::*;
-use glory_render::{Change, DismissReason, Layer, LayerPlacement, Patch};
+use glory_render::{Action, Change, DismissReason, Layer, LayerPlacement, Patch};
 
 #[derive(Clone)]
 pub(super) struct Open {
@@ -36,6 +36,18 @@ pub(super) fn inside(tree: &glory_render::memory::Memory, mut id: NodeId, scope:
 }
 
 impl Layers {
+    pub fn boundary(&self, tree: &glory_render::memory::Memory, mut id: NodeId) -> Option<NodeId> {
+        loop {
+            if self
+                .open
+                .iter()
+                .any(|entry| entry.physical && entry.id == id)
+            {
+                return Some(id);
+            }
+            id = tree.node(id).ok()?.parent?;
+        }
+    }
     pub fn modal(&self) -> Option<NodeId> {
         self.open
             .iter()
@@ -67,7 +79,7 @@ impl Layers {
     }
 }
 
-fn visible(tree: &glory_render::memory::Memory, mut id: NodeId) -> bool {
+pub(super) fn visible(tree: &glory_render::memory::Memory, mut id: NodeId) -> bool {
     loop {
         let Ok(node) = tree.node(id) else {
             return false;
@@ -88,7 +100,7 @@ fn visible(tree: &glory_render::memory::Memory, mut id: NodeId) -> bool {
     }
 }
 
-fn eligible(state: &State, id: NodeId) -> bool {
+pub(super) fn eligible(state: &State, id: NodeId) -> bool {
     state.mapper.tree().active(id)
         && state.mapper.tree().enabled(id)
         && state.layers.allowed(state.mapper.tree(), id)
@@ -115,6 +127,44 @@ fn first_focus(state: &State, root: NodeId) -> Option<NodeId> {
             return Some(id);
         }
         pending.extend(node.children.iter().rev());
+    }
+    None
+}
+
+fn handoff_previous(
+    tree: &glory_render::memory::Memory,
+    closed: &[Open],
+    previous_top: Option<NodeId>,
+) -> Option<NodeId> {
+    let mut entry = closed
+        .iter()
+        .rev()
+        .find(|entry| Some(entry.id) == previous_top && entry.restore)?;
+    // Only this synchronization's closing scopes participate. Implicit previous
+    // targets keep their exact lifetime; no closed-layer history is retained.
+    for _ in 0..closed.len() {
+        let valid = |id| {
+            visible(tree, id)
+                && tree.enabled(id)
+                && tree.node(id).is_ok_and(|node| {
+                    Action::Focus(id)
+                        .validate_target(node.descriptor.view())
+                        .is_ok()
+                })
+        };
+        if let Some(id) = entry
+            .config
+            .return_focus
+            .as_ref()
+            .and_then(|name| tree.named(name))
+            .filter(|id| valid(*id))
+            .or(entry.previous.filter(|id| valid(*id)))
+        {
+            return Some(id);
+        }
+        entry = closed
+            .iter()
+            .find(|parent| Some(parent.id) == entry.previous_scope && parent.restore)?;
     }
     None
 }
@@ -339,7 +389,8 @@ fn sync_inner(
         .dom
         .doc
         .get_focussed_node_id()
-        .and_then(|id| state.dom.owner(id));
+        .and_then(|id| state.dom.owner(id))
+        .or_else(|| handoff_previous(tree, &closed, previous_top));
     let previous_scope = previous.and_then(|previous| {
         layers
             .open
@@ -797,5 +848,197 @@ pub(super) fn receive(
             !allowed
         }
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod handoff_tests {
+    use super::*;
+    use glory_render::{Descriptor, NodeIds, Props, Render, RuntimeId, SemanticId, Semantics};
+
+    fn closed(id: NodeId, previous: Option<NodeId>, previous_scope: Option<NodeId>) -> Open {
+        Open {
+            id,
+            config: Layer::default(),
+            previous,
+            previous_scope,
+            restore: true,
+            outside_pending: false,
+            physical: false,
+            scope: false,
+        }
+    }
+    fn target(tree: &mut glory_render::memory::Memory, id: NodeId) {
+        let mut descriptor = Descriptor::new(Props::Button(Default::default()));
+        descriptor.semantics = Some(Box::new(Semantics {
+            id: Some(SemanticId::new("handoff-opener").unwrap()),
+            ..Default::default()
+        }));
+        tree.apply(&[
+            Mutation::Create {
+                id,
+                node: Box::new(descriptor),
+            },
+            Mutation::Place {
+                id,
+                parent: None,
+                before: None,
+            },
+        ])
+        .unwrap();
+    }
+    #[test]
+    fn native_handoff_keeps_exact_local_lifetimes_and_rejects_retired_or_foreign_targets() {
+        let runtime = RuntimeId::new();
+        let mut ids = NodeIds::new(runtime);
+        let mut tree = glory_render::memory::Memory::new(runtime);
+        let opener = ids.allocate();
+        let old_layer = ids.allocate();
+        target(&mut tree, opener);
+        let local = closed(old_layer, Some(opener), None);
+        assert_eq!(
+            handoff_previous(&tree, std::slice::from_ref(&local), Some(old_layer)),
+            Some(opener)
+        );
+        assert_eq!(
+            handoff_previous(&tree, std::slice::from_ref(&local), Some(opener)),
+            None
+        );
+        let foreign_runtime = RuntimeId::new();
+        let foreign = NodeIds::new(foreign_runtime).allocate();
+        let mut foreign_tree = glory_render::memory::Memory::new(foreign_runtime);
+        target(&mut foreign_tree, foreign);
+        assert_eq!(
+            handoff_previous(
+                &tree,
+                &[closed(old_layer, Some(foreign), None)],
+                Some(old_layer)
+            ),
+            None
+        );
+        tree.apply(&[Mutation::Dispose { id: opener }]).unwrap();
+        let replacement = ids.allocate();
+        target(&mut tree, replacement);
+        assert_eq!(
+            handoff_previous(&tree, &[local], Some(old_layer)),
+            None,
+            "implicit focus must not rebind to a replacement with the same semantic name"
+        );
+        assert!(foreign_tree.node(foreign).is_ok());
+    }
+    #[test]
+    fn native_handoff_excludes_hidden_inert_disabled_and_suspended_current_targets() {
+        let runtime = RuntimeId::new();
+        let mut ids = NodeIds::new(runtime);
+        let mut tree = glory_render::memory::Memory::new(runtime);
+        let opener = ids.allocate();
+        let old_layer = ids.allocate();
+        target(&mut tree, opener);
+        let parent = ids.allocate();
+        tree.apply(&[
+            Mutation::Create {
+                id: parent,
+                node: Box::new(Descriptor::new(Props::View)),
+            },
+            Mutation::Place {
+                id: parent,
+                parent: None,
+                before: None,
+            },
+            Mutation::Place {
+                id: opener,
+                parent: Some(parent),
+                before: None,
+            },
+        ])
+        .unwrap();
+        let closed = [closed(old_layer, Some(opener), None)];
+        for semantics in [
+            Semantics {
+                hidden: true,
+                ..Default::default()
+            },
+            Semantics {
+                inert: true,
+                ..Default::default()
+            },
+        ] {
+            tree.apply(&[Mutation::Patch {
+                id: parent,
+                patch: Patch::Semantics(Change::Set(Some(Box::new(semantics)))),
+            }])
+            .unwrap();
+            assert_eq!(handoff_previous(&tree, &closed, Some(old_layer)), None);
+        }
+        tree.apply(&[
+            Mutation::Patch {
+                id: parent,
+                patch: Patch::Semantics(Change::Clear),
+            },
+            Mutation::Patch {
+                id: opener,
+                patch: Patch::Enabled(Change::Set(false)),
+            },
+        ])
+        .unwrap();
+        assert_eq!(handoff_previous(&tree, &closed, Some(old_layer)), None);
+        tree.apply(&[
+            Mutation::Patch {
+                id: opener,
+                patch: Patch::Enabled(Change::Set(true)),
+            },
+            Mutation::Suspend { id: opener },
+        ])
+        .unwrap();
+        assert_eq!(handoff_previous(&tree, &closed, Some(old_layer)), None);
+        tree.apply(&[Mutation::Resume {
+            id: opener,
+            parent: Some(parent),
+            before: None,
+        }])
+        .unwrap();
+        assert_eq!(
+            handoff_previous(&tree, &closed, Some(old_layer)),
+            Some(opener)
+        );
+    }
+    #[test]
+    fn native_handoff_walks_only_current_managed_closed_scopes_and_honors_explicit_return() {
+        let runtime = RuntimeId::new();
+        let mut ids = NodeIds::new(runtime);
+        let mut tree = glory_render::memory::Memory::new(runtime);
+        let opener = ids.allocate();
+        let parent = ids.allocate();
+        let top = ids.allocate();
+        let retired_child = ids.allocate();
+        target(&mut tree, opener);
+        let outer = closed(parent, Some(opener), None);
+        let inner = closed(top, Some(retired_child), Some(parent));
+        assert_eq!(
+            handoff_previous(&tree, &[outer.clone(), inner.clone()], Some(top)),
+            Some(opener)
+        );
+        let mut preserve = outer.clone();
+        preserve.restore = false;
+        assert_eq!(
+            handoff_previous(&tree, &[preserve, inner.clone()], Some(top)),
+            None
+        );
+        let mut preserve = inner.clone();
+        preserve.restore = false;
+        assert_eq!(handoff_previous(&tree, &[outer, preserve], Some(top)), None);
+        let mut explicit = inner;
+        explicit.config.return_focus = Some(SemanticId::new("handoff-opener").unwrap());
+        assert_eq!(
+            handoff_previous(&tree, &[explicit], Some(top)),
+            Some(opener)
+        );
+        let a = closed(parent, None, Some(top));
+        let b = closed(top, None, Some(parent));
+        assert_eq!(
+            handoff_previous(&tree, &[a, b], Some(top)),
+            None,
+            "current closed-scope traversal is bounded"
+        );
     }
 }

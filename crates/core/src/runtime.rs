@@ -9,6 +9,9 @@ use std::time::Duration;
 
 use crate::RuntimeId;
 use crate::arena::{Arena, Key};
+#[path = "dependencies.rs"]
+mod dependencies;
+use dependencies::Dependencies;
 use glory_render::profile::{Phase, Profile};
 #[path = "fields.rs"]
 mod fields;
@@ -102,6 +105,16 @@ pub struct RuntimeStats {
     pub field_target_keys: usize,
 }
 
+/// Live graph shape. Kind order: Source, Derived, Structure, Binding, Effect.
+/// Degree bins: 0, 1, 2, 3-4, 5-8, 9-64, 65+. Snapshotting is opt-in;
+/// it performs no user callbacks and adds no persistent per-node counters.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct GraphStats {
+    pub nodes: [usize; 5],
+    pub dependencies: [[usize; 7]; 5],
+    pub subscribers: [[usize; 7]; 5],
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Mode {
     Pure,
@@ -138,9 +151,10 @@ struct Node {
     // A validation/new subscription rearms it before any refreshed consumer
     // could otherwise be hidden behind an already-pending ancestor.
     propagated: bool,
+    queued: bool,
     last_flush: u64,
     flush_runs: u32,
-    dependencies: BTreeMap<Key, u64>,
+    dependencies: Dependencies,
     subscribers: BTreeSet<Key>,
 }
 
@@ -172,7 +186,7 @@ struct State {
     bindings: VecDeque<Key>,
     structures: VecDeque<Key>,
     effects: VecDeque<Key>,
-    queued: BTreeSet<Key>,
+    queued: usize,
     queue_retired: usize,
     flushing: bool,
     batch_depth: usize,
@@ -186,7 +200,7 @@ struct State {
 struct Frame {
     runtime: RuntimeId,
     key: Key,
-    dependencies: BTreeMap<Key, u64>,
+    dependencies: Dependencies,
 }
 thread_local! {
     // This is only a handle lookup and stack of active evaluations. Every graph,
@@ -285,7 +299,7 @@ impl State {
             bindings: VecDeque::new(),
             structures: VecDeque::new(),
             effects: VecDeque::new(),
-            queued: BTreeSet::new(),
+            queued: 0,
             queue_retired: 0,
             flushing: false,
             batch_depth: 0,
@@ -298,7 +312,7 @@ impl State {
     }
 
     fn enqueue(&mut self, key: Key) {
-        let Some(node) = self.nodes.get(key) else {
+        let Some(node) = self.nodes.get_mut(key) else {
             return;
         };
         let phase = match node.compute {
@@ -307,7 +321,9 @@ impl State {
             Compute::Effect(_) => 2,
             _ => return,
         };
-        if self.queued.insert(key) {
+        if !node.queued {
+            node.queued = true;
+            self.queued += 1;
             match phase {
                 0 => self.structures.push_back(key),
                 1 => self.bindings.push_back(key),
@@ -321,11 +337,11 @@ impl State {
     }
 
     fn compact_queues(&mut self) {
-        debug_assert_eq!(self.queue_entries(), self.queued.len() + self.queue_retired);
+        debug_assert_eq!(self.queue_entries(), self.queued + self.queue_retired);
         if self.queue_retired == 0 {
             return;
         }
-        let live = self.queued.len();
+        let live = self.queued;
         if live == 0 {
             // Keys own no data. Clearing lengths needs no per-key destruction.
             self.structures.clear();
@@ -352,7 +368,11 @@ impl State {
                 .pop_front()
                 .or_else(|| self.bindings.pop_front())
                 .or_else(|| self.effects.pop_front())?;
-            if self.queued.remove(&key) {
+            if let Some(node) = self.nodes.get_mut(key)
+                && node.queued
+            {
+                node.queued = false;
+                self.queued -= 1;
                 // Draining live work can also change the live/tombstone ratio.
                 // Compact before callbacks so the bound holds during reentry.
                 self.compact_queues();
@@ -420,11 +440,8 @@ impl State {
                 source.subscribers.remove(&key);
             }
         }
-        if matches!(
-            &node.compute,
-            Compute::Structure(_) | Compute::Binding(_) | Compute::Effect(_)
-        ) && self.queued.remove(&key)
-        {
+        if node.queued {
+            self.queued -= 1;
             // Cancel membership immediately. A small retirement must not scan
             // unrelated ready work. Only numeric stale keys wait for compaction.
             self.queue_retired += 1;
@@ -542,13 +559,13 @@ impl Evaluation {
             stack.push(Some(Frame {
                 runtime,
                 key: self.key,
-                dependencies: BTreeMap::new(),
+                dependencies: Dependencies::new(),
             }));
             previous
         }));
     }
 
-    fn dependencies(&mut self) -> BTreeMap<Key, u64> {
+    fn dependencies(&mut self) -> Dependencies {
         self.frame.take();
         TRACKING.with_borrow_mut(|stack| {
             let frame = stack.pop().flatten().expect("evaluation tracking frame");
@@ -704,7 +721,11 @@ fn ensure(runtime: RuntimeId, state: &Shared, key: Key) -> Result<(), AccessErro
     let mut needs_rerun = false;
     for (dependency, version) in &dependencies {
         if let Some(source) = state.nodes.get_mut(*dependency) {
-            source.subscribers.insert(key);
+            // Existing edges remain registered while callbacks run. Still
+            // rearm/validate every dependency, even when insertion is skipped.
+            if !old_dependencies.contains_key(dependency) {
+                source.subscribers.insert(key);
+            }
             // A new or recomputed subscriber has now observed this version.
             // The next publication must reach it, even after unobserved writes.
             source.propagated = false;
@@ -782,6 +803,17 @@ impl Runtime {
     }
     pub fn now(&self) -> Option<Duration> {
         self.state.borrow().host.as_ref().map(|host| host.now())
+    }
+    /// Ask the attached event loop for an observation turn. This does not poll
+    /// tasks or execute application callbacks; host wake must only enqueue.
+    pub fn request_observe(&self) -> bool {
+        let host = self.state.borrow().host.clone();
+        if let Some(host) = host {
+            host.wake();
+            true
+        } else {
+            false
+        }
     }
     pub fn owner(&self) -> Owner {
         let root = self.state.borrow().root;
@@ -885,6 +917,36 @@ impl Runtime {
         Ok(())
     }
 
+    /// Explicit O(live nodes) diagnostic. Fixed aggregate bins contain no
+    /// values, identities, visited rows or evaluation history.
+    pub fn graph_stats(&self) -> GraphStats {
+        fn bin(degree: usize) -> usize {
+            match degree {
+                0 => 0,
+                1 => 1,
+                2 => 2,
+                3..=4 => 3,
+                5..=8 => 4,
+                9..=64 => 5,
+                _ => 6,
+            }
+        }
+        let state = self.state.borrow();
+        let mut result = GraphStats::default();
+        for node in state.nodes.values() {
+            let kind = match node.compute {
+                Compute::Source => 0,
+                Compute::Derived { .. } => 1,
+                Compute::Structure(_) => 2,
+                Compute::Binding(_) => 3,
+                Compute::Effect(_) => 4,
+            };
+            result.nodes[kind] += 1;
+            result.dependencies[kind][bin(node.dependencies.len())] += 1;
+            result.subscribers[kind][bin(node.subscribers.len())] += 1;
+        }
+        result
+    }
     pub fn stats(&self) -> RuntimeStats {
         let state = self.state.borrow();
         let (entry_keys, entry_buckets) = state.fields.entry_stats();
@@ -903,7 +965,7 @@ impl Runtime {
                 .values()
                 .map(|node| node.dependencies.len())
                 .sum(),
-            queued: state.queued.len(),
+            queued: state.queued,
             queue_entries: state.queue_entries(),
             queue_capacity: state.structures.capacity()
                 + state.bindings.capacity()
@@ -999,9 +1061,10 @@ impl Owner {
             status: Status::Clean,
             rerun: false,
             propagated: false,
+            queued: false,
             last_flush: 0,
             flush_runs: 0,
-            dependencies: BTreeMap::new(),
+            dependencies: Dependencies::new(),
             subscribers: BTreeSet::new(),
         };
         let key = lookup(self.runtime)
@@ -1014,6 +1077,28 @@ impl Owner {
         }
     }
 
+    /// Synchronous, untracked pure computation under this live Owner.
+    /// Allocates no reactive node. Both reads and unwind restore the outer
+    /// tracking/mode/construction context; writes/creation remain forbidden.
+    pub fn compute<T>(&self, f: impl FnOnce() -> T) -> Result<T, AccessError> {
+        let state = lookup(self.runtime)?;
+        if state.borrow().owners.get(self.key).is_none() {
+            return Err(AccessError::Disposed);
+        }
+        struct Pure;
+        impl Drop for Pure {
+            fn drop(&mut self) {
+                EVALUATING.with_borrow_mut(|stack| {
+                    stack.pop();
+                });
+            }
+        }
+        Ok(enter_owner(self.runtime, self.key, || {
+            EVALUATING.with_borrow_mut(|stack| stack.push(Mode::Pure));
+            let _pure = Pure;
+            untracked(f)
+        }))
+    }
     pub fn bond<T: 'static>(&self, mapper: impl Fn() -> T + 'static) -> Bond<T> {
         make_bond(self.runtime, self.key, mapper).expect("live owner")
     }
@@ -1047,9 +1132,10 @@ impl Owner {
             status: Status::Dirty,
             rerun: false,
             propagated: false,
+            queued: false,
             last_flush: 0,
             flush_runs: 0,
-            dependencies: BTreeMap::new(),
+            dependencies: Dependencies::new(),
             subscribers: BTreeSet::new(),
         };
         let key = lookup(self.runtime)
@@ -1225,6 +1311,21 @@ impl Scope {
     }
     pub fn owner(&self) -> &Owner {
         &self.owner
+    }
+    /// Whether this live Scope has an explicitly installed task execution service.
+    /// This neither constructs/polls a future nor asks the host to perform work.
+    /// An installed but closed/limited host still reports its normal spawn error.
+    pub fn has_task_host(&self) -> Result<bool, AccessError> {
+        let state = lookup(self.id.runtime)?;
+        let state = state.borrow();
+        let instance = state
+            .instances
+            .get(self.id.key)
+            .ok_or(AccessError::Disposed)?;
+        if instance.owner != self.owner.key || state.owners.get(self.owner.key).is_none() {
+            return Err(AccessError::Disposed);
+        }
+        Ok(state.host.is_some())
     }
     pub fn child(&self) -> Self {
         make_scope(self.owner.child(), Some(self.id.key)).expect("live scope")
@@ -1527,9 +1628,10 @@ fn make_bond<T: 'static>(
         status: Status::Dirty,
         rerun: false,
         propagated: false,
+        queued: false,
         last_flush: 0,
         flush_runs: 0,
-        dependencies: BTreeMap::new(),
+        dependencies: Dependencies::new(),
         subscribers: BTreeSet::new(),
     };
     let key = lookup(runtime)?.borrow_mut().insert_node(owner, node)?;

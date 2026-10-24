@@ -15,16 +15,17 @@ use templates::Templates;
 #[path = "plans.rs"]
 mod plans;
 
-// HTML has exactly three typed parts. Keep live DOM handles inline rather
+// HTML has exactly four typed parts. Keep live DOM handles inline rather
 // than allocating a BTreeMap node for each semantic node.
 #[derive(Default)]
-pub(super) struct Parts([Option<Node>; 3]);
+pub(super) struct Parts([Option<Node>; 4]);
 impl Parts {
     fn index(part: Part) -> usize {
         match part {
             Part::Main => 0,
             Part::Control => 1,
             Part::Content => 2,
+            Part::Picker => 3,
         }
     }
     pub fn get(&self, part: &Part) -> Option<&Node> {
@@ -71,10 +72,11 @@ pub(super) struct Editing {
     )>,
     pub composing: bool,
     pub revision: u64,
-    requested: u64,
+    pub(super) requested: u64,
     pending: Option<String>,
 }
 pub(super) struct Entry {
+    pub(super) rich: RefCell<Option<Box<super::rich::Editing>>>,
     pub(super) collapse: RefCell<Option<Box<super::collapse::Observer>>>,
     pub(super) image: RefCell<Option<Box<super::images::Observer>>>,
     pub parent: Cell<Option<NodeId>>,
@@ -167,10 +169,14 @@ impl Entry {
             editing.revision = editing.requested;
             return Ok(());
         }
+        if let Property::RichDocument(document) = value {
+            return super::rich::property(self, document.clone());
+        }
         let value: JsValue = match value {
             Property::Text(value) => value.into(),
             Property::Bool(value) => (*value).into(),
             Property::SelectedKeys(_) => unreachable!(),
+            Property::RichDocument(_) => unreachable!(),
         };
         js_sys::Reflect::set(&node, &name.into(), &value).map_err(backend)?;
         Ok(())
@@ -201,6 +207,10 @@ pub(super) struct DragSession {
     pub captured: bool,
 }
 pub(super) struct Dom {
+    pub(super) rich_pending: RefCell<Vec<NodeId>>,
+    pub(super) rich_live: RefCell<BTreeSet<NodeId>>,
+    pub(super) files: RefCell<super::files::Files>,
+    pub(super) clipboards: RefCell<super::clipboard::Writes>,
     pub(super) translations: RefCell<super::translation::Translations>,
     pub(super) collapses: RefCell<super::collapse::Collapses>,
     pub(super) images: RefCell<super::images::Images>,
@@ -209,6 +219,7 @@ pub(super) struct Dom {
     pub(super) sheets: RefCell<super::sheet::Sheets>,
     pub layer_layout: Cell<bool>,
     pub drag: RefCell<Option<DragSession>>,
+    pub(super) swipe: RefCell<Option<super::swipe::Session>>,
     pub suppress_click: Cell<bool>,
     pub document: Document,
     pub root: Element,
@@ -235,15 +246,21 @@ impl Dom {
     pub fn new(document: Document, root: Element, frame: Rc<Frame>) -> Result<Rc<Self>, Error> {
         let document_layers = super::layers::DocumentLayers::acquire(&document)?;
         let error = root.set_attribute("data-gly-app", "").err().map(backend);
+        let files = super::files::Files::new(&document)?;
         let dom = Rc::new(Self {
+            rich_pending: RefCell::new(Vec::new()),
+            rich_live: RefCell::new(BTreeSet::new()),
+            files: RefCell::new(files),
             translations: RefCell::new(super::translation::Translations::default()),
             collapses: RefCell::new(super::collapse::Collapses::default()),
             images: RefCell::new(super::images::Images::default()),
+            clipboards: RefCell::new(super::clipboard::Writes::default()),
             layers: RefCell::new(super::layers::Layers::default()),
             document_layers: document_layers.clone(),
             sheets: RefCell::new(super::sheet::Sheets::default()),
             layer_layout: Cell::new(false),
             drag: RefCell::new(None),
+            swipe: RefCell::new(None),
             suppress_click: Cell::new(false),
             document,
             root,
@@ -312,6 +329,7 @@ impl Dom {
             }
         }
         let entry = Rc::new(Entry {
+            rich: RefCell::new(None),
             collapse: RefCell::new(None),
             image: RefCell::new(None),
             parent: Cell::new(parent),
@@ -363,6 +381,9 @@ impl Dom {
                 }
             }
         }
+        if entry.edit == EditKind::Rich {
+            self.rich_live.borrow_mut().insert(id);
+        }
         self.entries.borrow_mut().insert(id, entry);
         Ok(())
     }
@@ -395,6 +416,16 @@ impl Dom {
             entry.interests.borrow_mut().insert(kind);
         } else {
             entry.interests.borrow_mut().remove(&kind);
+        }
+        if kind == EventKind::Swipe
+            && !enabled
+            && self
+                .swipe
+                .borrow()
+                .as_ref()
+                .is_some_and(|current| current.node == id)
+        {
+            super::swipe::cancel(self);
         }
         if kind == EventKind::ImageStatus {
             self.queue_image(id, &entry, enabled);
@@ -483,7 +514,10 @@ impl Dom {
         }
         if matches!(
             event,
-            Event::Drag {
+            Event::Swipe {
+                phase: glory_render::DragPhase::Move,
+                ..
+            } | Event::Drag {
                 phase: glory_render::DragPhase::Move,
                 ..
             }
@@ -492,9 +526,13 @@ impl Dom {
             event: previous,
         }) = inputs.last_mut()
             && *node == id
+            && previous.kind() == event.kind()
             && matches!(
                 previous,
-                Event::Drag {
+                Event::Swipe {
+                    phase: glory_render::DragPhase::Move,
+                    ..
+                } | Event::Drag {
                     phase: glory_render::DragPhase::Move,
                     ..
                 }
@@ -604,6 +642,9 @@ impl Dom {
                 .map_err(backend)?;
         }
         let entry = self.make_entry(&shape, parts, fragment)?;
+        if entry.edit == EditKind::Rich {
+            self.rich_live.borrow_mut().insert(id);
+        }
         self.entries.borrow_mut().insert(id, entry);
         Ok(())
     }
@@ -615,22 +656,30 @@ impl Dom {
     ) -> Result<Rc<Entry>, Error> {
         #[cfg(feature = "hydrate")]
         let is_virtual = virtual_shape(shape);
+        let (first, last) = if shape.pieces.is_empty() {
+            let range = fragment.as_ref().ok_or(Error::Unsupported("Group range"))?;
+            (
+                range
+                    .first_child()
+                    .ok_or(Error::Unsupported("Group start"))?,
+                range.last_child().ok_or(Error::Unsupported("Group end"))?,
+            )
+        } else {
+            let root = parts
+                .get(&shape.root_part()?)
+                .cloned()
+                .ok_or(Error::Unsupported("HTML physical root"))?;
+            (root.clone(), root)
+        };
         let entry = Rc::new(Entry {
+            rich: RefCell::new(None),
             collapse: RefCell::new(None),
             image: RefCell::new(None),
             parent: Cell::new(None),
             #[cfg(feature = "hydrate")]
             is_virtual,
-            first: parts
-                .get(&Part::Main)
-                .cloned()
-                .or_else(|| fragment.as_ref()?.first_child())
-                .expect("created range"),
-            last: parts
-                .get(&Part::Main)
-                .cloned()
-                .or_else(|| fragment.as_ref()?.last_child())
-                .expect("created range"),
+            first,
+            last,
             fragment: RefCell::new(fragment),
             parts,
             children: shape.children,
@@ -783,6 +832,12 @@ impl Dom {
             subtree.iter().filter_map(|id| entries.remove(id)).collect()
         };
         let subtree: HashSet<_> = subtree.into_iter().collect();
+        self.rich_pending
+            .borrow_mut()
+            .retain(|id| !subtree.contains(id));
+        for id in &subtree {
+            self.rich_live.borrow_mut().remove(id);
+        }
         if self
             .drag
             .borrow()
@@ -799,6 +854,7 @@ impl Dom {
             for id in &subtree {
                 sizes.remove(id);
                 self.images.borrow_mut().retire(*id);
+                self.clipboards.borrow_mut().retire(*id);
                 self.collapses.borrow_mut().retire(*id);
                 self.translations.borrow_mut().retire(*id);
             }
@@ -829,6 +885,10 @@ impl Dom {
         Ok(())
     }
     pub fn clear(&self) {
+        self.rich_pending.borrow_mut().clear();
+        self.rich_live.borrow_mut().clear();
+        self.swipe.borrow_mut().take();
+        self.close_files();
         *self.collapses.borrow_mut() = super::collapse::Collapses::default();
         *self.translations.borrow_mut() = super::translation::Translations::default();
         *self.sheets.borrow_mut() = super::sheet::Sheets::default();
@@ -851,6 +911,7 @@ impl Dom {
         self.sizes.borrow_mut().clear();
         self.inputs.borrow_mut().clear();
         self.images.borrow_mut().clear();
+        self.clipboards.borrow_mut().clear();
         // Root is claimed exclusively. Clear ranges even after a failed prefix.
         if self.owned.get() {
             self.root.set_text_content(None);

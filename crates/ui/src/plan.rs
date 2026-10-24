@@ -101,6 +101,30 @@ impl PlanInstance {
         let (scope, id) = self.resolve(part)?;
         bind(&scope, id, value.into(), patch)
     }
+    /// One pure property observer, without an intermediate Bond. Use Bond for
+    /// shared/cached computations; this closure runs under the instance Owner.
+    pub fn bind_fn<T: Clone + PartialEq + 'static>(
+        &self,
+        part: &PlanPart,
+        read: impl FnMut() -> T + 'static,
+        patch: impl FnMut(T) -> Patch + 'static,
+    ) -> Result {
+        let (scope, id) = self.resolve(part)?;
+        bind_fn(&scope, id, read, patch, None)
+    }
+    pub fn text_fn(&self, part: &PlanPart, read: impl FnMut() -> String + 'static) -> Result {
+        self.bind_fn(part, read, |v| Patch::Text(Change::Set(v)))
+    }
+    pub fn label_fn(&self, part: &PlanPart, read: impl FnMut() -> String + 'static) -> Result {
+        self.bind_fn(part, read, |v| Patch::Label(Change::Set(v)))
+    }
+    pub fn class_fn(&self, part: &PlanPart, read: impl FnMut() -> String + 'static) -> Result {
+        self.bind_fn(part, read, |v| {
+            Patch::Classes(Change::Set(
+                v.split_whitespace().map(str::to_owned).collect(),
+            ))
+        })
+    }
     pub fn text(&self, part: &PlanPart, value: impl Into<Lotus<String>>) -> Result {
         self.bind(part, value, |v| Patch::Text(Change::Set(v)))
     }
@@ -133,6 +157,10 @@ pub(crate) fn bind<T: Clone + PartialEq + 'static>(
 ) -> Result {
     if let Lotus::Value(value) = value {
         return match patch(value) {
+            Patch::RichDocument {
+                document: Change::Set(value),
+                ..
+            } => scope.session()?.rich_document(node, value),
             Patch::Value {
                 value: Change::Set(value),
                 ..
@@ -166,6 +194,53 @@ pub(crate) fn bind<T: Clone + PartialEq + 'static>(
         }
         let update = patch(value.clone());
         let result = match update {
+            Patch::RichDocument {
+                document: Change::Set(value),
+                ..
+            } => session.rich_document(node, value),
+            Patch::Value {
+                value: Change::Set(value),
+                ..
+            } => session.input_value(node, value),
+            Patch::SelectSelection {
+                keys: Change::Set(keys),
+                ..
+            } => session.select_selection(node, keys),
+            Patch::Source {
+                source: Change::Set(value),
+                ..
+            } => session.image_source(node, value),
+            update => session.patch(node, update),
+        };
+        match result {
+            Ok(()) => previous = Some(value),
+            Err(error) => session.report(error),
+        }
+    });
+    Ok(())
+}
+
+pub(crate) fn bind_fn<T: Clone + PartialEq + 'static>(
+    scope: &Scope,
+    node: NodeId,
+    mut read: impl FnMut() -> T + 'static,
+    mut patch: impl FnMut(T) -> Patch + 'static,
+    mut previous: Option<T>,
+) -> Result {
+    let session = Rc::downgrade(&scope.session()?);
+    scope.binding(move || {
+        let Some(session) = session.upgrade() else {
+            return;
+        };
+        let value = read();
+        if previous.as_ref() == Some(&value) {
+            return;
+        }
+        let result = match patch(value.clone()) {
+            Patch::RichDocument {
+                document: Change::Set(value),
+                ..
+            } => session.rich_document(node, value),
             Patch::Value {
                 value: Change::Set(value),
                 ..

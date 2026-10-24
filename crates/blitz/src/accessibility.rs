@@ -13,6 +13,7 @@ const ROOT: AxId = AxId(0);
 enum Key {
     Main(NodeId),
     Label(NodeId),
+    TreeChildren(NodeId),
 }
 
 struct Relations {
@@ -85,6 +86,7 @@ impl Tree {
         nodes.insert(ROOT, root);
         let mut alive = HashSet::new();
         let mut totals: HashMap<AxId, (Option<usize>, bool)> = HashMap::new();
+        let mut tree_items = Vec::new();
         let mut pending: Vec<_> = state
             .mapper
             .tree()
@@ -286,6 +288,29 @@ impl Tree {
                         glory_render::Current::Date => accesskit::AriaCurrent::Date,
                     });
                 }
+                if s.grid_multiple {
+                    node.set_multiselectable();
+                }
+                if let Some(tree) = s.tree_navigation
+                    && tree.multiple
+                {
+                    node.set_multiselectable();
+                }
+                if let Some(item) = s.tree_item {
+                    node.set_level(usize::from(item.level - 1));
+                    node.set_position_in_set(usize::from(item.position));
+                    let mut ancestor = semantic.parent;
+                    while let Some(current) = ancestor {
+                        let parent_node = state.mapper.tree().node(current)?;
+                        if parent_node.descriptor.view().role == Some(Role::Tree) {
+                            if let Some(tree) = self.ids.get(&Key::Main(current)).copied() {
+                                tree_items.push((id, ax_id, parent, tree, item));
+                            }
+                            break;
+                        }
+                        ancestor = parent_node.parent;
+                    }
+                }
                 if s.required {
                     node.set_required();
                 }
@@ -300,6 +325,13 @@ impl Tree {
                 }
                 if let Some(selected) = s.selected {
                     node.set_selected(selected);
+                }
+                if let Some(checked) = s.tree_checked {
+                    node.set_toggled(match checked {
+                        glory_render::TreeCheckState::Unchecked => Toggled::False,
+                        glory_render::TreeCheckState::Checked => Toggled::True,
+                        glory_render::TreeCheckState::Mixed => Toggled::Mixed,
+                    });
                 }
                 if let Some(pressed) = s.pressed {
                     node.set_toggled(if pressed {
@@ -424,17 +456,21 @@ impl Tree {
                 node.set_live_atomic();
             }
             let control = state.dom.control(id).ok();
+            if let Some(environment) = state.mapper.tree().inherited_environment(id)? {
+                node.set_language(environment.language.as_str().to_owned());
+            }
             if state.mapper.tree().enabled(id)
                 && control.is_some_and(|control| state.dom.focus_visible(control))
             {
-                if d.focus != FocusMode::Auto
-                    || control.is_some_and(|control| {
-                        state
-                            .dom
-                            .doc
-                            .get_node(control)
-                            .is_some_and(|n| n.is_focussable())
-                    })
+                if focus_scope::allowed(state, id)
+                    && (d.focus != FocusMode::Auto
+                        || control.is_some_and(|control| {
+                            state
+                                .dom
+                                .doc
+                                .get_node(control)
+                                .is_some_and(|n| n.is_focussable())
+                        }))
                 {
                     node.add_action(AxAction::Focus);
                 }
@@ -500,6 +536,66 @@ impl Tree {
                         .rev()
                         .map(|child| (*child, ax_id, list)),
                 );
+            }
+        }
+        // Flat ARIA trees carry explicit levels. AccessKit puts known sibling
+        // size on the container, so lower the same live preorder to actual
+        // TreeItem/Group ancestry. Scratch stacks contain live identities only;
+        // synthetic groups retire as soon as their last live child disappears.
+        let mut stacks: HashMap<AxId, Vec<(u8, NodeId, AxId)>> = HashMap::new();
+        let mut tree_removals: HashMap<AxId, HashSet<AxId>> = HashMap::new();
+        for (id, item_id, old_parent, tree, item) in tree_items {
+            let stack = stacks.entry(tree).or_default();
+            while stack
+                .last()
+                .is_some_and(|(level, _, _)| *level >= item.level)
+            {
+                stack.pop();
+            }
+            let container = if item.level == 1 {
+                Some(tree)
+            } else if let Some((_, parent, parent_id)) = stack
+                .last()
+                .copied()
+                .filter(|(level, _, _)| *level + 1 == item.level)
+            {
+                let key = Key::TreeChildren(parent);
+                let group = self.id(key)?;
+                alive.insert(key);
+                if let std::collections::btree_map::Entry::Vacant(entry) = nodes.entry(group) {
+                    entry.insert(Node::new(AxRole::Group));
+                    nodes
+                        .get_mut(&parent_id)
+                        .expect("live tree parent")
+                        .push_child(group);
+                }
+                Some(group)
+            } else {
+                None
+            };
+            if let Some(container) = container {
+                let count = Some(usize::from(item.count));
+                let entry = totals.entry(container).or_insert((count, true));
+                entry.1 &= entry.0 == count;
+                if old_parent != container {
+                    tree_removals.entry(old_parent).or_default().insert(item_id);
+                    nodes
+                        .get_mut(&container)
+                        .expect("live tree container")
+                        .push_child(item_id);
+                }
+            }
+            stack.push((item.level, id, item_id));
+        }
+        for (parent, removed) in tree_removals {
+            if let Some(parent) = nodes.get_mut(&parent) {
+                let children = parent
+                    .children()
+                    .iter()
+                    .copied()
+                    .filter(|id| !removed.contains(id))
+                    .collect::<Vec<_>>();
+                parent.set_children(children);
             }
         }
         for (list, (count, consistent)) in totals {
@@ -643,6 +739,7 @@ impl Tree {
                         glory_render::PopupKind::Dialog => accesskit::HasPopup::Dialog,
                         glory_render::PopupKind::Menu => accesskit::HasPopup::Menu,
                         glory_render::PopupKind::Listbox => accesskit::HasPopup::Listbox,
+                        glory_render::PopupKind::Tree => accesskit::HasPopup::Tree,
                     });
                 }
             }
@@ -783,87 +880,7 @@ impl Tree {
 }
 
 fn reveal_native(state: &mut State, id: NodeId) -> Result<(), Error> {
-    let target = state.dom.main(id)?;
-    if !state.dom.focus_visible(target) {
-        return Ok(());
-    }
-    let viewport_before = state.dom.doc.viewport_scroll();
-    let mut changed = false;
-    let mut cursor = state.dom.doc.get_node(target).and_then(|n| n.parent);
-    while let Some(parent) = cursor {
-        let host = state.dom.doc.get_node(parent).ok_or(Error::NodeGone(id))?;
-        cursor = host.parent;
-        if !host.has_boxes() {
-            continue;
-        }
-        let (Some(mut rect), Some(mut outer)) = (
-            state.dom.doc.get_client_bounding_rect(target),
-            state.dom.doc.get_client_bounding_rect(parent),
-        ) else {
-            continue;
-        };
-        let own = *state
-            .dom
-            .doc
-            .get_node(target)
-            .ok_or(Error::NodeGone(id))?
-            .scroll_offset();
-        rect.x += own.x;
-        rect.y += own.y;
-        let before = *host.scroll_offset();
-        let layout = host.final_layout();
-        outer.x += before.x + f64::from(layout.border.left);
-        outer.y += before.y + f64::from(layout.border.top);
-        let width = f64::from(
-            (layout.size.width
-                - layout.border.left
-                - layout.border.right
-                - layout.scrollbar_size.width)
-                .max(0.0),
-        );
-        let height = f64::from(
-            (layout.size.height
-                - layout.border.top
-                - layout.border.bottom
-                - layout.scrollbar_size.height)
-                .max(0.0),
-        );
-        state.dom.doc.scroll_by(
-            parent,
-            nearest(rect.x - outer.x, rect.width, width),
-            nearest(rect.y - outer.y, rect.height, height),
-            ScrollBehavior::Instant,
-        );
-        changed |= before
-            != *state
-                .dom
-                .doc
-                .get_node(parent)
-                .ok_or(Error::NodeGone(id))?
-                .scroll_offset();
-    }
-    state.dom.doc.scroll_into_view(
-        target,
-        ScrollBehavior::Instant,
-        blitz_dom::ScrollLogicalPosition::Nearest,
-        blitz_dom::ScrollLogicalPosition::Nearest,
-    );
-    if changed || viewport_before != state.dom.doc.viewport_scroll() {
-        state.observation_pending = true;
-        state.dom.invalidate();
-    }
-    Ok(())
-}
-
-fn nearest(start: f64, size: f64, viewport: f64) -> f64 {
-    let end = start + size;
-    if (start >= 0.0 && end <= viewport) || (start <= 0.0 && end >= viewport) {
-        0.0
-    } else if start.abs() < (end - viewport).abs() {
-        start
-    } else {
-        end - viewport
-    }
+    super::super::scroll_into_view::reveal(state, id)
 }
 
 fn revealable(state: &State, id: NodeId) -> bool {
@@ -984,6 +1001,8 @@ fn role(d: glory_render::DescriptorView<'_>) -> AxRole {
             Some(Role::Table) => AxRole::Table,
             Some(Role::Grid) => AxRole::Grid,
             Some(Role::GridCell) => AxRole::GridCell,
+            Some(Role::Tree) => AxRole::Tree,
+            Some(Role::TreeItem) => AxRole::TreeItem,
             Some(Role::Row) => AxRole::Row,
             Some(Role::ColumnHeader) => AxRole::ColumnHeader,
             Some(Role::Cell) => AxRole::Cell,
@@ -1010,7 +1029,7 @@ fn role(d: glory_render::DescriptorView<'_>) -> AxRole {
             TextKind::Kbd => AxRole::Label,
             TextKind::Mark => AxRole::Mark,
         },
-        Props::Button(_) => AxRole::Button,
+        Props::Button(_) | Props::File(_) => AxRole::Button,
         Props::Select(_) => AxRole::ComboBox,
         Props::Input(_) if d.semantics.as_ref().is_some_and(|s| s.spinbutton.is_some()) => {
             AxRole::SpinButton
@@ -1030,6 +1049,7 @@ fn role(d: glory_render::DescriptorView<'_>) -> AxRole {
         Props::Image(_) => AxRole::Image,
         Props::Graphic(_) => AxRole::Image,
         Props::Link(_) => AxRole::Link,
+        Props::RichEditor(_) => unreachable!("native rich editing is rejected during preflight"),
         Props::Group => unreachable!("transparent group"),
     }
 }

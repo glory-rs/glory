@@ -217,6 +217,10 @@ impl Render for Renderer {
     }
     fn action(&mut self, action: glory_render::Action) -> Result<(), glory_render::Error> {
         action.validate_target(&self.mapper.borrow().tree().node(action.node())?.descriptor)?;
+        self.mapper
+            .borrow()
+            .tree()
+            .validate_clipboard_action(action)?;
         Err(glory_render::Error::Unsupported(
             "SSR has no physical actions",
         ))
@@ -298,7 +302,7 @@ pub fn stream_with<W: Widget>(
         ids.sort_by_key(|id| model.key(*id));
         let nodes = ids.into_iter().map(|id| {
             let node = model.tree().node(id)?;
-            Ok(json!({"key":model.key(id).expect("key").to_string(),"shape":edits::shape(glory_html::shape(&node.descriptor)?),"parent":node.parent.and_then(|id|model.key(id)).map(|key|key.to_string()),"children":node.children.iter().map(|id|model.key(*id).expect("key").to_string()).collect::<Vec<_>>(),"placed":node.placed,"suspended":node.suspended}))
+            Ok(json!({"key":model.key(id).expect("key").to_string(),"shape":edits::shape(glory_html::shape_in(model.tree(),id)?),"parent":node.parent.and_then(|id|model.key(id)).map(|key|key.to_string()),"children":node.children.iter().map(|id|model.key(*id).expect("key").to_string()).collect::<Vec<_>>(),"placed":node.placed,"suspended":node.suspended}))
         }).collect::<Result<Vec<_>,glory_render::Error>>()?;
         serde_json::to_string(&nodes)?
     };

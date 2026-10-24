@@ -352,6 +352,206 @@ fn native_viewport_layer_resolves_live_coordinates_without_replacing_its_editor(
 }
 
 #[test]
+fn native_raise_preserves_actual_editor_selection_preedit_and_rejects_modal_crossing() {
+    let mut app = WindowApp::new();
+    let first = app.app.scope().cage(None);
+    let second = app.app.scope().cage(None);
+    let editor = app.app.scope().cage(None);
+    let modal = app.app.scope().cage(false);
+    let modal_editor = app.app.scope().cage(None);
+    let window = |key: &'static str, reference, content| {
+        view()
+            .role(Role::Dialog)
+            .name(key)
+            .focus(FocusMode::Programmatic)
+            .node_ref(reference)
+            .style(
+                Style::new()
+                    .width(Length::Px(260.))
+                    .height(Length::Px(180.)),
+            )
+            .semantics(Some(Box::new(Semantics {
+                id: Some(name(key)),
+                layer: Some(Layer {
+                    modal: false,
+                    outside: false,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            })))
+            .fill(content)
+    };
+    app.mount(view().fill((
+        window("window-a", first, input().value("draft").node_ref(editor)),
+        window("window-b", second, input()),
+        panel(modal, "blocking-modal", modal_editor, true),
+    )))
+    .unwrap();
+    settle(&mut app);
+    let first = first.get().unwrap();
+    let editor = editor.get().unwrap();
+    let physical = app.renderer.engine_id(editor, Part::Main).unwrap();
+    focus(&mut app, editor);
+    app.handle_ui_event(UiEvent::Ime(BlitzImeEvent::Preedit(
+        "中".into(),
+        Some((3, 3)),
+    )));
+    settle(&mut app);
+    let before = (
+        super::focus_tests::selection(&mut app, editor),
+        app.renderer.0.borrow().dom.text_value(editor).unwrap(),
+    );
+    app.renderer
+        .action(glory_render::Action::RaiseLayer(first))
+        .unwrap();
+    settle(&mut app);
+    assert_eq!(
+        app.renderer.engine_id(editor, Part::Main).unwrap(),
+        physical
+    );
+    assert_eq!(focused(&app), Some(editor));
+    assert_eq!(
+        (
+            super::focus_tests::selection(&mut app, editor),
+            app.renderer.0.borrow().dom.text_value(editor).unwrap()
+        ),
+        before
+    );
+    assert!(
+        app.renderer
+            .0
+            .borrow()
+            .dom
+            .range(editor)
+            .unwrap()
+            .editing
+            .composing
+    );
+    let main = app.renderer.engine_id(first, Part::Main).unwrap();
+    assert_eq!(
+        app.renderer
+            .inspect(|doc| doc.top_layers().last().unwrap().node_id),
+        main
+    );
+    modal.revise(|value| *value = true);
+    settle(&mut app);
+    assert!(matches!(
+        app.renderer.action(glory_render::Action::RaiseLayer(first)),
+        Err(Error::Unsupported(_))
+    ));
+    assert_eq!(focused(&app), modal_editor.get());
+}
+
+#[test]
+fn native_scroll_into_view_uses_current_ancestors_preserves_editor_focus_and_stops_at_the_layer() {
+    use glory_render::{Action, style::Overflow};
+    let mut app = WindowApp::new();
+    let outside = app.app.scope().cage(None);
+    let target = app.app.scope().cage(None);
+    let scroller = app.app.scope().cage(None);
+    let panel = app.app.scope().cage(None);
+    app.mount(
+        view().fill((
+            input().value("caret").node_ref(outside),
+            view().style(Style::new().height(Length::Px(1400.))),
+            view()
+                .role(Role::Dialog)
+                .name("Scroll scope")
+                .focus(FocusMode::Programmatic)
+                .node_ref(panel)
+                .style(
+                    Style::new()
+                        .width(Length::Px(300.))
+                        .height(Length::Px(200.)),
+                )
+                .semantics(Some(Box::new(Semantics {
+                    id: Some(name("scroll-scope")),
+                    layer: Some(Layer {
+                        modal: false,
+                        outside: false,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                })))
+                .fill(
+                    view()
+                        .node_ref(scroller)
+                        .style(
+                            Style::new()
+                                .height(Length::Px(100.))
+                                .overflow_y(Overflow::Auto),
+                        )
+                        .fill((
+                            view().style(Style::new().height(Length::Px(600.))),
+                            button().label("Reveal current box").node_ref(target),
+                        )),
+                ),
+        )),
+    )
+    .unwrap();
+    settle(&mut app);
+    let outside = outside.get().unwrap();
+    let target = target.get().unwrap();
+    let scroller = scroller.get().unwrap();
+    focus(&mut app, outside);
+    app.handle_ui_event(UiEvent::Ime(BlitzImeEvent::Preedit(
+        "中".into(),
+        Some((3, 3)),
+    )));
+    settle(&mut app);
+    {
+        let mut state = app.renderer.0.borrow_mut();
+        state
+            .dom
+            .doc
+            .set_viewport_scroll(blitz_dom::Point { x: 0., y: 240. });
+        state.dom.invalidate();
+    }
+    settle(&mut app);
+    let before = (
+        super::focus_tests::selection(&mut app, outside),
+        app.renderer.0.borrow().dom.text_value(outside).unwrap(),
+    );
+    let applied = app.renderer.stats().applied;
+    app.app
+        .scope()
+        .action(Action::ScrollIntoView(target))
+        .unwrap();
+    app.app.flush().unwrap();
+    settle(&mut app);
+    let rect = bounds_now(&app, target);
+    let outer = bounds_now(&app, scroller);
+    assert!(
+        rect.y >= outer.y - 0.1 && rect.y + rect.height <= outer.y + outer.height + 0.1,
+        "{rect:?} {outer:?}"
+    );
+    assert_eq!(app.renderer.inspect(|doc| doc.viewport_scroll().y), 240.);
+    assert_eq!(app.renderer.stats().applied, applied);
+    assert_eq!(focused(&app), Some(outside));
+    assert_eq!(
+        (
+            super::focus_tests::selection(&mut app, outside),
+            app.renderer.0.borrow().dom.text_value(outside).unwrap()
+        ),
+        before
+    );
+    assert!(
+        app.renderer
+            .0
+            .borrow()
+            .dom
+            .range(outside)
+            .unwrap()
+            .editing
+            .composing
+    );
+    app.renderer
+        .action(Action::ScrollIntoView(panel.get().unwrap()))
+        .unwrap();
+    assert_eq!(app.renderer.inspect(|doc| doc.viewport_scroll().y), 240.);
+}
+
+#[test]
 fn native_nested_and_out_of_order_modals_preserve_current_focus_and_transfer_fallbacks() {
     let mut app = WindowApp::new();
     let a = app.app.scope().cage(false);

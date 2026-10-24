@@ -78,6 +78,9 @@ impl<'a> DescriptorView<'a> {
     }
 
     pub fn validate(&self) -> Result<(), Error> {
+        if let Some(source) = self.semantics.as_ref().and_then(|s| s.clipboard.as_ref()) {
+            source.validate()?
+        }
         self.validate_fields(true, true, true)
     }
 
@@ -177,6 +180,12 @@ impl<'a> DescriptorView<'a> {
         }
         if self.role.is_some() && !matches!(self.props, Props::View) {
             return Err(Error::InvalidProps("structural roles require a view"));
+        }
+        if input && let Props::RichEditor(editor) = self.props {
+            editor.validate()?;
+        }
+        if input && let Props::File(file) = self.props {
+            file.validate()?;
         }
         if input && let Props::Select(select) = self.props {
             select.validate()?;

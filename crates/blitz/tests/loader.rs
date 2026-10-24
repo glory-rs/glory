@@ -729,6 +729,7 @@ fn huge_fixed_and_measured_lists_bound_real_http_jobs_and_image_history() {
             let host = Renderer::with_config(
                 runtime,
                 Config {
+                    motion: Default::default(),
                     base_url: server.url.clone(),
                     provider: Some(loader.clone()),
                     resources: ResourceLimits {
@@ -881,6 +882,7 @@ fn pressure_app(
         let host = Renderer::with_config(
             runtime,
             Config {
+                motion: Default::default(),
                 base_url,
                 provider: Some(loader),
                 resources: limits,

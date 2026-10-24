@@ -42,6 +42,10 @@ fn property(value: Property) -> Value {
         Property::Text(value) => json!(value),
         Property::Bool(value) => json!(value),
         Property::SelectedKeys(keys) => json!(keys),
+        Property::RichDocument(document) => json!(document.blocks.iter().map(|block| {
+            let kind=match block.kind {glory_render::RichBlockKind::Paragraph=>0,glory_render::RichBlockKind::Quote=>7,glory_render::RichBlockKind::Heading(level)=>level};
+            json!({"kind":kind,"runs":block.runs.iter().map(|run|json!({"text":run.text,"bold":run.marks.bold,"italic":run.marks.italic,"code":run.marks.code,"link":run.marks.link})).collect::<Vec<_>>()})
+        }).collect::<Vec<_>>()),
     }
 }
 pub(super) fn shape(shape: Shape) -> Value {

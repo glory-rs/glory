@@ -1,14 +1,16 @@
 # Glory 核心响应式与渲染优化评估
 
-日期：2026-10-24（Asia/Shanghai）
+日期：2026-10-24 初稿；2026-10-25 更新（Asia/Shanghai）。主性能测量在 2026-10-24 完成。
 
-状态：已按当前实现与声明共享专项结果更新，并完成文档/源码复核；本次未实施下列候选或运行新基准。
+状态：已实施并测量四项内部优化，另提供显式直接属性 API；两个额外实验已撤回。最终合并回归已通过（Windows 898 / Linux 897，27 组浏览器、64/1024 真实行高、窗口/传输验收），详见下列实施报告。
 
 ## 结论与证据范围
 
 保留当前架构：Cage/Bond/Lotus、属性级 Binding、显式 Owner、代际身份、有限语义树和类型化渲染协议。下一轮重点是降低这些机制的分配、复制、登记和提交成本。
 
-本文区分已完成实现、源码可见候选和已有冻结实验。工作区存在同期功能修改，既有冻结基准不能视为覆盖全部当前源码的测量。所有候选收益均待独立 A/B 验证，不能把容器、clone 或宿主调用数量直接换算成时间收益。
+本轮实现、独立构建、原始数据、撤回项和验收范围见 [实施与实测报告](../docs/reactive-runtime-optimization-2026-10-24.md)。before 冻结 494 个输入，内部候选逐项独立构建；两批分别 1,944 / 1,296 个主样本，不混池。标准 benchmark 的 15 个应用输入与 before 一致。
+
+最终同批 Glory 创建千行 / 替换千行 / 创建万行 / 清空千行的 Script 为 **20.975 / 30.986 / 247.109 / 15.317 ms**；同批 before 为 21.618 / 32.750 / 246.364 / 15.707 ms。选行 0.893→0.623 ms（约 -30.2%），千行替换约 -5.4%，万行创建基本持平。另一批创建千行略有回退，所以不声称批量创建稳定改善。原生单依赖高扇出显著改善，不等于 DOM 构造同幅提速。WASM Node 80→96 B、空帧微小回退和缓冲保留成本均已记录。
 
 Glory 的日常更新粒度更接近 Leptos：组件构造不自动成为订阅者，动态属性和控制流各自建立观察者。Dioxus 的组件本身是 reactive context，常见更新路径是重跑订阅组件，再通过模板辅助的 VDOM diff 生成 mutation。Dioxus 的静态结构复用和宿主提交方式值得借鉴，但无需为此改变 Glory 的更新模型。
 
@@ -49,7 +51,7 @@ Cage 写入并推进版本
 
 当前 builders 源码还包含响应式初值与订阅安装分离的改动；必须把它与后续候选分开测量，不能重复计算收益。
 
-最新可用实测来自[双份 Memory 声明共享专项](../docs/shared-declarations-2026-10-24.md)。下表是其最终同批结果，单位为 ScriptDuration 中位数 ms；Glory after 指该报告保留的 inline 版本。
+上轮历史实测来自[双份 Memory 声明共享专项](../docs/shared-declarations-2026-10-24.md)。下表是其最终同批结果，单位为 ScriptDuration 中位数 ms；Glory after 指该报告保留的 inline 版本。
 
 | 操作 | Glory before | Glory after | Leptos 0.8.19 | Dioxus 0.7.9 |
 |---|---:|---:|---:|---:|
@@ -80,11 +82,11 @@ P0 表示实施前的基线与观测准备；P1 表示优先独立实验；P2 �
 | 任务 | 状态 / 优先级 | 下一步边界 |
 |---|---|---|
 | 2.1 静态声明分离 | 已完成 | 仅对剩余 Props 初始化、Plan 引用和普通 Create 成本提出新假设 |
-| 2.5-A 提交/输入缓冲复用 | 候选 / P1，先行 | 保持协议和排队顺序，量化容量复用与保留成本 |
-| 2.5-B queued 成员资格 | 候选 / P1，单独实验 | 替换成员查询，不改变 propagated、FIFO 和取消/压缩规则 |
-| 2.2 依赖快照与追踪 | 候选 / P1，观测后实施 | 快照优化与容器替换分开；少依赖路径和大 fan-out 同测 |
-| 2.3 直接属性计算 | 候选 / P1，针对批量构造 | 显式 API，单独记录应用迁移对照 |
-| 2.6 退休遍历 | 候选 / P1，profile 决定具体项 | 只处理仍存在的收集、查找或扫描热点 |
+| 2.5-A 提交/输入缓冲复用 | 已实现 / 保留 | 单流空缓冲 1 MiB 上限；原生诊断回到小批后合计约 2.13 MiB，非 RSS |
+| 2.5-B queued 成员资格 | 已实现 / 保留 | 独立节点标志 + live 计数，propagated、FIFO、取消/压缩不变 |
+| 2.2 依赖快照与追踪 | A/B 均已实现 / 保留 | 跳过重复登记；Empty/One/Many；保留旧边与快照，多依赖回退，记录 WASM 体积成本 |
+| 2.3 直接属性计算 | API 已实现 / 显式选用 | 迁移选行更快，万行不稳定；默认应用未迁移，不宣称解决批量构造 |
+| 2.6 退休遍历 | 已复核 / 暂无额外重写 | 新 profile 未证明替换的 Owner.dispose 改善，禁止凭 inclusive 数字重写某个集合 |
 | 2.4-A 窄范围宿主批处理 | 候选 / P2 | 剩余逐节点桥接、多个离线根插入或批量释放，分别试验 |
 | 2.4-B 通用编码提交器 | 待窄实验结果 / P2 | 尚不作为下一轮首项建设任务 |
 
@@ -102,15 +104,17 @@ Plan 实例现在保存独立 Props、Plan 引用、声明索引和可选覆盖�
 
 ### 2.2 依赖存储与追踪缓冲
 
-**优先级：P1；源码可见候选，先分项观测，再做少依赖路径实验。**
+**状态：已分项实施和测量；后续优先检查 WASM 记录体积。**
 
-当前 Node 使用 BTreeMap 保存依赖与观察版本，使用 BTreeSet 保存订阅者。ensure 对 Clean 节点直接返回；只在需要验证或计算时克隆旧依赖表，重算时收集新表，之后比较新旧边。不能将它描述为每次读取都复制依赖。
+当前使用 [Dependencies](../crates/core/src/dependencies.rs)：Empty / One(Key, version) / Many(BTreeMap)，订阅者仍为 BTreeSet。已有依赖不再重复插入 subscriber；旧边仍留在节点上供退休路径读取，前沿重置与版本检查保留。Runtime::graph_stats 是显式 O(活跃节点) 统计，不自动进入帧循环。实际千行行场景的 3,001 个计算/观察节点均为单依赖。原生 1/10,000 的 100 次写入+flush 为 233.954→71.475 ms；多依赖和 wasm32 Node 80→96 B 的成本详见实测报告。
+
+本轮 before 的 Node 使用 BTreeMap 保存依赖与观察版本、BTreeSet 保存订阅者。ensure 对 Clean 节点直接返回；只在需要验证或计算时克隆旧依赖表，重算时收集新表，之后比较新旧边。不能将它描述为每次读取都复制依赖。
 
 node.compute.clone() 和 node.value.clone() 中的引用计数句柄克隆，应与依赖 BTreeMap 克隆及业务 T::clone 区分计量。空 BTreeMap::new 本身也不等于发生堆分配。publish/invalidate 虽有临时 Vec，但 Vec 消费/collect 可能复用存储，实际分配次数应由实验确认，不能仅按源码中的 Vec 变量数相加。
 
-先按 Source / Derived / Binding / Structure / Effect 统计活跃节点数量、依赖数与 fan-out 分布、非 Clean 验证和实际重算次数、分配次数/字节及阶段耗时。使用按区间聚合的有界直方图，不保留访问过的行键或每次求值历史。
+已按 Source / Derived / Binding / Structure / Effect 统计活跃节点、依赖数与 fan-out 的有界直方图；现有 RuntimeStats / Profile 记录验证、重算及阶段工作。另测记录大小和缓冲容量；本轮未测 allocator 总分配数/字节或 RSS，不据此宣称整体内存下降。不保留访问过的行键或每次求值历史。
 
-拆成两个实验：A 减少验证快照/重复登记；B 少量依赖的紧凑存储、追踪缓冲复用与大集合回退。先完成 A 的语义验证，再独立评价 B，避免把快照、容器、传播算法同时修改。必须同时测量小节点和高扇出图；给所有节点增加内联容量可能使无依赖 Source 和大图承担额外 Node/缓存压力。
+本轮按顺序完成两个实验：A 跳过重复登记，保留旧边快照；B 少量依赖的紧凑存储与大集合回退。没有移走旧表，也没有同时改传播算法；通用追踪缓冲复用仍未实施。必须同时测量小节点和高扇出图；给所有节点增加内联容量可能使无依赖 Source 和大图承担额外 Node/缓存压力。
 
 Leptos v0.8.19 的实际边集代码使用 IndexSet 和 FxHasher，并要求删除时保持订阅顺序。源码顶部关于 Vec 的注释不应替代实际实现。Glory 当前 Key 按 slot/generation 排序，订阅集合按 Key 遍历，invalidate 用栈继续传播，调度保持各阶段 live FIFO；保留“插入顺序”不等于保留这个执行顺序。容器替换不能机械套用另一框架。
 
@@ -122,15 +126,15 @@ Leptos v0.8.19 的实际边集代码使用 IndexSet 和 FxHasher，并要求删�
 
 ### 2.3 廉价属性转换直接进入 Binding
 
-**优先级：P1；针对批量创建/替换，可先于通用宿主编码提交评估。**
+**状态：已实现显式 API、独立迁移对照；默认应用不迁移。**
 
-研究显式属性计算入口，将只被一个属性使用的简单格式化从 Cage → Bond → Binding 缩短为 Cage → Binding 内计算。
+新增显式属性计算入口，将只被一个属性使用的简单格式化从 Cage → Bond → Binding 缩短为 Cage → Binding 内计算。
 
 当前 [benchmark 每行选中样式](../benchmarks/glory/src/main.rs) 经 selected.map(...) 创建 Bond，再由 instance.class 安装 Binding，具有具体的单消费者转换作用点。直接属性计算有机会减少每行一个 Bond 及其值、边和退休工作；减少节点数不等于相同比例的时间收益，标签 Cage 和属性 Binding 仍保留。
 
 借鉴 Leptos 对普通派生闭包与 Memo 的区分：昂贵计算、多消费者共享结果和需要派生层相等门控时保留 Bond；廉价单消费者转换可以避免独立缓存节点。直接属性计算仍保留 Binding 对最后成功注入值的比较，不能把“属性值需要相等比较”本身当成必须额外创建 Bond 的理由。
 
-这是显式 API 候选，不是悄悄改变 Cage::map 或 Lotus 的语义。不得自动合并无关属性的订阅，不得引入隐式回调记忆化。计算仍应纯净，生命周期仍归 Binding 的 Owner。
+已提供 content_fn / class_fn / style_fn / label_fn，以及 PlanInstance::bind_fn 等显式 API，并以 Owner::compute 约束普通 builder 初值。见 [直接属性测试](../crates/ui/tests/direct_properties.rs)。它没有改变 Cage::map 或 Lotus 的语义。不得自动合并无关属性的订阅，不得引入隐式回调记忆化。计算仍应纯净，生命周期仍归 Binding 的 Owner。
 
 初值与后续运行都要受纯计算限制，不能只把初值包在 untracked 中就认为已经禁止写入。普通 builder 保留完整初值校验/预检先于身份分配的边界；PlanInstance 已有身份，其动态安装应遵守现有 patch 预检与失败前不改变模型/队列的边界，不能误称实例尚未分配身份。追踪只属于最终属性 Binding。还要验证首次安装、源在安装前变化、相等输出、条件依赖、Owner 退休与值版本耗尽。
 
@@ -156,9 +160,9 @@ Leptos v0.8.19 的实际边集代码使用 IndexSet 和 FxHasher，并要求删�
 
 ### 2.5 提交与输入缓冲复用
 
-**优先级：P1；A/B 两项分别构建和测量，不同时修改。**
+**状态：A/B 已分别独立构建和测量，均保留；空提交分支另测后撤回。**
 
-2.5-A：当前 commit 通过 mem::take 取走 commands/actions/listeners，处理后没有归还原 Vec 容量；pump 创建新的输入 Vec。研究双缓冲或 RAII 归还空缓冲，减少长期帧循环的反复分配。
+2.5-A 已实现 [RAII 空缓冲池](../crates/ui/src/buffer.rs) 和 [App 行为测试](../crates/ui/src/buffer_tests.rs)。before 的 commit 取走 commands/actions/listeners 后不归还容量，pump 新建输入 Vec；当前改为有界复用。输入仍同时收集 renderer 和 staged Memory 的通知。每个已处理缓冲超过 1 MiB 就释放，返回空容量不覆盖处理期间的新队列。
 
 归还必须兼容处理期间的新排队内容、错误和重入；不能覆盖新命令，不能在借用内部销毁用户捕获。复用存储只保留容量，不保留访问过的行或用户值历史。
 
@@ -166,13 +170,13 @@ Leptos v0.8.19 的实际边集代码使用 IndexSet 和 FxHasher，并要求删�
 
 验收持续小帧、突发大批次后回到小帧、空帧、适配器错误、处理期间新排队内容和 panic；pump 仍须处理完整 drained tick、完成后续查询并执行必需 flush，不能在首个路由错误处提前退出。
 
-2.5-B：当前 State.queued 为 BTreeSet。独立试验节点 queued 标志以减少成员资格集合操作，但不能复用 propagated：是否已入队与当前失效是否已经传到订阅前沿是不同事实。
+2.5-B 已完成独立实验：before 的 State.queued 为 BTreeSet，当前改为节点 queued 标志和 live 计数，不能复用 propagated：是否已入队与当前失效是否已经传到订阅前沿是不同事实。
 
 保留即时取消、代际校验、Structure → Binding → Effect 及各阶段 live FIFO；压缩仍在取消或有效出队后、回调/重入前进行。物理队列仍满足 entries ≤ 2 × live queued + 64，live queued 为零时清空长度；重复入队、退休槽位复用、计算期间再次失效、部分读取与晚订阅均需覆盖。与边集容器替换分开，保持传播逻辑不变。
 
 ### 2.6 退休遍历与临时集合
 
-**优先级：P1；先确认当前销毁热点，必要时可提前某个已定位的小项。**
+**状态：已用新采样复核；本轮没有新增退休遍历重写。**
 
 Core、UI、Memory、Mapper 和 DOM 各自承担不同退休责任。先减少同一层内重复收集子树、临时 Vec/HashSet 和已知成员的重复查找，不直接跨层复用未经独立校验的可变树。
 
@@ -291,11 +295,11 @@ Leptos 的 Owner 内部使用 Arc/RwLock，响应式系统也提供线程安全�
 
 继续保留相同业务数据、语义/物理节点 census、存续 Element/Text 对象与完整 NodeId、所有行真实几何和最终截图对照。变高列表使用 64/1024 测量缓存、真实行高与原容差，检查小数锚点、滚动位置和身份；不能用 bulk benchmark 的通过替代虚拟列表或输入协议回归。
 
-新构建与缓存全部使用独立 D:/BuildCache 路径，并用 cargo metadata 验证 target_directory。新候选按影响范围运行 core/UI/各适配器单测、native/WASM 严格检查与浏览器/SSR/stream/hydration 验收；涉及 native 路径时保留适用平台的布局、窗口和辅助技术验收。减少 workspace 或只测无 DOM 路径不能充当完整回归。本文更新没有执行编译或新基准。
+新构建与缓存全部使用独立 D:/BuildCache 路径，并用 cargo metadata 验证 target_directory。新候选按影响范围运行 core/UI/各适配器单测、native/WASM 严格检查与浏览器/SSR/stream/hydration 验收；涉及 native 路径时保留适用平台的布局、窗口和辅助技术验收。减少 workspace 或只测无 DOM 路径不能充当完整回归。本轮已经执行独立构建、主计时与正确性验收，最终合并回归的具体结果以实施报告为准。
 
-## 6. 本次更新与复核记录
+## 6. 复核记录
 
-本次修改范围仅为本报告；以下“通过”指文档事实、链接和任务边界的复核，不表示候选已经实现或运行时测试重新通过。
+以下表格记录实施前那次**仅文档**复核，作为历史保留；其中“候选”和“收益未知”描述当时状态。本次实施、测试和数值见文首及独立实施报告，不以历史文档复核代替运行时验收。
 
 | 复核项 | 依据与结论 |
 |---|---|
@@ -310,6 +314,8 @@ Leptos 的 Owner 内部使用 Arc/RwLock，响应式系统也提供线程安全�
 | 验收与来源 | 21 个本地链接可解析，最新表 16 个数值与原始汇总一致、历史表 12 个数值与旧报告一致；数值沿用既有冻结实验，当前新增候选收益未知，文档检查不冒充运行时回归 |
 
 ## 7. 官方参考与既有报告
+
+- [本轮核心响应图与提交优化：实施、实测与撤回项](../docs/reactive-runtime-optimization-2026-10-24.md)
 
 - [Dioxus v0.7.9 Runtime / TLS](https://github.com/DioxusLabs/dioxus/blob/v0.7.9/packages/core/src/runtime.rs)
 - [Dioxus v0.7.9 ReactiveContext / TLS](https://github.com/DioxusLabs/dioxus/blob/v0.7.9/packages/core/src/reactive_context.rs)

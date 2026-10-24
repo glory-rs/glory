@@ -26,6 +26,8 @@ impl Render for Delayed {
             focus: true,
             input: true,
             collapse_completion: false,
+            clipboard_write: false,
+            files: None,
         }
     }
     fn apply(&mut self, mutations: &[Mutation]) -> Result<Receipt, Error> {
@@ -62,6 +64,84 @@ fn fixture() -> (App, NodeId, Rc<RefCell<Wire>>) {
     app.mount(input().value("a😀z")).unwrap();
     let node = app.tree().roots()[0];
     (app, node, wire)
+}
+
+#[test]
+fn physical_reveal_validates_identity_and_caps_skips_late_hidden_inert_and_survives_host_refusal() {
+    let wire = Rc::new(RefCell::new(Wire::default()));
+    let copy = wire.clone();
+    let app = App::new(move |id| Delayed {
+        memory: Memory::new(id),
+        wire: copy,
+    });
+    app.mount(glory_ui::view()).unwrap();
+    let node = app.tree().roots()[0];
+    app.scope().action(Action::ScrollIntoView(node)).unwrap();
+    app.flush().unwrap();
+    assert_eq!(wire.borrow().actions, [Action::ScrollIntoView(node)]);
+    app.scope().action(Action::ScrollIntoView(node)).unwrap();
+    app.scope()
+        .patch(
+            node,
+            Patch::Semantics(Change::Set(Some(Box::new(Semantics {
+                hidden: true,
+                ..Default::default()
+            })))),
+        )
+        .unwrap();
+    app.flush().unwrap();
+    assert_eq!(wire.borrow().actions.len(), 1);
+    assert!(app.scope().action(Action::ScrollIntoView(node)).is_err());
+    app.scope()
+        .patch(
+            node,
+            Patch::Semantics(Change::Set(Some(Box::new(Semantics {
+                inert: true,
+                ..Default::default()
+            })))),
+        )
+        .unwrap();
+    assert!(app.scope().action(Action::ScrollIntoView(node)).is_err());
+    app.scope()
+        .patch(node, Patch::Semantics(Change::Clear))
+        .unwrap();
+    app.flush().unwrap();
+    wire.borrow_mut().action_error = Some(Error::Unsupported("late layout or modal refusal"));
+    app.scope().action(Action::ScrollIntoView(node)).unwrap();
+    app.flush().unwrap();
+    wire.borrow_mut().action_error = None;
+    app.scope().action(Action::ScrollIntoView(node)).unwrap();
+    app.flush().unwrap();
+    assert_eq!(
+        wire.borrow().actions.len(),
+        3,
+        "ordinary refusal never faults later work"
+    );
+    let foreign = NodeIds::new(RuntimeId::new()).allocate();
+    assert!(matches!(
+        app.scope().action(Action::ScrollIntoView(foreign)),
+        Err(UiError::Render(Error::ForeignRuntime))
+    ));
+    app.clear().unwrap();
+    assert!(app.scope().action(Action::ScrollIntoView(node)).is_err());
+    let headless = App::memory();
+    headless.mount(glory_ui::view()).unwrap();
+    assert!(matches!(
+        headless
+            .scope()
+            .action(Action::ScrollIntoView(headless.tree().roots()[0])),
+        Err(UiError::Render(Error::Unsupported("scroll")))
+    ));
+    let logical = App::memory();
+    logical.mount(glory_ui::group()).unwrap();
+    assert!(matches!(
+        logical
+            .scope()
+            .action(Action::ScrollIntoView(logical.tree().roots()[0])),
+        Err(UiError::Render(Error::Unsupported(
+            "group has no physical action target"
+        )))
+    ));
 }
 
 #[test]

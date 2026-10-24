@@ -50,6 +50,7 @@ pub enum PopupKind {
     Dialog,
     Menu,
     Listbox,
+    Tree,
 }
 impl PopupKind {
     pub fn as_str(self) -> &'static str {
@@ -57,6 +58,7 @@ impl PopupKind {
             Self::Dialog => "dialog",
             Self::Menu => "menu",
             Self::Listbox => "listbox",
+            Self::Tree => "tree",
         }
     }
 }
@@ -237,6 +239,13 @@ impl Orientation {
 /// live names in their document. Removing a target retains no owning reference.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Semantics {
+    /// Explicit inherited text direction/language on an ordinary boxed View.
+    pub environment: Option<crate::Environment>,
+    /// A focus-only boundary. It has no role, top-layer paint or inert backdrop.
+    pub focus_scope: Option<crate::FocusScopeConfig>,
+    /// Nonphysical source read from the accepted semantic tree only when a
+    /// typed clipboard action is admitted. It is not duplicated into HTML.
+    pub clipboard: Option<crate::ClipboardText>,
     /// Present only on a structural column header; actions remain intrinsic buttons.
     pub sort: Option<crate::SortDirection>,
     /// Replace ordinary host ValueChanged with one bounded post-edit path.
@@ -249,6 +258,8 @@ pub struct Semantics {
     pub collapse: Option<crate::CollapseConfig>,
     /// Immediate primary-pointer capture, in viewport CSS pixels.
     pub drag_capture: Option<crate::DragCapture>,
+    /// Axis intent capture preserves orthogonal native panning.
+    pub swipe_capture: Option<crate::SwipeCapture>,
     /// An explicit context region. Touch long-press remains host-native.
     pub context_menu: Option<crate::ContextEditPolicy>,
     /// Opted-in free tag entry policy; retains the Input's intrinsic textbox.
@@ -310,6 +321,12 @@ pub struct Semantics {
     /// A two-dimensional physical Button navigation boundary, independent of
     /// the linear collection navigation protocol.
     pub grid_navigation: Option<Direction>,
+    /// A Grid that permits more than one selected cell.
+    pub grid_multiple: bool,
+    pub tree_navigation: Option<crate::TreeNavigation>,
+    pub tree_item: Option<crate::TreeItem>,
+    /// A checkable tree item, independent from list selection and Check props.
+    pub tree_checked: Option<crate::TreeCheckState>,
     pub navigation_item: bool,
     pub navigation_panel: Option<crate::NavigationPanel>,
     /// Native radio association; not an accessible name or a submission value.
@@ -321,6 +338,85 @@ pub struct Semantics {
 }
 impl Semantics {
     pub(crate) fn validate(&self, d: crate::DescriptorView<'_>) -> Result<(), Error> {
+        if let Some(environment) = &self.environment {
+            if !matches!(d.props, Props::View) {
+                return Err(Error::InvalidProps("environment metadata belongs to View"));
+            }
+            if self.navigation.is_some() && self.navigation_direction != environment.direction
+                || self
+                    .grid_navigation
+                    .is_some_and(|direction| direction != environment.direction)
+                || self
+                    .tree_navigation
+                    .is_some_and(|tree| tree.direction != environment.direction)
+            {
+                return Err(Error::InvalidProps(
+                    "environment and navigation directions disagree",
+                ));
+            }
+        }
+        if self.focus_scope.is_some()
+            && (!matches!(d.props, Props::View)
+                || d.focus != crate::FocusMode::Programmatic
+                || !matches!(d.role, None | Some(Role::Group))
+                || self.layer.is_some())
+        {
+            return Err(Error::InvalidProps(
+                "FocusScope requires an independent programmatic View",
+            ));
+        }
+        if self.tree_checked.is_some()
+            && (d.role != Some(Role::TreeItem)
+                || self.tree_item.is_none()
+                || self.selected.is_some())
+        {
+            return Err(Error::InvalidProps(
+                "tree checked state requires a TreeItem with coordinates, without selected state",
+            ));
+        }
+        if self.tree_navigation.is_some()
+            && (d.role != Some(Role::Tree)
+                || !matches!(d.props, Props::View)
+                || self.navigation.is_some()
+                || self.grid_navigation.is_some()
+                || self.navigation_item
+                || self.tree_item.is_some()
+                || self.typeahead)
+        {
+            return Err(Error::InvalidProps(
+                "tree navigation requires an independent Tree View",
+            ));
+        }
+        if let Some(item) = self.tree_item {
+            item.validate()?;
+            if d.role != Some(Role::TreeItem)
+                || !matches!(d.props, Props::View)
+                || self.navigation.is_some()
+                || self.grid_navigation.is_some()
+                || self.navigation_item
+                || self.table.is_some()
+                || self.typeahead
+            {
+                return Err(Error::InvalidProps(
+                    "tree coordinates require an independent TreeItem View",
+                ));
+            }
+        }
+        if self.clipboard.is_some()
+            && (!matches!(d.props, Props::Button(_))
+                || self.form_action.is_some()
+                || self.tab
+                || self.menu_item.is_some())
+        {
+            return Err(Error::InvalidProps(
+                "clipboard source requires an independent intrinsic Button",
+            ));
+        }
+        if self.grid_multiple && (d.role != Some(Role::Grid) || !matches!(d.props, Props::View)) {
+            return Err(Error::InvalidProps(
+                "multiple grid selection requires a Grid View",
+            ));
+        }
         if self.grid_navigation.is_some()
             && (d.role != Some(Role::Grid)
                 || !matches!(d.props, Props::View)
@@ -381,6 +477,22 @@ impl Semantics {
                     "collapse requires an independent View and hidden/inert opposite to open",
                 ));
             }
+        }
+        if self.swipe_capture.is_some()
+            && (!matches!(d.props, Props::View)
+                || d.role.is_some_and(|role| role != Role::Group)
+                || self.document_part.is_some()
+                || self.field_part.is_some()
+                || self.drag_capture.is_some()
+                || self.slider.is_some()
+                || self.splitter.is_some()
+                || self.sheet_grip
+                || self.layer.is_some()
+                || self.collapse.is_some())
+        {
+            return Err(Error::InvalidProps(
+                "swipe capture requires an independent boxed View",
+            ));
         }
         if self.drag_capture.is_some()
             && (!matches!(d.props, Props::View)
@@ -739,7 +851,7 @@ impl Semantics {
         let input_field = self.combobox.is_some()
             || matches!(
                 d.props,
-                Props::Input(_) | Props::Select(_) | Props::Check(_)
+                Props::Input(_) | Props::Select(_) | Props::Check(_) | Props::RichEditor(_)
             )
             || matches!(d.role, Some(Role::RadioGroup | Role::Slider));
         if (self.required && !input_field)
@@ -815,6 +927,7 @@ impl Semantics {
                             | Role::Menu
                             | Role::Tooltip
                             | Role::Listbox
+                            | Role::Tree
                             | Role::Group
                     )
                 )
@@ -843,6 +956,11 @@ impl Semantics {
                         || layer.focus != LayerFocus::Preserve
                         || d.focus != crate::FocusMode::Auto
                         || self.navigation != Some(Orientation::Vertical)))
+                || (d.role == Some(Role::Tree)
+                    && (layer.modal
+                        || layer.focus != LayerFocus::Manage
+                        || self.tree_navigation.is_none()
+                        || d.focus == crate::FocusMode::Auto))
                 || (d.role == Some(Role::Menu)
                     && (layer.modal
                         || layer.focus != LayerFocus::Manage
@@ -877,13 +995,15 @@ impl Semantics {
             ));
         }
         if (self.tab
-            || self.expanded.is_some()
+            || (self.expanded.is_some() && d.role != Some(Role::TreeItem))
             || (self.disabled
                 && self.splitter.is_none()
                 && self.slider.is_none()
                 && self.context_menu.is_none()
                 && self.drag_capture.is_none()
+                && self.swipe_capture.is_none()
                 && d.role != Some(Role::Menubar)
+                && !matches!(d.role, Some(Role::Tree | Role::TreeItem))
                 && !matches!(self.field_part, Some(FieldPart::Fieldset | FieldPart::Form))))
             && !matches!(d.props, Props::Button(_))
             && self.combobox.is_none()
@@ -905,6 +1025,7 @@ impl Semantics {
             && !self.tab
             && self.option.is_none()
             && d.role != Some(Role::GridCell)
+            && d.role != Some(Role::TreeItem)
             || self.tab && (self.expanded.is_some() || self.selected.is_none())
         {
             return Err(Error::InvalidProps(

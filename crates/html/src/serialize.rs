@@ -1,4 +1,4 @@
-use crate::{Kind, Part, Property, Shape, shape};
+use crate::{Kind, Part, Property, Shape};
 use glory_render::memory::Memory;
 use glory_render::{Error, NodeId};
 
@@ -29,7 +29,7 @@ pub fn serialize(tree: &Memory, key: impl Fn(NodeId) -> Option<u64>) -> Result<S
             return Ok(());
         }
         let key_value = key(id).ok_or(Error::NodeGone(id))?;
-        let shape = shape(&model.descriptor)?;
+        let shape = crate::shape_in(tree, id)?;
         if shape.pieces.is_empty() {
             out.push_str(&format!("<!--gly:s:{key_value}-->"));
             for child in &model.children {
@@ -37,7 +37,7 @@ pub fn serialize(tree: &Memory, key: impl Fn(NodeId) -> Option<u64>) -> Result<S
             }
             out.push_str(&format!("<!--gly:e:{key_value}-->"));
         } else {
-            piece(&shape, Part::Main, key_value, out, &mut |out| {
+            piece(&shape, shape.root_part()?, key_value, out, &mut |out| {
                 for child in &model.children {
                     node(tree, *child, key, out)?;
                 }
@@ -82,6 +82,9 @@ pub fn serialize(tree: &Memory, key: impl Fn(NodeId) -> Option<u64>) -> Result<S
                     out.push('"');
                 }
                 out.push('>');
+                if let Some(Property::RichDocument(document)) = properties.get("richDocument") {
+                    out.push_str(&rich_document(document));
+                }
                 if *tag == "select"
                     && let Some(options) = &shape.select_options
                 {
@@ -125,6 +128,64 @@ pub fn serialize(tree: &Memory, key: impl Fn(NodeId) -> Option<u64>) -> Result<S
         node(tree, *root, &key, &mut out)?;
     }
     Ok(out)
+}
+
+/// Serialize the finite intrinsic editor document; never accepts raw markup.
+pub fn rich_document(document: &glory_render::RichDocument) -> String {
+    use glory_render::RichBlockKind;
+    let mut out = String::new();
+    for block in &document.blocks {
+        let tag = match block.kind {
+            RichBlockKind::Paragraph => "p",
+            RichBlockKind::Heading(1) => "h1",
+            RichBlockKind::Heading(2) => "h2",
+            RichBlockKind::Heading(3) => "h3",
+            RichBlockKind::Heading(4) => "h4",
+            RichBlockKind::Heading(5) => "h5",
+            RichBlockKind::Heading(6) => "h6",
+            RichBlockKind::Quote => "blockquote",
+            RichBlockKind::Heading(_) => unreachable!("validated rich heading"),
+        };
+        out.push('<');
+        out.push_str(tag);
+        out.push('>');
+        for run in &block.runs {
+            if let Some(link) = &run.marks.link {
+                out.push_str("<a href=\"");
+                out.push_str(&escape(link));
+                out.push_str("\">");
+            }
+            if run.marks.bold {
+                out.push_str("<strong>");
+            }
+            if run.marks.italic {
+                out.push_str("<em>");
+            }
+            if run.marks.code {
+                out.push_str("<code>");
+            }
+            out.push_str(&escape(&run.text));
+            if run.marks.code {
+                out.push_str("</code>");
+            }
+            if run.marks.italic {
+                out.push_str("</em>");
+            }
+            if run.marks.bold {
+                out.push_str("</strong>");
+            }
+            if run.marks.link.is_some() {
+                out.push_str("</a>");
+            }
+        }
+        if block.runs.iter().all(|run| run.text.is_empty()) {
+            out.push_str("<br>");
+        }
+        out.push_str("</");
+        out.push_str(tag);
+        out.push('>');
+    }
+    out
 }
 
 /// Serialize only the finite intrinsic children of a native select.

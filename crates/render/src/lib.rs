@@ -62,12 +62,26 @@ pub use semantics::{
     Semantics,
 };
 pub use text::normalize_text;
+mod clipboard;
+mod files;
+pub use clipboard::{ClipboardOutcome, ClipboardText, MAX_CLIPBOARD_BYTES};
+pub use files::{
+    FileCapabilities, FileChunk, FileConfig, FileDocumentId, FileEvent, FileFilter,
+    FileImageFormat, FileImageInfo, FileInfo, FileOrigin, FileOutcome, FilePreview,
+    FilePreviewError, FilePreviewLimits, FileProps, FileRead, FileRejection, FileToken,
+    MAX_FILE_BYTES, MAX_FILE_CHUNK_BYTES, MAX_FILE_COUNT, MAX_FILE_FILTER_BYTES, MAX_FILE_FILTERS,
+    MAX_FILE_HEADER_BYTES, MAX_FILE_METADATA_BYTES, MAX_FILE_MIME_BYTES, MAX_FILE_NAME_BYTES,
+    MAX_FILE_READS, MAX_PREVIEW_DIMENSION, MAX_PREVIEW_ENCODED_BYTES, MAX_PREVIEW_PIXELS,
+    inspect_file_preview,
+};
 mod keyboard;
 pub use keyboard::{KeyboardCommand, KeyboardInput};
 mod navigation_panel;
 pub use navigation_panel::{NavigationPanel, NavigationPanelCommand};
 mod grid;
 pub use grid::GridCommand;
+mod tree;
+pub use tree::{TreeCheckState, TreeCommand, TreeItem, TreeNavigation};
 mod scroll;
 pub use scroll::{ScrollAxes, ScrollCommand, ScrollMetrics, ScrollMovement};
 mod sheet;
@@ -80,6 +94,8 @@ mod input_assist;
 pub use input_assist::{InputAssist, InputAutofill, InputMode};
 mod text_selection;
 pub use text_selection::{SelectionDirection, TextSelection};
+mod focus_scope;
+pub use focus_scope::{FocusScopeConfig, MAX_FOCUS_SCOPE_NODES, MAX_FOCUS_SCOPES};
 mod input_edit;
 pub use input_edit::{
     InputEdit, InputEditCapture, InputEditIntent, InputEditRejection, MAX_INPUT_EDIT_BYTES,
@@ -166,6 +182,10 @@ pub enum Mutation {
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Capabilities {
+    /// Explicit text clipboard writes with terminal host observations.
+    pub clipboard_write: bool,
+    /// Current consumer identity and independently available file operations.
+    pub files: Option<FileCapabilities>,
     pub measure: bool,
     pub scroll: bool,
     pub focus: bool,
@@ -179,6 +199,9 @@ pub struct QueryToken(pub u64);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Query {
+    RichSelection(NodeId),
+    FileRead(FileRead),
+    FilePreview(FileToken),
     Bounds(NodeId),
     Scroll(NodeId),
     ScrollMetrics(NodeId),
@@ -191,7 +214,10 @@ pub enum Query {
 impl Query {
     pub fn node(self) -> NodeId {
         match self {
-            Self::Bounds(id)
+            Self::FileRead(read) => read.file.node,
+            Self::FilePreview(file) => file.node,
+            Self::RichSelection(id)
+            | Self::Bounds(id)
             | Self::Scroll(id)
             | Self::ScrollMetrics(id)
             | Self::Selection(id)
@@ -206,6 +232,31 @@ impl Query {
         if matches!(node.props, Props::Group) {
             return Err(Error::Unsupported("group has no physical query target"));
         }
+        if matches!(self, Self::RichSelection(_)) && !matches!(node.props, Props::RichEditor(_)) {
+            return Err(Error::Unsupported("rich selection requires a RichEditor"));
+        }
+        if let Self::FileRead(read) = self {
+            read.validate()?;
+        }
+        if let Self::FileRead(FileRead { file, .. }) | Self::FilePreview(file) = self {
+            file.validate()?;
+            let Props::File(props) = node.props else {
+                return Err(Error::Unsupported("file queries require a File control"));
+            };
+            if file.revision != props.revision {
+                return Err(Error::InputRevision {
+                    current: props.revision,
+                    incoming: file.revision,
+                });
+            }
+            if !props.enabled {
+                return Err(Error::Unsupported("file control is disabled"));
+            }
+            if matches!(self, Self::FilePreview(_)) && props.configuration.preview.is_none() {
+                return Err(Error::Unsupported("file previews are not enabled"));
+            }
+        }
+
         if matches!(self, Self::Selection(_)) && !matches!(node.props, Props::Input(_)) {
             return Err(Error::Unsupported("selection requires a text input"));
         }
@@ -216,6 +267,16 @@ impl Query {
     /// use logical pixels; selection offsets use UTF-16 code units on all hosts.
     pub fn validate_response(self, value: &QueryValue) -> Result<(), Error> {
         match (self, value) {
+            (Self::FileRead(read), QueryValue::FileBytes(chunk)) => chunk.validate_read(read)?,
+            (Self::FilePreview(file), QueryValue::FilePreview(preview)) => {
+                if let Some(preview) = preview {
+                    preview.validate()?;
+                    if preview.file != file {
+                        return Err(Error::InvalidResponse("file preview token mismatch"));
+                    }
+                }
+            }
+            (Self::RichSelection(_), QueryValue::RichSelection(snapshot)) => snapshot.validate()?,
             (Self::Bounds(_), QueryValue::Bounds(rect)) => {
                 if ![rect.x, rect.y, rect.width, rect.height]
                     .into_iter()
@@ -247,11 +308,34 @@ impl Query {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Action {
+    PickFiles {
+        node: NodeId,
+        revision: u64,
+        request: u64,
+    },
+    ClearFiles {
+        node: NodeId,
+        revision: u64,
+    },
+    RemoveFile(FileToken),
+    CopyText {
+        node: NodeId,
+        revision: u64,
+        request: u64,
+    },
     /// Bring a current nonmodal Dialog layer forward without moving its DOM,
     /// editor identity or actual focus. The host's current modal still applies.
     RaiseLayer(NodeId),
+    /// Reveal one current physical box using nearest alignment and instant
+    /// scrolling, without focus or a logical collection controller.
+    ScrollIntoView(NodeId),
     /// Select an exact range in the current ASCII Input value. A stale revision
     /// is rejected; Unicode/surrogate/grapheme addressing is explicitly deferred.
+    SelectRich {
+        node: NodeId,
+        revision: u64,
+        selection: RichSelection,
+    },
     SelectText {
         node: NodeId,
         revision: u64,
@@ -281,17 +365,90 @@ pub enum Action {
 impl Action {
     pub fn node(self) -> NodeId {
         match self {
+            Self::PickFiles { node, .. }
+            | Self::ClearFiles { node, .. }
+            | Self::CopyText { node, .. } => node,
+            Self::RemoveFile(file) => file.node,
             Self::Focus(node)
             | Self::RaiseLayer(node)
+            | Self::ScrollIntoView(node)
             | Self::ScrollTo { node, .. }
             | Self::ExitMenu { node, .. }
             | Self::RevealOption { node } => node,
-            Self::SelectText { node, .. } => node,
+            Self::SelectText { node, .. } | Self::SelectRich { node, .. } => node,
         }
     }
     /// Validate after checking identity, before capability checks or queuing.
     pub fn validate_target<'a>(self, node: impl Into<DescriptorView<'a>>) -> Result<(), Error> {
         let node = node.into();
+        if let Self::SelectRich {
+            revision,
+            selection,
+            ..
+        } = self
+        {
+            let Props::RichEditor(editor) = node.props else {
+                return Err(Error::Unsupported(
+                    "rich selection action requires a RichEditor",
+                ));
+            };
+            if revision != editor.revision {
+                return Err(Error::InputRevision {
+                    current: editor.revision,
+                    incoming: revision,
+                });
+            }
+            editor.document.validate_selection(selection)?;
+            if !editor.enabled {
+                return Err(Error::Unsupported("rich editor is disabled"));
+            }
+        }
+        if let Self::PickFiles { revision, .. }
+        | Self::ClearFiles { revision, .. }
+        | Self::RemoveFile(FileToken { revision, .. }) = self
+        {
+            let Props::File(props) = node.props else {
+                return Err(Error::Unsupported("file action requires a File control"));
+            };
+            if revision != props.revision {
+                return Err(Error::InputRevision {
+                    current: props.revision,
+                    incoming: revision,
+                });
+            }
+            if !matches!(self, Self::ClearFiles { .. }) && !props.enabled {
+                return Err(Error::Unsupported("file control is disabled"));
+            }
+            if matches!(self, Self::PickFiles { request: 0, .. }) {
+                return Err(Error::InvalidProps("file picker request must be positive"));
+            }
+            if let Self::RemoveFile(file) = self {
+                file.validate()?;
+            }
+        }
+
+        if let Self::CopyText {
+            revision, request, ..
+        } = self
+        {
+            let source = node
+                .semantics
+                .as_ref()
+                .and_then(|s| s.clipboard.as_ref())
+                .ok_or(Error::Unsupported("button has no clipboard source"))?;
+            source.validate()?;
+            if !matches!(node.props, Props::Button(_))
+                || !node.props.enabled()
+                || node.semantics.as_ref().is_some_and(|s| s.disabled)
+            {
+                return Err(Error::Unsupported("clipboard requires an enabled Button"));
+            }
+            if revision != source.revision || request == 0 {
+                return Err(Error::InvalidProps(
+                    "clipboard request requires the exact source revision and a positive identity",
+                ));
+            }
+        }
         if matches!(self, Self::RaiseLayer(_))
             && (node.role != Some(Role::Dialog)
                 || node.hidden()
@@ -431,6 +588,9 @@ pub enum Navigation {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum QueryValue {
+    RichSelection(Box<RichSnapshot>),
+    FileBytes(Box<FileChunk>),
+    FilePreview(Option<Box<FilePreview>>),
     ScrollMetrics(ScrollMetrics),
     Focus(bool),
     Bounds(Rect),
@@ -448,6 +608,27 @@ pub enum QueryValue {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
+    RichCommand {
+        command: RichCommand,
+        revision: u64,
+    },
+    /// Current physical content exceeded the finite rich document grammar or
+    /// budgets. The host restores its accepted value before publishing this.
+    RichRejected {
+        revision: u64,
+    },
+    RichEdit(Box<RichSnapshot>),
+    RichSelection(Box<RichSnapshot>),
+    Files(Box<FileEvent>),
+    TreeNavigate {
+        from: NodeId,
+        command: TreeCommand,
+    },
+    Clipboard {
+        revision: u64,
+        request: u64,
+        outcome: ClipboardOutcome,
+    },
     GridNavigate {
         from: NodeId,
         command: GridCommand,
@@ -527,6 +708,13 @@ pub enum Event {
         from: NodeId,
     },
     /// Start/Move/Cancel target the source. Drop targets a live accepting node.
+    Swipe {
+        from: NodeId,
+        phase: DragPhase,
+        x: f64,
+        y: f64,
+        revision: u64,
+    },
     Drag {
         from: NodeId,
         phase: DragPhase,
@@ -616,6 +804,13 @@ pub struct ScrollAck {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum EventKind {
+    RichCommand,
+    RichRejected,
+    RichEdit,
+    RichSelection,
+    Files,
+    TreeNavigate,
+    Clipboard,
     GridNavigate,
     InputEdit,
     CollapseComplete,
@@ -637,6 +832,7 @@ pub enum EventKind {
     ColorSchemeChanged,
     Keyboard,
     Palette,
+    Swipe,
     Drag,
     ValueChanged,
     Commit,
@@ -659,6 +855,55 @@ impl EventKind {
     /// can produce it (SSR records handlers for later browser adoption).
     pub fn validate_target<'a>(self, node: impl Into<DescriptorView<'a>>) -> Result<(), Error> {
         let node = node.into();
+        if matches!(
+            self,
+            Self::RichEdit | Self::RichSelection | Self::RichRejected | Self::RichCommand
+        ) && !matches!(node.props, Props::RichEditor(_))
+        {
+            return Err(Error::InvalidProps(
+                "rich observations require a RichEditor",
+            ));
+        }
+        if self == Self::Swipe
+            && (!matches!(node.props, Props::View)
+                || node
+                    .semantics
+                    .as_ref()
+                    .is_none_or(|s| s.swipe_capture.is_none()))
+        {
+            return Err(Error::InvalidProps(
+                "swipe observations require a declared View capture",
+            ));
+        }
+        if self == Self::Files && !matches!(node.props, Props::File(_)) {
+            return Err(Error::InvalidProps(
+                "file observations require a File control",
+            ));
+        }
+
+        if self == Self::TreeNavigate
+            && (node.role != Some(Role::Tree)
+                || !matches!(node.props, Props::View)
+                || node
+                    .semantics
+                    .as_ref()
+                    .is_none_or(|s| s.tree_navigation.is_none()))
+        {
+            return Err(Error::InvalidProps(
+                "tree navigation requires an opted-in Tree View",
+            ));
+        }
+        if self == Self::Clipboard
+            && (!matches!(node.props, Props::Button(_))
+                || node
+                    .semantics
+                    .as_ref()
+                    .is_none_or(|s| s.clipboard.is_none()))
+        {
+            return Err(Error::Unsupported(
+                "clipboard observation requires a declared Button source",
+            ));
+        }
         if self == Self::GridNavigate
             && (node.role != Some(Role::Grid)
                 || !matches!(node.props, Props::View)
@@ -800,8 +1045,10 @@ impl EventKind {
                 "palette shortcut requires a non-editor physical scope or origin",
             ));
         }
-        if matches!(self, Self::ValueChanged | Self::Commit | Self::Composition)
+        if matches!(self, Self::ValueChanged | Self::Commit)
             && !matches!(node.props, Props::Input(_))
+            || self == Self::Composition
+                && !matches!(node.props, Props::Input(_) | Props::RichEditor(_))
             || matches!(self, Self::CheckedChanged) && !matches!(node.props, Props::Check(_))
         {
             return Err(Error::InvalidProps("event does not belong to this control"));
@@ -830,7 +1077,8 @@ impl Event {
         !self.is_terminal_loss()
             && !matches!(
                 self,
-                Self::ImageStatus { .. }
+                Self::Clipboard { .. }
+                    | Self::ImageStatus { .. }
                     | Self::ColorSchemeChanged { .. }
                     | Self::Scroll { .. }
                     | Self::Resize { .. }
@@ -840,12 +1088,20 @@ impl Event {
     /// Cleanup observations still reach live scopes after suspension. Retired
     /// identities never become valid again because an event is terminal.
     pub fn is_terminal_loss(&self) -> bool {
+        if let Self::Files(event) = self {
+            return !matches!(event.outcome, FileOutcome::Selected(_));
+        }
         matches!(
             self,
-            Self::CollapseComplete { .. }
+            Self::Clipboard { .. }
+                | Self::CollapseComplete { .. }
                 | Self::FocusChanged(false)
                 | Self::Composition { active: false }
                 | Self::FocusWithin { focused: false, .. }
+                | Self::Swipe {
+                    phase: DragPhase::Cancel,
+                    ..
+                }
                 | Self::Drag {
                     phase: DragPhase::Cancel,
                     ..
@@ -863,6 +1119,7 @@ impl Event {
 
     pub(crate) fn origin(&self) -> Option<NodeId> {
         match self {
+            Self::TreeNavigate { from, .. } => Some(*from),
             Self::GridNavigate { from, .. } => Some(*from),
             Self::ContextMenu { from, .. } => Some(*from),
             Self::Tags { from, .. } => Some(*from),
@@ -880,7 +1137,7 @@ impl Event {
             Self::Spin { from, .. } | Self::Range { from, .. } => Some(*from),
             Self::Sheet { from, .. } => Some(*from),
             Self::NavigationPanel { from, .. } => Some(*from),
-            Self::Drag { from, .. } => Some(*from),
+            Self::Swipe { from, .. } | Self::Drag { from, .. } => Some(*from),
             Self::Anchor { row, .. } => Some(*row),
             _ => None,
         }
@@ -895,6 +1152,98 @@ impl Event {
         node: impl Into<DescriptorView<'a>>,
     ) -> Result<(), Error> {
         let node = node.into();
+        if let Self::RichRejected { revision } | Self::RichCommand { revision, .. } = self {
+            let Props::RichEditor(editor) = node.props else {
+                return Err(Error::InvalidEvent("rich rejection requires its editor"));
+            };
+            if *revision > editor.revision {
+                return Err(Error::InputRevision {
+                    current: editor.revision,
+                    incoming: *revision,
+                });
+            }
+        }
+        if let Self::RichEdit(snapshot) | Self::RichSelection(snapshot) = self {
+            let Props::RichEditor(editor) = node.props else {
+                return Err(Error::InvalidEvent("rich input requires its RichEditor"));
+            };
+            snapshot.validate_input(editor)?;
+        }
+        if let Self::Swipe {
+            from,
+            x,
+            y,
+            revision,
+            ..
+        } = self
+        {
+            EventKind::Swipe.validate_target(node)?;
+            if from.runtime() != target.runtime() {
+                return Err(Error::ForeignRuntime);
+            }
+            if *from != target || !x.is_finite() || !y.is_finite() {
+                return Err(Error::InvalidEvent(
+                    "swipe requires its exact finite boxed origin",
+                ));
+            }
+            let capture = node
+                .semantics
+                .as_ref()
+                .and_then(|s| s.swipe_capture)
+                .expect("validated swipe capture");
+            if *revision > capture.revision {
+                return Err(Error::InputRevision {
+                    current: capture.revision,
+                    incoming: *revision,
+                });
+            }
+        }
+        if let Self::Files(event) = self {
+            let Props::File(props) = node.props else {
+                return Err(Error::InvalidEvent(
+                    "file observations require a File control",
+                ));
+            };
+            event.validate_node(target, props)?;
+        }
+
+        if let Self::TreeNavigate { from, command } = self {
+            EventKind::TreeNavigate.validate_target(node)?;
+            command.validate()?;
+            if from.runtime() != target.runtime() {
+                return Err(Error::ForeignRuntime);
+            }
+            if *from == target {
+                return Err(Error::InvalidEvent(
+                    "tree command requires a descendant TreeItem",
+                ));
+            }
+            if matches!(command, TreeCommand::Search { .. })
+                && node
+                    .semantics
+                    .as_ref()
+                    .and_then(|s| s.tree_navigation)
+                    .is_none_or(|s| !s.typeahead)
+            {
+                return Err(Error::InvalidEvent("tree search is not enabled"));
+            }
+        }
+        if let Self::Clipboard {
+            revision, request, ..
+        } = self
+        {
+            EventKind::Clipboard.validate_target(node)?;
+            let source = node
+                .semantics
+                .as_ref()
+                .and_then(|s| s.clipboard.as_ref())
+                .expect("validated source");
+            if *request == 0 || *revision > source.revision {
+                return Err(Error::InvalidEvent(
+                    "clipboard completion has a future revision or zero request",
+                ));
+            }
+        }
         if let Self::GridNavigate { from, .. } = self {
             EventKind::GridNavigate.validate_target(node)?;
             if from.runtime() != target.runtime() {
@@ -1277,6 +1626,11 @@ impl Event {
 
     pub fn kind(&self) -> EventKind {
         match self {
+            Self::RichCommand { .. } => EventKind::RichCommand,
+            Self::RichRejected { .. } => EventKind::RichRejected,
+            Self::TreeNavigate { .. } => EventKind::TreeNavigate,
+            Self::Files(_) => EventKind::Files,
+            Self::Clipboard { .. } => EventKind::Clipboard,
             Self::GridNavigate { .. } => EventKind::GridNavigate,
             Self::InputEdit(_) => EventKind::InputEdit,
             Self::CollapseComplete { .. } => EventKind::CollapseComplete,
@@ -1298,6 +1652,9 @@ impl Event {
             Self::ColorSchemeChanged { .. } => EventKind::ColorSchemeChanged,
             Self::Keyboard { .. } => EventKind::Keyboard,
             Self::Palette { .. } => EventKind::Palette,
+            Self::RichEdit(_) => EventKind::RichEdit,
+            Self::RichSelection(_) => EventKind::RichSelection,
+            Self::Swipe { .. } => EventKind::Swipe,
             Self::Drag { .. } => EventKind::Drag,
             Self::ValueChanged { .. } => EventKind::ValueChanged,
             Self::Commit { .. } => EventKind::Commit,
@@ -1464,5 +1821,19 @@ pub trait Render {
     fn drain(&mut self, inputs: &mut Vec<Input>);
 }
 
+mod environment;
 mod table;
+pub use environment::{Environment, LanguageTag};
 pub use table::{MAX_CELL_HEADERS, MAX_TABLE_SPAN, SortDirection, TableMetadata};
+
+mod swipe;
+pub use swipe::SwipeCapture;
+
+mod rich_document;
+pub use rich_document::{
+    MAX_RICH_BLOCKS, MAX_RICH_LINK_BYTES, MAX_RICH_METADATA_BYTES, MAX_RICH_RUNS,
+    MAX_RICH_TEXT_BYTES, RichBlock, RichBlockKind, RichDocument, RichFormat, RichMarks, RichPoint,
+    RichRun, RichSelection,
+};
+mod rich;
+pub use rich::{RichCommand, RichEditorProps, RichSnapshot};

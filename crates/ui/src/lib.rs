@@ -2,6 +2,8 @@
 //! layout engines and DOM objects are never created by configuring a component.
 
 mod app;
+mod buffer;
+pub use buffer::BufferStats;
 mod builders;
 mod control;
 mod input;

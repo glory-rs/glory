@@ -310,6 +310,42 @@ impl Storage {
             (Patch::Selectable(change), Props::Text(p)) => {
                 exchange(change, &mut p.selectable, true)
             }
+            (Patch::Label(change), Props::File(p)) => {
+                exchange(change, &mut p.label, "Choose file".into())
+            }
+            (Patch::Enabled(change), Props::RichEditor(p)) => {
+                exchange(change, &mut p.enabled, true)
+            }
+            (Patch::RichDocument { document, revision }, Props::RichEditor(p)) => {
+                if !matches!(document, Change::Keep) {
+                    exchange(
+                        document,
+                        &mut p.document,
+                        std::rc::Rc::new(crate::RichDocument::default()),
+                    );
+                    std::mem::swap(revision, &mut p.revision);
+                }
+            }
+            (Patch::Enabled(change), Props::File(p)) => exchange(change, &mut p.enabled, true),
+            (
+                Patch::File {
+                    configuration,
+                    revision,
+                },
+                Props::File(p),
+            ) => {
+                if !matches!(configuration, Change::Keep) {
+                    match configuration {
+                        Change::Set(value) => std::mem::swap(value.as_mut(), &mut p.configuration),
+                        Change::Clear => {
+                            *configuration =
+                                Change::Set(Box::new(std::mem::take(&mut p.configuration)))
+                        }
+                        Change::Keep => {}
+                    }
+                    std::mem::swap(revision, &mut p.revision);
+                }
+            }
             (Patch::Label(change), Props::Button(p)) => {
                 exchange(change, &mut p.label, String::new())
             }
@@ -380,6 +416,22 @@ impl Storage {
         self.swap_patch(inverse)?;
         let result = (|| {
             if let Patch::Semantics(Change::Set(previous)) = &inverse {
+                if let Some(next) = self
+                    .view()
+                    .semantics
+                    .as_ref()
+                    .and_then(|s| s.clipboard.as_ref())
+                {
+                    if let Some(old) = previous.as_ref().and_then(|s| s.clipboard.as_ref()) {
+                        next.validate_update(old)?
+                    } else {
+                        next.validate()?
+                    }
+                }
+                crate::swipe::revision(
+                    previous.as_ref().and_then(|s| s.swipe_capture),
+                    self.view().semantics.as_ref().and_then(|s| s.swipe_capture),
+                )?;
                 crate::collapse::revision(
                     previous.as_ref().and_then(|s| s.collapse.as_ref()),
                     self.view()
@@ -417,6 +469,26 @@ impl Storage {
                 (self.view().props, &inverse)
             {
                 new.transition_from(old)?;
+            }
+            if let (
+                Props::File(file),
+                Patch::File {
+                    configuration: Change::Set(old),
+                    revision,
+                },
+            ) = (self.view().props, &inverse)
+            {
+                file.configuration.validate()?;
+                if file.revision < *revision
+                    || file.revision == *revision && file.configuration != **old
+                {
+                    return Err(Error::InvalidProps(
+                        "file configuration changes must advance their revision",
+                    ));
+                }
+            }
+            if let (Props::File(file), Patch::Label(_)) = (self.view().props, &inverse) {
+                file.validate_label()?;
             }
             if graphic && let Props::Graphic(graphic) = self.view().props {
                 graphic.validate()?;
@@ -456,6 +528,24 @@ impl Storage {
                     current: *revision,
                     incoming: image.revision,
                 });
+            }
+            if let (
+                Patch::RichDocument {
+                    document: Change::Set(previous),
+                    revision,
+                },
+                Props::RichEditor(next),
+            ) = (&*inverse, self.view().props)
+            {
+                next.document.validate()?;
+                if next.revision < *revision
+                    || next.revision == *revision && next.document != *previous
+                {
+                    return Err(Error::InputRevision {
+                        current: *revision,
+                        incoming: next.revision,
+                    });
+                }
             }
             self.view().validate_fields(false, style, classes)
         })();

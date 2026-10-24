@@ -18,6 +18,8 @@ mod image_observation;
 #[path = "resource_wake.rs"]
 mod resource_wake;
 use image_observation::ImageObserver;
+#[path = "focus_scope.rs"]
+mod focus_scope;
 #[path = "graphic.rs"]
 mod graphic;
 #[cfg(feature = "paint")]
@@ -25,6 +27,11 @@ mod graphic;
 mod graphic_motion;
 #[path = "layers.rs"]
 mod layers;
+#[path = "scroll_into_view.rs"]
+mod scroll_into_view;
+#[cfg(feature = "shell")]
+#[path = "swipe.rs"]
+mod swipe;
 #[path = "translation.rs"]
 mod translation;
 use style::computed_values::visibility::T as Visibility;
@@ -148,6 +155,12 @@ fn check_mode<'a>(
     }
     if semantics.is_some_and(|semantics| semantics.typeahead) {
         return Err(Error::Unsupported("native typeahead input"));
+    }
+    if matches!(node.props, Props::RichEditor(_)) {
+        return Err(Error::Unsupported("native rich editing"));
+    }
+    if matches!(node.props, Props::File(_)) {
+        return Err(Error::Unsupported("native file picker controls"));
     }
     if matches!(node.props, Props::Select(_)) {
         return Err(Error::Unsupported("native select controls"));
@@ -418,6 +431,11 @@ impl Dom {
             .iter()
             .any(|piece| matches!(&piece.kind, Kind::Element { tag: "img", .. }))
             .then(|| ImageObserver::new(shape.revision));
+        let physical_root = if shape.pieces.is_empty() {
+            None
+        } else {
+            Some(shape.root_part()?)
+        };
         let mut m = self.doc.mutate();
         let mut parts = BTreeMap::new();
         let mut properties = BTreeMap::new();
@@ -473,11 +491,11 @@ impl Dom {
                 }
                 parts.insert(piece.part, node);
             }
-            let main = parts
-                .get(&Part::Main)
+            let root = parts
+                .get(&physical_root.expect("non-group physical root"))
                 .copied()
-                .ok_or_else(|| invariant("no main part"))?;
-            (main, main, None)
+                .ok_or_else(|| invariant("no physical root part"))?;
+            (root, root, None)
         };
         drop(m);
         if let Some(main) = parts.get(&Part::Main) {
@@ -1013,10 +1031,15 @@ struct DragSession {
     captured: bool,
 }
 struct State {
+    #[cfg(feature = "shell")]
+    keyboard_clock: std::time::Instant,
     layers: layers::Layers,
+    focus_scopes: focus_scope::Scopes,
     color_scheme: Option<bool>,
     #[cfg(feature = "shell")]
     drag: Option<DragSession>,
+    #[cfg(feature = "shell")]
+    swipe: Option<swipe::Session>,
     #[cfg(feature = "shell")]
     suppress_click: bool,
     #[cfg(feature = "paint")]
@@ -1189,6 +1212,7 @@ impl State {
             return;
         }
         layers::repair_focus(self);
+        focus_scope::repair(self);
         let physical = self.dom.doc.get_focussed_node_id();
         let next = physical.and_then(|node| self.dom.owner(node));
         if let Some(next) = next
@@ -1212,7 +1236,10 @@ impl State {
             return Err(Error::Unsupported("headless Blitz focus"));
         }
         let descriptor = self.mapper.tree().node(id)?.descriptor.view();
-        if !self.mapper.tree().enabled(id) || !self.layers.allowed(self.mapper.tree(), id) {
+        if !self.mapper.tree().enabled(id)
+            || !self.layers.allowed(self.mapper.tree(), id)
+            || !focus_scope::allowed(self, id)
+        {
             return Err(Error::Unsupported("focus on disabled control"));
         }
         let explicit = descriptor.focus != glory_render::FocusMode::Auto;
@@ -1266,7 +1293,10 @@ impl Renderer {
     }
     fn configured_with(runtime: RuntimeId, interactive: bool, config: Config) -> Self {
         Self(Rc::new(RefCell::new(State {
+            #[cfg(feature = "shell")]
+            keyboard_clock: std::time::Instant::now(),
             layers: layers::Layers::default(),
+            focus_scopes: focus_scope::Scopes::default(),
             #[cfg(feature = "paint")]
             runtime,
             mapper: Mapper::new(runtime),
@@ -1284,6 +1314,8 @@ impl Renderer {
             space: None,
             #[cfg(feature = "shell")]
             drag: None,
+            #[cfg(feature = "shell")]
+            swipe: None,
             color_scheme: None,
             #[cfg(feature = "shell")]
             suppress_click: false,
@@ -1301,6 +1333,8 @@ impl Renderer {
             return Err(Error::InvalidProps("Blitz logical viewport overflow"));
         }
         if state.dom.doc.viewport() != &viewport {
+            #[cfg(feature = "shell")]
+            swipe::cancel(&mut state);
             state.dom.doc.set_viewport(viewport);
             state.dom.invalidate();
             let State { mapper, dom, .. } = &mut *state;
@@ -1450,6 +1484,8 @@ impl Render for Renderer {
     }
     fn capabilities(&self) -> Capabilities {
         Capabilities {
+            clipboard_write: false,
+            files: None,
             measure: true,
             scroll: true,
             focus: self.0.borrow().interactive,
@@ -1574,6 +1610,8 @@ impl Render for Renderer {
             Ok(mapper.receipt())
         })();
         state.receipt = state.mapper.receipt();
+        #[cfg(feature = "shell")]
+        swipe::update(&mut state);
         let translated = {
             let State { mapper, dom, .. } = &mut *state;
             dom.sync_translations(mapper.tree(), mutations)
@@ -1591,6 +1629,7 @@ impl Render for Renderer {
         if result.is_ok() {
             layered?;
         }
+        focus_scope::sync(&mut state);
         let State {
             mapper,
             scroll_requests,
@@ -1648,6 +1687,15 @@ impl Render for Renderer {
             }
         } else {
             state.subscriptions.remove(&(node, kind));
+            #[cfg(feature = "shell")]
+            if kind == EventKind::Swipe
+                && state
+                    .swipe
+                    .as_ref()
+                    .is_some_and(|current| current.node == node)
+            {
+                swipe::cancel(&mut state);
+            }
         }
         if matches!(kind, EventKind::Scroll | EventKind::Resize) {
             if enabled {
@@ -1662,6 +1710,7 @@ impl Render for Renderer {
     fn action(&mut self, action: glory_render::Action) -> Result<(), Error> {
         let mut state = self.0.borrow_mut();
         action.validate_target(&state.mapper.tree().node(action.node())?.descriptor)?;
+        state.mapper.tree().validate_clipboard_action(action)?;
         if matches!(action, glory_render::Action::Focus(_))
             && !state.mapper.tree().enabled(action.node())
         {
@@ -1671,7 +1720,15 @@ impl Render for Renderer {
             return Err(Error::Unsupported("action on disconnected Blitz range"));
         }
         match action {
-            glory_render::Action::RaiseLayer(id) => layers::raise(&mut state,id),
+            glory_render::Action::ScrollIntoView(id) => scroll_into_view::reveal(&mut state, id),
+            glory_render::Action::PickFiles { .. }
+            | glory_render::Action::SelectRich { .. }
+            | glory_render::Action::ClearFiles { .. }
+            | glory_render::Action::RemoveFile(_) => Err(Error::Unsupported("native file access")),
+            glory_render::Action::CopyText { .. } => {
+                return Err(Error::Unsupported("native text clipboard write"));
+            }
+            glory_render::Action::RaiseLayer(id) => layers::raise(&mut state, id),
             glory_render::Action::SelectText {
                 node,
                 revision,
@@ -1788,6 +1845,9 @@ impl Render for Renderer {
             let node = state.dom.main(query.node())?;
             state.dom.resolve();
             match query {
+                Query::RichSelection(_) | Query::FileRead(_) | Query::FilePreview(_) => {
+                    Err(Error::Unsupported("native file access"))
+                }
                 Query::Focus(id) if state.interactive => {
                     state.sync_focus();
                     let control = state.dom.control(id)?;

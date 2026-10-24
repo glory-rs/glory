@@ -36,6 +36,10 @@ fn check_table_rows(count: usize, offset: Option<&Lotus<u32>>) -> Result {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ListStats {
+    /// This commit accepted physical user scrolling or an explicit list
+    /// navigation command. Measurement, anchoring and programmatic scroll
+    /// acknowledgements alone do not set this flag.
+    pub user_moved: bool,
     pub range: Range<usize>,
     pub rows: usize,
     /// Extra mounted rows outside range, currently at most one focused row.
@@ -612,6 +616,7 @@ impl<K: Clone + Eq + Hash + 'static> Widget for List<K> {
                 let position = desired.as_ref().map(Lotus::try_get).transpose()?;
                 let native_changed = state.native_sequence != input.sequence;
                 let mut user_scrolled = false;
+                let mut user_moved = false;
                 if native_changed {
                     state.native_sequence = input.sequence;
                     let previous_physical = state.physical;
@@ -644,6 +649,14 @@ impl<K: Clone + Eq + Hash + 'static> Widget for List<K> {
                     }
                     // Accepted coordinates distinguish quantization from real
                     // movement, even when both reach the same coalesced frame.
+                    // A late/external acknowledged program scroll may cancel
+                    // navigation without being physical user input. A user
+                    // movement coalesced with an acknowledgement differs from
+                    // that acknowledgement's actual coordinate.
+                    user_moved = input.physical
+                        != input
+                            .ack
+                            .map_or(applied.unwrap_or(previous_physical), |ack| ack.y);
                     if external || input.physical != applied.unwrap_or(previous_physical) {
                         user_scrolled = true;
                         state.expected = None;
@@ -1078,6 +1091,7 @@ impl<K: Clone + Eq + Hash + 'static> Widget for List<K> {
                 if let Some(inspect) = &mut inspect {
                     untracked(|| {
                         inspect(ListStats {
+                            user_moved: user_moved || navigating,
                             range: next.render,
                             rows: cache.len(),
                             pinned,

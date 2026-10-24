@@ -93,7 +93,7 @@ impl Plan {
                         descriptor.field_part(),
                         Some(crate::FieldPart::Label | crate::FieldPart::Legend)
                     ),
-                button || matches!(descriptor.props, Props::Button(_)),
+                button || matches!(descriptor.props, Props::Button(_) | Props::File(_)),
                 form || descriptor.field_part() == Some(crate::FieldPart::Form),
                 tooltip
                     || matches!(
@@ -166,13 +166,21 @@ pub(crate) fn validate_context<'a>(
                     || s.expanded.is_some()
                     || s.menu_item.is_some()
                     || s.form_action.is_some()
+                    || s.swipe_capture.is_some()
             }))
     {
         return Err(Error::InvalidProps(
             "tooltip/progress content must remain passive",
         ));
     }
-    if interactive && (descriptor.props.interactive() || descriptor.focus != FocusMode::Auto) {
+    if interactive
+        && (descriptor.props.interactive()
+            || descriptor.focus != FocusMode::Auto
+            || descriptor
+                .semantics
+                .as_ref()
+                .is_some_and(|s| s.swipe_capture.is_some()))
+    {
         return Err(Error::InvalidProps("interactive controls cannot be nested"));
     }
     if button

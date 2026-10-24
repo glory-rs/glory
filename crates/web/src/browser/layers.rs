@@ -19,6 +19,7 @@ pub(super) use document::DocumentLayers;
 #[derive(Default)]
 pub(super) struct Layers {
     declarations: BTreeMap<NodeId, Layer>,
+    scope_declarations: BTreeMap<NodeId, glory_render::FocusScopeConfig>,
     stack: Vec<Open>,
     blocked: BTreeSet<NodeId>,
     anchors: BTreeMap<NodeId, bool>,
@@ -53,6 +54,23 @@ impl Drop for Working<'_> {
 }
 impl Layers {
     pub fn update(&mut self, tree: &glory_render::memory::Memory, mutations: &[Mutation]) {
+        self.scope_declarations.clear();
+        for id in tree.focus_scope_roots() {
+            if tree.active(id)
+                && !tree.inert(id)
+                && tree.enabled(id)
+                && let Some(config) = tree.node(id).ok().and_then(|node| {
+                    node.descriptor
+                        .view()
+                        .semantics
+                        .as_ref()?
+                        .focus_scope
+                        .as_ref()
+                })
+            {
+                self.scope_declarations.insert(id, config.clone());
+            }
+        }
         for id in mutations
             .iter()
             .flat_map(|mutation| match mutation {

@@ -133,6 +133,8 @@ pub(crate) fn role_name(role: Role) -> &'static str {
         Role::Table => "table",
         Role::Grid => "grid",
         Role::GridCell => "gridcell",
+        Role::Tree => "tree",
+        Role::TreeItem => "treeitem",
         Role::Row => "row",
         Role::ColumnHeader => "columnheader",
         Role::Cell => "cell",
@@ -280,6 +282,8 @@ pub fn shape<'a>(descriptor: impl Into<glory_render::DescriptorView<'a>>) -> Res
         Props::Button(_) => "button",
         Props::Input(input) if input.multiline => "textarea",
         Props::Input(_) => "input",
+        Props::RichEditor(_) => "div",
+        Props::File(_) => "button",
         Props::Select(_) => "select",
         Props::Check(_) => "label",
         Props::Image(_) => "img",
@@ -298,6 +302,64 @@ pub fn shape<'a>(descriptor: impl Into<glory_render::DescriptorView<'a>>) -> Res
         ..Shape::default()
     };
     let kind = match &descriptor.props {
+        Props::RichEditor(value) => {
+            attrs(&mut shape, Part::Main)
+                .insert("data-gly-rich-focus", rich_focus(descriptor.focus).into());
+            attrs(&mut shape, Part::Main).insert(
+                if value.enabled {
+                    "data-gly-enabled"
+                } else {
+                    "data-gly-disabled"
+                },
+                String::new(),
+            );
+            shape.edit = EditKind::Rich;
+            shape.revision = value.revision;
+            props(&mut shape, Part::Main).insert(
+                "richDocument",
+                Property::RichDocument(value.document.clone()),
+            );
+            attrs(&mut shape, Part::Main).insert("role", "textbox".into());
+            attrs(&mut shape, Part::Main).insert("aria-multiline", "true".into());
+            attrs(&mut shape, Part::Main).insert(
+                "contenteditable",
+                if value.enabled && !descriptor.semantics.as_ref().is_some_and(|s| s.readonly) {
+                    "true"
+                } else {
+                    "false"
+                }
+                .into(),
+            );
+            if !value.enabled {
+                attrs(&mut shape, Part::Main).insert("aria-disabled", "true".into());
+            }
+            "rich-editor"
+        }
+        Props::File(value) => {
+            shape.revision = value.revision;
+            shape.pieces[0].parent = Some(Part::Control);
+            shape.pieces.insert(0, element(Part::Control, None, "span"));
+            attrs(&mut shape, Part::Control).insert("style", "display:contents;".into());
+            attrs(&mut shape, Part::Main).insert("type", "button".into());
+            text(&mut shape, &value.label);
+            shape
+                .pieces
+                .push(element(Part::Picker, Some(Part::Control), "input"));
+            attrs(&mut shape, Part::Picker).insert("type", "file".into());
+            attrs(&mut shape, Part::Picker).insert("hidden", String::new());
+            attrs(&mut shape, Part::Picker).insert("tabindex", "-1".into());
+            attrs(&mut shape, Part::Picker).insert("aria-hidden", "true".into());
+            attrs(&mut shape, Part::Picker).extend(file_attributes(&value.configuration));
+            if value.configuration.drop {
+                attrs(&mut shape, Part::Main).insert("data-gly-file-drop", String::new());
+            }
+            enabled(&mut shape, Part::Main, value.enabled);
+            props(&mut shape, Part::Picker).insert("disabled", Property::Bool(!value.enabled));
+            if !value.enabled {
+                attrs(&mut shape, Part::Picker).insert("disabled", String::new());
+            }
+            "file"
+        }
         Props::View => "view",
         Props::Text(value) => {
             text(&mut shape, &value.content);
@@ -458,6 +520,9 @@ pub fn shape<'a>(descriptor: impl Into<glory_render::DescriptorView<'a>>) -> Res
             attrs(&mut shape, control).insert("tabindex", "0".into());
         }
     }
+    if matches!(descriptor.props,Props::RichEditor(value) if !value.enabled) {
+        attrs(&mut shape, control).insert("tabindex", "-1".into());
+    }
     if let Some(item) = descriptor.item {
         attrs(&mut shape, Part::Main).insert("aria-posinset", (item.index + 1).to_string());
         attrs(&mut shape, Part::Main).insert(
@@ -485,7 +550,59 @@ pub fn shape<'a>(descriptor: impl Into<glory_render::DescriptorView<'a>>) -> Res
             }
         }
     }
+    shape.root_part()?;
     Ok(shape)
+}
+pub(crate) fn rich_focus(focus: FocusMode) -> &'static str {
+    match focus {
+        FocusMode::Auto => "auto",
+        FocusMode::TabStop => "tab",
+        FocusMode::Programmatic => "programmatic",
+    }
+}
+pub(crate) fn rich_tabindex(focus: FocusMode, enabled: bool) -> Option<&'static str> {
+    if !enabled {
+        return Some("-1");
+    }
+    match focus {
+        FocusMode::Auto => None,
+        FocusMode::TabStop => Some("0"),
+        FocusMode::Programmatic => Some("-1"),
+    }
+}
+/// Resolve only rich editors' inherited disabled policy from the supplied
+/// semantic tree. Ordinary shapes remain descriptor-local. Intrinsic HTML
+/// controls already inherit fieldset behavior in their native host.
+pub fn shape_in(tree: &Memory, id: NodeId) -> Result<Shape, Error> {
+    let descriptor = tree.node(id)?.descriptor.view();
+    let mut shape = shape(descriptor)?;
+    if matches!(descriptor.props,Props::RichEditor(value) if value.enabled) && !tree.enabled(id) {
+        let attrs = attrs(&mut shape, Part::Main);
+        attrs.insert("data-gly-rich-ancestor-disabled", String::new());
+        attrs.insert("contenteditable", "false".into());
+        attrs.insert("aria-disabled", "true".into());
+        attrs.insert("tabindex", "-1".into());
+    }
+    Ok(shape)
+}
+
+pub(crate) fn file_attributes(config: &glory_render::FileConfig) -> BTreeMap<&'static str, String> {
+    let mut attrs = BTreeMap::new();
+    if config.multiple {
+        attrs.insert("multiple", String::new());
+    }
+    if !config.filters.is_empty() {
+        attrs.insert(
+            "accept",
+            config
+                .filters
+                .iter()
+                .map(|f| f.text())
+                .collect::<Vec<_>>()
+                .join(","),
+        );
+    }
+    attrs
 }
 
 /// Shared with field lowering: explicit false remains observable to AT.

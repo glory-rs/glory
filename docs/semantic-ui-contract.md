@@ -142,6 +142,30 @@ Mask 12 项已验收；这些不证明实际 OS IME 或 Unicode 字素选择能�
 
 ## 查询、动作与能力
 
+### 有限二维 Grid
+
+View 支持独立 Grid/GridCell 结构角色，复用 Row/ColumnHeader 和
+TableMetadata 的有限行列计数/坐标。GridCell 可显式 selected，当前日期 Button
+使用 Current::Date，二者不能互相冒充。Grid 可 readonly；它保留导航，
+应用选择回调仍负责拒绝写入。HTML 与原生 AccessKit 映射真实 Grid/GridCell，
+而不是 Button 组假装表格。
+
+`Semantics.grid_navigation: Option<Direction>` 仅允许 Grid View，拒绝叠加
+线性 collection navigation/typeahead。有限 GridCommand 包含二维四方向、
+行首尾、前后页及前后年；Shift 只用于 PageUp/PageDown 年命令，
+Ctrl/Meta/Alt、组合状态和编辑器保持宿主策略。RTL 只翻转水平意图。
+这不修改 Orientation 的集合键盘规则。
+
+宿主只从实际焦点 Button 的最近 opted-in Grid 排队 GridNavigate，原生监听
+不回调业务。逻辑 Group 不具备 Main part，Web 祖先查找跳过该物理读取后
+继续沿语义父链。共享 Memory 先验证 live identity，再验证根 Grid 配置、
+真实 Button 后代、最近 Grid、active/enabled/inert；移出、退休、foreign、
+嵌套更近 Grid 的旧来源不能继续导航原网格。不会扫描业务数据或保存访问史。
+
+共享目标/移动/退休测试、HTML 字段差分、原生实际键队列与 AX selected/current
+坐标、Sapid Calendar 四主题 CSR/接管及实际 Arrow/Space/Enter/触摸均有证据。
+这些不等于实际屏幕阅读器宣布时序或 OS IME 验收。
+
 | 目标/请求 | 共同规则 | 实际宿主差异 |
 |---|---|---|
 | Bounds / Scroll | Group 没有自己的物理目标，明确 Unsupported | 其他节点是否已有布局盒取决于引擎/样式/连接状态 |
@@ -490,8 +514,24 @@ padding within 0..=4096 CSS px, and an explicit constrain boolean. It belongs
 only to an unanchored Dialog. A shared pure resolver preserves panel dimensions,
 optionally clamps its position and starts oversized panels at the padded edge.
 Web and native use that same policy. Classic envelope remains v2; Start and End
-both require HTML8. Version7 and missing-version data fail before registration or
+both required HTML8 at introduction. The current format is HTML9; version8 and missing-version data fail before registration or
 DOM mutation, and failed snapshot adoption leaves the original root intact.
+
+HTML9 adds the finite Tree/TreeItem presentation: LTR/RTL tree navigation,
+typeahead and multiple-selection flags, and separate one-based level plus
+zero-based sibling position/count. Level is 1..=64, count is nonzero and
+position is smaller than count. HTML ARIA positions are one-based; AccessKit
+retains zero-based sibling positions. Every field validates independently and
+prepared Semantics patches retain the full-shape differential oracle. Classic
+Start/End and snapshot markers all require version9, without an alias for8.
+
+`Action::ScrollIntoView` reveals only its current live physical target with
+nearest, instant scrolling. Identity, physical target and scroll capability
+validate before queuing; inactive/inert late targets and host/modal refusal do
+not fault later work. It never moves focus or resolves virtual data. Web and
+native stop ancestor scrolling at a current top-layer boundary, preserving
+background viewport scroll and editor selection/preedit. The existing virtual
+Row-only AccessKit ScrollIntoView advertisement remains a separate policy.
 
 `Semantics::field_part` 提供有限的 Label、Fieldset、Legend；它们只属于无显式 role、
 无 focus 的结构 View。HTML 对应真实 label/fieldset/legend，节点生命周期内不可通过
@@ -531,6 +571,14 @@ readonly input 配合宿主事件保护；readonly Check 在默认切换前阻�
 
 
 ## NativeSelect 与当前 HTML/stream 格式（2026-10-24）
+
+当前 HTML `FORMAT_VERSION` 为 **12**，classic stream envelope 仍为 **2**。
+Environment 是 View 的独立有限元数据：`dir` 只接受 `ltr`/`rtl`，`lang`
+接受 2–63 字节 ASCII 标签（首段 2–8 字母，后续段 1–8 字母或数字）。
+同节点环境方向与线性/Grid/Tree 导航方向必须一致。语言按当前语义祖先继承到
+原生 AX；改变环境只更新元数据，不替换子编辑器或重写其值、选区和预编辑状态。
+Start、End、SSR marker、CSR/hydration 和 classic JS 使用同一版本；10 及更旧
+版本明确拒绝，失败接管不得修改宿主。样式 profile 的版本独立于 HTML wire。
 
 当前 HTML 映射/SSR Snapshot 为 **v7**，classic stream envelope 为 **v2**；上文 v3 与下述 NativeSelect v4、Anchor v6 段落记录此前格式扩展。资源种子 envelope 仍独立为 v1。旧 Snapshot v3 和 stream v1 不提供兼容别名：采用/启动首先拒绝旧版本，不修改根子树。
 

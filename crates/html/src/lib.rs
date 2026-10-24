@@ -3,6 +3,8 @@ mod graphic;
 mod mapping;
 mod patch;
 mod plan;
+#[cfg(test)]
+mod rich_tests;
 pub use plan::PlanShape;
 #[cfg(test)]
 mod anchor_tests;
@@ -14,6 +16,10 @@ mod collapse_tests;
 mod context_menu_tests;
 #[cfg(test)]
 mod drag_capture_tests;
+#[cfg(test)]
+mod environment_tests;
+#[cfg(test)]
+mod focus_scope_tests;
 #[cfg(test)]
 mod menubar_tests;
 #[cfg(test)]
@@ -36,10 +42,10 @@ use glory_render::memory::{Memory, Subtree};
 use glory_render::{Error, Mutation, NodeId, Receipt, Render, RuntimeId};
 use std::collections::{BTreeMap, HashMap};
 
-pub use mapping::{preflight, shape};
-pub use serialize::{escape, select_options, serialize};
+pub use mapping::{preflight, shape, shape_in};
+pub use serialize::{escape, rich_document, select_options, serialize};
 pub use styles::style;
-pub const FORMAT_VERSION: u32 = 8;
+pub const FORMAT_VERSION: u32 = 13;
 /// Namespace is determined solely by the mapper's finite element vocabulary.
 pub fn element_namespace(tag: &str) -> &'static str {
     if matches!(tag, "svg" | "path") {
@@ -56,6 +62,7 @@ pub const BASE_CSS: &str = concat!(
     "@keyframes gly-rotate{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}",
     "[data-gly-rotate]{animation-name:gly-rotate;animation-timing-function:linear;animation-iteration-count:infinite;transform-box:view-box;transform-origin:50% 50%}",
     "@media(prefers-reduced-motion:reduce){[data-gly-rotate]{animation-name:none;transform:none}}",
+    "[data-gly-swipe-axis=horizontal]{touch-action:pan-y pinch-zoom;user-select:none}[data-gly-swipe-axis=vertical]{touch-action:pan-x pinch-zoom;user-select:none}",
     "[data-gly-splitter],[data-gly-slider],[data-gly-sheet-grip],[data-gly-drag-capture]{touch-action:none}",
     "[data-gly-sheet][data-gly-layer=left],[data-gly-sheet][data-gly-layer=right]{width:var(--gly-sheet-extent,100vw)!important;min-width:0!important;max-width:100vw!important}",
     "[data-gly-sheet][data-gly-layer=top],[data-gly-sheet][data-gly-layer=bottom]{height:var(--gly-sheet-extent,100dvh)!important;min-height:0!important;max-height:100dvh!important}",
@@ -88,7 +95,7 @@ pub const BASE_CSS: &str = concat!(
     "@media(prefers-reduced-motion:reduce){[data-gly-collapse]{transition:none!important}}",
     "[data-gly-app][data-gly-collapse-static] [data-gly-collapse]{transition:none!important}",
     "[data-gly-kind]{box-sizing:border-box}[data-gly-kind=text]{margin:0;font:inherit}",
-    "[data-gly-kind=select],[data-gly-kind=button],[data-gly-kind=input],[data-gly-kind=check] input{font:inherit}",
+    "[data-gly-kind=select],[data-gly-kind=button],[data-gly-kind=file],[data-gly-kind=input],[data-gly-kind=check] input{font:inherit}",
     "[data-gly-virtual=surface]:not([data-gly-live]){height:auto!important;overflow:visible!important}",
     "[data-gly-virtual=row]:not([data-gly-live]){display:flow-root!important;position:relative!important;top:auto!important;left:auto!important}",
 );
@@ -120,6 +127,7 @@ pub enum Part {
     Main,
     Control,
     Content,
+    Picker,
 }
 impl Part {
     pub fn name(self) -> &'static str {
@@ -127,6 +135,7 @@ impl Part {
             Self::Main => "main",
             Self::Control => "control",
             Self::Content => "content",
+            Self::Picker => "picker",
         }
     }
 }
@@ -135,6 +144,7 @@ pub enum Property {
     Text(String),
     Bool(bool),
     SelectedKeys(Vec<String>),
+    RichDocument(std::rc::Rc<glory_render::RichDocument>),
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Kind {
@@ -158,6 +168,7 @@ pub enum EditKind {
     Text,
     Check,
     Select,
+    Rich,
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SelectOptions {
@@ -175,6 +186,35 @@ pub struct Shape {
     pub edit: EditKind,
     pub revision: u64,
     pub prevent_activate_default: bool,
+}
+impl Shape {
+    /// The physical range root may differ from the semantic main/control node.
+    /// Groups have comment boundaries and therefore no physical root part.
+    pub fn root_part(&self) -> Result<Part, Error> {
+        let mut seen = std::collections::BTreeSet::new();
+        let mut root = None;
+        for piece in &self.pieces {
+            if !seen.insert(piece.part) {
+                return Err(Error::InvalidProps("duplicate HTML part"));
+            }
+            match piece.parent {
+                Some(parent) if parent == piece.part || !seen.contains(&parent) => {
+                    return Err(Error::InvalidProps("HTML part parent order"));
+                }
+                None if root.replace(piece.part).is_some() => {
+                    return Err(Error::InvalidProps("multiple HTML part roots"));
+                }
+                _ => {}
+            }
+        }
+        if !seen.contains(&Part::Main)
+            || self.control.is_some_and(|part| !seen.contains(&part))
+            || self.children.is_some_and(|part| !seen.contains(&part))
+        {
+            return Err(Error::InvalidProps("missing HTML part"));
+        }
+        root.ok_or(Error::Unsupported("Group has no physical root part"))
+    }
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Edit {
@@ -302,6 +342,29 @@ impl Mapper {
     }
     pub fn tree(&self) -> &Memory {
         &self.tree
+    }
+    /// Admit a host action identity without exposing mutable descriptors.
+    pub fn admit_file_action(&mut self, action: glory_render::Action) -> Result<(), Error> {
+        self.tree.admit_file_action(action)
+    }
+    pub fn finish_files(
+        &mut self,
+        node: NodeId,
+        document: glory_render::FileDocumentId,
+        event: &glory_render::FileEvent,
+    ) -> Result<bool, Error> {
+        self.tree.finish_files(node, document, event)
+    }
+    pub fn admit_clipboard(&mut self, action: glory_render::Action) -> Result<(), Error> {
+        self.tree.admit_clipboard(action)
+    }
+    pub fn finish_clipboard(
+        &mut self,
+        node: NodeId,
+        request: u64,
+        revision: u64,
+    ) -> Result<bool, Error> {
+        self.tree.finish_clipboard(node, request, revision)
     }
     pub fn key(&self, id: NodeId) -> Option<u64> {
         self.keys.get(&id).copied()
@@ -470,7 +533,10 @@ pub fn preflight_place(
             return Err(Error::InvalidPlacement("tree cycle"));
         }
         let node = tree.node(ancestor)?;
-        button |= matches!(node.descriptor.view().props, glory_render::Props::Button(_));
+        button |= matches!(
+            node.descriptor.view().props,
+            glory_render::Props::Button(_) | glory_render::Props::File(_)
+        );
         cursor = node.parent;
     }
     // Semantic Inline text may explicitly map to <p>. That extension must
@@ -499,7 +565,7 @@ pub fn preflight_place(
                     while let Some(parent) = ancestor {
                         in_button |= matches!(
                             plan.nodes()[parent].descriptor.view().props,
-                            glory_render::Props::Button(_)
+                            glory_render::Props::Button(_) | glory_render::Props::File(_)
                         );
                         ancestor = plan.nodes()[parent].parent;
                     }
@@ -592,7 +658,7 @@ fn difference(
                 }
                 for (name, value) in properties {
                     if old_props.get(name) != Some(value)
-                        || revision && *name == "value"
+                        || revision && matches!(*name, "value" | "richDocument")
                         || select_write && *name == "selectedKeys"
                         || checked_write && *name == "checked"
                         || *name == "checked" && old.get("type") != attrs.get("type")
@@ -613,4 +679,82 @@ fn difference(
 }
 
 #[cfg(test)]
+mod clipboard_tests;
+#[cfg(test)]
 mod table_tests;
+#[cfg(test)]
+mod tree_tests;
+
+#[cfg(test)]
+mod file_shape_tests {
+    use super::*;
+    use glory_render::{Descriptor, FileConfig, FileFilter, FileProps, Mutation, NodeIds, Props};
+
+    #[test]
+    fn file_range_root_keeps_real_button_and_hidden_picker_siblings() {
+        let runtime = RuntimeId::new();
+        let id = NodeIds::new(runtime).allocate();
+        let node = Descriptor::new(Props::File(FileProps {
+            label: "Select <file>".into(),
+            configuration: FileConfig {
+                multiple: true,
+                max_files: 2,
+                filters: vec![FileFilter::Mime("image/png".into())],
+                ..Default::default()
+            },
+            ..Default::default()
+        }));
+        let shape = shape(&node).unwrap();
+        assert_eq!(shape.root_part().unwrap(), Part::Control);
+        assert_eq!(shape.control, Some(Part::Main));
+        assert_eq!(shape.children, None);
+        for part in [Part::Main, Part::Picker] {
+            assert_eq!(
+                shape.pieces.iter().find(|p| p.part == part).unwrap().parent,
+                Some(Part::Control)
+            );
+        }
+        let mut tree = Memory::new(runtime);
+        tree.apply(&[
+            Mutation::Create {
+                id,
+                node: Box::new(node),
+            },
+            Mutation::Place {
+                id,
+                parent: None,
+                before: None,
+            },
+        ])
+        .unwrap();
+        let html = serialize(&tree, |_| Some(1)).unwrap();
+        assert!(html.starts_with("<span data-gly-key=\"1\" data-gly-part=\"control\""));
+        assert!(html.contains("<button "));
+        assert!(html.contains("Select &lt;file&gt;</button><input "));
+        assert!(html.contains("accept=\"image/png\""));
+        assert!(html.contains("type=\"file\""));
+        assert!(html.ends_with("></span>"));
+        assert!(!html.contains("value="));
+    }
+
+    #[test]
+    fn physical_root_validation_rejects_missing_duplicate_and_disconnected_parts() {
+        let mut shape = shape(&Descriptor::new(Props::File(FileProps::default()))).unwrap();
+        let original = shape.clone();
+        shape.pieces[1].parent = None;
+        assert!(shape.root_part().is_err());
+        shape = original.clone();
+        shape.pieces[1].part = Part::Picker;
+        assert!(shape.root_part().is_err());
+        shape = original.clone();
+        shape.pieces[0].parent = Some(Part::Main);
+        assert!(shape.root_part().is_err());
+        shape = original;
+        shape.pieces.retain(|p| p.part != Part::Main);
+        assert!(shape.root_part().is_err());
+        assert!(Shape::default().root_part().is_err());
+    }
+}
+
+#[cfg(test)]
+mod swipe_tests;

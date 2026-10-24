@@ -1,9 +1,14 @@
 # Native viewport top layers
 
 The genuine `glory-rs/blitz` fork is pinned to
-`7e0b5f85727da016285028f656a437d89ca10c46`. The provenance record and Cargo
+`c127fd9699a89ff8ecba0c8d8c9eccb3330627af`. The provenance record and Cargo
 lockfiles resolve all four Blitz packages to that full commit. No vendored code,
 managed Cargo checkout edits, global patches or DOM portals are involved.
+
+The final current-pin provenance and combined native regressions pass in
+`D:/BuildCache/sapid/final-engine-forks.log` and `final-native-acceptance.log`.
+The two pre-existing interactive desktop/UIA tests remain ignored in this run;
+actual displayed-window or OS client acceptance is not inferred from it.
 
 `BaseDocument::set_top_layer` admits at most 1024 current leases. A lease keeps
 the element's DOM/Stylo parent, selector matching and inherited style, while
@@ -34,6 +39,18 @@ live anchor. Background capture is cancelled, late background AT actions are
 ignored, and outside nonmodal dismissal preserves the user's clicked target.
 Only active layers force geometry work; ordinary mutations and closed layer
 declarations retain lazy layout.
+
+FIFO replacement also transfers the closing managed top Layer's current live
+focus fallback when disposal has already removed its focused control. Only
+scopes closing in that synchronization participate; Preserve does not supply
+a fallback. Implicit targets retain their exact NodeId lifetime and are checked
+against the current local semantic tree; retired/foreign, hidden/inert, disabled
+and suspended targets are excluded. No closed-layer history or global focus
+cache is added. Three focused boundary tests and a four-theme real Sapid
+ModalsManager consumer test cover this later adapter correction. Their logs are
+`modals-native-handoff-tests.log`, `modals-native-current-tests-fixed.log` and
+the matching `modals-native-*-clippy.log` under `D:/BuildCache/sapid`. The original
+consumer focus failure is retained in `modals-native-current-tests.log`.
 
 Menu, Tooltip, Listbox and navigation Group layers, sheet, ContextPoint and a
 Layer's own Translation remain explicit native rejections. Descriptor preflight,

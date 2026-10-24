@@ -52,7 +52,10 @@ fn queue_commit(
 struct Listener {
     target: EventTarget,
     name: &'static str,
-    callback: Closure<dyn FnMut(web_sys::Event)>,
+    // Focus containment can synchronously dispatch another native focusin.
+    // Captures are immutable Weak handles; mutable state lives in Dom and is
+    // released before host calls. Fn permits that legitimate native reentry.
+    callback: Closure<dyn Fn(web_sys::Event)>,
 }
 pub(super) struct Listeners {
     listeners: Vec<Listener>,
@@ -109,10 +112,14 @@ impl Listeners {
             });
         }
         for name in [
+            "dragenter",
+            "dragover",
+            "drop",
             "submit",
             "reset",
             "click",
             "input",
+            "selectionchange",
             "beforeinput",
             "paste",
             "contextmenu",
@@ -151,6 +158,7 @@ impl Listeners {
             } else if matches!(
                 name,
                 "keydown"
+                    | "selectionchange"
                     | "pointerdown"
                     | "click"
                     | "focusin"
@@ -200,6 +208,7 @@ impl Listeners {
                 let weak = Rc::downgrade(&dom);
                 let callback = Closure::new(move |event: web_sys::Event| {
                     let Some(dom) = weak.upgrade() else { return };
+                    super::swipe::cancel(&dom);
                     if let Err(error) = super::sheet::receive(&dom, "resize", &event) {
                         dom.error.borrow_mut().get_or_insert(error);
                     }
@@ -225,6 +234,14 @@ impl Listeners {
                 if let Ok(entry) = entry.dyn_into::<web_sys::ResizeObserverEntry>()
                     && let Some((id, _)) = target(&dom, &entry.target())
                 {
+                    if dom
+                        .swipe
+                        .borrow()
+                        .as_ref()
+                        .is_some_and(|current| current.node == id)
+                    {
+                        super::swipe::cancel(&dom);
+                    }
                     if let Some(size) = border_size(&dom, &entry) {
                         dom.sizes.borrow_mut().insert(id, size);
                     }
@@ -305,6 +322,30 @@ pub(super) fn target(dom: &Dom, element: &Element) -> Option<(NodeId, Element)> 
     Some((id, target))
 }
 fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_render::Error> {
+    if name == "selectionchange" {
+        if let Some(element) = dom.document.active_element()
+            && let Some((id, _)) = target(dom, &element)
+            && let Ok(entry) = dom.entry(id)
+            && entry.edit == EditKind::Rich
+        {
+            entry
+                .rich
+                .borrow_mut()
+                .get_or_insert_with(Default::default)
+                .selected = true;
+            super::rich::mark(dom, id);
+        }
+        return Ok(());
+    }
+    if super::swipe::receive(dom, name, &event)? {
+        return Ok(());
+    }
+    if name == "pointerdown" && dom.swipe.borrow().is_some() {
+        drag::cancel(dom);
+    }
+    if super::files::receive(dom, name, &event)? {
+        return Ok(());
+    }
     if super::layers::receive(dom, name, &event)? {
         return Ok(());
     }
@@ -319,7 +360,8 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
             | "pointercancel"
             | "lostpointercapture"
             | "blur"
-    ) && drag::receive(dom, name, &event)?
+    ) && dom.swipe.borrow().is_none()
+        && drag::receive(dom, name, &event)?
     {
         return Ok(());
     }
@@ -364,6 +406,9 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
         return Ok(());
     };
     let entry = dom.entry(id)?;
+    if entry.edit == EditKind::Rich && super::rich::receive(dom, id, &entry, name, &event)? {
+        return Ok(());
+    }
     if context_menu::receive(dom, name, &event, id, &element)? {
         return Ok(());
     }
@@ -548,6 +593,69 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
                         .is_some();
             if tags::key(dom, id, &entry, &element, &node, &event, key)? {
                 return Ok(());
+            }
+            if element.has_attribute("data-gly-tree-item")
+                && node == Node::from(entry.control()?)
+                && dom.document.active_element().as_ref() == Some(&element)
+                && !editable
+            {
+                let mut cursor = dom.parent(id);
+                while let Some(tree) = cursor {
+                    let root = dom.entry(tree)?;
+                    if root.parts.get(&glory_html::Part::Main).is_none() {
+                        cursor = dom.parent(tree);
+                        continue;
+                    }
+                    let root_element = root.element()?;
+                    if root_element.get_attribute("role").as_deref() == Some("tree") {
+                        let direction = match root_element
+                            .get_attribute("data-gly-tree-navigation")
+                            .as_deref()
+                        {
+                            Some("ltr") => Some(glory_render::Direction::Ltr),
+                            Some("rtl") => Some(glory_render::Direction::Rtl),
+                            _ => None,
+                        };
+                        let clock = key.time_stamp();
+                        if root.interests.borrow().contains(&EventKind::TreeNavigate)
+                            && clock.is_finite()
+                            && clock >= 0.0
+                            && clock <= glory_render::MAX_TYPEAHEAD_MILLIS as f64
+                            && let Some(command) = direction.and_then(|direction| {
+                                glory_render::TreeCommand::key(
+                                    glory_render::TreeNavigation {
+                                        direction,
+                                        typeahead: root_element
+                                            .get_attribute("data-gly-tree-typeahead")
+                                            .as_deref()
+                                            == Some("true"),
+                                        multiple: root_element
+                                            .get_attribute("aria-multiselectable")
+                                            .as_deref()
+                                            == Some("true"),
+                                    },
+                                    KeyboardInput {
+                                        key: &key.key(),
+                                        control: key.ctrl_key(),
+                                        meta: key.meta_key(),
+                                        alt: key.alt_key(),
+                                        shift: key.shift_key(),
+                                        repeat: key.repeat(),
+                                        composing: false,
+                                        editable,
+                                    },
+                                    clock as u64,
+                                )
+                            })
+                        {
+                            event.prevent_default();
+                            dom.queue(tree, Event::TreeNavigate { from: id, command });
+                            return Ok(());
+                        }
+                        break;
+                    }
+                    cursor = dom.parent(tree);
+                }
             }
             if node == Node::from(entry.control()?)
                 && dom.document.active_element().as_ref() == Some(&element)
@@ -987,9 +1095,10 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
                     return Ok(());
                 }
             }
-            // Explicit composite collections opt in per trigger; their nested
-            // editors and ordinary buttons keep native keyboard behavior.
-            if element.has_attribute("data-gly-navigation-item")
+            // Explicit composite triggers and the navigation boundary itself opt in.
+            // Descendant editors and ordinary buttons retain native behavior.
+            if (element.has_attribute("data-gly-navigation-item")
+                || element.has_attribute("data-gly-navigation"))
                 && node == Node::from(entry.control()?)
                 && let Some(root) = element.closest("[data-gly-navigation]").map_err(backend)?
                 && let Some((root_id, _)) = target(dom, &root)

@@ -131,6 +131,52 @@ pub(crate) fn lower(next: glory_render::DescriptorView<'_>, inverse: &Patch) -> 
         };
     }
     match inverse {
+        Patch::RichDocument { document, revision } => {
+            let previous = old!(document);
+            let Props::RichEditor(value) = next.props else {
+                unreachable!()
+            };
+            if *revision != value.revision {
+                edits.push(Edit::Revision(value.revision));
+            }
+            if previous != &value.document || *revision != value.revision {
+                edits.push(Edit::Property {
+                    part: Part::Main,
+                    name: "richDocument",
+                    value: Property::RichDocument(value.document.clone()),
+                });
+            }
+        }
+        Patch::File {
+            configuration,
+            revision,
+        } => {
+            let old = old!(configuration);
+            let Props::File(value) = next.props else {
+                unreachable!()
+            };
+            if *revision != value.revision {
+                edits.push(Edit::Revision(value.revision));
+            }
+            attribute(
+                &mut edits,
+                Part::Main,
+                "data-gly-file-drop",
+                old.drop.then_some(""),
+                value.configuration.drop.then_some(""),
+            );
+            let before = crate::mapping::file_attributes(old);
+            let after = crate::mapping::file_attributes(&value.configuration);
+            for name in ["accept", "multiple"] {
+                attribute(
+                    &mut edits,
+                    Part::Picker,
+                    name,
+                    before.get(name).map(String::as_str),
+                    after.get(name).map(String::as_str),
+                );
+            }
+        }
         Patch::Text(change) => {
             let old = old!(change);
             let Props::Text(value) = &next.props else {
@@ -142,6 +188,7 @@ pub(crate) fn lower(next: glory_render::DescriptorView<'_>, inverse: &Patch) -> 
             let old = old!(change);
             let value = match &next.props {
                 Props::Button(p) => &p.label,
+                Props::File(p) => &p.label,
                 Props::Check(p) => &p.label,
                 Props::Link(p) => &p.label,
                 _ => unreachable!(),
@@ -240,6 +287,29 @@ pub(crate) fn lower(next: glory_render::DescriptorView<'_>, inverse: &Patch) -> 
         }
         Patch::Semantics(change) => {
             let old = old!(change);
+            if matches!(next.props, Props::RichEditor(_)) {
+                attribute(
+                    &mut edits,
+                    Part::Main,
+                    "contenteditable",
+                    Some(
+                        if next.props.enabled() && !old.as_ref().is_some_and(|s| s.readonly) {
+                            "true"
+                        } else {
+                            "false"
+                        },
+                    ),
+                    Some(
+                        if next.props.enabled()
+                            && !next.semantics.as_ref().is_some_and(|s| s.readonly)
+                        {
+                            "true"
+                        } else {
+                            "false"
+                        },
+                    ),
+                );
+            }
             if old.as_deref().and_then(|s| s.translation)
                 != next.semantics.as_deref().and_then(|s| s.translation)
             {
@@ -282,12 +352,29 @@ pub(crate) fn lower(next: glory_render::DescriptorView<'_>, inverse: &Patch) -> 
         }
         Patch::Focus(change) => {
             let old = *old!(change);
+            if matches!(next.props, Props::RichEditor(_)) {
+                attribute(
+                    &mut edits,
+                    Part::Main,
+                    "data-gly-rich-focus",
+                    Some(crate::mapping::rich_focus(old)),
+                    Some(crate::mapping::rich_focus(next.focus)),
+                );
+            }
             attribute(
                 &mut edits,
                 control,
                 "tabindex",
-                tabindex(old),
-                tabindex(next.focus),
+                if matches!(next.props, Props::RichEditor(_)) {
+                    crate::mapping::rich_tabindex(old, next.props.enabled())
+                } else {
+                    tabindex(old)
+                },
+                if matches!(next.props, Props::RichEditor(_)) {
+                    crate::mapping::rich_tabindex(next.focus, next.props.enabled())
+                } else {
+                    tabindex(next.focus)
+                },
             );
         }
         Patch::Item(change) => {
@@ -311,7 +398,45 @@ pub(crate) fn lower(next: glory_render::DescriptorView<'_>, inverse: &Patch) -> 
         Patch::Enabled(change) => {
             let old = *old!(change);
             let new = next.props.enabled();
-            if old != new {
+            if matches!(next.props, Props::RichEditor(_)) {
+                attribute(
+                    &mut edits,
+                    Part::Main,
+                    "tabindex",
+                    crate::mapping::rich_tabindex(next.focus, old),
+                    crate::mapping::rich_tabindex(next.focus, new),
+                );
+                let readonly = next.semantics.as_ref().is_some_and(|s| s.readonly);
+                attribute(
+                    &mut edits,
+                    Part::Main,
+                    "aria-disabled",
+                    (!old).then_some("true"),
+                    (!new).then_some("true"),
+                );
+                attribute(
+                    &mut edits,
+                    Part::Main,
+                    "contenteditable",
+                    Some(if old && !readonly { "true" } else { "false" }),
+                    Some(if new && !readonly { "true" } else { "false" }),
+                );
+                attribute(
+                    &mut edits,
+                    Part::Main,
+                    "data-gly-enabled",
+                    old.then_some(""),
+                    new.then_some(""),
+                );
+                attribute(
+                    &mut edits,
+                    Part::Main,
+                    "data-gly-disabled",
+                    (!old).then_some(""),
+                    (!new).then_some(""),
+                );
+            }
+            if old != new && !matches!(next.props, Props::RichEditor(_)) {
                 attribute(
                     &mut edits,
                     Part::Main,
@@ -338,6 +463,20 @@ pub(crate) fn lower(next: glory_render::DescriptorView<'_>, inverse: &Patch) -> 
                     name: "disabled",
                     value: Property::Bool(!new),
                 });
+                if matches!(next.props, Props::File(_)) {
+                    attribute(
+                        &mut edits,
+                        Part::Picker,
+                        "disabled",
+                        (!old).then_some(""),
+                        (!new).then_some(""),
+                    );
+                    edits.push(Edit::Property {
+                        part: Part::Picker,
+                        name: "disabled",
+                        value: Property::Bool(!new),
+                    });
+                }
             }
         }
         Patch::CheckMode(change) => {

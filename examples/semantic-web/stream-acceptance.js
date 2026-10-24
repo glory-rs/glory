@@ -36,10 +36,10 @@ async (hostPage) => {
       sameRow: document.querySelector('.stream-row-0') === window.streamOriginal.row, middle: document.querySelector('.stream-middle') === window.streamOriginal.middle,
       middleDraft: window.streamOriginal.middle.value, hidden: !!document.querySelector('.stream-hidden'), active: GloryStream.active(), writes: window.targetWrites,
       focused: document.activeElement === window.streamOriginal.row, selection: [window.streamOriginal.row.selectionStart, window.streamOriginal.row.selectionEnd],
-      firstMarker: document.getElementById('stream-root').firstChild.nodeValue, blocks: document.querySelectorAll('script[data-gly-stream]').length,
+      formatVersion: window.demo.html_format_version(), firstMarker: document.getElementById('stream-root').firstChild.nodeValue, blocks: document.querySelectorAll('script[data-gly-stream]').length,
       resources: JSON.parse(document.getElementById('stream-data').textContent).records.length, injected: window.streamInjected === 1, frames: window.streamFrames }));
     check(ended.editor === 'typed while streaming' && ended.check && ended.sameRow && ended.middle && ended.middleDraft === 'middle draft' && ended.hidden, JSON.stringify(ended));
-    check(ended.active === 0 && ended.writes === 0 && ended.focused && ended.selection.join() === '1,4' && ended.firstMarker === 'gly:v:4' && ended.blocks === 0 && ended.resources === 2 && !ended.injected, JSON.stringify(ended));
+    check(ended.active === 0 && ended.writes === 0 && ended.focused && ended.selection.join() === '1,4' && ended.firstMarker === `gly:v:${ended.formatVersion}` && ended.blocks === 0 && ended.resources === 2 && !ended.injected, JSON.stringify(ended));
     const anchor = () => page.evaluate(() => { const list = document.querySelector('[role=list]'), top = list.getBoundingClientRect().top + list.clientTop; return [...list.querySelectorAll('[role=listitem]')].map(node => ({ text: node.textContent, top: node.getBoundingClientRect().top - top, bottom: node.getBoundingClientRect().bottom - top })).find(row => row.top <= 0.1 && row.bottom > 0.1); });
     const before = await anchor();
     await page.evaluate(() => window.demo.stream_hydrate());
@@ -113,7 +113,7 @@ async (hostPage) => {
         if (type === 'version') bad.version = 999;
         if (type === 'missing') bad.ops = [{ op: 'suspend', key: '99999999' }];
         if (type === 'tag' || type === 'attribute') {
-          bad.ops = [{ op: 'create', key: '9007199254740993', shape: { pieces: [{ part: 'main', parent: null, tag: type === 'tag' ? 'script' : 'div', attributes: type === 'attribute' ? { onclick: 'bad()' } : {}, properties: {} }], children: 'main', control: 'main', revision: 0 } }];
+          bad.ops = [{ op: 'create', key: '9007199254740993', shape: { options: null, pieces: [{ part: 'main', parent: null, tag: type === 'tag' ? 'script' : 'div', attributes: type === 'attribute' ? { onclick: 'bad()' } : {}, properties: {} }], children: 'main', control: 'main', revision: 0 } }];
         }
         let failure; try { controller.apply(bad); } catch (error) { failure = String(error); }
         if (!failure || before !== root.innerHTML) throw new Error(`malformed ${type} mutated shell`);
@@ -126,8 +126,8 @@ async (hostPage) => {
       const start = JSON.parse(source.querySelector('script[data-gly-stream]').textContent);
       const root = document.importNode(source.getElementById('stream-root'), true); root.id = 'test-precision'; document.body.append(root);
       const controller = GloryStream.start(root, { ...start, data_id: 'precision-data' });
-      controller.apply({ version: 1, kind: 'patch', sequence: 1, ops: [
-        { op: 'create', key: '9007199254740993', shape: { pieces: [{part:'main',parent:null,tag:'span',attributes:{},properties:{}},{part:'content',parent:'main',text:'exact key'}],children:null,control:'main',revision:0 } },
+      controller.apply({ version: start.version, kind: 'patch', sequence: 1, ops: [
+        { op: 'create', key: '9007199254740993', shape: { options: null, pieces: [{part:'main',parent:null,tag:'span',attributes:{},properties:{}},{part:'content',parent:'main',text:'exact key'}],children:null,control:'main',revision:0 } },
         { op: 'place', key: '9007199254740993', parent: null, before: null },
       ] });
       const exact = root.querySelector('[data-gly-key="9007199254740993"]').textContent === 'exact key';

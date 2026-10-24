@@ -2182,7 +2182,7 @@ glory-web 当前仍有 validate_children 的既有 dead_code warning。Windows �
 
 ### 2026-10-24：Popover 有限锚点定位与 HTML v6
 
-当前 FORMAT_VERSION=6；此前 v4/v5 记录保留为历史。AnchorPlacement 用显式物理
+本批引入 FORMAT_VERSION=6；此前 v4/v5 记录保留为历史。AnchorPlacement 用显式物理
 side、align、gap、viewport_padding、flip、shift 取代四个旧 Anchor 枚举，不保留别名。
 纯几何 resolver 由 Web 宿主复用，并保留嵌套浮层的父位移拓扑计算。六项 HTML 属性
 与 prepared-field lowering/full-shape oracle 一致。Classic envelope 保持2，Start/End
@@ -2192,3 +2192,40 @@ AnchorLost 请求在直达 App/参考队列中重新校验。Web 抑制失效锚
 拒绝不保留悬空可交互浮层。Sapid trigger/close slots 保持真实 Button；不扩大
 native 能力声明。十三组 Chromium148 实际几何/AX/adoption/stream 验收见
 Sapid docs/popover.md；跨 App modal 协调和原生引擎浮层仍继续实施。
+
+### 2026-10-24：当前 HTML9、Tree 与物理目标滚动
+
+当前 FORMAT_VERSION=10，classic envelope=2。Tree/TreeItem 的有限方向、typeahead、
+multiple 与层级/兄弟位置独立校验和 lowering 进入相同共享格式；所有手写 classic
+Start/End、End marker 与旧版拒绝探针统一迁移，不接受 version8 别名。v8 的四个
+Viewport 字段及 v7 Translation 继续保留；现有 full-shape differential oracle 不删。
+
+新增 Action::ScrollIntoView：仅 current physical identity，先校验 scroll capability，
+不移动 focus、不查业务数据、不替代虚拟 Row 的逻辑 reveal。Web/native 都在实际
+top-layer 边界停止祖先滚动。UI focused1 和 native实际1覆盖 identity、能力、晚到
+hidden/inert、拒绝后继续、真实祖先滚动及背景视口/编辑状态保持；原有 AX 回归
+32 passed、1 interactive Windows test ignored。日志见 D:/BuildCache/sapid/reveal-*。
+
+
+### File physical ranges and format 10
+
+The following Environment extension advances the current HTML format to **11**;
+the classic envelope remains **2**. View-only `Environment` stores bounded
+`LanguageTag` and finite `Direction`; HTML emits independent `lang`/`dir`
+attributes, and the complete shape oracle checks Set/Keep/Clear. Native AX reads
+the nearest current semantic ancestor. Native actual tests change flex direction
+while retaining the editor identity, UTF-16 selection and active preedit. Classic
+Start/End and all browser marker/probe consumers use 11, with 10 explicitly
+refused before host mutation. Style profile revisions are unchanged by this wire
+upgrade. Sapid providers pass immutable explicit context values to one Owner-bound
+factory; no global application context or implicit recoloring registry is added.
+
+File controls have a finite fourth `Picker` part. Their `Control` span is the
+physical range root (`display:contents`); the semantic `Main` button and hidden
+file input are siblings. `Shape.control = Some(Main)` preserves genuine button
+focus and geometry. `Shape.root_part()` validates one root, unique parts and
+parent-before-child order. Serialization, cloned plans, DOM creation/adoption,
+native ranges and classic Start/Create/End use that root, rather than assuming
+that semantic Main is the whole physical range. Native File construction remains
+explicitly unsupported until an actual system file driver exists. This shape
+checkpoint does not claim a completed Web file picker/read component.

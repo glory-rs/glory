@@ -7,6 +7,8 @@ use std::{
 };
 use wasm_bindgen::JsValue;
 use web_sys::{Document, HtmlElement};
+#[path = "focus_scope.rs"]
+mod focus_scope;
 
 thread_local! { static DOCUMENTS: RefCell<Vec<Weak<DocumentLayers>>> = const { RefCell::new(Vec::new()) }; }
 const MAX_APPS: usize = 64;
@@ -30,6 +32,7 @@ pub(in crate::browser) struct DocumentLayers {
     state: RefCell<State>,
     busy: Cell<bool>,
     event_tag: js_sys::Object,
+    scopes: RefCell<Vec<focus_scope::Scope>>,
 }
 struct Busy<'a>(&'a Cell<bool>);
 impl Drop for Busy<'_> {
@@ -189,6 +192,7 @@ impl DocumentLayers {
                 state: RefCell::new(State::default()),
                 busy: Cell::new(false),
                 event_tag: js_sys::Object::new(),
+                scopes: RefCell::new(Vec::new()),
             });
             DOCUMENTS.with(|documents| documents.borrow_mut().push(Rc::downgrade(&created)));
             created
@@ -449,7 +453,7 @@ impl DocumentLayers {
         if let Some(target) = target.or(repair_target) {
             dom::focus(&target)?;
         }
-        Ok(())
+        self.sync_scopes()
     }
     pub(in crate::browser) fn unregister(&self, dom: &Dom) {
         self.state
@@ -557,6 +561,9 @@ impl DocumentLayers {
             return Ok(event.default_prevented());
         }
         js_sys::Reflect::set(event, &symbol, &self.event_tag).map_err(backend)?;
+        if self.receive_scope(name, event)? {
+            return Ok(true);
+        }
         let target = event
             .target()
             .and_then(|value| value.dyn_into::<Node>().ok());

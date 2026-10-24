@@ -43,3 +43,12 @@ harness = false
 
 [lints]
 workspace = true
+
+[[test]]
+name = 'graph_stats'
+path = 'tests/graph_stats.rs'
+
+[[bench]]
+name = "graph"
+path = "benches/graph.rs"
+harness = false

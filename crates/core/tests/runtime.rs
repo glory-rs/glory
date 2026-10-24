@@ -1326,3 +1326,54 @@ fn repeated_subtree_retirement_preserves_cleanup_order_and_reused_binding_identi
     assert!(binding.is_alive());
     assert_eq!((drops.get(), called.get()), (1, 1));
 }
+
+#[path = "task_host.rs"]
+mod task_host;
+
+#[test]
+fn pure_owner_compute_is_untracked_without_graph_nodes_and_restores_context_after_unwind() {
+    use std::{cell::Cell, rc::Rc};
+    let runtime = glory_core::Runtime::new();
+    let owner = Rc::new(runtime.owner());
+    let observed = owner.cage(0);
+    let hidden = owner.cage(0);
+    let calls = Rc::new(Cell::new(0));
+    let counter = calls.clone();
+    let context = owner.clone();
+    owner.binding(move || {
+        observed.get();
+        context.compute(|| hidden.get()).unwrap();
+        counter.set(counter.get() + 1);
+    });
+    runtime.flush().unwrap();
+    let nodes = runtime.stats().nodes;
+    hidden.revise(|n| *n += 1);
+    runtime.flush().unwrap();
+    assert_eq!(calls.get(), 1);
+    observed.revise(|n| *n += 1);
+    runtime.flush().unwrap();
+    assert_eq!(calls.get(), 2);
+    owner
+        .compute(|| {
+            assert_eq!(
+                hidden.try_revise(|n| *n += 1),
+                Err(glory_core::AccessError::WriteDuringCompute)
+            )
+        })
+        .unwrap();
+    assert!(
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            owner.compute(|| panic!("restore pure mode")).unwrap();
+        }))
+        .is_err()
+    );
+    hidden.revise(|n| *n += 1);
+    assert_eq!(runtime.stats().nodes, nodes);
+    owner.dispose();
+    let called = Cell::new(false);
+    assert_eq!(
+        owner.compute(|| called.set(true)),
+        Err(glory_core::AccessError::Disposed)
+    );
+    assert!(!called.get());
+}

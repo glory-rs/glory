@@ -10,8 +10,10 @@ pub enum GridCommand {
     LastInRow,
     PreviousPage,
     NextPage,
-    PreviousYear,
-    NextYear,
+    /// Shift+PageUp; the grid defines its finite larger page interval.
+    PreviousLargePage,
+    /// Shift+PageDown; the grid defines its finite larger page interval.
+    NextLargePage,
 }
 impl GridCommand {
     pub fn key(direction: Direction, input: KeyboardInput<'_>) -> Option<Self> {
@@ -19,8 +21,8 @@ impl GridCommand {
             return None;
         }
         match (input.key, input.shift) {
-            ("PageUp", true) => Some(Self::PreviousYear),
-            ("PageDown", true) => Some(Self::NextYear),
+            ("PageUp", true) => Some(Self::PreviousLargePage),
+            ("PageDown", true) => Some(Self::NextLargePage),
             (_, true) => None,
             ("ArrowLeft", false) => Some(if direction == Direction::Rtl {
                 Self::Right

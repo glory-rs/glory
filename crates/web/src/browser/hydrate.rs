@@ -62,6 +62,8 @@ struct Plan {
     check_repairs: Vec<(Element, bool)>,
     select_repairs: Vec<(Element, Vec<String>)>,
     collapse_revisions: Vec<(Element, String)>,
+    file_adoptions: Vec<NodeId>,
+    rich_repairs: Vec<(Element, Rc<glory_render::RichDocument>)>,
 }
 struct Validator<'a> {
     dom: &'a dom::Dom,
@@ -87,7 +89,7 @@ impl Validator<'_> {
         }
         let key = self.mapper.key(id).expect("live HTML key");
         let children = model.children.clone();
-        let shape = glory_html::shape(&model.descriptor)?;
+        let shape = glory_html::shape_in(self.mapper.tree(), id)?;
         let mut parts = BTreeMap::new();
         let (first, last) = if shape.pieces.is_empty() {
             let first = self.comment(cursor, &format!("gly:s:{key}"), key)?;
@@ -106,7 +108,7 @@ impl Validator<'_> {
                 && self.mapper.tree().inert(id);
             let root = self.piece(
                 &shape,
-                Part::Main,
+                shape.root_part()?,
                 (key, layer_inert),
                 &children,
                 cursor,
@@ -114,6 +116,21 @@ impl Validator<'_> {
             )?;
             (root.clone(), root)
         };
+        if matches!(model.descriptor.view().props, glory_render::Props::File(_)) {
+            let picker = parts
+                .get(&Part::Picker)
+                .and_then(|node| node.dyn_ref::<web_sys::HtmlInputElement>())
+                .ok_or_else(|| mismatch(Some(key), "file picker part"))?;
+            if picker.files().is_some_and(|files| files.length() > 0) {
+                if self.plan.file_adoptions.len() >= 128 {
+                    return Err(mismatch(
+                        Some(key),
+                        "dirty file adoption exceeds 128 controls",
+                    ));
+                }
+                self.plan.file_adoptions.push(id);
+            }
+        }
         if let Some(control) = shape
             .control
             .and_then(|part| parts.get(&part))
@@ -236,6 +253,54 @@ impl Validator<'_> {
                     }
                 }
                 EditKind::None => {}
+                EditKind::Rich => {
+                    let Some(Property::RichDocument(expected)) = properties.get("richDocument")
+                    else {
+                        unreachable!()
+                    };
+                    let (actual, blocks) = super::rich::read(control)?;
+                    let composing = dom::preload_composing(control);
+                    let dirty = js_sys::Reflect::get(
+                        control,
+                        &js_sys::Symbol::for_("glory.preload.rich").into(),
+                    )
+                    .ok()
+                    .and_then(|value| value.as_bool())
+                    .unwrap_or(false)
+                        || composing;
+                    if actual != *expected && !dirty {
+                        return Err(mismatch(Some(key), "rich intrinsic document"));
+                    }
+                    if actual != *expected || composing {
+                        let allowed = self.mapper.tree().active(id)
+                            && self.mapper.tree().enabled(id)
+                            && !self.mapper.tree().inert(id)
+                            && !self.mapper.tree().node(id)?.descriptor.view().readonly();
+                        if allowed {
+                            let selection = super::rich::selection(control, &actual, &blocks)
+                                .unwrap_or_default();
+                            if composing {
+                                self.plan.inputs.push(Input::Event {
+                                    node: id,
+                                    event: Event::Composition { active: true },
+                                });
+                            }
+                            self.plan.inputs.push(Input::Event {
+                                node: id,
+                                event: Event::RichEdit(Box::new(glory_render::RichSnapshot {
+                                    document: actual,
+                                    selection,
+                                    revision: shape.revision,
+                                    composing,
+                                })),
+                            });
+                        } else {
+                            self.plan
+                                .rich_repairs
+                                .push((control.clone(), expected.clone()));
+                        }
+                    }
+                }
             }
             if self.dom.document.active_element().as_ref() == Some(control) {
                 self.plan.inputs.push(Input::Event {
@@ -350,6 +415,12 @@ impl Validator<'_> {
                     }
                 }
                 let mut inner = element.first_child();
+                if properties.contains_key("richDocument") {
+                    // The finite editor grammar is checked again with current
+                    // dirty/selection policy after its whole physical shape.
+                    super::rich::read(&element)?;
+                    inner = None;
+                }
                 if *tag == "select" {
                     let Some(config) = &shape.select_options else {
                         return Err(mismatch(Some(key), "select config"));
@@ -460,6 +531,8 @@ pub fn hydrate_with<W: Widget>(root: Element, factory: impl FnOnce(&Scope) -> W)
                 check_repairs: Vec::new(),
                 select_repairs: Vec::new(),
                 collapse_revisions: Vec::new(),
+                file_adoptions: Vec::new(),
+                rich_repairs: Vec::new(),
             },
         };
         let mut cursor = start.next_sibling();
@@ -496,6 +569,9 @@ pub fn hydrate_with<W: Widget>(root: Element, factory: impl FnOnce(&Scope) -> W)
     for (control, keys) in plan.select_repairs {
         super::select::write(&control, &keys)?;
     }
+    for (control, document) in plan.rich_repairs {
+        super::rich::write(&control, &document)?;
+    }
     for empty in plan.empty {
         empty
             .parent
@@ -514,6 +590,7 @@ pub fn hydrate_with<W: Widget>(root: Element, factory: impl FnOnce(&Scope) -> W)
             entry.last,
         )?;
     }
+    dom.adopt_files(&mut mapper.borrow_mut(), plan.file_adoptions)?;
     dom.staging.set(false);
     for id in mapper.borrow().tree().roots() {
         missing(&dom, &mapper.borrow(), *id)?;

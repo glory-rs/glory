@@ -9,6 +9,75 @@ use glory_render::{
 use glory_ui::{App, Widget, button, component, list, text};
 
 #[test]
+fn list_stats_distinguish_user_movement_from_programmatic_and_measurement_commits() {
+    let app = App::memory();
+    let position = app.scope().cage(0.);
+    let moved = Rc::new(RefCell::new(Vec::new()));
+    let output = moved.clone();
+    app.mount(
+        list(1000usize, |index| index, |_, _| text().content("row"))
+            .height(600.)
+            .position(position)
+            .inspect(move |stats| output.borrow_mut().push(stats.user_moved)),
+    )
+    .unwrap();
+    assert!(moved.borrow().iter().all(|value| !*value));
+    moved.borrow_mut().clear();
+    position.revise(|value| *value = 800.);
+    app.flush().unwrap();
+    assert!(moved.borrow().iter().all(|value| !*value));
+    moved.borrow_mut().clear();
+    let ack = glory_render::ScrollAck {
+        requested: glory_render::ScrollRequest { x: 0., y: 400. },
+        x: 0.,
+        y: 400.,
+    };
+    app.dispatch(
+        root(&app),
+        Event::Scroll {
+            x: 0.,
+            y: 400.,
+            viewport: Rect {
+                width: 800.,
+                height: 600.,
+                ..Rect::default()
+            },
+            ack: Some(ack),
+        },
+    )
+    .unwrap();
+    app.flush().unwrap();
+    assert!(
+        moved.borrow().iter().all(|value| !*value),
+        "late program acknowledgement is not a physical user movement"
+    );
+    moved.borrow_mut().clear();
+    app.dispatch(
+        root(&app),
+        Event::Scroll {
+            x: 0.,
+            y: 300.,
+            viewport: Rect {
+                width: 800.,
+                height: 600.,
+                ..Rect::default()
+            },
+            ack: Some(ack),
+        },
+    )
+    .unwrap();
+    app.flush().unwrap();
+    assert!(
+        moved.borrow().iter().any(|value| *value),
+        "coalesced user movement survives an older program acknowledgement"
+    );
+    moved.borrow_mut().clear();
+    app.dispatch(root(&app), scroll_event(200.)).unwrap();
+    app.flush().unwrap();
+    assert!(moved.borrow().iter().any(|value| *value));
+}
+
+#[test]
 fn event_created_paths_and_derived_values_retire_with_huge_list_rows_except_the_live_focus_pin() {
     let (app, observed) = app();
     let model = app.scope().cage((0usize, vec![9u8; 1024 * 1024]));

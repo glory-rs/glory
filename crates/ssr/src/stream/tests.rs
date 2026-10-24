@@ -12,6 +12,8 @@ use super::*;
 mod anchor;
 #[path = "choice_tests.rs"]
 mod choice;
+#[path = "clipboard_tests.rs"]
+mod clipboard;
 #[path = "collapse_tests.rs"]
 mod collapse;
 #[path = "command_tests.rs"]
@@ -20,6 +22,12 @@ mod command;
 mod document;
 #[path = "drag_capture_tests.rs"]
 mod drag_capture;
+#[path = "environment_tests.rs"]
+mod environment;
+#[path = "files_tests.rs"]
+mod files;
+#[path = "focus_scope_tests.rs"]
+mod focus_scope;
 #[path = "graphic_tests.rs"]
 mod graphic;
 #[path = "graphic_transition_tests.rs"]
@@ -36,10 +44,14 @@ mod menu;
 mod motion;
 #[path = "progress_tests.rs"]
 mod progress;
+#[path = "rich_tests.rs"]
+mod rich;
 #[path = "sheet_tests.rs"]
 mod sheet;
 #[path = "table_tests.rs"]
 mod table;
+#[path = "table_virtual_tests.rs"]
+mod table_virtual;
 #[path = "translation_tests.rs"]
 mod translation;
 

@@ -80,6 +80,7 @@ struct Present {
     node_owner_count: usize,
     query_owner_count: usize,
     node_owners: HashMap<NodeId, InstanceId>,
+    disposal_boundaries: BTreeSet<NodeId>,
     handlers: HashMap<NodeId, BTreeMap<EventKind, Subscription>>,
     listeners: Vec<(NodeId, EventKind, bool)>,
     commands: Vec<Mutation>,
@@ -112,6 +113,10 @@ impl Present {
 }
 
 pub(crate) struct Session {
+    command_buffer: crate::buffer::Pool<Mutation>,
+    action_buffer: crate::buffer::Pool<Action>,
+    listener_buffer: crate::buffer::Pool<(NodeId, EventKind, bool)>,
+    input_buffer: crate::buffer::Pool<Input>,
     pub runtime: Runtime,
     present: RefCell<Present>,
     renderer: RefCell<Box<dyn Render>>,
@@ -139,6 +144,7 @@ impl Session {
                 node_owner_count: 0,
                 query_owner_count: 0,
                 node_owners: HashMap::new(),
+                disposal_boundaries: BTreeSet::new(),
                 handlers: HashMap::new(),
                 listeners: Vec::new(),
                 commands: Vec::new(),
@@ -153,6 +159,10 @@ impl Session {
             faulted: Cell::new(false),
             error: RefCell::new(None),
             cancelled_queries: RefCell::new(Vec::new()),
+            command_buffer: Default::default(),
+            action_buffer: Default::default(),
+            listener_buffer: Default::default(),
+            input_buffer: Default::default(),
         })
     }
 
@@ -211,6 +221,33 @@ impl Session {
             id,
             Patch::Value {
                 value: glory_render::Change::Set(value),
+                revision,
+            },
+        )
+    }
+
+    pub(crate) fn rich_document(
+        &self,
+        id: NodeId,
+        document: Rc<glory_render::RichDocument>,
+    ) -> Result {
+        document.validate()?;
+        let revision = {
+            let present = self.present.borrow();
+            let glory_render::Props::RichEditor(editor) =
+                present.tree.node(id)?.descriptor.view().props
+            else {
+                return Err(RenderError::Unsupported("rich document requires a RichEditor").into());
+            };
+            editor
+                .revision
+                .checked_add(1)
+                .ok_or(RenderError::InputRevisionExhausted)?
+        };
+        self.patch(
+            id,
+            Patch::RichDocument {
+                document: glory_render::Change::Set(document),
                 revision,
             },
         )
@@ -343,6 +380,15 @@ impl Session {
                     if parent_owner.is_alive() {
                         break;
                     }
+                    // An explicit boundary must survive until its own Owner's
+                    // cleanup callback can move live foreign-owned ranges out.
+                    // Ordinary disposal keeps its empty-set fast path.
+                    if *parent_owner != owner
+                        && !present.disposal_boundaries.is_empty()
+                        && present.disposal_boundaries.contains(&parent)
+                    {
+                        break;
+                    }
                     id = parent;
                 }
                 let mut pending = vec![id];
@@ -357,6 +403,9 @@ impl Session {
                             .copied(),
                     );
                     present.ids.release(child);
+                    if !present.disposal_boundaries.is_empty() {
+                        present.disposal_boundaries.remove(&child);
+                    }
                     let node_owner = present.node_owners.remove(&child);
                     let handlers = present.handlers.remove(&child);
                     // This callback already extracted its entire Owned record.
@@ -425,7 +474,8 @@ impl Session {
         if self.faulted.get() {
             return Err(Error::Faulted);
         }
-        let commands = std::mem::take(&mut self.present.borrow_mut().commands);
+        let mut commands = self.command_buffer.take();
+        std::mem::swap(&mut *commands, &mut self.present.borrow_mut().commands);
         if !commands.is_empty() {
             let _span = self
                 .runtime
@@ -449,9 +499,11 @@ impl Session {
             }
             self.applied.set(receipt.applied);
         }
-        let actions = std::mem::take(&mut self.present.borrow_mut().actions);
-        let listeners = std::mem::take(&mut self.present.borrow_mut().listeners);
-        for (node, kind, enabled) in listeners {
+        let mut actions = self.action_buffer.take();
+        std::mem::swap(&mut *actions, &mut self.present.borrow_mut().actions);
+        let mut listeners = self.listener_buffer.take();
+        std::mem::swap(&mut *listeners, &mut self.present.borrow_mut().listeners);
+        for (node, kind, enabled) in listeners.drain(..) {
             if !self.present.borrow().ids.contains(node) {
                 continue;
             }
@@ -459,8 +511,66 @@ impl Session {
                 self.report(error.into());
             }
         }
-        for action in actions {
+        for action in actions.drain(..) {
             let present = self.present.borrow();
+            if let Action::PickFiles {
+                node,
+                revision,
+                request,
+            } = action
+            {
+                if !present
+                    .tree
+                    .file_pending(node, request, revision)
+                    .unwrap_or(false)
+                {
+                    continue;
+                }
+                if present.tree.validate_file_action(action).is_err() {
+                    drop(present);
+                    if let Some(files) = self.renderer.borrow().capabilities().files {
+                        self.present.borrow_mut().tree.push_event(
+                            node,
+                            file_picker_failure(files.document, revision, request),
+                        )?;
+                        self.runtime.request_observe();
+                    }
+                    continue;
+                }
+            }
+            if let Action::ClearFiles{node,revision} | Action::RemoveFile(glory_render::FileToken{node,revision,..})=action
+                && !present.tree.node(node).is_ok_and(|node|matches!(node.descriptor.view().props,glory_render::Props::File(props) if props.revision==revision)) {continue;}
+            if let Action::CopyText {
+                node,
+                revision,
+                request,
+            } = action
+            {
+                if !present
+                    .tree
+                    .clipboard_pending(node, request, revision)
+                    .unwrap_or(false)
+                {
+                    continue;
+                }
+                if !present.tree.active(node)
+                    || !present.tree.enabled(node)
+                    || present.tree.inert(node)
+                {
+                    drop(present);
+                    self.present.borrow_mut().tree.push_event(
+                        node,
+                        Event::Clipboard {
+                            revision,
+                            request,
+                            outcome: glory_render::ClipboardOutcome::Failed,
+                        },
+                    )?;
+                    self.runtime.request_observe();
+                    continue;
+                }
+            }
+            if let Action::SelectRich{node,revision,..}=action && !present.tree.node(node).is_ok_and(|node|matches!(node.descriptor.view().props,glory_render::Props::RichEditor(p) if p.revision==revision)){continue;}
             if let Action::SelectText {node,revision,..}=action
                 && !present.tree.node(node).is_ok_and(|node|matches!(node.descriptor.view().props,glory_render::Props::Input(p) if p.revision==revision))
             { continue; }
@@ -474,7 +584,11 @@ impl Session {
             }
             if matches!(
                 action,
-                Action::Focus(_) | Action::RaiseLayer(_) | Action::ExitMenu { .. }
+                Action::Focus(_)
+                    | Action::SelectRich { .. }
+                    | Action::RaiseLayer(_)
+                    | Action::ScrollIntoView(_)
+                    | Action::ExitMenu { .. }
             ) && present.tree.inert(action.node())
             {
                 continue;
@@ -484,7 +598,48 @@ impl Session {
                 .runtime
                 .profile()
                 .map(|profile| profile.span(Phase::Action));
+            let file_document = if matches!(action, Action::PickFiles { .. }) {
+                self.renderer
+                    .borrow()
+                    .capabilities()
+                    .files
+                    .map(|files| files.document)
+            } else {
+                None
+            };
             if let Err(error) = self.renderer.borrow_mut().action(action) {
+                if let Action::PickFiles {
+                    node,
+                    revision,
+                    request,
+                } = action
+                    && let Some(document) = file_document
+                {
+                    self.present
+                        .borrow_mut()
+                        .tree
+                        .push_event(node, file_picker_failure(document, revision, request))?;
+                    self.runtime.request_observe();
+                    continue;
+                }
+
+                if let Action::CopyText {
+                    node,
+                    revision,
+                    request,
+                } = action
+                {
+                    self.present.borrow_mut().tree.push_event(
+                        node,
+                        Event::Clipboard {
+                            revision,
+                            request,
+                            outcome: glory_render::ClipboardOutcome::Failed,
+                        },
+                    )?;
+                    self.runtime.request_observe();
+                    continue;
+                }
                 // Focus can become unavailable after queuing (CSS/layout,
                 // disabling, host policy). That ordinary refusal does not
                 // desynchronize the semantic tree. Focus is a best-effort
@@ -492,7 +647,11 @@ impl Session {
                 // intents; actual backend failures remain fatal.
                 if matches!(
                     action,
-                    Action::Focus(_) | Action::RaiseLayer(_) | Action::SelectText { .. }
+                    Action::Focus(_)
+                        | Action::RaiseLayer(_)
+                        | Action::ScrollIntoView(_)
+                        | Action::SelectText { .. }
+                        | Action::SelectRich { .. }
                 ) && matches!(error, RenderError::Unsupported(_))
                 {
                     continue;
@@ -518,7 +677,7 @@ impl Session {
         // Disposal remains guarded by generational identity and live handlers.
         let terminal_loss = event.is_terminal_loss();
         let (handlers, observed_tree) = {
-            let present = self.present.borrow();
+            let mut present = self.present.borrow_mut();
             if !present.ids.contains(node) || !present.tree.active(node) && !terminal_loss {
                 return Ok(false);
             }
@@ -576,6 +735,21 @@ impl Session {
             if !present.tree.validate_event(node, &event)? {
                 return Ok(false);
             }
+            if let Event::Files(result) = &event {
+                let files = self.renderer.borrow().capabilities().files.ok_or(
+                    RenderError::InvalidEvent("file observation without a file consumer"),
+                )?;
+                if !present.tree.finish_files(node, files.document, result)? {
+                    return Ok(false);
+                }
+            }
+            if let Event::Clipboard {
+                request, revision, ..
+            } = event
+                && !present.tree.finish_clipboard(node, request, revision)?
+            {
+                return Ok(false);
+            }
             if !present.tree.enabled(node)
                 && !event.is_terminal_loss()
                 && matches!(
@@ -590,6 +764,7 @@ impl Session {
                         | Event::ContextMenu { .. }
                         | Event::NavigationPanel { .. }
                         | Event::GridNavigate { .. }
+                        | Event::TreeNavigate { .. }
                         | Event::Sheet { .. }
                         | Event::Choice { .. }
                         | Event::Drag { .. }
@@ -606,8 +781,29 @@ impl Session {
             }
             let mut cursor = Some(node);
             let mut handler = None;
+            let mut nested_control = false;
             while let Some(id) = cursor {
                 let current = present.tree.node(id)?;
+                // A real tree item can contain editable/action controls. Their
+                // clicks keep native policy even without a local app handler;
+                // labels and other passive content still activate their item.
+                if matches!(event, Event::Activate) {
+                    if id != node
+                        && current.descriptor.view().role == Some(glory_render::Role::TreeItem)
+                        && nested_control
+                    {
+                        break;
+                    }
+                    nested_control |= matches!(
+                        current.descriptor.view().props,
+                        glory_render::Props::Input(_)
+                            | glory_render::Props::Button(_)
+                            | glory_render::Props::Check(_)
+                            | glory_render::Props::Link(_)
+                            | glory_render::Props::Select(_)
+                            | glory_render::Props::RichEditor(_)
+                    );
+                }
                 if matches!(
                     event,
                     Event::Activate
@@ -1163,14 +1359,50 @@ impl Scope {
                 .node(action.node())?
                 .descriptor,
         )?;
-        if matches!(action, Action::Focus(_))
+        if matches!(action, Action::SelectRich { .. })
+            && (!session.present.borrow().tree.active(action.node())
+                || !session.present.borrow().tree.enabled(action.node())
+                || session.present.borrow().tree.inert(action.node()))
+        {
+            return Err(RenderError::Unsupported(
+                "rich selection requires an active enabled non-inert editor",
+            )
+            .into());
+        }
+        if matches!(action, Action::CopyText { .. })
+            && (!session.present.borrow().tree.enabled(action.node())
+                || session.present.borrow().tree.inert(action.node())
+                || !session.present.borrow().tree.active(action.node()))
+        {
+            return Err(RenderError::Unsupported(
+                "clipboard source is inactive, disabled or inert",
+            )
+            .into());
+        }
+        if matches!(action, Action::RaiseLayer(_) | Action::ScrollIntoView(_))
+            && (!session.present.borrow().tree.active(action.node())
+                || session.present.borrow().tree.inert(action.node()))
+        {
+            return Err(RenderError::Unsupported("raise on an inactive layer").into());
+        }
+        if matches!(action, Action::Focus(_) | Action::RaiseLayer(_))
             && !session.present.borrow().tree.enabled(action.node())
         {
             return Err(RenderError::Unsupported("focus in disabled fieldset").into());
         }
+        session.present.borrow().tree.validate_file_action(action)?;
         let capabilities = session.renderer.borrow().capabilities();
         match action {
-            Action::SelectText { .. } if !capabilities.input => {
+            Action::PickFiles { .. } if !capabilities.files.is_some_and(|files| files.picker) => {
+                return Err(RenderError::Unsupported("file picker").into());
+            }
+            Action::ClearFiles { .. } | Action::RemoveFile(_) if capabilities.files.is_none() => {
+                return Err(RenderError::Unsupported("file access").into());
+            }
+            Action::CopyText { .. } if !capabilities.clipboard_write => {
+                return Err(RenderError::Unsupported("text clipboard write").into());
+            }
+            Action::SelectRich { .. } | Action::SelectText { .. } if !capabilities.input => {
                 return Err(RenderError::Unsupported("text selection").into());
             }
             Action::Focus(_) | Action::RaiseLayer(_) | Action::ExitMenu { .. }
@@ -1178,15 +1410,108 @@ impl Scope {
             {
                 return Err(RenderError::Unsupported("focus").into());
             }
-            Action::ScrollTo { .. } | Action::RevealOption { .. } if !capabilities.scroll => {
+            Action::ScrollTo { .. } | Action::ScrollIntoView(_) | Action::RevealOption { .. }
+                if !capabilities.scroll =>
+            {
                 return Err(RenderError::Unsupported("scroll").into());
             }
             _ => {}
         }
         let mut present = session.present.borrow_mut();
         present.tree.node(action.node())?;
+        present.tree.admit_clipboard(action)?;
+        present.tree.admit_file_action(action)?;
         present.actions.push(action);
         Ok(())
+    }
+    /// Validate a complete finite configuration before allocating a revision.
+    /// Equal declarations preserve the current selection and request lifetime.
+    pub fn set_file_configuration(
+        &self,
+        node: NodeId,
+        configuration: glory_render::FileConfig,
+    ) -> Result<u64> {
+        configuration.validate()?;
+        let session = self.session()?;
+        let revision = {
+            let present = session.present.borrow();
+            let glory_render::Props::File(props) = present.tree.node(node)?.descriptor.view().props
+            else {
+                return Err(
+                    RenderError::Unsupported("file configuration requires a File control").into(),
+                );
+            };
+            if props.configuration == configuration {
+                return Ok(props.revision);
+            }
+            props
+                .revision
+                .checked_add(1)
+                .ok_or(RenderError::InvalidProps(
+                    "file configuration revision exhausted",
+                ))?
+        };
+        self.patch(
+            node,
+            Patch::File {
+                configuration: glory_render::Change::Set(Box::new(configuration)),
+                revision,
+            },
+        )?;
+        Ok(revision)
+    }
+    pub fn clear_files(&self, node: NodeId) -> Result {
+        let revision = {
+            let session = self.session()?;
+            let present = session.present.borrow();
+            let glory_render::Props::File(props) = present.tree.node(node)?.descriptor.view().props
+            else {
+                return Err(RenderError::Unsupported("clear requires a File control").into());
+            };
+            props.revision
+        };
+        self.action(Action::ClearFiles { node, revision })
+    }
+    pub fn remove_file(&self, file: glory_render::FileToken) -> Result {
+        self.action(Action::RemoveFile(file))
+    }
+    pub fn pick_files(&self, node: NodeId) -> Result<u64> {
+        let session = self.session()?;
+        let (revision, request) = {
+            let present = session.present.borrow();
+            let glory_render::Props::File(props) = present.tree.node(node)?.descriptor.view().props
+            else {
+                return Err(RenderError::Unsupported("file picker requires a File control").into());
+            };
+            (props.revision, present.tree.next_file_request(node)?)
+        };
+        self.action(Action::PickFiles {
+            node,
+            revision,
+            request,
+        })?;
+        Ok(request)
+    }
+    /// Queue an explicit text write from this live Button's accepted source.
+    /// The returned identity is strictly increasing for its NodeId lifetime.
+    pub fn copy_text(&self, node: NodeId) -> Result<u64> {
+        let session = self.session()?;
+        let (revision, request) = {
+            let present = session.present.borrow();
+            let descriptor = present.tree.node(node)?.descriptor.view();
+            let source = descriptor
+                .semantics
+                .as_ref()
+                .and_then(|s| s.clipboard.as_ref())
+                .ok_or(RenderError::Unsupported("button has no clipboard source"))?;
+            (source.revision, present.tree.next_clipboard_request(node)?)
+        };
+        self.action(Action::CopyText {
+            node,
+            revision,
+            request,
+        })?;
+        Ok(request)
     }
     /// Queue an exact ASCII selection using this Input's current program
     /// revision. Call after set_input_value when formatting changed the value.
@@ -1206,6 +1531,52 @@ impl Scope {
             input.revision
         };
         self.action(Action::SelectText {
+            node,
+            revision,
+            selection,
+        })
+    }
+    /// Explicit program document write, even when equal, acknowledges or rejects
+    /// a physical draft using a new revision from the live node.
+    pub fn set_rich_document(
+        &self,
+        node: NodeId,
+        document: Rc<glory_render::RichDocument>,
+    ) -> Result<u64> {
+        let session = self.session()?;
+        session.rich_document(node, document)?;
+        Ok(self.rich_editor_value(node)?.1)
+    }
+    /// Read staged accepted state, without a host query or flush.
+    pub fn rich_editor_value(&self, node: NodeId) -> Result<(Rc<glory_render::RichDocument>, u64)> {
+        let session = self.session()?;
+        let present = session.present.borrow();
+        let glory_render::Props::RichEditor(editor) =
+            present.tree.node(node)?.descriptor.view().props
+        else {
+            return Err(RenderError::Unsupported("rich document requires a RichEditor").into());
+        };
+        Ok((editor.document.clone(), editor.revision))
+    }
+    pub fn rich_editor_editable(&self, node: NodeId) -> Result<bool> {
+        let session = self.session()?;
+        let present = session.present.borrow();
+        let descriptor = present.tree.node(node)?.descriptor.view();
+        if !matches!(descriptor.props, glory_render::Props::RichEditor(_)) {
+            return Err(RenderError::Unsupported("rich edit requires a RichEditor").into());
+        }
+        Ok(present.tree.active(node)
+            && present.tree.enabled(node)
+            && !present.tree.inert(node)
+            && !descriptor.readonly())
+    }
+    pub fn set_rich_selection(
+        &self,
+        node: NodeId,
+        selection: glory_render::RichSelection,
+    ) -> Result {
+        let revision = self.rich_editor_value(node)?.1;
+        self.action(Action::SelectRich {
             node,
             revision,
             selection,
@@ -1258,6 +1629,39 @@ impl Scope {
         let present = session.present.borrow();
         present.tree.node(node)?;
         Ok(present.tree.active(node))
+    }
+    /// Current semantic enabled ancestry, without a host query or flush. This
+    /// is independent of placement/visibility, which `is_active` checks.
+    pub fn is_enabled(&self, node: NodeId) -> Result<bool> {
+        let session = self.session()?;
+        let present = session.present.borrow();
+        present.tree.node(node)?;
+        Ok(present.tree.enabled(node))
+    }
+    /// Keep this owned node out of an earlier child's retired-ancestor
+    /// coalescing. Its own Owner cleanup still disposes it normally. This lets
+    /// that Owner move live foreign ranges before their semantic parent dies;
+    /// it does not keep the Owner or its own descendants alive. The marker is
+    /// reclaimed whenever the node is disposed, including ancestor disposal.
+    pub fn defer_descendant_disposal(&self, node: NodeId) -> Result {
+        let session = self.session()?;
+        let mut present = session.present.borrow_mut();
+        present.tree.node(node)?;
+        if present.node_owners.get(&node) != Some(&self.id()) {
+            return Err(RenderError::InvalidProps(
+                "disposal boundary must belong to the registering Scope",
+            )
+            .into());
+        }
+        present.disposal_boundaries.insert(node);
+        Ok(())
+    }
+    /// Current inherited inert state. This reads the logical live tree only.
+    pub fn is_inert(&self, node: NodeId) -> Result<bool> {
+        let session = self.session()?;
+        let present = session.present.borrow();
+        present.tree.node(node)?;
+        Ok(present.tree.inert(node))
     }
     /// The immediate logical child of parent containing node. Retired focus
     /// targets are normal after removal; physical DOM ancestry is irrelevant.
@@ -1398,6 +1802,7 @@ pub struct UiStats {
     pub query_owners: usize,
     pub query_targets: usize,
     pub pending: usize,
+    pub disposal_boundaries: usize,
 }
 
 pub struct App {
@@ -1422,12 +1827,36 @@ impl App {
         for _ in 0..limit {
             turn.handled = turn.handled.saturating_add(self.pump()?);
             turn.passes += 1;
-            turn.pending = self.session.renderer.borrow().needs_observe();
+            turn.pending = self.session.renderer.borrow().needs_observe()
+                || self.session.present.borrow().tree.needs_observe();
             if !turn.pending {
                 break;
             }
         }
         Ok(turn)
+    }
+    /// Pending and idle-spare capacity; excludes batches currently being
+    /// processed. Slot/byte counts describe Vec storage, not RSS or live data.
+    pub fn buffer_stats(&self) -> crate::BufferStats {
+        let p = self.session.present.borrow();
+        let commands = p.commands.capacity() + self.session.command_buffer.capacity();
+        let actions = p.actions.capacity() + self.session.action_buffer.capacity();
+        let listeners = p.listeners.capacity() + self.session.listener_buffer.capacity();
+        let inputs = self.session.input_buffer.capacity();
+        crate::BufferStats {
+            commands,
+            actions,
+            listeners,
+            inputs,
+            bytes: commands * size_of::<Mutation>()
+                + actions * size_of::<Action>()
+                + listeners * size_of::<(NodeId, EventKind, bool)>()
+                + inputs * size_of::<Input>(),
+        }
+    }
+    /// Explicit live graph diagnostic; never called by the host frame loop.
+    pub fn graph_stats(&self) -> glory_core::GraphStats {
+        self.session.runtime.graph_stats()
     }
     pub fn profile(&self) -> Option<Profile> {
         self.session.runtime.profile()
@@ -1501,6 +1930,7 @@ impl App {
             query_owners: present.query_owner_count,
             query_targets: present.node_queries.len(),
             pending: present.commands.len() + present.actions.len() + present.listeners.len(),
+            disposal_boundaries: present.disposal_boundaries.len(),
         }
     }
     pub fn mount(&self, widget: impl Widget) -> Result {
@@ -1517,20 +1947,27 @@ impl App {
         self.session.flush()
     }
     pub fn dispatch(&self, node: NodeId, event: Event) -> Result<bool> {
+        if matches!(event, Event::Clipboard { .. } | Event::Files(_)) {
+            return Err(RenderError::InvalidEvent(
+                "clipboard and file completions require the host input channel",
+            )
+            .into());
+        }
         let handled = self.session.route(node, event)?;
         self.flush()?;
         Ok(handled)
     }
     /// All events delivered in this host tick share one reactive/render flush.
     pub fn pump(&self) -> Result<usize> {
-        let mut inputs = Vec::new();
+        let mut inputs = self.session.input_buffer.take();
         {
             let _span = self.profile().map(|profile| profile.span(Phase::Observe));
             self.session.renderer.borrow_mut().drain(&mut inputs);
+            self.session.present.borrow_mut().tree.drain(&mut inputs);
         }
         let mut handled = 0;
         let mut event_error = None;
-        for input in inputs {
+        for input in inputs.drain(..) {
             match input {
                 Input::Event { node, event } => match self.session.route(node, event) {
                     Ok(delivered) => handled += usize::from(delivered),
@@ -1587,6 +2024,21 @@ impl Drop for App {
         // application code after the app lifetime has ended.
         self.session.cancelled_queries.borrow_mut().clear();
     }
+}
+
+fn file_picker_failure(
+    document: glory_render::FileDocumentId,
+    revision: u64,
+    request: u64,
+) -> Event {
+    Event::Files(Box::new(glory_render::FileEvent {
+        document,
+        revision,
+        request: Some(request),
+        batch: 1,
+        origin: glory_render::FileOrigin::Picker,
+        outcome: glory_render::FileOutcome::Rejected(glory_render::FileRejection::Failed),
+    }))
 }
 
 #[cfg(test)]
@@ -1719,3 +2171,7 @@ mod placement_tests {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "buffer_tests.rs"]
+mod buffer_tests;

@@ -1,14 +1,20 @@
+mod clipboard;
 mod collapse;
 mod dom;
 mod events;
+mod file_document;
+mod files;
 mod frame;
 #[cfg(feature = "hydrate")]
 mod hydrate;
 mod images;
 mod input_edit;
 mod layers;
+mod rich;
+mod scroll_into_view;
 mod select;
 mod sheet;
+mod swipe;
 mod translation;
 #[cfg(feature = "hydrate")]
 pub use hydrate::*;
@@ -42,6 +48,7 @@ pub struct Renderer {
     _events: events::Listeners,
     supports_layers: bool,
     supports_translations: bool,
+    supports_files: bool,
 }
 impl Renderer {
     fn new(runtime: RuntimeId, dom: Rc<Dom>) -> Self {
@@ -52,6 +59,14 @@ impl Renderer {
             js_sys::Reflect::get(&dom.root, &"showPopover".into()).is_ok_and(|v| v.is_function());
         let supports_translations =
             js_sys::Reflect::get(&dom.root, &"animate".into()).is_ok_and(|v| v.is_function());
+        let supports_files = dom
+            .document
+            .create_element("input")
+            .ok()
+            .is_some_and(|element| {
+                js_sys::Reflect::get(&element, &"showPicker".into())
+                    .is_ok_and(|method| method.is_function())
+            });
         dom.frame.attach_dom(&dom);
         let events = events::Listeners::new(dom.clone());
         Self {
@@ -61,6 +76,7 @@ impl Renderer {
             _events: events,
             supports_layers,
             supports_translations,
+            supports_files,
         }
     }
     fn check_layers<'a>(
@@ -109,6 +125,14 @@ impl Render for Renderer {
     }
     fn capabilities(&self) -> Capabilities {
         Capabilities {
+            clipboard_write: true,
+            files: Some(glory_render::FileCapabilities {
+                document: self.dom.files.borrow().document,
+                picker: self.supports_files,
+                drop: true,
+                read: true,
+                preview: true,
+            }),
             measure: true,
             scroll: true,
             focus: true,
@@ -148,6 +172,7 @@ impl Render for Renderer {
             })()
         };
         self.receipt = mapper.receipt();
+        swipe::update(&self.dom, mapper.tree());
         self.dom
             .sheets
             .borrow_mut()
@@ -161,6 +186,9 @@ impl Render for Renderer {
             .update(mapper.tree(), mutations);
         self.dom.update_collapses(mapper.tree(), mutations);
         self.dom.update_translations(mapper.tree(), mutations);
+        self.dom.update_clipboard(mapper.tree());
+        self.dom.update_files(mapper.tree());
+        rich::update(&self.dom, mapper.tree())?;
         drop(mapper);
         if !self.dom.staging.get() && self.dom.live.get() {
             sheet::sync_accepted(&self.dom)?;
@@ -181,6 +209,102 @@ impl Render for Renderer {
     }
     fn action(&mut self, action: Action) -> Result<(), Error> {
         action.validate_target(&self.mapper.borrow().tree().node(action.node())?.descriptor)?;
+        if matches!(
+            action,
+            Action::PickFiles { .. } | Action::ClearFiles { .. } | Action::RemoveFile(_)
+        ) {
+            let mut mapper = self.mapper.borrow_mut();
+            mapper.tree().validate_file_action(action)?;
+            if self.dom.staging.get() || self.dom.hold_actions.get() || !self.dom.live.get() {
+                return Err(Error::Unsupported("file action before adoption"));
+            }
+            if matches!(action, Action::PickFiles { .. })
+                && !self
+                    .dom
+                    .document_layers
+                    .allows(Some(self.dom.entry(action.node())?.control()?.as_ref()))
+            {
+                return Err(Error::Unsupported(
+                    "file control outside document modal scope",
+                ));
+            }
+            mapper.admit_file_action(action)?;
+            match action {
+                Action::PickFiles {
+                    node,
+                    revision,
+                    request,
+                } => {
+                    drop(mapper);
+                    if let Err(reason) = self.dom.pick_files(node, revision, request) {
+                        self.dom.reject_picker(
+                            &mut self.mapper.borrow_mut(),
+                            node,
+                            revision,
+                            request,
+                            reason,
+                        )?;
+                    }
+                }
+                Action::ClearFiles { node, .. } => {
+                    self.dom.clear_file_control(node);
+                }
+                Action::RemoveFile(_) => self.dom.update_files(mapper.tree()),
+                _ => unreachable!(),
+            }
+            return Ok(());
+        }
+        if let Action::CopyText {
+            node,
+            revision,
+            request,
+        } = action
+        {
+            let mut mapper = self.mapper.borrow_mut();
+            mapper.tree().validate_clipboard_action(action)?;
+            if self.dom.staging.get() || self.dom.hold_actions.get() || !self.dom.live.get() {
+                return Err(Error::Unsupported("clipboard write before adoption"));
+            }
+            let target = self.dom.entry(node)?.control()?;
+            if !self.dom.document_layers.allows(Some(target.as_ref())) {
+                return Err(Error::Unsupported(
+                    "clipboard source outside document modal scope",
+                ));
+            }
+            mapper.admit_clipboard(action)?;
+            let text = mapper
+                .tree()
+                .node(node)?
+                .descriptor
+                .view()
+                .semantics
+                .as_ref()
+                .and_then(|s| s.clipboard.as_ref())
+                .expect("validated source")
+                .text
+                .clone();
+            drop(mapper);
+            self.dom.write_clipboard(node, revision, request, text);
+            return Ok(());
+        }
+        if matches!(action, Action::RaiseLayer(_))
+            && (!self.mapper.borrow().tree().active(action.node())
+                || !self.mapper.borrow().tree().enabled(action.node()))
+        {
+            return Err(Error::Unsupported("raise on an inactive layer"));
+        }
+        if let Action::SelectRich { node, .. } = action {
+            let mapper = self.mapper.borrow();
+            let glory_render::Props::RichEditor(expected) =
+                mapper.tree().node(node)?.descriptor.view().props
+            else {
+                unreachable!()
+            };
+            let (actual, _) = rich::read(&self.dom.entry(node)?.control()?)?;
+            if actual != expected.document {
+                return Err(Error::Unsupported("rich selection document changed"));
+            }
+        }
         if let Action::SelectText { node, .. } = action {
             let mapper = self.mapper.borrow();
             let glory_render::Props::Input(expected) =
@@ -199,7 +323,11 @@ impl Render for Renderer {
         }
         if matches!(
             action,
-            Action::Focus(_) | Action::RaiseLayer(_) | Action::ExitMenu { .. }
+            Action::Focus(_)
+                | Action::RaiseLayer(_)
+                | Action::ScrollIntoView(_)
+                | Action::ExitMenu { .. }
+                | Action::SelectRich { .. }
         ) && self.mapper.borrow().tree().inert(action.node())
         {
             return Err(Error::Unsupported("focus in an inert region"));
@@ -217,6 +345,24 @@ impl Render for Renderer {
         perform(&self.dom, action)
     }
     fn request(&mut self, query: Query, token: QueryToken) -> Result<(), Error> {
+        if matches!(query, Query::FileRead(_) | Query::FilePreview(_)) {
+            let result = self.dom.request_file(
+                self.mapper.borrow().tree(),
+                query,
+                token,
+                self.receipt.applied,
+            );
+            if let Err(error) = result {
+                self.dom.inputs.borrow_mut().push(Input::Response {
+                    token,
+                    applied: self.receipt.applied,
+                    result: Err(error),
+                });
+                self.dom.frame.input();
+            }
+            return Ok(());
+        }
+
         self.mapper.borrow().tree().node(query.node())?;
         if self.dom.staging.get() {
             return Err(Error::Unsupported("physical query before adoption"));
@@ -229,6 +375,23 @@ impl Render for Renderer {
                 return Err(Error::Unsupported("query on a disconnected range"));
             }
             match query {
+                Query::RichSelection(_) => {
+                    let control = entry.control()?;
+                    let (document, blocks) = rich::read(&control)?;
+                    let selection = rich::selection(&control, &document, &blocks)?;
+                    let editing = entry.editing.borrow();
+                    Ok(QueryValue::RichSelection(Box::new(
+                        glory_render::RichSnapshot {
+                            document,
+                            selection,
+                            revision: editing.revision,
+                            composing: editing.composing,
+                        },
+                    )))
+                }
+                Query::FileRead(_) | Query::FilePreview(_) => {
+                    Err(Error::Unsupported("browser file driver not installed"))
+                }
                 Query::Focus(_) => Ok(QueryValue::Focus(dom::has_focus(&entry.control()?)?)),
                 Query::Bounds(_) => {
                     let rect = entry.element()?.get_bounding_client_rect();
@@ -278,6 +441,19 @@ impl Render for Renderer {
         Ok(())
     }
     fn drain(&mut self, inputs: &mut Vec<Input>) {
+        let rich_writes = match rich::observe(&self.dom, self.mapper.borrow().tree()) {
+            Ok(writes) => writes,
+            Err(error) => {
+                self.dom.error.borrow_mut().get_or_insert(error);
+                Vec::new()
+            }
+        };
+        if let Err(error) = self.dom.read_files(&mut self.mapper.borrow_mut()) {
+            self.dom.error.borrow_mut().get_or_insert(error);
+        }
+        if let Err(error) = self.dom.read_clipboard(&mut self.mapper.borrow_mut()) {
+            self.dom.error.borrow_mut().get_or_insert(error);
+        }
         if let Err(error) = self.dom.read_translations(self.mapper.borrow().tree()) {
             self.dom.error.borrow_mut().get_or_insert(error);
         }
@@ -288,11 +464,39 @@ impl Render for Renderer {
             self.dom.error.borrow_mut().get_or_insert(error);
         }
         self.dom.read_layout();
+        for write in rich_writes {
+            if let Err(error) = write.apply() {
+                self.dom.error.borrow_mut().get_or_insert(error);
+            }
+        }
         inputs.append(&mut self.dom.inputs.borrow_mut());
     }
 }
 fn perform(dom: &Dom, action: Action) -> Result<(), Error> {
     match action {
+        Action::SelectRich {
+            node,
+            revision,
+            selection,
+        } => {
+            let entry = dom.entry(node)?;
+            if entry.editing.borrow().revision != revision || entry.editing.borrow().composing {
+                return Err(Error::Unsupported(
+                    "rich selection revision/composition changed",
+                ));
+            }
+            let control = entry.control()?;
+            if !dom.document_layers.allows(Some(control.as_ref()))
+                || !dom.document_layers.allows_scope(control.as_ref())
+            {
+                return Err(Error::Unsupported("rich selection outside modal scope"));
+            }
+            rich::select(&control, selection)?;
+        }
+        Action::PickFiles { .. } | Action::ClearFiles { .. } | Action::RemoveFile(_) => {
+            return Err(Error::Unsupported("browser file driver not installed"));
+        }
+        Action::CopyText { .. } => return Err(Error::Unsupported("text clipboard write")),
         Action::SelectText {
             node,
             revision,
@@ -305,7 +509,9 @@ fn perform(dom: &Dom, action: Action) -> Result<(), Error> {
                 ));
             }
             let target = entry.control()?;
-            if !dom.document_layers.allows(Some(target.as_ref())) {
+            if !dom.document_layers.allows(Some(target.as_ref()))
+                || !dom.document_layers.allows_scope(target.as_ref())
+            {
                 return Err(Error::Unsupported(
                     "text selection outside document modal scope",
                 ));
@@ -335,6 +541,7 @@ fn perform(dom: &Dom, action: Action) -> Result<(), Error> {
         }
         Action::RevealOption { node } => select::reveal(dom, node)?,
         Action::RaiseLayer(node) => layers::raise(dom, node)?,
+        Action::ScrollIntoView(node) => scroll_into_view::reveal(dom, node)?,
         Action::ExitMenu { node, backwards } => layers::exit_menu(dom, node, backwards)?,
         Action::Focus(node) => {
             let target = dom.entry(node)?.control()?;

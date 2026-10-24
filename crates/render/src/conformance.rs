@@ -104,6 +104,7 @@ pub fn verify(mut renderer: impl Render, runtime: RuntimeId, geometry: bool) {
             assert_eq!(*applied, receipt.applied);
             let capabilities = renderer.capabilities();
             let expected = match query {
+                Query::RichSelection(_) | Query::FileRead(_) | Query::FilePreview(_) => false,
                 Query::Focus(_) => capabilities.focus && boxed,
                 Query::Selection(_) => capabilities.input && edits,
                 Query::Bounds(_) | Query::Scroll(_) | Query::ScrollMetrics(_) => geometry && boxed,

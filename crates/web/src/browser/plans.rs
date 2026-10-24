@@ -148,12 +148,14 @@ impl Plans {
                 parts[parent]
                     .get(&slot)
                     .expect("parent part")
-                    .append_child(own.get(&Part::Main).expect("main part"))
+                    .append_child(own.get(&node.root_part()?).expect("physical root part"))
                     .map_err(backend)?;
             }
             parts.push(own);
         }
-        let root = parts[0].get(&Part::Main).expect("plan root");
+        let root = parts[0]
+            .get(&shape.shapes[0].root_part()?)
+            .expect("plan root");
         let prototype =
             prototype(root, &all_parts, &owners, &virtual_parts, &fields).map_err(backend)?;
         let (nodes, bytes) = shape.weight();
@@ -223,6 +225,9 @@ impl Dom {
         // instance together; subsequent internal edges need no physical writes.
         let mut table = self.entries.borrow_mut();
         for (id, entry) in ids.iter().zip(entries) {
+            if entry.edit == glory_html::EditKind::Rich {
+                self.rich_live.borrow_mut().insert(*id);
+            }
             table.insert(*id, entry);
         }
         Ok(())

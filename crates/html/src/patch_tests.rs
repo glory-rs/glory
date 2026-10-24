@@ -13,6 +13,10 @@ impl Sink for Record {
 #[test]
 fn every_field_delta_matches_full_shape_difference_including_resets_and_normalization() {
     let mut bases = vec![
+        Props::RichEditor(RichEditorProps {
+            revision: 10,
+            ..Default::default()
+        }),
         Props::View,
         Props::Group,
         Props::Text(TextProps {
@@ -26,6 +30,25 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
         }),
         Props::Button(ButtonProps {
             label: "old".into(),
+            ..Default::default()
+        }),
+        Props::File(FileProps {
+            revision: 10,
+            ..Default::default()
+        }),
+        Props::File(FileProps {
+            revision: 10,
+            enabled: false,
+            configuration: FileConfig {
+                multiple: true,
+                max_files: 4,
+                drop: true,
+                filters: vec![
+                    FileFilter::Mime("image/*".into()),
+                    FileFilter::Extension(".png".into()),
+                ],
+                ..Default::default()
+            },
             ..Default::default()
         }),
         Props::Select(SelectProps {
@@ -122,6 +145,7 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
         grid.role = Some(Role::Grid);
         grid.semantics = Some(Box::new(Semantics {
             grid_navigation: Some(direction),
+            grid_multiple: direction == glory_render::Direction::Rtl,
             table: Some(TableMetadata::Table {
                 rows: Some(6),
                 columns: Some(7),
@@ -282,6 +306,18 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
     }));
     bases.push(fieldset);
     let mut patches = vec![
+        Patch::RichDocument {
+            document: Change::Set(std::rc::Rc::new(RichDocument::default())),
+            revision: 11,
+        },
+        Patch::RichDocument {
+            document: Change::Clear,
+            revision: 11,
+        },
+        Patch::RichDocument {
+            document: Change::Keep,
+            revision: 0,
+        },
         Patch::Semantics(Change::Set(Some(Box::new(Semantics {
             field_part: Some(FieldPart::Fieldset),
             invalid: true,
@@ -326,6 +362,32 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
         Patch::Selectable(Change::Set(false)),
         Patch::Selectable(Change::Set(true)),
         Patch::Selectable(Change::Clear),
+        Patch::File {
+            configuration: Change::Keep,
+            revision: u64::MAX,
+        },
+        Patch::File {
+            configuration: Change::Clear,
+            revision: 11,
+        },
+        Patch::File {
+            configuration: Change::Set(Box::default()),
+            revision: 10,
+        },
+        Patch::File {
+            configuration: Change::Set(Box::default()),
+            revision: 11,
+        },
+        Patch::File {
+            configuration: Change::Set(Box::new(FileConfig {
+                multiple: true,
+                max_files: 2,
+                drop: true,
+                filters: vec![FileFilter::Mime("text/plain".into())],
+                ..Default::default()
+            })),
+            revision: 11,
+        },
         Patch::Label(Change::Keep),
         Patch::Label(Change::Set("new\r\n\0🙂".into())),
         Patch::Label(Change::Clear),
@@ -755,6 +817,10 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
         },
         Semantics {
             current: Some(glory_render::Current::Date),
+            ..Default::default()
+        },
+        Semantics {
+            grid_multiple: true,
             ..Default::default()
         },
         Semantics {

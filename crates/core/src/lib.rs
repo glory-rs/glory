@@ -15,6 +15,6 @@ mod runtime;
 pub use glory_render::RuntimeId;
 pub use resource::{Resource, ResourceSeed, ResourceState};
 pub use runtime::{
-    AccessError, BindingId, Bond, Cage, Host, HostError, InstanceId, LocalFuture, Lotus, Owner,
-    Runtime, RuntimeStats, Scope, Task, TaskToken, untracked,
+    AccessError, BindingId, Bond, Cage, GraphStats, Host, HostError, InstanceId, LocalFuture,
+    Lotus, Owner, Runtime, RuntimeStats, Scope, Task, TaskToken, untracked,
 };

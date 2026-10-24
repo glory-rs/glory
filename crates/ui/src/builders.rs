@@ -11,7 +11,7 @@ use glory_style::{Display, FlexDirection, Style};
 use crate::app::{Result, Scope, Widget};
 
 type Bind = Box<dyn FnOnce(&Scope, NodeId) -> Result>;
-type Prepare = Box<dyn FnOnce() -> Result<(Patch, Bind)>>;
+type Prepare = Box<dyn FnOnce(&Scope) -> Result<(Patch, Bind)>>;
 type Handler = Box<dyn FnMut(Event)>;
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Slot {
@@ -29,6 +29,7 @@ enum Slot {
     Enabled,
     Value,
     SelectSelection,
+    RichDocument,
     Purpose,
     Multiline,
     Checked,
@@ -88,7 +89,7 @@ impl Element {
             value => {
                 self.bindings.insert(
                     slot,
-                    Box::new(move || {
+                    Box::new(move |_| {
                         // Read without subscribing the surrounding component or
                         // structural observer. The binding registers its own
                         // dependencies when it first runs after construction.
@@ -113,6 +114,10 @@ impl Element {
                                 }
                                 let update = patch(value.clone());
                                 let result = match update {
+                                    Patch::RichDocument {
+                                        document: Change::Set(value),
+                                        ..
+                                    } => session.rich_document(node, value),
                                     Patch::Value {
                                         value: Change::Set(value),
                                         ..
@@ -140,6 +145,25 @@ impl Element {
             }
         }
     }
+    fn set_fn<T: Clone + PartialEq + 'static>(
+        &mut self,
+        slot: Slot,
+        mut read: impl FnMut() -> T + 'static,
+        mut patch: impl FnMut(T) -> Patch + 'static,
+    ) {
+        self.initial.remove(&slot);
+        self.bindings.insert(
+            slot,
+            Box::new(move |scope| {
+                let initial = scope.owner().compute(&mut read)?;
+                let update = patch(initial.clone());
+                let install: Bind = Box::new(move |scope, node| {
+                    crate::plan::bind_fn(scope, node, read, patch, Some(initial))
+                });
+                Ok((update, install))
+            }),
+        );
+    }
     fn build(&mut self, scope: &Scope) -> Result {
         if self.needs_alt {
             return Err(glory_render::Error::InvalidProps(
@@ -148,10 +172,13 @@ impl Element {
             .into());
         }
         let mut descriptor = self.descriptor.take().ok_or(crate::app::Error::Gone)?;
+        if let Props::File(props) = &descriptor.props {
+            props.configuration.validate()?;
+        }
         let mut initial = std::mem::take(&mut self.initial);
         let mut bindings = Vec::with_capacity(self.bindings.len());
         for (slot, prepare) in std::mem::take(&mut self.bindings) {
-            let (patch, install) = prepare()?;
+            let (patch, install) = prepare(scope)?;
             initial.insert(slot, patch);
             bindings.push(install);
         }
@@ -200,6 +227,9 @@ impl Element {
             .into());
         }
         let mut descriptor = self.descriptor.take().ok_or(crate::Error::Gone)?;
+        if let Props::File(props) = &descriptor.props {
+            props.configuration.validate()?;
+        }
         let mut initial = std::mem::take(&mut self.initial);
         seed_graphic(&mut descriptor, &mut initial);
         descriptor.patches(initial.into_values())?;
@@ -304,6 +334,12 @@ element!(Text, text, Props::Text(TextProps::default()));
 element!(Button, button, Props::Button(ButtonProps::default()));
 element!(Input, input, Props::Input(InputProps::default()));
 element!(
+    RichEditor,
+    rich_editor,
+    Props::RichEditor(Default::default())
+);
+element!(File, file, Props::File(glory_render::FileProps::default()));
+element!(
     Select,
     select,
     Props::Select(glory_render::SelectProps::default())
@@ -323,6 +359,13 @@ macro_rules! common {
             /// Set the complete whitespace-separated class list (last call wins).
             pub fn class(mut self, value: impl Into<Lotus<String>>) -> Self {
                 self.inner.set(Slot::Classes, value, |value: String| Patch::Classes(Change::Set(value.split_whitespace().map(str::to_owned).collect()))); self
+            }
+            /// Compute one property directly in its pure Binding.
+            pub fn class_fn(mut self, read: impl FnMut() -> String + 'static) -> Self {
+                self.inner.set_fn(Slot::Classes, read, |value: String| Patch::Classes(Change::Set(value.split_whitespace().map(str::to_owned).collect()))); self
+            }
+            pub fn style_fn(mut self, read: impl FnMut() -> Style + 'static) -> Self {
+                self.inner.set_fn(Slot::Style, read, |value| Patch::Style(Change::Set(Box::new(value)))); self
             }
             pub fn style(mut self, value: impl Into<Lotus<Style>>) -> Self {
                 self.inner.set(Slot::Style, value, |value| Patch::Style(Change::Set(Box::new(value)))); self
@@ -345,8 +388,24 @@ macro_rules! common {
     )+};
 }
 common!(
-    View, Text, Button, Input, Select, Check, Image, Graphic, Link
+    View, Text, Button, Input, File, Select, Check, Image, Graphic, Link, RichEditor
 );
+impl RichEditor {
+    pub fn document(mut self, value: impl Into<Lotus<Rc<glory_render::RichDocument>>>) -> Self {
+        self.inner
+            .set(Slot::RichDocument, value, |document| Patch::RichDocument {
+                document: Change::Set(document),
+                revision: 1,
+            });
+        self
+    }
+    pub fn enabled(mut self, value: impl Into<Lotus<bool>>) -> Self {
+        self.inner.set(Slot::Enabled, value, |value| {
+            Patch::Enabled(Change::Set(value))
+        });
+        self
+    }
+}
 impl Graphic {
     pub fn drawing(mut self, value: impl Into<Lotus<glory_render::GraphicProps>>) -> Self {
         self.inner.set(Slot::Graphic, value, |value| {
@@ -400,7 +459,11 @@ macro_rules! fill {
 fill!(View, Group, Button, Link);
 macro_rules! label {
     ($($name:ident),+) => {$ (
-        impl $name { pub fn label(mut self, value: impl Into<Lotus<String>>) -> Self { self.inner.set(Slot::Label, value, |value| Patch::Label(Change::Set(value))); self } }
+        impl $name {
+            pub fn label_fn(mut self, read: impl FnMut() -> String + 'static) -> Self {
+                self.inner.set_fn(Slot::Label, read, |value| Patch::Label(Change::Set(value))); self
+            }
+            pub fn label(mut self, value: impl Into<Lotus<String>>) -> Self { self.inner.set(Slot::Label, value, |value| Patch::Label(Change::Set(value))); self } }
     )+};
 }
 label!(Button, Check, Link);
@@ -409,8 +472,36 @@ macro_rules! enabled {
         impl $name { pub fn enabled(mut self, value: impl Into<Lotus<bool>>) -> Self { self.inner.set(Slot::Enabled, value, |value| Patch::Enabled(Change::Set(value))); self } }
     )+};
 }
-enabled!(Button, Input, Check);
+enabled!(Button, Input, File, Check);
+impl File {
+    pub fn label(mut self, value: impl Into<String>) -> Self {
+        self.inner.set(Slot::Label, value.into(), |value| {
+            Patch::Label(Change::Set(value))
+        });
+        self
+    }
+    /// Initial finite declaration. Reactive changes use Scope::set_file_configuration,
+    /// which allocates from this live node's accepted configuration revision.
+    pub fn configuration(mut self, value: glory_render::FileConfig) -> Self {
+        let Props::File(props) = &mut self
+            .inner
+            .descriptor
+            .as_mut()
+            .expect("unmounted file builder")
+            .props
+        else {
+            unreachable!()
+        };
+        props.configuration = value;
+        self
+    }
+}
 impl Text {
+    pub fn content_fn(mut self, read: impl FnMut() -> String + 'static) -> Self {
+        self.inner
+            .set_fn(Slot::Text, read, |value| Patch::Text(Change::Set(value)));
+        self
+    }
     pub fn content(mut self, value: impl Into<Lotus<String>>) -> Self {
         self.inner
             .set(Slot::Text, value, |value| Patch::Text(Change::Set(value)));

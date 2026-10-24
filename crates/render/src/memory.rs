@@ -29,6 +29,9 @@ pub struct Node {
     pub suspended: bool,
     // Logical adjacency, including suspended siblings. No historical identities.
     next: Option<NodeId>,
+    clipboard: Option<Box<crate::clipboard::Requests>>,
+    files: Option<Box<crate::files::state::State>>,
+    swipe: Option<Box<crate::swipe::State>>,
 }
 
 /// A proposed child of a logical parent. New descriptors have no identity or
@@ -61,6 +64,7 @@ pub struct Memory {
     receipt: Receipt,
     stats: Stats,
     layers: usize,
+    pub(crate) focus_scopes: std::collections::BTreeMap<NodeId, usize>,
 }
 
 /// One validated field update. Its descriptor is a borrowed view of the staged
@@ -72,6 +76,7 @@ pub struct PreparedPatch<'a> {
     id: NodeId,
     inverse: Option<Patch>,
     fields_before: u8,
+    focus_size: Option<usize>,
 }
 impl PreparedPatch<'_> {
     pub fn descriptor(&self) -> DescriptorView<'_> {
@@ -82,6 +87,72 @@ impl PreparedPatch<'_> {
         self.inverse.as_ref().expect("uncommitted patch")
     }
     fn accept(&mut self) {
+        if matches!(self.inverse, Some(Patch::Semantics(_)))
+            && let Some(capture) = self
+                .descriptor()
+                .semantics
+                .as_ref()
+                .and_then(|s| s.swipe_capture)
+        {
+            let target = self
+                .tree
+                .nodes
+                .get_mut(&self.id)
+                .expect("prepared swipe node");
+            if let Some(state) = target.swipe.as_mut() {
+                state.revision = capture.revision;
+            } else {
+                target.swipe = Some(crate::swipe::State::new(capture));
+            }
+        }
+        if let Some(Patch::Semantics(Change::Set(old))) = &self.inverse {
+            let before = old.as_ref().is_some_and(|s| s.focus_scope.is_some());
+            let after = crate::focus_scope::declared(self.descriptor());
+            if after && !before {
+                self.tree
+                    .focus_scopes
+                    .insert(self.id, self.focus_size.expect("validated FocusScope size"));
+            } else if before && !after {
+                self.tree.focus_scopes.remove(&self.id);
+            }
+        }
+        if let Some(Patch::File {
+            configuration: Change::Set(previous),
+            revision,
+        }) = &self.inverse
+        {
+            let Props::File(current) = self.descriptor().props else {
+                unreachable!()
+            };
+            if (**previous != current.configuration || *revision != current.revision)
+                && let Some(state) = self
+                    .tree
+                    .nodes
+                    .get_mut(&self.id)
+                    .expect("prepared file node")
+                    .files
+                    .as_mut()
+            {
+                state.clear();
+            }
+        }
+        if let Some(Patch::Semantics(Change::Set(previous))) = &self.inverse {
+            let before = previous.as_ref().and_then(|s| s.clipboard.as_ref());
+            let after = self
+                .descriptor()
+                .semantics
+                .as_ref()
+                .and_then(|s| s.clipboard.as_ref());
+            if before != after
+                && let Some(requests) = self
+                    .tree
+                    .nodes
+                    .get_mut(&self.id)
+                    .and_then(|n| n.clipboard.as_mut())
+            {
+                requests.cancel();
+            }
+        }
         if let Some(Patch::Semantics(Change::Set(old))) = &self.inverse {
             let old = old.as_ref().is_some_and(|s| s.layer.is_some());
             let new = layer(self.descriptor());
@@ -134,6 +205,261 @@ impl Drop for PreparedPatch<'_> {
 }
 
 impl Memory {
+    pub fn file_pending(&self, node: NodeId, request: u64, revision: u64) -> Result<bool, Error> {
+        let node = self.node(node)?;
+        Ok(node
+            .files
+            .as_ref()
+            .is_some_and(|state| state.pending(request, revision))
+            && matches!(node.descriptor.view().props,Props::File(props) if props.revision==revision))
+    }
+    pub fn validate_file_action(&self, action: Action) -> Result<(), Error> {
+        if !matches!(
+            action,
+            Action::PickFiles { .. } | Action::ClearFiles { .. } | Action::RemoveFile(_)
+        ) {
+            return Ok(());
+        }
+        let node = action.node();
+        action.validate_target(&self.node(node)?.descriptor)?;
+        if matches!(action, Action::PickFiles { .. } | Action::RemoveFile(_))
+            && (!self.active(node) || !self.enabled(node) || self.inert(node))
+        {
+            return Err(Error::Unsupported(
+                "file control is inactive, disabled or inert",
+            ));
+        }
+        if let Action::RemoveFile(file) = action {
+            self.selected_file(file)?;
+        }
+        Ok(())
+    }
+    pub fn admit_file_action(&mut self, action: Action) -> Result<(), Error> {
+        self.validate_file_action(action)?;
+        match action {
+            Action::PickFiles {
+                node,
+                revision,
+                request,
+            } => self.admit_file_picker(node, revision, request),
+            Action::ClearFiles { node, revision } => self.clear_files(node, revision),
+            Action::RemoveFile(file) => self.remove_file(file),
+            _ => Ok(()),
+        }
+    }
+
+    pub fn next_file_request(&self, node: NodeId) -> Result<u64, Error> {
+        self.node(node)?
+            .files
+            .as_ref()
+            .map_or(Ok(1), |state| state.next_request())
+    }
+    pub fn admit_file_picker(
+        &mut self,
+        node: NodeId,
+        revision: u64,
+        request: u64,
+    ) -> Result<(), Error> {
+        let Props::File(props) = self.node(node)?.descriptor.view().props else {
+            return Err(Error::Unsupported("file picker requires a File control"));
+        };
+        if revision != props.revision {
+            return Err(Error::InputRevision {
+                current: props.revision,
+                incoming: revision,
+            });
+        }
+        if !self.active(node) || !self.enabled(node) || self.inert(node) {
+            return Err(Error::Unsupported(
+                "file picker is inactive, disabled or inert",
+            ));
+        }
+        self.nodes
+            .get_mut(&node)
+            .expect("validated file node")
+            .files
+            .get_or_insert_with(Default::default)
+            .admit(request, revision)
+    }
+    pub fn validate_file_event(
+        &self,
+        node: NodeId,
+        document: FileDocumentId,
+        event: &FileEvent,
+    ) -> Result<bool, Error> {
+        let target = self.node(node)?;
+        let Props::File(props) = target.descriptor.view().props else {
+            return Err(Error::InvalidEvent("file event requires a File control"));
+        };
+        if matches!(&event.outcome, FileOutcome::Selected(_))
+            && (!self.active(node) || !self.enabled(node) || self.inert(node))
+        {
+            return Ok(false);
+        }
+        match target.files.as_ref() {
+            Some(state) => state.validate_event(node, props, document, event),
+            None => {
+                crate::files::state::State::default().validate_event(node, props, document, event)
+            }
+        }
+    }
+    pub fn finish_files(
+        &mut self,
+        node: NodeId,
+        document: FileDocumentId,
+        event: &FileEvent,
+    ) -> Result<bool, Error> {
+        if !self.validate_file_event(node, document, event)? {
+            return Ok(false);
+        }
+        let target = self.nodes.get_mut(&node).expect("validated file node");
+        let Props::File(props) = target.descriptor.view().props else {
+            unreachable!()
+        };
+        target
+            .files
+            .get_or_insert_with(Default::default)
+            .observe(node, props, document, event)
+    }
+    pub fn selected_file(&self, token: FileToken) -> Result<&FileInfo, Error> {
+        token.validate()?;
+        let target = self.node(token.node)?;
+        let Props::File(props) = target.descriptor.view().props else {
+            return Err(Error::Unsupported("file token requires a File control"));
+        };
+        if props.revision != token.revision {
+            return Err(Error::Unsupported(
+                "file token belongs to a retired configuration",
+            ));
+        }
+        target
+            .files
+            .as_ref()
+            .ok_or(Error::Unsupported("file token is not selected"))?
+            .file(token)
+    }
+    pub fn clear_files(&mut self, node: NodeId, revision: u64) -> Result<(), Error> {
+        let target = self.node(node)?;
+        let Props::File(props) = target.descriptor.view().props else {
+            return Err(Error::Unsupported("clear files requires a File control"));
+        };
+        if revision != props.revision {
+            return Err(Error::InputRevision {
+                current: props.revision,
+                incoming: revision,
+            });
+        }
+        if let Some(state) = self
+            .nodes
+            .get_mut(&node)
+            .expect("validated file node")
+            .files
+            .as_mut()
+        {
+            state.clear();
+        }
+        Ok(())
+    }
+    pub fn remove_file(&mut self, token: FileToken) -> Result<(), Error> {
+        self.selected_file(token)?;
+        self.nodes
+            .get_mut(&token.node)
+            .expect("validated file node")
+            .files
+            .as_mut()
+            .expect("validated selection")
+            .remove(token)
+    }
+    /// Numeric identity belongs to this live NodeId, even if the source facet
+    /// is cleared and declared again. Merely reading it does not reserve it.
+    pub fn next_clipboard_request(&self, node: NodeId) -> Result<u64, Error> {
+        self.node(node)?
+            .clipboard
+            .as_ref()
+            .map_or(Ok(1), |state| state.next())
+    }
+    pub fn clipboard_pending(
+        &self,
+        node: NodeId,
+        request: u64,
+        revision: u64,
+    ) -> Result<bool, Error> {
+        let node = self.node(node)?;
+        Ok(node
+            .clipboard
+            .as_ref()
+            .is_some_and(|state| state.matches(request, revision))
+            && node
+                .descriptor
+                .view()
+                .semantics
+                .as_ref()
+                .and_then(|s| s.clipboard.as_ref())
+                .is_some_and(|source| source.revision == revision))
+    }
+    pub fn validate_clipboard_action(&self, action: Action) -> Result<(), Error> {
+        if !matches!(action, Action::CopyText { .. }) {
+            return Ok(());
+        }
+        let node = action.node();
+        action.validate_target(&self.node(node)?.descriptor)?;
+        if !self.active(node) || !self.enabled(node) || self.inert(node) {
+            return Err(Error::Unsupported(
+                "clipboard source is inactive, disabled or inert",
+            ));
+        }
+        Ok(())
+    }
+    /// Shared request admission. Call after capability checks, immediately
+    /// before queuing/performing the host action. No payload or callback cache.
+    pub fn admit_clipboard(&mut self, action: Action) -> Result<(), Error> {
+        let Action::CopyText {
+            node,
+            revision,
+            request,
+        } = action
+        else {
+            return Ok(());
+        };
+        self.validate_clipboard_action(action)?;
+        self.nodes
+            .get_mut(&node)
+            .expect("validated node")
+            .clipboard
+            .get_or_insert_with(Default::default)
+            .admit(request, revision)
+    }
+    /// First terminal delivery consumes the current pending numeric request.
+    pub fn finish_clipboard(
+        &mut self,
+        node: NodeId,
+        request: u64,
+        revision: u64,
+    ) -> Result<bool, Error> {
+        self.node(node)?;
+        self.nodes
+            .get_mut(&node)
+            .expect("validated node")
+            .clipboard
+            .as_mut()
+            .ok_or(Error::InvalidEvent(
+                "clipboard completion names an unadmitted request",
+            ))?
+            .observe(request, revision)
+    }
+    pub fn cancel_clipboard(&mut self, node: NodeId) -> Result<(), Error> {
+        self.node(node)?;
+        if let Some(state) = self
+            .nodes
+            .get_mut(&node)
+            .expect("validated node")
+            .clipboard
+            .as_mut()
+        {
+            state.cancel()
+        }
+        Ok(())
+    }
     pub fn new(runtime: RuntimeId) -> Self {
         Self {
             runtime,
@@ -145,6 +471,7 @@ impl Memory {
             receipt: Receipt::default(),
             stats: Stats::default(),
             layers: 0,
+            focus_scopes: std::collections::BTreeMap::new(),
         }
     }
 
@@ -233,6 +560,24 @@ impl Memory {
     /// a lowering adapter, then committed, or dropped if adapter checks fail.
     pub fn prepare_patch(&mut self, id: NodeId, patch: &Patch) -> Result<PreparedPatch<'_>, Error> {
         self.node(id)?;
+        if let Patch::Semantics(Change::Set(next)) = patch
+            && let Some(capture) = next.as_ref().and_then(|s| s.swipe_capture)
+        {
+            let target = &self.nodes[&id];
+            if target
+                .descriptor
+                .view()
+                .semantics
+                .as_ref()
+                .is_none_or(|s| s.swipe_capture.is_none())
+                && let Some(history) = &target.swipe
+                && capture.revision <= history.revision
+            {
+                return Err(Error::InvalidProps(
+                    "reactivating swipe capture must advance its node watermark",
+                ));
+            }
+        }
         let fields_before = self.nodes[&id].descriptor.field_mask();
         let mut inverse = patch.clone();
         self.nodes
@@ -240,12 +585,23 @@ impl Memory {
             .expect("validated node")
             .descriptor
             .patch_live(&mut inverse)?;
-        let prepared = PreparedPatch {
+        let mut prepared = PreparedPatch {
             tree: self,
             id,
             inverse: Some(inverse),
             fields_before,
+            focus_size: None,
         };
+        if matches!(prepared.previous(), Patch::Semantics(Change::Set(old)) if !old.as_ref().is_some_and(|s| s.focus_scope.is_some()))
+            && crate::focus_scope::declared(prepared.descriptor())
+        {
+            prepared.tree.admit_focus_scopes(1)?;
+            prepared.focus_size = Some(
+                prepared
+                    .tree
+                    .scope_subtree_size(id, crate::MAX_FOCUS_SCOPE_NODES)?,
+            );
+        }
         if matches!(prepared.previous(), Patch::Semantics(Change::Set(old)) if !old.as_ref().is_some_and(|s| s.layer.is_some()))
             && layer(prepared.descriptor())
         {
@@ -397,7 +753,15 @@ impl Memory {
                             || s.slider.is_some()
                             || s.context_menu.is_some()
                             || s.drag_capture.is_some()
-                            || node.descriptor.view().role == Some(crate::Role::Menubar))
+                            || s.swipe_capture.is_some()
+                            || matches!(
+                                node.descriptor.view().role,
+                                Some(
+                                    crate::Role::Menubar
+                                        | crate::Role::Tree
+                                        | crate::Role::TreeItem
+                                )
+                            ))
                             && s.disabled
                 })
             {
@@ -461,6 +825,19 @@ impl Memory {
         if !Self::event_in(&self.nodes, self.runtime, id, event)? {
             return Ok(false);
         }
+        if let Event::Clipboard {
+            request, revision, ..
+        } = event
+        {
+            event.validate_payload(id, &self.node(id)?.descriptor)?;
+            let Some(requests) = self.node(id)?.clipboard.as_ref() else {
+                return Err(Error::InvalidEvent(
+                    "clipboard completion names an unadmitted request",
+                ));
+            };
+            requests.validate(*request)?;
+            return Ok(requests.matches(*request, *revision));
+        }
         if matches!(event, Event::Dismiss(crate::DismissReason::AnchorLost)) {
             event.validate_payload(id, &self.node(id)?.descriptor)?;
             return Ok(self.active(id) && !self.layer_anchor_live(id));
@@ -509,6 +886,29 @@ impl Memory {
             nodes.get(&id).ok_or(Error::NodeGone(id))
         };
         let target = get(id)?;
+        if let Event::Clipboard {
+            request, revision, ..
+        } = event
+        {
+            let state = target.clipboard.as_ref().ok_or(Error::InvalidEvent(
+                "clipboard completion names an unadmitted request",
+            ))?;
+            state.validate(*request)?;
+            let Some(source) = target
+                .descriptor
+                .view()
+                .semantics
+                .as_ref()
+                .and_then(|s| s.clipboard.as_ref())
+            else {
+                return Ok(false);
+            };
+            if *revision < source.revision {
+                return Ok(false);
+            }
+            event.validate_payload(id, &target.descriptor)?;
+            return Ok(state.matches(*request, *revision));
+        }
         if let Event::CollapseComplete { revision } = event {
             event.validate_payload(id, &target.descriptor)?;
             if target
@@ -530,6 +930,123 @@ impl Memory {
                         .filter(|origin| *origin != id)
                         .is_some_and(|origin| Self::inert_in(nodes, origin)))
         };
+        if let Event::RichEdit(snapshot) | Event::RichSelection(snapshot) = event {
+            let Props::RichEditor(editor) = target.descriptor.view().props else {
+                return Err(Error::InvalidEvent("rich input requires its RichEditor"));
+            };
+            event.validate_payload(id, &target.descriptor)?;
+            if snapshot.revision < editor.revision {
+                return Ok(false);
+            }
+            if matches!(event, Event::RichEdit(_)) && target.descriptor.view().readonly() {
+                return Err(Error::InvalidEvent(
+                    "readonly rich document cannot be edited",
+                ));
+            }
+            return Ok(Self::active_in(nodes, id) && Self::enabled_in(nodes, id) && interactive());
+        }
+        if let Event::RichCommand { revision, .. } | Event::RichRejected { revision } = event {
+            event.validate_payload(id, &target.descriptor)?;
+            let Props::RichEditor(editor) = target.descriptor.view().props else {
+                unreachable!()
+            };
+            return Ok(*revision == editor.revision
+                && Self::active_in(nodes, id)
+                && Self::enabled_in(nodes, id)
+                && interactive()
+                && (!matches!(event, Event::RichCommand { .. })
+                    || !target.descriptor.view().readonly()));
+        }
+        if let Event::Swipe {
+            from,
+            x,
+            y,
+            revision,
+            ..
+        } = event
+        {
+            if from.runtime() != id.runtime() {
+                return Err(Error::ForeignRuntime);
+            }
+            if *from != id || !x.is_finite() || !y.is_finite() {
+                return Err(Error::InvalidEvent(
+                    "swipe requires its exact finite boxed origin",
+                ));
+            }
+            let capture = target
+                .descriptor
+                .view()
+                .semantics
+                .as_ref()
+                .and_then(|s| s.swipe_capture);
+            let Some(capture) = capture else {
+                if target
+                    .swipe
+                    .as_ref()
+                    .is_some_and(|state| *revision <= state.revision)
+                {
+                    return Ok(false);
+                }
+                return Err(Error::InvalidEvent("swipe target has no active capture"));
+            };
+            event.validate_payload(id, &target.descriptor)?;
+            let mut visible = true;
+            let mut cursor = Some(id);
+            while let Some(id) = cursor {
+                let node = get(id)?;
+                let view = node.descriptor.view();
+                if view.hidden() || view.style.display == Some(crate::style::Display::None) {
+                    visible = false;
+                    break;
+                }
+                cursor = node.parent;
+            }
+            return Ok(*revision == capture.revision
+                && (Self::active_in(nodes, id) || event.is_terminal_loss())
+                && (Self::enabled_in(nodes, id) || event.is_terminal_loss())
+                && (visible || event.is_terminal_loss())
+                && interactive());
+        }
+        if let Event::TreeNavigate { from, .. } = event {
+            let source = match get(*from) {
+                Ok(source) => source,
+                Err(Error::NodeGone(_)) => return Ok(false),
+                Err(error) => return Err(error),
+            };
+            event.validate_payload(id, &target.descriptor)?;
+            let descriptor = source.descriptor.view();
+            if descriptor.role != Some(crate::Role::TreeItem)
+                || !matches!(descriptor.props, Props::View)
+                || descriptor
+                    .semantics
+                    .as_ref()
+                    .is_none_or(|s| s.tree_item.is_none())
+            {
+                return Err(Error::InvalidEvent(
+                    "tree command origin must be a declared TreeItem",
+                ));
+            }
+            if !Self::active_in(nodes, *from)
+                || !Self::active_in(nodes, id)
+                || !Self::enabled_in(nodes, *from)
+                || !Self::enabled_in(nodes, id)
+            {
+                return Ok(false);
+            }
+            let mut cursor = source.parent;
+            while let Some(current) = cursor {
+                let ancestor = get(current)?;
+                if ancestor.descriptor.view().role == Some(crate::Role::Tree) {
+                    return if current == id {
+                        Ok(interactive())
+                    } else {
+                        Err(Error::InvalidEvent("tree origin belongs to a nearer Tree"))
+                    };
+                }
+                cursor = ancestor.parent;
+            }
+            return Err(Error::InvalidEvent("tree origin is outside its target"));
+        }
         if let Event::GridNavigate { from, .. } = event {
             let source = match get(*from) {
                 Ok(source) => source,
@@ -949,7 +1466,10 @@ impl Memory {
                     node.descriptor.view().field_part(),
                     Some(crate::FieldPart::Label | crate::FieldPart::Legend)
                 );
-            button_ancestor |= matches!(node.descriptor.view().props, Props::Button(_));
+            button_ancestor |= matches!(
+                node.descriptor.view().props,
+                Props::Button(_) | Props::File(_)
+            );
             form_ancestor |= node.descriptor.view().field_part() == Some(crate::FieldPart::Form);
             tooltip_ancestor |= matches!(
                 node.descriptor.view().role,
@@ -958,6 +1478,7 @@ impl Memory {
             cursor = node.parent;
         }
         // Most placements (including ordinary list moves) need no subtree scan.
+        self.validate_focus_child(child, parent)?;
         if let Subtree::New(descriptor) = child {
             self.validate_name(descriptor, None)?;
         }
@@ -1108,6 +1629,7 @@ impl Memory {
         resume: bool,
     ) -> Result<(), Error> {
         self.validate_placement(id, parent, before, resume)?;
+        let focus_movement = self.scope_movement(id, parent)?;
         self.unlink(id);
         let siblings = if let Some(parent) = parent {
             &mut self
@@ -1142,6 +1664,9 @@ impl Memory {
         node.parent = parent;
         node.placed = true;
         node.suspended = false;
+        if let Some(movement) = focus_movement {
+            movement.commit(self);
+        }
         self.stats.placed += 1;
         Ok(())
     }
@@ -1177,6 +1702,21 @@ impl Memory {
                         .filter(|node| layer(node.descriptor.view()))
                         .count(),
                 )?;
+                let scope_count = plan
+                    .nodes()
+                    .iter()
+                    .filter(|node| crate::focus_scope::declared(node.descriptor.view()))
+                    .count();
+                self.admit_focus_scopes(scope_count)?;
+                let mut focus_sizes = Vec::new();
+                if scope_count > 0 {
+                    focus_sizes.resize(ids.len(), 1usize);
+                    for (index, node) in plan.nodes().iter().enumerate().rev() {
+                        if let Some(parent) = node.parent {
+                            focus_sizes[parent] += focus_sizes[index];
+                        }
+                    }
+                }
                 for (index, node) in plan.nodes().iter().enumerate() {
                     // The immutable declaration checked content/topology once;
                     // the complete identity/name check above precedes mutation.
@@ -1184,10 +1724,19 @@ impl Memory {
                     let id = ids[index];
                     let descriptor = LiveDescriptor::plan(plan, index);
                     self.layers += usize::from(layer(descriptor.view()));
+                    if crate::focus_scope::declared(descriptor.view()) {
+                        self.focus_scopes.insert(id, focus_sizes[index]);
+                    }
                     if let Some(name) = descriptor.view().semantic_id() {
                         self.names.insert(name.clone(), id);
                     }
                     self.generations.insert(id.slot(), (id.generation(), true));
+                    let swipe = descriptor
+                        .view()
+                        .semantics
+                        .as_ref()
+                        .and_then(|s| s.swipe_capture)
+                        .map(crate::swipe::State::new);
                     self.nodes.insert(
                         id,
                         Node {
@@ -1197,6 +1746,9 @@ impl Memory {
                             placed: node.parent.is_some(),
                             suspended: false,
                             next: None,
+                            clipboard: None,
+                            files: None,
+                            swipe,
                         },
                     );
                     self.stats.created += 1;
@@ -1232,12 +1784,22 @@ impl Memory {
                 let mut descriptor = node.as_ref().clone();
                 self.validate_name(node.as_ref(), None)?;
                 self.admit_layers(usize::from(layer(node.view())))?;
+                self.admit_focus_scopes(usize::from(crate::focus_scope::declared(node.view())))?;
                 descriptor.normalize_input()?;
                 self.layers += usize::from(layer(descriptor.view()));
+                if crate::focus_scope::declared(descriptor.view()) {
+                    self.focus_scopes.insert(*id, 1);
+                }
                 if let Some(name) = descriptor.view().semantic_id() {
                     self.names.insert(name.clone(), *id);
                 }
                 self.generations.insert(id.slot(), (id.generation(), true));
+                let swipe = descriptor
+                    .view()
+                    .semantics
+                    .as_ref()
+                    .and_then(|s| s.swipe_capture)
+                    .map(crate::swipe::State::new);
                 self.nodes.insert(
                     *id,
                     Node {
@@ -1247,6 +1809,9 @@ impl Memory {
                         placed: false,
                         suspended: false,
                         next: None,
+                        clipboard: None,
+                        files: None,
+                        swipe,
                     },
                 );
                 self.stats.created += 1;
@@ -1269,10 +1834,14 @@ impl Memory {
             }
             Mutation::Dispose { id } => {
                 self.node(*id)?;
+                let focus_ancestors = self.scope_ancestors(self.node(*id)?.parent)?;
                 self.unlink(*id);
                 let mut pending = vec![*id];
+                let mut focus_removed = 0usize;
                 while let Some(id) = pending.pop() {
                     let node = self.nodes.remove(&id).expect("owned subtree");
+                    self.focus_scopes.remove(&id);
+                    focus_removed += 1;
                     self.layers -= usize::from(layer(node.descriptor.view()));
                     if let Some(name) = node.descriptor.view().semantic_id() {
                         self.names.remove(name);
@@ -1283,6 +1852,12 @@ impl Memory {
                         .1 = false;
                     pending.extend(node.children);
                     self.stats.disposed += 1;
+                }
+                for root in focus_ancestors {
+                    *self
+                        .focus_scopes
+                        .get_mut(&root)
+                        .expect("surviving scope ancestor") -= focus_removed;
                 }
                 // Pending native/browser events carry identities too. Do not
                 // deliver an event whose target was destroyed in this batch.
@@ -1303,6 +1878,7 @@ impl Render for Memory {
     }
     fn action(&mut self, action: Action) -> Result<(), Error> {
         action.validate_target(&self.node(action.node())?.descriptor)?;
+        self.validate_clipboard_action(action)?;
         Err(Error::Unsupported(
             "headless reference interpreter has no physical actions",
         ))

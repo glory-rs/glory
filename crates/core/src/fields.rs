@@ -890,9 +890,10 @@ impl Context {
             status: Status::Clean,
             rerun: false,
             propagated: false,
+            queued: false,
             last_flush: 0,
             flush_runs: 0,
-            dependencies: BTreeMap::new(),
+            dependencies: Dependencies::new(),
             subscribers: BTreeSet::new(),
         };
         let key = graph.insert_node(owner, node)?;

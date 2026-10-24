@@ -3,7 +3,7 @@ use crate::{KeyboardInput, SemanticId};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ComboboxKind {
-    /// A Button retaining activation, with a bounded listbox as its popup.
+    /// A Button retaining activation, with a bounded listbox or tree popup.
     Select,
     /// A single-line Input retaining editing, composition and selection.
     Editable,
@@ -87,7 +87,8 @@ impl crate::Semantics {
             if !valid
                 || self.id.is_none()
                 || self.controls.is_none()
-                || self.popup != Some(PopupKind::Listbox)
+                || !(self.popup == Some(PopupKind::Listbox)
+                    || kind == ComboboxKind::Select && self.popup == Some(PopupKind::Tree))
                 || self.expanded.is_none()
                 || self.tab
                 || self.menu_item.is_some()
@@ -103,7 +104,8 @@ impl crate::Semantics {
         if self.active_descendant.is_some()
             && (self.combobox.is_none()
                 || self.expanded != Some(true)
-                || self.active_descendant == self.id)
+                || self.active_descendant == self.id
+                || self.popup != Some(PopupKind::Listbox))
         {
             return Err(Error::InvalidProps(
                 "active descendant requires an expanded combobox and distinct option",
@@ -341,15 +343,23 @@ impl crate::memory::Memory {
                 .and_then(|name| self.named(name))
         {
             let owner = self.node(owner)?.descriptor.view();
-            if owner.role != Some(crate::Role::Listbox)
-                || owner
-                    .semantics
-                    .as_ref()
-                    .is_some_and(|owner| owner.listbox_multiple)
-                    != (semantics.combobox == Some(ComboboxKind::Multiple))
+            let tree_popup = semantics.popup == Some(crate::PopupKind::Tree);
+            if (tree_popup
+                && (owner.role != Some(crate::Role::Tree)
+                    || owner
+                        .semantics
+                        .as_ref()
+                        .is_none_or(|s| s.tree_navigation.is_none())))
+                || (!tree_popup
+                    && (owner.role != Some(crate::Role::Listbox)
+                        || owner
+                            .semantics
+                            .as_ref()
+                            .is_some_and(|owner| owner.listbox_multiple)
+                            != (semantics.combobox == Some(ComboboxKind::Multiple))))
             {
                 return Err(crate::Error::InvalidProps(
-                    "combobox controls must resolve to a matching single or multiple listbox",
+                    "combobox controls must resolve to the declared tree or matching single/multiple listbox",
                 ));
             }
         }

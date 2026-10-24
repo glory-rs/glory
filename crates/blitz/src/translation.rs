@@ -17,6 +17,7 @@ pub(super) struct Translations {
     pub(super) preference: MotionPreference,
 }
 impl Translations {
+    #[cfg(feature = "paint")]
     pub fn is_empty(&self) -> bool {
         self.live.is_empty()
     }

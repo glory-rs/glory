@@ -195,7 +195,12 @@ impl EventHandler for Events {
             event_state.prevent_default();
             return;
         }
-        if layers::receive(&mut state, event.target, &event.data) {
+        if focus_scope::prevent_pointer_focus(&state, event.target, &event.data) {
+            event_state.prevent_default();
+        }
+        if focus_scope::receive(&mut state, event.target, &event.data)
+            || layers::receive(&mut state, event.target, &event.data)
+        {
             event_state.prevent_default();
             return;
         }
@@ -290,6 +295,10 @@ impl EventHandler for Events {
                 }
                 let edit = state.dom.ranges.get(&node).expect("mapped input").edit;
                 let value = match edit {
+                    EditKind::Rich => {
+                        state.input_error = Some(Error::Unsupported("native rich editing"));
+                        None
+                    }
                     EditKind::Select => {
                         state.input_error =
                             Some(glory_render::Error::Unsupported("native select controls"));
@@ -317,7 +326,14 @@ impl EventHandler for Events {
                 return;
             }
         }
-        if drag_input(&mut state, event.target, &event.data) {
+        if swipe::input(&mut state, event.target, &event.data) {
+            event_state.prevent_default();
+            return;
+        }
+        if matches!(event.data, DomEventData::PointerDown(_)) && state.swipe.is_some() {
+            cancel_drag(&mut state);
+        }
+        if state.swipe.is_none() && drag_input(&mut state, event.target, &event.data) {
             event_state.prevent_default();
             return;
         }
@@ -343,10 +359,11 @@ impl EventHandler for Events {
                         break;
                     };
                     if button.is_none()
-                        && matches!(
+                        && (matches!(
                             current.descriptor.view().props,
                             glory_render::Props::Button(_)
-                        )
+                        ) || current.descriptor.view().role
+                            == Some(glory_render::Role::TreeItem))
                     {
                         button = Some(id);
                     }
@@ -657,6 +674,76 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
             matches!(node.descriptor.view().props, glory_render::Props::Input(_))
         });
         let key_name = key.key.to_string();
+        if state.focused == Some(origin)
+            && !editable
+            && state.dom.control(origin).ok() == Some(target)
+            && state.mapper.tree().enabled(origin)
+            && state.mapper.tree().node(origin).is_ok_and(|node| {
+                node.descriptor.view().role == Some(glory_render::Role::TreeItem)
+                    && node
+                        .descriptor
+                        .view()
+                        .semantics
+                        .as_ref()
+                        .is_some_and(|s| s.tree_item.is_some())
+            })
+        {
+            let mut cursor = state
+                .mapper
+                .tree()
+                .node(origin)
+                .ok()
+                .and_then(|node| node.parent);
+            while let Some(tree) = cursor {
+                let Ok(root) = state.mapper.tree().node(tree) else {
+                    break;
+                };
+                if root.descriptor.view().role == Some(glory_render::Role::Tree) {
+                    if state
+                        .subscriptions
+                        .contains(&(tree, EventKind::TreeNavigate))
+                        && let Some(command) = root
+                            .descriptor
+                            .view()
+                            .semantics
+                            .as_ref()
+                            .and_then(|s| s.tree_navigation)
+                            .and_then(|config| {
+                                glory_render::TreeCommand::key(
+                                    config,
+                                    glory_render::KeyboardInput {
+                                        key: &key_name,
+                                        control: key.modifiers.contains(Modifiers::CONTROL),
+                                        meta: key.modifiers.contains(Modifiers::META),
+                                        alt: key.modifiers.contains(Modifiers::ALT),
+                                        shift: key.modifiers.contains(Modifiers::SHIFT),
+                                        repeat: key.is_auto_repeating,
+                                        composing: false,
+                                        editable,
+                                    },
+                                    state
+                                        .keyboard_clock
+                                        .elapsed()
+                                        .as_millis()
+                                        .min(u128::from(glory_render::MAX_TYPEAHEAD_MILLIS))
+                                        as u64,
+                                )
+                            })
+                    {
+                        state.inputs.push(Input::Event {
+                            node: tree,
+                            event: Event::TreeNavigate {
+                                from: origin,
+                                command,
+                            },
+                        });
+                        return true;
+                    }
+                    break;
+                }
+                cursor = root.parent;
+            }
+        }
         if state.focused == Some(origin)
             && !editable
             && state.mapper.tree().enabled(origin)
@@ -1075,6 +1162,7 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
                         state.mapper.tree().active(owner)
                             && state.mapper.tree().enabled(owner)
                             && state.layers.allowed(state.mapper.tree(), owner)
+                            && focus_scope::allowed(state, owner)
                     })
             })
         };
@@ -1467,8 +1555,16 @@ impl ApplicationHandler for Shell {
                     *theme == winit::window::Theme::Dark,
                 );
             }
+            if matches!(
+                event,
+                WindowEvent::SurfaceResized(_) | WindowEvent::ScaleFactorChanged { .. }
+            ) {
+                swipe::cancel(&mut view.downcast_doc_mut::<WindowApp>().renderer.0.borrow_mut());
+            }
             if matches!(event, WindowEvent::Focused(false)) {
-                cancel_drag(&mut view.downcast_doc_mut::<WindowApp>().renderer.0.borrow_mut());
+                let mut state = view.downcast_doc_mut::<WindowApp>().renderer.0.borrow_mut();
+                cancel_drag(&mut state);
+                swipe::cancel(&mut state);
             }
             if matches!(event, WindowEvent::RedrawRequested) {
                 // Read queued scroll/resize inputs and commit the current
@@ -1555,6 +1651,12 @@ mod command_tests;
 #[cfg(test)]
 #[path = "editing_tests.rs"]
 mod editing_tests;
+#[cfg(test)]
+#[path = "environment_tests.rs"]
+mod environment_tests;
+#[cfg(test)]
+#[path = "focus_scope_tests.rs"]
+mod focus_scope_tests;
 #[cfg(test)]
 #[path = "focus_tests.rs"]
 mod focus_tests;

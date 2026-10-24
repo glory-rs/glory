@@ -97,6 +97,8 @@ pub enum Role {
     Table,
     Grid,
     GridCell,
+    Tree,
+    TreeItem,
     Row,
     ColumnHeader,
     Cell,
@@ -229,6 +231,8 @@ pub enum Props {
     Button(ButtonProps),
     Input(InputProps),
     Select(crate::SelectProps),
+    File(crate::FileProps),
+    RichEditor(crate::RichEditorProps),
     Check(CheckProps),
     Image(ImageProps),
     Graphic(crate::GraphicProps),
@@ -239,7 +243,13 @@ impl Props {
     pub fn interactive(&self) -> bool {
         matches!(
             self,
-            Self::Button(_) | Self::Input(_) | Self::Select(_) | Self::Check(_) | Self::Link(_)
+            Self::Button(_)
+                | Self::Input(_)
+                | Self::Select(_)
+                | Self::File(_)
+                | Self::RichEditor(_)
+                | Self::Check(_)
+                | Self::Link(_)
         )
     }
 
@@ -248,6 +258,8 @@ impl Props {
             Self::Button(p) => p.enabled,
             Self::Input(p) => p.enabled,
             Self::Select(p) => p.enabled,
+            Self::File(p) => p.enabled,
+            Self::RichEditor(p) => p.enabled,
             Self::Check(p) => p.enabled,
             _ => true,
         }
@@ -350,10 +362,26 @@ impl Descriptor {
     }
 
     fn validate_input_revision(&self, next: &Self) -> Result<(), Error> {
+        if let (Some(old), Some(next)) = (
+            self.semantics.as_ref().and_then(|s| s.clipboard.as_ref()),
+            next.semantics.as_ref().and_then(|s| s.clipboard.as_ref()),
+        ) {
+            next.validate_update(old)?;
+        }
+        crate::swipe::revision(
+            self.semantics.as_ref().and_then(|s| s.swipe_capture),
+            next.semantics.as_ref().and_then(|s| s.swipe_capture),
+        )?;
         crate::collapse::revision(
             self.semantics.as_ref().and_then(|s| s.collapse.as_ref()),
             next.semantics.as_ref().and_then(|s| s.collapse.as_ref()),
         )?;
+        if let (Props::RichEditor(old), Props::RichEditor(next)) = (&self.props, &next.props) {
+            next.validate_update(old)?;
+        }
+        if let (Props::File(old), Props::File(new)) = (&self.props, &next.props) {
+            new.validate_update(old)?;
+        }
         if let (Props::Graphic(old), Props::Graphic(new)) = (&self.props, &next.props) {
             new.transition_from(old)?;
         }
@@ -429,6 +457,36 @@ impl Descriptor {
             (Patch::Text(change), Props::Text(p)) => change.apply(&mut p.content),
             (Patch::TextKind(change), Props::Text(p)) => change.apply(&mut p.kind),
             (Patch::Selectable(change), Props::Text(p)) => change.apply_or(&mut p.selectable, true),
+            (Patch::Label(change), Props::File(p)) => {
+                change.apply_or(&mut p.label, "Choose file".into())
+            }
+            (Patch::Enabled(change), Props::RichEditor(p)) => change.apply_or(&mut p.enabled, true),
+            (Patch::RichDocument { document, revision }, Props::RichEditor(p)) => {
+                if !matches!(document, Change::Keep) {
+                    document.apply_or(
+                        &mut p.document,
+                        std::rc::Rc::new(crate::RichDocument::default()),
+                    );
+                    p.revision = revision;
+                }
+            }
+            (Patch::Enabled(change), Props::File(p)) => change.apply_or(&mut p.enabled, true),
+            (
+                Patch::File {
+                    configuration,
+                    revision,
+                },
+                Props::File(p),
+            ) => {
+                if !matches!(configuration, Change::Keep) {
+                    match configuration {
+                        Change::Set(value) => p.configuration = *value,
+                        Change::Clear => p.configuration = crate::FileConfig::default(),
+                        Change::Keep => {}
+                    }
+                    p.revision = revision;
+                }
+            }
             (Patch::Label(change), Props::Button(p)) => change.apply(&mut p.label),
             (Patch::Label(change), Props::Check(p)) => change.apply(&mut p.label),
             (Patch::Label(change), Props::Link(p)) => change.apply(&mut p.label),
@@ -497,6 +555,10 @@ pub enum Patch {
         value: Change<String>,
         revision: u64,
     },
+    RichDocument {
+        document: Change<std::rc::Rc<crate::RichDocument>>,
+        revision: u64,
+    },
     SelectSelection {
         keys: Change<Vec<crate::SemanticId>>,
         revision: u64,
@@ -513,6 +575,10 @@ pub enum Patch {
     },
     Alternative(Change<Option<String>>),
     Graphic(Change<Box<crate::GraphicProps>>),
+    File {
+        configuration: Change<Box<crate::FileConfig>>,
+        revision: u64,
+    },
     Target(Change<String>),
     Classes(Change<Vec<String>>),
     Style(Change<Box<Style>>),

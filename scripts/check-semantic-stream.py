@@ -12,6 +12,8 @@ import argparse
 import json
 import socket
 import time
+import re
+from pathlib import Path
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--port', type=int, default=8789)
@@ -58,7 +60,10 @@ assert "ready second" in frames[2][0]["body"]
 assert frames[1][1] - frames[0][1] >= 60, frames
 assert frames[2][1] - frames[0][1] >= 350, frames
 terminal = json.loads(frames[-1][0]["body"])
-assert terminal["html_version"] == 4
+source = Path(__file__).resolve().parents[1] / "crates/html/src/lib.rs"
+version = re.search(r"pub const FORMAT_VERSION: u32 = (\d+);", source.read_text(encoding="utf-8"))
+assert version, "HTML format version missing"
+assert terminal["html_version"] == int(version.group(1))
 assert len(terminal["resources"]["records"]) == 2
 wait_for(lambda s: s["active"] == 0 and s["timers"] == 0)
 

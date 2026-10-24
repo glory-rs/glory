@@ -1,0 +1,1179 @@
+- generic [active] [ref=f1e1]:
+  - generic [ref=f1e3]:
+    - banner [ref=f1e4]:
+      - generic [ref=f1e5]:
+        - generic [ref=f1e6]:
+          - generic [ref=f1e8]:
+            - link "Mantine home page" [ref=f1e9] [cursor=pointer]:
+              - /url: /
+            - generic [ref=f1e17]:
+              - link "Mantine UI" [ref=f1e18] [cursor=pointer]:
+                - /url: https://ui.mantine.dev
+              - link "FAQ" [ref=f1e19] [cursor=pointer]:
+                - /url: https://help.mantine.dev
+              - link "Colors generator" [ref=f1e20] [cursor=pointer]:
+                - /url: /colors-generator/
+          - generic [ref=f1e21]:
+            - button "v9.7.3" [ref=f1e22] [cursor=pointer]
+            - generic [ref=f1e26]:
+              - button [ref=f1e27] [cursor=pointer]:
+                - generic [ref=f1e28]:
+                  - paragraph [ref=f1e31]: Search
+                  - paragraph [ref=f1e32]: Ctrl + K
+              - link "Discord" [ref=f1e33] [cursor=pointer]:
+                - /url: https://discord.gg/wbH82zuWMN
+              - link "Sponsor" [ref=f1e36] [cursor=pointer]:
+                - /url: https://opencollective.com/mantinedev
+              - link "Source code" [ref=f1e39] [cursor=pointer]:
+                - /url: https://github.com/mantinedev/mantine
+              - button "RTL direction" [ref=f1e42] [cursor=pointer]
+              - button "Toggle color scheme" [ref=f1e43] [cursor=pointer]
+        - navigation [ref=f1e46]:
+          - link "Get started" [ref=f1e47] [cursor=pointer]:
+            - /url: /getting-started/
+          - link "Theming & Styles" [ref=f1e48] [cursor=pointer]:
+            - /url: /theming/mantine-provider/
+          - link "Hooks" [ref=f1e49] [cursor=pointer]:
+            - /url: /hooks/package/
+          - link "Form" [ref=f1e50] [cursor=pointer]:
+            - /url: /form/package/
+          - link "Components" [ref=f1e51] [cursor=pointer]:
+            - /url: /core/package/
+          - link "Extensions" [ref=f1e52] [cursor=pointer]:
+            - /url: /x/extensions/
+    - generic [ref=f1e54]:
+      - navigation [ref=f1e55]:
+        - generic [ref=f1e59]:
+          - link "Get started" [ref=f1e62] [cursor=pointer]:
+            - /url: /core/package/
+          - generic [ref=f1e63]:
+            - generic [ref=f1e64]: Layout
+            - generic [ref=f1e65]:
+              - link "AppShell" [ref=f1e66] [cursor=pointer]:
+                - /url: /core/app-shell/
+              - link "AspectRatio" [ref=f1e67] [cursor=pointer]:
+                - /url: /core/aspect-ratio/
+              - link "Center" [ref=f1e68] [cursor=pointer]:
+                - /url: /core/center/
+              - link "Container" [ref=f1e69] [cursor=pointer]:
+                - /url: /core/container/
+              - link "Flex" [ref=f1e70] [cursor=pointer]:
+                - /url: /core/flex/
+              - link "Grid" [ref=f1e71] [cursor=pointer]:
+                - /url: /core/grid/
+              - link "Group" [ref=f1e72] [cursor=pointer]:
+                - /url: /core/group/
+              - link "SimpleGrid" [ref=f1e73] [cursor=pointer]:
+                - /url: /core/simple-grid/
+              - link "Space" [ref=f1e74] [cursor=pointer]:
+                - /url: /core/space/
+              - link "Splitter" [ref=f1e75] [cursor=pointer]:
+                - /url: /core/splitter/
+              - link "Stack" [ref=f1e76] [cursor=pointer]:
+                - /url: /core/stack/
+          - generic [ref=f1e77]:
+            - generic [ref=f1e78]: Inputs
+            - generic [ref=f1e79]:
+              - link "AlphaSlider" [ref=f1e80] [cursor=pointer]:
+                - /url: /core/alpha-slider/
+              - link "AngleSlider" [ref=f1e81] [cursor=pointer]:
+                - /url: /core/angle-slider/
+              - link "Checkbox" [ref=f1e82] [cursor=pointer]:
+                - /url: /core/checkbox/
+              - link "Chip" [ref=f1e83] [cursor=pointer]:
+                - /url: /core/chip/
+              - link "ColorInput" [ref=f1e84] [cursor=pointer]:
+                - /url: /core/color-input/
+              - link "ColorPicker" [ref=f1e85] [cursor=pointer]:
+                - /url: /core/color-picker/
+              - link "Fieldset" [ref=f1e86] [cursor=pointer]:
+                - /url: /core/fieldset/
+              - link "FileInput" [ref=f1e87] [cursor=pointer]:
+                - /url: /core/file-input/
+              - link "HueSlider" [ref=f1e88] [cursor=pointer]:
+                - /url: /core/hue-slider/
+              - link "Input" [ref=f1e89] [cursor=pointer]:
+                - /url: /core/input/
+              - link "JsonInput" [ref=f1e90] [cursor=pointer]:
+                - /url: /core/json-input/
+              - link "MaskInput" [ref=f1e91] [cursor=pointer]:
+                - /url: /core/mask-input/
+              - link "NativeSelect" [ref=f1e92] [cursor=pointer]:
+                - /url: /core/native-select/
+              - link "NumberInput" [ref=f1e93] [cursor=pointer]:
+                - /url: /core/number-input/
+              - link "PasswordInput" [ref=f1e94] [cursor=pointer]:
+                - /url: /core/password-input/
+              - link "PinInput" [ref=f1e95] [cursor=pointer]:
+                - /url: /core/pin-input/
+              - link "Radio" [ref=f1e96] [cursor=pointer]:
+                - /url: /core/radio/
+              - link "RangeSlider" [ref=f1e97] [cursor=pointer]:
+                - /url: /core/range-slider/
+              - link "Rating" [ref=f1e98] [cursor=pointer]:
+                - /url: /core/rating/
+              - link "SegmentedControl" [ref=f1e99] [cursor=pointer]:
+                - /url: /core/segmented-control/
+              - link "Slider" [ref=f1e100] [cursor=pointer]:
+                - /url: /core/slider/
+              - link "Switch" [ref=f1e101] [cursor=pointer]:
+                - /url: /core/switch/
+              - link "Textarea" [ref=f1e102] [cursor=pointer]:
+                - /url: /core/textarea/
+              - link "TextInput" [ref=f1e103] [cursor=pointer]:
+                - /url: /core/text-input/
+          - generic [ref=f1e104]:
+            - generic [ref=f1e105]: Combobox
+            - generic [ref=f1e106]:
+              - link "Autocomplete" [ref=f1e107] [cursor=pointer]:
+                - /url: /core/autocomplete/
+              - link "Cascader" [ref=f1e108] [cursor=pointer]:
+                - /url: /core/cascader/
+              - link "Combobox" [ref=f1e109] [cursor=pointer]:
+                - /url: /core/combobox/
+              - link "ComboboxPopover" [ref=f1e110] [cursor=pointer]:
+                - /url: /core/combobox-popover/
+              - link "MultiSelect" [ref=f1e111] [cursor=pointer]:
+                - /url: /core/multi-select/
+              - link "Pill" [ref=f1e112] [cursor=pointer]:
+                - /url: /core/pill/
+              - link "PillsInput" [ref=f1e113] [cursor=pointer]:
+                - /url: /core/pills-input/
+              - link "Select" [ref=f1e114] [cursor=pointer]:
+                - /url: /core/select/
+              - link "TagsInput" [ref=f1e115] [cursor=pointer]:
+                - /url: /core/tags-input/
+              - link "TreeSelect" [ref=f1e116] [cursor=pointer]:
+                - /url: /core/tree-select/
+          - generic [ref=f1e117]:
+            - generic [ref=f1e118]: Buttons
+            - generic [ref=f1e119]:
+              - link "ActionIcon" [ref=f1e120] [cursor=pointer]:
+                - /url: /core/action-icon/
+              - link "Button" [ref=f1e121] [cursor=pointer]:
+                - /url: /core/button/
+              - link "CloseButton" [ref=f1e122] [cursor=pointer]:
+                - /url: /core/close-button/
+              - link "CopyButton" [ref=f1e123] [cursor=pointer]:
+                - /url: /core/copy-button/
+              - link "FileButton" [ref=f1e124] [cursor=pointer]:
+                - /url: /core/file-button/
+              - link "Toggle" [ref=f1e125] [cursor=pointer]:
+                - /url: /core/toggle/
+              - link "UnstyledButton" [ref=f1e126] [cursor=pointer]:
+                - /url: /core/unstyled-button/
+          - generic [ref=f1e127]:
+            - generic [ref=f1e128]: Navigation
+            - generic [ref=f1e129]:
+              - link "Anchor" [ref=f1e130] [cursor=pointer]:
+                - /url: /core/anchor/
+              - link "Breadcrumbs" [ref=f1e131] [cursor=pointer]:
+                - /url: /core/breadcrumbs/
+              - link "Burger" [ref=f1e132] [cursor=pointer]:
+                - /url: /core/burger/
+              - link "NavLink" [ref=f1e133] [cursor=pointer]:
+                - /url: /core/nav-link/
+              - link "Pagination" [ref=f1e134] [cursor=pointer]:
+                - /url: /core/pagination/
+              - link "Stepper" [ref=f1e135] [cursor=pointer]:
+                - /url: /core/stepper/
+              - link "TableOfContents" [ref=f1e136] [cursor=pointer]:
+                - /url: /core/table-of-contents/
+              - link "Tabs" [ref=f1e137] [cursor=pointer]:
+                - /url: /core/tabs/
+              - link "Tree" [ref=f1e138] [cursor=pointer]:
+                - /url: /core/tree/
+          - generic [ref=f1e139]:
+            - generic [ref=f1e140]: Feedback
+            - generic [ref=f1e141]:
+              - link "Alert" [ref=f1e142] [cursor=pointer]:
+                - /url: /core/alert/
+              - link "EmptyState" [ref=f1e143] [cursor=pointer]:
+                - /url: /core/empty-state/
+              - link "Loader" [ref=f1e144] [cursor=pointer]:
+                - /url: /core/loader/
+              - link "Notification" [ref=f1e145] [cursor=pointer]:
+                - /url: /core/notification/
+              - link "Progress" [ref=f1e146] [cursor=pointer]:
+                - /url: /core/progress/
+              - link "RingProgress" [ref=f1e147] [cursor=pointer]:
+                - /url: /core/ring-progress/
+              - link "SemiCircleProgress" [ref=f1e148] [cursor=pointer]:
+                - /url: /core/semi-circle-progress/
+              - link "Skeleton" [ref=f1e149] [cursor=pointer]:
+                - /url: /core/skeleton/
+          - generic [ref=f1e150]:
+            - generic [ref=f1e151]: Overlays
+            - generic [ref=f1e152]:
+              - link "ActionBar" [ref=f1e153] [cursor=pointer]:
+                - /url: /core/action-bar/
+              - link "Affix" [ref=f1e154] [cursor=pointer]:
+                - /url: /core/affix/
+              - link "Dialog" [ref=f1e155] [cursor=pointer]:
+                - /url: /core/dialog/
+              - link "Drawer" [ref=f1e156] [cursor=pointer]:
+                - /url: /core/drawer/
+              - link "FloatingIndicator" [ref=f1e157] [cursor=pointer]:
+                - /url: /core/floating-indicator/
+              - link "FloatingWindow" [ref=f1e158] [cursor=pointer]:
+                - /url: /core/floating-window/
+              - link "HoverCard" [ref=f1e159] [cursor=pointer]:
+                - /url: /core/hover-card/
+              - link "LoadingOverlay" [ref=f1e160] [cursor=pointer]:
+                - /url: /core/loading-overlay/
+              - link "Menu" [ref=f1e161] [cursor=pointer]:
+                - /url: /core/menu/
+              - link "Menubar" [ref=f1e162] [cursor=pointer]:
+                - /url: /core/menubar/
+              - link "Modal" [ref=f1e163] [cursor=pointer]:
+                - /url: /core/modal/
+              - link "Overlay" [ref=f1e164] [cursor=pointer]:
+                - /url: /core/overlay/
+              - link "Popover" [ref=f1e165] [cursor=pointer]:
+                - /url: /core/popover/
+              - link "Tooltip" [ref=f1e166] [cursor=pointer]:
+                - /url: /core/tooltip/
+              - link "Tour" [ref=f1e167] [cursor=pointer]:
+                - /url: /core/tour/
+          - generic [ref=f1e168]:
+            - generic [ref=f1e169]: Data display
+            - generic [ref=f1e170]:
+              - link "Accordion" [ref=f1e171] [cursor=pointer]:
+                - /url: /core/accordion/
+              - link "Avatar" [ref=f1e172] [cursor=pointer]:
+                - /url: /core/avatar/
+              - link "BackgroundImage" [ref=f1e173] [cursor=pointer]:
+                - /url: /core/background-image/
+              - link "Badge" [ref=f1e174] [cursor=pointer]:
+                - /url: /core/badge/
+              - link "Card" [ref=f1e175] [cursor=pointer]:
+                - /url: /core/card/
+              - link "ColorSwatch" [ref=f1e176] [cursor=pointer]:
+                - /url: /core/color-swatch/
+              - link "DataList" [ref=f1e177] [cursor=pointer]:
+                - /url: /core/data-list/
+              - link "Image" [ref=f1e178] [cursor=pointer]:
+                - /url: /core/image/
+              - link "Indicator" [ref=f1e179] [cursor=pointer]:
+                - /url: /core/indicator/
+              - link "Kbd" [ref=f1e180] [cursor=pointer]:
+                - /url: /core/kbd/
+              - link "NumberFormatter" [ref=f1e181] [cursor=pointer]:
+                - /url: /core/number-formatter/
+              - link "OverflowList" [ref=f1e182] [cursor=pointer]:
+                - /url: /core/overflow-list/
+              - link "RollingNumber" [ref=f1e183] [cursor=pointer]:
+                - /url: /core/rolling-number/
+              - link "Spoiler" [ref=f1e184] [cursor=pointer]:
+                - /url: /core/spoiler/
+              - link "ThemeIcon" [ref=f1e185] [cursor=pointer]:
+                - /url: /core/theme-icon/
+              - link "Timeline" [ref=f1e186] [cursor=pointer]:
+                - /url: /core/timeline/
+          - generic [ref=f1e187]:
+            - generic [ref=f1e188]: Typography
+            - generic [ref=f1e189]:
+              - link "Blockquote" [ref=f1e190] [cursor=pointer]:
+                - /url: /core/blockquote/
+              - link "Code" [ref=f1e191] [cursor=pointer]:
+                - /url: /core/code/
+              - link "Highlight" [ref=f1e192] [cursor=pointer]:
+                - /url: /core/highlight/
+              - link "List" [ref=f1e193] [cursor=pointer]:
+                - /url: /core/list/
+              - link "Mark" [ref=f1e194] [cursor=pointer]:
+                - /url: /core/mark/
+              - link "Table" [ref=f1e195] [cursor=pointer]:
+                - /url: /core/table/
+              - link "Text" [ref=f1e196] [cursor=pointer]:
+                - /url: /core/text/
+              - link "Title" [ref=f1e197] [cursor=pointer]:
+                - /url: /core/title/
+              - link "Typography" [ref=f1e198] [cursor=pointer]:
+                - /url: /core/typography/
+          - generic [ref=f1e199]:
+            - generic [ref=f1e200]: Miscellaneous
+            - generic [ref=f1e201]:
+              - link "Box" [ref=f1e202] [cursor=pointer]:
+                - /url: /core/box/
+              - link "Collapse" [ref=f1e203] [cursor=pointer]:
+                - /url: /core/collapse/
+              - link "Divider" [ref=f1e204] [cursor=pointer]:
+                - /url: /core/divider/
+              - link "FocusTrap" [ref=f1e205] [cursor=pointer]:
+                - /url: /core/focus-trap/
+              - link "Marquee" [ref=f1e206] [cursor=pointer]:
+                - /url: /core/marquee/
+              - link "Paper" [ref=f1e207] [cursor=pointer]:
+                - /url: /core/paper/
+              - link "Portal" [ref=f1e208] [cursor=pointer]:
+                - /url: /core/portal/
+              - link "ScrollArea" [ref=f1e209] [cursor=pointer]:
+                - /url: /core/scroll-area/
+              - link "Scroller" [ref=f1e210] [cursor=pointer]:
+                - /url: /core/scroller/
+              - link "Toolbar" [ref=f1e211] [cursor=pointer]:
+                - /url: /core/toolbar/
+              - link "Transition" [ref=f1e212] [cursor=pointer]:
+                - /url: /core/transition/
+              - link "VisuallyHidden" [ref=f1e213] [cursor=pointer]:
+                - /url: /core/visually-hidden/
+      - main [ref=f1e214]:
+        - generic [ref=f1e216]:
+          - heading "Button" [level=1] [ref=f1e217]
+          - paragraph [ref=f1e218]: Button component to render button or link
+          - generic [ref=f1e219]:
+            - paragraph [ref=f1e220]: Source
+            - link [ref=f1e222] [cursor=pointer]:
+              - /url: https://github.com/mantinedev/mantine/blob/master/packages/@mantine/core/src/components/Button/Button.tsx
+          - generic [ref=f1e226]:
+            - paragraph [ref=f1e227]: LLM docs
+            - link [ref=f1e229] [cursor=pointer]:
+              - /url: /llms/core-button.md
+          - generic [ref=f1e233]:
+            - paragraph [ref=f1e234]: Docs
+            - link [ref=f1e236] [cursor=pointer]:
+              - /url: https://github.com/mantinedev/mantine/blob/master/apps/mantine.dev/src/pages/core/button.mdx
+          - generic [ref=f1e240]:
+            - paragraph [ref=f1e241]: Package
+            - link [ref=f1e243] [cursor=pointer]:
+              - /url: https://www.npmjs.com/package/@mantine/core
+        - generic [ref=f1e249]:
+          - tablist [ref=f1e251]:
+            - tab "Documentation" [selected] [ref=f1e252] [cursor=pointer]
+            - tab "Props" [ref=f1e257] [cursor=pointer]
+            - tab "Styles API" [ref=f1e262] [cursor=pointer]
+          - tabpanel "Documentation" [ref=f1e267]:
+            - generic [ref=f1e268]:
+              - generic [ref=f1e269]:
+                - heading [level=2] [ref=f1e270]:
+                  - link "Usage" [ref=f1e271] [cursor=pointer]:
+                    - /url: "#usage"
+                - generic [ref=f1e272]:
+                  - generic [ref=f1e274]:
+                    - button "Button" [ref=f1e277] [cursor=pointer]
+                    - generic [ref=f1e282]:
+                      - generic [ref=f1e283]:
+                        - generic [ref=f1e284]: Variant
+                        - combobox "Variant" [ref=f1e286] [cursor=pointer]:
+                          - option "Default"
+                          - option "Filled" [selected]
+                          - option "Light"
+                          - option "Outline"
+                          - option "Subtle"
+                          - option "Transparent"
+                          - option "White"
+                      - generic [ref=f1e287]:
+                        - generic [ref=f1e288]: Color
+                        - generic [ref=f1e289]:
+                          - button "gray" [ref=f1e290] [cursor=pointer]
+                          - button "red" [ref=f1e295] [cursor=pointer]
+                          - button "pink" [ref=f1e300] [cursor=pointer]
+                          - button "grape" [ref=f1e305] [cursor=pointer]
+                          - button "violet" [ref=f1e310] [cursor=pointer]
+                          - button "indigo" [ref=f1e315] [cursor=pointer]
+                          - button "blue" [ref=f1e320] [cursor=pointer]
+                          - button "cyan" [ref=f1e327] [cursor=pointer]
+                          - button "teal" [ref=f1e332] [cursor=pointer]
+                          - button "green" [ref=f1e337] [cursor=pointer]
+                          - button "lime" [ref=f1e342] [cursor=pointer]
+                          - button "yellow" [ref=f1e347] [cursor=pointer]
+                          - button "orange" [ref=f1e352] [cursor=pointer]
+                          - button "Pick color" [ref=f1e357] [cursor=pointer]
+                      - generic [ref=f1e371]:
+                        - generic [ref=f1e372]: Size
+                        - slider "Size" [ref=f1e377] [cursor=pointer]
+                      - generic [ref=f1e378]:
+                        - generic [ref=f1e379]: Radius
+                        - slider "Size" [ref=f1e384] [cursor=pointer]
+                  - generic [ref=f1e385]:
+                    - button "Demo.tsx" [ref=f1e390]
+                    - generic [ref=f1e396]:
+                      - generic [ref=f1e397]:
+                        - button "Collapse code" [ref=f1e398] [cursor=pointer]
+                        - button "Copy code" [ref=f1e403] [cursor=pointer]
+                      - code [ref=f1e414]: "import { Button } from '@mantine/core'; function Demo() { return <Button variant=\"filled\">Button</Button>; }"
+                - heading [level=2] [ref=f1e415]:
+                  - link "Full width" [ref=f1e416] [cursor=pointer]:
+                    - /url: "#full-width"
+                - paragraph [ref=f1e417]:
+                  - text: If the
+                  - code [ref=f1e418]: fullWidth
+                  - text: prop is set, the
+                  - code [ref=f1e419]: Button
+                  - text: "will take 100% of the parent width:"
+                - generic [ref=f1e420]:
+                  - button "Full width button" [ref=f1e423] [cursor=pointer]
+                  - generic [ref=f1e426]:
+                    - button "Demo.tsx" [ref=f1e431]
+                    - generic [ref=f1e437]:
+                      - generic [ref=f1e438]:
+                        - button "Collapse code" [ref=f1e439] [cursor=pointer]
+                        - button "Copy code" [ref=f1e444] [cursor=pointer]
+                      - code [ref=f1e455]: "import { Button } from '@mantine/core'; function Demo() { return <Button fullWidth>Full width button</Button>; }"
+                - heading [level=2] [ref=f1e456]:
+                  - link "Left and right sections" [ref=f1e457] [cursor=pointer]:
+                    - /url: "#left-and-right-sections"
+                - paragraph [ref=f1e458]:
+                  - code [ref=f1e459]: leftSection
+                  - text: and
+                  - code [ref=f1e460]: rightSection
+                  - text: allow adding icons or any other element to the left and right sides of the button. When a section is added, padding on the corresponding side is reduced.
+                - paragraph [ref=f1e461]:
+                  - text: Note that
+                  - code [ref=f1e462]: leftSection
+                  - text: and
+                  - code [ref=f1e463]: rightSection
+                  - text: are flipped in
+                  - link "RTL" [ref=f1e464] [cursor=pointer]:
+                    - /url: /styles/rtl/
+                  - text: mode (
+                  - code [ref=f1e465]: leftSection
+                  - text: is displayed on the right and
+                  - code [ref=f1e466]: rightSection
+                  - text: is displayed on the left).
+                - generic [ref=f1e467]:
+                  - generic [ref=f1e470]:
+                    - button "Gallery" [ref=f1e471] [cursor=pointer]
+                    - button "Download" [ref=f1e477] [cursor=pointer]
+                    - button "Visit gallery" [ref=f1e483] [cursor=pointer]
+                  - generic [ref=f1e492]:
+                    - button "Demo.tsx" [ref=f1e497]
+                    - generic [ref=f1e503]:
+                      - generic [ref=f1e504]:
+                        - button "Collapse code" [ref=f1e505] [cursor=pointer]
+                        - button "Copy code" [ref=f1e510] [cursor=pointer]
+                      - code [ref=f1e521]: "import { Group, Button } from '@mantine/core'; import { ImageIcon, DownloadSimpleIcon, ArrowRightIcon } from '@phosphor-icons/react'; function Demo() { return ( <Group justify=\"center\"> <Button leftSection={<ImageIcon size={14} />} variant=\"default\"> Gallery </Button> <Button rightSection={<DownloadSimpleIcon size={14} />}>Download</Button> <Button variant=\"light\" leftSection={<ImageIcon size={14} />} rightSection={<ArrowRightIcon size={14} />} > Visit gallery </Button> </Group> ); }"
+                - heading [level=2] [ref=f1e522]:
+                  - link "Sections position" [ref=f1e523] [cursor=pointer]:
+                    - /url: "#sections-position"
+                - paragraph [ref=f1e524]:
+                  - text: The
+                  - code [ref=f1e525]: justify
+                  - text: prop sets the
+                  - code [ref=f1e526]: justify-content
+                  - text: of the
+                  - code [ref=f1e527]: inner
+                  - text: element. You can use it to change the alignment of left and right sections. For example, to spread them across the button, set
+                  - code [ref=f1e528]: justify="space-between"
+                  - text: .
+                - paragraph [ref=f1e529]:
+                  - text: If you need to align just one section to the side of the button, set
+                  - code [ref=f1e530]: justify
+                  - text: to
+                  - code [ref=f1e531]: space-between
+                  - text: and add an empty
+                  - code [ref=f1e532]: <span />
+                  - text: to the opposite section.
+                - generic [ref=f1e533]:
+                  - generic [ref=f1e535]:
+                    - generic [ref=f1e537]:
+                      - button "Button label" [ref=f1e538] [cursor=pointer]
+                      - button "Button label" [ref=f1e547] [cursor=pointer]
+                      - button "Button label" [ref=f1e553] [cursor=pointer]
+                      - button "Button label" [ref=f1e559] [cursor=pointer]
+                    - generic [ref=f1e568]:
+                      - generic [ref=f1e569]: Justify
+                      - radiogroup [ref=f1e570]:
+                        - generic [ref=f1e572]:
+                          - radio "Center" [checked]
+                          - generic [ref=f1e573] [cursor=pointer]: Center
+                        - generic [ref=f1e574]:
+                          - radio "Space-between"
+                          - generic [ref=f1e575] [cursor=pointer]: Space-between
+                  - generic [ref=f1e576]:
+                    - button "Demo.tsx" [ref=f1e581]
+                    - generic [ref=f1e587]:
+                      - generic [ref=f1e588]:
+                        - button "Collapse code" [ref=f1e589] [cursor=pointer]
+                        - button "Copy code" [ref=f1e594] [cursor=pointer]
+                      - code [ref=f1e605]: "import { Button } from '@mantine/core'; import { ImageIcon } from '@phosphor-icons/react'; function Demo() { const icon = <ImageIcon size={14} />; return ( <> <Button justify=\"center\" fullWidth leftSection={icon} rightSection={icon} variant=\"default\"> Button label </Button> <Button justify=\"center\" fullWidth leftSection={icon} variant=\"default\" mt=\"md\"> Button label </Button> <Button justify=\"center\" fullWidth rightSection={icon} variant=\"default\" mt=\"md\"> Button label </Button> <Button justify=\"center\" fullWidth rightSection={icon} leftSection={<span />} variant=\"default\" mt=\"md\" > Button label </Button> </> ); }"
+                - heading [level=2] [ref=f1e606]:
+                  - link "Compact size" [ref=f1e607] [cursor=pointer]:
+                    - /url: "#compact-size"
+                - paragraph [ref=f1e608]:
+                  - code [ref=f1e609]: Button
+                  - text: supports
+                  - code [ref=f1e610]: xs
+                  - text: –
+                  - code [ref=f1e611]: xl
+                  - text: and
+                  - code [ref=f1e612]: compact-xs
+                  - text: –
+                  - code [ref=f1e613]: compact-xl
+                  - text: sizes.
+                  - code [ref=f1e614]: compact
+                  - text: sizes have the same font size as
+                  - code [ref=f1e615]: xs
+                  - text: –
+                  - code [ref=f1e616]: xl
+                  - text: but with reduced padding and height.
+                - generic [ref=f1e617]:
+                  - generic [ref=f1e619]:
+                    - generic [ref=f1e622]:
+                      - button "Regular md" [ref=f1e623] [cursor=pointer]
+                      - button "Compact md" [ref=f1e626] [cursor=pointer]
+                    - generic [ref=f1e632]:
+                      - generic [ref=f1e633]: Size
+                      - slider "Size" [ref=f1e638] [cursor=pointer]
+                  - generic [ref=f1e639]:
+                    - button "Demo.tsx" [ref=f1e644]
+                    - generic [ref=f1e650]:
+                      - generic [ref=f1e651]:
+                        - button "Collapse code" [ref=f1e652] [cursor=pointer]
+                        - button "Copy code" [ref=f1e657] [cursor=pointer]
+                      - code [ref=f1e668]: "import { Button, Group } from '@mantine/core'; function Demo() { return ( <Group justify=\"center\"> <Button size=\"md\">Regular md</Button> <Button size=\"compact-md\">Compact md</Button> </Group> ); }"
+                - heading [level=2] [ref=f1e669]:
+                  - link "Gradient variant" [ref=f1e670] [cursor=pointer]:
+                    - /url: "#gradient-variant"
+                - paragraph [ref=f1e671]:
+                  - text: When the
+                  - code [ref=f1e672]: variant
+                  - text: prop is set to
+                  - code [ref=f1e673]: gradient
+                  - text: ", you can control the gradient with the"
+                  - code [ref=f1e674]: gradient
+                  - text: prop, which accepts an object with
+                  - code [ref=f1e675]: from
+                  - text: ","
+                  - code [ref=f1e676]: to
+                  - text: and
+                  - code [ref=f1e677]: deg
+                  - text: properties. If the
+                  - code [ref=f1e678]: gradient
+                  - text: prop is not set,
+                  - code [ref=f1e679]: Button
+                  - text: will use
+                  - code [ref=f1e680]: theme.defaultGradient
+                  - text: which can be configured on the
+                  - link "theme object" [ref=f1e681] [cursor=pointer]:
+                    - /url: /theming/theme-object/
+                  - text: . The
+                  - code [ref=f1e682]: gradient
+                  - text: prop is ignored when
+                  - code [ref=f1e683]: variant
+                  - text: is not
+                  - code [ref=f1e684]: gradient
+                  - text: .
+                - paragraph [ref=f1e685]:
+                  - text: Note that
+                  - code [ref=f1e686]: variant="gradient"
+                  - text: supports only linear gradients with two colors. If you need a more complex gradient, use the
+                  - link "Styles API" [ref=f1e687] [cursor=pointer]:
+                    - /url: /styles/styles-api/
+                  - text: to modify
+                  - code [ref=f1e688]: Button
+                  - text: styles.
+                - generic [ref=f1e689]:
+                  - generic [ref=f1e691]:
+                    - button "Gradient button" [ref=f1e694] [cursor=pointer]
+                    - generic [ref=f1e699]:
+                      - generic [ref=f1e700]:
+                        - generic [ref=f1e701]: Gradient from
+                        - generic [ref=f1e702]:
+                          - button "gray" [ref=f1e703] [cursor=pointer]
+                          - button "red" [ref=f1e708] [cursor=pointer]
+                          - button "pink" [ref=f1e713] [cursor=pointer]
+                          - button "grape" [ref=f1e718] [cursor=pointer]
+                          - button "violet" [ref=f1e723] [cursor=pointer]
+                          - button "indigo" [ref=f1e728] [cursor=pointer]
+                          - button "blue" [ref=f1e733] [cursor=pointer]
+                          - button "cyan" [ref=f1e740] [cursor=pointer]
+                          - button "teal" [ref=f1e745] [cursor=pointer]
+                          - button "green" [ref=f1e750] [cursor=pointer]
+                          - button "lime" [ref=f1e755] [cursor=pointer]
+                          - button "yellow" [ref=f1e760] [cursor=pointer]
+                          - button "orange" [ref=f1e765] [cursor=pointer]
+                          - button "Pick color" [ref=f1e770] [cursor=pointer]
+                      - generic [ref=f1e784]:
+                        - generic [ref=f1e785]: Gradient to
+                        - generic [ref=f1e786]:
+                          - button "gray" [ref=f1e787] [cursor=pointer]
+                          - button "red" [ref=f1e792] [cursor=pointer]
+                          - button "pink" [ref=f1e797] [cursor=pointer]
+                          - button "grape" [ref=f1e802] [cursor=pointer]
+                          - button "violet" [ref=f1e807] [cursor=pointer]
+                          - button "indigo" [ref=f1e812] [cursor=pointer]
+                          - button "blue" [ref=f1e817] [cursor=pointer]
+                          - button "cyan" [ref=f1e822] [cursor=pointer]
+                          - button "teal" [ref=f1e829] [cursor=pointer]
+                          - button "green" [ref=f1e834] [cursor=pointer]
+                          - button "lime" [ref=f1e839] [cursor=pointer]
+                          - button "yellow" [ref=f1e844] [cursor=pointer]
+                          - button "orange" [ref=f1e849] [cursor=pointer]
+                          - button "Pick color" [ref=f1e854] [cursor=pointer]
+                      - generic [ref=f1e868]:
+                        - generic [ref=f1e869]: Gradient degree
+                        - slider "Size" [ref=f1e874] [cursor=pointer]
+                  - generic [ref=f1e875]:
+                    - button "Demo.tsx" [ref=f1e880]
+                    - generic [ref=f1e886]:
+                      - generic [ref=f1e887]:
+                        - button "Collapse code" [ref=f1e888] [cursor=pointer]
+                        - button "Copy code" [ref=f1e893] [cursor=pointer]
+                      - code [ref=f1e904]: "import { Button } from '@mantine/core'; function Demo() { return ( <Button variant=\"gradient\" gradient={{ from: 'blue', to: 'cyan', deg: 90 }} > Gradient button </Button> ); }"
+                - heading [level=2] [ref=f1e905]:
+                  - link "Disabled state" [ref=f1e906] [cursor=pointer]:
+                    - /url: "#disabled-state"
+                - paragraph [ref=f1e907]:
+                  - text: To make a
+                  - code [ref=f1e908]: Button
+                  - text: disabled, set the
+                  - code [ref=f1e909]: disabled
+                  - text: prop. This will prevent any interactions with the button and add disabled styles. If you want the button to just look disabled but still be interactive, set the
+                  - code [ref=f1e910]: data-disabled
+                  - text: prop instead. Note that disabled styles are the same for all variants.
+                - generic [ref=f1e911]:
+                  - button "Disabled button" [disabled] [ref=f1e914]
+                  - generic [ref=f1e917]:
+                    - button "Demo.tsx" [ref=f1e922]
+                    - generic [ref=f1e928]:
+                      - generic [ref=f1e929]:
+                        - button "Collapse code" [ref=f1e930] [cursor=pointer]
+                        - button "Copy code" [ref=f1e935] [cursor=pointer]
+                      - code [ref=f1e946]: "import { Button } from '@mantine/core'; function Demo() { return <Button disabled>Disabled button</Button>; }"
+                - heading [level=2] [ref=f1e947]:
+                  - link "Disabled state when Button is link" [ref=f1e948] [cursor=pointer]:
+                    - /url: "#disabled-state-when-button-is-link"
+                - paragraph [ref=f1e949]:
+                  - text: The
+                  - code [ref=f1e950]: <a />
+                  - text: element does not support the
+                  - code [ref=f1e951]: disabled
+                  - text: attribute. To make a
+                  - code [ref=f1e952]: Button
+                  - text: disabled when it is rendered as a link, set the
+                  - code [ref=f1e953]: data-disabled
+                  - text: attribute instead and prevent default behavior in the
+                  - code [ref=f1e954]: onClick
+                  - text: event handler.
+                - generic [ref=f1e955]:
+                  - link "Disabled link" [ref=f1e958]:
+                    - /url: https://mantine.dev
+                  - generic [ref=f1e961]:
+                    - button "Demo.tsx" [ref=f1e966]
+                    - generic [ref=f1e972]:
+                      - generic [ref=f1e973]:
+                        - button "Collapse code" [ref=f1e974] [cursor=pointer]
+                        - button "Copy code" [ref=f1e979] [cursor=pointer]
+                      - code [ref=f1e990]: "import { Button } from '@mantine/core'; function Demo() { return ( <Button component=\"a\" href=\"https://mantine.dev\" data-disabled onClick={(event) => event.preventDefault()} > Disabled link </Button> ); }"
+                - heading [level=2] [ref=f1e991]:
+                  - link "Customize disabled styles" [ref=f1e992] [cursor=pointer]:
+                    - /url: "#customize-disabled-styles"
+                - paragraph [ref=f1e993]:
+                  - text: To customize disabled styles, it is recommended to use both
+                  - code [ref=f1e994]: "&:disabled"
+                  - text: and
+                  - code [ref=f1e995]: "&[data-disabled]"
+                  - text: "selectors:"
+                - list [ref=f1e996]:
+                  - listitem [ref=f1e997]:
+                    - code [ref=f1e998]: "&:disabled"
+                    - text: is used to style the button when the
+                    - code [ref=f1e999]: disabled
+                    - text: prop is set and also when the button is disabled by the parent component (for example, when the
+                    - code [ref=f1e1000]: disabled
+                    - text: prop is set on a
+                    - code [ref=f1e1001]: <fieldset />
+                    - text: element which contains the
+                    - code [ref=f1e1002]: Button
+                    - text: ).
+                  - listitem [ref=f1e1003]:
+                    - code [ref=f1e1004]: "&[data-disabled]"
+                    - text: is used to style the button when it is not actually disabled but should look like it is (for example,
+                    - code [ref=f1e1005]: data-disabled
+                    - text: should be used if you need to use
+                    - link "Tooltip" [ref=f1e1006] [cursor=pointer]:
+                      - /url: /core/tooltip/
+                    - text: with a disabled
+                    - code [ref=f1e1007]: Button
+                    - text: or when the
+                    - code [ref=f1e1008]: Button
+                    - text: is used as a link)
+                - generic [ref=f1e1009]:
+                  - button "Disabled with styles" [disabled] [ref=f1e1012]
+                  - generic [ref=f1e1015]:
+                    - generic [ref=f1e1019]:
+                      - button "Demo.module.css" [ref=f1e1020] [cursor=pointer]
+                      - button "Demo.tsx" [ref=f1e1026] [cursor=pointer]
+                    - generic [ref=f1e1032]:
+                      - generic [ref=f1e1033]:
+                        - button "Collapse code" [ref=f1e1034] [cursor=pointer]
+                        - button "Copy code" [ref=f1e1039] [cursor=pointer]
+                      - code [ref=f1e1050]: ".button { &:disabled, &[data-disabled] { border-color: light-dark(var(--mantine-color-gray-3), var(--mantine-color-dark-4)); background-color: transparent; } }"
+                - heading [level=2] [ref=f1e1051]:
+                  - link "Disabled button with Tooltip" [ref=f1e1052] [cursor=pointer]:
+                    - /url: "#disabled-button-with-tooltip"
+                - paragraph [ref=f1e1053]:
+                  - text: The
+                  - code [ref=f1e1054]: onMouseLeave
+                  - text: event
+                  - link "is not triggered" [ref=f1e1055] [cursor=pointer]:
+                    - /url: https://github.com/facebook/react/issues/18753
+                  - text: when a
+                  - code [ref=f1e1056]: Button
+                  - text: is disabled, so if you need to use a
+                  - link "Tooltip" [ref=f1e1057] [cursor=pointer]:
+                    - /url: /core/tooltip/
+                  - text: with a disabled
+                  - code [ref=f1e1058]: Button
+                  - text: ", you need to set the"
+                  - code [ref=f1e1059]: data-disabled
+                  - text: prop on the
+                  - code [ref=f1e1060]: Button
+                  - text: instead of
+                  - code [ref=f1e1061]: disabled
+                  - text: . Note that it is also required to change the
+                  - code [ref=f1e1062]: onClick
+                  - text: event handler to
+                  - code [ref=f1e1063]: (event) => event.preventDefault()
+                  - text: as the
+                  - code [ref=f1e1064]: Button
+                  - text: is not actually disabled and will still trigger the
+                  - code [ref=f1e1065]: onClick
+                  - text: event.
+                - generic [ref=f1e1066]:
+                  - button "Disabled button with tooltip" [ref=f1e1069]
+                  - generic [ref=f1e1072]:
+                    - button "Demo.tsx" [ref=f1e1077]
+                    - generic [ref=f1e1083]:
+                      - generic [ref=f1e1084]:
+                        - button "Collapse code" [ref=f1e1085] [cursor=pointer]
+                        - button "Copy code" [ref=f1e1090] [cursor=pointer]
+                      - code [ref=f1e1101]: "import { Button, Tooltip } from '@mantine/core'; function Demo() { return ( <Tooltip label=\"Tooltip for disabled button\"> <Button data-disabled onClick={(event) => event.preventDefault()}> Disabled button with tooltip </Button> </Tooltip> ); }"
+                - heading [level=2] [ref=f1e1102]:
+                  - link "Loading state" [ref=f1e1103] [cursor=pointer]:
+                    - /url: "#loading-state"
+                - paragraph [ref=f1e1104]:
+                  - text: When the
+                  - code [ref=f1e1105]: loading
+                  - text: prop is set, the
+                  - code [ref=f1e1106]: Button
+                  - text: will be disabled and a
+                  - link "Loader" [ref=f1e1107] [cursor=pointer]:
+                    - /url: /core/loader/
+                  - text: with overlay will be rendered in the center of the button.
+                  - link "Loader" [ref=f1e1108] [cursor=pointer]:
+                    - /url: /core/loader/
+                  - text: color depends on the
+                  - code [ref=f1e1109]: Button
+                  - text: variant.
+                - generic [ref=f1e1110]:
+                  - generic [ref=f1e1112]:
+                    - generic [ref=f1e1113]:
+                      - button "Filled button" [ref=f1e1114] [cursor=pointer]
+                      - button "Light button" [ref=f1e1117] [cursor=pointer]
+                      - button "Outline button" [ref=f1e1120] [cursor=pointer]
+                    - generic [ref=f1e1124]:
+                      - switch "Loading state" [ref=f1e1125]
+                      - generic [ref=f1e1129]: Loading state
+                  - generic [ref=f1e1131]:
+                    - button "Demo.tsx" [ref=f1e1136]
+                    - generic [ref=f1e1142]:
+                      - generic [ref=f1e1143]:
+                        - button "Collapse code" [ref=f1e1144] [cursor=pointer]
+                        - button "Copy code" [ref=f1e1149] [cursor=pointer]
+                      - code [ref=f1e1160]: "import { Button, Group, Switch } from '@mantine/core'; import { useDisclosure } from '@mantine/hooks'; function Demo() { const [loading, { toggle }] = useDisclosure(); return ( <> <Group> <Button loading={loading}>Filled button</Button> <Button variant=\"light\" loading={loading}> Light button </Button> <Button variant=\"outline\" loading={loading}> Outline button </Button> </Group> <Switch checked={loading} onChange={toggle} label=\"Loading state\" mt=\"md\" /> </> ); }"
+                - heading [level=2] [ref=f1e1161]:
+                  - link "Loader props" [ref=f1e1162] [cursor=pointer]:
+                    - /url: "#loader-props"
+                - paragraph [ref=f1e1163]:
+                  - text: You can customize the
+                  - link "Loader" [ref=f1e1164] [cursor=pointer]:
+                    - /url: /core/loader/
+                  - text: with the
+                  - code [ref=f1e1165]: loaderProps
+                  - text: prop, which accepts all props that the
+                  - link "Loader" [ref=f1e1166] [cursor=pointer]:
+                    - /url: /core/loader/
+                  - text: "component has:"
+                - generic [ref=f1e1167]:
+                  - button "Loading button" [disabled] [ref=f1e1170]
+                  - generic [ref=f1e1178]:
+                    - button "Demo.tsx" [ref=f1e1183]
+                    - generic [ref=f1e1189]:
+                      - generic [ref=f1e1190]:
+                        - button "Collapse code" [ref=f1e1191] [cursor=pointer]
+                        - button "Copy code" [ref=f1e1196] [cursor=pointer]
+                      - code [ref=f1e1207]: "import { Button } from '@mantine/core'; function Demo() { return ( <Button loading loaderProps={{ type: 'dots' }}> Loading button </Button> ); }"
+                - heading [level=2] [ref=f1e1208]:
+                  - link "Styles API" [ref=f1e1209] [cursor=pointer]:
+                    - /url: "#styles-api"
+                - paragraph [ref=f1e1210]:
+                  - code [ref=f1e1211]: Button
+                  - text: supports the
+                  - link "Styles API" [ref=f1e1212] [cursor=pointer]:
+                    - /url: /styles/styles-api/
+                  - text: ; you can add styles to any inner element of the component with the
+                  - code [ref=f1e1213]: classNames
+                  - text: prop. Follow the
+                  - link "Styles API" [ref=f1e1214] [cursor=pointer]:
+                    - /url: /styles/styles-api/
+                  - text: documentation to learn more.
+                - generic [ref=f1e1215]:
+                  - generic [ref=f1e1217]:
+                    - button "Your email" [ref=f1e1220] [cursor=pointer]
+                    - generic [ref=f1e1226]:
+                      - generic [ref=f1e1227]:
+                        - paragraph [ref=f1e1228]: Component Styles API
+                        - paragraph [ref=f1e1229]: Hover over selectors to highlight corresponding elements
+                      - button [ref=f1e1230]:
+                        - paragraph [ref=f1e1231]: root
+                        - paragraph [ref=f1e1232]: Root element
+                      - button [ref=f1e1233]:
+                        - paragraph [ref=f1e1234]: loader
+                        - paragraph [ref=f1e1235]: "Loader component, displayed only when `loading` prop is set"
+                      - button [ref=f1e1236]:
+                        - paragraph [ref=f1e1237]: inner
+                        - paragraph [ref=f1e1238]: "Contains all other elements, child of the `root` element"
+                      - button [ref=f1e1239]:
+                        - paragraph [ref=f1e1240]: section
+                        - paragraph [ref=f1e1241]: Left and right sections of the button
+                      - button [ref=f1e1242]:
+                        - paragraph [ref=f1e1243]: label
+                        - paragraph [ref=f1e1244]: Button children
+                  - generic [ref=f1e1245]:
+                    - generic [ref=f1e1249]:
+                      - button "Demo.module.css" [ref=f1e1250] [cursor=pointer]
+                      - button "Demo.tsx" [ref=f1e1256] [cursor=pointer]
+                    - generic [ref=f1e1262]:
+                      - generic [ref=f1e1263]:
+                        - button "Collapse code" [ref=f1e1264] [cursor=pointer]
+                        - button "Copy code" [ref=f1e1269] [cursor=pointer]
+                      - code [ref=f1e1280]: /* * Hover over selectors to apply outline styles * */
+                - paragraph [ref=f1e1281]:
+                  - text: Example of customizing
+                  - code [ref=f1e1282]: Button
+                  - text: with
+                  - link "Styles API" [ref=f1e1283] [cursor=pointer]:
+                    - /url: /styles/styles-api/
+                  - text: and
+                  - link "data-* attributes" [ref=f1e1284] [cursor=pointer]:
+                    - /url: /styles/data-attributes/
+                  - text: ":"
+                - generic [ref=f1e1285]:
+                  - generic [ref=f1e1288]:
+                    - button "12 Send files" [ref=f1e1289] [cursor=pointer]:
+                      - generic [ref=f1e1290]:
+                        - generic [ref=f1e1291]: "12"
+                        - generic [ref=f1e1292]: Send files
+                    - button "3 Send files" [disabled] [ref=f1e1296]:
+                      - generic [ref=f1e1297]:
+                        - generic [ref=f1e1298]: "3"
+                        - generic [ref=f1e1299]: Send files
+                  - generic [ref=f1e1303]:
+                    - generic [ref=f1e1307]:
+                      - button "Demo.module.css" [ref=f1e1308] [cursor=pointer]
+                      - button "Demo.tsx" [ref=f1e1314] [cursor=pointer]
+                    - generic [ref=f1e1320]:
+                      - generic [ref=f1e1321]:
+                        - button "Collapse code" [ref=f1e1322] [cursor=pointer]
+                        - button "Copy code" [ref=f1e1327] [cursor=pointer]
+                      - code [ref=f1e1338]: ".root { border-top-left-radius: var(--mantine-radius-xl); border-bottom-left-radius: var(--mantine-radius-xl); padding-left: 4px; /* The following styles will be applied only when button is disabled */ &[data-disabled] { /* You can use Mantine PostCSS mixins inside data attributes */ @mixin light { border: 1px solid var(--mantine-color-gray-2); } @mixin dark { border: 1px solid var(--mantine-color-dark-4); } /* You can target child elements that are inside .root[data-disabled] */ & .section[data-position='left'] { opacity: 0.6; } } } .section { /* Apply styles only to left section */ &[data-position='left'] { --section-size: calc(var(--button-height) - 8px); background-color: var(--mantine-color-body); color: var(--mantine-color-text); height: var(--section-size); width: var(--section-size); display: flex; align-items: center; justify-content: center; border-radius: var(--mantine-radius-xl); } &[data-position='right'] { @mixin rtl { transform: rotate(180deg); } } }"
+                - heading [level=2] [ref=f1e1339]:
+                  - link "Custom variants" [ref=f1e1340] [cursor=pointer]:
+                    - /url: "#custom-variants"
+                - paragraph [ref=f1e1341]:
+                  - text: To add new
+                  - code [ref=f1e1342]: Button
+                  - text: variants, use the
+                  - link "data-variant" [ref=f1e1343] [cursor=pointer]:
+                    - /url: /styles/variants-sizes/
+                  - text: attribute. Usually new variants are added to the
+                  - link "theme" [ref=f1e1344] [cursor=pointer]:
+                    - /url: /theming/theme-object/
+                  - text: ", this way they are available in all"
+                  - code [ref=f1e1345]: Button
+                  - text: components in your application.
+                - generic [ref=f1e1346]:
+                  - generic [ref=f1e1349]:
+                    - button "Danger variant" [ref=f1e1350] [cursor=pointer]
+                    - button "Primary variant" [ref=f1e1353] [cursor=pointer]
+                  - generic [ref=f1e1356]:
+                    - generic [ref=f1e1360]:
+                      - button "Demo.tsx" [ref=f1e1361] [cursor=pointer]
+                      - button "Demo.module.css" [ref=f1e1367] [cursor=pointer]
+                    - generic [ref=f1e1373]:
+                      - generic [ref=f1e1374]:
+                        - button "Collapse code" [ref=f1e1375] [cursor=pointer]
+                        - button "Copy code" [ref=f1e1380] [cursor=pointer]
+                      - code [ref=f1e1391]: "import { Group, Button, MantineProvider, createTheme } from '@mantine/core'; import classes from './Demo.module.css'; const theme = createTheme({ components: { Button: Button.extend({ classNames: classes, }), }, }); function Demo() { return ( <MantineProvider theme={theme}> <Group> <Button variant=\"danger\">Danger variant</Button> <Button variant=\"primary\">Primary variant</Button> </Group> </MantineProvider> ); }"
+                - heading [level=2] [ref=f1e1392]:
+                  - link "Customize variant colors" [ref=f1e1393] [cursor=pointer]:
+                    - /url: "#customize-variant-colors"
+                - paragraph [ref=f1e1394]:
+                  - text: You can customize colors for
+                  - code [ref=f1e1395]: Button
+                  - text: and other component variants by adding
+                  - link "variantColorResolver" [ref=f1e1396] [cursor=pointer]:
+                    - /url: /theming/colors/#colors-variant-resolver
+                  - text: to your theme.
+                - generic [ref=f1e1397]:
+                  - generic [ref=f1e1400]:
+                    - button "Lime filled button" [ref=f1e1401] [cursor=pointer]
+                    - button "Orange light button" [ref=f1e1404] [cursor=pointer]
+                    - button "Danger button" [ref=f1e1407] [cursor=pointer]
+                  - generic [ref=f1e1410]:
+                    - button "Demo.tsx" [ref=f1e1415]
+                    - generic [ref=f1e1421]:
+                      - generic [ref=f1e1422]:
+                        - button "Collapse code" [ref=f1e1423] [cursor=pointer]
+                        - button "Copy code" [ref=f1e1428] [cursor=pointer]
+                      - code [ref=f1e1439]: "import { Button, Group, MantineProvider, defaultVariantColorsResolver, VariantColorsResolver, parseThemeColor, rgba, darken, } from '@mantine/core'; const variantColorResolver: VariantColorsResolver = (input) => { const defaultResolvedColors = defaultVariantColorsResolver(input); const parsedColor = parseThemeColor({ color: input.color || input.theme.primaryColor, theme: input.theme, }); // Override some properties for variant if (parsedColor.isThemeColor && parsedColor.color === 'lime' && input.variant === 'filled') { return { ...defaultResolvedColors, color: 'var(--mantine-color-black)', hoverColor: 'var(--mantine-color-black)', }; } // Completely override variant if (input.variant === 'light') { return { background: rgba(parsedColor.value, 0.1), hover: rgba(parsedColor.value, 0.15), border: `1px solid ${parsedColor.value}`, color: darken(parsedColor.value, 0.1), }; } // Add new variants support if (input.variant === 'danger') { return { background: 'var(--mantine-color-red-9)', hover: 'var(--mantine-color-red-8)', color: 'var(--mantine-color-white)', border: 'none', }; } return defaultResolvedColors; }; function Demo() { return ( <MantineProvider theme={{ variantColorResolver }}> <Group> <Button color=\"lime.4\" variant=\"filled\"> Lime filled button </Button> <Button color=\"orange\" variant=\"light\"> Orange light button </Button> <Button variant=\"danger\">Danger button</Button> </Group> </MantineProvider> ); }"
+                - heading [level=2] [ref=f1e1440]:
+                  - link "autoContrast" [ref=f1e1441] [cursor=pointer]:
+                    - /url: "#auto-contrast"
+                - paragraph [ref=f1e1442]:
+                  - code [ref=f1e1443]: Button
+                  - text: supports the
+                  - code [ref=f1e1444]: autoContrast
+                  - text: prop and
+                  - link "theme.autoContrast" [ref=f1e1445] [cursor=pointer]:
+                    - /url: /theming/theme-object/#autocontrast
+                  - text: . If
+                  - code [ref=f1e1446]: autoContrast
+                  - text: is set either on
+                  - code [ref=f1e1447]: Button
+                  - text: or on the theme, the content color will be adjusted to have sufficient contrast with the value specified in the
+                  - code [ref=f1e1448]: color
+                  - text: prop.
+                - paragraph [ref=f1e1449]:
+                  - text: Note that the
+                  - code [ref=f1e1450]: autoContrast
+                  - text: feature works only if you use the
+                  - code [ref=f1e1451]: color
+                  - text: prop to change the background color.
+                  - code [ref=f1e1452]: autoContrast
+                  - text: works only with the
+                  - code [ref=f1e1453]: filled
+                  - text: variant.
+                - generic [ref=f1e1454]:
+                  - generic [ref=f1e1457]:
+                    - button "Default" [ref=f1e1458] [cursor=pointer]
+                    - button "Auto contrast" [ref=f1e1461] [cursor=pointer]
+                  - generic [ref=f1e1464]:
+                    - button "Demo.tsx" [ref=f1e1469]
+                    - generic [ref=f1e1475]:
+                      - generic [ref=f1e1476]:
+                        - button "Collapse code" [ref=f1e1477] [cursor=pointer]
+                        - button "Copy code" [ref=f1e1482] [cursor=pointer]
+                      - code [ref=f1e1493]: "import { Button, Group } from '@mantine/core'; function Demo() { return ( <Group> <Button color=\"lime.4\">Default</Button> <Button color=\"lime.4\" autoContrast> Auto contrast </Button> </Group> ); }"
+                - heading [level=2] [ref=f1e1494]:
+                  - link "Button.Group" [ref=f1e1495] [cursor=pointer]:
+                    - /url: "#buttongroup"
+                - generic [ref=f1e1496]:
+                  - generic [ref=f1e1498]:
+                    - group [ref=f1e1501]:
+                      - button "First" [ref=f1e1502] [cursor=pointer]
+                      - button "Second" [ref=f1e1505] [cursor=pointer]
+                      - button "Third" [ref=f1e1508] [cursor=pointer]
+                    - generic [ref=f1e1514]:
+                      - generic [ref=f1e1515]: Orientation
+                      - radiogroup [ref=f1e1516]:
+                        - generic [ref=f1e1518]:
+                          - radio "Horizontal" [checked]
+                          - generic [ref=f1e1519] [cursor=pointer]: Horizontal
+                        - generic [ref=f1e1520]:
+                          - radio "Vertical"
+                          - generic [ref=f1e1521] [cursor=pointer]: Vertical
+                  - generic [ref=f1e1522]:
+                    - button "Demo.tsx" [ref=f1e1527]
+                    - generic [ref=f1e1533]:
+                      - generic [ref=f1e1534]:
+                        - button "Collapse code" [ref=f1e1535] [cursor=pointer]
+                        - button "Copy code" [ref=f1e1540] [cursor=pointer]
+                      - code [ref=f1e1551]: "import { Button } from '@mantine/core'; function Demo() { return ( <Button.Group> <Button variant=\"default\">First</Button> <Button variant=\"default\">Second</Button> <Button variant=\"default\">Third</Button> </Button.Group> ); }"
+                - paragraph [ref=f1e1552]:
+                  - text: Note that you must not wrap child
+                  - code [ref=f1e1553]: Button
+                  - text: "components with any additional elements:"
+                - generic [ref=f1e1554]:
+                  - button "Copy code" [ref=f1e1556] [cursor=pointer]
+                  - code [ref=f1e1567]: "import { Button } from '@mantine/core'; function Demo() { return ( <Button.Group> <div> <Button>This will not work</Button> </div> <Button>Buttons will have incorrect borders</Button> </Button.Group> ); }"
+                - heading [level=2] [ref=f1e1568]:
+                  - link "Button.GroupSection" [ref=f1e1569] [cursor=pointer]:
+                    - /url: "#buttongroupsection"
+                - paragraph [ref=f1e1570]:
+                  - text: Use
+                  - code [ref=f1e1571]: Button.GroupSection
+                  - text: component to render sections that are not buttons inside
+                  - code [ref=f1e1572]: Button.Group
+                  - text: ":"
+                - generic [ref=f1e1573]:
+                  - group [ref=f1e1576]:
+                    - button [ref=f1e1577] [cursor=pointer]
+                    - generic [ref=f1e1582]: "135"
+                    - button [ref=f1e1583] [cursor=pointer]
+                  - generic [ref=f1e1588]:
+                    - button "Demo.tsx" [ref=f1e1593]
+                    - generic [ref=f1e1599]:
+                      - generic [ref=f1e1600]:
+                        - button "Collapse code" [ref=f1e1601] [cursor=pointer]
+                        - button "Copy code" [ref=f1e1606] [cursor=pointer]
+                      - code [ref=f1e1617]: "import { CaretDownIcon, CaretUpIcon } from '@phosphor-icons/react'; import { Button } from '@mantine/core'; import { useCounter } from '@mantine/hooks'; function Demo() { const [value, { increment, decrement }] = useCounter(135, { min: 0 }); return ( <Button.Group> <Button variant=\"default\" onClick={decrement}> <CaretDownIcon color=\"var(--mantine-color-red-text)\" /> </Button> <Button.GroupSection variant=\"default\" bg=\"var(--mantine-color-body)\" miw={80}> {value} </Button.GroupSection> <Button variant=\"default\" onClick={increment}> <CaretUpIcon color=\"var(--mantine-color-teal-text)\" /> </Button> </Button.Group> ); }"
+                - heading [level=2] [ref=f1e1618]:
+                  - link "Polymorphic component" [ref=f1e1619] [cursor=pointer]:
+                    - /url: "#polymorphic-component"
+                - paragraph [ref=f1e1620]:
+                  - code [ref=f1e1621]: Button
+                  - text: is a
+                  - link "polymorphic component" [ref=f1e1622] [cursor=pointer]:
+                    - /url: /guides/polymorphic/
+                  - text: – its default root element is
+                  - code [ref=f1e1623]: button
+                  - text: ", but it can be changed to any other element or component with the"
+                  - code [ref=f1e1624]: component
+                  - text: "prop:"
+                - generic [ref=f1e1625]:
+                  - button "Copy code" [ref=f1e1627] [cursor=pointer]
+                  - code [ref=f1e1638]: "import { Button } from '@mantine/core'; function Demo() { return <Button component=\"a\" />; }"
+                - paragraph [ref=f1e1639]:
+                  - text: You can also use components in the
+                  - code [ref=f1e1640]: component
+                  - text: prop, for example, Next.js
+                  - code [ref=f1e1641]: Link
+                  - text: ":"
+                - generic [ref=f1e1642]:
+                  - button "Copy code" [ref=f1e1644] [cursor=pointer]
+                  - code [ref=f1e1655]: "import Link from 'next/link'; import { Button } from '@mantine/core'; function Demo() { return <Button component={Link} href=\"/\" />; }"
+                - blockquote [ref=f1e1656]:
+                  - paragraph [ref=f1e1661]: Polymorphic components with TypeScript
+                  - paragraph [ref=f1e1662]:
+                    - text: Note that polymorphic component prop types are different from regular components – they do not extend HTML element props of the default element. For example,
+                    - code [ref=f1e1663]: ButtonProps
+                    - text: does not extend
+                    - code [ref=f1e1664]: React.ComponentProps'<'div'>'
+                    - text: although
+                    - code [ref=f1e1665]: button
+                    - text: is the default element.
+                  - paragraph [ref=f1e1666]:
+                    - text: If you want to create a wrapper for a polymorphic component that is not polymorphic (does not support the
+                    - code [ref=f1e1667]: component
+                    - text: "prop), then your component props interface should extend HTML element props, for example:"
+                  - generic [ref=f1e1668]:
+                    - button "Copy code" [ref=f1e1670] [cursor=pointer]
+                    - code [ref=f1e1681]: "import type { ButtonProps, ElementProps } from '@mantine/core'; interface MyButtonProps extends ButtonProps, ElementProps<'a', keyof ButtonProps> {}"
+                  - paragraph [ref=f1e1682]:
+                    - text: If you want your component to remain polymorphic after wrapping, use the
+                    - code [ref=f1e1683]: polymorphic
+                    - text: function described in
+                    - link "this guide" [ref=f1e1684] [cursor=pointer]:
+                      - /url: /guides/polymorphic/
+                    - text: .
+                - heading [level=2] [ref=f1e1685]:
+                  - link "Get element ref" [ref=f1e1686] [cursor=pointer]:
+                    - /url: "#get-element-ref"
+                - generic [ref=f1e1687]:
+                  - button "Copy code" [ref=f1e1689] [cursor=pointer]
+                  - code [ref=f1e1700]: "import { useRef } from 'react'; import { Button } from '@mantine/core'; function Demo() { const ref = useRef<HTMLButtonElement>(null); return <Button ref={ref} />; }"
+                - generic [ref=f1e1701]:
+                  - link [ref=f1e1702] [cursor=pointer]:
+                    - /url: /core/action-icon/
+                    - paragraph [ref=f1e1705]: ActionIcon
+                  - link [ref=f1e1706] [cursor=pointer]:
+                    - /url: /core/close-button/
+                    - paragraph [ref=f1e1707]: CloseButton
+              - navigation [ref=f1e1711]:
+                - generic [ref=f1e1713]:
+                  - paragraph [ref=f1e1714]: Table of contents
+                  - generic [ref=f1e1720]:
+                    - link "Usage" [ref=f1e1721] [cursor=pointer]:
+                      - /url: "#usage"
+                    - link "Full width" [ref=f1e1722] [cursor=pointer]:
+                      - /url: "#full-width"
+                    - link "Left and right sections" [ref=f1e1723] [cursor=pointer]:
+                      - /url: "#left-and-right-sections"
+                    - link "Sections position" [ref=f1e1724] [cursor=pointer]:
+                      - /url: "#sections-position"
+                    - link "Compact size" [ref=f1e1725] [cursor=pointer]:
+                      - /url: "#compact-size"
+                    - link "Gradient variant" [ref=f1e1726] [cursor=pointer]:
+                      - /url: "#gradient-variant"
+                    - link "Disabled state" [ref=f1e1727] [cursor=pointer]:
+                      - /url: "#disabled-state"
+                    - link "Disabled state when Button is link" [ref=f1e1728] [cursor=pointer]:
+                      - /url: "#disabled-state-when-button-is-link"
+                    - link "Customize disabled styles" [ref=f1e1729] [cursor=pointer]:
+                      - /url: "#customize-disabled-styles"
+                    - link "Disabled button with Tooltip" [ref=f1e1730] [cursor=pointer]:
+                      - /url: "#disabled-button-with-tooltip"
+                    - link "Loading state" [ref=f1e1731] [cursor=pointer]:
+                      - /url: "#loading-state"
+                    - link "Loader props" [ref=f1e1732] [cursor=pointer]:
+                      - /url: "#loader-props"
+                    - link "Styles API" [ref=f1e1733] [cursor=pointer]:
+                      - /url: "#styles-api"
+                    - link "Custom variants" [ref=f1e1734] [cursor=pointer]:
+                      - /url: "#custom-variants"
+                    - link "Customize variant colors" [ref=f1e1735] [cursor=pointer]:
+                      - /url: "#customize-variant-colors"
+                    - link "autoContrast" [ref=f1e1736] [cursor=pointer]:
+                      - /url: "#auto-contrast"
+                    - link "Button.Group" [ref=f1e1737] [cursor=pointer]:
+                      - /url: "#buttongroup"
+                    - link "Button.GroupSection" [ref=f1e1738] [cursor=pointer]:
+                      - /url: "#buttongroupsection"
+                    - link "Polymorphic component" [ref=f1e1739] [cursor=pointer]:
+                      - /url: "#polymorphic-component"
+                    - link "Get element ref" [ref=f1e1740] [cursor=pointer]:
+                      - /url: "#get-element-ref"
+        - generic [ref=f1e1745]:
+          - generic [ref=f1e1746]:
+            - generic [ref=f1e1747]:
+              - link "Mantine" [ref=f1e1748] [cursor=pointer]:
+                - /url: /
+                - generic [ref=f1e1749]: Welcome to Mantine, React components library that you always wished for
+              - paragraph [ref=f1e1757]: Build fully functional accessible web applications faster than ever
+            - generic [ref=f1e1758]:
+              - generic [ref=f1e1759]:
+                - paragraph [ref=f1e1760]: About
+                - link "OpenCollective" [ref=f1e1761] [cursor=pointer]:
+                  - /url: https://opencollective.com/mantinedev
+                - link "Contribute" [ref=f1e1762] [cursor=pointer]:
+                  - /url: /contribute/
+                - link "Changelog" [ref=f1e1763] [cursor=pointer]:
+                  - /url: /changelog/previous-versions/
+                - link "GitHub Releases" [ref=f1e1764] [cursor=pointer]:
+                  - /url: https://github.com/mantinedev/mantine/releases
+              - generic [ref=f1e1765]:
+                - paragraph [ref=f1e1766]: Community
+                - link "Chat on Discord" [ref=f1e1767] [cursor=pointer]:
+                  - /url: https://discord.gg/wbH82zuWMN
+                - link "Follow on X" [ref=f1e1768] [cursor=pointer]:
+                  - /url: https://x.com/mantinedev
+                - link "Follow on Github" [ref=f1e1769] [cursor=pointer]:
+                  - /url: https://github.com/rtivital
+                - link "GitHub discussions" [ref=f1e1770] [cursor=pointer]:
+                  - /url: https://github.com/mantinedev/mantine/discussions
+              - generic [ref=f1e1771]:
+                - paragraph [ref=f1e1772]: Project
+                - link "Mantine UI" [ref=f1e1773] [cursor=pointer]:
+                  - /url: https://ui.mantine.dev/
+                - link "Help Center" [ref=f1e1774] [cursor=pointer]:
+                  - /url: https://help.mantine.dev
+                - link "Github organization" [ref=f1e1775] [cursor=pointer]:
+                  - /url: https://github.com/mantinedev
+                - link "npm organization" [ref=f1e1776] [cursor=pointer]:
+                  - /url: https://www.npmjs.com/org/mantine
+          - generic [ref=f1e1778]:
+            - paragraph [ref=f1e1779]:
+              - text: Built by
+              - link "Vitaly Rtishchev" [ref=f1e1780] [cursor=pointer]:
+                - /url: https://github.com/rtivital
+              - text: and
+              - link "these awesome people" [ref=f1e1781] [cursor=pointer]:
+                - /url: https://github.com/mantinedev/mantine/graphs/contributors
+            - generic [ref=f1e1782]:
+              - link "Join Discord community" [ref=f1e1783] [cursor=pointer]:
+                - /url: https://discord.gg/wbH82zuWMN
+              - link "Follow Mantine on X" [ref=f1e1789] [cursor=pointer]:
+                - /url: https://x.com/mantinedev
+  - generic [ref=f1e1796]:
+    - paragraph [ref=f1e1797]: LLM
+    - generic [ref=f1e1798]:
+      - link [ref=f1e1799] [cursor=pointer]:
+        - /url: /llms/core-button.md
+      - button [ref=f1e1803] [cursor=pointer]
+      - link [ref=f1e1807] [cursor=pointer]:
+        - /url: https://github.com/orgs/mantinedev/discussions/new?category=ai-and-llm-usage-feedback
+  - alert [ref=f1e1811]

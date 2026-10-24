@@ -4,6 +4,7 @@ fn grid() -> Descriptor {
     d.role = Some(Role::Grid);
     d.semantics = Some(Box::new(Semantics {
         grid_navigation: Some(Direction::Ltr),
+        grid_multiple: true,
         table: Some(TableMetadata::Table {
             rows: Some(6),
             columns: Some(7),
@@ -35,6 +36,23 @@ fn create(
 }
 #[test]
 fn grid_metadata_and_selected_are_finite_role_specific_and_roll_back_conflicts() {
+    let mut selection_only = Descriptor::new(Props::View);
+    selection_only.role = Some(Role::Grid);
+    selection_only.semantics = Some(Box::new(Semantics {
+        grid_multiple: true,
+        ..Default::default()
+    }));
+    selection_only.validate().unwrap();
+    for role in [
+        None,
+        Some(Role::Table),
+        Some(Role::Group),
+        Some(Role::GridCell),
+    ] {
+        let mut bad = selection_only.clone();
+        bad.role = role;
+        assert!(bad.validate().is_err());
+    }
     let d = grid();
     d.validate().unwrap();
     EventKind::GridNavigate.validate_target(&d).unwrap();
@@ -101,7 +119,7 @@ fn two_dimensional_commands_preserve_ime_editing_modifiers_and_linear_orientatio
                 ..Default::default()
             }
         ),
-        Some(GridCommand::PreviousYear)
+        Some(GridCommand::PreviousLargePage)
     );
     for input in [
         KeyboardInput {

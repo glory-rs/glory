@@ -86,6 +86,11 @@ mod browser {
     }
 
     #[wasm_bindgen]
+    pub fn html_format_version() -> u32 {
+        glory::html::FORMAT_VERSION
+    }
+
+    #[wasm_bindgen]
     pub fn mount(id: &str) -> Result<(), JsValue> {
         unmount();
         let root = web_sys::window()

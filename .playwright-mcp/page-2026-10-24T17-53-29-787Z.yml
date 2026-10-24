@@ -1,0 +1,962 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e6]:
+        - generic [ref=e8]:
+          - link "Mantine home page" [ref=e9] [cursor=pointer]:
+            - /url: /
+          - generic [ref=e17]:
+            - link "Mantine UI" [ref=e18] [cursor=pointer]:
+              - /url: https://ui.mantine.dev
+            - link "FAQ" [ref=e19] [cursor=pointer]:
+              - /url: https://help.mantine.dev
+            - link "Colors generator" [ref=e20] [cursor=pointer]:
+              - /url: /colors-generator/
+        - generic [ref=e21]:
+          - button "v9.7.3" [ref=e22] [cursor=pointer]
+          - generic [ref=e26]:
+            - button [ref=e27] [cursor=pointer]:
+              - generic [ref=e28]:
+                - paragraph [ref=e31]: Search
+                - paragraph [ref=e32]: Ctrl + K
+            - link "Discord" [ref=e33] [cursor=pointer]:
+              - /url: https://discord.gg/wbH82zuWMN
+            - link "Sponsor" [ref=e36] [cursor=pointer]:
+              - /url: https://opencollective.com/mantinedev
+            - link "Source code" [ref=e39] [cursor=pointer]:
+              - /url: https://github.com/mantinedev/mantine
+            - button "RTL direction" [ref=e42] [cursor=pointer]
+            - button "Toggle color scheme" [ref=e43] [cursor=pointer]
+    - main [ref=e46]:
+      - generic [ref=e47]:
+        - generic [ref=e52]:
+          - heading "A fully featured React components library" [level=1] [ref=e53]
+          - paragraph [ref=e54]: Build fully functional accessible web applications faster than ever – Mantine includes more than 120 customizable components and 70 hooks to cover you in any situation
+          - generic [ref=e55]:
+            - link "Get Started" [ref=e56] [cursor=pointer]:
+              - /url: /getting-started/
+            - link "GitHub" [ref=e62] [cursor=pointer]:
+              - /url: https://github.com/mantinedev/mantine
+        - generic [ref=e68]:
+          - paragraph [ref=e69]: Sponsored by
+          - generic [ref=e70]:
+            - link "Mantine is sponsored by Metabase 💋" [ref=e71] [cursor=pointer]:
+              - /url: https://www.metabase.com/?utm_campaign=opencollective
+              - img "Metabase" [ref=e72]
+              - generic [ref=e73]: Metabase
+            - link "Mantine is sponsored by PropelAuth 💋" [ref=e74] [cursor=pointer]:
+              - /url: https://www.propelauth.com
+              - img "PropelAuth" [ref=e75]
+              - generic [ref=e76]: PropelAuth
+            - link "Mantine is sponsored by Medplum 💋" [ref=e77] [cursor=pointer]:
+              - /url: https://www.medplum.com/
+              - img "Medplum" [ref=e78]
+              - generic [ref=e79]: Medplum
+            - link "Mantine is sponsored by N-iX Ltd 💋" [ref=e80] [cursor=pointer]:
+              - /url: https://www.n-ix.com/
+              - img "N-iX Ltd" [ref=e81]
+              - generic [ref=e82]: N-iX Ltd
+            - link "Mantine is sponsored by Followerhit 💋" [ref=e83] [cursor=pointer]:
+              - /url: https://followerhit.de/
+              - img "Followerhit" [ref=e84]
+              - generic [ref=e85]: Followerhit
+            - link "You? Sponsor Mantine" [ref=e86] [cursor=pointer]:
+              - /url: https://opencollective.com/mantinedev
+              - generic [ref=e87]: You? ❤️
+              - generic [ref=e88]: Sponsor Mantine to get featured here and support the project.
+        - generic [ref=e91]:
+          - generic [ref=e93]:
+            - heading "Built for the AI-assisted workflow" [level=2] [ref=e94]
+            - paragraph [ref=e95]: LLM-optimized docs, agent skills for complex tasks, and an MCP server for direct API access — Mantine is designed to work with Cursor, Claude Code, Windsurf, and every AI coding tool you already use.
+            - link "Learn more about LLM integrations" [ref=e96] [cursor=pointer]:
+              - /url: /guides/llms/
+            - generic [ref=e100]:
+              - generic [ref=e105]:
+                - heading "LLM documentation" [level=3] [ref=e106]
+                - paragraph [ref=e107]: llms.txt and llms-full.txt files follow the LLMs.txt standard – use them with Cursor, Windsurf, ChatGPT, Claude, and other AI tools
+              - generic [ref=e112]:
+                - heading "Skills for AI agents" [level=3] [ref=e113]
+                - paragraph [ref=e114]: Install Mantine skills for complex tasks like building forms, custom components, and combobox-based inputs
+              - generic [ref=e119]:
+                - heading "MCP server" [level=3] [ref=e120]
+                - paragraph [ref=e121]: Use @mantine/mcp-server to give AI agents direct access to component docs, props, and search across the entire library
+              - generic [ref=e126]:
+                - heading "Always up to date" [level=3] [ref=e127]
+                - paragraph [ref=e128]: LLM documentation is regenerated with every release – AI tools always have access to the latest API and examples
+          - generic [ref=e130]:
+            - generic [ref=e131]:
+              - button "Documentation" [ref=e132] [cursor=pointer]
+              - button "Skills" [ref=e133] [cursor=pointer]
+              - button "MCP server" [ref=e134] [cursor=pointer]
+              - generic [ref=e135] [cursor=pointer]
+            - generic [ref=e137]:
+              - button "Copy code" [ref=e139] [cursor=pointer]
+              - code [ref=e150]:
+                - generic [ref=e151]: "# Reference Mantine docs in Cursor"
+                - generic [ref=e152]: "@Docs https://mantine.dev/llms.txt"
+                - generic [ref=e153]: "# Or download full documentation"
+                - generic [ref=e154]: curl -o mantine-docs.txt https://mantine.dev/llms-full.txt
+                - generic [ref=e155]: "# Use with ChatGPT/Claude"
+                - generic [ref=e156]: "\"Using Mantine, how do I create a dark mode toggle?"
+                - generic [ref=e157]: "Reference: https://mantine.dev/llms.txt\""
+        - generic [ref=e159]:
+          - heading "120+ components" [level=2] [ref=e160]
+          - paragraph [ref=e161]: "Build your next app faster with high-quality, well-tested components. Mantine includes everything you need to create complex web applications with ease: custom select, date pickers, notifications, modals, and more."
+          - generic [ref=e162]:
+            - generic [ref=e163]:
+              - button "Inputs" [ref=e164] [cursor=pointer]
+              - button "Overlays" [ref=e165] [cursor=pointer]
+              - button "Navigation" [ref=e166] [cursor=pointer]
+              - generic [ref=e167] [cursor=pointer]
+            - generic [ref=e170]:
+              - generic [ref=e171]:
+                - generic [ref=e172]: Text input
+                - textbox "Text input" [ref=e174]
+              - generic [ref=e175]:
+                - generic [ref=e176]: Number input
+                - generic [ref=e177]:
+                  - textbox "Number input" [ref=e178]: $ 30,712
+                  - generic [ref=e180]:
+                    - button [aria-hidden] [ref=e181] [cursor=pointer]
+                    - button [aria-hidden] [ref=e184] [cursor=pointer]
+              - generic [ref=e187]:
+                - generic [ref=e188]: Date range picker
+                - button "Date range picker" [ref=e190] [cursor=pointer]: Your last vacation
+              - generic [ref=e191]:
+                - generic [ref=e192]: Color input
+                - generic [ref=e193]:
+                  - textbox "Color input" [ref=e194]:
+                    - /placeholder: What other library has color input?
+                    - text: "#129ce0"
+                  - button [ref=e196] [cursor=pointer]
+              - generic [ref=e201]:
+                - generic [ref=e202]: Tree select
+                - textbox "Tree select" [ref=e204] [cursor=pointer]:
+                  - /placeholder: Pick from the tree
+                  - text: React
+              - generic [ref=e205]:
+                - generic [ref=e206]: File input
+                - button "File input" [ref=e208] [cursor=pointer]: Upload file
+              - generic [ref=e209]:
+                - generic [ref=e210]: Select
+                - combobox "Select" [ref=e212] [cursor=pointer]: 🇫🇷 France
+              - generic [ref=e213]:
+                - generic [ref=e214]: Multiselect
+                - generic [ref=e217]:
+                  - generic [ref=e218]:
+                    - generic [ref=e219]: React
+                    - button [aria-hidden] [ref=e220] [cursor=pointer]
+                  - generic [ref=e221]:
+                    - generic [ref=e222]: Vue
+                    - button [aria-hidden] [ref=e223] [cursor=pointer]
+                  - combobox "Multiselect" [ref=e224]
+              - generic [ref=e225]:
+                - generic [ref=e226]: Pin input
+                - group [ref=e227]:
+                  - textbox "PinInput" [ref=e229]:
+                    - /placeholder: ○
+                  - textbox "PinInput" [ref=e231]:
+                    - /placeholder: ○
+                  - textbox "PinInput" [ref=e233]:
+                    - /placeholder: ○
+                  - textbox "PinInput" [ref=e235]:
+                    - /placeholder: ○
+        - generic [ref=e237]:
+          - heading "Hooks library" [level=2] [ref=e238]
+          - paragraph [ref=e239]: 70+ hooks for handling tricky and common parts of your application
+          - link "Browse all hooks" [ref=e240] [cursor=pointer]:
+            - /url: /hooks/package/
+          - generic [ref=e244]:
+            - generic [ref=e245]:
+              - generic [ref=e246]:
+                - heading [level=3] [ref=e247]:
+                  - link "use-move" [ref=e248] [cursor=pointer]:
+                    - /url: /hooks/use-move/
+                - paragraph [ref=e249]: use-move hook handles move behavior over given element, can be used to build custom sliders
+              - generic [ref=e250]:
+                - generic [ref=e254]:
+                  - generic [ref=e255]: "30"
+                  - generic [ref=e257]: "70"
+                - generic [ref=e262]:
+                  - generic [ref=e266]:
+                    - button "Demo.tsx" [ref=e267] [cursor=pointer]
+                    - button "Demo.module.css" [ref=e273] [cursor=pointer]
+                  - generic [ref=e279]:
+                    - generic [ref=e280]:
+                      - button "Expand code" [ref=e281] [cursor=pointer]
+                      - button "Copy code" [ref=e286] [cursor=pointer]
+                    - code [ref=e297]:
+                      - generic [ref=e298]: "import { useState } from 'react';"
+                      - generic [ref=e299]: "import { DotsSixVerticalIcon } from '@phosphor-icons/react';"
+                      - generic [ref=e300]: "import { clamp, useMove } from '@mantine/hooks';"
+                      - generic [ref=e301]: import classes from './Demo.module.css';
+                      - generic [ref=e302]: "function Demo() {"
+                      - generic [ref=e303]: const [value, setValue] = useState(0.3);
+                      - generic [ref=e304]: "const { ref } = useMove(({ x }) => setValue(clamp(x, 0.1, 0.9)));"
+                      - generic [ref=e305]: const labelFloating = value < 0.2 || value > 0.8;
+                      - generic [ref=e306]: return (
+                      - generic [ref=e307]: "<div className={classes.root}>"
+                      - generic [ref=e308]: "<div className={classes.track} ref={ref}>"
+                      - generic [ref=e309]: <div
+                      - generic [ref=e310]: "className={classes.filled}"
+                      - generic [ref=e311]: "style={{"
+                      - generic [ref=e312]: "width: `calc(${value * 100}% - var(--thumb-width) / 2 - var(--thumb-offset) / 2)`,"
+                      - generic [ref=e313]: "}}"
+                      - generic [ref=e314]: ">"
+                      - generic [ref=e315]: "<span className={classes.label} data-floating={labelFloating || undefined} data-filled>"
+                      - generic [ref=e316]: "{(value * 100).toFixed(0)}"
+                      - generic [ref=e317]: </span>
+                      - generic [ref=e318]: </div>
+                      - generic [ref=e319]: <div
+                      - generic [ref=e320]: "className={classes.empty}"
+                      - generic [ref=e321]: "style={{"
+                      - generic [ref=e322]: "width: `calc(${(1 - value) * 100}% - var(--thumb-width) / 2 - var(--thumb-offset) / 2)`,"
+                      - generic [ref=e323]: "}}"
+                      - generic [ref=e324]: ">"
+                      - generic [ref=e325]: "<span className={classes.label} data-floating={labelFloating || undefined}>"
+                      - generic [ref=e326]: "{((1 - value) * 100).toFixed(0)}"
+                      - generic [ref=e327]: </span>
+                      - generic [ref=e328]: </div>
+                      - generic [ref=e329]: <div
+                      - generic [ref=e330]: "className={classes.thumb}"
+                      - generic [ref=e331]: "style={{ left: `calc(${value * 100}% - var(--thumb-width) / 2)` }}"
+                      - generic [ref=e332]: ">"
+                      - generic [ref=e333]: <DotsSixVerticalIcon />
+                      - generic [ref=e334]: </div>
+                      - generic [ref=e335]: </div>
+                      - generic [ref=e336]: </div>
+                      - generic [ref=e337]: );
+                      - generic [ref=e338]: "}"
+                    - button "Expand code" [ref=e339] [cursor=pointer]
+            - generic [ref=e340]:
+              - generic [ref=e341]:
+                - heading [level=3] [ref=e342]:
+                  - link "use-resize-observer" [ref=e343] [cursor=pointer]:
+                    - /url: /hooks/use-resize-observer/
+                - paragraph [ref=e344]: use-resize-observer hook tracks element size and position changes
+              - generic [ref=e345]:
+                - generic [ref=e348]:
+                  - generic [ref=e349]: Resize me!
+                  - table [ref=e351]:
+                    - caption [ref=e352]: Resize element by dragging its right bottom corner
+                    - rowgroup [ref=e353]:
+                      - row [ref=e354]:
+                        - columnheader "Property" [ref=e355]
+                        - columnheader "Value" [ref=e356]
+                    - rowgroup [ref=e357]:
+                      - row [ref=e358]:
+                        - cell "width" [ref=e359]
+                        - cell "400" [ref=e360]
+                      - row [ref=e361]:
+                        - cell "height" [ref=e362]
+                        - cell "200" [ref=e363]
+                - generic [ref=e364]:
+                  - generic [ref=e368]:
+                    - button "Demo.tsx" [ref=e369] [cursor=pointer]
+                    - button "Demo.module.css" [ref=e375] [cursor=pointer]
+                  - generic [ref=e381]:
+                    - generic [ref=e382]:
+                      - button "Expand code" [ref=e383] [cursor=pointer]
+                      - button "Copy code" [ref=e388] [cursor=pointer]
+                    - code [ref=e399]:
+                      - generic [ref=e400]: "import { Group, Table } from '@mantine/core';"
+                      - generic [ref=e401]: "import { useResizeObserver } from '@mantine/hooks';"
+                      - generic [ref=e402]: "function Demo() {"
+                      - generic [ref=e403]: const [ref, rect] = useResizeObserver();
+                      - generic [ref=e404]: return (
+                      - generic [ref=e405]: "<div className={classes.root}>"
+                      - generic [ref=e406]: <Group justify="center">
+                      - generic [ref=e407]: "<div ref={ref} className={classes.demo}>"
+                      - generic [ref=e408]: Resize me!
+                      - generic [ref=e409]: </div>
+                      - generic [ref=e410]: </Group>
+                      - generic [ref=e411]: <Table
+                      - generic [ref=e412]: captionSide="top"
+                      - generic [ref=e413]: "data={{"
+                      - generic [ref=e414]: "caption: 'Resize element by dragging its right bottom corner',"
+                      - generic [ref=e415]: "head: ['Property', 'Value'],"
+                      - generic [ref=e416]: "body: ["
+                      - generic [ref=e417]: "['width', rect.width],"
+                      - generic [ref=e418]: "['height', rect.height],"
+                      - generic [ref=e419]: "],"
+                      - generic [ref=e420]: "}}"
+                      - generic [ref=e421]: />
+                      - generic [ref=e422]: </div>
+                      - generic [ref=e423]: );
+                      - generic [ref=e424]: "}"
+                    - button "Expand code" [ref=e425] [cursor=pointer]
+            - generic [ref=e426]:
+              - generic [ref=e427]:
+                - heading [level=3] [ref=e428]:
+                  - link "use-hotkeys" [ref=e429] [cursor=pointer]:
+                    - /url: /hooks/use-hotkeys/
+                - paragraph [ref=e430]: use-hotkeys hook allows binding keyboard shortcuts to actions
+              - generic [ref=e431]:
+                - generic [ref=e433]:
+                  - generic [ref=e434]:
+                    - generic [ref=e435]: Ctrl
+                    - generic [ref=e436]: +
+                    - generic [ref=e437]: K
+                    - generic [ref=e438]: – Open search
+                  - generic [ref=e439]:
+                    - generic [ref=e440]: Ctrl
+                    - generic [ref=e441]: +
+                    - generic [ref=e442]: J
+                    - generic [ref=e443]: – Toggle color scheme
+                - generic [ref=e444]:
+                  - generic [ref=e448]:
+                    - button "Demo.tsx" [ref=e449] [cursor=pointer]
+                    - button "Shortcut.tsx" [ref=e455] [cursor=pointer]
+                  - generic [ref=e461]:
+                    - generic [ref=e462]:
+                      - button "Expand code" [ref=e463] [cursor=pointer]
+                      - button "Copy code" [ref=e468] [cursor=pointer]
+                    - code [ref=e479]:
+                      - generic [ref=e480]: "import { useHotkeys } from '@mantine/hooks';"
+                      - generic [ref=e481]: "import { spotlight } from '@mantine/spotlight';"
+                      - generic [ref=e482]: "import { useMantineColorScheme } from '@mantine/core';"
+                      - generic [ref=e483]: "import { Shortcut } from './Shortcut';"
+                      - generic [ref=e484]: "function Demo() {"
+                      - generic [ref=e485]: "const { toggleColorScheme } = useMantineColorScheme();"
+                      - generic [ref=e486]: useHotkeys([
+                      - generic [ref=e487]: "['mod + K', () => spotlight.open()],"
+                      - generic [ref=e488]: "['mod + J', () => toggleColorScheme()],"
+                      - generic [ref=e489]: "['mod + shift + alt + X', () => secret()],"
+                      - generic [ref=e490]: "]);"
+                      - generic [ref=e491]: return (
+                      - generic [ref=e492]: <>
+                      - generic [ref=e493]: <Shortcut symbol="K" description="Open search" />
+                      - generic [ref=e494]: <Shortcut symbol="J" description="Toggle color scheme" />
+                      - generic [ref=e495]: </>
+                      - generic [ref=e496]: );
+                      - generic [ref=e497]: "}"
+                    - button "Expand code" [ref=e498] [cursor=pointer]
+            - generic [ref=e499]:
+              - generic [ref=e500]:
+                - heading [level=3] [ref=e501]:
+                  - link "use-eye-dropper" [ref=e502] [cursor=pointer]:
+                    - /url: /hooks/use-eye-dropper/
+                - paragraph [ref=e503]: use-eye-dropper hook allows picking colors from anywhere on the screen
+              - generic [ref=e504]:
+                - generic [ref=e507]:
+                  - button [ref=e508] [cursor=pointer]
+                  - paragraph [ref=e512]: Click the button to pick color
+                - generic [ref=e513]:
+                  - button "Demo.tsx" [ref=e518]
+                  - generic [ref=e524]:
+                    - generic [ref=e525]:
+                      - button "Expand code" [ref=e526] [cursor=pointer]
+                      - button "Copy code" [ref=e531] [cursor=pointer]
+                    - code [ref=e542]:
+                      - generic [ref=e543]: "import { useState } from 'react';"
+                      - generic [ref=e544]: "import { ActionIcon, Group, ColorSwatch, Text } from '@mantine/core';"
+                      - generic [ref=e545]: "import { CrosshairIcon } from '@phosphor-icons/react';"
+                      - generic [ref=e546]: "import { useEyeDropper } from '@mantine/hooks';"
+                      - generic [ref=e547]: "function Demo() {"
+                      - generic [ref=e548]: const [color, setColor] = useState('');
+                      - generic [ref=e549]: const [error, setError] = useState<Error | null>(null);
+                      - generic [ref=e550]: "const { supported, open } = useEyeDropper();"
+                      - generic [ref=e551]: "const pickColor = async () => {"
+                      - generic [ref=e552]: "try {"
+                      - generic [ref=e553]: "const { sRGBHex } = (await open())!;"
+                      - generic [ref=e554]: setColor(sRGBHex);
+                      - generic [ref=e555]: "} catch (e) {"
+                      - generic [ref=e556]: setError(e as Error);
+                      - generic [ref=e557]: "}"
+                      - generic [ref=e558]: "};"
+                      - generic [ref=e559]: "if (!supported) {"
+                      - generic [ref=e560]: return <Text ta="center">EyeDropper API is not supported in your browser</Text>;
+                      - generic [ref=e561]: "}"
+                      - generic [ref=e562]: return (
+                      - generic [ref=e563]: <Group>
+                      - generic [ref=e564]: "<ActionIcon variant=\"default\" onClick={pickColor} size=\"xl\">"
+                      - generic [ref=e565]: "<CrosshairIcon size={28} />"
+                      - generic [ref=e566]: </ActionIcon>
+                      - generic [ref=e567]: "{color ? ("
+                      - generic [ref=e568]: <Group gap="xs">
+                      - generic [ref=e569]: "<ColorSwatch color={color} />"
+                      - generic [ref=e570]: "<Text>Picked color: {color}</Text>"
+                      - generic [ref=e571]: </Group>
+                      - generic [ref=e572]: ") : ("
+                      - generic [ref=e573]: <Text>Click the button to pick color</Text>
+                      - generic [ref=e574]: ")}"
+                      - generic [ref=e575]: "{error && <Text c=\"red\">Error: {error?.message}</Text>}"
+                      - generic [ref=e576]: </Group>
+                      - generic [ref=e577]: );
+                      - generic [ref=e578]: "}"
+                    - button "Expand code" [ref=e579] [cursor=pointer]
+        - generic [ref=e582]:
+          - generic [ref=e584]:
+            - heading "Flexible styling" [level=2] [ref=e585]
+            - paragraph [ref=e586]: Mantine components are built with native CSS – styles are performant and easy to override
+            - link "Learn more about styles" [ref=e587] [cursor=pointer]:
+              - /url: /styles/styles-overview/
+            - generic [ref=e591]:
+              - generic [ref=e596]:
+                - heading "Built with CSS" [level=3] [ref=e597]
+                - paragraph [ref=e598]: Mantine styles are exposed as .css files – styles are performant and do not have any runtime overhead
+              - generic [ref=e603]:
+                - heading "Override anything" [level=3] [ref=e604]
+                - paragraph [ref=e605]: All Mantine components support Styles API which allows to override any part of component styles with inline styles of classes
+              - generic [ref=e610]:
+                - heading "PostCSS preset" [level=3] [ref=e611]
+                - paragraph [ref=e612]: postcss-preset-mantine includes mixins and functions to apply dark/light, rtl and responsive styles
+              - generic [ref=e617]:
+                - heading "Compatible with any styling solution" [level=3] [ref=e618]
+                - paragraph [ref=e619]: You can bring your own library to style Mantine components (Emotion, Vanilla Extract, Sass, etc.) – you are not limited to any specific tool
+          - generic [ref=e621]:
+            - generic [ref=e624]:
+              - button "12 Send files" [ref=e625] [cursor=pointer]:
+                - generic [ref=e626]:
+                  - generic [ref=e627]: "12"
+                  - generic [ref=e628]: Send files
+              - button "3 Send files" [disabled] [ref=e632]:
+                - generic [ref=e633]:
+                  - generic [ref=e634]: "3"
+                  - generic [ref=e635]: Send files
+            - generic [ref=e639]:
+              - generic [ref=e643]:
+                - button "Demo.module.css" [ref=e644] [cursor=pointer]
+                - button "Demo.tsx" [ref=e650] [cursor=pointer]
+              - generic [ref=e656]:
+                - generic [ref=e657]:
+                  - button "Collapse code" [ref=e658] [cursor=pointer]
+                  - button "Copy code" [ref=e663] [cursor=pointer]
+                - code [ref=e674]:
+                  - generic [ref=e675]: ".root {"
+                  - generic [ref=e676]: "border-top-left-radius: var(--mantine-radius-xl);"
+                  - generic [ref=e677]: "border-bottom-left-radius: var(--mantine-radius-xl);"
+                  - generic [ref=e678]: "padding-left: 4px;"
+                  - generic [ref=e679]: /* The following styles will be applied only when button is disabled */
+                  - generic [ref=e680]: "&[data-disabled] {"
+                  - generic [ref=e681]: /* You can use Mantine PostCSS mixins inside data attributes */
+                  - generic [ref=e682]: "@mixin light {"
+                  - generic [ref=e683]: "border: 1px solid var(--mantine-color-gray-2);"
+                  - generic [ref=e684]: "}"
+                  - generic [ref=e685]: "@mixin dark {"
+                  - generic [ref=e686]: "border: 1px solid var(--mantine-color-dark-4);"
+                  - generic [ref=e687]: "}"
+                  - generic [ref=e688]: /* You can target child elements that are inside .root[data-disabled] */
+                  - generic [ref=e689]: "& .section[data-position='left'] {"
+                  - generic [ref=e690]: "opacity: 0.6;"
+                  - generic [ref=e691]: "}"
+                  - generic [ref=e692]: "}"
+                  - generic [ref=e693]: "}"
+                  - generic [ref=e694]: ".section {"
+                  - generic [ref=e695]: /* Apply styles only to left section */
+                  - generic [ref=e696]: "&[data-position='left'] {"
+                  - generic [ref=e697]: "--section-size: calc(var(--button-height) - 8px);"
+                  - generic [ref=e698]: "background-color: var(--mantine-color-body);"
+                  - generic [ref=e699]: "color: var(--mantine-color-text);"
+                  - generic [ref=e700]: "height: var(--section-size);"
+                  - generic [ref=e701]: "width: var(--section-size);"
+                  - generic [ref=e702]: "display: flex;"
+                  - generic [ref=e703]: "align-items: center;"
+                  - generic [ref=e704]: "justify-content: center;"
+                  - generic [ref=e705]: "border-radius: var(--mantine-radius-xl);"
+                  - generic [ref=e706]: "}"
+                  - generic [ref=e707]: "&[data-position='right'] {"
+                  - generic [ref=e708]: "@mixin rtl {"
+                  - generic [ref=e709]: "transform: rotate(180deg);"
+                  - generic [ref=e710]: "}"
+                  - generic [ref=e711]: "}"
+                  - generic [ref=e712]: "}"
+        - generic [ref=e714]:
+          - heading "Dark color scheme" [level=2] [ref=e715]
+          - generic [ref=e718]:
+            - paragraph [ref=e719]: Add dark theme to your application with just a few lines of code – Mantine exports global styles both for light and dark theme, all components support dark theme out of the box.
+            - generic [ref=e720]:
+              - button "Copy code" [ref=e722] [cursor=pointer]
+              - code [ref=e733]:
+                - generic [ref=e734]: "import { MantineProvider } from '@mantine/core';"
+                - generic [ref=e735]: "function Demo() {"
+                - generic [ref=e736]: return (
+                - generic [ref=e737]: <MantineProvider defaultColorScheme="dark">
+                - generic [ref=e738]: <App />
+                - generic [ref=e739]: </MantineProvider>
+                - generic [ref=e740]: );
+                - generic [ref=e741]: "}"
+            - button "Toggle color scheme" [ref=e743] [cursor=pointer]
+        - generic [ref=e750]:
+          - heading "Combobox component" [level=2] [ref=e751]
+          - paragraph [ref=e752]: Combobox is a composable component which can be used to create custom select, multiselect, autocomplete, tags input and other similar components. It provides a lot of flexibility and gives you full control over the UI and behavior while keeping your codebase clean and simple.
+          - link "Explore all 50+ Combobox examples" [ref=e753] [cursor=pointer]:
+            - /url: /combobox/?e=BasicSelect
+          - generic [ref=e757]:
+            - generic [ref=e758]:
+              - generic [ref=e759]:
+                - heading "Autocomplete with search highlight" [level=3] [ref=e760]
+                - link "View example code" [ref=e761] [cursor=pointer]:
+                  - /url: /combobox/?e=AutocompleteHighlight
+              - generic [ref=e766]:
+                - generic [ref=e767]: Pick value or type anything
+                - textbox "Pick value or type anything" [ref=e769]
+            - generic [ref=e770]:
+              - generic [ref=e771]:
+                - heading "Multiselect with selected items limit" [level=3] [ref=e772]
+                - link "View example code" [ref=e773] [cursor=pointer]:
+                  - /url: /combobox/?e=MaxSelectedItems
+              - generic [ref=e781] [cursor=pointer]:
+                - generic [ref=e782]: Pick one or more values
+                - textbox
+            - generic [ref=e783]:
+              - generic [ref=e784]:
+                - heading "Creatable Multiselect" [level=3] [ref=e785]
+                - link "View example code" [ref=e786] [cursor=pointer]:
+                  - /url: /combobox/?e=MultiSelectCreatable
+              - textbox "Search values" [ref=e795]
+            - generic [ref=e796]:
+              - generic [ref=e797]:
+                - heading "Select with search in dropdown" [level=3] [ref=e798]
+                - link "View example code" [ref=e799] [cursor=pointer]:
+                  - /url: /combobox/?e=SelectDropdownSearch
+              - button "Pick value" [ref=e806] [cursor=pointer]
+            - generic [ref=e807]:
+              - generic [ref=e808]:
+                - heading "Select with custom option component" [level=3] [ref=e809]
+                - link "View example code" [ref=e810] [cursor=pointer]:
+                  - /url: /combobox/?e=SelectOptionComponent
+              - button "Pick value" [ref=e817] [cursor=pointer]
+            - generic [ref=e818]:
+              - generic [ref=e819]:
+                - heading "Transfer list with inline options list" [level=3] [ref=e820]
+                - link "View example code" [ref=e821] [cursor=pointer]:
+                  - /url: /combobox/?e=TransferList
+              - generic [ref=e826]:
+                - generic [ref=e827]:
+                  - generic [ref=e828]:
+                    - textbox "Search groceries" [ref=e831]
+                    - button "Transfer selected items right" [ref=e832] [cursor=pointer]
+                  - listbox [ref=e837]:
+                    - option "🍎 Apples" [ref=e838] [cursor=pointer]:
+                      - generic [ref=e839]:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - checkbox [aria-hidden]
+                        - generic [ref=e840]: 🍎 Apples
+                    - option "🍌 Bananas" [ref=e841] [cursor=pointer]:
+                      - generic [ref=e842]:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - checkbox [aria-hidden]
+                        - generic [ref=e843]: 🍌 Bananas
+                    - option "🍓 Strawberries" [ref=e844] [cursor=pointer]:
+                      - generic [ref=e845]:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - checkbox [aria-hidden]
+                        - generic [ref=e846]: 🍓 Strawberries
+                - generic [ref=e847]:
+                  - generic [ref=e848]:
+                    - textbox "Search groceries" [ref=e851]
+                    - button "Transfer selected items left" [ref=e852] [cursor=pointer]
+                  - listbox [ref=e857]:
+                    - option "🥦 Broccoli" [ref=e858] [cursor=pointer]:
+                      - generic [ref=e859]:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - checkbox [aria-hidden]
+                        - generic [ref=e860]: 🥦 Broccoli
+                    - option "🥕 Carrots" [ref=e861] [cursor=pointer]:
+                      - generic [ref=e862]:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - checkbox [aria-hidden]
+                        - generic [ref=e863]: 🥕 Carrots
+                    - option "🥬 Lettuce" [ref=e864] [cursor=pointer]:
+                      - generic [ref=e865]:
+                        - generic:
+                          - generic:
+                            - generic:
+                              - checkbox [aria-hidden]
+                        - generic [ref=e866]: 🥬 Lettuce
+        - generic [ref=e868]:
+          - heading "Extensions" [level=2] [ref=e869]
+          - paragraph [ref=e870]: Extensions are additional packages that provide extra functionality to Mantine, such as rich text editor, notifications system, charts, modals manager and more. They are built to be easily integrated into your application and provide a seamless experience.
+          - link "Browse all extensions" [ref=e871] [cursor=pointer]:
+            - /url: /x/extensions/
+          - generic [ref=e875]:
+            - generic [ref=e876]:
+              - generic [ref=e877]:
+                - heading "Rich text editor" [level=3] [ref=e878]
+                - paragraph [ref=e879]: TipTap based rich text editor
+              - generic [ref=e881]:
+                - generic [ref=e882]:
+                  - generic [ref=e883]:
+                    - button "Bold" [ref=e884] [cursor=pointer]
+                    - button "Italic" [ref=e889] [cursor=pointer]
+                    - button "Underline" [ref=e893] [cursor=pointer]
+                    - button "Strikethrough" [ref=e897] [cursor=pointer]
+                    - button "Clear formatting" [ref=e901] [cursor=pointer]
+                    - button "Highlight text" [ref=e907] [cursor=pointer]
+                    - button "Code" [ref=e914] [cursor=pointer]
+                  - generic [ref=e920]:
+                    - button "Heading 1" [ref=e921] [cursor=pointer]
+                    - button "Heading 2" [pressed] [ref=e925] [cursor=pointer]
+                    - button "Heading 3" [ref=e929] [cursor=pointer]
+                    - button "Heading 4" [ref=e934] [cursor=pointer]
+                  - generic [ref=e938]:
+                    - button "Blockquote" [ref=e939] [cursor=pointer]
+                    - button "Horizontal line" [ref=e944] [cursor=pointer]
+                    - button "Bullet list" [ref=e947] [cursor=pointer]
+                    - button "Ordered list" [ref=e950] [cursor=pointer]
+                    - button "Subscript" [ref=e955] [cursor=pointer]
+                    - button "Superscript" [ref=e960] [cursor=pointer]
+                  - generic [ref=e965]:
+                    - button "Link" [ref=e966] [cursor=pointer]
+                    - button "Remove link" [ref=e972] [cursor=pointer]
+                  - generic [ref=e978]:
+                    - 'button "Align text: left" [ref=e979] [cursor=pointer]'
+                    - 'button "Align text: center" [ref=e982] [cursor=pointer]'
+                    - 'button "Align text: justify" [ref=e985] [cursor=pointer]'
+                    - 'button "Align text: right" [ref=e988] [cursor=pointer]'
+                  - generic [ref=e991]:
+                    - button "Undo" [disabled] [ref=e992]
+                    - button "Redo" [disabled] [ref=e997]
+                - textbox [ref=e1004]:
+                  - heading "Welcome to Mantine rich text editor" [level=2] [ref=e1005]
+                  - paragraph [ref=e1006]:
+                    - code [ref=e1007]: RichTextEditor
+                    - text: component focuses on usability and is designed to be as simple as possible to bring a familiar editing experience to regular users.
+                    - code [ref=e1008]: RichTextEditor
+                    - text: is based on
+                    - link "Tiptap.dev" [ref=e1009]:
+                      - /url: https://tiptap.dev/
+                    - text: "and supports all of its features:"
+                  - list [ref=e1010]:
+                    - listitem [ref=e1011]:
+                      - paragraph [ref=e1012]:
+                        - text: "General text formatting:"
+                        - strong [ref=e1013]: bold
+                        - text: ","
+                        - emphasis [ref=e1014]: italic
+                        - text: ", underline, strike-through"
+                    - listitem [ref=e1015]:
+                      - paragraph [ref=e1016]: Headings (h1-h6)
+                    - listitem [ref=e1017]:
+                      - paragraph [ref=e1018]:
+                        - text: Sub and super scripts (
+                        - superscript [ref=e1019]: <sup />
+                        - text: and
+                        - subscript [ref=e1020]: <sub />
+                        - text: tags)
+                    - listitem [ref=e1021]:
+                      - paragraph [ref=e1022]: Ordered and bullet lists
+                    - listitem [ref=e1023]:
+                      - paragraph [ref=e1024]: Text align
+                    - listitem [ref=e1025]:
+                      - paragraph [ref=e1026]:
+                        - text: And all
+                        - link "other extensions" [ref=e1027]:
+                          - /url: https://tiptap.dev/extensions
+            - generic [ref=e1029]:
+              - generic [ref=e1030]:
+                - generic [ref=e1031]:
+                  - heading "Notifications system" [level=3] [ref=e1032]
+                  - paragraph [ref=e1033]: Show/update/hide notifications at any part of your application
+                - button "Show notification" [ref=e1036] [cursor=pointer]
+              - generic [ref=e1039]:
+                - generic [ref=e1040]:
+                  - heading "Spotlight" [level=3] [ref=e1041]
+                  - paragraph [ref=e1042]: Ctrl + K command palette, can be used for search or common actions
+                - button "Open search spotlight" [ref=e1045] [cursor=pointer]
+              - generic [ref=e1051]:
+                - generic [ref=e1052]:
+                  - heading "Carousel" [level=3] [ref=e1053]
+                  - paragraph [ref=e1054]: Embla based carousel component
+                - region [ref=e1056]:
+                  - status [ref=e1057]: Slide 1 of 5
+                  - generic:
+                    - button "Previous slide" [ref=e1058] [cursor=pointer]
+                    - button "Next slide" [ref=e1061] [cursor=pointer]
+                  - generic [ref=e1065]:
+                    - group "Carousel slide" [ref=e1066]
+                    - group "Carousel slide" [ref=e1067]
+                    - group "Carousel slide" [ref=e1068]
+                    - group "Carousel slide" [ref=e1069]
+                    - group "Carousel slide" [ref=e1070]
+                  - tablist "Slides":
+                    - tab "Go to slide 1" [selected] [ref=e1071] [cursor=pointer]
+                    - tab "Go to slide 2" [ref=e1072] [cursor=pointer]
+                    - tab "Go to slide 3" [ref=e1073] [cursor=pointer]
+                    - tab "Go to slide 4" [ref=e1074] [cursor=pointer]
+                    - tab "Go to slide 5" [ref=e1075] [cursor=pointer]
+        - generic [ref=e1078]:
+          - generic [ref=e1080]:
+            - heading "Form library" [level=2] [ref=e1081]
+            - paragraph [ref=e1082]: "@mantine/form – performant form library designed for Mantine components. Works out of the box with all Mantine inputs."
+            - link "Explore all form features" [ref=e1083] [cursor=pointer]:
+              - /url: /form/package/
+            - generic [ref=e1087]:
+              - generic [ref=e1092]:
+                - heading "Seamless integration" [level=3] [ref=e1093]
+                - paragraph [ref=e1094]: useForm hook works out of the box with all Mantine inputs
+              - generic [ref=e1099]:
+                - heading "Excellent performance" [level=3] [ref=e1100]
+                - paragraph [ref=e1101]: useForm rerenders only for validation and status changes, usually only 2-3 times per form lifecycle
+              - generic [ref=e1106]:
+                - heading "Lightweight" [level=3] [ref=e1107]
+                - paragraph [ref=e1108]: 6.3kb minified + gzipped, no dependencies except React
+              - generic [ref=e1113]:
+                - heading "Fully featured" [level=3] [ref=e1114]
+                - paragraph [ref=e1115]: useForm supports lists and nested objects, multiple validation approaches (including schema based with zod) and an easy way to manage subscriptions to values updates
+          - generic [ref=e1117]:
+            - generic [ref=e1120]:
+              - generic [ref=e1121]:
+                - generic [ref=e1122]: Email *
+                - textbox "Email" [ref=e1124]:
+                  - /placeholder: your@email.com
+              - generic [ref=e1126]:
+                - checkbox "I agree to sell my privacy" [ref=e1128]
+                - generic [ref=e1129]: I agree to sell my privacy
+              - button "Submit" [ref=e1132] [cursor=pointer]
+            - generic [ref=e1135]:
+              - button "Demo.tsx" [ref=e1140]
+              - generic [ref=e1146]:
+                - generic [ref=e1147]:
+                  - button "Collapse code" [ref=e1148] [cursor=pointer]
+                  - button "Copy code" [ref=e1153] [cursor=pointer]
+                - code [ref=e1164]:
+                  - generic [ref=e1165]: "import { Button, Checkbox, Group, TextInput } from '@mantine/core';"
+                  - generic [ref=e1166]: "import { useForm } from '@mantine/form';"
+                  - generic [ref=e1167]: "function Demo() {"
+                  - generic [ref=e1168]: "const form = useForm({"
+                  - generic [ref=e1169]: "mode: 'uncontrolled',"
+                  - generic [ref=e1170]: "initialValues: {"
+                  - generic [ref=e1171]: "email: '',"
+                  - generic [ref=e1172]: "termsOfService: false,"
+                  - generic [ref=e1173]: "},"
+                  - generic [ref=e1174]: "validate: {"
+                  - generic [ref=e1175]: "email: (value) => (/^\\S+@\\S+$/.test(value) ? null : 'Invalid email'),"
+                  - generic [ref=e1176]: "},"
+                  - generic [ref=e1177]: "});"
+                  - generic [ref=e1178]: return (
+                  - generic [ref=e1179]: "<form onSubmit={form.onSubmit((values) => console.log(values))}>"
+                  - generic [ref=e1180]: <TextInput
+                  - generic [ref=e1181]: withAsterisk
+                  - generic [ref=e1182]: label="Email"
+                  - generic [ref=e1183]: placeholder="your@email.com"
+                  - generic [ref=e1184]: "key={form.key('email')}"
+                  - generic [ref=e1185]: "{...form.getInputProps('email')}"
+                  - generic [ref=e1186]: />
+                  - generic [ref=e1187]: <Checkbox
+                  - generic [ref=e1188]: mt="md"
+                  - generic [ref=e1189]: label="I agree to sell my privacy"
+                  - generic [ref=e1190]: "key={form.key('termsOfService')}"
+                  - generic [ref=e1191]: "{...form.getInputProps('termsOfService', { type: 'checkbox' })}"
+                  - generic [ref=e1192]: />
+                  - generic [ref=e1193]: <Group justify="flex-end" mt="md">
+                  - generic [ref=e1194]: <Button type="submit">Submit</Button>
+                  - generic [ref=e1195]: </Group>
+                  - generic [ref=e1196]: </form>
+                  - generic [ref=e1197]: );
+                  - generic [ref=e1198]: "}"
+        - generic [ref=e1203]:
+          - paragraph [ref=e1204]: Build even faster with Mantine UI
+          - heading "120+ responsive components built with Mantine" [level=1] [ref=e1205]
+          - paragraph [ref=e1206]: Build your next website even faster with premade responsive components designed and built by Mantine maintainers and community. All components are free forever for everyone.
+          - link "Explore components" [ref=e1208] [cursor=pointer]:
+            - /url: https://ui.mantine.dev/
+        - generic [ref=e1216]:
+          - generic [ref=e1218]:
+            - heading "Trusted by thousands of developers" [level=2] [ref=e1219]
+            - paragraph [ref=e1220]: 30,000+ GitHub stars, 5M+ monthly downloads, 500+ contributors. Mantine is built in the open and shaped by the developers who use it every day.
+            - link "View all reviews from the community" [ref=e1221] [cursor=pointer]:
+              - /url: https://github.com/orgs/mantinedev/discussions/categories/kind-words
+            - generic [ref=e1225]:
+              - link [ref=e1226] [cursor=pointer]:
+                - /url: https://github.com/mantinedev/mantine
+                - paragraph [ref=e1227]: 30,000+
+                - paragraph [ref=e1228]: Stars on GitHub
+              - link [ref=e1229] [cursor=pointer]:
+                - /url: https://www.npmjs.com/package/@mantine/hooks
+                - paragraph [ref=e1230]: 5M+
+                - paragraph [ref=e1231]: Monthly downloads
+              - link [ref=e1232] [cursor=pointer]:
+                - /url: https://discord.gg/wbH82zuWMN
+                - paragraph [ref=e1233]: 12,000+
+                - paragraph [ref=e1234]: Discord members
+          - generic [ref=e1235]:
+            - article [ref=e1236]:
+              - generic [ref=e1237]:
+                - generic [ref=e1238]:
+                  - img "smsuraj100" [ref=e1240]
+                  - link "@smsuraj100" [ref=e1241] [cursor=pointer]:
+                    - /url: https://github.com/smsuraj100
+                - link "Open on GitHub" [ref=e1242] [cursor=pointer]:
+                  - /url: https://github.com/orgs/mantinedev/discussions/5783
+              - link "One of the best UI libraries I've come across." [ref=e1246] [cursor=pointer]:
+                - /url: https://github.com/orgs/mantinedev/discussions/5783
+              - generic [ref=e1247]:
+                - paragraph [ref=e1248]: I am a senior Frontend Developer and wanted to use something new instead of Material UI and came across this, it has been well thought of all the different scenarios you and come across, and the hooks are just pure love :)
+                - paragraph [ref=e1249]: Thank you so much for this.
+            - article [ref=e1250]:
+              - generic [ref=e1251]:
+                - generic [ref=e1252]:
+                  - img "sideral" [ref=e1254]
+                  - link "@sideral" [ref=e1255] [cursor=pointer]:
+                    - /url: https://github.com/sideral
+                - link "Open on GitHub" [ref=e1256] [cursor=pointer]:
+                  - /url: https://github.com/orgs/mantinedev/discussions/6150
+              - link "You nailed it!" [ref=e1260] [cursor=pointer]:
+                - /url: https://github.com/orgs/mantinedev/discussions/6150
+              - paragraph [ref=e1262]:
+                - text: Man, I've been doing Front-End for 20 years. This is, hands-down, the best component library I've ever used. What's more, the parts that I didn't like (Styling from JS Objects, slow with big forms) have been addressed in v7. Please keep it up, this library deserves more exposure, it just works and works well and beautifully. Many thanks to
+                - link "@rtivital" [ref=e1263] [cursor=pointer]:
+                  - /url: https://github.com/rtivital
+                - text: and the contributors!
+            - article [ref=e1264]:
+              - generic [ref=e1265]:
+                - generic [ref=e1266]:
+                  - img "leighton-carr" [ref=e1268]
+                  - link "@leighton-carr" [ref=e1269] [cursor=pointer]:
+                    - /url: https://github.com/leighton-carr
+                - link "Open on GitHub" [ref=e1270] [cursor=pointer]:
+                  - /url: https://github.com/orgs/mantinedev/discussions/5504
+              - link "Absurdly good" [ref=e1274] [cursor=pointer]:
+                - /url: https://github.com/orgs/mantinedev/discussions/5504
+              - generic [ref=e1275]:
+                - paragraph [ref=e1276]: Hope this kind of post is ok - just wanted to say thank you.
+                - paragraph [ref=e1277]: I've been writing software professionally for 25 years, with the last 15 in web (mostly internal projects in my company). This is easily the best component library I've ever used.
+                - paragraph [ref=e1278]: In every other instance I've run into the boundaries of what the library does and have to spend a lot of time and energy customizing or extending it. Not only does Mantine provide easy access to everything under the hood, but 99% the things you need are provided as default options. I've started to lose count of the "guess I'd better build my standard xyz... oh wait, they have that too" moments. Also the docs are perfect.
+                - paragraph [ref=e1279]: Bravo, thank you.
+            - article [ref=e1280]:
+              - generic [ref=e1281]:
+                - generic [ref=e1282]:
+                  - img "Gitgud6969" [ref=e1284]
+                  - link "@Gitgud6969" [ref=e1285] [cursor=pointer]:
+                    - /url: https://github.com/Gitgud6969
+                - link "Open on GitHub" [ref=e1286] [cursor=pointer]:
+                  - /url: https://github.com/orgs/mantinedev/discussions/3741
+              - link "Thank you mantine 💘" [ref=e1290] [cursor=pointer]:
+                - /url: https://github.com/orgs/mantinedev/discussions/3741
+              - paragraph [ref=e1292]: Dear Mantine Team, thank you for putting this library together. I have started to use and love Mantine in my free time, and bringing this great library to good use in our company now. All the developers are very pleased with the development experience, the time savings for any bigger project is insane. The amount of flexibility we have with our designers and developers will result in great products. All thanks to every contributor. Continue the good work!
+            - article [ref=e1293]:
+              - generic [ref=e1294]:
+                - generic [ref=e1295]:
+                  - img "SeeSharpCode" [ref=e1297]
+                  - link "@SeeSharpCode" [ref=e1298] [cursor=pointer]:
+                    - /url: https://github.com/SeeSharpCode
+                - link "Open on GitHub" [ref=e1299] [cursor=pointer]:
+                  - /url: https://github.com/orgs/mantinedev/discussions/5456
+              - link "A solution for every problem" [ref=e1303] [cursor=pointer]:
+                - /url: https://github.com/orgs/mantinedev/discussions/5456
+              - paragraph [ref=e1305]: Mantine has a solution for every problem I’ve needed to solve in my web app. Components and props are named clearly, design choices promote simplicity, and it looks beautiful out of the box. Thank you for jump starting my application in a big way!
+            - article [ref=e1306]:
+              - generic [ref=e1307]:
+                - generic [ref=e1308]:
+                  - img "OmkoBass" [ref=e1310]
+                  - link "@OmkoBass" [ref=e1311] [cursor=pointer]:
+                    - /url: https://github.com/OmkoBass
+                - link "Open on GitHub" [ref=e1312] [cursor=pointer]:
+                  - /url: https://github.com/orgs/mantinedev/discussions/259
+              - link "Thank you Mantine!" [ref=e1316] [cursor=pointer]:
+                - /url: https://github.com/orgs/mantinedev/discussions/259
+              - paragraph [ref=e1318]: Out of all react component libraries that I have ever seen this one is the most straight forward, easy to use, well documented and really beautiful. I plan on switching and using this full time. Just wanted to say huge thanks to the people that made this.
+        - generic [ref=e1320]:
+          - heading "Join the community" [level=2] [ref=e1321]
+          - paragraph [ref=e1322]: Mantine is an open-source project with a growing community of developers and contributors. Join us on GitHub, Discord, Twitter and other platforms to stay updated and get help with your projects.
+          - generic [ref=e1324]:
+            - link "Chat on Discord Join a community of 10,000+ developers to ask questions, share feedback and explore upcoming features" [ref=e1325] [cursor=pointer]:
+              - /url: https://discord.gg/wbH82zuWMN
+              - generic [ref=e1330]:
+                - generic [ref=e1331]: Chat on Discord
+                - generic [ref=e1332]: Join a community of 10,000+ developers to ask questions, share feedback and explore upcoming features
+            - generic [ref=e1333]:
+              - link "Start a discussion Request new features, ask questions and provide feedback with GitHub discussions" [ref=e1334] [cursor=pointer]:
+                - /url: https://github.com/mantinedev/mantine/discussions
+                - generic [ref=e1339]:
+                  - generic [ref=e1340]: Start a discussion
+                  - generic [ref=e1341]: Request new features, ask questions and provide feedback with GitHub discussions
+              - link "Follow on X Get notified about new minor and major releases" [ref=e1342] [cursor=pointer]:
+                - /url: https://x.com/mantinedev
+                - generic [ref=e1347]:
+                  - generic [ref=e1348]: Follow on X
+                  - generic [ref=e1349]: Get notified about new minor and major releases
+        - generic [ref=e1351]:
+          - heading "Ready to get started?" [level=2] [ref=e1352]
+          - paragraph [ref=e1353]: "Mantine can be used with any modern React framework or build tool: get started with Next.js, Vite, React Router and other tools in minutes by following the installation guide or using one of the available templates."
+          - link "Get started without a framework" [ref=e1354] [cursor=pointer]:
+            - /url: /
+          - generic [ref=e1358]:
+            - generic [ref=e1360]:
+              - link "Recommended Vite Best choice for a single page application (SPA)" [ref=e1361] [cursor=pointer]:
+                - /url: /guides/vite/
+                - generic [ref=e1364]: Recommended
+                - generic [ref=e1403]:
+                  - paragraph [ref=e1404]: Vite
+                  - paragraph [ref=e1405]: Best choice for a single page application (SPA)
+              - link "Recommended Next.js Best choice for an application with SSR" [ref=e1406] [cursor=pointer]:
+                - /url: /guides/next/
+                - generic [ref=e1409]: Recommended
+                - generic [ref=e1416]:
+                  - paragraph [ref=e1417]: Next.js
+                  - paragraph [ref=e1418]: Best choice for an application with SSR
+            - generic [ref=e1420]:
+              - link [ref=e1421] [cursor=pointer]:
+                - /url: /guides/react-router/
+                - generic [ref=e1426]:
+                  - paragraph [ref=e1427]: React Router
+                  - paragraph [ref=e1428]: Get started with React Router
+              - link [ref=e1429] [cursor=pointer]:
+                - /url: /guides/tanstack-start/
+                - generic [ref=e1433]:
+                  - paragraph [ref=e1434]: TanStack Start
+                  - paragraph [ref=e1435]: Get started with TanStack Start
+      - generic [ref=e1440]:
+        - generic [ref=e1441]:
+          - generic [ref=e1442]:
+            - link "Mantine" [ref=e1443] [cursor=pointer]:
+              - /url: /
+              - generic [ref=e1444]: Welcome to Mantine, React components library that you always wished for
+            - paragraph [ref=e1452]: Build fully functional accessible web applications faster than ever
+          - generic [ref=e1453]:
+            - generic [ref=e1454]:
+              - paragraph [ref=e1455]: About
+              - link "OpenCollective" [ref=e1456] [cursor=pointer]:
+                - /url: https://opencollective.com/mantinedev
+              - link "Contribute" [ref=e1457] [cursor=pointer]:
+                - /url: /contribute/
+              - link "Changelog" [ref=e1458] [cursor=pointer]:
+                - /url: /changelog/previous-versions/
+              - link "GitHub Releases" [ref=e1459] [cursor=pointer]:
+                - /url: https://github.com/mantinedev/mantine/releases
+            - generic [ref=e1460]:
+              - paragraph [ref=e1461]: Community
+              - link "Chat on Discord" [ref=e1462] [cursor=pointer]:
+                - /url: https://discord.gg/wbH82zuWMN
+              - link "Follow on X" [ref=e1463] [cursor=pointer]:
+                - /url: https://x.com/mantinedev
+              - link "Follow on Github" [ref=e1464] [cursor=pointer]:
+                - /url: https://github.com/rtivital
+              - link "GitHub discussions" [ref=e1465] [cursor=pointer]:
+                - /url: https://github.com/mantinedev/mantine/discussions
+            - generic [ref=e1466]:
+              - paragraph [ref=e1467]: Project
+              - link "Mantine UI" [ref=e1468] [cursor=pointer]:
+                - /url: https://ui.mantine.dev/
+              - link "Help Center" [ref=e1469] [cursor=pointer]:
+                - /url: https://help.mantine.dev
+              - link "Github organization" [ref=e1470] [cursor=pointer]:
+                - /url: https://github.com/mantinedev
+              - link "npm organization" [ref=e1471] [cursor=pointer]:
+                - /url: https://www.npmjs.com/org/mantine
+        - generic [ref=e1473]:
+          - paragraph [ref=e1474]:
+            - text: Built by
+            - link "Vitaly Rtishchev" [ref=e1475] [cursor=pointer]:
+              - /url: https://github.com/rtivital
+            - text: and
+            - link "these awesome people" [ref=e1476] [cursor=pointer]:
+              - /url: https://github.com/mantinedev/mantine/graphs/contributors
+          - generic [ref=e1477]:
+            - link "Join Discord community" [ref=e1478] [cursor=pointer]:
+              - /url: https://discord.gg/wbH82zuWMN
+            - link "Follow Mantine on X" [ref=e1484] [cursor=pointer]:
+              - /url: https://x.com/mantinedev
+  - alert [ref=e1490]

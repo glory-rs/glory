@@ -69,6 +69,7 @@ impl PlanShape {
                                 Property::Text(v) => v.len(),
                                 Property::Bool(_) => 0,
                                 Property::SelectedKeys(keys) => keys.iter().map(String::len).sum(),
+                                Property::RichDocument(document) => document.charged_bytes(),
                             })
                             .sum::<usize>();
                     }

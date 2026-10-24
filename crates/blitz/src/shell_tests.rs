@@ -958,3 +958,6 @@ fn native_scroll_keyboard_is_queued_for_only_the_actually_focused_viewport() {
     tick(&mut app);
     assert_eq!((outer_count.get(), inner_count.get()), (2, 1));
 }
+
+#[path = "swipe_tests.rs"]
+mod swipe;

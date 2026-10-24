@@ -21,6 +21,65 @@ pub(crate) fn attributes(
         attrs.insert("aria-level", level.to_string());
     }
     let Some(value) = value else { return attrs };
+    if let Some(environment) = &value.environment {
+        attrs.insert(
+            "dir",
+            match environment.direction {
+                glory_render::Direction::Ltr => "ltr",
+                glory_render::Direction::Rtl => "rtl",
+            }
+            .into(),
+        );
+        attrs.insert("lang", environment.language.as_str().into());
+    }
+    if let Some(scope) = &value.focus_scope {
+        attrs.insert("data-gly-focus-scope", scope.active.to_string());
+        attrs.insert("data-gly-focus-loop", scope.loop_tab.to_string());
+        attrs.insert("data-gly-focus-contain", scope.contain_focus.to_string());
+        attrs.insert("data-gly-focus-auto", scope.auto_focus.to_string());
+        attrs.insert("data-gly-focus-restore", scope.restore_focus.to_string());
+        if let Some(id) = &scope.initial_focus {
+            attrs.insert("data-gly-focus-initial", id.as_str().into());
+        }
+        if let Some(id) = &scope.return_focus {
+            attrs.insert("data-gly-focus-return", id.as_str().into());
+        }
+    }
+    if let Some(checked) = value.tree_checked {
+        attrs.insert("aria-checked", checked.as_str().into());
+    }
+    if let Some(tree) = value.tree_navigation {
+        attrs.insert(
+            "data-gly-tree-navigation",
+            if tree.direction == glory_render::Direction::Rtl {
+                "rtl"
+            } else {
+                "ltr"
+            }
+            .into(),
+        );
+        attrs.insert("data-gly-tree-typeahead", tree.typeahead.to_string());
+        attrs.insert("aria-multiselectable", tree.multiple.to_string());
+        attrs.insert(
+            "dir",
+            if tree.direction == glory_render::Direction::Rtl {
+                "rtl"
+            } else {
+                "ltr"
+            }
+            .into(),
+        );
+    }
+    if let Some(item) = value.tree_item {
+        attrs.insert("aria-level", item.level.to_string());
+        attrs.insert("aria-posinset", (u32::from(item.position) + 1).to_string());
+        attrs.insert("aria-setsize", item.count.to_string());
+        attrs.insert("data-gly-tree-item", String::new());
+    }
+    if let Some(capture) = value.swipe_capture {
+        attrs.insert("data-gly-swipe-axis", capture.axis_name().into());
+        attrs.insert("data-gly-swipe-revision", capture.revision.to_string());
+    }
     if let Some(capture) = value.input_edit {
         attrs.insert("data-gly-input-edit", capture.max_bytes.to_string());
     }
@@ -175,6 +234,9 @@ pub(crate) fn attributes(
         attrs.insert("role", "option".into());
         attrs.insert("data-gly-option-owner", option.owner.as_str().into());
         attrs.insert("form", option.owner.as_str().into());
+    }
+    if role == Some(Role::Grid) {
+        attrs.insert("aria-multiselectable", value.grid_multiple.to_string());
     }
     if role == Some(Role::Listbox) {
         attrs.insert("aria-multiselectable", value.listbox_multiple.to_string());
@@ -379,8 +441,14 @@ pub(crate) fn attributes(
         if let glory_render::LayerPlacement::Viewport(placement) = layer.placement {
             attrs.insert("data-gly-viewport-x", placement.x.to_string());
             attrs.insert("data-gly-viewport-y", placement.y.to_string());
-            attrs.insert("data-gly-viewport-padding", placement.viewport_padding.to_string());
-            attrs.insert("data-gly-viewport-constrain", placement.constrain.to_string());
+            attrs.insert(
+                "data-gly-viewport-padding",
+                placement.viewport_padding.to_string(),
+            );
+            attrs.insert(
+                "data-gly-viewport-constrain",
+                placement.constrain.to_string(),
+            );
         }
         if let glory_render::LayerPlacement::Anchor(placement) = layer.placement {
             attrs.insert("data-gly-anchor-side", placement.side.as_str().into());

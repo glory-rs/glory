@@ -79,6 +79,11 @@ impl Render for Renderer {
         Ok(())
     }
     fn action(&mut self, action: Action) -> Result<(), Error> {
+        self.0
+            .borrow()
+            .mapper
+            .tree()
+            .validate_clipboard_action(action)?;
         action.validate_target(
             &self
                 .0

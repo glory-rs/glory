@@ -40,7 +40,7 @@ fn native_grid_navigation_is_queued_two_dimensional_and_preserves_nested_editor_
                 }
             })
             .fill((
-                button().label("29").node_ref(day),
+                glory_ui::group().fill(button().label("29").node_ref(day)),
                 input().value("12").node_ref(editor),
             )),
     )
@@ -53,7 +53,7 @@ fn native_grid_navigation_is_queued_two_dimensional_and_preserves_nested_editor_
     assert_eq!(calls.borrow().as_slice(), [GridCommand::Down]);
     key(&mut host, "PageUp", Modifiers::SHIFT, false, false);
     tick(&mut host);
-    assert_eq!(calls.borrow().last(), Some(&GridCommand::PreviousYear));
+    assert_eq!(calls.borrow().last(), Some(&GridCommand::PreviousLargePage));
     for modifiers in [Modifiers::CONTROL, Modifiers::ALT, Modifiers::META] {
         key(&mut host, "ArrowLeft", modifiers, false, false);
         tick(&mut host);
@@ -1539,4 +1539,81 @@ fn native_single_line_enter_queues_commit_before_form_submit_and_keeps_textarea_
     key(&mut app, "Enter", Modifiers::empty(), false, false);
     tick(&mut app);
     assert!(events.borrow().is_empty());
+}
+
+#[test]
+fn native_tree_commands_are_queued_cross_groups_and_leave_nested_editors_and_chords_native() {
+    use super::focus_tests::focus;
+    use glory_render::{
+        Direction, FocusMode, Role, Semantics, TreeCommand, TreeItem, TreeNavigation,
+    };
+    let mut host = WindowApp::new();
+    let item = host.app.scope().cage(None);
+    let editor = host.app.scope().cage(None);
+    let commands = Rc::new(RefCell::new(Vec::new()));
+    let out = commands.clone();
+    host.mount(
+        view()
+            .role(Role::Tree)
+            .name("Files")
+            .semantics(Some(Box::new(Semantics {
+                tree_navigation: Some(TreeNavigation {
+                    direction: Direction::Rtl,
+                    ..Default::default()
+                }),
+                ..Default::default()
+            })))
+            .on(EventKind::TreeNavigate, move |event| {
+                if let Event::TreeNavigate { command, .. } = event {
+                    out.borrow_mut().push(command)
+                }
+            })
+            .fill(
+                glory_ui::group().fill(
+                    view()
+                        .role(Role::TreeItem)
+                        .name("Source")
+                        .focus(FocusMode::TabStop)
+                        .node_ref(item)
+                        .semantics(Some(Box::new(Semantics {
+                            tree_item: Some(TreeItem {
+                                level: 1,
+                                position: 0,
+                                count: 1,
+                            }),
+                            expanded: Some(false),
+                            selected: Some(false),
+                            ..Default::default()
+                        })))
+                        .fill(input().node_ref(editor).value("draft")),
+                ),
+            ),
+    )
+    .unwrap();
+    focus(&mut host, item.get().unwrap());
+    key(&mut host, "ArrowLeft", Modifiers::empty(), false, false);
+    assert!(commands.borrow().is_empty());
+    tick(&mut host);
+    assert_eq!(commands.borrow().as_slice(), [TreeCommand::Open]);
+    key(&mut host, "l", Modifiers::empty(), false, false);
+    tick(&mut host);
+    assert!(matches!(commands.borrow().last(),Some(TreeCommand::Search{text,..}) if text=="l"));
+    for modifiers in [
+        Modifiers::CONTROL,
+        Modifiers::ALT,
+        Modifiers::META,
+        Modifiers::SHIFT,
+    ] {
+        key(&mut host, "ArrowDown", modifiers, false, false);
+        tick(&mut host);
+    }
+    key(&mut host, "ArrowDown", Modifiers::empty(), true, false);
+    tick(&mut host);
+    assert_eq!(commands.borrow().len(), 2);
+    focus(&mut host, editor.get().unwrap());
+    key(&mut host, "ArrowLeft", Modifiers::empty(), false, false);
+    tick(&mut host);
+    assert_eq!(commands.borrow().len(), 2);
+    host.app.clear().unwrap();
+    assert!(item.get().is_none());
 }

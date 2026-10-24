@@ -5,7 +5,7 @@ vendor、副本补丁树或子模块；应用无需添加全局 Cargo patch。
 
 | Fork | 上游基线 | Glory 固定提交 | 维护范围 |
 |---|---|---|---|
-| [glory-rs/blitz](https://github.com/glory-rs/blitz) | `92b11f1b` / beta.4 | [7e0b5f85](https://github.com/glory-rs/blitz/commit/7e0b5f85727da016285028f656a437d89ca10c46) | 资源生命周期、增量失效、焦点、密码显示、IME、阶段计时、inline 样式差分失效、隐藏子树销毁缓存回收及真正的文档顶层 |
+| [glory-rs/blitz](https://github.com/glory-rs/blitz) | `92b11f1b` / beta.4 | [c127fd96](https://github.com/glory-rs/blitz/commit/c127fd9699a89ff8ecba0c8d8c9eccb3330627af) | 资源生命周期、增量失效、焦点、密码显示、IME、阶段计时、inline 样式差分失效、隐藏子树销毁与移动缓存回收及真正的文档顶层 |
 | [glory-rs/taffy](https://github.com/glory-rs/taffy) | `eb645069` / 0.15.0 | [dd7914fb](https://github.com/glory-rs/taffy/commit/dd7914fba2e6e0b5d8a2c8854d764a2ade817efd) | 小数 flex 因子的 gap 计算与回归测试 |
 
 恢复上游包名 blitz-dom/traits/paint/shell、stylo_taffy、taffy；Glory 自己的
@@ -63,11 +63,22 @@ URL 共享 fetch。只有实际消费、缓存命中或明确 admission/no-provi
 `D:/BuildCache/sapid/engine-image-observation.log`、`engine-image-observation-parallel.log`。
 宿主事件、Web decode Promise 和 Sapid fallback 仍由各自的实际验收确认。
 
-原生浮层扩展的当前完整提交为
-`7e0b5f85727da016285028f656a437d89ca10c46`。保留逻辑 DOM/Stylo 继承父链，
+原生浮层扩展由
+`7e0b5f85727da016285028f656a437d89ca10c46` 引入，当前固定提交见上表。保留逻辑 DOM/Stylo 继承父链，
 引擎独立进行 viewport 布局、最后绘制和逆序命中，modal backdrop 参与真实绘制；
 不使用 portal。当前 lease 上限为 1024，detach/drop 退休，connected move 保留。
 显式 `contain_scroll` 复用 wheel/touch/fling/editor 的原生滚动链。
 `native-top-layer-final-provenance.log` 的独立干净检出验证通过 Taffy185、Blitz113、
 parallel/writing-mode114、既有 focused 及 CPU actual paint1；focused 与全库重叠，
 不合并为独立用例数。宿主焦点/AX/组件验收见 [native-top-layers.md](native-top-layers.md)。
+
+2026-10-25 的 connected move 修复来自 Sapid OverflowList 的真实原生弹出验收：
+旧隐藏面板的 DOM children 已空，但派生 layout children 仍引用移入测量区的条目。
+当前固定提交在改变 DOM parent 前退休跨移动子树边界的 layout / hoisted 引用，
+清除旧 owner 的布局、绘制和 stacking 缓存；anonymous children 也是派生列表。
+内部布局关系、真实 DOM children、NodeId、焦点、原始文本、selection 和 preedit 保留。
+最小基线失败保存在 `D:/BuildCache/sapid/overflow-engine-baseline.log`；
+默认和 parallel-construct 全库各 126 项通过，新增矩阵覆盖 24 配置、每配置 16 次
+往返移动及同父重排。完整日志为 `overflow-engine-full-tests.log` 和
+`overflow-engine-parallel-full-tests.log`（均在 `D:/BuildCache/sapid`）。
+`engine-forks.json` 的并行附加检查包含 `layout_move_tests`；实际适配器和组件仍需独立验收。
