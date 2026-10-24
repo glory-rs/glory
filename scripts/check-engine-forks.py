@@ -71,7 +71,11 @@ def main():
             directory.parent.mkdir(parents=True, exist_ok=True)
             test_fork(fork, directory, paths["CARGO_TARGET_DIR"])
     retired = {"glory-blitz-dom", "glory-blitz-traits", "glory-blitz-paint", "glory-blitz-shell", "glory-taffy", "glory-stylo-taffy"}
-    for lockfile in (root / "Cargo.lock", root / "examples/semantic-web/Cargo.lock"):
+    for lockfile in (
+        root / "Cargo.lock",
+        root / "examples/semantic-web/Cargo.lock",
+        root / "examples/counter/Cargo.lock",
+    ):
         packages = tomllib.loads(lockfile.read_text(encoding="utf-8"))["package"]
         assert not retired.intersection(package["name"] for package in packages), lockfile
         for fork in record["forks"]:

@@ -1,5 +1,5 @@
 use crate::*;
-use glory_render::{Change, Descriptor, Error, FocusMode, Patch, Props, Purpose, Role, TextKind};
+use glory_render::{Change, Error, FocusMode, Patch, Props, Purpose, Role, TextKind};
 use std::collections::BTreeMap;
 
 fn normalize_in_place(value: &mut String) {
@@ -97,6 +97,8 @@ fn view_tag(
     }
     match role {
         Some(Role::Main) => "main",
+        Some(Role::Banner) => "header",
+        Some(Role::ContentInfo) => "footer",
         Some(Role::Navigation) => "nav",
         Some(Role::Section) => "section",
         _ => "div",
@@ -104,8 +106,13 @@ fn view_tag(
 }
 pub(crate) fn role_name(role: Role) -> &'static str {
     match role {
+        Role::ProgressBar => "progressbar",
+        Role::Slider => "slider",
+        Role::Separator => "separator",
         Role::Group => "group",
         Role::Main => "main",
+        Role::Banner => "banner",
+        Role::ContentInfo => "contentinfo",
         Role::Navigation => "navigation",
         Role::Section => "region",
         Role::List => "list",
@@ -117,9 +124,14 @@ pub(crate) fn role_name(role: Role) -> &'static str {
         Role::ColumnHeader => "columnheader",
         Role::Cell => "cell",
         Role::Dialog => "dialog",
+        Role::AlertDialog => "alertdialog",
+        Role::Tooltip => "tooltip",
         Role::TabList => "tablist",
         Role::TabPanel => "tabpanel",
         Role::RadioGroup => "radiogroup",
+        Role::Toolbar => "toolbar",
+        Role::Menu => "menu",
+        Role::Listbox => "listbox",
         Role::Heading(_) => "heading",
     }
 }
@@ -154,7 +166,9 @@ fn text_tag(kind: TextKind, options: Option<&HtmlTextOptions>) -> Result<&'stati
             TextTag::H5,
             TextTag::H6,
         ][level as usize - 1],
-        TextKind::Heading(_) => return Err(Error::InvalidProps("heading level must be 1..=6")),
+        TextKind::Heading(_) => {
+            return Err(Error::InvalidProps("heading level must be 1..=6"));
+        }
     };
     let selected = options.and_then(|options| options.tag).unwrap_or(default);
     if (kind != TextKind::Inline && selected != default)
@@ -182,7 +196,11 @@ fn text_tag(kind: TextKind, options: Option<&HtmlTextOptions>) -> Result<&'stati
 /// Check descriptor-local HTML constraints without shaping text, allocating
 /// styles, reading a host tree or cloning a node's potentially large value.
 /// Creation checks mapping options; patches preserve the existing HTML tag.
-pub fn preflight(node: &Descriptor, patch: Option<&Patch>) -> Result<(), Error> {
+pub fn preflight<'a>(
+    node: impl Into<glory_render::DescriptorView<'a>>,
+    patch: Option<&Patch>,
+) -> Result<(), Error> {
+    let node = node.into();
     let tags = match (&node.props, patch) {
         (Props::Text(text), None) => {
             text_tag(text.kind, node.options.get::<HtmlTextOptions>())?;
@@ -232,7 +250,8 @@ pub fn preflight(node: &Descriptor, patch: Option<&Patch>) -> Result<(), Error> 
     Ok(())
 }
 
-pub fn shape(descriptor: &Descriptor) -> Result<Shape, Error> {
+pub fn shape<'a>(descriptor: impl Into<glory_render::DescriptorView<'a>>) -> Result<Shape, Error> {
+    let descriptor = descriptor.into();
     descriptor.validate()?;
     if matches!(descriptor.props, Props::Group) {
         return Ok(Shape::default());
@@ -247,8 +266,10 @@ pub fn shape(descriptor: &Descriptor) -> Result<Shape, Error> {
         Props::Button(_) => "button",
         Props::Input(input) if input.multiline => "textarea",
         Props::Input(_) => "input",
+        Props::Select(_) => "select",
         Props::Check(_) => "label",
         Props::Image(_) => "img",
+        Props::Graphic(_) => "svg",
         Props::Link(_) => "a",
         Props::Group => unreachable!(),
     };
@@ -291,6 +312,33 @@ pub fn shape(descriptor: &Descriptor) -> Result<Shape, Error> {
             enabled(&mut shape, Part::Main, value.enabled);
             "input"
         }
+        Props::Select(value) => {
+            shape.edit = EditKind::Select;
+            shape.revision = value.selection.revision;
+            shape.select_options = Some(crate::SelectOptions {
+                entries: value.entries.clone(),
+                placeholder: (!value.multiple).then(|| value.placeholder.clone()),
+            });
+            props(&mut shape, Part::Main).insert(
+                "selectedKeys",
+                Property::SelectedKeys(
+                    value
+                        .selection
+                        .keys
+                        .iter()
+                        .map(|key| key.as_str().to_owned())
+                        .collect(),
+                ),
+            );
+            if value.multiple {
+                attrs(&mut shape, Part::Main).insert("multiple", String::new());
+            }
+            if let Some(rows) = value.rows {
+                attrs(&mut shape, Part::Main).insert("size", rows.to_string());
+            }
+            enabled(&mut shape, Part::Main, value.enabled);
+            "select"
+        }
         Props::Check(value) => {
             shape.control = Some(Part::Control);
             shape.edit = EditKind::Check;
@@ -321,6 +369,7 @@ pub fn shape(descriptor: &Descriptor) -> Result<Shape, Error> {
             "check"
         }
         Props::Image(value) => {
+            shape.revision = value.revision;
             if !value.source.is_empty() {
                 attrs(&mut shape, Part::Main).insert("src", value.source.clone());
             }
@@ -330,6 +379,15 @@ pub fn shape(descriptor: &Descriptor) -> Result<Shape, Error> {
                 attrs(&mut shape, Part::Main).insert("aria-hidden", "true".into());
             }
             "image"
+        }
+        Props::Graphic(value) => {
+            attrs(&mut shape, Part::Main)
+                .extend(crate::graphic::main(value, descriptor.name.as_deref()));
+            shape
+                .pieces
+                .push(element(Part::Content, Some(Part::Main), "path"));
+            attrs(&mut shape, Part::Content).extend(crate::graphic::content(value));
+            "graphic"
         }
         Props::Link(value) => {
             attrs(&mut shape, Part::Main).insert("href", value.target.clone());
@@ -353,7 +411,7 @@ pub fn shape(descriptor: &Descriptor) -> Result<Shape, Error> {
     if !descriptor.classes.is_empty() {
         attrs(&mut shape, Part::Main).insert("class", descriptor.classes.join(" "));
     }
-    let css = style(&descriptor.style);
+    let css = style(descriptor.style);
     if !css.is_empty() {
         attrs(&mut shape, Part::Main)
             .entry("style")

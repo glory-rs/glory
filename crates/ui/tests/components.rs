@@ -183,7 +183,7 @@ impl Render for Recorder {
     fn request(&mut self, query: Query, token: QueryToken) -> std::result::Result<(), RenderError> {
         self.trace.borrow_mut().queries.push(format!(
             "{:?}",
-            self.memory.node(query.node())?.descriptor.props
+            self.memory.node(query.node())?.descriptor.view().props
         ));
         if self.delayed {
             Ok(())
@@ -212,7 +212,7 @@ fn find(app: &App, test: impl Fn(&Props) -> bool) -> NodeId {
     let mut pending = tree.roots().to_vec();
     while let Some(id) = pending.pop() {
         let node = tree.node(id).unwrap();
-        if test(&node.descriptor.props) {
+        if test(node.descriptor.view().props) {
             return id;
         }
         pending.extend(node.children.iter().copied());
@@ -221,7 +221,7 @@ fn find(app: &App, test: impl Fn(&Props) -> bool) -> NodeId {
 }
 fn text_at(app: &App, id: NodeId) -> String {
     let tree = app.tree();
-    let Props::Text(text) = &tree.node(id).unwrap().descriptor.props else {
+    let Props::Text(text) = &tree.node(id).unwrap().descriptor.view().props else {
         panic!()
     };
     text.content.clone()
@@ -288,12 +288,12 @@ fn bound_password_visibility_patches_purpose_without_replacing_the_input_or_valu
     })))
     .unwrap();
     let id = find(&app, |props| matches!(props, Props::Input(_)));
-    let before = app.tree().node(id).unwrap().descriptor.clone();
+    let before = app.tree().node(id).unwrap().descriptor.view().to_owned();
     trace.borrow_mut().mutations.clear();
     visible.revise(|visible| *visible = true);
     app.flush().unwrap();
     assert_eq!(find(&app, |props| matches!(props, Props::Input(_))), id);
-    let after = app.tree().node(id).unwrap().descriptor.clone();
+    let after = app.tree().node(id).unwrap().descriptor.view().to_owned();
     let (Props::Input(before), Props::Input(after)) = (before.props, after.props) else {
         panic!("input expected");
     };
@@ -600,7 +600,7 @@ fn keyed_empty_and_multi_root_components_keep_rendered_order() {
             .children
             .iter()
             .map(|id| {
-                let Props::Text(text) = &tree.node(*id).unwrap().descriptor.props else {
+                let Props::Text(text) = &tree.node(*id).unwrap().descriptor.view().props else {
                     panic!()
                 };
                 text.content.clone()

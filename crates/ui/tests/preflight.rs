@@ -63,3 +63,51 @@ fn a_surviving_scope_cannot_allocate_children_under_a_retired_or_reused_parent()
     app.flush().unwrap();
     assert!(app.scope().is_active(new).unwrap());
 }
+
+#[test]
+fn reactive_initial_fields_validate_together_and_preserve_first_value_revision() {
+    let app = App::memory();
+    let content = app.scope().cage("first\nsecond".to_string());
+    app.mount(glory_ui::input().value(content).multiline(true))
+        .unwrap();
+    let node = app.tree().roots()[0];
+    assert!(
+        matches!(&app.tree().node(node).unwrap().descriptor.view().props,Props::Input(value) if value.multiline && value.value=="first\nsecond"&&value.revision==1)
+    );
+    content.revise(|text| *text = "updated\nvalue".into());
+    app.flush().unwrap();
+    assert!(
+        matches!(&app.tree().node(node).unwrap().descriptor.view().props,Props::Input(value) if value.value=="updated\nvalue"&&value.revision==2)
+    );
+}
+#[test]
+fn initial_sampling_is_untracked_by_the_surrounding_structure_and_registers_its_own_binding() {
+    let app = App::memory();
+    let show = app.scope().cage(true);
+    let content = app.scope().cage("first".to_string());
+    let builds = std::rc::Rc::new(std::cell::Cell::new(0));
+    let count = builds.clone();
+    app.mount(glory_ui::when(show, move || {
+        count.set(count.get() + 1);
+        glory_ui::text().content(content)
+    }))
+    .unwrap();
+    let root = app.tree().roots()[0];
+    let node = app.tree().node(root).unwrap().children[0];
+    content.revise(|text| *text = "second".into());
+    app.flush().unwrap();
+    assert_eq!(builds.get(), 1);
+    assert!(
+        matches!(&app.tree().node(node).unwrap().descriptor.view().props,Props::Text(value) if value.content=="second")
+    );
+}
+#[test]
+fn retired_reactive_initial_values_fail_before_identity_allocation() {
+    let app = App::memory();
+    let owner = app.scope().owner().child();
+    let content = owner.cage("retired".to_string());
+    owner.dispose();
+    let before = (app.stats(), app.tree().stats());
+    assert!(app.mount(glory_ui::text().content(content)).is_err());
+    assert_eq!((app.stats(), app.tree().stats()), before);
+}

@@ -129,8 +129,12 @@ fn every_typed_property_has_a_valid_finite_text_representation() {
     let css = css.replace("line-height:20px", "line-height:20px;font-family:system-ui;font-weight:450.5;white-space:pre-wrap;border-width:1px 2px;border-color:#123;border-style:solid;border-radius:4px;opacity:.5");
     let css = css.replace("line-height:20px", "line-height:20px;field-sizing:content");
     let css = css.replace(
+        "position:relative",
+        "position:relative;right:auto;bottom:4px",
+    );
+    let css = css.replace(
         "field-sizing:content",
-        "field-sizing:content;box-shadow:0 2px 4px #0003;flex-wrap:wrap;text-overflow:ellipsis",
+        "field-sizing:content;box-shadow:0 2px 4px #0003;flex-wrap:wrap;text-overflow:ellipsis;grid-template-columns:1fr auto;grid-template-rows:none;grid-column:1 / span 2;grid-row:span 1;aspect-ratio:16 / 9;object-fit:cover;pointer-events:none",
     );
     let sheet = Sheet::parse(&css).unwrap();
     let mut actual: Vec<_> = sheet.rules()[0]

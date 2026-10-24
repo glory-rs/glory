@@ -20,7 +20,7 @@ fn app() -> (App, Renderer) {
 fn unsupported(property: Property, value: Value) -> Error {
     Error::UnsupportedStyle {
         profile: "blitz",
-        version: 6,
+        version: glory_blitz::STYLE_PROFILE.version,
         requirement: Unsupported {
             property,
             value: Some(value),
@@ -33,7 +33,7 @@ fn rejected() -> [(Style, Error); 6] {
             Style::new().text_overflow(glory_render::style::TextOverflow::Clip),
             Error::UnsupportedStyle {
                 profile: "blitz",
-                version: 6,
+                version: glory_blitz::STYLE_PROFILE.version,
                 requirement: Unsupported {
                     property: Property::TextOverflow,
                     value: None,
@@ -44,7 +44,7 @@ fn rejected() -> [(Style, Error); 6] {
             Style::new().text_overflow(glory_render::style::TextOverflow::Ellipsis),
             Error::UnsupportedStyle {
                 profile: "blitz",
-                version: 6,
+                version: glory_blitz::STYLE_PROFILE.version,
                 requirement: Unsupported {
                     property: Property::TextOverflow,
                     value: None,
@@ -63,7 +63,7 @@ fn rejected() -> [(Style, Error); 6] {
             Style::new().field_sizing(glory_render::style::FieldSizing::Fixed),
             Error::UnsupportedStyle {
                 profile: "blitz",
-                version: 6,
+                version: glory_blitz::STYLE_PROFILE.version,
                 requirement: Unsupported {
                     property: Property::FieldSizing,
                     value: None,
@@ -74,7 +74,7 @@ fn rejected() -> [(Style, Error); 6] {
             Style::new().field_sizing(glory_render::style::FieldSizing::Content),
             Error::UnsupportedStyle {
                 profile: "blitz",
-                version: 6,
+                version: glory_blitz::STYLE_PROFILE.version,
                 requirement: Unsupported {
                     property: Property::FieldSizing,
                     value: None,
@@ -116,7 +116,7 @@ fn native_profile_distinguishes_unimplemented_values_from_the_html_dialect() {
     }
     assert_eq!(
         (profile.name, profile.version, profile.css),
-        ("blitz", 6, Css::Html)
+        ("blitz", 10, Css::Html)
     );
     assert!(
         glory_render::style::Profile::HTML
@@ -137,7 +137,7 @@ fn native_creation_and_explicit_preflight_reject_before_identity_queue_or_layout
         let mut node = Descriptor::new(Props::View);
         node.style = style;
         let before = (app.stats(), app.tree().stats(), renderer.stats());
-        assert_eq!(renderer.preflight(&node, None), Err(error.clone()));
+        assert_eq!(renderer.preflight((node).view(), None), Err(error.clone()));
         assert_eq!(app.scope().create(node), Err(UiError::Render(error)));
         assert_eq!((app.stats(), app.tree().stats(), renderer.stats()), before);
     }
@@ -165,10 +165,10 @@ fn staged_style_rejection_keeps_input_identity_value_and_subsequent_updates_usab
             app.stats(),
             app.tree().stats(),
             renderer.stats(),
-            app.tree().node(id).unwrap().descriptor.clone(),
+            app.tree().node(id).unwrap().descriptor.view().to_owned(),
         );
         assert_eq!(
-            renderer.preflight(&before.3, Some(&patch)),
+            renderer.preflight((before.3).view(), Some(&patch)),
             Err(error.clone())
         );
         assert_eq!(app.scope().patch(id, patch), Err(UiError::Render(error)));
@@ -177,7 +177,7 @@ fn staged_style_rejection_keeps_input_identity_value_and_subsequent_updates_usab
                 app.stats(),
                 app.tree().stats(),
                 renderer.stats(),
-                app.tree().node(id).unwrap().descriptor.clone()
+                app.tree().node(id).unwrap().descriptor.view().to_owned()
             ),
             before
         );
@@ -417,7 +417,7 @@ fn interactive_host_uses_the_same_profile_and_preserves_focus_after_rejection() 
         assert_eq!(query(app, Query::Focus(id)), QueryValue::Focus(true));
         assert_eq!(host.renderer().engine_id(id, Part::Main).unwrap(), physical);
     }
-    let revision = match &app.tree().node(id).unwrap().descriptor.props {
+    let revision = match &app.tree().node(id).unwrap().descriptor.view().props {
         Props::Input(current) => current.revision + 1,
         _ => panic!("input"),
     };

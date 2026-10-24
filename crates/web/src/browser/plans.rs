@@ -113,7 +113,9 @@ impl Plans {
                     Kind::Element {
                         tag, attributes, ..
                     } => {
-                        let element = document.create_element(tag).map_err(backend)?;
+                        let element = document
+                            .create_element_ns(Some(glory_html::element_namespace(tag)), tag)
+                            .map_err(backend)?;
                         for (name, value) in attributes {
                             if deferred(name) {
                                 let field = js_sys::Array::new();

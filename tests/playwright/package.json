@@ -5,7 +5,7 @@
   "scripts": {
     "test": "playwright test",
     "list": "playwright test --list",
-    "test:counter": "playwright test --project=web-csr-counter",
+    "test:counter": "playwright test --project=counter",
     "test:routing": "playwright test --project=web-csr-routing",
     "test:ssr": "playwright test --project=ssr-hydration",
     "test:fullstack": "playwright test --project=fullstack-serverfn",

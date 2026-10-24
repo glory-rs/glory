@@ -47,7 +47,7 @@ fn field_state_targets_validate_and_failed_patches_roll_back() {
         .is_err()
     );
     assert_eq!(tree.stats(), stats);
-    assert!(tree.node(id).unwrap().descriptor.semantics.is_none());
+    assert!(tree.node(id).unwrap().descriptor.view().semantics.is_none());
 }
 #[test]
 fn readonly_validates_revisions_before_discarding_edits_and_allows_program_writes() {
@@ -108,7 +108,7 @@ fn readonly_validates_revisions_before_discarding_edits_and_allows_program_write
     .unwrap()
     .commit();
     assert!(
-        matches!(&tree.node(id).unwrap().descriptor.props,Props::Input(p) if p.value=="program")
+        matches!(&tree.node(id).unwrap().descriptor.view().props,Props::Input(p) if p.value=="program")
     );
 }
 #[test]
@@ -210,5 +210,12 @@ fn structural_form_patches_recheck_existing_children_and_roll_back() {
     );
     assert_eq!(tree.receipt(), before);
     assert_eq!(tree.stats(), stats);
-    assert!(tree.node(parent).unwrap().descriptor.semantics.is_none());
+    assert!(
+        tree.node(parent)
+            .unwrap()
+            .descriptor
+            .view()
+            .semantics
+            .is_none()
+    );
 }

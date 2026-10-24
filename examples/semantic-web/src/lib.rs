@@ -407,6 +407,7 @@ mod browser {
             let node = tree.node(id).expect("live model node");
             if node
                 .descriptor
+                .view()
                 .classes
                 .iter()
                 .any(|class| class == "editor")

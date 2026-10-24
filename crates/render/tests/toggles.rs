@@ -20,7 +20,7 @@ fn pressed_is_a_boolean_native_button_state_and_conflicts_are_transactional() {
         },
         Semantics {
             pressed: Some(false),
-            has_popup: true,
+            popup: Some(glory_render::PopupKind::Dialog),
             ..Default::default()
         },
         Semantics {

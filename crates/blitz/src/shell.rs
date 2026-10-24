@@ -199,6 +199,25 @@ impl EventHandler for Events {
             })
             .or_else(|| state.dom.owner(event.target));
         if let Some(node) = node {
+            // Engine defaults run after this callback. Inert content must not
+            // acquire a caret/selection or a context action before UI routing.
+            // Scroll/wheel and terminal loss retain their independent behavior.
+            if state.mapper.tree().inert(node)
+                && matches!(
+                    event.data,
+                    DomEventData::PointerDown(_)
+                        | DomEventData::PointerMove(_)
+                        | DomEventData::MouseDown(_)
+                        | DomEventData::TouchStart(_)
+                        | DomEventData::DoubleClick(_)
+                        | DomEventData::ContextMenu(_)
+                        | DomEventData::KeyPress(_)
+                        | DomEventData::AppleStandardKeybinding(_)
+                )
+            {
+                event_state.prevent_default();
+                return;
+            }
             let enabled = state.mapper.tree().active(node)
                 && state
                     .mapper
@@ -230,7 +249,7 @@ impl EventHandler for Events {
                     .mapper
                     .tree()
                     .node(node)
-                    .is_ok_and(|n| n.descriptor.readonly())
+                    .is_ok_and(|n| n.descriptor.view().readonly())
                 {
                     if (matches!(ime, BlitzImeEvent::Disabled | BlitzImeEvent::Commit(_))
                         || matches!(ime, BlitzImeEvent::Preedit(text, _) if text.is_empty()))
@@ -250,13 +269,18 @@ impl EventHandler for Events {
                     .mapper
                     .tree()
                     .node(node)
-                    .is_ok_and(|n| n.descriptor.readonly())
+                    .is_ok_and(|n| n.descriptor.view().readonly())
                 {
                     event_state.prevent_default();
                     return;
                 }
                 let edit = state.dom.ranges.get(&node).expect("mapped input").edit;
                 let value = match edit {
+                    EditKind::Select => {
+                        state.input_error =
+                            Some(glory_render::Error::Unsupported("native select controls"));
+                        None
+                    }
                     EditKind::Text => match editing::text_event(&mut state, node, &input.value) {
                         Ok(event) => Some(event),
                         Err(error) => {
@@ -305,6 +329,7 @@ impl EventHandler for Events {
                     };
                     label_for = current
                         .descriptor
+                        .view()
                         .semantics
                         .as_ref()
                         .and_then(|s| s.label_for.clone());
@@ -322,8 +347,8 @@ impl EventHandler for Events {
                     if state.mapper.tree().enabled(target) && state.mapper.tree().active(target) {
                         let _ = state.focus(target);
                         if state.mapper.tree().node(target).is_ok_and(|n| {
-                            matches!(n.descriptor.props, glory_render::Props::Check(_))
-                                && !n.descriptor.readonly()
+                            matches!(n.descriptor.view().props, glory_render::Props::Check(_))
+                                && !n.descriptor.view().readonly()
                         }) {
                             activate_control(&mut state, target);
                         }
@@ -331,8 +356,8 @@ impl EventHandler for Events {
                     return;
                 }
                 if state.mapper.tree().node(node).is_ok_and(|n| {
-                    n.descriptor.readonly()
-                        && matches!(n.descriptor.props, glory_render::Props::Check(_))
+                    n.descriptor.view().readonly()
+                        && matches!(n.descriptor.view().props, glory_render::Props::Check(_))
                 }) {
                     event_state.prevent_default();
                     return;
@@ -404,7 +429,7 @@ fn drag_input(state: &mut State, target: EngineId, event: &DomEventData) -> bool
                 return false;
             };
             if matches!(
-                node.descriptor.props,
+                node.descriptor.view().props,
                 glory_render::Props::Input(_)
                     | glory_render::Props::Button(_)
                     | glory_render::Props::Link(_)
@@ -415,15 +440,43 @@ fn drag_input(state: &mut State, target: EngineId, event: &DomEventData) -> bool
             cursor = node.parent;
         }
         if let Some(from) = drag_observer(state, origin) {
+            let slider = state.mapper.tree().node(from).ok().is_some_and(|node| {
+                node.descriptor
+                    .view()
+                    .semantics
+                    .as_ref()
+                    .is_some_and(|s| s.slider.is_some())
+            });
+            if slider {
+                if !state.mapper.tree().enabled(from)
+                    || state
+                        .mapper
+                        .tree()
+                        .node(from)
+                        .is_ok_and(|node| node.descriptor.view().readonly())
+                {
+                    return false;
+                }
+                let _ = state.focus(from);
+                state.inputs.push(Input::Event {
+                    node: from,
+                    event: Event::Drag {
+                        from,
+                        phase: DragPhase::Start,
+                        x,
+                        y,
+                    },
+                });
+            }
             state.drag = Some(DragSession {
                 from,
                 pointer: pointer.id,
                 x,
                 y,
-                started: false,
+                started: slider,
             });
         }
-        return false;
+        return state.drag.as_ref().is_some_and(|drag| drag.started);
     }
     let Some(mut drag) = state.drag.take() else {
         return false;
@@ -481,9 +534,17 @@ fn drag_input(state: &mut State, target: EngineId, event: &DomEventData) -> bool
             .element_from_point(x as f32, y as f32)
             .and_then(|engine| state.dom.owner(engine))
             .and_then(|id| drag_observer(state, id));
-        let (node, phase) = drop.map_or((drag.from, DragPhase::Cancel), |target| {
-            (target, DragPhase::Drop)
-        });
+        let captured = state
+            .mapper
+            .tree()
+            .node(drag.from)
+            .ok()
+            .and_then(|node| node.descriptor.view().semantics.as_ref())
+            .is_some_and(|s| s.splitter.is_some() || s.slider.is_some());
+        let (node, phase) = (if captured { Some(drag.from) } else { drop })
+            .map_or((drag.from, DragPhase::Cancel), |target| {
+                (target, DragPhase::Drop)
+            });
         state.inputs.push(Input::Event {
             node,
             event: Event::Drag {
@@ -504,7 +565,7 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
             .mapper
             .tree()
             .node(id)
-            .is_ok_and(|n| n.descriptor.readonly())
+            .is_ok_and(|n| n.descriptor.view().readonly())
     }) {
         state.space = None;
         let value = key.key.to_string();
@@ -542,20 +603,216 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
     }
     let origin = owner.or_else(|| {
         state.mapper.tree().roots().iter().copied().find(|id| {
-            state
-                .mapper
-                .tree()
-                .node(*id)
-                .is_ok_and(|node| !matches!(node.descriptor.props, glory_render::Props::Group))
+            state.mapper.tree().node(*id).is_ok_and(|node| {
+                !matches!(node.descriptor.view().props, glory_render::Props::Group)
+            })
         })
     });
     if let Some(origin) = origin {
-        let editable = state
-            .mapper
-            .tree()
-            .node(origin)
-            .is_ok_and(|node| matches!(node.descriptor.props, glory_render::Props::Input(_)));
+        let editable = state.mapper.tree().node(origin).is_ok_and(|node| {
+            matches!(node.descriptor.view().props, glory_render::Props::Input(_))
+        });
         let key_name = key.key.to_string();
+        if state.focused == Some(origin)
+            && state.dom.control(origin).ok() == Some(target)
+            && state.mapper.tree().enabled(origin)
+            && state.mapper.tree().node(origin).is_ok_and(|node| {
+                node.descriptor
+                    .view()
+                    .semantics
+                    .as_ref()
+                    .is_some_and(|s| s.navigation_item)
+            })
+        {
+            let trigger = state.mapper.tree().node(origin).is_ok_and(|node| {
+                node.descriptor
+                    .view()
+                    .semantics
+                    .as_ref()
+                    .and_then(|s| s.navigation_panel)
+                    == Some(glory_render::NavigationPanel::Trigger)
+            });
+            let mut content = None;
+            let mut cursor = Some(origin);
+            while let Some(id) = cursor {
+                let Ok(node) = state.mapper.tree().node(id) else {
+                    break;
+                };
+                if node
+                    .descriptor
+                    .view()
+                    .semantics
+                    .as_ref()
+                    .and_then(|s| s.navigation_panel)
+                    == Some(glory_render::NavigationPanel::Content)
+                {
+                    content = Some(id);
+                    break;
+                }
+                cursor = node.parent;
+            }
+            let mut direction = glory_render::Direction::Ltr;
+            let mut cursor = content.or(Some(origin));
+            while let Some(id) = cursor {
+                let Ok(node) = state.mapper.tree().node(id) else {
+                    break;
+                };
+                if let Some(semantics) = node.descriptor.view().semantics.as_ref()
+                    && semantics.navigation.is_some()
+                {
+                    direction = semantics.navigation_direction;
+                    break;
+                }
+                cursor = node.parent;
+            }
+            if let Some(command) = (glory_render::KeyboardInput {
+                key: &key_name,
+                control: key.modifiers.contains(Modifiers::CONTROL),
+                meta: key.modifiers.contains(Modifiers::META),
+                alt: key.modifiers.contains(Modifiers::ALT),
+                shift: key.modifiers.contains(Modifiers::SHIFT),
+                repeat: key.is_auto_repeating,
+                composing: false,
+                editable,
+            })
+            .navigation_panel(direction, trigger, content.is_some())
+            {
+                let interested = if command == glory_render::NavigationPanelCommand::Close {
+                    content.is_some_and(|id| {
+                        state
+                            .subscriptions
+                            .contains(&(id, EventKind::NavigationPanel))
+                    })
+                } else {
+                    state
+                        .subscriptions
+                        .contains(&(origin, EventKind::NavigationPanel))
+                };
+                if interested {
+                    state.inputs.push(Input::Event {
+                        node: origin,
+                        event: Event::NavigationPanel {
+                            from: origin,
+                            command,
+                        },
+                    });
+                    return true;
+                }
+            }
+        }
+        if state.focused == Some(origin)
+            && state.dom.control(origin).ok() == Some(target)
+            && state.subscriptions.contains(&(origin, EventKind::Range))
+            && let Some(slider) = state
+                .mapper
+                .tree()
+                .node(origin)
+                .ok()
+                .and_then(|node| node.descriptor.view().semantics.as_ref())
+                .and_then(|s| s.slider.as_ref())
+            && let Some(command) = glory_render::RangeCommand::slider_key(
+                slider.axis,
+                slider.direction,
+                glory_render::KeyboardInput {
+                    key: &key_name,
+                    control: key.modifiers.contains(Modifiers::CONTROL),
+                    meta: key.modifiers.contains(Modifiers::META),
+                    alt: key.modifiers.contains(Modifiers::ALT),
+                    shift: key.modifiers.contains(Modifiers::SHIFT),
+                    repeat: key.is_auto_repeating,
+                    composing: false,
+                    editable,
+                },
+            )
+        {
+            if state.mapper.tree().enabled(origin)
+                && state
+                    .mapper
+                    .tree()
+                    .node(origin)
+                    .is_ok_and(|node| !node.descriptor.view().readonly())
+            {
+                state.inputs.push(Input::Event {
+                    node: origin,
+                    event: Event::Range {
+                        from: origin,
+                        command,
+                    },
+                });
+            }
+            return true;
+        }
+        if state.focused == Some(origin)
+            && state.dom.control(origin).ok() == Some(target)
+            && state.mapper.tree().enabled(origin)
+            && state.subscriptions.contains(&(origin, EventKind::Range))
+            && let Some(command) = state
+                .mapper
+                .tree()
+                .node(origin)
+                .ok()
+                .and_then(|node| node.descriptor.view().semantics.as_ref())
+                .filter(|s| s.splitter.is_some())
+                .and_then(|s| s.separator_axis)
+                .and_then(|line| {
+                    glory_render::RangeCommand::splitter_key(
+                        line,
+                        glory_render::KeyboardInput {
+                            key: &key_name,
+                            control: key.modifiers.contains(Modifiers::CONTROL),
+                            meta: key.modifiers.contains(Modifiers::META),
+                            alt: key.modifiers.contains(Modifiers::ALT),
+                            shift: key.modifiers.contains(Modifiers::SHIFT),
+                            repeat: key.is_auto_repeating,
+                            composing: false,
+                            editable,
+                        },
+                    )
+                })
+        {
+            state.inputs.push(Input::Event {
+                node: origin,
+                event: Event::Range {
+                    from: origin,
+                    command,
+                },
+            });
+            return true;
+        }
+        if state.focused == Some(origin)
+            && state.dom.control(origin).ok() == Some(target)
+            && state
+                .subscriptions
+                .contains(&(origin, EventKind::ScrollKeyboard))
+            && let Some(command) = state
+                .mapper
+                .tree()
+                .node(origin)
+                .ok()
+                .and_then(|node| node.descriptor.view().semantics.as_ref())
+                .and_then(|semantics| semantics.scroll_keyboard)
+                .and_then(|axes| {
+                    axes.key(glory_render::KeyboardInput {
+                        key: &key_name,
+                        control: key.modifiers.contains(Modifiers::CONTROL),
+                        meta: key.modifiers.contains(Modifiers::META),
+                        alt: key.modifiers.contains(Modifiers::ALT),
+                        shift: key.modifiers.contains(Modifiers::SHIFT),
+                        repeat: key.is_auto_repeating,
+                        composing: false,
+                        editable,
+                    })
+                })
+        {
+            state.inputs.push(Input::Event {
+                node: origin,
+                event: Event::ScrollKeyboard {
+                    from: origin,
+                    command,
+                },
+            });
+            return true;
+        }
         let command = glory_render::KeyboardInput {
             key: &key_name,
             control: key.modifiers.contains(Modifiers::CONTROL),
@@ -574,7 +831,7 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
             let mut in_form = false;
             while let Some(id) = cursor {
                 in_form |= state.mapper.tree().node(id).is_ok_and(|node| {
-                    node.descriptor.field_part() == Some(glory_render::FieldPart::Form)
+                    node.descriptor.view().field_part() == Some(glory_render::FieldPart::Form)
                 });
                 if state.subscriptions.contains(&(id, EventKind::Keyboard)) {
                     interested = true;
@@ -587,7 +844,7 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
                     .and_then(|node| node.parent);
             }
             let form_submit=in_form && command==glory_render::KeyboardCommand::Submit
-                && state.mapper.tree().node(origin).is_ok_and(|node| matches!(&node.descriptor.props,glory_render::Props::Input(input) if !input.multiline));
+                && state.mapper.tree().node(origin).is_ok_and(|node| matches!(&node.descriptor.view().props,glory_render::Props::Input(input) if !input.multiline));
             if interested && (!editable || own_interest) || form_submit {
                 if command == glory_render::KeyboardCommand::Submit {
                     let revision = state
@@ -629,7 +886,7 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
     {
         if space
             && matches!(
-                node.descriptor.props,
+                node.descriptor.view().props,
                 glory_render::Props::Button(_) | glory_render::Props::Check(_)
             )
         {
@@ -638,7 +895,7 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
         }
         if key.key == Key::Named(NamedKey::Enter)
             && matches!(
-                node.descriptor.props,
+                node.descriptor.view().props,
                 glory_render::Props::Button(_) | glory_render::Props::Link(_)
             )
         {
@@ -657,7 +914,7 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
                 .mapper
                 .tree()
                 .node(id)
-                .is_ok_and(|node| matches!(&node.descriptor.props, glory_render::Props::Input(input) if !input.multiline))
+                .is_ok_and(|node| matches!(&node.descriptor.view().props, glory_render::Props::Input(input) if !input.multiline))
         {
             let revision = range.editing.revision;
             match state.dom.text_value(id) {
@@ -735,10 +992,20 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
     if state.dom.control(origin).ok() == Some(target)
         && let Some((root, axis)) = state.mapper.tree().navigation(origin)
         && state.subscriptions.contains(&(root, EventKind::Navigate))
-        && let Some(command) = axis.key(glory_render::KeyboardInput {
-            key: &key.key.to_string(),
-            ..Default::default()
-        })
+        && let Some(command) = axis.key_with_direction(
+            state
+                .mapper
+                .tree()
+                .node(root)
+                .ok()
+                .and_then(|node| node.descriptor.view().semantics.as_ref())
+                .map(|s| s.navigation_direction)
+                .unwrap_or_default(),
+            glory_render::KeyboardInput {
+                key: &key.key.to_string(),
+                ..Default::default()
+            },
+        )
     {
         state.inputs.push(Input::Event {
             node: origin,
@@ -750,7 +1017,10 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
         return true;
     }
     if !matches!(
-        node.descriptor.options.get::<glory_render::VirtualPart>(),
+        node.descriptor
+            .view()
+            .options
+            .get::<glory_render::VirtualPart>(),
         Some(glory_render::VirtualPart::Root | glory_render::VirtualPart::Row)
     ) || state.dom.control(origin).ok() != Some(target)
     {
@@ -790,7 +1060,8 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
 fn activate_control(state: &mut State, id: NodeId) {
     if !state.mapper.tree().enabled(id)
         || state.mapper.tree().node(id).is_ok_and(|n| {
-            n.descriptor.readonly() && matches!(n.descriptor.props, glory_render::Props::Check(_))
+            n.descriptor.view().readonly()
+                && matches!(n.descriptor.view().props, glory_render::Props::Check(_))
         })
     {
         return;

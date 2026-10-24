@@ -241,7 +241,7 @@ fn huge_measured_rows_converge_before_one_changed_raster_and_keep_final_geometry
                 .iter()
                 .find_map(|row| {
                     let node = tree.node(*row).unwrap();
-                    let key = node.descriptor.item.unwrap().index;
+                    let key = node.descriptor.view().item.unwrap().index;
                     let physical = renderer.engine_id(*row, glory_html::Part::Main).unwrap();
                     let rect =
                         renderer.inspect(|doc| doc.get_client_bounding_rect(physical).unwrap());

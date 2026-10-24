@@ -13,6 +13,20 @@ impl Scope {
         self.session()?.input_value(node, value.into())
     }
 
+    /// Reconcile a native select after a complete host tick using its live revision.
+    pub fn set_select_selection(
+        &self,
+        node: NodeId,
+        keys: Vec<glory_render::SemanticId>,
+    ) -> Result {
+        self.session()?.select_selection(node, keys)
+    }
+
+    /// Start a new image request revision, including an explicit same-URL retry.
+    pub fn set_image_source(&self, node: NodeId, source: impl Into<String>) -> Result {
+        self.session()?.image_source(node, source.into())
+    }
+
     /// Report a custom widget's asynchronous Binding/Effect/handler error at the
     /// next App flush. Retired scopes ignore late errors without retaining App.
     pub fn report_error(&self, error: impl Into<Error>) {

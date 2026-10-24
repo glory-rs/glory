@@ -19,7 +19,7 @@ fn native_layers_reject_in_preflight_and_direct_apply_without_losing_prefix() {
     let mut renderer = Renderer::new(runtime);
     let error = Error::Unsupported("native top layers");
     let d = layer();
-    assert_eq!(renderer.preflight(&d, None), Err(error.clone()));
+    assert_eq!(renderer.preflight((d).view(), None), Err(error.clone()));
     let mut ids = NodeIds::new(runtime);
     let first = ids.allocate();
     let rejected = ids.allocate();
@@ -58,7 +58,7 @@ fn native_layers_reject_in_preflight_and_direct_apply_without_losing_prefix() {
     ));
     let patch = Patch::Semantics(Change::Set(d.semantics));
     assert_eq!(
-        renderer.preflight(&Descriptor::new(Props::View), Some(&patch)),
+        renderer.preflight((Descriptor::new(Props::View)).view(), Some(&patch)),
         Err(error.clone())
     );
     assert_eq!(

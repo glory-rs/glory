@@ -60,12 +60,22 @@ fn prepared_layer_patch_rolls_back_cross_field_failure_and_stale_dismissals_are_
     .unwrap();
     let stats = tree.stats();
     assert!(tree.prepare_patch(id, &Patch::Role(Change::Clear)).is_err());
-    assert_eq!(tree.node(id).unwrap().descriptor.role, Some(Role::Dialog));
+    assert_eq!(
+        tree.node(id).unwrap().descriptor.view().role,
+        Some(Role::Dialog)
+    );
     assert_eq!(tree.stats(), stats);
     Event::Dismiss(DismissReason::Escape)
         .validate_payload(id, &tree.node(id).unwrap().descriptor)
         .unwrap();
-    let mut metadata = tree.node(id).unwrap().descriptor.semantics.clone().unwrap();
+    let mut metadata = tree
+        .node(id)
+        .unwrap()
+        .descriptor
+        .view()
+        .semantics
+        .clone()
+        .unwrap();
     metadata.layer.as_mut().unwrap().escape = false;
     tree.prepare_patch(id, &Patch::Semantics(Change::Set(Some(metadata))))
         .unwrap()

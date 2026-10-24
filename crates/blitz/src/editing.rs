@@ -6,7 +6,7 @@ fn multiline(state: &State, node: NodeId) -> bool {
         .mapper
         .tree()
         .node(node)
-        .is_ok_and(|node| matches!(&node.descriptor.props, glory_render::Props::Input(input) if input.multiline))
+        .is_ok_and(|node| matches!(&node.descriptor.view().props, glory_render::Props::Input(input) if input.multiline))
 }
 
 pub(super) fn sanitize_ime(state: &State, event: &mut UiEvent) {

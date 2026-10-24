@@ -10,6 +10,10 @@ defines the target; the [implementation ledger](docs/semantic-ui-implementation.
 records what actually works. Old HTML examples and adapter sources have not yet
 been ported and are not supported entry points for the new core.
 
+The migrated [counter example](examples/counter) shares one semantic component,
+state, event handlers and typed styles between Web and Blitz desktop hosts.
+Its README includes build/run commands and the current platform boundaries.
+
 ## Available now
 
 - `glory-style`: explicit portable style values, separate from CSS engines.

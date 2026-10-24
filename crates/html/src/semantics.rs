@@ -14,6 +14,94 @@ pub(crate) fn attributes(
         attrs.insert("aria-level", level.to_string());
     }
     let Some(value) = value else { return attrs };
+    if let Some(policy) = value.tags_input {
+        attrs.insert("data-gly-tags", policy.as_str().into());
+    }
+    if value.inert {
+        attrs.insert("inert", String::new());
+        attrs.insert("data-gly-inert", String::new());
+    }
+    if let Some(kind) = value.combobox {
+        attrs.insert("role", "combobox".into());
+        attrs.insert(
+            "data-gly-combobox",
+            match kind {
+                glory_render::ComboboxKind::Select => "select",
+                glory_render::ComboboxKind::Editable => "editable",
+                glory_render::ComboboxKind::Autocomplete => "autocomplete",
+                glory_render::ComboboxKind::Multiple => "multiple",
+            }
+            .into(),
+        );
+        if kind != glory_render::ComboboxKind::Select {
+            attrs.insert("aria-autocomplete", "list".into());
+        }
+    }
+    if let Some(option) = &value.option {
+        attrs.insert("role", "option".into());
+        attrs.insert("data-gly-option-owner", option.owner.as_str().into());
+        attrs.insert("form", option.owner.as_str().into());
+    }
+    if role == Some(Role::Listbox) {
+        attrs.insert("aria-multiselectable", value.listbox_multiple.to_string());
+    }
+    if let Some(progress) = &value.progress {
+        attrs.insert("aria-valuemin", progress.min.to_string());
+        attrs.insert("aria-valuemax", progress.max.to_string());
+        if let Some(current) = progress.current {
+            attrs.insert("aria-valuenow", current.to_string());
+        }
+        if let Some(text) = &progress.value_text {
+            attrs.insert("aria-valuetext", text.clone());
+        }
+    }
+    if let Some(busy) = value.busy {
+        attrs.insert("aria-busy", busy.to_string());
+        attrs.insert("data-gly-busy", busy.to_string());
+    }
+    if let Some(current) = value.current {
+        attrs.insert(
+            "aria-current",
+            match current {
+                glory_render::Current::Page => "page",
+                glory_render::Current::Step => "step",
+            }
+            .into(),
+        );
+    }
+    if let Some(axis) = value.separator_axis {
+        attrs.insert("aria-orientation", axis.as_str().into());
+    }
+    if let Some(slider) = &value.slider {
+        attrs.insert("aria-valuemin", slider.range.min.to_string());
+        attrs.insert("aria-valuemax", slider.range.max.to_string());
+        attrs.insert("aria-valuenow", slider.range.value.to_string());
+        attrs.insert("aria-orientation", slider.axis.as_str().into());
+        attrs.insert(
+            "dir",
+            match slider.direction {
+                glory_render::Direction::Ltr => "ltr",
+                glory_render::Direction::Rtl => "rtl",
+            }
+            .into(),
+        );
+        attrs.insert("data-gly-slider", String::new());
+        if let Some(text) = &slider.value_text {
+            attrs.insert("aria-valuetext", text.clone());
+        }
+    }
+    if let Some(range) = value.splitter {
+        attrs.insert("aria-valuemin", range.min.to_string());
+        attrs.insert("aria-valuemax", range.max.to_string());
+        attrs.insert("aria-valuenow", range.value.to_string());
+        attrs.insert("data-gly-splitter", String::new());
+    }
+    if let Some(axes) = value.scroll_keyboard {
+        attrs.insert("data-gly-scroll-keyboard", axes.as_str().into());
+    }
+    if value.link_request {
+        attrs.insert("data-gly-link-request", String::new());
+    }
     if value.link_open == Some(glory_render::LinkOpen::NewContext) {
         attrs.insert("target", "_blank".into());
         attrs.insert("rel", "noopener noreferrer".into());
@@ -34,14 +122,22 @@ pub(crate) fn attributes(
         attrs.insert("name", group.as_str().into());
     }
     if let Some(control) = &value.form_control {
-        attrs.insert("name", control.name.clone());
+        // A custom range View is serialized by the explicit form snapshot API;
+        // it is not silently presented as a native successful HTML input.
+        let (name_key, value_key) = if value.slider.is_some() {
+            ("data-gly-control-name", "data-gly-control-value")
+        } else {
+            ("name", "value")
+        };
+        attrs.insert(name_key, control.name.clone());
         if let Some(value) = &control.value {
-            attrs.insert("value", value.clone());
+            attrs.insert(value_key, value.clone());
         }
     }
     for (name, id) in [
         ("id", &value.id),
         ("aria-controls", &value.controls),
+        ("aria-activedescendant", &value.active_descendant),
         ("aria-labelledby", &value.labelled_by),
         ("aria-describedby", &value.described_by),
         ("for", &value.label_for),
@@ -63,7 +159,15 @@ pub(crate) fn attributes(
             .or_insert_with(|| error.as_str().into());
     }
     for (flag, name) in [(value.required, "required"), (value.readonly, "readonly")] {
-        if flag {
+        if flag
+            && value.slider.is_none()
+            && (name != "required" || value.tags_input.is_none())
+            && !matches!(
+                (name, value.combobox),
+                (_, Some(glory_render::ComboboxKind::Select))
+                    | ("required", Some(glory_render::ComboboxKind::Multiple))
+            )
+        {
             attrs.insert(name, String::new());
         }
     }
@@ -88,13 +192,47 @@ pub(crate) fn attributes(
     if value.tab {
         attrs.insert("role", "tab".into());
     }
-    if value.has_popup {
-        attrs.insert("aria-haspopup", "dialog".into());
+    if let Some(item) = &value.menu_item {
+        attrs.insert(
+            "role",
+            match item.kind {
+                glory_render::MenuItemKind::Action => "menuitem",
+                glory_render::MenuItemKind::Checkbox => "menuitemcheckbox",
+                glory_render::MenuItemKind::Radio => "menuitemradio",
+            }
+            .into(),
+        );
+        attrs.insert("form", item.owner.as_str().into());
+        attrs.insert("data-gly-menu-item", String::new());
+    }
+    if let Some(popup) = value.popup {
+        attrs.insert("aria-haspopup", popup.as_str().into());
+    }
+    if value.sheet_grip {
+        attrs.insert("data-gly-sheet-grip", String::new());
     }
     if let Some(layer) = &value.layer {
+        if let Some(sheet) = &layer.sheet {
+            attrs.insert(
+                "data-gly-sheet",
+                sheet
+                    .fractions
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join(","),
+            );
+            attrs.insert("data-gly-sheet-current", sheet.current.to_string());
+            attrs.insert("data-gly-sheet-max", sheet.max_extent.to_string());
+            attrs.insert("data-gly-sheet-settle", sheet.settle_millis.to_string());
+            attrs.insert("data-gly-sheet-dismissible", sheet.dismissible.to_string());
+            attrs.insert("data-gly-sheet-revision", sheet.revision.to_string());
+        }
         attrs.insert("popover", "manual".into());
         attrs.insert("data-gly-layer", layer.placement.as_str().into());
-        attrs.insert("aria-modal", layer.modal.to_string());
+        if matches!(role, Some(Role::Dialog | Role::AlertDialog)) {
+            attrs.insert("aria-modal", layer.modal.to_string());
+        }
     }
     for (name, state) in [
         ("aria-expanded", value.expanded),
@@ -123,12 +261,26 @@ pub(crate) fn attributes(
     }
     if let Some(axis) = value.navigation {
         attrs.insert("data-gly-navigation", axis.as_str().into());
-        if matches!(role, Some(Role::TabList | Role::RadioGroup)) {
+        attrs.insert(
+            "dir",
+            match value.navigation_direction {
+                glory_render::Direction::Ltr => "ltr",
+                glory_render::Direction::Rtl => "rtl",
+            }
+            .into(),
+        );
+        if matches!(role, Some(Role::TabList | Role::RadioGroup | Role::Toolbar)) {
             attrs.insert("aria-orientation", axis.as_str().into());
         }
     }
+    if value.typeahead {
+        attrs.insert("data-gly-typeahead", String::new());
+    }
     if value.navigation_item {
         attrs.insert("data-gly-navigation-item", String::new());
+    }
+    if let Some(panel) = value.navigation_panel {
+        attrs.insert("data-gly-navigation-panel", panel.as_str().into());
     }
     attrs
 }

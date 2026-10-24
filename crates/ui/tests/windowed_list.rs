@@ -47,7 +47,7 @@ impl Host {
             .children
             .iter()
             .map(|id| {
-                let Props::Text(p) = &self.memory.node(*id).unwrap().descriptor.props else {
+                let Props::Text(p) = &self.memory.node(*id).unwrap().descriptor.view().props else {
                     panic!()
                 };
                 p.content.split(':').next().unwrap().parse().unwrap()

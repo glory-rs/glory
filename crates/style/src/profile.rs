@@ -1,8 +1,9 @@
 //! Machine-readable acceptance of the typed inline style contract. This is not
 //! a CSS parser, cascade engine, or claim that every HTML stylesheet is portable.
 use crate::{
-    Align, BorderStyle, Display, Family, FieldSizing, FlexDirection, FlexWrap, Justify, Length,
-    Limit, Overflow, Position, Style, TextOverflow, WhiteSpace,
+    Align, AspectRatio, BorderStyle, Display, Family, FieldSizing, FlexDirection, FlexWrap,
+    GridPlacement, GridTrack, GridTracks, Justify, Length, Limit, ObjectFit, Overflow,
+    PointerEvents, Position, Style, TextOverflow, WhiteSpace,
 };
 
 macro_rules! properties {
@@ -26,7 +27,12 @@ macro_rules! properties {
 }
 properties! {
     Position => position => "position", Top => top => "top", Left => left => "left",
-    Display => display => "display", Direction => flex_direction => "flex-direction",
+    Display => display => "display",
+    GridColumns => grid_columns => "grid-template-columns", GridRows => grid_rows => "grid-template-rows",
+    GridColumn => grid_column => "grid-column", GridRow => grid_row => "grid-row", AspectRatio => aspect_ratio => "aspect-ratio",
+    ObjectFit => object_fit => "object-fit",
+    PointerEvents => pointer_events => "pointer-events",
+    Direction => flex_direction => "flex-direction",
     FlexWrap => flex_wrap => "flex-wrap",
     Width => width => "width", Height => height => "height",
     MinWidth => min_width => "min-width", MinHeight => min_height => "min-height",
@@ -42,6 +48,7 @@ properties! {
     WhiteSpace => white_space => "white-space", TextOverflow => text_overflow => "text-overflow", FieldSizing => field_sizing => "field-sizing", BorderWidth => border_width => "border-width",
     BorderColor => border_color => "border-color", BorderStyle => border_style => "border-style",
     Radius => radius => "border-radius", Opacity => opacity => "opacity", BoxShadow => box_shadow => "box-shadow",
+    Right => right => "right", Bottom => bottom => "bottom",
 }
 
 macro_rules! values {
@@ -53,7 +60,7 @@ macro_rules! values {
     };
 }
 values! {
-    Auto, Px, Percent, Block, Flex, None, Static, Relative, Absolute, Sticky,
+    Auto, Px, Percent, Block, Flex, InlineFlex, None, Static, Relative, Absolute, Sticky,
     Visible, Hidden, Clip, OverflowAuto, Scroll, AnchorAuto, AnchorNone,
     AlignStart, AlignEnd, AlignCenter, AlignStretch, JustifyStart, JustifyEnd,
     JustifyCenter, Between, Around, Evenly, Row, Column,
@@ -61,6 +68,9 @@ values! {
     FontNamed, Serif, Sans, Mono, System, Cursive, Fantasy, FieldFixed, FieldContent,
     ShadowNone, ShadowOutset, FlexNoWrap, FlexWrap,
     TextClip, TextEllipsis,
+    Grid, TrackList, Fr, PlacementSpan, PlacementAt, Ratio,
+    FitFill, FitContain, FitCover, FitNone, FitScaleDown,
+    Fixed,
 }
 macro_rules! convert {
     ($ty:ty, $($from:ident => $to:ident),+ $(,)?) => {
@@ -69,15 +79,17 @@ macro_rules! convert {
         }
     };
 }
-convert!(Display, Block => Block, Flex => Flex, None => None);
-convert!(Position, Static => Static, Relative => Relative, Absolute => Absolute, Sticky => Sticky);
+convert!(Display, Block => Block, Flex => Flex, InlineFlex => InlineFlex, Grid => Grid, None => None);
+convert!(Position, Static => Static, Relative => Relative, Absolute => Absolute, Sticky => Sticky, Fixed => Fixed);
 convert!(Overflow, Visible => Visible, Hidden => Hidden, Clip => Clip, Auto => OverflowAuto, Scroll => Scroll);
 convert!(Align, Start => AlignStart, End => AlignEnd, Center => AlignCenter, Stretch => AlignStretch);
 convert!(Justify, Start => JustifyStart, End => JustifyEnd, Center => JustifyCenter, Between => Between, Around => Around, Evenly => Evenly);
 convert!(FlexDirection, Row => Row, Column => Column);
 convert!(FlexWrap, NoWrap => FlexNoWrap, Wrap => FlexWrap);
 convert!(WhiteSpace, Normal => Normal, NoWrap => NoWrap, Pre => Pre, PreWrap => PreWrap);
+convert!(ObjectFit, Fill => FitFill, Contain => FitContain, Cover => FitCover, None => FitNone, ScaleDown => FitScaleDown);
 convert!(TextOverflow, Clip => TextClip, Ellipsis => TextEllipsis);
+convert!(PointerEvents, Auto => Auto, None => None);
 convert!(FieldSizing, Fixed => FieldFixed, Content => FieldContent);
 convert!(BorderStyle, None => BorderNone, Solid => BorderSolid);
 impl From<&Family> for Value {
@@ -99,6 +111,41 @@ impl From<Length> for Value {
             Length::Auto => Self::Auto,
             Length::Px(_) => Self::Px,
             Length::Percent(_) => Self::Percent,
+        }
+    }
+}
+impl From<&GridTracks> for Value {
+    fn from(value: &GridTracks) -> Self {
+        match value {
+            GridTracks::None => Self::None,
+            GridTracks::Tracks(_) => Self::TrackList,
+        }
+    }
+}
+impl From<GridTrack> for Value {
+    fn from(value: GridTrack) -> Self {
+        match value {
+            GridTrack::Auto => Self::Auto,
+            GridTrack::Px(_) => Self::Px,
+            GridTrack::Percent(_) => Self::Percent,
+            GridTrack::Fr(_) => Self::Fr,
+        }
+    }
+}
+impl From<GridPlacement> for Value {
+    fn from(value: GridPlacement) -> Self {
+        match value {
+            GridPlacement::Auto => Self::Auto,
+            GridPlacement::Span(_) => Self::PlacementSpan,
+            GridPlacement::At { .. } => Self::PlacementAt,
+        }
+    }
+}
+impl From<AspectRatio> for Value {
+    fn from(value: AspectRatio) -> Self {
+        match value {
+            AspectRatio::Auto => Self::Auto,
+            AspectRatio::Ratio(_) => Self::Ratio,
         }
     }
 }
@@ -183,7 +230,26 @@ impl Support {
             style.position.map(|v| (Property::Position, v.into())),
             style.top.map(|v| (Property::Top, v.into())),
             style.left.map(|v| (Property::Left, v.into())),
+            style.right.map(|v| (Property::Right, v.into())),
+            style.bottom.map(|v| (Property::Bottom, v.into())),
             style.display.map(|v| (Property::Display, v.into())),
+            style
+                .grid_columns
+                .as_ref()
+                .map(|v| (Property::GridColumns, v.into())),
+            style
+                .grid_rows
+                .as_ref()
+                .map(|v| (Property::GridRows, v.into())),
+            style.object_fit.map(|v| (Property::ObjectFit, v.into())),
+            style
+                .pointer_events
+                .map(|v| (Property::PointerEvents, v.into())),
+            style.grid_column.map(|v| (Property::GridColumn, v.into())),
+            style.grid_row.map(|v| (Property::GridRow, v.into())),
+            style
+                .aspect_ratio
+                .map(|v| (Property::AspectRatio, v.into())),
             style
                 .flex_direction
                 .map(|v| (Property::Direction, v.into())),
@@ -258,6 +324,22 @@ impl Support {
                 });
             }
         }
+        for (property, tracks) in [
+            (Property::GridColumns, style.grid_columns.as_ref()),
+            (Property::GridRows, style.grid_rows.as_ref()),
+        ] {
+            if let Some(GridTracks::Tracks(tracks)) = tracks {
+                for track in tracks {
+                    let value = (*track).into();
+                    if !self.supports_value(value) {
+                        return Err(Unsupported {
+                            property,
+                            value: Some(value),
+                        });
+                    }
+                }
+            }
+        }
         Ok(())
     }
 }
@@ -291,7 +373,7 @@ impl Profile {
     /// Reference storage accepts typed declarations but performs no CSS/layout.
     pub const RECORD: Self = Self {
         name: "record",
-        version: 5,
+        version: 9,
         inline: Support::ALL,
         css: Css::None,
     };
@@ -299,7 +381,7 @@ impl Profile {
     /// remains engine-specific; this is not a complete stylesheet validator.
     pub const HTML: Self = Self {
         name: "html",
-        version: 5,
+        version: 9,
         inline: Support::ALL,
         css: Css::Html,
     };
@@ -339,7 +421,7 @@ mod tests {
                 );
             }
         }
-        assert_eq!((Profile::HTML.version, Profile::RECORD.version), (5, 5));
+        assert_eq!((Profile::HTML.version, Profile::RECORD.version), (9, 9));
     }
 
     #[test]
@@ -348,7 +430,16 @@ mod tests {
             position: Some(Position::Relative),
             top: Some(Length::Auto),
             left: Some(Length::Px(-1.0)),
+            right: Some(Length::Auto),
+            bottom: Some(Length::Percent(12.0)),
             display: Some(Display::Flex),
+            grid_columns: Some(GridTracks::Tracks(vec![GridTrack::Fr(1.0)])),
+            grid_rows: Some(GridTracks::None),
+            grid_column: Some(GridPlacement::At { start: 1, span: 1 }),
+            grid_row: Some(GridPlacement::Span(1)),
+            aspect_ratio: Some(AspectRatio::Ratio(2.0)),
+            object_fit: Some(ObjectFit::Cover),
+            pointer_events: Some(PointerEvents::None),
             flex_direction: Some(FlexDirection::Row),
             flex_wrap: Some(FlexWrap::Wrap),
             width: Some(Length::Percent(100.0)),
@@ -404,6 +495,26 @@ mod tests {
     fn finite_enum_values_and_length_units_are_all_checked() {
         for value in Value::ALL {
             let (property, style) = match value {
+                Value::FitFill => (
+                    Property::ObjectFit,
+                    Style::new().object_fit(ObjectFit::Fill),
+                ),
+                Value::FitContain => (
+                    Property::ObjectFit,
+                    Style::new().object_fit(ObjectFit::Contain),
+                ),
+                Value::FitCover => (
+                    Property::ObjectFit,
+                    Style::new().object_fit(ObjectFit::Cover),
+                ),
+                Value::FitNone => (
+                    Property::ObjectFit,
+                    Style::new().object_fit(ObjectFit::None),
+                ),
+                Value::FitScaleDown => (
+                    Property::ObjectFit,
+                    Style::new().object_fit(ObjectFit::ScaleDown),
+                ),
                 Value::TextClip => (
                     Property::TextOverflow,
                     Style::new().text_overflow(TextOverflow::Clip),
@@ -441,6 +552,28 @@ mod tests {
                 Value::Percent => (Property::Width, Style::new().width(Length::Percent(1.0))),
                 Value::Block => (Property::Display, Style::new().display(Display::Block)),
                 Value::Flex => (Property::Display, Style::new().display(Display::Flex)),
+                Value::Grid => (Property::Display, Style::new().display(Display::Grid)),
+                Value::TrackList => (
+                    Property::GridColumns,
+                    Style::new().grid_columns(GridTracks::Tracks(vec![GridTrack::Auto])),
+                ),
+                Value::Fr => (
+                    Property::GridRows,
+                    Style::new().grid_rows(GridTracks::Tracks(vec![GridTrack::Fr(1.0)])),
+                ),
+                Value::PlacementSpan => (
+                    Property::GridRow,
+                    Style::new().grid_row(GridPlacement::Span(1)),
+                ),
+                Value::PlacementAt => (
+                    Property::GridColumn,
+                    Style::new().grid_column(GridPlacement::At { start: 1, span: 1 }),
+                ),
+                Value::Ratio => (
+                    Property::AspectRatio,
+                    Style::new().aspect_ratio(AspectRatio::Ratio(1.0)),
+                ),
+                Value::InlineFlex => (Property::Display, Style::new().display(Display::InlineFlex)),
                 Value::None => (Property::Display, Style::new().display(Display::None)),
                 Value::Static => (Property::Position, Style::new().position(Position::Static)),
                 Value::Relative => (
@@ -452,6 +585,7 @@ mod tests {
                     Style::new().position(Position::Absolute),
                 ),
                 Value::Sticky => (Property::Position, Style::new().position(Position::Sticky)),
+                Value::Fixed => (Property::Position, Style::new().position(Position::Fixed)),
                 Value::Visible => (
                     Property::OverflowY,
                     Style::new().overflow_y(Overflow::Visible),

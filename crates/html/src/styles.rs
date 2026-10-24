@@ -58,6 +58,76 @@ pub fn style(style: &Style) -> String {
     let mut declaration = |name: &str, value: String| {
         write!(out, "{name}:{value};").expect("string write");
     };
+    if let Some(value) = style.pointer_events {
+        declaration(
+            "pointer-events",
+            match value {
+                PointerEvents::Auto => "auto",
+                PointerEvents::None => "none",
+            }
+            .into(),
+        );
+    }
+    for (name, value) in [
+        ("grid-template-columns", style.grid_columns.as_ref()),
+        ("grid-template-rows", style.grid_rows.as_ref()),
+    ] {
+        if let Some(value) = value {
+            declaration(
+                name,
+                match value {
+                    GridTracks::None => "none".into(),
+                    GridTracks::Tracks(tracks) => tracks
+                        .iter()
+                        .map(|track| match track {
+                            GridTrack::Auto => "auto".into(),
+                            GridTrack::Px(value) => format!("{value}px"),
+                            GridTrack::Percent(value) => format!("{value}%"),
+                            GridTrack::Fr(value) => format!("{value}fr"),
+                        })
+                        .collect::<Vec<_>>()
+                        .join(" "),
+                },
+            );
+        }
+    }
+    for (name, value) in [
+        ("grid-column", style.grid_column),
+        ("grid-row", style.grid_row),
+    ] {
+        if let Some(value) = value {
+            declaration(
+                name,
+                match value {
+                    GridPlacement::Auto => "auto".into(),
+                    GridPlacement::Span(span) => format!("span {span}"),
+                    GridPlacement::At { start, span } => format!("{start} / span {span}"),
+                },
+            );
+        }
+    }
+    if let Some(value) = style.object_fit {
+        declaration(
+            "object-fit",
+            match value {
+                ObjectFit::Fill => "fill",
+                ObjectFit::Contain => "contain",
+                ObjectFit::Cover => "cover",
+                ObjectFit::None => "none",
+                ObjectFit::ScaleDown => "scale-down",
+            }
+            .into(),
+        );
+    }
+    if let Some(value) = style.aspect_ratio {
+        declaration(
+            "aspect-ratio",
+            match value {
+                AspectRatio::Auto => "auto".into(),
+                AspectRatio::Ratio(value) => format!("{value}"),
+            },
+        );
+    }
     if let Some(value) = style.flex_wrap {
         declaration(
             "flex-wrap",
@@ -86,7 +156,12 @@ pub fn style(style: &Style) -> String {
             declaration(name, limit(value));
         }
     }
-    for (name, value) in [("top", style.top), ("left", style.left)] {
+    for (name, value) in [
+        ("top", style.top),
+        ("left", style.left),
+        ("right", style.right),
+        ("bottom", style.bottom),
+    ] {
         if let Some(value) = value {
             declaration(name, length(value));
         }
@@ -99,6 +174,7 @@ pub fn style(style: &Style) -> String {
                 Position::Relative => "relative",
                 Position::Absolute => "absolute",
                 Position::Sticky => "sticky",
+                Position::Fixed => "fixed",
             }
             .into(),
         );
@@ -109,6 +185,8 @@ pub fn style(style: &Style) -> String {
             match value {
                 Display::Block => "block",
                 Display::Flex => "flex",
+                Display::InlineFlex => "inline-flex",
+                Display::Grid => "grid",
                 Display::None => "none",
             }
             .into(),

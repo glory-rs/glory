@@ -111,7 +111,7 @@ pub fn input_stats() -> String {
             .children
             .iter()
             .map(|id| {
-                let Props::Input(input) = &tree.node(*id).unwrap().descriptor.props else {
+                let Props::Input(input) = tree.node(*id).unwrap().descriptor.view().props else {
                     panic!("input")
                 };
                 js_sys::Array::of2(

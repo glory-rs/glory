@@ -54,7 +54,7 @@ fn semantic_names_are_bounded_live_and_transactional() {
         .is_err()
     );
     assert_eq!(
-        tree.node(b).unwrap().descriptor.semantic_id(),
+        tree.node(b).unwrap().descriptor.view().semantic_id(),
         Some(&id("second"))
     );
     assert_eq!(tree.stats(), stats);

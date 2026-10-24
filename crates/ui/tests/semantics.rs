@@ -34,7 +34,7 @@ fn rejected_semantic_overrides_preserve_identity_queue_and_existing_bindings() {
     name.revise(|v| *v = "Updated editor".into());
     app.flush().unwrap();
     let tree = app.tree();
-    let node = &tree.node(id).unwrap().descriptor;
+    let node = tree.node(id).unwrap().descriptor.view();
     assert_eq!(node.name.as_deref(), Some("Updated editor"));
     assert!(matches!(&node.props, Props::Input(input) if input.value == "updated🙂"));
 }

@@ -188,7 +188,7 @@ impl Session {
         }
         self.renderer
             .borrow()
-            .preflight(&present.tree.node(id)?.descriptor, Some(&patch))?;
+            .preflight(present.tree.node(id)?.descriptor.view(), Some(&patch))?;
         let mutation = Mutation::Patch { id, patch };
         present.tree.apply(std::slice::from_ref(&mutation))?;
         present.commands.push(mutation);
@@ -198,7 +198,8 @@ impl Session {
     pub(crate) fn input_value(&self, id: NodeId, value: String) -> Result {
         let revision = {
             let present = self.present.borrow();
-            let glory_render::Props::Input(input) = &present.tree.node(id)?.descriptor.props else {
+            let glory_render::Props::Input(input) = &present.tree.node(id)?.descriptor.view().props
+            else {
                 return Err(RenderError::InvalidProps("value requires an input").into());
             };
             input
@@ -210,6 +211,54 @@ impl Session {
             id,
             Patch::Value {
                 value: glory_render::Change::Set(value),
+                revision,
+            },
+        )
+    }
+
+    pub(crate) fn select_selection(
+        &self,
+        id: NodeId,
+        keys: Vec<glory_render::SemanticId>,
+    ) -> Result {
+        let revision = {
+            let present = self.present.borrow();
+            let glory_render::Props::Select(select) =
+                present.tree.node(id)?.descriptor.view().props
+            else {
+                return Err(RenderError::InvalidProps("selection requires a select").into());
+            };
+            select
+                .selection
+                .revision
+                .checked_add(1)
+                .ok_or(RenderError::SelectRevisionExhausted)?
+        };
+        self.patch(
+            id,
+            Patch::SelectSelection {
+                keys: glory_render::Change::Set(keys),
+                revision,
+            },
+        )
+    }
+
+    pub(crate) fn image_source(&self, id: NodeId, source: String) -> Result {
+        let revision = {
+            let present = self.present.borrow();
+            let glory_render::Props::Image(image) = present.tree.node(id)?.descriptor.view().props
+            else {
+                return Err(RenderError::InvalidProps("source requires an image").into());
+            };
+            image
+                .revision
+                .checked_add(1)
+                .ok_or(RenderError::ImageRevisionExhausted)?
+        };
+        self.patch(
+            id,
+            Patch::Source {
+                source: glory_render::Change::Set(source),
                 revision,
             },
         )
@@ -411,9 +460,21 @@ impl Session {
             }
         }
         for action in actions {
-            if !self.present.borrow().tree.active(action.node()) {
+            let present = self.present.borrow();
+            // Menu close and exit commit together. The retained panel may now
+            // be hidden, but the host must still move focus past its trigger.
+            if present.tree.node(action.node()).is_err()
+                || (!present.tree.active(action.node())
+                    && !matches!(action, Action::ExitMenu { .. }))
+            {
                 continue;
             }
+            if matches!(action, Action::Focus(_) | Action::ExitMenu { .. })
+                && present.tree.inert(action.node())
+            {
+                continue;
+            }
+            drop(present);
             let _span = self
                 .runtime
                 .profile()
@@ -454,15 +515,48 @@ impl Session {
             if !present.ids.contains(node) || !present.tree.active(node) && !terminal_loss {
                 return Ok(false);
             }
-            let props = &present.tree.node(node)?.descriptor.props;
+            let props = &present.tree.node(node)?.descriptor.view().props;
             if matches!(event, Event::Activate)
-                && !present.tree.node(node)?.descriptor.activation_enabled()
+                && !present
+                    .tree
+                    .node(node)?
+                    .descriptor
+                    .view()
+                    .activation_enabled()
             {
                 return Ok(false);
             }
-            if let Event::ValueChanged { revision, .. } | Event::Commit { revision, .. } = &event
+            if let Event::ValueChanged { revision, .. }
+            | Event::Commit { revision, .. }
+            | Event::Tags { revision, .. } = &event
                 && let glory_render::Props::Input(input) = props
                 && *revision < input.revision
+            {
+                return Ok(false);
+            }
+            if let Event::Sheet { revision, .. } = &event
+                && present
+                    .tree
+                    .node(node)?
+                    .descriptor
+                    .view()
+                    .semantics
+                    .as_ref()
+                    .and_then(|s| s.layer.as_ref())
+                    .and_then(|l| l.sheet.as_ref())
+                    .is_some_and(|s| *revision < s.revision)
+            {
+                return Ok(false);
+            }
+            if let Event::SelectChanged { revision, .. } = &event
+                && let glory_render::Props::Select(select) = props
+                && *revision < select.selection.revision
+            {
+                return Ok(false);
+            }
+            if let Event::ImageStatus { revision, .. } = &event
+                && let glory_render::Props::Image(image) = props
+                && *revision < image.revision
             {
                 return Ok(false);
             }
@@ -476,9 +570,16 @@ impl Session {
                         | Event::Submit { .. }
                         | Event::Reset
                         | Event::Keyboard { .. }
+                        | Event::Typeahead { .. }
+                        | Event::Menu { .. }
+                        | Event::NavigationPanel { .. }
+                        | Event::Sheet { .. }
+                        | Event::Choice { .. }
                         | Event::Drag { .. }
+                        | Event::Range { .. }
                         | Event::ValueChanged { .. }
                         | Event::CheckedChanged(_)
+                        | Event::SelectChanged { .. }
                         | Event::Commit { .. }
                 )
             {
@@ -488,8 +589,15 @@ impl Session {
             let mut handler = None;
             while let Some(id) = cursor {
                 let current = present.tree.node(id)?;
-                if matches!(event, Event::Activate | Event::Keyboard { .. })
-                    && !current.descriptor.props.enabled()
+                if matches!(
+                    event,
+                    Event::Activate
+                        | Event::Keyboard { .. }
+                        | Event::Typeahead { .. }
+                        | Event::Menu { .. }
+                        | Event::NavigationPanel { .. }
+                        | Event::Choice { .. }
+                ) && !current.descriptor.view().props.enabled()
                 {
                     return Ok(false);
                 }
@@ -502,7 +610,13 @@ impl Session {
                 }
                 if !matches!(
                     event,
-                    Event::Activate | Event::Navigate { .. } | Event::Keyboard { .. }
+                    Event::Activate
+                        | Event::Navigate { .. }
+                        | Event::Keyboard { .. }
+                        | Event::Typeahead { .. }
+                        | Event::Menu { .. }
+                        | Event::NavigationPanel { .. }
+                        | Event::Choice { .. }
                 ) {
                     break;
                 }
@@ -511,6 +625,16 @@ impl Session {
             let mut handlers = Vec::new();
             let focused = if let Event::FocusChanged(focused) = &event {
                 Some(*focused)
+            } else {
+                None
+            };
+            let pointer = if let Event::Pointer {
+                from,
+                related,
+                phase,
+            } = &event
+            {
+                Some((*from, *related, *phase))
             } else {
                 None
             };
@@ -538,13 +662,50 @@ impl Session {
                     cursor = present.tree.node(id)?.parent;
                 }
             }
+            if let Some((from, related, phase)) = pointer {
+                // A boundary ends at the first common physical ancestry.
+                // Each chain is walked once, with no stored visit history.
+                let mut shared = BTreeSet::new();
+                let mut cursor = related;
+                while let Some(id) = cursor {
+                    shared.insert(id);
+                    cursor = present.tree.node(id)?.parent;
+                }
+                let mut cursor = Some(from);
+                while let Some(id) = cursor {
+                    if shared.contains(&id) {
+                        break;
+                    }
+                    if let Some(subscription) = present
+                        .handlers
+                        .get(&id)
+                        .and_then(|handlers| handlers.get(&EventKind::PointerWithin))
+                    {
+                        handlers.push((
+                            id,
+                            EventKind::PointerWithin,
+                            subscription.callback.clone(),
+                            Event::PointerWithin {
+                                from,
+                                related,
+                                phase,
+                            },
+                        ));
+                    }
+                    cursor = present.tree.node(id)?.parent;
+                }
+            }
             (handlers, present.tree.stats())
         };
         let handled = !handlers.is_empty();
         for (id, kind, handler, event) in handlers {
             let owner = {
                 let present = self.present.borrow();
-                if present.tree.active(id) || terminal_loss {
+                if (present.tree.active(id) || terminal_loss)
+                    && !(event.is_user_interaction()
+                        && present.tree.stats() != observed_tree
+                        && !present.tree.validate_event(id, &event).unwrap_or(false))
+                {
                     present
                         .handlers
                         .get(&id)
@@ -559,7 +720,10 @@ impl Session {
                 // An earlier direct/ancestor callback may have removed or moved
                 // the focus origin. Only re-walk ancestry after tree changes;
                 // the normal focus path stays linear in logical depth.
-                if matches!(event, Event::FocusWithin { .. }) {
+                if matches!(
+                    event,
+                    Event::FocusWithin { .. } | Event::PointerWithin { .. }
+                ) {
                     let present = self.present.borrow();
                     if present.tree.stats() != observed_tree
                         && !present.tree.validate_event(id, &event).unwrap_or(false)
@@ -578,15 +742,15 @@ impl Session {
             let source=present.tree.node(node).ok()?;
             if !present.tree.active(node) || !present.tree.enabled(node) { return None; }
             let action=if keyboard {
-                if !matches!(&source.descriptor.props,glory_render::Props::Input(input) if !input.multiline) { return None; }
+                if !matches!(&source.descriptor.view().props,glory_render::Props::Input(input) if !input.multiline) { return None; }
                 glory_render::FormAction::Submit
             } else {
-                source.descriptor.semantics.as_ref()?.form_action?
+                source.descriptor.view().semantics.as_ref()?.form_action?
             };
             let mut cursor=source.parent;
             while let Some(id)=cursor {
                 let current=present.tree.node(id).ok()?;
-                if current.descriptor.field_part()==Some(glory_render::FieldPart::Form) {
+                if current.descriptor.view().field_part()==Some(glory_render::FieldPart::Form) {
                     return Some((id,match action {
                         glory_render::FormAction::Submit=>Event::Submit { submitter:(!keyboard).then_some(node) },
                         glory_render::FormAction::Reset=>Event::Reset,
@@ -723,8 +887,8 @@ impl Scope {
                 .validate_child(Subtree::Plan(&plan.semantic), self.0.parent)?;
             let renderer = session.renderer.borrow();
             for node in plan.semantic.nodes() {
-                session.check_style(&node.descriptor.style)?;
-                renderer.preflight(&node.descriptor, None)?;
+                session.check_style(node.descriptor.view().style)?;
+                renderer.preflight(node.descriptor.view(), None)?;
             }
             renderer.preflight_place(
                 &present.tree,
@@ -859,6 +1023,23 @@ impl Scope {
         self.session()?.present.borrow().tree.node(parent)?;
         Self::new(self.0.core.child(), &self.session()?, Some(parent))
     }
+    /// Whether this Scope's construction parent is the supplied live node or
+    /// one of its staged descendants. Reads semantic ancestry only; hidden and
+    /// suspended nodes remain valid, with no host query or commit barrier.
+    pub fn is_within(&self, parent: NodeId) -> Result<bool> {
+        let session = self.session()?;
+        let present = session.present.borrow();
+        present.tree.node(parent)?;
+        let mut cursor = self.0.parent;
+        while let Some(node) = cursor {
+            let current = present.tree.node(node)?;
+            if node == parent {
+                return Ok(true);
+            }
+            cursor = current.parent;
+        }
+        Ok(false)
+    }
     pub fn retain(&self, resource: impl Any) -> Result {
         self.session()?;
         self.0.resources.borrow_mut().push(Box::new(resource));
@@ -869,15 +1050,18 @@ impl Scope {
         descriptor.validate()?;
         let session = self.session()?;
         session.check_style(&descriptor.style)?;
-        session.renderer.borrow().preflight(&descriptor, None)?;
+        session
+            .renderer
+            .borrow()
+            .preflight(descriptor.view(), None)?;
         let id = {
             let mut present = session.present.borrow_mut();
             present
                 .tree
-                .validate_child(Subtree::New(&descriptor), self.0.parent)?;
+                .validate_child(Subtree::New(descriptor.view()), self.0.parent)?;
             session.renderer.borrow().preflight_place(
                 &present.tree,
-                Subtree::New(&descriptor),
+                Subtree::New(descriptor.view()),
                 self.0.parent,
             )?;
             let id = present.ids.allocate();
@@ -904,6 +1088,30 @@ impl Scope {
     pub fn patch(&self, id: NodeId, patch: Patch) -> Result {
         self.session()?.patch(id, patch)
     }
+    /// Move a live semantic range to an explicit parent, retaining its original
+    /// Owner. Shared placement rules and adapter preflight run before changing
+    /// the model or queue; suspended ranges resume through the same path.
+    pub fn place(&self, node: NodeId, parent: Option<NodeId>, before: Option<NodeId>) -> Result {
+        self.session()?.place(node, parent, before)
+    }
+    /// Read the accepted semantic link target/context without host I/O or a
+    /// commit barrier. A rejected source update never changes this snapshot.
+    pub fn link_request(&self, id: NodeId) -> Result<(String, glory_render::LinkOpen)> {
+        let session = self.session()?;
+        let present = session.present.borrow();
+        let descriptor = present.tree.node(id)?.descriptor.view();
+        let glory_render::Props::Link(link) = &descriptor.props else {
+            return Err(RenderError::InvalidProps("link request requires a link").into());
+        };
+        Ok((
+            link.target.clone(),
+            descriptor
+                .semantics
+                .as_ref()
+                .and_then(|s| s.link_open)
+                .unwrap_or_default(),
+        ))
+    }
     pub fn action(&self, action: Action) -> Result {
         let session = self.session()?;
         action.validate_target(
@@ -921,10 +1129,10 @@ impl Scope {
         }
         let capabilities = session.renderer.borrow().capabilities();
         match action {
-            Action::Focus(_) if !capabilities.focus => {
+            Action::Focus(_) | Action::ExitMenu { .. } if !capabilities.focus => {
                 return Err(RenderError::Unsupported("focus").into());
             }
-            Action::ScrollTo { .. } if !capabilities.scroll => {
+            Action::ScrollTo { .. } | Action::RevealOption { .. } if !capabilities.scroll => {
                 return Err(RenderError::Unsupported("scroll").into());
             }
             _ => {}
@@ -944,6 +1152,31 @@ impl Scope {
         reply: impl FnOnce(std::result::Result<QueryValue, RenderError>) + 'static,
     ) -> Result<QueryToken> {
         self.session()?.request(self.id(), query, Box::new(reply))
+    }
+    /// Revoke this Scope's pending reply without attempting to undo host work.
+    /// Tokens are local to their App. Missing/completed tokens return false;
+    /// another live Scope's token is rejected before either index is changed.
+    pub fn cancel_request(&self, token: QueryToken) -> Result<bool> {
+        let session = self.session()?;
+        let pending = {
+            let mut present = session.present.borrow_mut();
+            match present.queries.get(&token) {
+                None => return Ok(false),
+                Some(query) if query.owner != self.id() => {
+                    return Err(RenderError::InvalidProps(
+                        "query cancellation requires its requesting Scope",
+                    )
+                    .into());
+                }
+                Some(_) => present.remove_query(token),
+            }
+        };
+        let removed = pending.is_some();
+        // Arbitrary captured destructors may write or reenter this registry.
+        session
+            .runtime
+            .enter(self.id(), || glory_core::untracked(|| drop(pending)))?;
+        Ok(removed)
     }
     pub fn capabilities(&self) -> Result<glory_render::Capabilities> {
         Ok(self.session()?.renderer.borrow().capabilities())
@@ -1273,6 +1506,9 @@ impl App {
     ) -> Result<QueryToken> {
         self.root.request(query, reply)
     }
+    pub fn cancel_request(&self, token: QueryToken) -> Result<bool> {
+        self.root.cancel_request(token)
+    }
 }
 impl Drop for App {
     fn drop(&mut self) {
@@ -1337,12 +1573,12 @@ mod placement_tests {
             parent: Option<NodeId>,
         ) -> std::result::Result<(), RenderError> {
             if let Some(parent) = parent
-                && tree.node(parent)?.descriptor.name.as_deref() == Some("restricted")
+                && tree.node(parent)?.descriptor.view().name.as_deref() == Some("restricted")
             {
                 let descriptor = match child {
-                    Subtree::Plan(plan) => &plan.nodes()[0].descriptor,
+                    Subtree::Plan(plan) => plan.nodes()[0].descriptor.view(),
                     Subtree::New(descriptor) => descriptor,
-                    Subtree::Existing(id) => &tree.node(id)?.descriptor,
+                    Subtree::Existing(id) => tree.node(id)?.descriptor.view(),
                 };
                 if descriptor.name.as_deref() == Some("blocked") {
                     return Err(RenderError::Unsupported("guarded child"));

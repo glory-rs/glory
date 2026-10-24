@@ -59,6 +59,8 @@ struct Plan {
     entries: Vec<Candidate>,
     empty: Vec<Empty>,
     inputs: Vec<Input>,
+    check_repairs: Vec<(Element, bool)>,
+    select_repairs: Vec<(Element, Vec<String>)>,
 }
 struct Validator<'a> {
     dom: &'a dom::Dom,
@@ -94,7 +96,21 @@ impl Validator<'_> {
             let last = self.comment(cursor, &format!("gly:e:{key}"), key)?;
             (first, last)
         } else {
-            let root = self.piece(&shape, Part::Main, key, &children, cursor, &mut parts)?;
+            let layer_inert = model
+                .descriptor
+                .view()
+                .semantics
+                .as_ref()
+                .is_some_and(|s| s.layer.is_some())
+                && self.mapper.tree().inert(id);
+            let root = self.piece(
+                &shape,
+                Part::Main,
+                (key, layer_inert),
+                &children,
+                cursor,
+                &mut parts,
+            )?;
             (root.clone(), root)
         };
         if let Some(control) = shape
@@ -154,11 +170,46 @@ impl Validator<'_> {
                         .map_err(backend)?
                         .as_bool()
                         .unwrap_or(false);
-                    if properties.get("checked") != Some(&Property::Bool(actual)) {
-                        self.plan.inputs.push(Input::Event {
-                            node: id,
-                            event: Event::CheckedChanged(actual),
-                        });
+                    if let Some(Property::Bool(expected)) = properties.get("checked")
+                        && *expected != actual
+                    {
+                        if self.mapper.tree().active(id) && self.mapper.tree().enabled(id) {
+                            self.plan.inputs.push(Input::Event {
+                                node: id,
+                                event: Event::CheckedChanged(actual),
+                            });
+                        } else {
+                            // An inactive control cannot publish a user edit.
+                            // Defer its canonical property repair until the
+                            // entire adoption has validated successfully.
+                            self.plan.check_repairs.push((control.clone(), *expected));
+                        }
+                    }
+                }
+                EditKind::Select => {
+                    let actual = super::select::read(control)?;
+                    let Some(Property::SelectedKeys(expected)) = properties.get("selectedKeys")
+                    else {
+                        unreachable!()
+                    };
+                    if actual
+                        .iter()
+                        .map(|key| key.as_str())
+                        .ne(expected.iter().map(String::as_str))
+                    {
+                        if self.mapper.tree().active(id) && self.mapper.tree().enabled(id) {
+                            self.plan.inputs.push(Input::Event {
+                                node: id,
+                                event: Event::SelectChanged {
+                                    keys: actual,
+                                    revision: shape.revision,
+                                },
+                            });
+                        } else {
+                            self.plan
+                                .select_repairs
+                                .push((control.clone(), expected.clone()));
+                        }
                     }
                 }
                 EditKind::None => {}
@@ -184,11 +235,12 @@ impl Validator<'_> {
         &mut self,
         shape: &Shape,
         part: Part,
-        key: u64,
+        context: (u64, bool),
         children: &[NodeId],
         cursor: &mut Option<Node>,
         parts: &mut BTreeMap<Part, Node>,
     ) -> Result<Node> {
+        let (key, layer_inert) = context;
         let piece = shape
             .pieces
             .iter()
@@ -228,7 +280,8 @@ impl Validator<'_> {
                     .and_then(|node| node.dyn_into::<Element>().ok())
                     .ok_or_else(|| mismatch(Some(key), "element"))?;
                 if element.local_name() != *tag
-                    || element.namespace_uri().as_deref() != Some("http://www.w3.org/1999/xhtml")
+                    || element.namespace_uri().as_deref()
+                        != Some(glory_html::element_namespace(tag))
                 {
                     return Err(mismatch(Some(key), "tag/namespace"));
                 }
@@ -237,7 +290,16 @@ impl Validator<'_> {
                 {
                     return Err(mismatch(Some(key), "key/part"));
                 }
-                if element.get_attribute_names().length() as usize != attributes.len() + 2 {
+                // The pre-WASM stream forces inherited inert onto a top-layer
+                // element. Accept only that exact derived empty attribute and
+                // only when the supplied semantic ancestry independently agrees.
+                let inherited_inert = part == Part::Main
+                    && layer_inert
+                    && !attributes.contains_key("inert")
+                    && element.get_attribute("inert").as_deref() == Some("");
+                if element.get_attribute_names().length() as usize
+                    != attributes.len() + 2 + usize::from(inherited_inert)
+                {
                     return Err(mismatch(Some(key), "unexpected attributes"));
                 }
                 for (name, expected) in attributes {
@@ -246,6 +308,23 @@ impl Validator<'_> {
                     }
                 }
                 let mut inner = element.first_child();
+                if *tag == "select" {
+                    let Some(config) = &shape.select_options else {
+                        return Err(mismatch(Some(key), "select config"));
+                    };
+                    let Some(Property::SelectedKeys(keys)) = properties.get("selectedKeys") else {
+                        unreachable!()
+                    };
+                    if !super::select::validate_children(
+                        &self.dom.document,
+                        &element,
+                        config,
+                        keys,
+                    )? {
+                        return Err(mismatch(Some(key), "select options"));
+                    }
+                    inner = None;
+                }
                 if *tag == "textarea" {
                     let Some(Property::Text(value)) = properties.get("value") else {
                         unreachable!()
@@ -260,7 +339,7 @@ impl Validator<'_> {
                     .iter()
                     .filter(|piece| piece.parent == Some(part))
                 {
-                    self.piece(shape, child.part, key, children, &mut inner, parts)?;
+                    self.piece(shape, child.part, context, children, &mut inner, parts)?;
                 }
                 if shape.children == Some(part) {
                     for child in children {
@@ -281,7 +360,8 @@ impl Validator<'_> {
 
 /// Adopt a versioned SSR Snapshot without remounting or replaying initial props.
 /// A mismatch is diagnosed before mutating the existing subtree. Existing user
-/// values/checked state win initial state via normal queued semantic events.
+/// values/checked state on active enabled controls win initial state via normal
+/// queued semantic events. Inactive checked controls restore semantic state.
 pub fn hydrate(root: Element, widget: impl Widget) -> Result<WebApp> {
     hydrate_with(root, move |_| widget)
 }
@@ -335,6 +415,8 @@ pub fn hydrate_with<W: Widget>(root: Element, factory: impl FnOnce(&Scope) -> W)
                 entries: Vec::new(),
                 empty: Vec::new(),
                 inputs: Vec::new(),
+                check_repairs: Vec::new(),
+                select_repairs: Vec::new(),
             },
         };
         let mut cursor = start.next_sibling();
@@ -360,6 +442,12 @@ pub fn hydrate_with<W: Widget>(root: Element, factory: impl FnOnce(&Scope) -> W)
     // Validation is complete. Only now create missing empty slots and attach
     // runtime metadata; no initial value setter or element move is replayed.
     *dom.root_end.borrow_mut() = Some(end);
+    for (control, checked) in plan.check_repairs {
+        js_sys::Reflect::set(&control, &"checked".into(), &checked.into()).map_err(backend)?;
+    }
+    for (control, keys) in plan.select_repairs {
+        super::select::write(&control, &keys)?;
+    }
     for empty in plan.empty {
         empty
             .parent
@@ -537,7 +625,7 @@ fn flow_anchors(mapper: &Mapper, entries: &[Candidate]) -> Result<Vec<Input>> {
     let mut inputs = Vec::new();
     for candidate in entries {
         let model = mapper.tree().node(candidate.id)?;
-        if model.descriptor.role != Some(Role::List) {
+        if model.descriptor.view().role != Some(Role::List) {
             continue;
         }
         let Some(surface) = model
@@ -549,6 +637,7 @@ fn flow_anchors(mapper: &Mapper, entries: &[Candidate]) -> Result<Vec<Input>> {
         };
         if surface
             .descriptor
+            .view()
             .options
             .get::<glory_render::VirtualPart>()
             != Some(&glory_render::VirtualPart::Surface)

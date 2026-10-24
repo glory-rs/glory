@@ -70,6 +70,7 @@ pub(super) struct Editing {
     pending: Option<String>,
 }
 pub(super) struct Entry {
+    pub(super) image: RefCell<Option<Box<super::images::Observer>>>,
     pub parent: Cell<Option<NodeId>>,
     #[cfg(feature = "hydrate")]
     is_virtual: bool,
@@ -86,6 +87,9 @@ pub(super) struct Entry {
     pub prevent_default: bool,
 }
 impl Entry {
+    pub(super) fn image_revision(&self) -> u64 {
+        self.editing.borrow().requested
+    }
     pub fn element(&self) -> Result<Element, Error> {
         self.part(Part::Main)?
             .dyn_into()
@@ -150,9 +154,17 @@ impl Entry {
             edit.pending = None;
             return Ok(());
         }
+        if let Property::SelectedKeys(keys) = value {
+            let element: Element = node.dyn_into().map_err(|node: Node| backend(node.into()))?;
+            super::select::write(&element, keys)?;
+            let mut editing = self.editing.borrow_mut();
+            editing.revision = editing.requested;
+            return Ok(());
+        }
         let value: JsValue = match value {
             Property::Text(value) => value.into(),
             Property::Bool(value) => (*value).into(),
+            Property::SelectedKeys(_) => unreachable!(),
         };
         js_sys::Reflect::set(&node, &name.into(), &value).map_err(backend)?;
         Ok(())
@@ -182,7 +194,9 @@ pub(super) struct DragSession {
     pub started: bool,
 }
 pub(super) struct Dom {
+    pub(super) images: RefCell<super::images::Images>,
     pub layers: RefCell<super::layers::Layers>,
+    pub(super) sheets: RefCell<super::sheet::Sheets>,
     pub layer_layout: Cell<bool>,
     pub drag: RefCell<Option<DragSession>>,
     pub suppress_click: Cell<bool>,
@@ -211,7 +225,9 @@ impl Dom {
     pub fn new(document: Document, root: Element, frame: Rc<Frame>) -> Rc<Self> {
         let error = root.set_attribute("data-gly-app", "").err().map(backend);
         Rc::new(Self {
+            images: RefCell::new(super::images::Images::default()),
             layers: RefCell::new(super::layers::Layers::default()),
+            sheets: RefCell::new(super::sheet::Sheets::default()),
             layer_layout: Cell::new(false),
             drag: RefCell::new(None),
             suppress_click: Cell::new(false),
@@ -280,6 +296,7 @@ impl Dom {
             }
         }
         let entry = Rc::new(Entry {
+            image: RefCell::new(None),
             parent: Cell::new(parent),
             #[cfg(feature = "hydrate")]
             is_virtual: virtual_shape(shape),
@@ -361,6 +378,9 @@ impl Dom {
             entry.interests.borrow_mut().insert(kind);
         } else {
             entry.interests.borrow_mut().remove(&kind);
+        }
+        if kind == EventKind::ImageStatus {
+            self.queue_image(id, &entry, enabled);
         }
         if enabled
             && kind == EventKind::ColorSchemeChanged
@@ -470,6 +490,7 @@ impl Dom {
         self.frame.input();
     }
     pub fn read_layout(&self) {
+        let sheet_writes = super::sheet::read(self);
         // Exactly one read phase before App processes events and writes DOM.
         let pending = std::mem::take(&mut *self.layout.borrow_mut());
         let mut inputs = self.inputs.borrow_mut();
@@ -516,6 +537,9 @@ impl Dom {
         if self.layer_layout.replace(false)
             && let Err(error) = super::layers::layout(self)
         {
+            self.error.borrow_mut().get_or_insert(error);
+        }
+        if let Err(error) = sheet_writes.and_then(|writes| super::sheet::write(self, writes)) {
             self.error.borrow_mut().get_or_insert(error);
         }
     }
@@ -572,6 +596,7 @@ impl Dom {
         #[cfg(feature = "hydrate")]
         let is_virtual = virtual_shape(shape);
         let entry = Rc::new(Entry {
+            image: RefCell::new(None),
             parent: Cell::new(None),
             #[cfg(feature = "hydrate")]
             is_virtual,
@@ -599,6 +624,21 @@ impl Dom {
             scroll_request: Cell::new(None),
             prevent_default: shape.prevent_activate_default,
         });
+        if let Some(options) = &shape.select_options {
+            let control = entry.control()?;
+            let keys = shape
+                .pieces
+                .iter()
+                .find_map(|piece| match &piece.kind {
+                    Kind::Element { properties, .. } => match properties.get("selectedKeys") {
+                        Some(Property::SelectedKeys(keys)) => Some(keys.as_slice()),
+                        _ => None,
+                    },
+                    _ => None,
+                })
+                .unwrap_or_default();
+            super::select::create(&self.document, &control, options, keys)?;
+        }
         for piece in &shape.pieces {
             if let Kind::Element {
                 attributes,
@@ -691,7 +731,12 @@ impl Dom {
         let entry = self.entry(id)?;
         for edit in edits {
             match edit {
-                Edit::Revision(revision) => entry.editing.borrow_mut().requested = revision,
+                Edit::Revision(revision) => {
+                    entry.editing.borrow_mut().requested = revision;
+                    if entry.interests.borrow().contains(&EventKind::ImageStatus) {
+                        self.queue_image(id, &entry, true);
+                    }
+                }
                 Edit::Text { part, value } => entry.part(part)?.set_node_value(Some(&value)),
                 Edit::Property { part, name, value } => entry.property(part, name, &value)?,
                 Edit::Attribute { part, name, value } => {
@@ -732,6 +777,7 @@ impl Dom {
             let mut sizes = self.sizes.borrow_mut();
             for id in &subtree {
                 sizes.remove(id);
+                self.images.borrow_mut().retire(*id);
             }
         }
         self.layout
@@ -760,6 +806,7 @@ impl Dom {
         Ok(())
     }
     pub fn clear(&self) {
+        *self.sheets.borrow_mut() = super::sheet::Sheets::default();
         if self.cleared.replace(true) {
             return;
         }
@@ -778,6 +825,7 @@ impl Dom {
         self.layout.borrow_mut().clear();
         self.sizes.borrow_mut().clear();
         self.inputs.borrow_mut().clear();
+        self.images.borrow_mut().clear();
         // Root is claimed exclusively. Clear ranges even after a failed prefix.
         if self.owned.get() {
             self.root.set_text_content(None);
@@ -868,12 +916,15 @@ pub(super) fn rect(rect: &web_sys::DomRect) -> Rect {
     }
 }
 pub(super) fn focus(element: &Element) -> Result<(), Error> {
-    let element = element
-        .dyn_ref::<HtmlElement>()
-        .ok_or(Error::Unsupported("focus on this element"))?;
     let options = web_sys::FocusOptions::new();
     options.set_prevent_scroll(true);
-    element.focus_with_options(&options).map_err(backend)
+    if let Some(element) = element.dyn_ref::<HtmlElement>() {
+        element.focus_with_options(&options).map_err(backend)
+    } else if let Some(element) = element.dyn_ref::<web_sys::SvgElement>() {
+        element.focus_with_options(&options).map_err(backend)
+    } else {
+        Err(Error::Unsupported("focus on this element"))
+    }
 }
 pub(super) fn has_focus(element: &Element) -> Result<bool, Error> {
     if !element.is_connected() {

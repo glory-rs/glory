@@ -137,19 +137,8 @@ jobs:
           npm --prefix tests/playwright install --package-lock=false
           npm --prefix tests/playwright exec -- playwright install --with-deps chromium
 
-      - name: Start counter example
-        shell: bash
-        run: |
-          cargo run -p glory-cli -- --manifest-path examples/counter/Cargo.toml serve --address 127.0.0.1 --port 4101 --no-open --no-reload > counter.log 2>&1 &
-          echo $! > counter.pid
-          for i in {1..120}; do
-            if curl -fsS http://127.0.0.1:4101 >/dev/null; then
-              exit 0
-            fi
-            sleep 1
-          done
-          cat counter.log
-          exit 1
+      # The migrated counter uses the current semantic hosts and has its own
+      # workflow (counter.yml). The remaining fixtures below are legacy apps.
 
       - name: Start SSR hydration example
         shell: bash
@@ -187,17 +176,6 @@ jobs:
           cat fullstack.log
           exit 1
 
-      - name: Start hot-reload server (counter under live reload)
-        shell: bash
-        run: |
-          cargo run -p glory-cli -- --manifest-path examples/counter/Cargo.toml serve --address 127.0.0.1 --port 4105 --no-open > hot-reload.log 2>&1 &
-          for i in {1..120}; do
-            if curl -fsS http://127.0.0.1:4105 >/dev/null; then exit 0; fi
-            sleep 1
-          done
-          cat hot-reload.log
-          exit 1
-
       - name: Start liveview example
         shell: bash
         run: |
@@ -211,23 +189,19 @@ jobs:
 
       - name: Run browser e2e tests
         env:
-          GLORY_COUNTER_URL: http://127.0.0.1:4101
           GLORY_SSR_URL: http://127.0.0.1:4102
           GLORY_ROUTER_URL: http://127.0.0.1:4103
           GLORY_FULLSTACK_URL: http://127.0.0.1:4104
-          GLORY_HOT_RELOAD_URL: http://127.0.0.1:4105
           GLORY_LIVEVIEW_URL: http://127.0.0.1:8080
-        run: npm --prefix tests/playwright run test -- --project=web-csr-counter --project=ssr-hydration --project=web-csr-routing --project=fullstack-serverfn --project=hot-reload --project=liveview
+        run: npm --prefix tests/playwright run test -- --project=ssr-hydration --project=web-csr-routing --project=fullstack-serverfn --project=liveview
 
       - name: Dump server logs
         if: always()
         shell: bash
         run: |
-          cat counter.log || true
           cat ssr.log || true
           cat router.log || true
           cat fullstack.log || true
-          cat hot-reload.log || true
           cat liveview.log || true
 
   cross-platform:

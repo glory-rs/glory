@@ -7,6 +7,28 @@ mod id;
 mod node_map;
 pub use node_map::NodeMap;
 mod document;
+mod graphic;
+mod graphic_transition;
+pub use graphic::{
+    GraphicPoint, GraphicProps, GraphicStroke, MAX_GRAPHIC_COMMANDS, MAX_GRAPHIC_COORDINATE,
+    PathCommand, StrokeCap,
+};
+pub use graphic_transition::GraphicTransition;
+mod choice;
+pub use choice::{ChoiceCommand, ComboboxKind, OptionSemantics};
+mod tags;
+pub use tags::{MAX_TAG_INPUT_BYTES, MAX_TAG_PASTE_BYTES, TagKey, TagSeparators, TagsCommand};
+mod select;
+pub use select::{
+    MAX_SELECT_BYTES, MAX_SELECT_GROUPS, MAX_SELECT_OPTIONS, SelectEntry, SelectGroup,
+    SelectOption, SelectProps, SelectSelection,
+};
+mod range;
+pub use range::RangeValue;
+mod progress;
+pub use progress::ProgressValue;
+mod motion;
+pub use motion::{GraphicAnimation, MotionPreference};
 pub mod memory;
 mod plan;
 pub mod profile;
@@ -20,14 +42,29 @@ pub use id::{NodeId, NodeIds, RuntimeId};
 pub use plan::{MAX_PLAN_NODES, Plan, PlanNode, WeakPlan};
 pub use props::*;
 pub use semantics::{
-    DismissReason, FieldPart, FormAction, FormControl, LinkOpen, Layer, LayerPlacement, Orientation,
-    SemanticId, Semantics,
+    Current, Direction, DismissReason, FieldPart, FormAction, FormControl, Layer, LayerFocus,
+    LayerPlacement, LinkOpen, MenuItemKind, MenuItemSemantics, Orientation, PopupKind, SemanticId,
+    Semantics,
 };
 pub use text::normalize_text;
 mod keyboard;
 pub use keyboard::{KeyboardCommand, KeyboardInput};
+mod navigation_panel;
+pub use navigation_panel::{NavigationPanel, NavigationPanelCommand};
+mod scroll;
+pub use scroll::{ScrollAxes, ScrollCommand, ScrollMetrics, ScrollMovement};
+mod sheet;
+pub use sheet::{MAX_SHEET_SNAPS, SheetCommand, SheetConfig};
+mod slider;
+pub use slider::SliderValue;
+mod splitter;
+pub use splitter::RangeCommand;
+mod typeahead;
+pub use typeahead::{MAX_TYPEAHEAD_MILLIS, validate_typeahead};
 mod drag;
 pub use drag::DragPhase;
+mod menu;
+pub use menu::{MenuCommand, PointerPhase};
 
 /// Optional windowed-view metadata. Engines can show a flow preview before
 /// geometry is available without changing logical ownership or identity.
@@ -115,6 +152,7 @@ pub struct QueryToken(pub u64);
 pub enum Query {
     Bounds(NodeId),
     Scroll(NodeId),
+    ScrollMetrics(NodeId),
     Selection(NodeId),
     /// Whether this node's actual control owns document focus at the request
     /// barrier. This is neither FocusWithin nor OS/window activation.
@@ -124,13 +162,18 @@ pub enum Query {
 impl Query {
     pub fn node(self) -> NodeId {
         match self {
-            Self::Bounds(id) | Self::Scroll(id) | Self::Selection(id) | Self::Focus(id) => id,
+            Self::Bounds(id)
+            | Self::Scroll(id)
+            | Self::ScrollMetrics(id)
+            | Self::Selection(id)
+            | Self::Focus(id) => id,
         }
     }
 
     /// Semantic target checks precede host-specific availability checks. A
     /// boxless Group has no physical bounds/scroll/selection of its own.
-    pub fn validate_target(self, node: &Descriptor) -> Result<(), Error> {
+    pub fn validate_target<'a>(self, node: impl Into<DescriptorView<'a>>) -> Result<(), Error> {
+        let node = node.into();
         if matches!(node.props, Props::Group) {
             return Err(Error::Unsupported("group has no physical query target"));
         }
@@ -160,6 +203,7 @@ impl Query {
                     return Err(Error::InvalidResponse("invalid scroll offsets"));
                 }
             }
+            (Self::ScrollMetrics(_), QueryValue::ScrollMetrics(metrics)) => metrics.validate()?,
             (Self::Selection(_), QueryValue::Selection { start, end }) => {
                 if start > end {
                     return Err(Error::InvalidResponse("reversed selection"));
@@ -174,6 +218,17 @@ impl Query {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Action {
+    /// Reveal a mounted option inside its nearest owning listbox, preserving
+    /// actual combobox focus and the outer document scroll position.
+    RevealOption {
+        node: NodeId,
+    },
+    /// Leave this named nonmodal Menu's tree in native Tab order, relative to
+    /// its return-focus trigger. Does not imply the controlled menu accepted a close.
+    ExitMenu {
+        node: NodeId,
+        backwards: bool,
+    },
     /// Request focus without scrolling. Ok means the host processed the intent;
     /// it may decline because of current layout/platform state. Query::Focus
     /// reads the actual result; FocusChanged reports actual transitions only.
@@ -187,15 +242,61 @@ pub enum Action {
 impl Action {
     pub fn node(self) -> NodeId {
         match self {
-            Self::Focus(node) | Self::ScrollTo { node, .. } => node,
+            Self::Focus(node)
+            | Self::ScrollTo { node, .. }
+            | Self::ExitMenu { node, .. }
+            | Self::RevealOption { node } => node,
         }
     }
     /// Validate after checking identity, before capability checks or queuing.
-    pub fn validate_target(self, node: &Descriptor) -> Result<(), Error> {
+    pub fn validate_target<'a>(self, node: impl Into<DescriptorView<'a>>) -> Result<(), Error> {
+        let node = node.into();
+        if matches!(self, Self::RevealOption { .. })
+            && !node.semantics.as_ref().is_some_and(|s| s.option.is_some())
+        {
+            return Err(Error::Unsupported(
+                "option reveal requires an intrinsic listbox option",
+            ));
+        }
+        if matches!(self, Self::Focus(_))
+            && (node.role == Some(Role::Listbox)
+                || node.semantics.as_ref().is_some_and(|s| s.option.is_some()))
+        {
+            return Err(Error::Unsupported(
+                "listbox options preserve combobox focus",
+            ));
+        }
+        if matches!(self, Self::ExitMenu { .. })
+            && (node.role != Some(Role::Menu)
+                || !node
+                    .semantics
+                    .as_ref()
+                    .and_then(|s| s.layer.as_ref())
+                    .is_some_and(|layer| !layer.modal && layer.return_focus.is_some()))
+        {
+            return Err(Error::Unsupported(
+                "menu exit requires a named nonmodal menu with a return target",
+            ));
+        }
         if let Self::ScrollTo { x, y, .. } = self
             && (!x.is_finite() || !y.is_finite() || x < 0.0 || y < 0.0)
         {
             return Err(Error::InvalidProps("invalid scroll position"));
+        }
+        if matches!(self, Self::Focus(_))
+            && node.role == Some(Role::Separator)
+            && !node
+                .semantics
+                .as_ref()
+                .is_some_and(|s| s.splitter.is_some())
+        {
+            return Err(Error::Unsupported("focus on passive separator"));
+        }
+        if matches!(self, Self::Focus(_)) && node.role == Some(Role::Tooltip) {
+            return Err(Error::Unsupported("focus on passive tooltip"));
+        }
+        if matches!(self, Self::Focus(_)) && node.role == Some(Role::ProgressBar) {
+            return Err(Error::Unsupported("focus on passive progress"));
         }
         if matches!(node.props, Props::Group) {
             return Err(Error::Unsupported("group has no physical action target"));
@@ -207,6 +308,11 @@ impl Action {
             && matches!(&node.props, Props::Image(image) if image.alternative.is_none())
         {
             return Err(Error::Unsupported("focus on decorative image"));
+        }
+        if matches!(self, Self::Focus(_))
+            && matches!(node.props, Props::Graphic(graphic) if graphic.alternative.is_none())
+        {
+            return Err(Error::Unsupported("focus on decorative graphic"));
         }
         Ok(())
     }
@@ -236,6 +342,7 @@ pub enum Navigation {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum QueryValue {
+    ScrollMetrics(ScrollMetrics),
     Focus(bool),
     Bounds(Rect),
     Scroll {
@@ -252,6 +359,43 @@ pub enum QueryValue {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Event {
+    Sheet {
+        from: NodeId,
+        revision: u64,
+        command: SheetCommand,
+    },
+    NavigationPanel {
+        from: NodeId,
+        command: NavigationPanelCommand,
+    },
+    Range {
+        from: NodeId,
+        command: RangeCommand,
+    },
+    ScrollKeyboard {
+        from: NodeId,
+        command: ScrollCommand,
+    },
+    /// Terminal observation for one program-selected image request.
+    ImageStatus {
+        revision: u64,
+        status: ImageStatus,
+    },
+    Menu {
+        from: NodeId,
+        command: MenuCommand,
+    },
+    Pointer {
+        from: NodeId,
+        related: Option<NodeId>,
+        phase: PointerPhase,
+    },
+    /// Logical boundary observation derived from a physical pointer origin.
+    PointerWithin {
+        from: NodeId,
+        related: Option<NodeId>,
+        phase: PointerPhase,
+    },
     /// Native form default behavior is cancelled before this queued request.
     /// None represents a programmatic request or implicit keyboard submission.
     Submit {
@@ -287,6 +431,19 @@ pub enum Event {
         revision: u64,
     },
     CheckedChanged(bool),
+    Tags {
+        from: NodeId,
+        revision: u64,
+        command: TagsCommand,
+    },
+    Choice {
+        from: NodeId,
+        command: ChoiceCommand,
+    },
+    SelectChanged {
+        keys: Vec<SemanticId>,
+        revision: u64,
+    },
     /// Direct focus origin. Hosts report this even if only an ancestor has a
     /// FocusWithin interest; App derives the logical ancestor observations.
     FocusChanged(bool),
@@ -300,6 +457,11 @@ pub enum Event {
     Navigate {
         from: NodeId,
         command: Navigation,
+    },
+    Typeahead {
+        from: NodeId,
+        text: String,
+        at_millis: u64,
     },
     Composition {
         active: bool,
@@ -342,6 +504,15 @@ pub struct ScrollAck {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum EventKind {
+    Tags,
+    Sheet,
+    NavigationPanel,
+    Range,
+    ScrollKeyboard,
+    ImageStatus,
+    Menu,
+    Pointer,
+    PointerWithin,
     Submit,
     Reset,
     Activate,
@@ -352,9 +523,12 @@ pub enum EventKind {
     ValueChanged,
     Commit,
     CheckedChanged,
+    SelectChanged,
+    Choice,
     FocusChanged,
     FocusWithin,
     Navigate,
+    Typeahead,
     Composition,
     Scroll,
     Resize,
@@ -365,10 +539,78 @@ impl EventKind {
     /// Logical bubbling/ancestor observations can target Groups; direct physical
     /// observations cannot. Recording a valid interest does not promise the host
     /// can produce it (SSR records handlers for later browser adoption).
-    pub fn validate_target(self, node: &Descriptor) -> Result<(), Error> {
+    pub fn validate_target<'a>(self, node: impl Into<DescriptorView<'a>>) -> Result<(), Error> {
+        let node = node.into();
+        if self == Self::Tags
+            && !matches!(node.props,Props::Input(input) if !input.multiline && node.semantics.as_ref().is_some_and(|s|s.tags_input.is_some()))
+        {
+            return Err(Error::InvalidProps(
+                "tags commands require an opted-in single-line input",
+            ));
+        }
+        if self == Self::Sheet && !matches!(node.props, Props::View) {
+            return Err(Error::InvalidProps("sheet commands require a view"));
+        }
+        if self == Self::NavigationPanel
+            && !matches!(node.props, Props::Button(_) | Props::Link(_) | Props::View)
+        {
+            return Err(Error::InvalidProps(
+                "navigation panel commands require a physical navigation control or content view",
+            ));
+        }
+        if self == Self::Range
+            && (!matches!(node.props, Props::View)
+                || !matches!(node.role, Some(Role::Separator | Role::Slider)))
+        {
+            return Err(Error::InvalidProps(
+                "range commands require a slider or splitter separator",
+            ));
+        }
+        if self == Self::Choice
+            && !node
+                .semantics
+                .as_ref()
+                .is_some_and(|s| s.combobox.is_some())
+        {
+            return Err(Error::InvalidProps("choice commands require a combobox"));
+        }
+        if self == Self::SelectChanged && !matches!(node.props, Props::Select(_)) {
+            return Err(Error::InvalidProps("selection event requires a select"));
+        }
+        if self == Self::ScrollKeyboard && !matches!(node.props, Props::View) {
+            return Err(Error::InvalidProps(
+                "scroll keyboard requires a viewport view",
+            ));
+        }
+        if self == Self::ImageStatus && !matches!(node.props, Props::Image(_)) {
+            return Err(Error::InvalidProps("image status requires an image"));
+        }
         if matches!(self, Self::Submit | Self::Reset) && node.field_part() != Some(FieldPart::Form)
         {
             return Err(Error::InvalidProps("form request requires a form"));
+        }
+        if matches!(
+            node.role,
+            Some(Role::Separator | Role::Tooltip | Role::ProgressBar)
+        ) && matches!(
+            self,
+            Self::Activate
+                | Self::Keyboard
+                | Self::ScrollKeyboard
+                | Self::Drag
+                | Self::Navigate
+                | Self::Typeahead
+                | Self::Menu
+                | Self::NavigationPanel
+                | Self::Range
+        ) && !(node.role == Some(Role::Separator)
+            && node
+                .semantics
+                .as_ref()
+                .is_some_and(|s| s.splitter.is_some())
+            && matches!(self, Self::Range | Self::Drag))
+        {
+            return Err(Error::Unsupported("passive separator has no interaction"));
         }
         // Interests may be registered before layer metadata bindings run.
         if self == Self::Dismiss && !matches!(node.props, Props::View) {
@@ -390,7 +632,12 @@ impl EventKind {
         if matches!(node.props, Props::Group)
             && matches!(
                 self,
-                Self::Resize | Self::Scroll | Self::Anchor | Self::FocusChanged | Self::Drag
+                Self::Resize
+                    | Self::Scroll
+                    | Self::Anchor
+                    | Self::FocusChanged
+                    | Self::Drag
+                    | Self::Pointer
             )
         {
             return Err(Error::Unsupported("group has no physical event target"));
@@ -400,6 +647,19 @@ impl EventKind {
 }
 
 impl Event {
+    /// User input is suppressed by inherited inert regions. Resource/layout
+    /// observations and terminal cleanup remain available to live Owners.
+    pub fn is_user_interaction(&self) -> bool {
+        !self.is_terminal_loss()
+            && !matches!(
+                self,
+                Self::ImageStatus { .. }
+                    | Self::ColorSchemeChanged { .. }
+                    | Self::Scroll { .. }
+                    | Self::Resize { .. }
+                    | Self::Anchor { .. }
+            )
+    }
     /// Cleanup observations still reach live scopes after suspension. Retired
     /// identities never become valid again because an event is terminal.
     pub fn is_terminal_loss(&self) -> bool {
@@ -412,15 +672,32 @@ impl Event {
                     phase: DragPhase::Cancel,
                     ..
                 }
+                | Self::Pointer {
+                    phase: PointerPhase::Leave,
+                    ..
+                }
+                | Self::PointerWithin {
+                    phase: PointerPhase::Leave,
+                    ..
+                }
         )
     }
 
     pub(crate) fn origin(&self) -> Option<NodeId> {
         match self {
+            Self::Tags { from, .. } => Some(*from),
             Self::Submit { submitter } => *submitter,
             Self::FocusWithin { node, .. } => Some(*node),
             Self::Navigate { from, .. } => Some(*from),
-            Self::Keyboard { from, .. } => Some(*from),
+            Self::Menu { from, .. }
+            | Self::Pointer { from, .. }
+            | Self::PointerWithin { from, .. } => Some(*from),
+            Self::Typeahead { from, .. } => Some(*from),
+            Self::Choice { from, .. } | Self::Keyboard { from, .. } => Some(*from),
+            Self::ScrollKeyboard { from, .. } => Some(*from),
+            Self::Range { from, .. } => Some(*from),
+            Self::Sheet { from, .. } => Some(*from),
+            Self::NavigationPanel { from, .. } => Some(*from),
             Self::Drag { from, .. } => Some(*from),
             Self::Anchor { row, .. } => Some(*row),
             _ => None,
@@ -430,7 +707,49 @@ impl Event {
     /// Check typed host input before business handlers. Embedded identities'
     /// liveness/ancestry require a tree and are checked by Memory::validate_event.
     /// Scroll offsets may be negative; local geometry must have x/y=0.
-    pub fn validate_payload(&self, target: NodeId, node: &Descriptor) -> Result<(), Error> {
+    pub fn validate_payload<'a>(
+        &self,
+        target: NodeId,
+        node: impl Into<DescriptorView<'a>>,
+    ) -> Result<(), Error> {
+        let node = node.into();
+        if let Self::Sheet {
+            from,
+            revision,
+            command,
+        } = self
+        {
+            if from.runtime() != target.runtime() {
+                return Err(Error::ForeignRuntime);
+            }
+            let config = node
+                .semantics
+                .as_ref()
+                .and_then(|s| s.layer.as_ref())
+                .and_then(|layer| layer.sheet.as_ref())
+                .ok_or(Error::InvalidEvent("sheet command requires a sheet"))?;
+            if *from != target {
+                return Err(Error::InvalidEvent(
+                    "sheet command origin must equal its target",
+                ));
+            }
+            if *revision > config.revision {
+                return Err(Error::SheetRevision {
+                    current: config.revision,
+                    incoming: *revision,
+                });
+            }
+            if *revision == config.revision
+                && match command {
+                    SheetCommand::Snap(index) => *index >= config.fractions.len(),
+                    SheetCommand::Dismiss => !config.dismissible,
+                }
+            {
+                return Err(Error::InvalidEvent(
+                    "sheet command exceeds its accepted configuration",
+                ));
+            }
+        }
         if let Self::Dismiss(reason) = self {
             let layer = node
                 .semantics
@@ -438,6 +757,9 @@ impl Event {
                 .and_then(|s| s.layer.as_ref())
                 .ok_or(Error::InvalidEvent("dismiss requires a layer"))?;
             if !match reason {
+                DismissReason::Gesture => {
+                    layer.sheet.as_ref().is_some_and(|sheet| sheet.dismissible)
+                }
                 DismissReason::Escape => layer.escape,
                 DismissReason::Outside => layer.outside,
             } {
@@ -451,6 +773,19 @@ impl Event {
             return Err(Error::ForeignRuntime);
         }
         self.kind().validate_target(node)?;
+        if matches!(
+            self,
+            Self::Choice {
+                command: ChoiceCommand::RemoveLast,
+                ..
+            }
+        ) && node.semantics.as_ref().and_then(|value| value.combobox)
+            != Some(ComboboxKind::Multiple)
+        {
+            return Err(Error::InvalidEvent(
+                "remove-last requires a multiple combobox",
+            ));
+        }
         let local = |rect: &Rect| {
             rect.x == 0.0
                 && rect.y == 0.0
@@ -460,6 +795,108 @@ impl Event {
                 && rect.height >= 0.0
         };
         match self {
+            Self::Range { from, command } => {
+                let range = node
+                    .semantics
+                    .as_ref()
+                    .filter(|s| !s.disabled)
+                    .and_then(|s| {
+                        s.splitter
+                            .or_else(|| s.slider.as_ref().map(|slider| slider.range))
+                    })
+                    .ok_or(Error::InvalidEvent(
+                        "range command requires an enabled slider or splitter",
+                    ))?;
+                if *from != target {
+                    return Err(Error::InvalidEvent(
+                        "range command requires its physical origin",
+                    ));
+                }
+                command.validate(range)?;
+            }
+            Self::Choice { from, .. } => {
+                if *from != target {
+                    return Err(Error::InvalidEvent(
+                        "choice command requires the combobox physical origin",
+                    ));
+                }
+            }
+            Self::ScrollKeyboard { from, command } => {
+                if *from != target
+                    || !node
+                        .semantics
+                        .as_ref()
+                        .and_then(|s| s.scroll_keyboard)
+                        .is_some_and(|axes| axes.allows(command.axis))
+                {
+                    return Err(Error::InvalidEvent(
+                        "scroll keyboard requires its opted-in physical viewport and axis",
+                    ));
+                }
+            }
+            Self::PointerWithin { related, .. } => {
+                if related.is_some_and(|related| related.runtime() != target.runtime()) {
+                    return Err(Error::ForeignRuntime);
+                }
+            }
+            Self::NavigationPanel { from, command } => {
+                if *from != target || matches!(node.props, Props::Group) {
+                    return Err(Error::InvalidEvent(
+                        "navigation panel requires its exact physical origin",
+                    ));
+                }
+                let marker = node.semantics.as_ref().and_then(|s| s.navigation_panel);
+                let member = node.semantics.as_ref().is_some_and(|s| s.navigation_item);
+                if *command == NavigationPanelCommand::Close {
+                    if !member && marker != Some(NavigationPanel::Content) {
+                        return Err(Error::InvalidEvent(
+                            "navigation close requires a content member",
+                        ));
+                    }
+                } else if marker != Some(NavigationPanel::Trigger) {
+                    return Err(Error::InvalidEvent(
+                        "navigation entry requires a disclosure trigger",
+                    ));
+                }
+            }
+            Self::Menu { from, .. } | Self::Pointer { from, .. } => {
+                if *from != target || matches!(node.props, Props::Group) {
+                    return Err(Error::InvalidEvent(
+                        "menu/pointer requires its physical origin",
+                    ));
+                }
+                if matches!(self, Self::Menu { .. })
+                    && node.role != Some(Role::Menu)
+                    && !node
+                        .semantics
+                        .as_ref()
+                        .is_some_and(|s| s.menu_item.is_some() || s.popup == Some(PopupKind::Menu))
+                {
+                    return Err(Error::InvalidEvent(
+                        "menu command requires a menu or menu trigger/item",
+                    ));
+                }
+                if let Self::Pointer {
+                    related: Some(related),
+                    ..
+                } = self
+                    && related.runtime() != target.runtime()
+                {
+                    return Err(Error::ForeignRuntime);
+                }
+            }
+            Self::Typeahead {
+                from,
+                text,
+                at_millis,
+            } => {
+                if *from != target || matches!(node.props, Props::Group) {
+                    return Err(Error::InvalidEvent(
+                        "typeahead requires its physical origin",
+                    ));
+                }
+                validate_typeahead(text, *at_millis)?;
+            }
             Self::Drag { from, phase, x, y } => {
                 if !x.is_finite() || !y.is_finite() {
                     return Err(Error::InvalidEvent("drag coordinates must be finite"));
@@ -509,6 +946,27 @@ impl Event {
             } if !within.is_finite() || *within < 0.0 || !local(viewport) => {
                 return Err(Error::InvalidEvent("invalid anchor geometry"));
             }
+            Self::SelectChanged { keys, revision } => {
+                if let Props::Select(select) = node.props {
+                    select.validate_user_selection(keys)?;
+                    if *revision > select.selection.revision {
+                        return Err(Error::SelectRevision {
+                            current: select.selection.revision,
+                            incoming: *revision,
+                        });
+                    }
+                }
+            }
+            Self::ImageStatus { revision, .. } => {
+                if let Props::Image(image) = node.props
+                    && *revision > image.revision
+                {
+                    return Err(Error::ImageRevision {
+                        current: image.revision,
+                        incoming: *revision,
+                    });
+                }
+            }
             Self::ValueChanged {
                 value, revision, ..
             }
@@ -531,6 +989,26 @@ impl Event {
                     });
                 }
             }
+            Self::Tags {
+                from,
+                revision,
+                command,
+            } => {
+                if *from != target {
+                    return Err(Error::InvalidEvent(
+                        "tags command requires its exact input origin",
+                    ));
+                }
+                command.validate()?;
+                if let Props::Input(input) = node.props
+                    && *revision > input.revision
+                {
+                    return Err(Error::InputRevision {
+                        current: input.revision,
+                        incoming: *revision,
+                    });
+                }
+            }
             _ => {}
         }
         Ok(())
@@ -538,6 +1016,15 @@ impl Event {
 
     pub fn kind(&self) -> EventKind {
         match self {
+            Self::Tags { .. } => EventKind::Tags,
+            Self::Range { .. } => EventKind::Range,
+            Self::Sheet { .. } => EventKind::Sheet,
+            Self::NavigationPanel { .. } => EventKind::NavigationPanel,
+            Self::ScrollKeyboard { .. } => EventKind::ScrollKeyboard,
+            Self::ImageStatus { .. } => EventKind::ImageStatus,
+            Self::Menu { .. } => EventKind::Menu,
+            Self::Pointer { .. } => EventKind::Pointer,
+            Self::PointerWithin { .. } => EventKind::PointerWithin,
             Self::Submit { .. } => EventKind::Submit,
             Self::Reset => EventKind::Reset,
             Self::Activate => EventKind::Activate,
@@ -548,9 +1035,12 @@ impl Event {
             Self::ValueChanged { .. } => EventKind::ValueChanged,
             Self::Commit { .. } => EventKind::Commit,
             Self::CheckedChanged(_) => EventKind::CheckedChanged,
+            Self::SelectChanged { .. } => EventKind::SelectChanged,
+            Self::Choice { .. } => EventKind::Choice,
             Self::FocusChanged(_) => EventKind::FocusChanged,
             Self::FocusWithin { .. } => EventKind::FocusWithin,
             Self::Navigate { .. } => EventKind::Navigate,
+            Self::Typeahead { .. } => EventKind::Typeahead,
             Self::Composition { .. } => EventKind::Composition,
             Self::Scroll { .. } => EventKind::Scroll,
             Self::Resize { .. } => EventKind::Resize,
@@ -603,6 +1093,21 @@ pub enum Error {
         incoming: u64,
     },
     InputRevisionExhausted,
+    SelectRevision {
+        current: u64,
+        incoming: u64,
+    },
+    SelectRevisionExhausted,
+    ImageRevision {
+        current: u64,
+        incoming: u64,
+    },
+    ImageRevisionExhausted,
+    SheetRevision {
+        current: u64,
+        incoming: u64,
+    },
+    SheetRevisionExhausted,
 }
 
 impl std::fmt::Display for Error {
@@ -634,7 +1139,7 @@ pub trait Render {
     /// calls, layout, application callbacks, or committed-tree lookups. Adapters
     /// must enforce the same restrictions in apply for callers without an App.
     /// This is not a transaction or a guarantee that later host work succeeds.
-    fn preflight(&self, _node: &Descriptor, _patch: Option<&Patch>) -> Result<(), Error> {
+    fn preflight(&self, _node: DescriptorView<'_>, _patch: Option<&Patch>) -> Result<(), Error> {
         Ok(())
     }
     /// Validate adapter-specific ancestor/content constraints against the App's

@@ -34,28 +34,34 @@ impl Plan {
             if parent.is_none_or(|parent| parent < index) {
                 let mut boxed_parent = parent;
                 while let Some(index) = boxed_parent {
-                    if !matches!(nodes[index].descriptor.props, Props::Group) {
+                    if !matches!(nodes[index].descriptor.view().props, Props::Group) {
                         break;
                     }
                     boxed_parent = nodes[index].parent;
                 }
                 crate::document::validate_child(
-                    &nodes[index].descriptor,
-                    boxed_parent.map(|parent| &nodes[parent].descriptor),
+                    nodes[index].descriptor.view(),
+                    boxed_parent.map(|parent| nodes[parent].descriptor.view()),
                     boxed_parent.is_none(),
                 )?;
             }
-            let (interactive, button, form) = match parent {
-                None if index == 0 => (false, false, false),
+            let (interactive, button, form, tooltip) = match parent {
+                None if index == 0 => (false, false, false, false),
                 Some(parent) if parent < index => {
-                    if nodes[index].descriptor.field_part() == Some(crate::FieldPart::Legend)
-                        && nodes[parent].descriptor.field_part() != Some(crate::FieldPart::Fieldset)
+                    if nodes[parent].descriptor.view().role == Some(crate::Role::Separator) {
+                        return Err(Error::InvalidProps(
+                            "passive separators cannot contain children",
+                        ));
+                    }
+                    if nodes[index].descriptor.view().field_part() == Some(crate::FieldPart::Legend)
+                        && nodes[parent].descriptor.view().field_part()
+                            != Some(crate::FieldPart::Fieldset)
                     {
                         return Err(Error::InvalidPlacement(
                             "legend requires a direct fieldset parent",
                         ));
                     }
-                    if !nodes[parent].descriptor.props.accepts_children() {
+                    if !nodes[parent].descriptor.view().props.accepts_children() {
                         return Err(Error::InvalidProps(
                             "leaf component cannot contain children",
                         ));
@@ -74,7 +80,7 @@ impl Plan {
             if form && descriptor.field_part() == Some(crate::FieldPart::Form) {
                 return Err(Error::InvalidPlacement("forms cannot be nested"));
             }
-            validate_context(descriptor, interactive, button)?;
+            validate_context(descriptor.view(), interactive, button, tooltip)?;
             if let Some(name) = descriptor.semantic_id()
                 && !names.insert(name.clone())
             {
@@ -89,9 +95,16 @@ impl Plan {
                     ),
                 button || matches!(descriptor.props, Props::Button(_)),
                 form || descriptor.field_part() == Some(crate::FieldPart::Form),
+                tooltip
+                    || matches!(
+                        descriptor.role,
+                        Some(crate::Role::Tooltip | crate::Role::ProgressBar | crate::Role::Slider)
+                    ),
             ));
         }
-        Ok(Self(nodes.into()))
+        let plan = Self(nodes.into());
+        crate::choice::validate_plan_owners(&plan, None, true)?;
+        Ok(plan)
     }
     pub fn nodes(&self) -> &[PlanNode] {
         &self.0
@@ -123,11 +136,42 @@ impl Hash for Plan {
     }
 }
 
-pub(crate) fn validate_context(
-    descriptor: &Descriptor,
+pub(crate) fn validate_context<'a>(
+    descriptor: impl Into<crate::DescriptorView<'a>>,
     interactive: bool,
     button: bool,
+    tooltip: bool,
 ) -> Result<(), Error> {
+    let descriptor = descriptor.into();
+    if tooltip
+        && (descriptor.props.interactive()
+            || descriptor.focus != FocusMode::Auto
+            || matches!(
+                descriptor.role,
+                Some(
+                    crate::Role::Dialog
+                        | crate::Role::AlertDialog
+                        | crate::Role::Menu
+                        | crate::Role::Toolbar
+                        | crate::Role::TabList
+                        | crate::Role::RadioGroup
+                )
+            )
+            || descriptor.semantics.as_ref().is_some_and(|s| {
+                s.layer.is_some()
+                    || s.navigation.is_some()
+                    || s.tab
+                    || s.pressed.is_some()
+                    || s.popup.is_some()
+                    || s.expanded.is_some()
+                    || s.menu_item.is_some()
+                    || s.form_action.is_some()
+            }))
+    {
+        return Err(Error::InvalidProps(
+            "tooltip/progress content must remain passive",
+        ));
+    }
     if interactive && (descriptor.props.interactive() || descriptor.focus != FocusMode::Auto) {
         return Err(Error::InvalidProps("interactive controls cannot be nested"));
     }
@@ -140,6 +184,7 @@ pub(crate) fn validate_context(
                     ..
                 })
                 | Props::Image(_)
+                | Props::Graphic(_)
         )
     {
         return Err(Error::InvalidProps(

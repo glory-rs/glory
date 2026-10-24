@@ -63,6 +63,7 @@ pub fn verify(mut renderer: impl Render, runtime: RuntimeId, geometry: bool) {
             (EventKind::CheckedChanged, checks),
             (EventKind::Drag, matches!(props, Props::View)),
             (EventKind::ColorSchemeChanged, matches!(props, Props::View)),
+            (EventKind::ScrollKeyboard, matches!(props, Props::View)),
         ] {
             let result = renderer.listen(id, kind, true);
             assert_eq!(result.is_ok(), valid, "{props:?}/{kind:?}: {result:?}");
@@ -72,6 +73,7 @@ pub fn verify(mut renderer: impl Render, runtime: RuntimeId, geometry: bool) {
         for (index, query) in [
             Query::Bounds(id),
             Query::Scroll(id),
+            Query::ScrollMetrics(id),
             Query::Selection(id),
             Query::Focus(id),
         ]
@@ -102,7 +104,7 @@ pub fn verify(mut renderer: impl Render, runtime: RuntimeId, geometry: bool) {
             let expected = match query {
                 Query::Focus(_) => capabilities.focus && boxed,
                 Query::Selection(_) => capabilities.input && edits,
-                Query::Bounds(_) | Query::Scroll(_) => geometry && boxed,
+                Query::Bounds(_) | Query::Scroll(_) | Query::ScrollMetrics(_) => geometry && boxed,
             };
             assert_eq!(result.is_ok(), expected, "{props:?}/{query:?}: {result:?}");
             if let Ok(value) = result {

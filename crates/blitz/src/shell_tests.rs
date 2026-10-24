@@ -8,6 +8,8 @@ use glory_ui::{Widget, button, component, events::activate, input, list, text, v
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::task::{Poll, Waker};
 use std::time::{Duration, Instant};
+#[path = "shell_inert_tests.rs"]
+mod inert;
 
 pub(super) fn tick(app: &mut WindowApp) -> bool {
     app.poll(Some(Context::from_waker(Waker::noop())))
@@ -687,7 +689,7 @@ impl ApplicationHandler for Driver {
                             == value
                     }));
                     assert!(
-                        matches!(&app.app.tree().node(*editor).unwrap().descriptor.props, glory_render::Props::Input(input) if input.value == *value)
+                        matches!(&app.app.tree().node(*editor).unwrap().descriptor.view().props, glory_render::Props::Input(input) if input.value == *value)
                     );
                     app.handle_ui_event(UiEvent::Ime(BlitzImeEvent::Commit("文".into())));
                     app.app.pump().unwrap();
@@ -731,6 +733,7 @@ impl ApplicationHandler for Driver {
                             .node(focused)
                             .unwrap()
                             .descriptor
+                            .view()
                             .item
                             .unwrap()
                             .index,
@@ -750,6 +753,7 @@ impl ApplicationHandler for Driver {
                             .node(focused)
                             .unwrap()
                             .descriptor
+                            .view()
                             .item
                             .unwrap()
                             .index,
@@ -764,7 +768,13 @@ impl ApplicationHandler for Driver {
                     let app = view.downcast_doc_mut::<WindowApp>();
                     let focused = native_focused(app);
                     assert!(matches!(
-                        app.app.tree().node(focused).unwrap().descriptor.props,
+                        app.app
+                            .tree()
+                            .node(focused)
+                            .unwrap()
+                            .descriptor
+                            .view()
+                            .props,
                         glory_render::Props::Input(_)
                     ));
                     native_key(app, Key::Named(NamedKey::End));
@@ -898,4 +908,53 @@ fn real_windows_present_scroll_resume_and_release_owned_tasks() {
         maxima.get().1,
         maxima.get().2
     );
+}
+
+#[test]
+fn native_scroll_keyboard_is_queued_for_only_the_actually_focused_viewport() {
+    let mut app = WindowApp::new();
+    let outer = app.app.scope().cage(None);
+    let inner = app.app.scope().cage(None);
+    let editor = app.app.scope().cage(None);
+    let outer_count = app.app.scope().cage(0usize);
+    let inner_count = app.app.scope().cage(0usize);
+    let metadata = Some(Box::new(glory_render::Semantics {
+        scroll_keyboard: Some(glory_render::ScrollAxes::Both),
+        ..Default::default()
+    }));
+    app.mount(
+        view()
+            .focus(glory_render::FocusMode::TabStop)
+            .node_ref(outer)
+            .semantics(metadata.clone())
+            .on(EventKind::ScrollKeyboard, move |_| {
+                outer_count.revise(|value| *value += 1)
+            })
+            .fill(
+                view()
+                    .focus(glory_render::FocusMode::TabStop)
+                    .node_ref(inner)
+                    .semantics(metadata)
+                    .on(EventKind::ScrollKeyboard, move |_| {
+                        inner_count.revise(|value| *value += 1)
+                    })
+                    .fill(input().node_ref(editor).value("Keep native editing")),
+            ),
+    )
+    .unwrap();
+    tick(&mut app);
+    native_focus(&mut app, outer.get().unwrap());
+    native_key(&mut app, Key::Named(NamedKey::PageDown));
+    native_key(&mut app, Key::Named(NamedKey::ArrowDown));
+    assert_eq!((outer_count.get(), inner_count.get()), (0, 0));
+    tick(&mut app);
+    assert_eq!((outer_count.get(), inner_count.get()), (2, 0));
+    native_focus(&mut app, inner.get().unwrap());
+    native_key(&mut app, Key::Named(NamedKey::End));
+    tick(&mut app);
+    assert_eq!((outer_count.get(), inner_count.get()), (2, 1));
+    native_focus(&mut app, editor.get().unwrap());
+    native_key(&mut app, Key::Named(NamedKey::ArrowDown));
+    tick(&mut app);
+    assert_eq!((outer_count.get(), inner_count.get()), (2, 1));
 }

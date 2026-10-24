@@ -49,6 +49,13 @@ reduced workspace check as proof that those adapters/platforms work.
   and rolls back on drop/unwind without stats/watermark changes. commit accepts
   exactly one mutation. Raw Descriptor::patch/patches keep full construction
   validation. Do not expose mutable live descriptors that bypass this invariant.
+  Explicit Plan declarations share immutable metadata across instances/Memories;
+  live Props and metadata overrides belong independently to each Memory.
+  Read through DescriptorView; do not materialize a full Descriptor on patch or
+  preflight paths. Only the touched metadata field detaches. Rejection, dropped
+  guards and unwind must restore both the value and prior sharing/override state.
+  Ordinary Create remains owned; do not infer a static declaration from business
+  values or retain visited instances in a declaration cache.
 - `glory-core`: per-Runtime graph, direct dependencies, Owner/Binding/Instance,
   keyed Resource/ResourceSeed, tasks and host execution services. No DOM aliases
   or global scheduler mode; resource wire serialization remains an outer concern.
@@ -66,12 +73,12 @@ reduced workspace check as proof that those adapters/platforms work.
   Optional css lowers Sheet selectors with zero-specificity main-node guards;
   Check focus maps to its internal control, enabled/disabled/checked to semantic
   main-node state attributes. Keep full shape, field lowering and classic stream
-  HTML format v3 in agreement. State attributes exist independently of css flags
+  HTML format v4 in agreement. State attributes exist independently of css flags
   so SSR and CSR builds do not acquire different mapping shapes.
   Patch lowering reads the prepared field/inverse, not two complete Shapes;
   full shaping remains for create/snapshot/hydration. Keep the cfg(test) full
   shape difference as a differential oracle when extending any Patch variant.
-  All eighteen variants, default resets, canonicalization, property barriers and
+  All finite variants, default resets, canonicalization, property barriers and
   controlled inputs must agree. Lowering is pure while the guard is borrowed;
   host sink work follows commit and retains the existing prefix/fault contract.
 - `glory-web`: wasm32 DOM interpreter and RAF/async host; no business reentry

@@ -1,9 +1,7 @@
 //! Lower one validated field, not two whole Shapes. Creation/snapshots retain
 //! full shaping. The inverse comes from Memory's rollback guard.
 use crate::{Edit, Part, Property};
-use glory_render::{
-    Change, Descriptor, FocusMode, ItemPosition, Patch, Props, Role, normalize_text,
-};
+use glory_render::{Change, FocusMode, ItemPosition, Patch, Props, Role, normalize_text};
 
 fn attribute(
     edits: &mut Vec<Edit>,
@@ -102,7 +100,7 @@ fn semantics(
     }
 }
 
-pub(crate) fn lower(next: &Descriptor, inverse: &Patch) -> Vec<Edit> {
+pub(crate) fn lower(next: glory_render::DescriptorView<'_>, inverse: &Patch) -> Vec<Edit> {
     let mut edits = Vec::new();
     // Every accepted Group patch leaves its boxless shape empty.
     if matches!(next.props, Props::Group) {
@@ -155,7 +153,7 @@ pub(crate) fn lower(next: &Descriptor, inverse: &Patch) -> Vec<Edit> {
             let old = old!(change);
             let selectable = !matches!(&next.props, Props::Text(text) if !text.selectable);
             let old = inline_style(old, selectable);
-            let new = inline_style(&next.style, selectable);
+            let new = inline_style(next.style, selectable);
             attribute(
                 &mut edits,
                 Part::Main,
@@ -169,8 +167,8 @@ pub(crate) fn lower(next: &Descriptor, inverse: &Patch) -> Vec<Edit> {
             let Props::Text(value) = &next.props else {
                 unreachable!()
             };
-            let old = inline_style(&next.style, old);
-            let new = inline_style(&next.style, value.selectable);
+            let old = inline_style(next.style, old);
+            let new = inline_style(next.style, value.selectable);
             attribute(
                 &mut edits,
                 Part::Main,
@@ -181,12 +179,16 @@ pub(crate) fn lower(next: &Descriptor, inverse: &Patch) -> Vec<Edit> {
         }
         Patch::Name(change) => {
             let old = old!(change);
+            let fallback = match next.props {
+                Props::Graphic(graphic) => graphic.alternative.as_deref(),
+                _ => None,
+            };
             attribute(
                 &mut edits,
                 control,
                 "aria-label",
-                old.as_deref(),
-                next.name.as_deref(),
+                old.as_deref().or(fallback),
+                next.name.as_deref().or(fallback),
             );
             if matches!(next.props, Props::View)
                 && next.field_part() != Some(glory_render::FieldPart::Form)
@@ -400,6 +402,28 @@ pub(crate) fn lower(next: &Descriptor, inverse: &Patch) -> Vec<Edit> {
                 value: Property::Bool(value.checked),
             });
         }
+        Patch::SelectSelection { keys, revision } => {
+            let _old = old!(keys);
+            let Props::Select(select) = next.props else {
+                unreachable!()
+            };
+            if *revision != select.selection.revision {
+                edits.push(Edit::Revision(select.selection.revision));
+            }
+            // Explicit equal writes acknowledge/reject native changes as well.
+            edits.push(Edit::Property {
+                part: control,
+                name: "selectedKeys",
+                value: Property::SelectedKeys(
+                    select
+                        .selection
+                        .keys
+                        .iter()
+                        .map(|key| key.as_str().to_owned())
+                        .collect(),
+                ),
+            });
+        }
         Patch::Value { value, revision } => {
             let old = old!(value);
             let Props::Input(input) = &next.props else {
@@ -441,11 +465,17 @@ pub(crate) fn lower(next: &Descriptor, inverse: &Patch) -> Vec<Edit> {
                 );
             }
         }
-        Patch::Source(change) => {
-            let old = old!(change);
+        Patch::Source { source, revision } => {
+            let old = old!(source);
             let Props::Image(image) = &next.props else {
                 unreachable!()
             };
+            if *revision != image.revision {
+                edits.push(Edit::Revision(image.revision));
+            }
+            let same_source_retry = *revision != image.revision
+                && glory_render::normalize_text(old, true).as_ref() == image.source
+                && !image.source.is_empty();
             attribute(
                 &mut edits,
                 Part::Main,
@@ -453,6 +483,13 @@ pub(crate) fn lower(next: &Descriptor, inverse: &Patch) -> Vec<Edit> {
                 nonempty(old),
                 nonempty(&image.source),
             );
+            if same_source_retry {
+                edits.push(Edit::Attribute {
+                    part: Part::Main,
+                    name: "src",
+                    value: Some(image.source.clone()),
+                });
+            }
         }
         Patch::Alternative(change) => {
             let old = old!(change);
@@ -473,6 +510,43 @@ pub(crate) fn lower(next: &Descriptor, inverse: &Patch) -> Vec<Edit> {
                 old.is_none().then_some("true"),
                 image.alternative.is_none().then_some("true"),
             );
+        }
+        Patch::Graphic(change) => {
+            let old = old!(change);
+            let Props::Graphic(graphic) = next.props else {
+                unreachable!()
+            };
+            for (part, old, new) in [
+                (
+                    Part::Main,
+                    crate::graphic::main(old, next.name.as_deref()),
+                    crate::graphic::main(graphic, next.name.as_deref()),
+                ),
+                (
+                    Part::Content,
+                    crate::graphic::content(old),
+                    crate::graphic::content(graphic),
+                ),
+            ] {
+                for (name, value) in &new {
+                    attribute(
+                        &mut edits,
+                        part,
+                        name,
+                        old.get(name).map(String::as_str),
+                        Some(value),
+                    );
+                }
+                for name in old.keys().filter(|name| !new.contains_key(*name)) {
+                    attribute(
+                        &mut edits,
+                        part,
+                        name,
+                        old.get(name).map(String::as_str),
+                        None,
+                    );
+                }
+            }
         }
         Patch::Target(change) => {
             let old = old!(change);

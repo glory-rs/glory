@@ -8,8 +8,28 @@ use glory_core::{AccessError, Resource, ResourceState};
 use glory_ui::{Widget, component, group, list, text, view, when};
 
 use super::*;
+#[path = "choice_tests.rs"]
+mod choice;
 #[path = "document_tests.rs"]
 mod document;
+#[path = "graphic_tests.rs"]
+mod graphic;
+#[path = "graphic_transition_tests.rs"]
+mod graphic_transition;
+#[path = "hints_tests.rs"]
+mod hints;
+#[path = "image_tests.rs"]
+mod image;
+#[path = "inert_tests.rs"]
+mod inert;
+#[path = "menu_tests.rs"]
+mod menu;
+#[path = "motion_tests.rs"]
+mod motion;
+#[path = "progress_tests.rs"]
+mod progress;
+#[path = "sheet_tests.rs"]
+mod sheet;
 
 #[test]
 fn stream_preflight_rejects_structural_and_grouped_child_changes_before_model_or_queue_updates() {
@@ -222,7 +242,7 @@ fn shell_precedes_loader_polling_and_backpressure_stops_execution() {
     assert_eq!(a.0.borrow().polls, 0);
     assert_eq!(b.0.borrow().polls, 0);
     let shell = frame(&mut stream);
-    assert!(shell.body().starts_with("<!--gly:stream:1-->"));
+    assert!(shell.body().starts_with("<!--gly:stream:2-->"));
     assert_eq!(shell.kind(), FrameKind::Shell);
     assert!(shell.body().contains("waiting a"));
     assert_eq!(a.0.borrow().polls, 0);
@@ -567,3 +587,6 @@ fn html_escaping_expansion_obeys_the_transport_frame_limit() {
         Err(Error::Limit("HTML frame bytes"))
     ));
 }
+
+#[path = "select_tests.rs"]
+mod select;

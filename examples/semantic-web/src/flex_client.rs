@@ -65,7 +65,7 @@ pub fn flex_case(index: usize) -> Result {
         if case.text
             || children.iter().any(|id| {
                 !matches!(
-                    app.tree().node(*id).map(|n| &n.descriptor.props),
+                    app.tree().node(*id).map(|n| n.descriptor.view().props),
                     Ok(Props::View)
                 )
             })

@@ -63,7 +63,7 @@ impl Host {
 
     fn text(&self, row: &Row) -> String {
         let memory = self.memory.borrow();
-        let Props::Text(props) = &memory.node(row.id).unwrap().descriptor.props else {
+        let Props::Text(props) = &memory.node(row.id).unwrap().descriptor.view().props else {
             panic!()
         };
         props.content.clone()

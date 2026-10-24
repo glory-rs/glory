@@ -3,7 +3,7 @@ use glory_ui::{App, input};
 
 fn state(app: &App) -> (String, u64) {
     let tree = app.tree();
-    let Props::Input(input) = &tree.node(tree.roots()[0]).unwrap().descriptor.props else {
+    let Props::Input(input) = &tree.node(tree.roots()[0]).unwrap().descriptor.view().props else {
         panic!("input")
     };
     (input.value.clone(), input.revision)

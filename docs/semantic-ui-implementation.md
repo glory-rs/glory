@@ -2140,3 +2140,35 @@ html/src/patch_tests.rs、blitz/tests/style_profile.rs。具体本次执行结�
 保留 staged / committed 两份 Memory 和全部节点身份，改用带完整 runtime / generation 校验的分页 NodeMap；DOM parent 并入 Entry，移除重复 token 索引和字符串副本，静态计划批量登记。五份全新独立构建、四轮 2,160 样本，千行创建 / 替换 / 万行创建 / 清空的 Script 中位数降低约 14% / 20% / 25% / 31%；小操作未全面改善。
 
 实测候选 Windows / Linux 各 470 测试、27 浏览器套件、真实行高 64/1024 缓存检查通过，全部数据 / 存续身份 / 万行几何 / 画面一致。另行冻结同期功能修改做合并验证，493 项 Windows 测试及 native/WASM 严格 Clippy 通过；这批代码不混入性能收益。完整拆分对照、剩余开销、体积/空间代价和证据边界见 [节点存储与 DOM 元数据报告](node-storage-dom-metadata-2026-10-24.md)。
+
+### 2026-10-24：双份 Memory 共享声明
+
+显式 Plan 的静态元数据从每节点 Descriptor 拷贝中分离；LiveDescriptor 保存独立 Props 和按字段分离的覆盖值，通过借用 DescriptorView 读取。普通 Create 保持独占。prepare_patch 回滚同时恢复值与原来的共享状态，staged / committed 独立校验、完整节点身份和成功前缀/查询水位不变。无 DSL、模板 VM 或依赖更改。
+
+六份独立 release 构建、最终 1,296 个样本：千行创建 / 替换 / 万行创建 / 清空 Script 为 19.59 / 30.43 / 234.37 / 15.45 ms，同批改善约 16% / 17% / 13% / 12%。Windows/Linux 各 522 项工作区测试及 27 浏览器套件通过；64/1024 真实行高、锚点、对象身份和画面检查保持原容差。同期功能另行合并验证，不计入性能收益。原生 size_of 记录、WASM 体积代价、消融异常与完整证据见 [声明共享报告](shared-declarations-2026-10-24.md)。
+
+
+### 2026-10-24：counter 示例迁移到共享语义组件
+
+`examples/counter` 已替换旧 `web::widgets`、DOM 事件和 BrowserHolder。共享库
+中的 Counter 包含状态、语义事件及类型化样式；`src/web.rs` 只处理 WASM/DOM
+挂载及 WebApp 生命周期，`src/main.rs` 只处理 Blitz 桌面窗口/事件循环。
+移除旧 Salvo 资源服务器、Trunk 配置和 web-csr/web-ssr features；独立 workspace
+默认不选宿主，显式选择 web 或 desktop。保留 signed i32 数值行为，输入草稿
+允许暂态负号，Enter/按钮规范化文本，边界加减饱和。Owner Effect 在宿主 tick
+后通过 set_input_value 确认最终值，覆盖输入与 Enter/Clear 同批回到原值的情况。
+
+新增 D: 构建脚本、README、锁文件与独立 counter CI；旧 CLI counter/hot-reload
+启动配置退出，Playwright counter 项目改用当前 Web 入口。引擎来源检查包含新锁。
+本地共享组件3项测试、desktop feature 下3项测试、native/WASM all-features/
+all-targets counter Clippy、两端构建与 Chromium counter 套件通过。WASM 依赖
+glory-web 当前仍有 validate_children 的既有 dead_code warning。Windows 实窗
+通过按钮加减、实际按键输入 -42、Enter 和 Clear；未据此宣称 OS IME、屏幕
+阅读器、Linux/macOS 设备或 Android 宿主完成。运行命令见示例 README；构建
+产物及浏览器验收输出均在 D:/BuildCache/glory-semantic-ui。
+
+### 2026-10-24：NativeSelect 有限原生选择协议与 HTML v4/classic v2
+
+新增真实 Props::Select、不可变有界 options/optgroups、独立选择 key/revision 补丁与事件；UI setter 从 live revision 分配，Memory guard 只交换 selection，HTML full-shape differential oracle 覆盖默认/Keep/Clear/相等写入。业务 value 与 key 分离，空 single 用内部禁用隐藏占位项，readonly 和 FormControl.value 对 Select 明确拒绝。Web 构造原生子节点并读写真实 selectedness；采用先验证全部子树再回放 dirty 状态。Blitz preflight/direct 明确拒绝并保留成功前缀/query 水位。
+
+这是有意破坏的格式升级：HTML FORMAT_VERSION=4，classic stream start/patch/end envelope=2、边界 stream:2、End 回交 v4；资源 envelope 维持1。新增 typed options/selectedKeys wire，旧版先拒绝、不兼容。现有手写 choices/menu/hints、Glory semantic-web/snapshot/transport 的当前格式常量同步迁移。Graphic 的 svg/path 与两个显式 camelCase 属性共同进入当前有限格式。具体 API/预算/证据见 Sapid docs/native-select-implementation.md；浏览器最终结果在该文档记录。

@@ -18,7 +18,13 @@ fn find(app: &App, class: &str) -> Result<NodeId> {
     let mut pending = tree.roots().to_vec();
     while let Some(id) = pending.pop() {
         let node = tree.node(id).map_err(js)?;
-        if node.descriptor.classes.iter().any(|value| value == class) {
+        if node
+            .descriptor
+            .view()
+            .classes
+            .iter()
+            .any(|value| value == class)
+        {
             return Ok(id);
         }
         pending.extend(node.children.iter().copied());

@@ -1,60 +1,19 @@
-use glory::web::events;
-use glory::web::helpers::event_target_value;
-use glory::web::widgets::*;
-use glory::web::holders::BrowserHolder;
-use glory::*;
+//! Desktop host. The component and all event handlers live in the shared library.
+#[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    use glory::blitz::shell::{Shell, WindowApp, WindowAttributes};
 
-pub fn main() {
-    BrowserHolder::new().mount(Counter::new());
+    let app = WindowApp::new();
+    app.mount(counter::Counter)?;
+
+    let mut shell = Shell::new()?;
+    shell.add_window(app, WindowAttributes::default().with_title("Glory Counter"));
+    shell.run()?;
+    Ok(())
 }
 
-#[derive(Debug)]
-struct Counter {
-    value: Cage<i32>,
-}
-impl Counter {
-    pub fn new() -> Self {
-        Self { value: Cage::new(0) }
-    }
-}
-
-impl Widget for Counter {
-    fn build(&mut self, ctx: &mut Scope) {
-        let value = self.value.clone();
-        let clear_counter = move |_| {
-            value.revise(|mut value| {
-                *value = 0;
-            });
-        };
-        let value = self.value.clone();
-        let decrease_counter = move |_| {
-            value.revise(|mut value| {
-                *value = *value - 1;
-            });
-        };
-        let value = self.value.clone();
-        let increase_counter = move |_| {
-            value.revise(|mut value| {
-                *value = *value + 1;
-            });
-        };
-
-        let value = self.value.clone();
-        let input_counter = move |ev| {
-            let v = event_target_value(&ev).parse::<i32>().unwrap_or_default();
-            value.revise(|mut value| {
-                *value = v;
-            });
-        };
-
-        let value = self.value.clone();
-        let text = self.value.map(|value| format!("Value: {value}"));
-        p().class("counter")
-            .fill(button().on(events::click, clear_counter).html("Clear"))
-            .fill(button().on(events::click, decrease_counter).html("-1"))
-            .fill(input().on(events::input, input_counter).prop("value", value))
-            .fill(span().html(text.clone()))
-            .fill(button().on(events::click, increase_counter).html("+1"))
-            .show_in(ctx);
-    }
+#[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+fn main() -> std::process::ExitCode {
+    eprintln!("counter-desktop requires Windows, Linux or macOS; Android needs a mobile host.");
+    std::process::ExitCode::FAILURE
 }

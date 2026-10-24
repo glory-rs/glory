@@ -1,8 +1,10 @@
 //! Document top-layer integration. Only mounted layer declarations are indexed;
 //! native listeners enqueue requests and never call application handlers.
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use glory_render::{DismissReason, Error, Event, Layer, LayerPlacement, Mutation, NodeId};
+use glory_render::{
+    DismissReason, Error, Event, Layer, LayerFocus, LayerPlacement, Mutation, NodeId,
+};
 use wasm_bindgen::JsCast;
 use web_sys::{Element, KeyboardEvent, Node};
 
@@ -16,6 +18,7 @@ pub(super) struct Layers {
     declarations: BTreeMap<NodeId, Layer>,
     stack: Vec<Open>,
     inert: Vec<Element>,
+    blocked: BTreeSet<NodeId>,
 }
 #[derive(Clone)]
 struct Open {
@@ -60,6 +63,7 @@ impl Layers {
             if let Ok(node) = tree.node(id) {
                 match node
                     .descriptor
+                    .view()
                     .semantics
                     .as_ref()
                     .and_then(|s| s.layer.clone())
@@ -74,6 +78,13 @@ impl Layers {
             }
         }
         self.declarations.retain(|id, _| tree.node(*id).is_ok());
+        self.blocked.clear();
+        self.blocked.extend(
+            self.declarations
+                .keys()
+                .copied()
+                .filter(|id| tree.inert(*id)),
+        );
     }
 }
 fn popover(element: &Element, method: &str) -> Result<(), Error> {
@@ -147,11 +158,18 @@ fn first(dom: &Dom, open: &Open) -> Element {
 }
 fn restore_inert(layers: &mut Layers) {
     for element in layers.inert.drain(..) {
-        let _ = element.remove_attribute("inert");
+        if !element.has_attribute("data-gly-inert") {
+            let _ = element.remove_attribute("inert");
+        }
     }
 }
 fn modal_inert(layers: &mut Layers) -> Result<(), Error> {
-    let Some(open) = layers.stack.iter().rev().find(|open| open.config.modal) else {
+    let Some(open) = layers
+        .stack
+        .iter()
+        .rev()
+        .find(|open| open.config.modal && !open.element.has_attribute("inert"))
+    else {
         return Ok(());
     };
     let mut branch = open.element.clone();
@@ -176,7 +194,7 @@ struct Position {
     x: f64,
     y: f64,
 }
-fn position(dom: &Dom, open: &Open) -> Result<Option<Position>, Error> {
+fn position(dom: &Dom, open: &Open, offset: (f64, f64)) -> Result<Option<Position>, Error> {
     let Some(anchor) = named(dom, open.config.anchor.as_ref()) else {
         return Ok(None);
     };
@@ -196,14 +214,37 @@ fn position(dom: &Dom, open: &Open) -> Result<Option<Position>, Error> {
         .map_err(backend)?
         .as_f64()
         .unwrap_or(0.0);
-    let left = if open.config.placement == LayerPlacement::AnchorEnd {
-        anchor.right() - bounds.width()
-    } else {
-        anchor.left()
+    let side = matches!(
+        open.config.placement,
+        LayerPlacement::AnchorLeft | LayerPlacement::AnchorRight
+    );
+    let right = anchor.right() + offset.0 + 4.0;
+    let left_edge = anchor.left() + offset.0 - bounds.width() - 4.0;
+    let left = match open.config.placement {
+        LayerPlacement::AnchorEnd => anchor.right() + offset.0 - bounds.width(),
+        LayerPlacement::AnchorRight => {
+            if right + bounds.width() <= width - 8.0 {
+                right
+            } else {
+                left_edge
+            }
+        }
+        LayerPlacement::AnchorLeft => {
+            if left_edge >= 8.0 {
+                left_edge
+            } else {
+                right
+            }
+        }
+        _ => anchor.left() + offset.0,
     };
-    let below = anchor.bottom() + 6.0;
-    let top = if below + bounds.height() > height - 8.0 && anchor.top() >= bounds.height() + 6.0 {
-        anchor.top() - bounds.height() - 6.0
+    let below = anchor.bottom() + offset.1 + 6.0;
+    let top = if side {
+        anchor.top() + offset.1
+    } else if below + bounds.height() > height - 8.0
+        && anchor.top() + offset.1 >= bounds.height() + 6.0
+    {
+        anchor.top() + offset.1 - bounds.height() - 6.0
     } else {
         below
     };
@@ -228,10 +269,57 @@ fn place(position: Position) -> Result<(), Error> {
     Ok(())
 }
 fn positions(dom: &Dom, stack: &[Open]) -> Result<(), Error> {
-    let pending = stack
+    // Resolve only the current live layer graph. An anchor inside another
+    // pending layer moves by that layer's planned delta. Topological read order
+    // also handles identity-slot reuse; stack/NodeId order is not ancestry.
+    let indices = stack
         .iter()
-        .map(|open| position(dom, open))
-        .collect::<Result<Vec<_>, _>>()?;
+        .enumerate()
+        .map(|(index, open)| (open.id, index))
+        .collect::<BTreeMap<_, _>>();
+    let mut parents = vec![None; stack.len()];
+    let mut children = vec![Vec::new(); stack.len()];
+    let mut ready = VecDeque::new();
+    for (index, open) in stack.iter().enumerate() {
+        let mut cursor = named(dom, open.config.anchor.as_ref());
+        while let Some(element) = cursor {
+            if let Some(parent) = element
+                .get_attribute("data-gly-node")
+                .and_then(|token| dom.id_for_token(&token))
+                .and_then(|id| indices.get(&id))
+                .copied()
+            {
+                parents[index] = Some(parent);
+                children[parent].push(index);
+                break;
+            }
+            cursor = element.parent_element();
+        }
+        if parents[index].is_none() {
+            ready.push_back(index)
+        }
+    }
+    let mut pending = (0..stack.len())
+        .map(|_| None)
+        .collect::<Vec<Option<Position>>>();
+    let mut processed = 0;
+    while let Some(index) = ready.pop_front() {
+        let offset = parents[index]
+            .and_then(|parent| pending[parent].as_ref())
+            .map_or((0.0, 0.0), |parent| {
+                let current = parent.element.get_bounding_client_rect();
+                (parent.x - current.x(), parent.y - current.y())
+            });
+        pending[index] = position(dom, &stack[index], offset)?;
+        processed += 1;
+        ready.extend(children[index].iter().copied());
+    }
+    if processed != stack.len() {
+        return Err(Error::InvalidProps(
+            "layer anchor geometry cannot contain cycles",
+        ));
+    }
+    // No layout-affecting writes occur until every observation is collected.
     for position in pending.into_iter().flatten() {
         place(position)?;
     }
@@ -249,6 +337,18 @@ pub(super) fn sync(dom: &Dom) -> Result<(), Error> {
     };
     let layers = &mut *state;
     restore_inert(layers);
+    // Top-layer elements must carry effective inert themselves. The live
+    // semantic index also covers boxless ancestry and inherited inert changes.
+    for id in layers.declarations.keys() {
+        let Ok(element) = dom.entry(*id).and_then(|entry| entry.element()) else {
+            continue;
+        };
+        if layers.blocked.contains(id) {
+            element.set_attribute("inert", "").map_err(backend)?;
+        } else if !element.has_attribute("data-gly-inert") {
+            element.remove_attribute("inert").map_err(backend)?;
+        }
+    }
     let active = dom.document.active_element();
     let mut restore = None;
     let mut retained = Vec::new();
@@ -266,7 +366,7 @@ pub(super) fn sync(dom: &Dom) -> Result<(), Error> {
             if open.element.matches(":popover-open").unwrap_or(false) {
                 popover(&open.element, "hidePopover")?;
             }
-            if focused {
+            if focused && open.config.focus == LayerFocus::Manage {
                 restore = named_control(dom, open.config.return_focus.as_ref()).or(open.previous);
             }
         }
@@ -288,10 +388,12 @@ pub(super) fn sync(dom: &Dom) -> Result<(), Error> {
             id: *id,
             element,
             config: config.clone(),
-            previous: active.clone(),
+            previous: restore.clone().or_else(|| active.clone()),
         };
         popover(&open.element, "showPopover")?;
-        autofocus = Some(first(dom, &open));
+        if open.config.focus == LayerFocus::Manage {
+            autofocus = Some(first(dom, &open));
+        }
         layers.stack.push(open);
     }
     modal_inert(layers)?;
@@ -309,9 +411,10 @@ pub(super) fn clear(dom: &Dom) {
     let mut restore = None;
     let active = dom.document.active_element();
     for open in layers.stack.into_iter().rev() {
-        if active
-            .as_ref()
-            .is_some_and(|e| open.element.contains(Some(e)))
+        if open.config.focus == LayerFocus::Manage
+            && active
+                .as_ref()
+                .is_some_and(|e| open.element.contains(Some(e)))
         {
             restore = named_control(dom, open.config.return_focus.as_ref()).or(open.previous);
         }
@@ -323,6 +426,77 @@ pub(super) fn clear(dom: &Dom) {
         let _ = dom::focus(&target);
     }
 }
+/// Actual mounted document traversal belongs to the host. Bound the physical
+/// walk, exclude the complete Menu tree, and never touch a business collection.
+pub(super) fn exit_menu(dom: &Dom, id: NodeId, backwards: bool) -> Result<(), Error> {
+    let config = dom
+        .layers
+        .borrow()
+        .declarations
+        .get(&id)
+        .cloned()
+        .ok_or(Error::Unsupported("menu exit target"))?;
+    let trigger = named_control(dom, config.return_focus.as_ref())
+        .ok_or(Error::Unsupported("menu exit return target"))?;
+    let scope = dom
+        .layers
+        .borrow()
+        .stack
+        .iter()
+        .rev()
+        .find(|open| open.config.modal && open.element.contains(Some(&trigger)))
+        .map(|open| open.element.clone())
+        .or_else(|| dom.document.body().map(Into::into))
+        .ok_or(Error::Unsupported("menu exit document"))?;
+    let mut pending = vec![scope];
+    let mut values = Vec::new();
+    let mut inspected = 0usize;
+    while let Some(node) = pending.pop() {
+        inspected += 1;
+        if inspected > 65_536 {
+            return Err(Error::Unsupported("menu exit mounted-node budget"));
+        }
+        if node.has_attribute("hidden")
+            || node.has_attribute("inert")
+            || node.get_attribute("role").as_deref() == Some("menu")
+        {
+            continue;
+        }
+        if js_sys::Reflect::get(&node, &"tabIndex".into())
+            .ok()
+            .and_then(|v| v.as_f64())
+            .is_some_and(|v| v >= 0.0)
+            && !node.has_attribute("disabled")
+            && visible(&node)
+        {
+            values.push(node.clone());
+        }
+        let mut child = node.last_element_child();
+        while let Some(node) = child {
+            child = node.previous_element_sibling();
+            pending.push(node);
+        }
+    }
+    let index = values
+        .iter()
+        .position(|value| value == &trigger)
+        .ok_or(Error::Unsupported("menu exit trigger is not a tab stop"))?;
+    let next = if backwards {
+        index.checked_sub(1)
+    } else {
+        index.checked_add(1).filter(|index| *index < values.len())
+    };
+    if let Some(index) = next {
+        dom::focus(&values[index])?;
+    } else if let Some(active) = dom
+        .document
+        .active_element()
+        .and_then(|element| element.dyn_into::<web_sys::HtmlElement>().ok())
+    {
+        active.blur().map_err(backend)?;
+    }
+    Ok(())
+}
 pub(super) fn receive(dom: &Dom, name: &str, event: &web_sys::Event) -> Result<bool, Error> {
     if !matches!(
         name,
@@ -333,15 +507,65 @@ pub(super) fn receive(dom: &Dom, name: &str, event: &web_sys::Event) -> Result<b
     if !dom.live.get() || event.default_prevented() {
         return Ok(false);
     }
-    let stack = dom.layers.borrow().stack.clone();
-    let Some(top) = stack.last() else {
+    let stack: Vec<_> = dom
+        .layers
+        .borrow()
+        .stack
+        .iter()
+        .filter(|open| open.element.closest("[inert]").ok().flatten().is_none())
+        .cloned()
+        .collect();
+    let target = event.target().and_then(|v| v.dyn_into::<Node>().ok());
+    let owned_target = target
+        .as_ref()
+        .and_then(|target| target.dyn_ref::<Element>())
+        .is_some_and(|element| super::events::target(dom, element).is_some());
+    let unfocused_target = target
+        .as_ref()
+        .and_then(|target| target.dyn_ref::<Element>())
+        .is_some_and(|element| matches!(element.tag_name().as_str(), "BODY" | "HTML"));
+    let top = if name == "keydown" {
+        stack.iter().rev().find(|open| {
+            open.config.focus == LayerFocus::Manage
+                || owned_target
+                || (unfocused_target
+                    && (open.element.matches(":hover").unwrap_or(false)
+                        || named(dom, open.config.anchor.as_ref())
+                            .is_some_and(|anchor| anchor.matches(":hover").unwrap_or(false))))
+        })
+    } else {
+        stack.last()
+    };
+    let Some(top) = top else {
         return Ok(false);
     };
-    let target = event.target().and_then(|v| v.dyn_into::<Node>().ok());
+    let menu_root = (top.element.get_attribute("role").as_deref() == Some("menu")).then(|| {
+        stack
+            .iter()
+            .find(|open| {
+                open.element.get_attribute("role").as_deref() == Some("menu")
+                    && open.element.contains(Some(&top.element))
+            })
+            .unwrap_or(top)
+    });
     let inside = target
         .as_ref()
         .is_some_and(|node| top.element.contains(Some(node)));
     let modal = stack.iter().rev().find(|open| open.config.modal);
+    let inside_modal = modal.is_none_or(|modal| {
+        stack
+            .iter()
+            .skip_while(|open| open.id != modal.id)
+            .any(|open| {
+                target
+                    .as_ref()
+                    .is_some_and(|node| open.element.contains(Some(node)))
+            })
+    });
+    let managed = stack
+        .iter()
+        .rev()
+        .find(|open| open.config.focus == LayerFocus::Manage);
     if name == "keydown" {
         let Some(key) = event.dyn_ref::<KeyboardEvent>() else {
             return Ok(false);
@@ -354,6 +578,28 @@ pub(super) fn receive(dom: &Dom, name: &str, event: &web_sys::Event) -> Result<b
             .is_some_and(|entry| entry.editing.borrow().composing);
         if key.is_composing() || composing {
             return Ok(false);
+        }
+        if menu_root.is_some()
+            && key.key() == "Tab"
+            && !key.alt_key()
+            && !key.ctrl_key()
+            && !key.meta_key()
+            && let Some((from, _)) = target
+                .as_ref()
+                .and_then(|node| node.dyn_ref::<Element>())
+                .and_then(|element| super::events::target(dom, element))
+        {
+            event.prevent_default();
+            dom.queue(
+                from,
+                Event::Menu {
+                    from,
+                    command: glory_render::MenuCommand::Exit {
+                        backwards: key.shift_key(),
+                    },
+                },
+            );
+            return Ok(true);
         }
         if key.key() == "Escape"
             && !key.repeat()
@@ -374,7 +620,7 @@ pub(super) fn receive(dom: &Dom, name: &str, event: &web_sys::Event) -> Result<b
             && !key.ctrl_key()
             && !key.meta_key()
         {
-            let scope = &top.element;
+            let scope = &managed.expect("modal layers manage focus").element;
             let values = candidates(scope);
             let active = dom.document.active_element();
             let current = values.iter().position(|e| Some(e) == active.as_ref());
@@ -406,7 +652,7 @@ pub(super) fn receive(dom: &Dom, name: &str, event: &web_sys::Event) -> Result<b
                     .is_some_and(|node| open.element.contains(Some(node)))
             });
         if !allowed {
-            dom::focus(&first(dom, top))?;
+            dom::focus(&first(dom, managed.unwrap_or(modal)))?;
             return Ok(true);
         }
     }
@@ -425,15 +671,22 @@ pub(super) fn receive(dom: &Dom, name: &str, event: &web_sys::Event) -> Result<b
                 element.get_attribute("aria-controls") == top.element.get_attribute("id")
             });
         if !trigger && top.config.outside {
-            dom.queue(top.id, Event::Dismiss(DismissReason::Outside));
+            let dismiss = menu_root
+                .filter(|root| {
+                    !target
+                        .as_ref()
+                        .is_some_and(|node| root.element.contains(Some(node)))
+                })
+                .unwrap_or(top);
+            dom.queue(dismiss.id, Event::Dismiss(DismissReason::Outside));
         }
-        if modal.is_some() {
+        if !inside_modal {
             event.prevent_default();
             event.stop_immediate_propagation();
             return Ok(true);
         }
     }
-    if name == "click" && modal.is_some() && !inside {
+    if name == "click" && !inside_modal {
         event.prevent_default();
         event.stop_immediate_propagation();
         return Ok(true);

@@ -17,7 +17,7 @@ module.exports = defineConfig({
   },
   projects: [
     {
-      name: "web-csr-counter",
+      name: "counter",
       testMatch: "counter.spec.js",
       use: desktop,
     },

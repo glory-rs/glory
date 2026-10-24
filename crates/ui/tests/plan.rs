@@ -34,10 +34,10 @@ fn live_instances_bind_and_route_independently_then_retire_without_a_retained_sc
     app.dispatch(old, Event::Activate).unwrap();
     assert_eq!(calls.get(), 1);
     assert!(
-        matches!(&app.tree().node(first.node(&text).unwrap()).unwrap().descriptor.props,Props::Text(v)if v.content=="clicked")
+        matches!(&app.tree().node(first.node(&text).unwrap()).unwrap().descriptor.view().props,Props::Text(v)if v.content=="clicked")
     );
     assert!(
-        matches!(&app.tree().node(second.node(&text).unwrap()).unwrap().descriptor.props,Props::Text(v)if v.content=="second")
+        matches!(&app.tree().node(second.node(&text).unwrap()).unwrap().descriptor.view().props,Props::Text(v)if v.content=="second")
     );
     first_owner.dispose();
     second_owner.dispose();

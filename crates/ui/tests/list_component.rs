@@ -780,7 +780,7 @@ fn rows(app: &App) -> Vec<NodeId> {
 fn row_index(app: &App, id: NodeId) -> usize {
     let tree = app.tree();
     let child = tree.node(id).unwrap().children[0];
-    let Props::Text(props) = &tree.node(child).unwrap().descriptor.props else {
+    let Props::Text(props) = &tree.node(child).unwrap().descriptor.view().props else {
         panic!()
     };
     props.content.strip_prefix("row:").unwrap().parse().unwrap()
@@ -1076,7 +1076,7 @@ fn labels(app: &App) -> Vec<(NodeId, String)> {
     while let Some(id) = pending.pop() {
         let node = tree.node(id).unwrap();
         pending.extend(node.children.iter().rev().copied());
-        if let Props::Text(props) = &node.descriptor.props {
+        if let Props::Text(props) = &node.descriptor.view().props {
             labels.push((id, props.content.clone()));
         }
     }
@@ -1106,12 +1106,18 @@ fn public_list_mounts_only_visible_rows_and_coalesces_a_tick_of_scroll_events() 
     assert_eq!(labels(&app).len(), 29);
     assert_eq!(keys.get(), 29);
     assert_eq!(
-        app.tree().node(id).unwrap().descriptor.role,
+        app.tree().node(id).unwrap().descriptor.view().role,
         Some(Role::List)
     );
     let body = app.tree().node(id).unwrap().children[0];
     assert_eq!(
-        app.tree().node(body).unwrap().descriptor.style.height,
+        app.tree()
+            .node(body)
+            .unwrap()
+            .descriptor
+            .view()
+            .style
+            .height,
         Some(glory_style::Length::Px(1_000_000.0))
     );
     let commits = observed.borrow().commits;
@@ -1365,7 +1371,7 @@ fn focused_virtual_rows_and_their_tasks_survive_far_scrolls_then_release_on_blur
         assert!(app.stats().node_slots <= 36);
         assert_eq!(app.stats().handlers, 5);
         assert!(
-            matches!(&app.tree().node(focused).unwrap().descriptor.props, Props::Input(value) if value.value == "draft:2")
+            matches!(&app.tree().node(focused).unwrap().descriptor.view().props, Props::Input(value) if value.value == "draft:2")
         );
         observed.borrow_mut().actions.clear();
         observed.borrow_mut().mutations.clear();
@@ -1474,7 +1480,7 @@ fn cached_keyed_editor_updates_a_distant_focus_pin_and_retires_its_target_on_blu
             runtime.field_slots <= 42 && runtime.node_slots <= 220 && runtime.owner_slots <= 220
         );
         assert!(
-            matches!(&app.tree().node(focused).unwrap().descriptor.props,Props::Input(p) if p.value==format!("draft🙂{step}!"))
+            matches!(&app.tree().node(focused).unwrap().descriptor.view().props,Props::Input(p) if p.value==format!("draft🙂{step}!"))
         );
         observed.borrow_mut().actions.clear();
         observed.borrow_mut().mutations.clear();
@@ -1536,7 +1542,7 @@ fn focused_keys_relocate_and_disappear_without_a_full_source_scan() {
     prefix.revise(|prefix| *prefix = 10_000);
     app.flush().unwrap();
     assert!(
-        matches!(&app.tree().node(target).unwrap().descriptor.props, Props::Input(value) if value.value == "2:10002")
+        matches!(&app.tree().node(target).unwrap().descriptor.view().props, Props::Input(value) if value.value == "2:10002")
     );
     // This source edit changes no visible key or length; the single pinned
     // key's own dependency must still invalidate the controller.
@@ -1568,7 +1574,7 @@ fn logical_navigation_batches_keys_and_reaches_the_last_of_a_hundred_million_row
     .unwrap();
     let root = root(&app);
     assert_eq!(
-        app.tree().node(root).unwrap().descriptor.focus,
+        app.tree().node(root).unwrap().descriptor.view().focus,
         FocusMode::TabStop
     );
     let navigate = |from, command| {
@@ -1623,7 +1629,14 @@ fn logical_navigation_batches_keys_and_reaches_the_last_of_a_hundred_million_row
     let before = reads.get();
     let last = navigate(page, Navigation::Last);
     assert!(reads.get() - before <= 20);
-    let item = app.tree().node(last).unwrap().descriptor.item.unwrap();
+    let item = app
+        .tree()
+        .node(last)
+        .unwrap()
+        .descriptor
+        .view()
+        .item
+        .unwrap();
     assert_eq!(item.index, 99_999_999);
     assert_eq!(item.count, Some(100_000_000));
     assert_eq!(navigate(last, Navigation::Next), last);
@@ -1660,6 +1673,7 @@ fn item_metadata_updates_even_when_data_count_changes_without_window_keys_changi
             .node(first)
             .unwrap()
             .descriptor
+            .view()
             .item
             .unwrap()
             .count,
@@ -1723,7 +1737,7 @@ fn reveal_retains_a_distant_editor_and_does_not_emit_a_focus_action() {
                 .all(|action| !matches!(action, Action::Focus(_)))
         );
         assert!(
-            matches!(&app.tree().node(editor).unwrap().descriptor.props, Props::Input(p) if p.value == "draft 0")
+            matches!(&app.tree().node(editor).unwrap().descriptor.view().props, Props::Input(p) if p.value == "draft 0")
         );
         assert!(rows(&app).contains(&row) && app.stats().nodes < 100);
     }
@@ -2113,7 +2127,7 @@ fn fractional_measurements_preserve_visual_anchor_without_accumulating_scroll_qu
             .into_iter()
             .find(|id| row_index(&app, *id) == 199)
             .unwrap();
-        let top = || match app.tree().node(anchor).unwrap().descriptor.style.top {
+        let top = || match app.tree().node(anchor).unwrap().descriptor.view().style.top {
             Some(Length::Px(value)) => value,
             _ => panic!("absolute row top"),
         };
@@ -2209,7 +2223,7 @@ fn far_segment_roundoff_does_not_hide_a_fractional_viewport_resize() {
         app.dispatch(root, ack(requested, requested, 600.0))
             .unwrap();
         let row = rows(&app)[4];
-        let top = || match app.tree().node(row).unwrap().descriptor.style.top {
+        let top = || match app.tree().node(row).unwrap().descriptor.view().style.top {
             Some(Length::Px(value)) => value,
             _ => panic!("row top"),
         };

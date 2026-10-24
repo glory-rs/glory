@@ -64,7 +64,7 @@ fn planned_and_ordinary_construction_have_identical_html_and_finite_host_operati
             .apply(
                 &[Mutation::Create {
                     id: ids[index],
-                    node: Box::new(node.descriptor.clone()),
+                    node: Box::new(node.descriptor.view().to_owned()),
                 }],
                 &mut b,
             )

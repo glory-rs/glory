@@ -13,8 +13,16 @@ use glory_render::{
 };
 use std::borrow::Cow;
 use std::sync::Arc;
+#[path = "image_observation.rs"]
+mod image_observation;
 #[path = "resource_wake.rs"]
 mod resource_wake;
+use image_observation::ImageObserver;
+#[path = "graphic.rs"]
+mod graphic;
+#[cfg(feature = "paint")]
+#[path = "graphic_motion.rs"]
+mod graphic_motion;
 use style::computed_values::visibility::T as Visibility;
 
 /// Typed inline acceptance for the pinned native engine. HTML-family CSS still
@@ -25,7 +33,7 @@ use style::computed_values::visibility::T as Visibility;
 /// Re-audit these exclusions against real geometry/paint before widening them.
 pub const STYLE_PROFILE: glory_render::style::Profile = glory_render::style::Profile {
     name: "blitz",
-    version: 6,
+    version: 10,
     inline: glory_render::style::Support::ALL
         .without_value(glory_render::style::Value::Sticky)
         .without_value(glory_render::style::Value::AnchorAuto)
@@ -48,16 +56,20 @@ fn check_style(style: &glory_render::style::Style) -> Result<(), Error> {
 
 // beta.4 has no document top-layer/focus-scope implementation. Reject the
 // promise before mutation instead of displaying a modal as ordinary content.
-fn check_layer(
-    node: &glory_render::Descriptor,
+fn check_layer<'a>(
+    node: impl Into<glory_render::DescriptorView<'a>>,
     patch: Option<&glory_render::Patch>,
 ) -> Result<(), Error> {
+    let node = node.into();
     use glory_render::{Change, Patch};
     let value = match patch {
         None => node.semantics.as_deref(),
         Some(Patch::Semantics(Change::Set(value))) => value.as_deref(),
         _ => None,
     };
+    if value.is_some_and(|s| s.sheet_grip) {
+        return Err(Error::Unsupported("native sheet gestures"));
+    }
     if value.is_some_and(|s| s.layer.is_some()) {
         return Err(Error::Unsupported("native top layers"));
     }
@@ -69,11 +81,30 @@ fn check_layer(
 
 /// The pinned native engine has no indeterminate editor state. Never publish
 /// an AX mixed state while displaying a plain boolean checkbox.
-fn check_mode(
-    node: &glory_render::Descriptor,
+fn check_mode<'a>(
+    node: impl Into<glory_render::DescriptorView<'a>>,
     patch: Option<&glory_render::Patch>,
 ) -> Result<(), Error> {
+    let node = node.into();
     use glory_render::{Change, CheckMode, Patch, Props};
+    let semantics = match patch {
+        Some(Patch::Semantics(Change::Set(semantics))) => semantics.as_ref(),
+        Some(Patch::Semantics(Change::Clear)) => None,
+        _ => node.semantics.as_ref(),
+    };
+    if semantics.is_some_and(|semantics| semantics.tags_input.is_some()) {
+        return Err(Error::Unsupported("native tags input policy"));
+    }
+    if semantics.is_some_and(|semantics| semantics.combobox.is_some() || semantics.option.is_some())
+    {
+        return Err(Error::Unsupported("native combobox controls"));
+    }
+    if semantics.is_some_and(|semantics| semantics.typeahead) {
+        return Err(Error::Unsupported("native typeahead input"));
+    }
+    if matches!(node.props, Props::Select(_)) {
+        return Err(Error::Unsupported("native select controls"));
+    }
     let Props::Check(check) = &node.props else {
         return Ok(());
     };
@@ -95,6 +126,7 @@ fn check_mode(
 /// default. A provider must queue work and honor cancel/close without UI reentry.
 #[derive(Clone)]
 pub struct Config {
+    pub motion: glory_render::MotionPreference,
     pub base_url: blitz_traits::net::Url,
     pub resources: blitz_dom::ResourceLimits,
     pub provider: Option<Arc<dyn blitz_traits::net::NetProvider>>,
@@ -102,6 +134,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            motion: glory_render::MotionPreference::Reduce,
             base_url: blitz_traits::net::Url::parse("glory://app/").expect("built-in base URL"),
             resources: blitz_dom::ResourceLimits::default(),
             provider: None,
@@ -124,7 +157,7 @@ pub mod shell;
 fn tag(name: &str) -> QualName {
     QualName::new(
         None,
-        blitz_dom::Namespace::from("http://www.w3.org/1999/xhtml"),
+        blitz_dom::Namespace::from(glory_html::element_namespace(name)),
         blitz_dom::LocalName::from(name),
     )
 }
@@ -140,6 +173,7 @@ fn invariant(message: &'static str) -> Error {
 }
 
 struct Range {
+    image: Option<ImageObserver>,
     first: EngineId,
     last: EngineId,
     parts: BTreeMap<Part, EngineId>,
@@ -174,12 +208,16 @@ impl Range {
     }
 }
 struct Dom {
+    #[cfg(feature = "paint")]
+    motion: graphic_motion::Motion,
     doc: BaseDocument,
     body: EngineId,
     css: EngineId,
     ranges: HashMap<NodeId, Range>,
     owners: HashMap<EngineId, NodeId>,
     controls: HashMap<EngineId, NodeId>,
+    image_ready: BTreeMap<u128, NodeId>,
+    image_sequence: u128,
     dirty: bool,
     time: f64,
     revision: u64,
@@ -255,7 +293,7 @@ impl Dom {
             let body = m.create_element(tag("body"), Vec::new());
             let base = m.create_element(tag("style"), Vec::new());
             let baseline = m.create_text_node(&format!(
-                "html,body{{margin:0;padding:0}}{}",
+                "html,body{{margin:0;padding:0}}{}[data-gly-rotate]{{animation:none!important;transform:none!important}}[data-gly-path-transition]{{transition:none!important}}",
                 glory_html::BASE_CSS
             ));
             let sheet = m.create_element(tag("style"), Vec::new());
@@ -268,12 +306,16 @@ impl Dom {
             (body, css)
         };
         Self {
+            #[cfg(feature = "paint")]
+            motion: graphic_motion::Motion::new(config.motion),
             doc,
             body,
             css,
             ranges: HashMap::new(),
             owners: HashMap::new(),
             controls: HashMap::new(),
+            image_ready: BTreeMap::new(),
+            image_sequence: 0,
             dirty: true,
             time: 0.0,
             revision: 1,
@@ -313,6 +355,11 @@ impl Dom {
         Ok(parent.children[start..=end].to_vec())
     }
     fn create(&mut self, id: NodeId, shape: Shape) -> Result<(), Error> {
+        let image = shape
+            .pieces
+            .iter()
+            .any(|piece| matches!(&piece.kind, Kind::Element { tag: "img", .. }))
+            .then(|| ImageObserver::new(shape.revision));
         let mut m = self.doc.mutate();
         let mut parts = BTreeMap::new();
         let mut properties = BTreeMap::new();
@@ -385,6 +432,7 @@ impl Dom {
         self.ranges.insert(
             id,
             Range {
+                image,
                 first,
                 last,
                 parts,
@@ -607,6 +655,7 @@ impl Dom {
         }
         for owner in owned {
             self.reflect(owner)?;
+            self.sync_image(owner)?;
         }
         Ok(())
     }
@@ -631,7 +680,12 @@ impl Dom {
         // Suspended children are no longer physically under their logical parent.
         // Explicitly reclaim every range, including empty/offline Group parks.
         for child in subtree {
+            #[cfg(feature = "paint")]
+            self.motion.remove(child);
             if let Some(range) = self.ranges.remove(&child) {
+                if let Some(ready) = range.image.and_then(|image| image.ready) {
+                    self.image_ready.remove(&ready);
+                }
                 if let Some(control) = range.control.and_then(|part| range.parts.get(&part)) {
                     self.controls.remove(control);
                 }
@@ -675,6 +729,8 @@ impl Dom {
             self.dirty = false;
             self.layouts += 1;
         }
+        #[cfg(feature = "paint")]
+        self.refresh_graphic_motion();
     }
     fn resources(&mut self) -> bool {
         let _span = self
@@ -860,6 +916,7 @@ impl Sink for Dom {
                         }
                     }
                 }
+                self.sync_image(id)?;
             }
         }
         self.invalidate();
@@ -973,7 +1030,7 @@ impl State {
         if !self.interactive {
             return Err(Error::Unsupported("headless Blitz focus"));
         }
-        let descriptor = &self.mapper.tree().node(id)?.descriptor;
+        let descriptor = self.mapper.tree().node(id)?.descriptor.view();
         if !self.mapper.tree().enabled(id) {
             return Err(Error::Unsupported("focus on disabled control"));
         }
@@ -1144,9 +1201,19 @@ impl Renderer {
             return Err(Error::InvalidProps("invalid Blitz animation time"));
         }
         if seconds > state.dom.time {
+            let was_animating = state.dom.doc.is_animating();
             state.dom.time = seconds;
-            if state.dom.doc.is_animating() {
+            #[cfg(feature = "paint")]
+            state.dom.motion.clock.set(seconds);
+            #[cfg(feature = "paint")]
+            let transition_finished = state.dom.motion.finish_transitions();
+            #[cfg(not(feature = "paint"))]
+            let transition_finished = false;
+            if was_animating || transition_finished || state.dom.doc.is_animating() {
                 state.dom.invalidate();
+                let wake = state.dom.resource_wake.clone();
+                drop(state);
+                wake.wake();
             }
         }
         Ok(())
@@ -1155,13 +1222,14 @@ impl Renderer {
 impl Render for Renderer {
     fn preflight(
         &self,
-        node: &glory_render::Descriptor,
+        node: glory_render::DescriptorView<'_>,
         patch: Option<&glory_render::Patch>,
     ) -> Result<(), Error> {
         check_layer(node, patch)?;
         check_mode(node, patch)?;
+        graphic::check(node, patch)?;
         match patch {
-            None => check_style(&node.style)?,
+            None => check_style(node.style)?,
             Some(glory_render::Patch::Style(glory_render::Change::Set(style))) => {
                 check_style(style)?
             }
@@ -1218,17 +1286,20 @@ impl Render for Renderer {
                         for node in plan.nodes() {
                             check_layer(&node.descriptor, None)?;
                             check_mode(&node.descriptor, None)?;
-                            check_style(&node.descriptor.style)?;
+                            graphic::check(node.descriptor.view(), None)?;
+                            check_style(node.descriptor.view().style)?;
                         }
                     }
                     Mutation::Create { node, .. } => {
                         check_layer(node, None)?;
                         check_mode(node, None)?;
+                        graphic::check(node.view(), None)?;
                     }
                     Mutation::Patch { id, patch } => {
-                        let descriptor = &mapper.tree().node(*id)?.descriptor;
+                        let descriptor = mapper.tree().node(*id)?.descriptor.view();
                         check_layer(descriptor, Some(patch))?;
                         check_mode(descriptor, Some(patch))?;
+                        graphic::check(descriptor, Some(patch))?;
                     }
                     _ => {}
                 }
@@ -1243,11 +1314,86 @@ impl Render for Renderer {
                     }
                     _ => {}
                 }
+                #[cfg(feature = "paint")]
+                let previous_graphic = if let Mutation::Patch {
+                    id,
+                    patch: glory_render::Patch::Graphic(glory_render::Change::Set(next)),
+                } = mutation
+                {
+                    if next.transition.is_some() {
+                        match mapper.tree().node(*id)?.descriptor.view().props {
+                            glory_render::Props::Graphic(old) => Some(old.commands.clone()),
+                            _ => None,
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
                 mapper.apply(std::slice::from_ref(mutation), dom)?;
+                #[cfg(feature = "paint")]
+                match mutation {
+                    Mutation::Create { id, .. }
+                    | Mutation::Patch {
+                        id,
+                        patch: glory_render::Patch::Graphic(_),
+                    } if !matches!(
+                        mutation,
+                        Mutation::Patch {
+                            patch: glory_render::Patch::Graphic(glory_render::Change::Keep),
+                            ..
+                        }
+                    ) =>
+                    {
+                        if let glory_render::Props::Graphic(graphic) =
+                            mapper.tree().node(*id)?.descriptor.view().props
+                        {
+                            dom.install_graphic(*id, graphic, previous_graphic.as_deref())?;
+                        }
+                    }
+                    Mutation::CreatePlan { ids, .. } => {
+                        for id in ids {
+                            if let glory_render::Props::Graphic(graphic) =
+                                mapper.tree().node(*id)?.descriptor.view().props
+                            {
+                                dom.install_graphic(*id, graphic, None)?;
+                            }
+                        }
+                    }
+                    Mutation::Place { id, .. } | Mutation::Resume { id, .. } => {
+                        // Engine detachment unloads custom widgets. Restore only
+                        // missing widgets in this live moved subtree after attach;
+                        // ordinary metadata/style patches never walk descendants.
+                        let mut pending = vec![*id];
+                        while let Some(id) = pending.pop() {
+                            let node = mapper.tree().node(id)?;
+                            pending.extend(&node.children);
+                            if let glory_render::Props::Graphic(graphic) =
+                                node.descriptor.view().props
+                            {
+                                let main = dom.main(id)?;
+                                if dom.doc.get_node(main).is_some_and(|node| {
+                                    node.element_data().is_some_and(|element| {
+                                        element.custom_widget_data().is_none()
+                                    })
+                                }) {
+                                    dom.install_graphic(id, graphic, None)?;
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
             }
             Ok(mapper.receipt())
         })();
         state.receipt = state.mapper.receipt();
+        #[cfg(feature = "paint")]
+        {
+            state.dom.motion.permissions(state.mapper.tree());
+            state.dom.refresh_graphic_motion();
+        }
         state.dom.doc.prune_resource_interests();
         let State {
             mapper,
@@ -1268,15 +1414,28 @@ impl Render for Renderer {
     }
     fn listen(&mut self, node: NodeId, kind: EventKind, enabled: bool) -> Result<(), Error> {
         let mut state = self.0.borrow_mut();
-        let descriptor = &state.mapper.tree().node(node)?.descriptor;
+        let descriptor = state.mapper.tree().node(node)?.descriptor.view();
         if enabled {
             kind.validate_target(descriptor)?;
+            if matches!(
+                kind,
+                EventKind::Menu | EventKind::Pointer | EventKind::PointerWithin
+            ) {
+                return Err(Error::Unsupported("native menu input"));
+            }
+            if kind == EventKind::Typeahead {
+                return Err(Error::Unsupported("native typeahead input"));
+            }
         }
         if enabled && matches!(kind, EventKind::Scroll | EventKind::Resize) {
             state.dom.main(node)?;
         }
         if enabled {
             state.subscriptions.insert((node, kind));
+            if kind == EventKind::ImageStatus {
+                state.dom.queue_image_result(node);
+                state.observation_pending = true;
+            }
             if kind == EventKind::ColorSchemeChanged
                 && let Some(dark) = state.color_scheme
             {
@@ -1310,6 +1469,12 @@ impl Render for Renderer {
             return Err(Error::Unsupported("action on disconnected Blitz range"));
         }
         match action {
+            glory_render::Action::RevealOption { .. } => {
+                Err(Error::Unsupported("native combobox controls"))
+            }
+            glory_render::Action::ExitMenu { .. } => {
+                Err(Error::Unsupported("native menu focus navigation"))
+            }
             glory_render::Action::Focus(id) => state.focus(id),
             glory_render::Action::ScrollTo { node, x, y } => {
                 let semantic = node;
@@ -1399,6 +1564,22 @@ impl Render for Renderer {
                         height: rect.height,
                     }))
                 }
+                Query::ScrollMetrics(_) => {
+                    let host = state
+                        .dom
+                        .doc
+                        .get_node(node)
+                        .ok_or(Error::NodeGone(query.node()))?;
+                    let offset = host.scroll_offset();
+                    Ok(QueryValue::ScrollMetrics(glory_render::ScrollMetrics {
+                        x: offset.x,
+                        y: offset.y,
+                        viewport_width: f64::from(host.client_width().max(0.0)),
+                        viewport_height: f64::from(host.client_height().max(0.0)),
+                        content_width: f64::from(host.scroll_width().max(0.0)),
+                        content_height: f64::from(host.scroll_height().max(0.0)),
+                    }))
+                }
                 Query::Scroll(_) => {
                     let offset = state
                         .dom
@@ -1426,6 +1607,7 @@ impl Render for Renderer {
     fn drain(&mut self, inputs: &mut Vec<Input>) {
         let mut state = self.0.borrow_mut();
         state.dom.resolve();
+        state.collect_image_inputs();
         state.sync_focus();
         let State {
             mapper,

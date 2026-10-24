@@ -24,13 +24,13 @@ fn duplicate_names_fail_before_identity_allocation_and_focus_is_reactive() {
     app.flush().unwrap();
     let node = reference.get().unwrap();
     assert_eq!(
-        app.tree().node(node).unwrap().descriptor.focus,
+        app.tree().node(node).unwrap().descriptor.view().focus,
         FocusMode::Programmatic
     );
     focus.revise(|value| *value = FocusMode::TabStop);
     app.flush().unwrap();
     assert_eq!(
-        app.tree().node(node).unwrap().descriptor.focus,
+        app.tree().node(node).unwrap().descriptor.view().focus,
         FocusMode::TabStop
     );
 }

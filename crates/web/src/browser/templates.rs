@@ -122,7 +122,9 @@ impl Templates {
     ) -> Result<Element, Error> {
         let Some(key) = Key::new(tag, attrs) else {
             return initialize(
-                document.create_element(tag).map_err(backend)?,
+                document
+                    .create_element_ns(Some(glory_html::element_namespace(tag)), tag)
+                    .map_err(backend)?,
                 attrs,
                 false,
                 token,

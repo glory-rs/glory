@@ -3,8 +3,22 @@ use accesskit_consumer::{NodeRef, Tree as Consumer, TreeChangeHandler};
 use glory_render::style::{Length, Style};
 use glory_ui::{ItemPosition, Widget, button, check, group, image, input, link, list, text, view};
 use std::cell::Cell;
+#[path = "accessibility_alert_tests.rs"]
+mod alerts;
+#[path = "accessibility_current_tests.rs"]
+mod current;
 #[path = "accessibility_document_tests.rs"]
 mod document;
+#[path = "accessibility_hint_tests.rs"]
+mod hints;
+#[path = "accessibility_inert_tests.rs"]
+mod inert;
+#[path = "accessibility_menu_tests.rs"]
+mod menu;
+#[path = "accessibility_progress_tests.rs"]
+mod progress;
+#[path = "accessibility_separator_tests.rs"]
+mod separator;
 #[cfg(target_os = "windows")]
 #[path = "accessibility_windows_tests.rs"]
 mod windows;
@@ -101,7 +115,7 @@ fn composite_roles_states_and_live_named_relations_reach_accesskit() {
                         .label("Disclosure")
                         .semantics(Some(Box::new(Semantics {
                             expanded: Some(true),
-                            has_popup: true,
+                            popup: Some(glory_render::PopupKind::Dialog),
                             ..Default::default()
                         }))),
                 ),
@@ -580,7 +594,7 @@ fn an_offscreen_focus_pin_keeps_its_accessible_identity_and_logical_position() {
         let id = pending.pop().unwrap();
         let tree = app.app.tree();
         let node = tree.node(id).unwrap();
-        if matches!(node.descriptor.props, Props::Input(_)) {
+        if matches!(node.descriptor.view().props, Props::Input(_)) {
             break id;
         }
         pending.extend(node.children.iter().rev().copied());

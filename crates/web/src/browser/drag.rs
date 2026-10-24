@@ -82,16 +82,36 @@ pub(super) fn receive(
         if let Some((id, _)) = target(dom, &element)
             && let Some(from) = interested(dom, id)
         {
+            let slider = dom.entry(from)?.element()?.has_attribute("data-gly-slider");
+            if slider {
+                let control = dom.entry(from)?.element()?;
+                if control.get_attribute("aria-disabled").as_deref() == Some("true")
+                    || control.get_attribute("aria-readonly").as_deref() == Some("true")
+                {
+                    return Ok(false);
+                }
+                event.prevent_default();
+                super::super::dom::focus(&control)?;
+                dom.queue(
+                    from,
+                    Event::Drag {
+                        from,
+                        phase: DragPhase::Start,
+                        x,
+                        y,
+                    },
+                );
+            }
             *dom.drag.borrow_mut() = Some(DragSession {
                 from,
                 pointer: pointer.pointer_id(),
                 x,
                 y,
-                started: false,
+                started: slider,
             });
             let _ = element.set_pointer_capture(pointer.pointer_id());
         }
-        return Ok(false);
+        return Ok(dom.drag.borrow().as_ref().is_some_and(|drag| drag.started));
     }
     let Some(mut drag) = dom.drag.borrow_mut().take() else {
         return Ok(false);
@@ -151,7 +171,20 @@ pub(super) fn receive(
         if drag.started {
             event.prevent_default();
             dom.suppress_click.set(true);
-            let (to, phase) = hit(dom, x, y).map_or((drag.from, DragPhase::Cancel), |target| {
+            let captured = dom
+                .entry(drag.from)
+                .ok()
+                .and_then(|entry| entry.element().ok())
+                .is_some_and(|element| {
+                    element.has_attribute("data-gly-splitter")
+                        || element.has_attribute("data-gly-slider")
+                });
+            let (to, phase) = (if captured {
+                Some(drag.from)
+            } else {
+                hit(dom, x, y)
+            })
+            .map_or((drag.from, DragPhase::Cancel), |target| {
                 (target, DragPhase::Drop)
             });
             dom.queue(

@@ -126,11 +126,11 @@ fn scrolling_style_and_empty_false_clear_are_typed() {
             },
         ])
         .unwrap();
-    let Props::Check(p) = &memory.node(check).unwrap().descriptor.props else {
+    let Props::Check(p) = &memory.node(check).unwrap().descriptor.view().props else {
         panic!()
     };
     assert!(!p.checked);
-    let Props::Input(p) = &memory.node(input).unwrap().descriptor.props else {
+    let Props::Input(p) = &memory.node(input).unwrap().descriptor.view().props else {
         panic!()
     };
     assert_eq!((&p.value, p.revision), (&String::new(), 12));
@@ -143,7 +143,7 @@ fn scrolling_style_and_empty_false_clear_are_typed() {
             },
         }])
         .unwrap();
-    let Props::Input(p) = &memory.node(input).unwrap().descriptor.props else {
+    let Props::Input(p) = &memory.node(input).unwrap().descriptor.view().props else {
         panic!()
     };
     assert_eq!(p.revision, 12);
@@ -180,7 +180,7 @@ fn invalid_structure_and_patches_leave_the_previous_node_intact() {
             .is_err()
     );
     assert_eq!(
-        memory.node(text).unwrap().descriptor.props,
+        *memory.node(text).unwrap().descriptor.view().props,
         Props::Text(TextProps::default())
     );
     assert!(

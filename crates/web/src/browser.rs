@@ -3,7 +3,10 @@ mod events;
 mod frame;
 #[cfg(feature = "hydrate")]
 mod hydrate;
+mod images;
 mod layers;
+mod select;
+mod sheet;
 #[cfg(feature = "hydrate")]
 pub use hydrate::*;
 
@@ -40,6 +43,7 @@ impl Renderer {
     fn new(runtime: RuntimeId, dom: Rc<Dom>) -> Self {
         let supports_layers =
             js_sys::Reflect::get(&dom.root, &"showPopover".into()).is_ok_and(|v| v.is_function());
+        dom.frame.attach_dom(&dom);
         let events = events::Listeners::new(dom.clone());
         Self {
             mapper: Rc::new(RefCell::new(Mapper::new(runtime))),
@@ -49,11 +53,12 @@ impl Renderer {
             supports_layers,
         }
     }
-    fn check_layers(
+    fn check_layers<'a>(
         &self,
-        node: &glory_render::Descriptor,
+        node: impl Into<glory_render::DescriptorView<'a>>,
         patch: Option<&glory_render::Patch>,
     ) -> Result<(), Error> {
+        let node = node.into();
         use glory_render::{Change, Patch};
         if self.supports_layers {
             return Ok(());
@@ -72,7 +77,7 @@ impl Renderer {
 impl Render for Renderer {
     fn preflight(
         &self,
-        node: &glory_render::Descriptor,
+        node: glory_render::DescriptorView<'_>,
         patch: Option<&glory_render::Patch>,
     ) -> Result<(), Error> {
         self.check_layers(node, patch)?;
@@ -130,18 +135,26 @@ impl Render for Renderer {
         };
         self.receipt = mapper.receipt();
         self.dom
+            .sheets
+            .borrow_mut()
+            .update(mapper.tree(), mutations);
+        if self.dom.sheets.borrow().needs_frame() {
+            self.dom.frame.input();
+        }
+        self.dom
             .layers
             .borrow_mut()
             .update(mapper.tree(), mutations);
         drop(mapper);
         if !self.dom.staging.get() && self.dom.live.get() {
+            sheet::sync_accepted(&self.dom)?;
             layers::sync(&self.dom)?;
         }
         result
     }
     fn listen(&mut self, node: NodeId, kind: EventKind, enabled: bool) -> Result<(), Error> {
         let mapper = self.mapper.borrow();
-        let descriptor = &mapper.tree().node(node)?.descriptor;
+        let descriptor = mapper.tree().node(node)?.descriptor.view();
         if enabled {
             kind.validate_target(descriptor)?;
         }
@@ -149,8 +162,19 @@ impl Render for Renderer {
     }
     fn action(&mut self, action: Action) -> Result<(), Error> {
         action.validate_target(&self.mapper.borrow().tree().node(action.node())?.descriptor)?;
+        if matches!(action, Action::Focus(_) | Action::ExitMenu { .. })
+            && self.mapper.borrow().tree().inert(action.node())
+        {
+            return Err(Error::Unsupported("focus in an inert region"));
+        }
         if self.dom.hold_actions.get() {
             self.dom.actions.borrow_mut().push(action);
+            return Ok(());
+        }
+        if let Action::RevealOption { node } = action
+            && (!self.mapper.borrow().tree().active(node)
+                || !self.mapper.borrow().tree().enabled(node))
+        {
             return Ok(());
         }
         perform(&self.dom, action)
@@ -171,6 +195,17 @@ impl Render for Renderer {
                 Query::Bounds(_) => {
                     let rect = entry.element()?.get_bounding_client_rect();
                     Ok(QueryValue::Bounds(dom::rect(&rect)))
+                }
+                Query::ScrollMetrics(_) => {
+                    let element = entry.element()?;
+                    Ok(QueryValue::ScrollMetrics(glory_render::ScrollMetrics {
+                        x: dom::number(&element, "scrollLeft"),
+                        y: dom::number(&element, "scrollTop"),
+                        viewport_width: dom::number(&element, "clientWidth"),
+                        viewport_height: dom::number(&element, "clientHeight"),
+                        content_width: dom::number(&element, "scrollWidth"),
+                        content_height: dom::number(&element, "scrollHeight"),
+                    }))
                 }
                 Query::Scroll(_) => {
                     let element = entry.element()?;
@@ -205,12 +240,17 @@ impl Render for Renderer {
         Ok(())
     }
     fn drain(&mut self, inputs: &mut Vec<Input>) {
+        if let Err(error) = self.dom.read_images(self.mapper.borrow().tree()) {
+            self.dom.error.borrow_mut().get_or_insert(error);
+        }
         self.dom.read_layout();
         inputs.append(&mut self.dom.inputs.borrow_mut());
     }
 }
 fn perform(dom: &Dom, action: Action) -> Result<(), Error> {
     match action {
+        Action::RevealOption { node } => select::reveal(dom, node)?,
+        Action::ExitMenu { node, backwards } => layers::exit_menu(dom, node, backwards)?,
         Action::Focus(node) => dom::focus(&dom.entry(node)?.control()?)?,
         Action::ScrollTo { node, x, y } => {
             let entry = dom.entry(node)?;

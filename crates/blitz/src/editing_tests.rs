@@ -241,7 +241,7 @@ fn canonical_multiline_echo_and_explicit_versions_preserve_native_selection_and_
     key(&mut app, Key::Character("X".into()), Modifiers::empty());
     assert_eq!(model.get(), "outsideX");
     assert!(
-        matches!(&app.app.tree().node(node).unwrap().descriptor.props, glory_render::Props::Input(input) if input.revision == 101)
+        matches!(&app.app.tree().node(node).unwrap().descriptor.view().props, glory_render::Props::Input(input) if input.revision == 101)
     );
     let raw = "中\0\r\n🙂";
     ime(

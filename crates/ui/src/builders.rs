@@ -11,6 +11,7 @@ use glory_style::{Display, FlexDirection, Style};
 use crate::app::{Result, Scope, Widget};
 
 type Bind = Box<dyn FnOnce(&Scope, NodeId) -> Result>;
+type Prepare = Box<dyn FnOnce() -> Result<(Patch, Bind)>>;
 type Handler = Box<dyn FnMut(Event)>;
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Slot {
@@ -27,19 +28,31 @@ enum Slot {
     Label,
     Enabled,
     Value,
+    SelectSelection,
     Purpose,
     Multiline,
     Checked,
     CheckMode,
     Source,
     Alternative,
+    Graphic,
     Target,
 }
 
+// A full initial Graphic declaration has no previous live path to interpolate.
+// Seed its props before whole-descriptor construction validation; later bound
+// writes still go through the canonical live topology guard.
+fn seed_graphic(descriptor: &mut Descriptor, patches: &mut BTreeMap<Slot, Patch>) {
+    if let (Props::Graphic(props), Some(Patch::Graphic(Change::Set(value)))) =
+        (&mut descriptor.props, patches.remove(&Slot::Graphic))
+    {
+        *props = *value;
+    }
+}
 struct Element {
     descriptor: Option<Descriptor>,
     initial: BTreeMap<Slot, Patch>,
-    bindings: BTreeMap<Slot, Bind>,
+    bindings: BTreeMap<Slot, Prepare>,
     handlers: BTreeMap<EventKind, Handler>,
     children: Vec<Box<dyn Widget>>,
     needs_alt: bool,
@@ -75,37 +88,53 @@ impl Element {
             value => {
                 self.bindings.insert(
                     slot,
-                    Box::new(move |scope, node| {
-                        let session = Rc::downgrade(&scope.session()?);
-                        let mut previous = None;
-                        scope.binding(move || {
-                            let Some(session) = session.upgrade() else {
-                                return;
-                            };
-                            let value = match value.try_get() {
-                                Ok(value) => value,
-                                Err(error) => {
-                                    session.report(error.into());
+                    Box::new(move || {
+                        // Read without subscribing the surrounding component or
+                        // structural observer. The binding registers its own
+                        // dependencies when it first runs after construction.
+                        let initial = glory_core::untracked(|| value.try_get())?;
+                        let initial_patch = patch(initial.clone());
+                        let install: Bind = Box::new(move |scope, node| {
+                            let session = Rc::downgrade(&scope.session()?);
+                            let mut previous = Some(initial);
+                            scope.binding(move || {
+                                let Some(session) = session.upgrade() else {
+                                    return;
+                                };
+                                let value = match value.try_get() {
+                                    Ok(value) => value,
+                                    Err(error) => {
+                                        session.report(error.into());
+                                        return;
+                                    }
+                                };
+                                if previous.as_ref() == Some(&value) {
                                     return;
                                 }
-                            };
-                            if previous.as_ref() == Some(&value) {
-                                return;
-                            }
-                            let update = patch(value.clone());
-                            let result = match update {
-                                Patch::Value {
-                                    value: Change::Set(value),
-                                    ..
-                                } => session.input_value(node, value),
-                                update => session.patch(node, update),
-                            };
-                            match result {
-                                Ok(()) => previous = Some(value),
-                                Err(error) => session.report(error),
-                            }
+                                let update = patch(value.clone());
+                                let result = match update {
+                                    Patch::Value {
+                                        value: Change::Set(value),
+                                        ..
+                                    } => session.input_value(node, value),
+                                    Patch::SelectSelection {
+                                        keys: Change::Set(keys),
+                                        ..
+                                    } => session.select_selection(node, keys),
+                                    Patch::Source {
+                                        source: Change::Set(value),
+                                        ..
+                                    } => session.image_source(node, value),
+                                    update => session.patch(node, update),
+                                };
+                                match result {
+                                    Ok(()) => previous = Some(value),
+                                    Err(error) => session.report(error),
+                                }
+                            });
+                            Ok(())
                         });
-                        Ok(())
+                        Ok((initial_patch, install))
                     }),
                 );
             }
@@ -119,9 +148,19 @@ impl Element {
             .into());
         }
         let mut descriptor = self.descriptor.take().ok_or(crate::app::Error::Gone)?;
-        descriptor.patches(std::mem::take(&mut self.initial).into_values())?;
+        let mut initial = std::mem::take(&mut self.initial);
+        let mut bindings = Vec::with_capacity(self.bindings.len());
+        for (slot, prepare) in std::mem::take(&mut self.bindings) {
+            let (patch, install) = prepare()?;
+            initial.insert(slot, patch);
+            bindings.push(install);
+        }
+        // Validate the complete initial descriptor and adapter profile before
+        // allocating identity or changing the semantic model/host queue.
+        seed_graphic(&mut descriptor, &mut initial);
+        descriptor.patches(initial.into_values())?;
         let node = scope.create(descriptor)?;
-        for bind in std::mem::take(&mut self.bindings).into_values() {
+        for bind in bindings {
             bind(scope, node)?;
         }
         for (kind, handler) in std::mem::take(&mut self.handlers) {
@@ -161,7 +200,9 @@ impl Element {
             .into());
         }
         let mut descriptor = self.descriptor.take().ok_or(crate::Error::Gone)?;
-        descriptor.patches(std::mem::take(&mut self.initial).into_values())?;
+        let mut initial = std::mem::take(&mut self.initial);
+        seed_graphic(&mut descriptor, &mut initial);
+        descriptor.patches(initial.into_values())?;
         let mut nodes = vec![glory_render::PlanNode {
             parent: None,
             descriptor,
@@ -262,8 +303,18 @@ element!(Group, group, Props::Group);
 element!(Text, text, Props::Text(TextProps::default()));
 element!(Button, button, Props::Button(ButtonProps::default()));
 element!(Input, input, Props::Input(InputProps::default()));
+element!(
+    Select,
+    select,
+    Props::Select(glory_render::SelectProps::default())
+);
 element!(Check, check, Props::Check(CheckProps::default()));
 element!(Image, image, Props::Image(ImageProps::default()));
+element!(
+    Graphic,
+    graphic,
+    Props::Graphic(glory_render::GraphicProps::default())
+);
 element!(Link, link, Props::Link(LinkProps::default()));
 
 macro_rules! common {
@@ -293,7 +344,17 @@ macro_rules! common {
         }
     )+};
 }
-common!(View, Text, Button, Input, Check, Image, Link);
+common!(
+    View, Text, Button, Input, Select, Check, Image, Graphic, Link
+);
+impl Graphic {
+    pub fn drawing(mut self, value: impl Into<Lotus<glory_render::GraphicProps>>) -> Self {
+        self.inner.set(Slot::Graphic, value, |value| {
+            Patch::Graphic(Change::Set(Box::new(value)))
+        });
+        self
+    }
+}
 impl View {
     /// Intrinsic document structure, installed before reactive metadata. Its
     /// kind cannot change on a live node; remount for a different document part.
@@ -408,8 +469,9 @@ impl Check {
 }
 impl Image {
     pub fn source(mut self, value: impl Into<Lotus<String>>) -> Self {
-        self.inner.set(Slot::Source, value, |value| {
-            Patch::Source(Change::Set(value))
+        self.inner.set(Slot::Source, value, |value| Patch::Source {
+            source: Change::Set(value),
+            revision: 1,
         });
         self
     }
@@ -472,6 +534,12 @@ pub mod events {
     #[allow(non_upper_case_globals)]
     pub const checked_changed: EventKind = EventKind::CheckedChanged;
     #[allow(non_upper_case_globals)]
+    pub const select_changed: EventKind = EventKind::SelectChanged;
+    #[allow(non_upper_case_globals)]
+    pub const choice_command: EventKind = EventKind::Choice;
+    #[allow(non_upper_case_globals)]
+    pub const tags_command: EventKind = EventKind::Tags;
+    #[allow(non_upper_case_globals)]
     pub const commit: EventKind = EventKind::Commit;
     #[allow(non_upper_case_globals)]
     pub const focus_changed: EventKind = EventKind::FocusChanged;
@@ -479,6 +547,14 @@ pub mod events {
     pub const focus_within: EventKind = EventKind::FocusWithin;
     #[allow(non_upper_case_globals)]
     pub const navigate: EventKind = EventKind::Navigate;
+    #[allow(non_upper_case_globals)]
+    pub const typeahead: EventKind = EventKind::Typeahead;
+    #[allow(non_upper_case_globals)]
+    pub const menu_command: EventKind = EventKind::Menu;
+    #[allow(non_upper_case_globals)]
+    pub const pointer_boundary: EventKind = EventKind::Pointer;
+    #[allow(non_upper_case_globals)]
+    pub const pointer_within: EventKind = EventKind::PointerWithin;
     #[allow(non_upper_case_globals)]
     pub const keyboard: EventKind = EventKind::Keyboard;
     #[allow(non_upper_case_globals)]
@@ -489,4 +565,30 @@ pub mod events {
     pub const scroll: EventKind = EventKind::Scroll;
     #[allow(non_upper_case_globals)]
     pub const resize: EventKind = EventKind::Resize;
+}
+
+impl Select {
+    /// Static bounded intrinsic options; selection has an independent revision.
+    pub fn configuration(mut self, value: glory_render::SelectProps) -> Self {
+        self.inner
+            .descriptor
+            .as_mut()
+            .expect("unmounted builder")
+            .props = Props::Select(value);
+        self
+    }
+    pub fn selected(mut self, value: impl Into<Lotus<Vec<glory_render::SemanticId>>>) -> Self {
+        self.inner.set(Slot::SelectSelection, value, |keys| {
+            Patch::SelectSelection {
+                keys: Change::Set(keys),
+                revision: 1,
+            }
+        });
+        self
+    }
+    pub fn enabled(mut self, value: impl Into<Lotus<bool>>) -> Self {
+        self.inner
+            .set(Slot::Enabled, value, |v| Patch::Enabled(Change::Set(v)));
+        self
+    }
 }

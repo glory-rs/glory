@@ -51,9 +51,9 @@ fn plan_instances_keep_independent_descriptors_and_generational_subtrees() {
     }])
     .unwrap();
     assert!(
-        matches!(&tree.node(second[1]).unwrap().descriptor.props,Props::Text(v)if v.content=="seed")
+        matches!(&tree.node(second[1]).unwrap().descriptor.view().props,Props::Text(v)if v.content=="seed")
     );
-    assert!(matches!(&plan.nodes()[1].descriptor.props,Props::Text(v)if v.content=="seed"));
+    assert!(matches!(&plan.nodes()[1].descriptor.view().props,Props::Text(v)if v.content=="seed"));
     tree.apply(&[
         Mutation::Suspend { id: first[0] },
         Mutation::Dispose { id: first[0] },

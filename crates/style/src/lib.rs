@@ -3,7 +3,12 @@
 //! This crate has no reactive runtime, CSS engine, window or platform dependencies.
 //! CSS cascade and geometry belong to the selected engine, not to these values.
 
+mod grid;
 mod profile;
+pub use grid::{
+    AspectRatio, GridPlacement, GridTrack, GridTracks, MAX_ASPECT_RATIO, MAX_GRID_TRACKS,
+    MIN_ASPECT_RATIO,
+};
 pub use profile::{Css, Profile, Property, Support, Unsupported, Value};
 #[cfg(feature = "css")]
 pub mod sheet;
@@ -81,6 +86,8 @@ pub enum Display {
     #[default]
     Block,
     Flex,
+    InlineFlex,
+    Grid,
     None,
 }
 
@@ -116,6 +123,7 @@ pub enum Position {
     Relative,
     Absolute,
     Sticky,
+    Fixed,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -215,10 +223,28 @@ pub enum WhiteSpace {
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ObjectFit {
+    #[default]
+    Fill,
+    Contain,
+    Cover,
+    None,
+    ScaleDown,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum TextOverflow {
     #[default]
     Clip,
     Ellipsis,
+}
+
+/// Physical pointer targeting. This does not disable focus or keyboard input.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum PointerEvents {
+    #[default]
+    Auto,
+    None,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -247,7 +273,17 @@ pub struct Style {
     pub position: Option<Position>,
     pub top: Option<Length>,
     pub left: Option<Length>,
+    pub right: Option<Length>,
+    pub bottom: Option<Length>,
     pub display: Option<Display>,
+    pub grid_columns: Option<GridTracks>,
+    pub grid_rows: Option<GridTracks>,
+    pub grid_column: Option<GridPlacement>,
+    pub grid_row: Option<GridPlacement>,
+    pub aspect_ratio: Option<AspectRatio>,
+    /// Replaced image content sizing within its existing box; centered position.
+    pub object_fit: Option<ObjectFit>,
+    pub pointer_events: Option<PointerEvents>,
     pub flex_direction: Option<FlexDirection>,
     pub flex_wrap: Option<FlexWrap>,
     pub width: Option<Length>,
@@ -289,6 +325,34 @@ pub struct Style {
 }
 
 impl Style {
+    pub fn pointer_events(mut self, value: PointerEvents) -> Self {
+        self.pointer_events = Some(value);
+        self
+    }
+    pub fn grid_columns(mut self, value: GridTracks) -> Self {
+        self.grid_columns = Some(value);
+        self
+    }
+    pub fn grid_rows(mut self, value: GridTracks) -> Self {
+        self.grid_rows = Some(value);
+        self
+    }
+    pub fn grid_column(mut self, value: GridPlacement) -> Self {
+        self.grid_column = Some(value);
+        self
+    }
+    pub fn grid_row(mut self, value: GridPlacement) -> Self {
+        self.grid_row = Some(value);
+        self
+    }
+    pub fn object_fit(mut self, value: ObjectFit) -> Self {
+        self.object_fit = Some(value);
+        self
+    }
+    pub fn aspect_ratio(mut self, value: AspectRatio) -> Self {
+        self.aspect_ratio = Some(value);
+        self
+    }
     pub fn text_overflow(mut self, value: TextOverflow) -> Self {
         self.text_overflow = Some(value);
         self
@@ -315,6 +379,14 @@ impl Style {
     }
     pub fn left(mut self, value: Length) -> Self {
         self.left = Some(value);
+        self
+    }
+    pub fn right(mut self, value: Length) -> Self {
+        self.right = Some(value);
+        self
+    }
+    pub fn bottom(mut self, value: Length) -> Self {
+        self.bottom = Some(value);
         self
     }
     pub fn new() -> Self {
@@ -414,7 +486,19 @@ impl Style {
     /// Reject non-finite and invalid geometry at the semantic boundary instead
     /// of letting one engine serialize NaN and another panic inside layout.
     pub fn validate(&self) -> Result<(), &'static str> {
-        if [self.top, self.left]
+        for tracks in [self.grid_columns.as_ref(), self.grid_rows.as_ref()]
+            .into_iter()
+            .flatten()
+        {
+            tracks.validate()?;
+        }
+        for placement in [self.grid_column, self.grid_row].into_iter().flatten() {
+            placement.validate()?;
+        }
+        if let Some(ratio) = self.aspect_ratio {
+            ratio.validate()?;
+        }
+        if [self.top, self.left, self.right, self.bottom]
             .into_iter()
             .flatten()
             .any(|value| !value.is_finite())

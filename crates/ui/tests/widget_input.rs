@@ -16,12 +16,28 @@ fn widget_value_writes_allocate_from_live_revisions_and_validate_before_mutation
         )
         .unwrap();
     app.scope().set_input_value(node, "next").unwrap();
-    let Props::Input(value) = app.tree().node(node).unwrap().descriptor.props.clone() else {
+    let Props::Input(value) = app
+        .tree()
+        .node(node)
+        .unwrap()
+        .descriptor
+        .view()
+        .props
+        .clone()
+    else {
         panic!()
     };
     assert_eq!((&*value.value, value.revision), ("next", 51));
     assert!(app.scope().set_input_value(node, "bad\nline").is_err());
-    let Props::Input(value) = app.tree().node(node).unwrap().descriptor.props.clone() else {
+    let Props::Input(value) = app
+        .tree()
+        .node(node)
+        .unwrap()
+        .descriptor
+        .view()
+        .props
+        .clone()
+    else {
         panic!()
     };
     assert_eq!((&*value.value, value.revision), ("next", 51));

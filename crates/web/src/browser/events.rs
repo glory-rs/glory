@@ -8,6 +8,8 @@ use web_sys::{Element, EventTarget, KeyboardEvent, Node, ResizeObserver};
 use super::{backend, dom::Dom};
 #[path = "drag.rs"]
 mod drag;
+#[path = "tags.rs"]
+mod tags;
 
 struct Listener {
     target: EventTarget,
@@ -73,6 +75,7 @@ impl Listeners {
             "reset",
             "click",
             "input",
+            "paste",
             "change",
             "compositionstart",
             "compositionend",
@@ -84,6 +87,8 @@ impl Listeners {
             "pointermove",
             "pointerup",
             "pointercancel",
+            "pointerover",
+            "pointerout",
             "lostpointercapture",
             "blur",
             "resize",
@@ -130,6 +135,34 @@ impl Listeners {
             });
         }
         let weak = Rc::downgrade(&dom);
+        if let Some(viewport) = dom
+            .document
+            .default_view()
+            .and_then(|window| window.visual_viewport())
+        {
+            for name in ["resize", "scroll"] {
+                let weak = Rc::downgrade(&dom);
+                let callback = Closure::new(move |event: web_sys::Event| {
+                    let Some(dom) = weak.upgrade() else { return };
+                    if let Err(error) = super::sheet::receive(&dom, "resize", &event) {
+                        dom.error.borrow_mut().get_or_insert(error);
+                    }
+                });
+                let target: EventTarget = viewport.clone().into();
+                if let Err(error) = target.add_event_listener_with_callback_and_bool(
+                    name,
+                    callback.as_ref().unchecked_ref(),
+                    true,
+                ) {
+                    dom.error.borrow_mut().get_or_insert(backend(error));
+                }
+                listeners.push(Listener {
+                    target,
+                    name,
+                    callback,
+                });
+            }
+        }
         let resize = Closure::<dyn FnMut(js_sys::Array)>::new(move |entries: js_sys::Array| {
             let Some(dom) = weak.upgrade() else { return };
             for entry in entries {
@@ -216,6 +249,9 @@ pub(super) fn target(dom: &Dom, element: &Element) -> Option<(NodeId, Element)> 
     Some((id, target))
 }
 fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_render::Error> {
+    if super::sheet::receive(dom, name, &event)? {
+        return Ok(());
+    }
     if super::layers::receive(dom, name, &event)? {
         return Ok(());
     }
@@ -312,14 +348,37 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
         event.prevent_default();
         return Ok(());
     }
+    if name == "pointerdown"
+        && element.has_attribute("data-gly-option-owner")
+        && let Some(pointer) = event.dyn_ref::<web_sys::PointerEvent>()
+        && pointer.is_primary()
+        && pointer.button() == 0
+    {
+        event.prevent_default();
+    }
     match name {
         "click" => {
-            if element.has_attribute("data-gly-form-action") {
+            if element.has_attribute("data-gly-form-action")
+                || element.has_attribute("data-gly-link-request")
+            {
                 event.prevent_default();
             }
             if dom.suppress_click.replace(false) {
                 event.prevent_default();
                 return Ok(());
+            }
+            // A custom slider remains a physical focusable View. Native label
+            // association does not focus divs, so perform only this host default;
+            // resulting focus events still queue before business delivery.
+            if let Some(label) = element.closest("label[for]").map_err(backend)?
+                && let Some(control) = label
+                    .get_attribute("for")
+                    .and_then(|id| dom.document.get_element_by_id(&id))
+                && control.has_attribute("data-gly-slider")
+                && control.get_attribute("aria-disabled").as_deref() != Some("true")
+            {
+                event.prevent_default();
+                super::dom::focus(&control)?;
             }
             // Label default activation dispatches a second click to its input.
             // Only that control click represents checkbox activation.
@@ -362,6 +421,11 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
             drop(edit);
             dom.queue(id, event);
         }
+        "change" if entry.edit == EditKind::Select => {
+            let keys = super::select::read(&entry.control()?)?;
+            let revision = entry.editing.borrow().revision;
+            dom.queue(id, Event::SelectChanged { keys, revision });
+        }
         "change" if entry.edit == EditKind::Check => {
             let control = entry.control()?;
             let checked = js_sys::Reflect::get(&control, &"checked".into())
@@ -369,6 +433,9 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
                 .as_bool()
                 .unwrap_or(false);
             dom.queue(id, Event::CheckedChanged(checked));
+        }
+        "paste" if entry.edit == EditKind::Text => {
+            tags::paste(dom, id, &entry, &element, &node, &event)?;
         }
         "compositionstart" if entry.edit == EditKind::Text => {
             entry.editing.borrow_mut().composing = true;
@@ -407,6 +474,174 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
                         .closest("input,textarea,select,[contenteditable=true],[role=textbox]")
                         .map_err(backend)?
                         .is_some();
+            if tags::key(dom, id, &entry, &element, &node, &event, key)? {
+                return Ok(());
+            }
+            if node == Node::from(entry.control()?)
+                && dom.document.active_element().as_ref() == Some(&element)
+                && entry.interests.borrow().contains(&EventKind::Choice)
+            {
+                let kind = match element.get_attribute("data-gly-combobox").as_deref() {
+                    Some("select") => Some(glory_render::ComboboxKind::Select),
+                    Some("editable") => Some(glory_render::ComboboxKind::Editable),
+                    Some("autocomplete") => Some(glory_render::ComboboxKind::Autocomplete),
+                    Some("multiple") => Some(glory_render::ComboboxKind::Multiple),
+                    _ => None,
+                };
+                if let Some(kind) = kind {
+                    let input = KeyboardInput {
+                        key: &key.key(),
+                        control: key.ctrl_key(),
+                        meta: key.meta_key(),
+                        alt: key.alt_key(),
+                        shift: key.shift_key(),
+                        repeat: key.repeat(),
+                        composing: false,
+                        editable,
+                    };
+                    if kind == glory_render::ComboboxKind::Multiple {
+                        let value =
+                            js_sys::Reflect::get(entry.control()?.as_ref(), &"value".into())
+                                .map_err(backend)?;
+                        if let Some(command) = input
+                            .choice_remove_last(kind, js_sys::JsString::from(value).length() == 0)
+                        {
+                            event.prevent_default();
+                            dom.queue(id, Event::Choice { from: id, command });
+                            return Ok(());
+                        }
+                    }
+                    if let Some(command) = input.choice(
+                        kind,
+                        element.get_attribute("aria-expanded").as_deref() == Some("true"),
+                    ) {
+                        event.prevent_default();
+                        dom.queue(id, Event::Choice { from: id, command });
+                        return Ok(());
+                    }
+                    let text = key.key();
+                    let clock = key.time_stamp();
+                    let at_millis = clock as u64;
+                    if kind == glory_render::ComboboxKind::Select
+                        && element.has_attribute("data-gly-typeahead")
+                        && entry.interests.borrow().contains(&EventKind::Typeahead)
+                        && clock.is_finite()
+                        && clock >= 0.0
+                        && clock <= glory_render::MAX_TYPEAHEAD_MILLIS as f64
+                        && input.typeahead(at_millis).is_some()
+                    {
+                        event.prevent_default();
+                        dom.queue(
+                            id,
+                            Event::Typeahead {
+                                from: id,
+                                text,
+                                at_millis,
+                            },
+                        );
+                        return Ok(());
+                    }
+                }
+            }
+            if node == Node::from(entry.element()?)
+                && dom.document.active_element().as_ref() == Some(&element)
+                && element.has_attribute("data-gly-slider")
+                && entry.interests.borrow().contains(&EventKind::Range)
+            {
+                let axis =
+                    if element.get_attribute("aria-orientation").as_deref() == Some("vertical") {
+                        glory_render::Orientation::Vertical
+                    } else {
+                        glory_render::Orientation::Horizontal
+                    };
+                let direction = if element.get_attribute("dir").as_deref() == Some("rtl") {
+                    glory_render::Direction::Rtl
+                } else {
+                    glory_render::Direction::Ltr
+                };
+                if let Some(command) = glory_render::RangeCommand::slider_key(
+                    axis,
+                    direction,
+                    glory_render::KeyboardInput {
+                        key: &key.key(),
+                        control: key.ctrl_key(),
+                        meta: key.meta_key(),
+                        alt: key.alt_key(),
+                        shift: key.shift_key(),
+                        repeat: key.repeat(),
+                        composing: key.is_composing(),
+                        editable: false,
+                    },
+                ) {
+                    event.prevent_default();
+                    if element.get_attribute("aria-disabled").as_deref() != Some("true")
+                        && element.get_attribute("aria-readonly").as_deref() != Some("true")
+                    {
+                        dom.queue(id, Event::Range { from: id, command });
+                    }
+                    return Ok(());
+                }
+            }
+            if node == Node::from(entry.element()?)
+                && dom.document.active_element().as_ref() == Some(&element)
+                && element.has_attribute("data-gly-splitter")
+                && element.get_attribute("aria-disabled").as_deref() != Some("true")
+                && entry.interests.borrow().contains(&EventKind::Range)
+            {
+                let line =
+                    if element.get_attribute("aria-orientation").as_deref() == Some("vertical") {
+                        glory_render::Orientation::Vertical
+                    } else {
+                        glory_render::Orientation::Horizontal
+                    };
+                if let Some(command) = glory_render::RangeCommand::splitter_key(
+                    line,
+                    KeyboardInput {
+                        key: &key.key(),
+                        control: key.ctrl_key(),
+                        meta: key.meta_key(),
+                        alt: key.alt_key(),
+                        shift: key.shift_key(),
+                        repeat: key.repeat(),
+                        composing: false,
+                        editable,
+                    },
+                ) {
+                    event.prevent_default();
+                    dom.queue(id, Event::Range { from: id, command });
+                    return Ok(());
+                }
+            }
+            if node == Node::from(entry.element()?)
+                && dom.document.active_element().as_ref() == Some(&element)
+                && entry
+                    .interests
+                    .borrow()
+                    .contains(&EventKind::ScrollKeyboard)
+            {
+                let axes = match element.get_attribute("data-gly-scroll-keyboard").as_deref() {
+                    Some("both") => Some(glory_render::ScrollAxes::Both),
+                    Some("horizontal") => Some(glory_render::ScrollAxes::Horizontal),
+                    Some("vertical") => Some(glory_render::ScrollAxes::Vertical),
+                    _ => None,
+                };
+                if let Some(command) = axes.and_then(|axes| {
+                    axes.key(KeyboardInput {
+                        key: &key.key(),
+                        control: key.ctrl_key(),
+                        meta: key.meta_key(),
+                        alt: key.alt_key(),
+                        shift: key.shift_key(),
+                        repeat: key.repeat(),
+                        composing: false,
+                        editable,
+                    })
+                }) {
+                    event.prevent_default();
+                    dom.queue(id, Event::ScrollKeyboard { from: id, command });
+                    return Ok(());
+                }
+            }
             let command = KeyboardInput {
                 key: &key.key(),
                 control: key.ctrl_key(),
@@ -468,6 +703,137 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
                 }
                 return Ok(());
             }
+            let panel_trigger = element
+                .get_attribute("data-gly-navigation-panel")
+                .as_deref()
+                == Some("trigger");
+            let panel_content = element
+                .closest("[data-gly-navigation-panel=content]")
+                .map_err(backend)?;
+            if node == Node::from(entry.control()?)
+                && (panel_trigger
+                    || panel_content.is_some() && element.has_attribute("data-gly-navigation-item"))
+            {
+                let boundary = panel_content.as_ref();
+                let direction = boundary
+                    .and_then(|root| root.get_attribute("dir"))
+                    .or_else(|| {
+                        element
+                            .closest("[data-gly-navigation]")
+                            .ok()
+                            .flatten()
+                            .and_then(|root| root.get_attribute("dir"))
+                    });
+                let direction = if direction.as_deref() == Some("rtl") {
+                    glory_render::Direction::Rtl
+                } else {
+                    glory_render::Direction::Ltr
+                };
+                if let Some(command) = (KeyboardInput {
+                    key: &key.key(),
+                    control: key.ctrl_key(),
+                    meta: key.meta_key(),
+                    alt: key.alt_key(),
+                    shift: key.shift_key(),
+                    repeat: key.repeat(),
+                    composing: false,
+                    editable,
+                })
+                .navigation_panel(
+                    direction,
+                    panel_trigger,
+                    panel_content.is_some(),
+                ) {
+                    let interested = if command == glory_render::NavigationPanelCommand::Close {
+                        panel_content
+                            .as_ref()
+                            .and_then(|root| target(dom, root))
+                            .and_then(|(id, _)| dom.entry(id).ok())
+                            .is_some_and(|entry| {
+                                entry
+                                    .interests
+                                    .borrow()
+                                    .contains(&EventKind::NavigationPanel)
+                            })
+                    } else {
+                        entry
+                            .interests
+                            .borrow()
+                            .contains(&EventKind::NavigationPanel)
+                    };
+                    if interested {
+                        event.prevent_default();
+                        dom.queue(id, Event::NavigationPanel { from: id, command });
+                        return Ok(());
+                    }
+                }
+            }
+            let menu_trigger = element.get_attribute("aria-haspopup").as_deref() == Some("menu")
+                && !element.has_attribute("data-gly-menu-item");
+            if entry.edit == EditKind::Check
+                && matches!(
+                    element.get_attribute("role").as_deref(),
+                    Some("menuitemcheckbox" | "menuitemradio")
+                )
+                && (KeyboardInput {
+                    key: &key.key(),
+                    control: key.ctrl_key(),
+                    meta: key.meta_key(),
+                    alt: key.alt_key(),
+                    shift: key.shift_key(),
+                    repeat: key.repeat(),
+                    composing: false,
+                    editable,
+                })
+                .menu_check_activation()
+            {
+                event.prevent_default();
+                entry
+                    .control()?
+                    .dyn_into::<web_sys::HtmlElement>()
+                    .map_err(|_| glory_render::Error::Unsupported("menu check activation"))?
+                    .click();
+                return Ok(());
+            }
+            let menu_root = element.closest("[role=menu]").map_err(backend)?;
+            if menu_trigger || menu_root.is_some() {
+                let direction = if menu_root
+                    .as_ref()
+                    .and_then(|root| root.get_attribute("dir"))
+                    .as_deref()
+                    == Some("rtl")
+                {
+                    glory_render::Direction::Rtl
+                } else {
+                    glory_render::Direction::Ltr
+                };
+                let interested = if menu_trigger {
+                    entry.interests.borrow().contains(&EventKind::Menu)
+                } else {
+                    menu_root
+                        .as_ref()
+                        .and_then(|root| target(dom, root))
+                        .and_then(|(id, _)| dom.entry(id).ok())
+                        .is_some_and(|entry| entry.interests.borrow().contains(&EventKind::Menu))
+                };
+                if interested
+                    && let Some(command) = (KeyboardInput {
+                        key: &key.key(),
+                        control: key.ctrl_key(),
+                        meta: key.meta_key(),
+                        alt: key.alt_key(),
+                        shift: key.shift_key(),
+                        repeat: key.repeat(),
+                        composing: false,
+                        editable,
+                    })
+                    .menu(direction, menu_trigger)
+                {
+                    event.prevent_default();
+                    dom.queue(id, Event::Menu { from: id, command });
+                    return Ok(());
+                }
+            }
             // Explicit composite collections opt in per trigger; their nested
             // editors and ordinary buttons keep native keyboard behavior.
             if element.has_attribute("data-gly-navigation-item")
@@ -485,18 +851,62 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
                     Some("vertical") => glory_render::Orientation::Vertical,
                     _ => return Ok(()),
                 };
-                if let Some(command) = axis.key(KeyboardInput {
-                    key: &key.key(),
-                    control: key.ctrl_key(),
-                    meta: key.meta_key(),
-                    alt: key.alt_key(),
-                    shift: key.shift_key(),
-                    repeat: key.repeat(),
-                    composing: false,
-                    editable,
-                }) {
+                let direction = if root.get_attribute("dir").as_deref() == Some("rtl") {
+                    glory_render::Direction::Rtl
+                } else {
+                    glory_render::Direction::Ltr
+                };
+                if let Some(command) = axis.key_with_direction(
+                    direction,
+                    KeyboardInput {
+                        key: &key.key(),
+                        control: key.ctrl_key(),
+                        meta: key.meta_key(),
+                        alt: key.alt_key(),
+                        shift: key.shift_key(),
+                        repeat: key.repeat(),
+                        composing: false,
+                        editable,
+                    },
+                ) {
                     event.prevent_default();
                     dom.queue(id, Event::Navigate { from: id, command });
+                    return Ok(());
+                }
+                let text = key.key();
+                let clock = key.time_stamp();
+                let at_millis = clock as u64;
+                if clock.is_finite()
+                    && clock >= 0.0
+                    && clock <= glory_render::MAX_TYPEAHEAD_MILLIS as f64
+                    && root.has_attribute("data-gly-typeahead")
+                    && dom
+                        .entry(root_id)?
+                        .interests
+                        .borrow()
+                        .contains(&EventKind::Typeahead)
+                    && (KeyboardInput {
+                        key: &text,
+                        control: key.ctrl_key(),
+                        meta: key.meta_key(),
+                        alt: key.alt_key(),
+                        shift: key.shift_key(),
+                        repeat: key.repeat(),
+                        composing: key.is_composing(),
+                        editable,
+                    })
+                    .typeahead(at_millis)
+                    .is_some()
+                {
+                    event.prevent_default();
+                    dom.queue(
+                        id,
+                        Event::Typeahead {
+                            from: id,
+                            text,
+                            at_millis,
+                        },
+                    );
                     return Ok(());
                 }
             }
@@ -539,6 +949,53 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
         // App also derives FocusWithin for semantic ancestors. The origin need
         // not have its own listener (nor a physical Group parent).
         "focusin" | "focusout" => dom.queue(id, Event::FocusChanged(name == "focusin")),
+        "pointermove" => {
+            if event
+                .dyn_ref::<web_sys::PointerEvent>()
+                .is_some_and(|pointer| matches!(pointer.pointer_type().as_str(), "mouse" | "pen"))
+            {
+                dom.queue(
+                    id,
+                    Event::Pointer {
+                        from: id,
+                        related: None,
+                        phase: glory_render::PointerPhase::Move,
+                    },
+                );
+            }
+        }
+        "pointerover" | "pointerout" => {
+            let Some(pointer) = event.dyn_ref::<web_sys::PointerEvent>() else {
+                return Ok(());
+            };
+            if pointer.pointer_type() != "mouse" && pointer.pointer_type() != "pen" {
+                return Ok(());
+            }
+            let related = pointer
+                .related_target()
+                .and_then(|target| target.dyn_into::<Node>().ok())
+                .and_then(|node| {
+                    node.dyn_ref::<Element>()
+                        .cloned()
+                        .or_else(|| node.parent_element())
+                })
+                .and_then(|element| target(dom, &element))
+                .map(|(id, _)| id);
+            if related != Some(id) {
+                dom.queue(
+                    id,
+                    Event::Pointer {
+                        from: id,
+                        related,
+                        phase: if name == "pointerover" {
+                            glory_render::PointerPhase::Enter
+                        } else {
+                            glory_render::PointerPhase::Leave
+                        },
+                    },
+                );
+            }
+        }
         "scroll" if entry.interests.borrow().contains(&EventKind::Scroll) => {
             dom.layout.borrow_mut().insert((id, EventKind::Scroll));
             dom.frame.input();

@@ -72,7 +72,7 @@ fn live_document_part_changes_rollback_without_stats_or_watermark_changes() {
     let mut tree = Memory::new(runtime);
     let id = create(&mut tree, &mut ids, document(DocumentPart::Blockquote));
     place(&mut tree, id, None).unwrap();
-    let old = tree.node(id).unwrap().descriptor.clone();
+    let old = tree.node(id).unwrap().descriptor.view().to_owned();
     let stats = tree.stats();
     let receipt = tree.receipt();
     for metadata in [
@@ -95,7 +95,10 @@ fn live_document_part_changes_rollback_without_stats_or_watermark_changes() {
         patch: Patch::Name(Change::Set(Some("Quote".into()))),
     }])
     .unwrap();
-    assert_eq!(tree.node(id).unwrap().descriptor.effective_role(), None);
+    assert_eq!(
+        tree.node(id).unwrap().descriptor.view().effective_role(),
+        None
+    );
 }
 
 #[test]

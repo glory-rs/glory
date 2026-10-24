@@ -388,6 +388,7 @@ mod raster {
                             .node(child)
                             .unwrap()
                             .descriptor
+                            .view()
                             .style
                             .background
                             .unwrap();

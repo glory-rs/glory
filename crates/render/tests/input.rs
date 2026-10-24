@@ -22,7 +22,7 @@ fn canonical_text_is_borrowed_and_host_normalization_handles_crlf_nul_and_unicod
         }])
         .unwrap();
     assert!(
-        matches!(&memory.node(id).unwrap().descriptor.props, Props::Input(input) if input.value == "\ninitial\n�🙂" && input.revision == 0)
+        matches!(&memory.node(id).unwrap().descriptor.view().props, Props::Input(input) if input.value == "\ninitial\n�🙂" && input.revision == 0)
     );
 }
 
@@ -128,7 +128,7 @@ fn rejected_program_writes_preserve_the_reference_node_and_next_commit_can_progr
         })
     );
     assert!(
-        matches!(&memory.node(id).unwrap().descriptor.props, Props::Input(input) if input.value == "initial")
+        matches!(&memory.node(id).unwrap().descriptor.view().props, Props::Input(input) if input.value == "initial")
     );
     let next = memory
         .apply(&[Mutation::Patch {
@@ -141,7 +141,7 @@ fn rejected_program_writes_preserve_the_reference_node_and_next_commit_can_progr
         .unwrap();
     assert_eq!(next.applied, first.applied + 1);
     assert!(
-        matches!(&memory.node(id).unwrap().descriptor.props, Props::Input(input) if input.value == "next�")
+        matches!(&memory.node(id).unwrap().descriptor.view().props, Props::Input(input) if input.value == "next�")
     );
 }
 

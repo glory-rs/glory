@@ -124,6 +124,7 @@ fn rows(app: &App) -> Vec<(usize, NodeId)> {
             tree.node(*id)
                 .unwrap()
                 .descriptor
+                .view()
                 .item
                 .map(|item| (item.index, *id))
         })

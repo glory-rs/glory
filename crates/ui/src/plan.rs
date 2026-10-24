@@ -137,6 +137,14 @@ pub(crate) fn bind<T: Clone + PartialEq + 'static>(
                 value: Change::Set(value),
                 ..
             } => scope.session()?.input_value(node, value),
+            Patch::SelectSelection {
+                keys: Change::Set(keys),
+                ..
+            } => scope.session()?.select_selection(node, keys),
+            Patch::Source {
+                source: Change::Set(value),
+                ..
+            } => scope.session()?.image_source(node, value),
             update => scope.patch(node, update),
         };
     }
@@ -162,6 +170,14 @@ pub(crate) fn bind<T: Clone + PartialEq + 'static>(
                 value: Change::Set(value),
                 ..
             } => session.input_value(node, value),
+            Patch::SelectSelection {
+                keys: Change::Set(keys),
+                ..
+            } => session.select_selection(node, keys),
+            Patch::Source {
+                source: Change::Set(value),
+                ..
+            } => session.image_source(node, value),
             update => session.patch(node, update),
         };
         match result {

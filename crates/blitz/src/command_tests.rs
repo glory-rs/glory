@@ -329,6 +329,56 @@ fn native_composite_navigation_is_axis_specific_and_requires_a_registered_trigge
 }
 
 #[test]
+fn native_horizontal_rtl_driver_reverses_arrows_and_preserves_home_end() {
+    use glory_render::{Direction, Navigation, Orientation, Semantics};
+    let mut app = WindowApp::new();
+    let trigger = app.app.scope().cage(None);
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let seen = events.clone();
+    app.mount(
+        view()
+            .semantics(Some(Box::new(Semantics {
+                navigation: Some(Orientation::Horizontal),
+                navigation_direction: Direction::Rtl,
+                ..Default::default()
+            })))
+            .on(EventKind::Navigate, move |event| {
+                seen.borrow_mut().push(event)
+            })
+            .fill(
+                glory_ui::button()
+                    .label("RTL member")
+                    .node_ref(trigger)
+                    .semantics(Some(Box::new(Semantics {
+                        navigation_item: true,
+                        ..Default::default()
+                    }))),
+            ),
+    )
+    .unwrap();
+    tick(&mut app);
+    let origin = trigger.get().unwrap();
+    native_focus(&mut app, origin);
+    for key_name in ["ArrowLeft", "ArrowRight", "Home", "End"] {
+        key(&mut app, key_name, Modifiers::empty(), false, false);
+        tick(&mut app);
+    }
+    assert_eq!(
+        *events.borrow(),
+        [
+            Navigation::Next,
+            Navigation::Previous,
+            Navigation::First,
+            Navigation::Last
+        ]
+        .map(|command| Event::Navigate {
+            from: origin,
+            command
+        })
+    );
+}
+
+#[test]
 fn native_keyboard_queues_real_commands_and_preserves_composition_and_shift_enter() {
     let mut app = WindowApp::new();
     let input_ref = app.app.scope().cage(None);
@@ -538,10 +588,381 @@ fn native_toggle_button_space_enter_queue_activation_and_keep_pressed_engine_ide
             .node(button)
             .unwrap()
             .descriptor
+            .view()
             .semantics
             .as_ref()
             .unwrap()
             .pressed,
         Some(false)
     );
+}
+
+#[test]
+fn native_splitter_captures_release_to_original_handle_and_queues_own_range_keys() {
+    use glory_render::{
+        FocusMode, Orientation, RangeCommand, RangeValue, Role, SemanticId, Semantics,
+    };
+    let mut app = WindowApp::new();
+    app.renderer.set_viewport(400, 300, 1.0).unwrap();
+    let reference = app.app.scope().cage(None);
+    let observed = Rc::new(RefCell::new(Vec::new()));
+    let output = observed.clone();
+    let sibling = observed.clone();
+    let range = observed.clone();
+    app.mount(
+        view().fill((
+            view()
+                .role(Role::Separator)
+                .focus(FocusMode::TabStop)
+                .node_ref(reference)
+                .semantics(Some(Box::new(Semantics {
+                    splitter: Some(RangeValue {
+                        min: 0.0,
+                        max: 100.0,
+                        value: 50.0,
+                    }),
+                    separator_axis: Some(Orientation::Vertical),
+                    controls: Some(SemanticId::new("pane").unwrap()),
+                    ..Default::default()
+                })))
+                .style(
+                    glory_render::style::Style::new()
+                        .width(glory_render::style::Length::Px(12.0))
+                        .height(glory_render::style::Length::Px(80.0)),
+                )
+                .on(EventKind::Drag, move |event| {
+                    output.borrow_mut().push(("handle", event))
+                })
+                .on(EventKind::Range, move |event| {
+                    range.borrow_mut().push(("range", event))
+                }),
+            view()
+                .style(
+                    glory_render::style::Style::new()
+                        .width(glory_render::style::Length::Px(180.0))
+                        .height(glory_render::style::Length::Px(80.0)),
+                )
+                .on(EventKind::Drag, move |event| {
+                    sibling.borrow_mut().push(("sibling", event))
+                }),
+        )),
+    )
+    .unwrap();
+    tick(&mut app);
+    let handle = reference.get().unwrap();
+    native_focus(&mut app, handle);
+    key(&mut app, "ArrowRight", Modifiers::empty(), false, false);
+    key(&mut app, "End", Modifiers::empty(), false, false);
+    assert!(observed.borrow().is_empty());
+    tick(&mut app);
+    assert!(observed.borrow().iter().any(|(_, event)| matches!(
+        event,
+        Event::Range {
+            command: RangeCommand::Increase,
+            ..
+        }
+    )));
+    observed.borrow_mut().clear();
+    let rect = bounds_now(&app, handle);
+    let x = (rect.x + 5.0) as f32;
+    let y = (rect.y + 20.0) as f32;
+    app.handle_ui_event(UiEvent::PointerDown(pointer(x, y, true)));
+    app.handle_ui_event(UiEvent::PointerMove(pointer(120.0, 130.0, true)));
+    app.handle_ui_event(UiEvent::PointerUp(pointer(120.0, 130.0, false)));
+    assert!(observed.borrow().is_empty());
+    tick(&mut app);
+    assert!(
+        observed
+            .borrow()
+            .iter()
+            .any(|(owner, event)| *owner == "handle"
+                && matches!(event,Event::Drag{phase:DragPhase::Drop,from,..}if *from==handle)),
+        "{:?}",
+        observed.borrow()
+    );
+    assert!(
+        !observed
+            .borrow()
+            .iter()
+            .any(|(owner, _)| *owner == "sibling")
+    );
+    observed.borrow_mut().clear();
+    let finger = |x, y, down| {
+        let mut event = pointer(x, y, down);
+        event.id = blitz_traits::events::BlitzPointerId::Finger(7);
+        event
+    };
+    app.handle_ui_event(UiEvent::PointerDown(finger(x, y, true)));
+    app.handle_ui_event(UiEvent::PointerMove(finger(120.0, 130.0, true)));
+    app.handle_ui_event(UiEvent::PointerUp(finger(120.0, 130.0, false)));
+    assert!(observed.borrow().is_empty());
+    tick(&mut app);
+    assert!(observed.borrow().iter().any(|(owner, event)| *owner == "handle"
+        && matches!(event, Event::Drag { phase: DragPhase::Drop, from, .. } if *from == handle)));
+    observed.borrow_mut().clear();
+    app.handle_ui_event(UiEvent::PointerDown(finger(x, y, true)));
+    app.handle_ui_event(UiEvent::PointerMove(finger(120.0, 130.0, true)));
+    app.handle_ui_event(UiEvent::PointerCancel(finger(120.0, 130.0, false)));
+    tick(&mut app);
+    assert!(observed.borrow().iter().any(|(_, event)| matches!(
+        event,
+        Event::Drag {
+            phase: DragPhase::Cancel,
+            ..
+        }
+    )));
+    assert!(!observed.borrow().iter().any(|(_, event)| matches!(
+        event,
+        Event::Drag {
+            phase: DragPhase::Drop,
+            ..
+        }
+    )));
+}
+
+#[test]
+fn native_navigation_panel_keys_queue_only_for_opted_in_controls_and_layer_open_is_rejected() {
+    use glory_render::{
+        Change, Layer, LayerFocus, LayerPlacement, NavigationPanel, NavigationPanelCommand,
+        Orientation, Patch, Role, SemanticId, Semantics,
+    };
+    let mut app = WindowApp::new();
+    let scope = app.app.scope();
+    let trigger = scope.cage(None);
+    let panel = scope.cage(None);
+    let link = scope.cage(None);
+    let ordinary = scope.cage(None);
+    let observed = Rc::new(RefCell::new(Vec::new()));
+    let header = observed.clone();
+    let content = observed.clone();
+    app.mount(
+        view().fill((
+            glory_ui::button()
+                .label("Products")
+                .node_ref(trigger)
+                .semantics(Some(Box::new(Semantics {
+                    id: Some(SemanticId::new("nav-trigger").unwrap()),
+                    controls: Some(SemanticId::new("nav-panel").unwrap()),
+                    expanded: Some(false),
+                    navigation_item: true,
+                    navigation_panel: Some(NavigationPanel::Trigger),
+                    ..Default::default()
+                })))
+                .on(EventKind::NavigationPanel, move |event| {
+                    header.borrow_mut().push(event)
+                }),
+            view()
+                .role(Role::Group)
+                .name("Product links")
+                .node_ref(panel)
+                .semantics(Some(Box::new(Semantics {
+                    id: Some(SemanticId::new("nav-panel").unwrap()),
+                    navigation: Some(Orientation::Vertical),
+                    navigation_panel: Some(NavigationPanel::Content),
+                    ..Default::default()
+                })))
+                .on(EventKind::NavigationPanel, move |event| {
+                    content.borrow_mut().push(event)
+                })
+                .fill((
+                    glory_ui::link()
+                        .target("/docs")
+                        .label("Docs")
+                        .node_ref(link)
+                        .semantics(Some(Box::new(Semantics {
+                            navigation_item: true,
+                            ..Default::default()
+                        }))),
+                    glory_ui::button()
+                        .label("Ordinary control")
+                        .node_ref(ordinary),
+                )),
+        )),
+    )
+    .unwrap();
+    tick(&mut app);
+    let trigger = trigger.get().unwrap();
+    native_focus(&mut app, trigger);
+    key(&mut app, "ArrowDown", Modifiers::empty(), false, false);
+    key(&mut app, "ArrowUp", Modifiers::empty(), false, false);
+    assert!(observed.borrow().is_empty());
+    tick(&mut app);
+    assert!(matches!(
+        &observed.borrow()[..],
+        [
+            Event::NavigationPanel {
+                command: NavigationPanelCommand::First,
+                ..
+            },
+            Event::NavigationPanel {
+                command: NavigationPanelCommand::Last,
+                ..
+            }
+        ]
+    ));
+    observed.borrow_mut().clear();
+    native_focus(&mut app, link.get().unwrap());
+    key(&mut app, "ArrowLeft", Modifiers::empty(), false, false);
+    assert!(observed.borrow().is_empty());
+    tick(&mut app);
+    assert!(matches!(
+        &observed.borrow()[..],
+        [Event::NavigationPanel {
+            command: NavigationPanelCommand::Close,
+            ..
+        }]
+    ));
+    observed.borrow_mut().clear();
+    native_focus(&mut app, ordinary.get().unwrap());
+    key(&mut app, "ArrowLeft", Modifiers::empty(), false, false);
+    tick(&mut app);
+    assert!(observed.borrow().is_empty());
+    let panel = panel.get().unwrap();
+    let mut metadata = app
+        .app
+        .tree()
+        .node(panel)
+        .unwrap()
+        .descriptor
+        .view()
+        .semantics
+        .as_deref()
+        .unwrap()
+        .clone();
+    metadata.layer = Some(Layer {
+        modal: false,
+        focus: LayerFocus::Preserve,
+        placement: LayerPlacement::AnchorStart,
+        anchor: Some(SemanticId::new("nav-trigger").unwrap()),
+        ..Default::default()
+    });
+    let before = (app.app.stats(), app.renderer.stats());
+    assert!(
+        app.app
+            .scope()
+            .patch(
+                panel,
+                Patch::Semantics(Change::Set(Some(Box::new(metadata))))
+            )
+            .is_err()
+    );
+    assert_eq!((app.app.stats(), app.renderer.stats()), before);
+}
+
+#[test]
+fn native_slider_queues_axis_rtl_page_keys_and_captures_mouse_and_touch_release_cancel() {
+    use glory_render::{
+        Direction, FocusMode, Orientation, RangeCommand, RangeValue, Role, Semantics, SliderValue,
+    };
+    let mut app = WindowApp::new();
+    app.renderer.set_viewport(500, 400, 1.).unwrap();
+    let reference = app.app.scope().cage(None);
+    let events = Rc::new(RefCell::new(Vec::new()));
+    let ranges = events.clone();
+    let drags = events.clone();
+    app.mount(
+        view()
+            .role(Role::Slider)
+            .focus(FocusMode::TabStop)
+            .name("RTL volume")
+            .node_ref(reference)
+            .semantics(Some(Box::new(Semantics {
+                slider: Some(SliderValue {
+                    range: RangeValue {
+                        min: 0.,
+                        max: 100.,
+                        value: 50.,
+                    },
+                    axis: Orientation::Horizontal,
+                    direction: Direction::Rtl,
+                    step: 1.,
+                    page_step: 10.,
+                    value_text: None,
+                }),
+                ..Default::default()
+            })))
+            .style(
+                glory_render::style::Style::new()
+                    .width(glory_render::style::Length::Px(200.))
+                    .height(glory_render::style::Length::Px(30.)),
+            )
+            .on(EventKind::Range, move |event| {
+                ranges.borrow_mut().push(event)
+            })
+            .on(EventKind::Drag, move |event| drags.borrow_mut().push(event)),
+    )
+    .unwrap();
+    tick(&mut app);
+    let id = reference.get().unwrap();
+    native_focus(&mut app, id);
+    key(&mut app, "ArrowRight", Modifiers::empty(), false, false);
+    key(&mut app, "PageUp", Modifiers::empty(), false, false);
+    key(&mut app, "ArrowUp", Modifiers::empty(), false, false);
+    assert!(events.borrow().is_empty());
+    tick(&mut app);
+    assert_eq!(
+        events
+            .borrow()
+            .iter()
+            .filter_map(|event| if let Event::Range { command, .. } = event {
+                Some(*command)
+            } else {
+                None
+            })
+            .collect::<Vec<_>>(),
+        vec![RangeCommand::Decrease, RangeCommand::PageIncrease]
+    );
+    events.borrow_mut().clear();
+    let rect = bounds_now(&app, id);
+    let (x, y) = ((rect.x + 40.) as f32, (rect.y + 15.) as f32);
+    for touch in [false, true] {
+        let sample = |x, y, down| {
+            let mut event = pointer(x, y, down);
+            if touch {
+                event.id = blitz_traits::events::BlitzPointerId::Finger(9)
+            }
+            event
+        };
+        app.handle_ui_event(UiEvent::PointerDown(sample(x, y, true)));
+        app.handle_ui_event(UiEvent::PointerMove(sample(350., 180., true)));
+        app.handle_ui_event(UiEvent::PointerUp(sample(350., 180., false)));
+        assert!(events.borrow().is_empty());
+        tick(&mut app);
+        assert!(
+            events
+                .borrow()
+                .iter()
+                .any(|e| matches!(e,Event::Drag{from,phase:DragPhase::Start,..}if *from==id))
+        );
+        assert!(
+            events
+                .borrow()
+                .iter()
+                .any(|e| matches!(e,Event::Drag{from,phase:DragPhase::Drop,..}if *from==id))
+        );
+        events.borrow_mut().clear();
+    }
+    let sample = |x, y, down| {
+        let mut event = pointer(x, y, down);
+        event.id = blitz_traits::events::BlitzPointerId::Finger(10);
+        event
+    };
+    app.handle_ui_event(UiEvent::PointerDown(sample(x, y, true)));
+    app.handle_ui_event(UiEvent::PointerMove(sample(350., 180., true)));
+    app.handle_ui_event(UiEvent::PointerCancel(sample(350., 180., false)));
+    tick(&mut app);
+    assert!(events.borrow().iter().any(|e| matches!(
+        e,
+        Event::Drag {
+            phase: DragPhase::Cancel,
+            ..
+        }
+    )));
+    assert!(!events.borrow().iter().any(|e| matches!(
+        e,
+        Event::Drag {
+            phase: DragPhase::Drop,
+            ..
+        }
+    )));
 }

@@ -321,7 +321,7 @@ pub fn event_probe() -> Result<String> {
         let app = demo.web.app();
         let root = demo.nodes[0];
         let editor = demo.nodes[4];
-        let revision = match &app.tree().node(editor).map_err(js)?.descriptor.props {
+        let revision = match app.tree().node(editor).map_err(js)?.descriptor.view().props {
             Props::Input(input) => input.revision,
             _ => return Err(js("missing input")),
         };

@@ -23,7 +23,7 @@ struct Relations {
     error: Option<AxId>,
     label_text: Option<String>,
     description_text: Option<String>,
-    has_popup: bool,
+    popup: Option<glory_render::PopupKind>,
 }
 
 #[derive(Default)]
@@ -95,10 +95,17 @@ impl Tree {
             .collect();
         while let Some((id, parent, list)) = pending.pop() {
             let semantic = state.mapper.tree().node(id)?;
-            if semantic.suspended {
+            if semantic.suspended
+                || semantic
+                    .descriptor
+                    .view()
+                    .semantics
+                    .as_ref()
+                    .is_some_and(|s| s.inert)
+            {
                 continue;
             }
-            let d = &semantic.descriptor;
+            let d = semantic.descriptor.view();
             if matches!(d.props, Props::Group) {
                 pending.extend(
                     semantic
@@ -139,10 +146,26 @@ impl Tree {
             if matches!(&d.props, Props::Image(p) if p.alternative.is_none()) {
                 continue;
             }
+            if matches!(d.props, Props::Graphic(p) if p.alternative.is_none()) {
+                continue;
+            }
             let key = Key::Main(id);
             let ax_id = self.id(key)?;
             alive.insert(key);
             let mut node = Node::new(role(d));
+            if d.role == Some(Role::Separator) {
+                node.set_orientation(
+                    match d
+                        .semantics
+                        .as_ref()
+                        .and_then(|s| s.separator_axis)
+                        .unwrap_or(glory_render::Orientation::Horizontal)
+                    {
+                        glory_render::Orientation::Horizontal => accesskit::Orientation::Horizontal,
+                        glory_render::Orientation::Vertical => accesskit::Orientation::Vertical,
+                    },
+                );
+            }
             if let Some(name) = &d.name {
                 node.set_label(normalize_text(name, true).into_owned());
             }
@@ -150,6 +173,44 @@ impl Tree {
                 node.set_disabled();
             }
             if let Some(s) = &d.semantics {
+                if let Some(slider) = &s.slider {
+                    node.set_min_numeric_value(slider.range.min);
+                    node.set_max_numeric_value(slider.range.max);
+                    node.set_numeric_value(slider.range.value);
+                    node.set_numeric_value_step(slider.step);
+                    node.set_orientation(match slider.axis {
+                        glory_render::Orientation::Horizontal => accesskit::Orientation::Horizontal,
+                        glory_render::Orientation::Vertical => accesskit::Orientation::Vertical,
+                    });
+                    if let Some(text) = &slider.value_text {
+                        node.set_value(normalize_text(text, true).into_owned());
+                    }
+                }
+                if let Some(range) = s.splitter {
+                    node.set_min_numeric_value(range.min);
+                    node.set_max_numeric_value(range.max);
+                    node.set_numeric_value(range.value);
+                }
+                if let Some(progress) = &s.progress {
+                    node.set_min_numeric_value(progress.min);
+                    node.set_max_numeric_value(progress.max);
+                    if let Some(current) = progress.current {
+                        node.set_numeric_value(current);
+                    }
+                    if let Some(text) = &progress.value_text {
+                        node.set_value(normalize_text(text, true).into_owned());
+                    }
+                    node.set_read_only();
+                }
+                if s.busy == Some(true) {
+                    node.set_busy();
+                }
+                if let Some(current) = s.current {
+                    node.set_aria_current(match current {
+                        glory_render::Current::Page => accesskit::AriaCurrent::Page,
+                        glory_render::Current::Step => accesskit::AriaCurrent::Step,
+                    });
+                }
                 if s.required {
                     node.set_required();
                 }
@@ -172,8 +233,10 @@ impl Tree {
                         Toggled::False
                     });
                 }
-                if d.role == Some(Role::TabList)
-                    && let Some(axis) = s.navigation
+                if matches!(
+                    d.role,
+                    Some(Role::TabList | Role::Toolbar | Role::RadioGroup)
+                ) && let Some(axis) = s.navigation
                 {
                     node.set_orientation(match axis {
                         glory_render::Orientation::Horizontal => {
@@ -260,6 +323,14 @@ impl Tree {
                         );
                     }
                 }
+                Props::Graphic(p) => {
+                    if d.name.is_none() {
+                        node.set_label(
+                            normalize_text(p.alternative.as_deref().unwrap_or_default(), true)
+                                .into_owned(),
+                        );
+                    }
+                }
                 Props::Link(p) => node.set_url(normalize_text(&p.target, true).into_owned()),
                 _ => {}
             }
@@ -288,6 +359,14 @@ impl Tree {
                 }
                 if d.activation_enabled() && clickable(state, id) && !d.readonly() {
                     node.add_action(AxAction::Click);
+                }
+                if d.semantics
+                    .as_ref()
+                    .is_some_and(|s| s.splitter.is_some() || s.slider.is_some() && !d.readonly())
+                {
+                    node.add_action(AxAction::Increment);
+                    node.add_action(AxAction::Decrement);
+                    node.add_action(AxAction::SetValue);
                 }
                 if matches!(d.props, Props::Input(_)) && !d.readonly() {
                     node.add_action(AxAction::SetValue);
@@ -320,13 +399,17 @@ impl Tree {
                 .expect("live accessibility parent")
                 .push_child(ax_id);
             nodes.insert(ax_id, node);
-            pending.extend(
-                semantic
-                    .children
-                    .iter()
-                    .rev()
-                    .map(|child| (*child, ax_id, list)),
-            );
+            // Slider descendants are presentational, matching the HTML/ARIA
+            // range control. Passive track/thumb boxes are never AX children.
+            if d.role != Some(Role::Slider) {
+                pending.extend(
+                    semantic
+                        .children
+                        .iter()
+                        .rev()
+                        .map(|child| (*child, ax_id, list)),
+                );
+            }
         }
         for (list, (count, consistent)) in totals {
             if consistent && let Some(count) = count {
@@ -341,7 +424,13 @@ impl Tree {
         let mut relations = Vec::new();
         for (key, ax_id) in &self.ids {
             let Key::Main(id) = key else { continue };
-            let Some(d) = state.mapper.tree().node(*id).ok().map(|n| &n.descriptor) else {
+            let Some(d) = state
+                .mapper
+                .tree()
+                .node(*id)
+                .ok()
+                .map(|n| n.descriptor.view())
+            else {
                 continue;
             };
             let Some(s) = &d.semantics else { continue };
@@ -382,7 +471,7 @@ impl Tree {
                 error,
                 label_text: label_text.filter(|_| d.name.is_none()),
                 description_text,
-                has_popup: s.has_popup,
+                popup: s.popup,
             });
         }
         // Read text before installing any derived names, so relation cycles
@@ -408,8 +497,12 @@ impl Tree {
                 if let Some(text) = relation.description_text {
                     node.set_description(text);
                 }
-                if relation.has_popup {
-                    node.set_has_popup(accesskit::HasPopup::Dialog);
+                if let Some(popup) = relation.popup {
+                    node.set_has_popup(match popup {
+                        glory_render::PopupKind::Dialog => accesskit::HasPopup::Dialog,
+                        glory_render::PopupKind::Menu => accesskit::HasPopup::Menu,
+                        glory_render::PopupKind::Listbox => accesskit::HasPopup::Listbox,
+                    });
                 }
             }
         }
@@ -447,7 +540,7 @@ impl Tree {
         if !state.mapper.tree().active(id) {
             return Ok(false);
         }
-        let d = &state.mapper.tree().node(id)?.descriptor;
+        let d = state.mapper.tree().node(id)?.descriptor.view();
         if !state.mapper.tree().enabled(id)
             || d.readonly() && matches!(request.action, AxAction::SetValue | AxAction::Click)
         {
@@ -459,6 +552,25 @@ impl Tree {
             return Ok(false);
         }
         match (&request.action, &request.data) {
+            (AxAction::Increment, None)
+            | (AxAction::Decrement, None)
+            | (AxAction::SetValue, Some(ActionData::NumericValue(_)))
+                if d.semantics.as_ref().is_some_and(|s| {
+                    s.splitter.is_some() || s.slider.is_some() && !d.readonly()
+                }) =>
+            {
+                let command = match (&request.action, &request.data) {
+                    (AxAction::Increment, _) => glory_render::RangeCommand::Increase,
+                    (AxAction::Decrement, _) => glory_render::RangeCommand::Decrease,
+                    (_, Some(ActionData::NumericValue(value))) => {
+                        glory_render::RangeCommand::Set(*value)
+                    }
+                    _ => unreachable!(),
+                };
+                let event = Event::Range { from: id, command };
+                event.validate_payload(id, d)?;
+                state.inputs.push(Input::Event { node: id, event });
+            }
             (AxAction::ScrollIntoView, None | Some(ActionData::ScrollHint(_)))
                 if revealable(state, id) =>
             {
@@ -588,7 +700,7 @@ fn revealable(state: &State, id: NodeId) -> bool {
     let Ok(node) = tree.node(id) else {
         return false;
     };
-    if node.descriptor.options.get::<VirtualPart>() != Some(&VirtualPart::Row) {
+    if node.descriptor.view().options.get::<VirtualPart>() != Some(&VirtualPart::Row) {
         return false;
     }
     let mut cursor = node.parent;
@@ -596,7 +708,7 @@ fn revealable(state: &State, id: NodeId) -> bool {
         let Ok(node) = tree.node(id) else {
             return false;
         };
-        if node.descriptor.options.get::<VirtualPart>() == Some(&VirtualPart::Root) {
+        if node.descriptor.view().options.get::<VirtualPart>() == Some(&VirtualPart::Root) {
             return state.subscriptions.contains(&(id, EventKind::Navigate));
         }
         cursor = node.parent;
@@ -611,7 +723,7 @@ mod tests;
 fn clickable(state: &State, id: NodeId) -> bool {
     state.mapper.tree().node(id).is_ok_and(|node| {
         matches!(
-            node.descriptor.props,
+            node.descriptor.view().props,
             Props::Button(_) | Props::Check(_) | Props::Link(_)
         )
     }) || state.subscriptions.contains(&(id, EventKind::Activate))
@@ -638,7 +750,7 @@ fn relation_text(nodes: &BTreeMap<AxId, Node>, target: AxId) -> Option<String> {
     (!text.is_empty()).then_some(text)
 }
 
-fn role(d: &glory_render::Descriptor) -> AxRole {
+fn role(d: glory_render::DescriptorView<'_>) -> AxRole {
     if let Some(part) = d.document_part() {
         return match part {
             glory_render::DocumentPart::Blockquote => AxRole::Blockquote,
@@ -661,9 +773,25 @@ fn role(d: &glory_render::Descriptor) -> AxRole {
     if d.semantics.as_ref().is_some_and(|s| s.tab) {
         return AxRole::Tab;
     }
+    if d.semantics.as_ref().is_some_and(|s| s.combobox.is_some()) {
+        return AxRole::ComboBox;
+    }
+    if d.semantics.as_ref().is_some_and(|s| s.option.is_some()) {
+        return AxRole::ListBoxOption;
+    }
+    if let Some(item) = d.semantics.as_ref().and_then(|s| s.menu_item.as_ref()) {
+        return match item.kind {
+            glory_render::MenuItemKind::Action => AxRole::MenuItem,
+            glory_render::MenuItemKind::Checkbox => AxRole::MenuItemCheckBox,
+            glory_render::MenuItemKind::Radio => AxRole::MenuItemRadio,
+        };
+    }
     match &d.props {
         Props::View => match d.effective_role() {
             Some(Role::Group) => AxRole::Group,
+            Some(Role::ProgressBar) => AxRole::ProgressIndicator,
+            Some(Role::Slider) => AxRole::Slider,
+            Some(Role::Separator) => AxRole::Splitter,
             Some(Role::Main) => AxRole::Main,
             Some(Role::Navigation) => AxRole::Navigation,
             Some(Role::Section) => AxRole::Region,
@@ -676,9 +804,16 @@ fn role(d: &glory_render::Descriptor) -> AxRole {
             Some(Role::ColumnHeader) => AxRole::ColumnHeader,
             Some(Role::Cell) => AxRole::Cell,
             Some(Role::Dialog) => AxRole::Dialog,
+            Some(Role::AlertDialog) => AxRole::AlertDialog,
+            Some(Role::Tooltip) => AxRole::Tooltip,
             Some(Role::TabList) => AxRole::TabList,
             Some(Role::TabPanel) => AxRole::TabPanel,
             Some(Role::RadioGroup) => AxRole::RadioGroup,
+            Some(Role::Toolbar) => AxRole::Toolbar,
+            Some(Role::Banner) => AxRole::Banner,
+            Some(Role::ContentInfo) => AxRole::ContentInfo,
+            Some(Role::Menu) => AxRole::Menu,
+            Some(Role::Listbox) => AxRole::ListBox,
             Some(Role::Heading(_)) => AxRole::Heading,
             None => AxRole::GenericContainer,
         },
@@ -691,6 +826,7 @@ fn role(d: &glory_render::Descriptor) -> AxRole {
             TextKind::Mark => AxRole::Mark,
         },
         Props::Button(_) => AxRole::Button,
+        Props::Select(_) => AxRole::ComboBox,
         Props::Input(p) if p.multiline => AxRole::MultilineTextInput,
         Props::Input(p) => match p.purpose {
             Purpose::Password => AxRole::PasswordInput,
@@ -704,6 +840,7 @@ fn role(d: &glory_render::Descriptor) -> AxRole {
         Props::Check(p) if p.mode == glory_render::CheckMode::Radio => AxRole::RadioButton,
         Props::Check(_) => AxRole::CheckBox,
         Props::Image(_) => AxRole::Image,
+        Props::Graphic(_) => AxRole::Image,
         Props::Link(_) => AxRole::Link,
         Props::Group => unreachable!("transparent group"),
     }

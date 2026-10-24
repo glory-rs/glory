@@ -29,7 +29,7 @@ fn unrelated_fields_and_keep_preserve_large_value_and_class_buffers() {
     descriptor.classes = (0..500).map(|index| format!("token-{index}")).collect();
     create(&mut memory, id, descriptor, None);
     let pointers = |memory: &Memory| {
-        let descriptor = &memory.node(id).unwrap().descriptor;
+        let descriptor = memory.node(id).unwrap().descriptor.view();
         let Props::Input(input) = &descriptor.props else {
             panic!()
         };
@@ -72,7 +72,7 @@ fn prepared_patch_drop_unwind_and_commit_preserve_atomicity_and_watermarks() {
         assert_eq!(prepared.descriptor().name.as_deref(), Some("staged"));
         assert_eq!(prepared.previous(), &Patch::Name(Change::Set(None)));
     }
-    assert_eq!(memory.node(id).unwrap().descriptor.name, None);
+    assert_eq!(*memory.node(id).unwrap().descriptor.view().name, None);
     assert_eq!(memory.stats(), stats);
     assert_eq!(memory.apply(&[]).unwrap(), receipt);
     assert!(
@@ -84,7 +84,7 @@ fn prepared_patch_drop_unwind_and_commit_preserve_atomicity_and_watermarks() {
         }))
         .is_err()
     );
-    assert_eq!(memory.node(id).unwrap().descriptor.role, None);
+    assert_eq!(memory.node(id).unwrap().descriptor.view().role, None);
     assert_eq!(memory.stats(), stats);
     assert_eq!(memory.apply(&[]).unwrap(), receipt);
     let committed = memory
@@ -94,7 +94,7 @@ fn prepared_patch_drop_unwind_and_commit_preserve_atomicity_and_watermarks() {
     assert_eq!(committed.applied, receipt.applied + 1);
     assert_eq!(memory.stats().patched, stats.patched + 1);
     assert_eq!(
-        memory.node(id).unwrap().descriptor.name.as_deref(),
+        memory.node(id).unwrap().descriptor.view().name.as_deref(),
         Some("accepted")
     );
 }
@@ -133,10 +133,10 @@ fn failed_ancestor_content_and_input_revisions_restore_the_original_buffers() {
         None,
     );
     let pointers = |memory: &Memory| {
-        let Props::Text(text) = &memory.node(text).unwrap().descriptor.props else {
+        let Props::Text(text) = &memory.node(text).unwrap().descriptor.view().props else {
             panic!()
         };
-        let Props::Input(input) = &memory.node(input).unwrap().descriptor.props else {
+        let Props::Input(input) = &memory.node(input).unwrap().descriptor.view().props else {
             panic!()
         };
         (text.content.as_ptr(), input.value.as_ptr())
@@ -176,7 +176,7 @@ fn failed_ancestor_content_and_input_revisions_restore_the_original_buffers() {
         }])
         .unwrap();
     assert!(
-        matches!(&memory.node(input).unwrap().descriptor.props, Props::Input(input) if input.value == "next�" && input.revision == 101)
+        matches!(&memory.node(input).unwrap().descriptor.view().props, Props::Input(input) if input.value == "next�" && input.revision == 101)
     );
 }
 
@@ -264,7 +264,10 @@ fn live_field_validation_matches_full_descriptor_validation_for_all_patch_varian
         Patch::Multiline(Change::Set(true)),
         Patch::Multiline(Change::Clear),
         Patch::Checked(Change::Set(true)),
-        Patch::Source(Change::Set("image.png".into())),
+        Patch::Source {
+            source: Change::Set("image.png".into()),
+            revision: 3,
+        },
         Patch::Alternative(Change::Set(Some("alt".into()))),
         Patch::Alternative(Change::Clear),
         Patch::Target(Change::Clear),
@@ -295,7 +298,10 @@ fn live_field_validation_matches_full_descriptor_validation_for_all_patch_varian
         Patch::Purpose(Change::Keep),
         Patch::Multiline(Change::Keep),
         Patch::Checked(Change::Keep),
-        Patch::Source(Change::Keep),
+        Patch::Source {
+            source: Change::Keep,
+            revision: 0,
+        },
         Patch::Alternative(Change::Keep),
         Patch::Target(Change::Keep),
         Patch::Classes(Change::Keep),
@@ -344,7 +350,7 @@ fn check_mode_prepare_swaps_only_mode_and_rolls_back_without_counters() {
         })),
         None,
     );
-    let pointer = match &memory.node(id).unwrap().descriptor.props {
+    let pointer = match &memory.node(id).unwrap().descriptor.view().props {
         Props::Check(check) => check.label.as_ptr(),
         _ => unreachable!(),
     };
@@ -365,7 +371,7 @@ fn check_mode_prepare_swaps_only_mode_and_rolls_back_without_counters() {
     assert_eq!(memory.stats(), before);
     assert_eq!(memory.apply(&[]).unwrap(), receipt);
     assert!(
-        matches!(&memory.node(id).unwrap().descriptor.props, Props::Check(check) if check.mode == CheckMode::Checkbox && check.label.as_ptr() == pointer)
+        matches!(&memory.node(id).unwrap().descriptor.view().props, Props::Check(check) if check.mode == CheckMode::Checkbox && check.label.as_ptr() == pointer)
     );
     assert_eq!(
         memory

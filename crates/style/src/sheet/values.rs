@@ -193,6 +193,20 @@ fn families<'i>(input: &mut Parser<'i>) -> Result<Vec<Family>> {
 pub(super) fn parse<'i>(name: &str, input: &mut Parser<'i>) -> Result<Style> {
     let mut style = Style::new();
     match name {
+        "grid-template-columns" => style.grid_columns = Some(grid_tracks(input)?),
+        "grid-template-rows" => style.grid_rows = Some(grid_tracks(input)?),
+        "grid-column" => style.grid_column = Some(grid_placement(input)?),
+        "grid-row" => style.grid_row = Some(grid_placement(input)?),
+        "aspect-ratio" => style.aspect_ratio = Some(aspect_ratio(input)?),
+        "pointer-events" => {
+            style.pointer_events =
+                Some(keyword!(input,"auto"=>PointerEvents::Auto,"none"=>PointerEvents::None))
+        }
+        "object-fit" => {
+            style.object_fit = Some(
+                keyword!(input,"fill"=>ObjectFit::Fill,"contain"=>ObjectFit::Contain,"cover"=>ObjectFit::Cover,"none"=>ObjectFit::None,"scale-down"=>ObjectFit::ScaleDown),
+            )
+        }
         "width" => style.width = Some(length(input)?),
         "height" => style.height = Some(length(input)?),
         "min-width" => style.min_width = Some(length(input)?),
@@ -201,6 +215,8 @@ pub(super) fn parse<'i>(name: &str, input: &mut Parser<'i>) -> Result<Style> {
         "max-height" => style.max_height = Some(limit(input)?),
         "top" => style.top = Some(length(input)?),
         "left" => style.left = Some(length(input)?),
+        "right" => style.right = Some(length(input)?),
+        "bottom" => style.bottom = Some(length(input)?),
         "gap" => style.gap = Some(px(input)?),
         "padding" => style.padding = Some(edges(input)?),
         "margin" => style.margin = Some(edges(input)?),
@@ -242,12 +258,12 @@ pub(super) fn parse<'i>(name: &str, input: &mut Parser<'i>) -> Result<Style> {
         }
         "position" => {
             style.position = Some(
-                keyword!(input,"static"=>Position::Static,"relative"=>Position::Relative,"absolute"=>Position::Absolute,"sticky"=>Position::Sticky),
+                keyword!(input,"static"=>Position::Static,"relative"=>Position::Relative,"absolute"=>Position::Absolute,"sticky"=>Position::Sticky,"fixed"=>Position::Fixed),
             )
         }
         "display" => {
             style.display = Some(
-                keyword!(input,"block"=>Display::Block,"flex"=>Display::Flex,"none"=>Display::None),
+                keyword!(input,"block"=>Display::Block,"flex"=>Display::Flex,"inline-flex"=>Display::InlineFlex,"grid"=>Display::Grid,"none"=>Display::None),
             )
         }
         "flex-direction" => {
@@ -285,4 +301,92 @@ pub(super) fn parse<'i>(name: &str, input: &mut Parser<'i>) -> Result<Style> {
     }
     input.expect_exhausted()?;
     Ok(style)
+}
+
+fn grid_tracks<'i>(input: &mut Parser<'i>) -> Result<GridTracks> {
+    if input
+        .try_parse(|parser| parser.expect_ident_matching("none"))
+        .is_ok()
+    {
+        return Ok(GridTracks::None);
+    }
+    let mut tracks = Vec::new();
+    while !input.is_exhausted() {
+        if tracks.len() == MAX_GRID_TRACKS {
+            return Err(invalid(input, "at most 64 grid tracks"));
+        }
+        let track = match input.next()?.clone() {
+            Token::Ident(name) if name.eq_ignore_ascii_case("auto") => GridTrack::Auto,
+            Token::Dimension { value, unit, .. } if unit.eq_ignore_ascii_case("px") => {
+                GridTrack::Px(value.into())
+            }
+            Token::Dimension { value, unit, .. } if unit.eq_ignore_ascii_case("fr") => {
+                GridTrack::Fr(value.into())
+            }
+            Token::Percentage { unit_value, .. } => {
+                GridTrack::Percent(f64::from(unit_value) * 100.0)
+            }
+            Token::Number { value: 0.0, .. } => GridTrack::Px(0.0),
+            _ => return Err(invalid(input, "expected grid auto/px/%/fr tracks")),
+        };
+        tracks.push(track);
+    }
+    Ok(GridTracks::Tracks(tracks))
+}
+fn grid_integer<'i>(input: &mut Parser<'i>) -> Result<u16> {
+    let value = input.expect_integer()?;
+    u16::try_from(value).map_err(|_| invalid(input, "expected positive grid line/span integer"))
+}
+fn grid_placement<'i>(input: &mut Parser<'i>) -> Result<GridPlacement> {
+    if input
+        .try_parse(|parser| parser.expect_ident_matching("auto"))
+        .is_ok()
+    {
+        return Ok(GridPlacement::Auto);
+    }
+    if input
+        .try_parse(|parser| parser.expect_ident_matching("span"))
+        .is_ok()
+    {
+        return Ok(GridPlacement::Span(grid_integer(input)?));
+    }
+    let start = grid_integer(input)?;
+    input.expect_delim('/')?;
+    input.expect_ident_matching("span")?;
+    Ok(GridPlacement::At {
+        start,
+        span: grid_integer(input)?,
+    })
+}
+fn aspect_ratio<'i>(input: &mut Parser<'i>) -> Result<AspectRatio> {
+    if input
+        .try_parse(|parser| parser.expect_ident_matching("auto"))
+        .is_ok()
+    {
+        return Ok(AspectRatio::Auto);
+    }
+    let width = ratio_number(input)?;
+    let height = if input.try_parse(|parser| parser.expect_delim('/')).is_ok() {
+        ratio_number(input)?
+    } else {
+        1.0
+    };
+    if !width.is_finite() || width <= 0.0 || !height.is_finite() || height <= 0.0 {
+        return Err(invalid(
+            input,
+            "expected finite positive aspect-ratio terms",
+        ));
+    }
+    Ok(AspectRatio::Ratio(width / height))
+}
+fn ratio_number<'i>(input: &mut Parser<'i>) -> Result<f64> {
+    // Token numbers use f32. Preserve the declared f64 boundary so the minimum
+    // legal 0.000001 does not round below the accepted ratio domain.
+    input.skip_whitespace();
+    let start = input.position();
+    input.expect_number()?;
+    input
+        .slice_from(start)
+        .parse()
+        .map_err(|_| invalid(input, "expected finite numeric ratio term"))
 }

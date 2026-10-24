@@ -11,6 +11,7 @@ use web_sys::Window;
 pub(super) struct Frame {
     window: Window,
     app: RefCell<Weak<App>>,
+    dom: RefCell<Weak<super::dom::Dom>>,
     callback: RefCell<Option<Closure<dyn FnMut(f64)>>>,
     pending: Cell<Option<i32>>,
     processing: Cell<bool>,
@@ -33,6 +34,7 @@ impl Frame {
         let frame = Rc::new(Self {
             window,
             app: RefCell::new(Weak::new()),
+            dom: RefCell::new(Weak::new()),
             callback: RefCell::new(None),
             pending: Cell::new(None),
             processing: Cell::new(false),
@@ -53,12 +55,20 @@ impl Frame {
             {
                 web_sys::console::error_1(&format!("Glory frame: {error}").into());
             }
+            if let Some(dom) = frame.dom.borrow().upgrade()
+                && let Err(error) = super::sheet::finish_turn(&dom)
+            {
+                dom.error.borrow_mut().get_or_insert(error);
+            }
             frame.processing.set(false);
             if frame.again.replace(false) {
                 frame.schedule();
             }
         }));
         frame
+    }
+    pub fn attach_dom(&self, dom: &Rc<super::dom::Dom>) {
+        *self.dom.borrow_mut() = Rc::downgrade(dom);
     }
     pub fn attach(&self, app: &Rc<App>) {
         *self.app.borrow_mut() = Rc::downgrade(app);

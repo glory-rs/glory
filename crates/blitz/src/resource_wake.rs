@@ -30,7 +30,7 @@ impl ResourceWake {
         drop(previous);
         self.pending.store(false, Ordering::Release);
     }
-    fn wake(&self) {
+    pub(super) fn wake(&self) {
         if self.closed.load(Ordering::Acquire) || self.pending.swap(true, Ordering::AcqRel) {
             return;
         }

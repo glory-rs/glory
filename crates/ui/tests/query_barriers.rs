@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use glory_render::memory::Memory;
 use glory_render::*;
-use glory_ui::{App, Error as UiError, input};
+use glory_ui::{App, Error as UiError, Widget, input};
 
 #[derive(Default)]
 struct Wire {
@@ -62,12 +62,240 @@ fn fixture() -> (App, NodeId, Rc<RefCell<Wire>>) {
     let node = app.tree().roots()[0];
     (app, node, wire)
 }
+
+#[test]
+fn option_reveal_uses_scroll_capability_and_drops_closed_or_retired_targets() {
+    let wire = Rc::new(RefCell::new(Wire::default()));
+    let copy = wire.clone();
+    let app = App::new(move |id| Delayed {
+        memory: Memory::new(id),
+        wire: copy,
+    });
+    let owner = SemanticId::new("reveal-options").unwrap();
+    let option = app.scope().cage(None);
+    let panel = app.scope().cage(None);
+    let metadata = Semantics {
+        id: Some(owner.clone()),
+        navigation: Some(Orientation::Vertical),
+        ..Default::default()
+    };
+    let mounted = glory_ui::view()
+        .role(Role::Listbox)
+        .node_ref(panel)
+        .semantics(Some(Box::new(metadata.clone())))
+        .fill(
+            glory_ui::button()
+                .label("Option")
+                .node_ref(option)
+                .focus(FocusMode::Programmatic)
+                .semantics(Some(Box::new(Semantics {
+                    id: Some(SemanticId::new("reveal-option").unwrap()),
+                    option: Some(OptionSemantics { owner }),
+                    selected: Some(false),
+                    ..Default::default()
+                }))),
+        )
+        .mount(app.scope())
+        .unwrap();
+    let node = option.get().unwrap();
+    assert!(matches!(
+        app.scope().action(Action::Focus(node)),
+        Err(UiError::Render(Error::Unsupported(_)))
+    ));
+    assert!(matches!(
+        app.scope().action(Action::RevealOption {
+            node: panel.get().unwrap()
+        }),
+        Err(UiError::Render(Error::Unsupported(_)))
+    ));
+    app.scope().action(Action::RevealOption { node }).unwrap();
+    app.flush().unwrap();
+    assert_eq!(wire.borrow().actions, [Action::RevealOption { node }]);
+    wire.borrow_mut().actions.clear();
+    app.scope().action(Action::RevealOption { node }).unwrap();
+    let mut hidden = metadata;
+    hidden.hidden = true;
+    app.scope()
+        .patch(
+            panel.get().unwrap(),
+            Patch::Semantics(Change::Set(Some(Box::new(hidden)))),
+        )
+        .unwrap();
+    app.flush().unwrap();
+    assert!(wire.borrow().actions.is_empty());
+    app.scope().action(Action::RevealOption { node }).unwrap();
+    drop(mounted);
+    app.flush().unwrap();
+    assert!(wire.borrow().actions.is_empty());
+    assert!(matches!(
+        app.scope().action(Action::RevealOption { node }),
+        Err(UiError::Render(Error::NodeGone(_)))
+    ));
+
+    let app = App::memory();
+    let owner = SemanticId::new("no-scroll-options").unwrap();
+    app.mount(
+        glory_ui::view()
+            .role(Role::Listbox)
+            .semantics(Some(Box::new(Semantics {
+                id: Some(owner.clone()),
+                navigation: Some(Orientation::Vertical),
+                ..Default::default()
+            })))
+            .fill(
+                glory_ui::button()
+                    .focus(FocusMode::Programmatic)
+                    .semantics(Some(Box::new(Semantics {
+                        id: Some(SemanticId::new("no-scroll-option").unwrap()),
+                        option: Some(OptionSemantics { owner }),
+                        selected: Some(false),
+                        ..Default::default()
+                    }))),
+            ),
+    )
+    .unwrap();
+    let root = app.tree().roots()[0];
+    let node = app.tree().node(root).unwrap().children[0];
+    assert_eq!(
+        app.scope().action(Action::RevealOption { node }),
+        Err(UiError::Render(Error::Unsupported("scroll")))
+    );
+}
+
+#[test]
+fn menu_exit_survives_the_same_commit_hiding_its_retained_panel() {
+    let wire = Rc::new(RefCell::new(Wire::default()));
+    let copy = wire.clone();
+    let app = App::new(move |id| Delayed {
+        memory: Memory::new(id),
+        wire: copy,
+    });
+    let metadata = Semantics {
+        id: Some(SemanticId::new("exit-menu").unwrap()),
+        navigation: Some(Orientation::Vertical),
+        layer: Some(Layer {
+            modal: false,
+            return_focus: Some(SemanticId::new("menu-trigger").unwrap()),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+    app.mount(
+        glory_ui::view()
+            .role(Role::Menu)
+            .focus(FocusMode::Programmatic)
+            .semantics(Some(Box::new(metadata.clone()))),
+    )
+    .unwrap();
+    let node = app.tree().roots()[0];
+    let mut closed = metadata;
+    closed.hidden = true;
+    app.scope()
+        .patch(node, Patch::Semantics(Change::Set(Some(Box::new(closed)))))
+        .unwrap();
+    app.scope()
+        .action(Action::ExitMenu {
+            node,
+            backwards: false,
+        })
+        .unwrap();
+    app.scope().action(Action::Focus(node)).unwrap();
+    app.flush().unwrap();
+    assert!(!app.tree().active(node));
+    assert_eq!(
+        wire.borrow().actions,
+        [Action::ExitMenu {
+            node,
+            backwards: false
+        }]
+    );
+}
 fn reply(wire: &RefCell<Wire>, token: QueryToken, applied: u64, result: Result<QueryValue, Error>) {
     wire.borrow_mut().inputs.push(Input::Response {
         token,
         applied,
         result,
     });
+}
+
+#[test]
+fn scroll_metrics_obey_owner_retirement_response_kind_and_captured_watermark() {
+    let (app, node, wire) = fixture();
+    let requester = app.scope().child().unwrap();
+    let called = Rc::new(Cell::new(0));
+    let out = called.clone();
+    let token = requester
+        .request(Query::ScrollMetrics(node), move |_| out.set(out.get() + 1))
+        .unwrap();
+    let accepted = wire.borrow().applied;
+    requester.dispose();
+    reply(
+        &wire,
+        token,
+        accepted,
+        Ok(QueryValue::ScrollMetrics(ScrollMetrics::default())),
+    );
+    app.pump().unwrap();
+    assert_eq!(called.get(), 0);
+    for wrong in [
+        Ok(QueryValue::Scroll { x: 0.0, y: 0.0 }),
+        Ok(QueryValue::ScrollMetrics(ScrollMetrics {
+            content_height: f64::NAN,
+            ..Default::default()
+        })),
+    ] {
+        let output = Rc::new(RefCell::new(None));
+        let saved = output.clone();
+        let token = app
+            .request(Query::ScrollMetrics(node), move |result| {
+                *saved.borrow_mut() = Some(result)
+            })
+            .unwrap();
+        let accepted = wire.borrow().applied;
+        reply(&wire, token, accepted, wrong);
+        app.pump().unwrap();
+        assert!(matches!(
+            output.borrow_mut().take().unwrap(),
+            Err(Error::InvalidResponse(_))
+        ));
+    }
+    let output = Rc::new(RefCell::new(None));
+    let saved = output.clone();
+    let token = app
+        .request(Query::ScrollMetrics(node), move |result| {
+            *saved.borrow_mut() = Some(result)
+        })
+        .unwrap();
+    let accepted = wire.borrow().applied;
+    app.scope()
+        .patch(node, Patch::Name(Change::Set(Some("later".into()))))
+        .unwrap();
+    app.flush().unwrap();
+    let metrics = ScrollMetrics {
+        x: -8.0,
+        viewport_width: 100.0,
+        content_width: 20.0,
+        ..Default::default()
+    };
+    reply(
+        &wire,
+        token,
+        accepted,
+        Ok(QueryValue::ScrollMetrics(metrics)),
+    );
+    app.pump().unwrap();
+    assert_eq!(
+        output.borrow_mut().take(),
+        Some(Ok(QueryValue::ScrollMetrics(metrics)))
+    );
+    reply(
+        &wire,
+        token,
+        accepted,
+        Ok(QueryValue::ScrollMetrics(metrics)),
+    );
+    app.pump().unwrap();
+    assert!(output.borrow().is_none());
 }
 
 #[test]
@@ -720,5 +948,126 @@ fn owner_interests_survive_independent_node_listener_and_query_retirement() {
             baseline.query_owners,
             baseline.query_targets
         )
+    );
+}
+
+#[test]
+fn explicit_query_cancellation_checks_requester_and_drops_reentrant_captures_outside_registry() {
+    struct Probe {
+        writes: glory_core::Cage<usize>,
+        scope: glory_ui::WeakScope,
+        node: NodeId,
+        next: Rc<Cell<Option<QueryToken>>>,
+    }
+    impl Drop for Probe {
+        fn drop(&mut self) {
+            self.writes.revise(|value| *value += 1);
+            let scope = self.scope.upgrade().unwrap();
+            self.next.set(Some(
+                scope.request(Query::Bounds(self.node), |_| {}).unwrap(),
+            ));
+        }
+    }
+    let (app, node, wire) = fixture();
+    let requester = app.scope().child().unwrap();
+    let sibling = app.scope().child().unwrap();
+    let writes = app.scope().cage(0);
+    let next = Rc::new(Cell::new(None));
+    let captured = Probe {
+        writes,
+        scope: requester.downgrade(),
+        node,
+        next: next.clone(),
+    };
+    let token = requester
+        .request(Query::Bounds(node), move |_| {
+            let _hold = captured;
+            panic!("cancelled reply");
+        })
+        .unwrap();
+    let accepted = wire.borrow().applied;
+    assert!(sibling.cancel_request(token).is_err());
+    assert!(app.cancel_request(token).is_err());
+    assert_eq!(app.stats().queries, 1);
+    assert_eq!(writes.get(), 0);
+    assert!(requester.cancel_request(token).unwrap());
+    assert_eq!(writes.get(), 1);
+    let reentrant = next.get().unwrap();
+    assert_eq!(app.stats().queries, 1);
+    assert!(!requester.cancel_request(token).unwrap());
+    assert!(!requester.cancel_request(QueryToken(u64::MAX)).unwrap());
+    assert!(requester.cancel_request(reentrant).unwrap());
+    assert_eq!(
+        (
+            app.stats().queries,
+            app.stats().query_owners,
+            app.stats().query_targets
+        ),
+        (0, 0, 0)
+    );
+    reply(
+        &wire,
+        token,
+        accepted,
+        Ok(QueryValue::Bounds(Rect::default())),
+    );
+    reply(
+        &wire,
+        reentrant,
+        accepted,
+        Ok(QueryValue::Bounds(Rect::default())),
+    );
+    app.pump().unwrap();
+    requester.dispose();
+    assert!(requester.cancel_request(token).is_err());
+    let root = app
+        .request(Query::Bounds(node), |_| panic!("cancelled app query"))
+        .unwrap();
+    assert!(app.cancel_request(root).unwrap());
+    assert!(!app.cancel_request(root).unwrap());
+    assert_eq!(
+        (
+            app.stats().queries,
+            app.stats().query_owners,
+            app.stats().query_targets
+        ),
+        (0, 0, 0)
+    );
+}
+
+#[test]
+fn explicit_cancel_also_revokes_queued_target_gone_reply_without_retaining_owner_buckets() {
+    let (app, _, wire) = fixture();
+    let target = app.scope().child().unwrap();
+    let node = target
+        .create(Descriptor::new(Props::Input(Default::default())))
+        .unwrap();
+    let requester = app.scope().child().unwrap();
+    let calls = Rc::new(Cell::new(0));
+    let seen = calls.clone();
+    let token = requester
+        .request(Query::Bounds(node), move |_| seen.set(seen.get() + 1))
+        .unwrap();
+    let accepted = wire.borrow().applied;
+    target.dispose();
+    assert_eq!(app.stats().queries, 1);
+    assert_eq!(app.stats().query_targets, 0);
+    assert!(requester.cancel_request(token).unwrap());
+    app.pump().unwrap();
+    reply(
+        &wire,
+        token,
+        accepted,
+        Ok(QueryValue::Bounds(Rect::default())),
+    );
+    app.pump().unwrap();
+    assert_eq!(calls.get(), 0);
+    assert_eq!(
+        (
+            app.stats().queries,
+            app.stats().query_owners,
+            app.stats().query_targets
+        ),
+        (0, 0, 0)
     );
 }

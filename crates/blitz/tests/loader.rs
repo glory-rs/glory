@@ -535,6 +535,7 @@ fn delayed_http_intrinsic_images_preserve_anchor_and_end_navigation() {
                 tree.node(*id)
                     .unwrap()
                     .descriptor
+                    .view()
                     .item
                     .is_some_and(|item| item.index == key)
             })

@@ -225,7 +225,7 @@ fn malformed_events_do_not_discard_later_edits_or_query_responses_and_valid_writ
     assert_eq!(completed.get(), 1);
     assert_eq!(app.stats().queries, 0);
     assert!(
-        matches!(&app.tree().node(node).unwrap().descriptor.props, Props::Input(input) if input.value == "edited🙂" && input.revision == 2)
+        matches!(&app.tree().node(node).unwrap().descriptor.view().props, Props::Input(input) if input.value == "edited🙂" && input.revision == 2)
     );
     assert_eq!(app.pump().unwrap(), 0);
     app.clear().unwrap();

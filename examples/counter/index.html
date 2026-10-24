@@ -1,7 +1,18 @@
-<!DOCTYPE html>
-<html>
-	<head>
-		<link data-trunk rel="rust" data-wasm-opt="z" data-weak-refs/>
-	</head>
-	<body id="main"></body>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Glory Counter</title>
+  </head>
+  <body>
+    <main id="app"></main>
+    <script type="module">
+      import init from "./counter.js";
+      init().catch((error) => {
+        document.getElementById("app").textContent = `Unable to start counter: ${error}`;
+        throw error;
+      });
+    </script>
+  </body>
 </html>

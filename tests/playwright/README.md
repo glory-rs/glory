@@ -24,12 +24,16 @@ $env:GLORY_COUNTER_URL = "http://127.0.0.1:8080"
 npm --prefix tests/playwright run test:counter
 ```
 
-CI currently starts the CSR counter example and the SSR hydration example, then
-runs the `web-csr-counter` and `ssr-hydration` projects in Chromium.
+The `counter` project targets the migrated semantic counter. Start it with
+`./examples/counter/build.ps1 -Platform web -Run` (see that example's README for
+the matching wasm-bindgen CLI), then set `GLORY_COUNTER_URL` to
+`http://127.0.0.1:8790`. The dedicated counter CI workflow builds its current WASM
+entry and runs this project. Other projects still target legacy examples and
+are not evidence that those examples support the current semantic architecture.
 
 Environment variables:
 
-- `GLORY_COUNTER_URL`: CSR counter example.
+- `GLORY_COUNTER_URL`: semantic counter Web entry.
 - `GLORY_ROUTER_URL`: CSR `router-basic` example.
 - `GLORY_SSR_URL`: SSR + hydration example such as `ssr-simple-salvo`.
 - `GLORY_FULLSTACK_URL`: fullstack server-function example such as

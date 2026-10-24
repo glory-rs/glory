@@ -82,6 +82,15 @@ pub fn serialize(tree: &Memory, key: impl Fn(NodeId) -> Option<u64>) -> Result<S
                     out.push('"');
                 }
                 out.push('>');
+                if *tag == "select"
+                    && let Some(options) = &shape.select_options
+                {
+                    let keys = match properties.get("selectedKeys") {
+                        Some(Property::SelectedKeys(keys)) => keys.as_slice(),
+                        _ => &[],
+                    };
+                    out.push_str(&select_options(options, keys));
+                }
                 if matches!(*tag, "input" | "img") {
                     return Ok(());
                 }
@@ -116,4 +125,53 @@ pub fn serialize(tree: &Memory, key: impl Fn(NodeId) -> Option<u64>) -> Result<S
         node(tree, *root, &key, &mut out)?;
     }
     Ok(out)
+}
+
+/// Serialize only the finite intrinsic children of a native select.
+pub fn select_options(config: &crate::SelectOptions, keys: &[String]) -> String {
+    fn option(value: &glory_render::SelectOption, keys: &[String], out: &mut String) {
+        out.push_str("<option data-gly-option=\"");
+        out.push_str(&escape(value.key.as_str()));
+        out.push_str("\" value=\"");
+        out.push_str(&escape(&value.value));
+        out.push('"');
+        if value.disabled {
+            out.push_str(" disabled");
+        }
+        if keys.iter().any(|key| key == value.key.as_str()) {
+            out.push_str(" selected");
+        }
+        out.push('>');
+        out.push_str(&escape(&value.label));
+        out.push_str("</option>");
+    }
+    let mut out = String::new();
+    if let Some(placeholder) = &config.placeholder {
+        out.push_str("<option data-gly-placeholder=\"\" value=\"\" disabled hidden");
+        if keys.is_empty() {
+            out.push_str(" selected");
+        }
+        out.push('>');
+        out.push_str(&escape(placeholder));
+        out.push_str("</option>");
+    }
+    for entry in config.entries.iter() {
+        match entry {
+            glory_render::SelectEntry::Option(value) => option(value, keys, &mut out),
+            glory_render::SelectEntry::Group(group) => {
+                out.push_str("<optgroup label=\"");
+                out.push_str(&escape(&group.label));
+                out.push('"');
+                if group.disabled {
+                    out.push_str(" disabled");
+                }
+                out.push('>');
+                for value in &group.options {
+                    option(value, keys, &mut out);
+                }
+                out.push_str("</optgroup>");
+            }
+        }
+    }
+    out
 }

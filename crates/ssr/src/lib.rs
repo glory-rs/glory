@@ -52,7 +52,7 @@ impl Renderer {
 impl Render for Renderer {
     fn preflight(
         &self,
-        node: &glory_render::Descriptor,
+        node: glory_render::DescriptorView<'_>,
         patch: Option<&glory_render::Patch>,
     ) -> Result<(), Error> {
         glory_html::preflight(node, patch)
@@ -72,7 +72,7 @@ impl Render for Renderer {
         enabled: bool,
     ) -> Result<(), Error> {
         let state = self.0.borrow();
-        let descriptor = &state.mapper.tree().node(node)?.descriptor;
+        let descriptor = state.mapper.tree().node(node)?.descriptor.view();
         if enabled {
             kind.validate_target(descriptor)?;
         }

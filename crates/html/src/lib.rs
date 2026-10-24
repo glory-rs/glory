@@ -1,8 +1,11 @@
 //! Common HTML lowering. No UI/core runtime, DOM, HTTP or window dependencies.
+mod graphic;
 mod mapping;
 mod patch;
 mod plan;
 pub use plan::PlanShape;
+#[cfg(test)]
+mod choice_tests;
 #[cfg(test)]
 mod patch_tests;
 mod semantics;
@@ -10,6 +13,8 @@ mod serialize;
 #[cfg(feature = "css")]
 mod sheets;
 mod styles;
+#[cfg(test)]
+mod tags_tests;
 #[cfg(feature = "css")]
 pub use glory_style::Sheet;
 #[cfg(feature = "css")]
@@ -20,11 +25,40 @@ use glory_render::{Error, Mutation, NodeId, Receipt, Render, RuntimeId};
 use std::collections::{BTreeMap, HashMap};
 
 pub use mapping::{preflight, shape};
-pub use serialize::{escape, serialize};
+pub use serialize::{escape, select_options, serialize};
 pub use styles::style;
-pub const FORMAT_VERSION: u32 = 3;
+pub const FORMAT_VERSION: u32 = 4;
+/// Namespace is determined solely by the mapper's finite element vocabulary.
+pub fn element_namespace(tag: &str) -> &'static str {
+    if matches!(tag, "svg" | "path") {
+        "http://www.w3.org/2000/svg"
+    } else {
+        "http://www.w3.org/1999/xhtml"
+    }
+}
 
 pub const BASE_CSS: &str = concat!(
+    "[data-gly-kind=graphic]>path:not([data-gly-path-transition]){transition:none}",
+    "[data-gly-path-transition]{transition-property:d;transition-timing-function:linear}",
+    "@media(prefers-reduced-motion:reduce){[data-gly-path-transition]{transition:none!important}}",
+    "@keyframes gly-rotate{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}",
+    "[data-gly-rotate]{animation-name:gly-rotate;animation-timing-function:linear;animation-iteration-count:infinite;transform-box:view-box;transform-origin:50% 50%}",
+    "@media(prefers-reduced-motion:reduce){[data-gly-rotate]{animation-name:none;transform:none}}",
+    "[data-gly-splitter],[data-gly-slider],[data-gly-sheet-grip]{touch-action:none}",
+    "[data-gly-sheet][data-gly-layer=left],[data-gly-sheet][data-gly-layer=right]{width:var(--gly-sheet-extent,100vw)!important;min-width:0!important;max-width:100vw!important}",
+    "[data-gly-sheet][data-gly-layer=top],[data-gly-sheet][data-gly-layer=bottom]{height:var(--gly-sheet-extent,100dvh)!important;min-height:0!important;max-height:100dvh!important}",
+    "[data-gly-sheet][data-gly-layer=left]{left:var(--gly-sheet-x,0px);top:var(--gly-sheet-y,0px);height:var(--gly-sheet-height,100dvh)!important}",
+    "[data-gly-sheet][data-gly-layer=right]{left:calc(var(--gly-sheet-x,0px) + var(--gly-sheet-width,100vw) - var(--gly-sheet-extent,100vw));right:auto;top:var(--gly-sheet-y,0px);height:var(--gly-sheet-height,100dvh)!important}",
+    "[data-gly-sheet][data-gly-layer=top]{left:var(--gly-sheet-x,0px);top:var(--gly-sheet-y,0px);width:var(--gly-sheet-width,100vw)!important}",
+    "[data-gly-sheet][data-gly-layer=bottom]{left:var(--gly-sheet-x,0px);top:calc(var(--gly-sheet-y,0px) + var(--gly-sheet-height,100dvh) - var(--gly-sheet-extent,100dvh));bottom:auto;width:var(--gly-sheet-width,100vw)!important}",
+    "[data-gly-sheet]{transition:width var(--gly-sheet-settle,0ms) ease-out,height var(--gly-sheet-settle,0ms) ease-out,left var(--gly-sheet-settle,0ms) ease-out,top var(--gly-sheet-settle,0ms) ease-out}",
+    "@media(prefers-reduced-motion:reduce){[data-gly-sheet]{transition:none}}",
+    "[data-gly-sheet-grip]{position:absolute;z-index:1}",
+    "[data-gly-sheet][data-gly-layer=bottom]>[data-gly-sheet-grip]{left:0;right:0;top:0;height:24px}",
+    "[data-gly-sheet][data-gly-layer=top]>[data-gly-sheet-grip]{left:0;right:0;bottom:0;height:24px}",
+    "[data-gly-sheet][data-gly-layer=left]>[data-gly-sheet-grip]{right:0;top:0;bottom:0;width:24px}",
+    "[data-gly-sheet][data-gly-layer=right]>[data-gly-sheet-grip]{left:0;top:0;bottom:0;width:24px}",
+    "[data-gly-sheet][data-gly-layer=left]>[data-gly-sheet-grip]>*,[data-gly-sheet][data-gly-layer=right]>[data-gly-sheet-grip]>*{width:4px!important;height:48px!important}",
     "[data-gly-layer]:not(:popover-open){display:none!important}",
     "[data-gly-layer]{position:fixed;inset:auto;margin:0;max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);overflow:auto}",
     "[data-gly-layer=center]{top:50%;left:50%;transform:translate(-50%,-50%)}",
@@ -36,7 +70,7 @@ pub const BASE_CSS: &str = concat!(
     "[data-gly-layer][aria-modal=true]::backdrop{background:rgba(0,0,0,.35)}",
     "[data-gly-hidden]{display:none!important}",
     "[data-gly-kind]{box-sizing:border-box}[data-gly-kind=text]{margin:0;font:inherit}",
-    "[data-gly-kind=button],[data-gly-kind=input],[data-gly-kind=check] input{font:inherit}",
+    "[data-gly-kind=select],[data-gly-kind=button],[data-gly-kind=input],[data-gly-kind=check] input{font:inherit}",
     "[data-gly-virtual=surface]:not([data-gly-live]){height:auto!important;overflow:visible!important}",
     "[data-gly-virtual=row]:not([data-gly-live]){display:flow-root!important;position:relative!important;top:auto!important;left:auto!important}",
 );
@@ -82,6 +116,7 @@ impl Part {
 pub enum Property {
     Text(String),
     Bool(bool),
+    SelectedKeys(Vec<String>),
 }
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Kind {
@@ -104,11 +139,19 @@ pub enum EditKind {
     None,
     Text,
     Check,
+    Select,
+}
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SelectOptions {
+    pub entries: std::rc::Rc<Vec<glory_render::SelectEntry>>,
+    /// Single controls always own one private, disabled empty-selection option.
+    pub placeholder: Option<String>,
 }
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Shape {
     /// Empty pieces describe a comment-delimited Group, not an element.
     pub pieces: Vec<Piece>,
+    pub select_options: Option<SelectOptions>,
     pub children: Option<Part>,
     pub control: Option<Part>,
     pub edit: EditKind,
@@ -315,7 +358,7 @@ impl Mapper {
                     continue;
                 }
                 Mutation::Create { id, node } => {
-                    let shape = shape(node)?;
+                    let shape = shape(node.view())?;
                     let key = self.next_key;
                     self.next_key = self
                         .next_key
@@ -330,7 +373,7 @@ impl Mapper {
                     }
                 }
                 Mutation::Patch { id, patch } => {
-                    let descriptor = &self.tree.node(*id)?.descriptor;
+                    let descriptor = self.tree.node(*id)?.descriptor.view();
                     preflight(descriptor, Some(patch))?;
                     let prepared = self.tree.prepare_patch(*id, patch)?;
                     let edits = patch::lower(prepared.descriptor(), prepared.previous());
@@ -409,7 +452,7 @@ pub fn preflight_place(
             return Err(Error::InvalidPlacement("tree cycle"));
         }
         let node = tree.node(ancestor)?;
-        button |= matches!(node.descriptor.props, glory_render::Props::Button(_));
+        button |= matches!(node.descriptor.view().props, glory_render::Props::Button(_));
         cursor = node.parent;
     }
     // Semantic Inline text may explicitly map to <p>. That extension must
@@ -417,7 +460,7 @@ pub fn preflight_place(
     // a previously built Group is moved into a button. Ordinary list moves
     // do not scan their subtree.
     if button || matches!(child, Subtree::Plan(_)) {
-        let check = |descriptor: &glory_render::Descriptor| {
+        let check = |descriptor: glory_render::DescriptorView<'_>| {
             if matches!(descriptor.props, glory_render::Props::Text(_))
                 && descriptor
                     .options
@@ -437,13 +480,13 @@ pub fn preflight_place(
                     let mut in_button = button;
                     while let Some(parent) = ancestor {
                         in_button |= matches!(
-                            plan.nodes()[parent].descriptor.props,
+                            plan.nodes()[parent].descriptor.view().props,
                             glory_render::Props::Button(_)
                         );
                         ancestor = plan.nodes()[parent].parent;
                     }
                     if in_button {
-                        check(&node.descriptor)?;
+                        check(node.descriptor.view())?;
                     }
                 }
             }
@@ -452,7 +495,7 @@ pub fn preflight_place(
                 let mut pending = vec![id];
                 while let Some(id) = pending.pop() {
                     let node = tree.node(id)?;
-                    check(&node.descriptor)?;
+                    check(node.descriptor.view())?;
                     pending.extend(node.children.iter().copied());
                 }
             }
@@ -467,11 +510,13 @@ fn difference(
     new: &Shape,
     checked_write: bool,
     mode_write: bool,
+    select_write: bool,
 ) -> Result<Vec<Edit>, Error> {
     if old.pieces.len() != new.pieces.len()
         || old.control != new.control
         || old.edit != new.edit
         || old.prevent_activate_default != new.prevent_activate_default
+        || old.select_options != new.select_options
     {
         return Err(Error::InvalidProps(
             "HTML structure changes require remount",
@@ -510,7 +555,7 @@ fn difference(
                 },
             ) if a == b => {
                 for (name, value) in attrs {
-                    if old.get(name) != Some(value) {
+                    if old.get(name) != Some(value) || revision && *name == "src" && *a == "img" {
                         edits.push(Edit::Attribute {
                             part: new.part,
                             name,
@@ -530,6 +575,7 @@ fn difference(
                 for (name, value) in properties {
                     if old_props.get(name) != Some(value)
                         || revision && *name == "value"
+                        || select_write && *name == "selectedKeys"
                         || checked_write && *name == "checked"
                         || *name == "checked" && old.get("type") != attrs.get("type")
                         || mode_write && *name == "indeterminate"

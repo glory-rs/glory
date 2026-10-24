@@ -50,9 +50,11 @@ pub mod prelude {
     };
     pub use glory_ui::events::*;
     pub use glory_ui::{
-        App, DismissReason, FieldPart, FocusMode, FormAction, FormControl, LinkOpen, ItemPosition, Layer,
-        LayerPlacement, Navigation, Orientation, Plan, PlanInstance, PlanPart, Purpose, Result,
-        Role, Scope, SemanticId, Semantics, TextKind, Widget, button, check, col, component, each,
-        group, image, input, link, list, plan, row, text, view, when,
+        App, Current, DismissReason, FieldPart, FocusMode, FormAction, FormControl, ItemPosition,
+        Layer, LayerPlacement, LinkOpen, Navigation, NavigationPanel, NavigationPanelCommand,
+        Orientation, Plan, PlanInstance, PlanPart, Purpose, RangeCommand, RangeValue, Result, Role,
+        Scope, ScrollAxes, ScrollCommand, ScrollMetrics, ScrollMovement, SemanticId, Semantics,
+        SliderValue, TextKind, Widget, button, check, col, component, each, group, image, input,
+        link, list, plan, row, text, view, when,
     };
 }

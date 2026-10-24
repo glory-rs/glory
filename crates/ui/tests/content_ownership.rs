@@ -34,7 +34,12 @@ fn filled_content_keeps_component_owners_and_moves_only_the_container_root() {
     app.flush().unwrap();
     assert!(app.tree().node(children[0]).is_err());
     assert!(matches!(
-        app.tree().node(children[1]).unwrap().descriptor.props,
+        app.tree()
+            .node(children[1])
+            .unwrap()
+            .descriptor
+            .view()
+            .props,
         Props::Text(_)
     ));
     assert_eq!(*cleaned.borrow(), [1]);

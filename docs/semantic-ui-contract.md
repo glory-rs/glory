@@ -117,6 +117,10 @@ Web读值时修复非规范主机文本并保留UTF-16选区；正常规范值�
 
 Scroll 查询可返回负值，例如 RTL/弹性滚动；当前 ScrollTo 的非负请求范围是明确限制，不等于已经实现完整 RTL 定位协议。
 
+`Query::ScrollMetrics` 以同一 accepted watermark 返回 `QueryValue::ScrollMetrics`：x/y、viewport_width/height、content_width/height 六个有限数，尺寸非负但内容可以小于视口；x/y 保留 RTL/弹性负偏移。目标与 Scroll 一致，Group 明确 Unsupported。Web 读取实际 CSSOM client/scroll 尺寸；Blitz 在解析布局后读取引擎公开 client_width/height、scroll_width/height 和 scroll_offset。同步 SSR、stream SSR 和无几何 reference interpreter 都异步回复 Unsupported；请求者 Owner 退休、重复回复、结果 kind/数值验证和查询水位沿用统一注册表契约。
+
+`Semantics.scroll_keyboard: Option<ScrollAxes>` 是独立 View 视口选择，不能混同集合 navigation、layer、field/document part。Web/native 只有实际聚焦该视口自身才消费 Arrow/Home/End/PageUp/PageDown，并排队 `Event::ScrollKeyboard { from, command }`；from 必须是事件目标且 command 轴在配置内。输入器/按钮/链接后代、内层视口、组合输入、修饰键和 Tab/Space/Enter 保留原行为。Page/Home/End 在 Both 时用纵轴，单轴用对应轴。HTML `data-gly-scroll-keyboard` 三值与清除经过全 shape/field delta oracle；组件可以用共享 typed ScrollTo 执行有界、按顺序 clamp 的命令，而无需原生事件内业务重入。
+
 `Capabilities` 是宿主级上限，不是每个节点或每种 CSS 状态的保证。Memory 与 SSR 四项均 false；无窗口 Blitz measure/scroll=true，focus/input=false；WindowApp 与 Web 均已启用四项。不能由 input=false 推导“不能生成受控 value HTML”。
 
 有效查询接受后返回 token，结果异步进队列，含接受时的 applied 水位；Unsupported 也是一次对应响应。后来的 commit 不能改变此前结果所属屏障。失效身份直接拒绝，不登记 waiter；已登记后被 Dispose 的等待者只完成一次 NodeGone，迟到响应忽略。App 验证 kind、水位、有限几何、非负宽高与有序选区。applied 只表示已应用，不表示布局已稳定或像素已显示。
@@ -357,6 +361,30 @@ scope.request(Query::Bounds(target), move |reply| {
 renderer借用之外。UiStats的queries/query_owners/query_targets分别计活等待项
 和非空索引桶，不表示引擎内响应队列/RSS；宿主仍需pump排空已接受的晚到回复。
 
+`Scope::cancel_request(token)` 只取消该 Scope 登记的等待项；`App` 的同名方法
+只操作应用根请求。先验证请求者代际，跨 Scope token 返回错误，缺失、已完成或
+重复取消返回 false。token 属于该 App。取消立即移除双索引，并在注册表借用外、
+登记 Owner 的 untracked 上下文释放捕获；已交给宿主的实际查询不承诺撤回。
+取消后的晚到或重复响应不再执行回调。
+
+交互 Splitter 是带 `Semantics.splitter: Some(RangeValue)` 的可聚焦 Separator。
+其有限 min/max/value、controls 和分隔线方向必须完整，普通 Separator 仍为被动
+叶节点。独立 `Event::Range` 命令使用与分隔线垂直的方向键及 Home/End，不改变
+集合 navigation。Web 与 native 只排队输入；指针释放交回捕获的原手柄，取消不
+转为 Drop。HTML 对此 typed 捕获契约提供 `touch-action:none`；这不增加通用
+Style 属性。native Finger 协议测试不能替代实际触摸硬件与辅助技术使用验收。
+
+typed `Position::Fixed` 与独立 `Style.right`/`bottom` 由 HTML/RECORD v8、
+Blitz v9 接受。四向偏移保留 Auto、有限有符号 Px/Percent；每个属性、单位和
+Fixed 值均经过独立 profile 拒绝测试，CSS 检查全部原声明后才安装。HTML 字段
+差分覆盖设置、替换和清除。原生 Fixed 的实际布局验证包含滚动祖先和 viewport
+尺寸变化；Sticky 继续明确 UnsupportedStyle，不能以 Fixed 代替 Sticky 行为。
+
+`Scope::is_within(parent)` 从当前 Scope 的构造 parent 开始（包含其本身），只走
+staged Memory 的祖先链；先验证 Scope 和目标 runtime/代际，不查询宿主、不刷新、
+不扫描子树。节点重排后的关系即时生效；live hidden/suspended 容器仍可构造
+KeepMounted 子内容。它判断实际构造位置，不能用来推断资源的 Owner 所有权。
+
 ## 窗口化列表的顺序协调
 
 Cache 的位置元数据只属于活跃行，行销毁时一并回收。下一窗口在源 key 验证期间保存旧顺序，重复 key/无效 pin 在任何行刷新、销毁或放置之前拒绝。保留行相对顺序递增时不计算 LIS，不移动保留行；发生逆序时仍用 LIS 选择最少移动子序列。源 index 与窗口 order 分开，焦点 pin 与普通行进入同一次协调。
@@ -388,7 +416,8 @@ SSR Document的可选sheets按顺序输出并使用nonce；Blitz set_sheet先完
 `Semantics::layer` 在具名、可程序聚焦的 `Role::Dialog` View 上声明有限浮层，
 `hidden` 决定其是否进入栈。Layer 包含 modal、Escape/外部关闭策略、有限位置、
 anchor/initial_focus/return_focus 符号关联。锚定位置必须有不同于自身的 anchor；
-其他位置不接受 anchor。`has_popup` 仅属于非 Tab Button；described_by 补充描述关联。
+其他位置不接受 anchor。`popup: Option<PopupKind>` 仅属于非 Tab Button，目前有限值为
+Dialog/Menu；它是 popup 角色的单一真值。described_by 补充描述关联。
 字段事务继续验证角色、focus 和 metadata 的交叉约束并在失败时回滚；HTML 的字段
 差分 oracle 覆盖新状态的 Set/Clear/Keep，不改变原生 Input 值或选择。
 
@@ -448,3 +477,47 @@ readonly input 配合宿主事件保护；readonly Check 在默认切换前阻�
 - 受限Sheet核心及上述文字/装饰域已有实现；更广文字/视觉语法、主题与非HTML解析/级联后端继续推进。完整CSS、RTL、transforms/writing modes不因采用Blitz就成为跨后端保证。
 
 实际 OS IME、辅助技术与 Android 设备属于 R3/R5/R6，继续独立验收。上述未完成项不能以本页或绿色基础矩阵勾选完成。
+
+
+## NativeSelect 与当前 HTML/stream 格式（2026-10-24）
+
+当前 HTML 映射/SSR Snapshot 为 **v4**，classic stream envelope 为 **v2**；上文 v3 段落记录此前状态。资源种子 envelope 仍独立为 v1。旧 Snapshot v3 和 stream v1 不提供兼容别名：采用/启动首先拒绝旧版本，不修改根子树。
+
+`Props::Select(SelectProps)` 是真正原生选择控件，不是给 View 增加角色。静态选项声明通过 Rc 共享：最多 1024 options、32 optgroups（不嵌套）、单 key 64 ASCII 字节、label 256 字节、业务 value 4096 字节，总声明 128KiB。keys 与成功表单 values 分开；业务 values 可以重复或为空。选项接收端应在收集前限制为预算加一，外部受控状态必须先借用校验再克隆。
+
+`SelectSelection { keys, revision }` 的 keys 唯一、已声明、按文档顺序；single 最多一个。`Patch::SelectSelection` 仅交换该字段，保留声明与其他 live metadata；Keep 忽略 revision，Set/Clear 版本不回退，相同版本要求相同 keys。显式相等写入仍修复宿主 selectedness。`Scope::set_select_selection` 从 live node 分配下一版本；整个宿主 tick 完成后协调，旧事件丢弃、未来版本拒绝。用户不能新增禁用 option/group 的选择，但可取消已由程序选择的禁用项。
+
+HTML v4 Shape 新增 nullable `select_options`（wire 为 `options`），只用于 create/snapshot，包含有限 option/group 和单选的禁用隐藏空值占位项。主节点是真实 select，内部 option/optgroup 不分配语义 NodeId。Property::SelectedKeys/`selectedKeys`、EditKind::Select 独立于 Text/Check，写入同时同步默认 selected attributes 与实际 properties。空 single 选择依赖内部占位项，避免解析器自动选中首个业务项；该禁用项不进入 FormData。Select 的 FormControl.value 非法，成功值来自原生 options；readonly 明确拒绝。
+
+classic v2 保留有限 piece/edit 结构并增加上述 options/selectedKeys，必须通过 key/count/byte/target 验证，且 End 的 html_version 为 4。SVG Graphic 沿用有限 svg/path tag、viewBox/preserveAspectRatio 和已验证路径属性，不新增任意标签或字符串执行口。dirty 选择与既有 value/checked 一样保留，仍更新 selected defaults，使后续采用能校验完整结构。采用先检查全部静态选项和结构再修复 disabled/inactive 选择；活跃用户选择经 SelectChanged 正常回放。
+
+Blitz 当前显式拒绝 Select，创建 preflight/direct apply 在注册引擎 facet 前拒绝，已接受前缀和 query watermark 保留。有限模型与 HTML 证据不代表原生 Select/平台读屏验收。
+
+## Listbox 与可编辑/选择型 Combobox（2026-10-24）
+
+`ComboboxKind::Select` 仅细化 Button，`ComboboxKind::Editable` 仅细化单行 Input；两者要求自身 id、Listbox popup、controls 和 expanded。`Role::Listbox` 仅用于 View，要求稳定 id、vertical navigation 和 FocusMode::Auto。`OptionSemantics { owner }` 仅细化 Button，要求独立 id、selected 和 Programmatic（负 tabindex）焦点模式。不会接受任意交互 View 的 role 覆盖。Listbox Layer 是非模态 Preserve：不得 autofocus、return 或 Tab trap。
+
+已放置 Option 必须有最近 Listbox 祖先，owner 与该祖先 id 相同；未放置声明可先配置。Create/Plan、Place/Resume、字段 guard、owner/role 更改遵守相同规则。同一最近 owner 内的普通移动只走祖先；跨边界移动或 owner/role 改变检查最多 4096 活节点的受限子树，内部 Listbox 截断外层所有权检查。没有新 Node 计数、业务来源扫描或访问历史。失败或 guard drop 不改变统计/水位。
+
+`active_descendant` 只用于已展开 Combobox，允许前向或暂时失活的命名引用；已知错误角色/owner 明确拒绝。共享 resolver 只接受当前活跃、enabled、可激活且属于正确最近 Listbox 的 Option。Structure 先卸载目标、Binding 后清理引用是合法顺序，不要求绑定 FIFO 越过 Structure。Owner 退休与槽复用不能复活旧目标。
+
+`Event::Choice` 仅由 intrinsic trigger 发出，保留显式 from 身份；共享 KeyboardInput 映射跳过组合输入和修饰快捷键，Editable 保留普通文本的 Space/Home/End 及关闭时 Enter 的原生提交，Tab 始终保留宿主导航。Select 的 Next/Previous/Commit 按控制器当前 open 源决定开启、移动或提交，不按可能尚未刷新的 DOM expanded 分类，保证同一 drained host tick 连续按键。Option 指针默认聚焦由 Web 在有限 Option target 上阻止，Select 的焦点始终留在触发器。
+
+`Action::RevealOption` 只接受 Option 且需要 scroll capability；它仅滚动最近匹配 owner 的 live Listbox，不改变焦点或页面滚动。关闭/停用/退休在宿主工作前再次检查。Option/Listbox 的 Focus action 明确拒绝。HTML full-shape oracle 和真实 Rust classic producer 同时覆盖 combobox/listbox/option、selected、expanded 与 active-descendant。HTML v4/classic v2 无须再扩展 wire；Blitz 在 facet 前明确拒绝本族 refinement，保留前缀/查询水位。
+
+
+NavigationPanel is an explicit navigation disclosure protocol, independent from
+Menu. Trigger metadata belongs to an opted-in Button with a distinct id/controls
+relation and expanded state; Content belongs to a physical View Role::Group
+with vertical navigation. Only nonmodal Preserve-focus Group Layers are valid.
+The HTML attributes identify these finite roles without emitting menuitem,
+menu or aria-haspopup. Ordinary navigation links keep Link semantics and may
+opt into navigation_item without acquiring selection state.
+
+On a top-level trigger, Down/Up queue First/Last. Within Content, the forward
+arrow on a nested trigger queues Open and the backward arrow on an opted-in
+member queues Close, respecting the nearest direction. Modifiers, composition,
+editable descendants and ordinary non-opted-in controls do not acquire these
+commands. Event origin identities and mounted Content ancestry are checked by
+Memory before routing. Native queues the same finite protocol, while unsupported
+floating Group Layers continue to fail preflight before changing the model.

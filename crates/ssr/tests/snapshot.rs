@@ -179,8 +179,8 @@ fn versioned_snapshots_have_text_boundaries_normalized_strings_and_flow_preview(
         ))
     })
     .unwrap();
-    assert!(snapshot.html.starts_with("<!--gly:v:3-->"));
-    assert!(snapshot.html.ends_with("<!--gly:/v:3-->"));
+    assert!(snapshot.html.starts_with("<!--gly:v:4-->"));
+    assert!(snapshot.html.ends_with("<!--gly:/v:4-->"));
     assert!(snapshot.html.contains("<!--gly:t:1--></span>"));
     assert!(snapshot.html.contains("a\nb\u{fffd}"));
     assert!(snapshot.html.contains("data-gly-virtual=\"surface\""));

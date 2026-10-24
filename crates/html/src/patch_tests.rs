@@ -28,6 +28,23 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
             label: "old".into(),
             ..Default::default()
         }),
+        Props::Select(SelectProps {
+            entries: std::rc::Rc::new(vec![SelectEntry::Option(SelectOption {
+                key: SemanticId::new("one").unwrap(),
+                label: "One".into(),
+                value: "business".into(),
+                disabled: false,
+            })]),
+            selection: SelectSelection {
+                keys: vec![SemanticId::new("one").unwrap()],
+                revision: 10,
+            },
+            ..Default::default()
+        }),
+        Props::Select(SelectProps {
+            multiple: true,
+            ..Default::default()
+        }),
         Props::Input(InputProps {
             value: "old".into(),
             revision: 10,
@@ -59,8 +76,37 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
             ..Default::default()
         }),
         Props::Image(Default::default()),
+        Props::Graphic(GraphicProps::default()),
+        Props::Graphic(GraphicProps {
+            commands: vec![
+                PathCommand::Move(GraphicPoint::new(2., 4.)),
+                PathCommand::Line(GraphicPoint::new(22., 4.)),
+            ],
+            transition: Some(GraphicTransition {
+                duration_millis: 200,
+            }),
+            ..Default::default()
+        }),
+        Props::Graphic(GraphicProps {
+            alternative: Some("Old icon".into()),
+            animation: Some(GraphicAnimation::Rotate {
+                period_millis: 1000,
+            }),
+            fill: Some(style::Color(255, 0, 0, 255)),
+            stroke: Some(GraphicStroke {
+                color: style::Color(0, 0, 255, 128),
+                width: 2.0,
+                cap: StrokeCap::Round,
+            }),
+            commands: vec![
+                PathCommand::Move(GraphicPoint::new(1.0, 2.0)),
+                PathCommand::Line(GraphicPoint::new(20.0, 21.0)),
+            ],
+            ..Default::default()
+        }),
         Props::Image(ImageProps {
             source: "old.png".into(),
+            revision: 1,
             alternative: Some("old".into()),
         }),
         Props::Link(LinkProps {
@@ -71,6 +117,32 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
     .into_iter()
     .map(Descriptor::new)
     .collect::<Vec<_>>();
+    let mut sheet = Descriptor::new(Props::View);
+    sheet.role = Some(Role::Dialog);
+    sheet.focus = FocusMode::Programmatic;
+    sheet.semantics = Some(Box::new(Semantics {
+        id: Some(SemanticId::new("oracle-sheet").unwrap()),
+        layer: Some(Layer {
+            placement: LayerPlacement::Bottom,
+            sheet: Some(SheetConfig {
+                fractions: vec![0.25, 0.5, 1.0],
+                current: 0,
+                max_extent: 640.0,
+                settle_millis: 180,
+                dismissible: true,
+                revision: 0,
+            }),
+            ..Default::default()
+        }),
+        ..Default::default()
+    }));
+    bases.push(sheet);
+    let mut grip = Descriptor::new(Props::View);
+    grip.semantics = Some(Box::new(Semantics {
+        sheet_grip: true,
+        ..Default::default()
+    }));
+    bases.push(grip);
     let mut overridden = Descriptor::new(Props::Text(TextProps {
         content: "old".into(),
         ..Default::default()
@@ -79,6 +151,15 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
         .options
         .insert(HtmlTextOptions::default().tag(TextTag::P));
     bases.push(overridden);
+    for axis in [Orientation::Horizontal, Orientation::Vertical] {
+        let mut separator = Descriptor::new(Props::View);
+        separator.role = Some(Role::Separator);
+        separator.semantics = Some(Box::new(Semantics {
+            separator_axis: Some(axis),
+            ..Default::default()
+        }));
+        bases.push(separator);
+    }
     for kind in [TextKind::Code, TextKind::Kbd, TextKind::Mark] {
         bases.push(Descriptor::new(Props::Text(TextProps {
             content: "old".into(),
@@ -100,8 +181,30 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
         bases.push(descriptor);
     }
     let mut named = Descriptor::new(Props::View);
+    for current in [None, Some(0.0), Some(25.0), Some(100.0)] {
+        let mut progress = Descriptor::new(Props::View);
+        progress.role = Some(Role::ProgressBar);
+        progress.semantics = Some(Box::new(Semantics {
+            progress: Some(ProgressValue {
+                min: 0.,
+                max: 100.,
+                current,
+                value_text: Some("old progress".into()),
+            }),
+            ..Default::default()
+        }));
+        bases.push(progress);
+    }
     named.name = Some("old\0".into());
     bases.push(named);
+    let mut inert = Descriptor::new(Props::View);
+    inert.semantics = Some(Box::new(Semantics {
+        inert: true,
+        busy: Some(true),
+        ..Default::default()
+    }));
+    inert.style.pointer_events = Some(style::PointerEvents::None);
+    bases.push(inert);
     let mut item = Descriptor::new(Props::View);
     item.role = Some(Role::ListItem);
     item.item = Some(ItemPosition {
@@ -128,6 +231,24 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
             ..Default::default()
         })))),
         Patch::Semantics(Change::Keep),
+        Patch::Semantics(Change::Set(Some(Box::new(Semantics {
+            progress: Some(ProgressValue {
+                min: -10.,
+                max: 50.,
+                current: None,
+                value_text: None,
+            }),
+            ..Default::default()
+        })))),
+        Patch::Semantics(Change::Set(Some(Box::new(Semantics {
+            progress: Some(ProgressValue {
+                min: 0.,
+                max: 100.,
+                current: Some(50.),
+                value_text: Some("half\r\n<&>".into()),
+            }),
+            ..Default::default()
+        })))),
         Patch::Semantics(Change::Clear),
         Patch::Semantics(Change::Set(None)),
         Patch::Text(Change::Keep),
@@ -183,18 +304,85 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
         Patch::CheckMode(Change::Set(CheckMode::Switch)),
         Patch::CheckMode(Change::Set(CheckMode::Radio)),
         Patch::CheckMode(Change::Clear),
+        Patch::SelectSelection {
+            keys: Change::Keep,
+            revision: 99,
+        },
+        Patch::SelectSelection {
+            keys: Change::Clear,
+            revision: 11,
+        },
+        Patch::SelectSelection {
+            keys: Change::Set(vec![SemanticId::new("one").unwrap()]),
+            revision: 11,
+        },
+        Patch::SelectSelection {
+            keys: Change::Set(vec![]),
+            revision: 10,
+        },
         Patch::Checked(Change::Keep),
         Patch::Checked(Change::Set(false)),
         Patch::Checked(Change::Set(true)),
         Patch::Checked(Change::Clear),
-        Patch::Source(Change::Keep),
-        Patch::Source(Change::Set("new\0.png".into())),
-        Patch::Source(Change::Clear),
+        Patch::Source {
+            source: Change::Keep,
+            revision: 0,
+        },
+        Patch::Source {
+            source: Change::Set("new\0.png".into()),
+            revision: 3,
+        },
+        Patch::Source {
+            source: Change::Clear,
+            revision: 3,
+        },
         Patch::Alternative(Change::Keep),
         Patch::Alternative(Change::Set(Some("new\r\n\0".into()))),
         Patch::Alternative(Change::Set(Some(String::new()))),
         Patch::Alternative(Change::Set(None)),
         Patch::Alternative(Change::Clear),
+        Patch::Graphic(Change::Keep),
+        Patch::Graphic(Change::Set(Box::new(GraphicProps {
+            commands: vec![
+                PathCommand::Move(GraphicPoint::new(2., 20.)),
+                PathCommand::Line(GraphicPoint::new(22., 20.)),
+            ],
+            transition: Some(GraphicTransition {
+                duration_millis: 300,
+            }),
+            ..Default::default()
+        }))),
+        Patch::Graphic(Change::Set(Box::new(GraphicProps {
+            commands: vec![
+                PathCommand::Move(GraphicPoint::new(2., 20.)),
+                PathCommand::Line(GraphicPoint::new(22., 20.)),
+            ],
+            transition: Some(GraphicTransition {
+                duration_millis: 501,
+            }),
+            ..Default::default()
+        }))),
+        Patch::Graphic(Change::Clear),
+        Patch::Graphic(Change::Set(Box::new(GraphicProps::default()))),
+        Patch::Graphic(Change::Set(Box::new(GraphicProps {
+            width: 48.0,
+            animation: Some(GraphicAnimation::Rotate {
+                period_millis: 2000,
+            }),
+            height: 32.0,
+            alternative: Some("New\r\n<&>icon".into()),
+            fill: Some(style::Color(1, 2, 3, 4)),
+            commands: vec![
+                PathCommand::Move(GraphicPoint::new(2.0, 3.0)),
+                PathCommand::Cubic {
+                    first: GraphicPoint::new(4.0, 5.0),
+                    second: GraphicPoint::new(6.0, 7.0),
+                    end: GraphicPoint::new(8.0, 9.0),
+                },
+                PathCommand::Close,
+            ],
+            ..Default::default()
+        }))),
         Patch::Target(Change::Keep),
         Patch::Target(Change::Set("#new\0".into())),
         Patch::Target(Change::Clear),
@@ -205,13 +393,59 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
         Patch::Classes(Change::Clear),
         Patch::Style(Change::Keep),
         Patch::Style(Change::Set(Box::new(
+            style::Style::new()
+                .display(style::Display::Grid)
+                .grid_columns(style::GridTracks::Tracks(vec![
+                    style::GridTrack::Px(10.0),
+                    style::GridTrack::Percent(20.0),
+                    style::GridTrack::Fr(1.0),
+                    style::GridTrack::Auto,
+                ]))
+                .grid_rows(style::GridTracks::Tracks(vec![style::GridTrack::Auto]))
+                .grid_column(style::GridPlacement::At { start: 2, span: 3 })
+                .grid_row(style::GridPlacement::Span(2))
+                .aspect_ratio(style::AspectRatio::Ratio(2.0)),
+        ))),
+        Patch::Style(Change::Set(Box::new(
+            style::Style::new()
+                .grid_columns(style::GridTracks::None)
+                .grid_rows(style::GridTracks::None)
+                .grid_column(style::GridPlacement::Auto)
+                .grid_row(style::GridPlacement::Auto)
+                .aspect_ratio(style::AspectRatio::Auto),
+        ))),
+        Patch::Style(Change::Set(Box::new(
             style::Style::new().text_overflow(style::TextOverflow::Clip),
+        ))),
+        Patch::Style(Change::Set(Box::new(
+            style::Style::new().pointer_events(style::PointerEvents::Auto),
+        ))),
+        Patch::Style(Change::Set(Box::new(
+            style::Style::new().pointer_events(style::PointerEvents::None),
+        ))),
+        Patch::Style(Change::Set(Box::new(
+            style::Style::new().object_fit(style::ObjectFit::Fill),
+        ))),
+        Patch::Style(Change::Set(Box::new(
+            style::Style::new().object_fit(style::ObjectFit::Contain),
+        ))),
+        Patch::Style(Change::Set(Box::new(
+            style::Style::new().object_fit(style::ObjectFit::Cover),
+        ))),
+        Patch::Style(Change::Set(Box::new(
+            style::Style::new().object_fit(style::ObjectFit::None),
+        ))),
+        Patch::Style(Change::Set(Box::new(
+            style::Style::new().object_fit(style::ObjectFit::ScaleDown),
         ))),
         Patch::Style(Change::Set(Box::new(
             style::Style::new().text_overflow(style::TextOverflow::Ellipsis),
         ))),
         Patch::Style(Change::Set(Box::new(
             style::Style::new().flex_wrap(style::FlexWrap::Wrap),
+        ))),
+        Patch::Style(Change::Set(Box::new(
+            style::Style::new().display(style::Display::InlineFlex),
         ))),
         Patch::Style(Change::Set(Box::new(
             style::Style::new().flex_wrap(style::FlexWrap::NoWrap),
@@ -236,6 +470,17 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
         ))),
         Patch::Style(Change::Set(Box::new(
             style::Style::new().width(style::Length::Px(-0.0)),
+        ))),
+        Patch::Style(Change::Set(Box::new(
+            style::Style::new()
+                .position(style::Position::Fixed)
+                .right(style::Length::Px(12.0))
+                .bottom(style::Length::Percent(5.0)),
+        ))),
+        Patch::Style(Change::Set(Box::new(
+            style::Style::new()
+                .right(style::Length::Auto)
+                .bottom(style::Length::Px(-2.0)),
         ))),
         Patch::Style(Change::Set(Box::new(style::Style {
             color: Some(style::Color(1, 2, 3, 255)),
@@ -279,7 +524,136 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
     }
     let semantic_cases = [
         Semantics {
+            slider: Some(SliderValue {
+                range: RangeValue {
+                    min: -10.,
+                    max: 90.,
+                    value: 30.,
+                },
+                axis: Orientation::Vertical,
+                direction: Direction::Rtl,
+                step: 0.5,
+                page_step: 5.,
+                value_text: Some("Thirty units".into()),
+            }),
+            readonly: true,
+            required: true,
+            form_control: Some(FormControl {
+                name: "amount".into(),
+                value: Some("30".into()),
+            }),
+            ..Default::default()
+        },
+        Semantics {
+            splitter: Some(glory_render::RangeValue {
+                min: 10.0,
+                max: 90.0,
+                value: 50.0,
+            }),
+            separator_axis: Some(Orientation::Vertical),
+            controls: Some(SemanticId::new("pane").unwrap()),
+            ..Default::default()
+        },
+        Semantics {
+            id: Some(SemanticId::new("decision-layer").unwrap()),
+            layer: Some(Layer {
+                initial_focus: Some(SemanticId::new("safe-cancel").unwrap()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+        Semantics {
+            busy: Some(true),
+            ..Default::default()
+        },
+        Semantics {
+            busy: Some(true),
+            inert: true,
+            ..Default::default()
+        },
+        Semantics {
+            busy: Some(false),
+            inert: false,
+            ..Default::default()
+        },
+        Semantics {
+            scroll_keyboard: Some(glory_render::ScrollAxes::Both),
+            ..Default::default()
+        },
+        Semantics {
+            scroll_keyboard: Some(glory_render::ScrollAxes::Horizontal),
+            ..Default::default()
+        },
+        Semantics {
+            scroll_keyboard: Some(glory_render::ScrollAxes::Vertical),
+            ..Default::default()
+        },
+        Semantics {
+            id: Some(SemanticId::new("description-layer").unwrap()),
+            layer: Some(Layer {
+                modal: false,
+                focus: glory_render::LayerFocus::Preserve,
+                placement: glory_render::LayerPlacement::AnchorStart,
+                anchor: Some(SemanticId::new("description-target").unwrap()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+        Semantics {
+            menu_item: Some(glory_render::MenuItemSemantics {
+                kind: glory_render::MenuItemKind::Radio,
+                owner: SemanticId::new("menu-owner").unwrap(),
+            }),
+            check_group: Some(SemanticId::new("menu-radios").unwrap()),
+            navigation_item: true,
+            ..Default::default()
+        },
+        Semantics {
+            id: Some(SemanticId::new("menu-layer").unwrap()),
+            navigation: Some(Orientation::Vertical),
+            typeahead: true,
+            layer: Some(Layer {
+                modal: false,
+                placement: glory_render::LayerPlacement::AnchorRight,
+                anchor: Some(SemanticId::new("menu-trigger").unwrap()),
+                return_focus: Some(SemanticId::new("menu-trigger").unwrap()),
+                ..Default::default()
+            }),
+            ..Default::default()
+        },
+        Semantics {
+            popup: Some(glory_render::PopupKind::Menu),
+            ..Default::default()
+        },
+        Semantics {
+            menu_item: Some(glory_render::MenuItemSemantics {
+                kind: glory_render::MenuItemKind::Action,
+                owner: SemanticId::new("menu-owner").unwrap(),
+            }),
+            ..Default::default()
+        },
+        Semantics {
+            menu_item: Some(glory_render::MenuItemSemantics {
+                kind: glory_render::MenuItemKind::Checkbox,
+                owner: SemanticId::new("menu-owner").unwrap(),
+            }),
+            navigation_item: true,
+            ..Default::default()
+        },
+        Semantics {
+            link_request: true,
+            ..Default::default()
+        },
+        Semantics {
             link_open: Some(glory_render::LinkOpen::Current),
+            ..Default::default()
+        },
+        Semantics {
+            current: Some(glory_render::Current::Page),
+            ..Default::default()
+        },
+        Semantics {
+            current: Some(glory_render::Current::Step),
             ..Default::default()
         },
         Semantics {
@@ -347,7 +721,7 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
             ..Default::default()
         },
         Semantics {
-            has_popup: true,
+            popup: Some(glory_render::PopupKind::Dialog),
             ..Default::default()
         },
         Semantics::default(),
@@ -381,10 +755,39 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
         },
         Semantics {
             navigation: Some(Orientation::Horizontal),
+            navigation_direction: glory_render::Direction::Rtl,
+            typeahead: true,
             ..Default::default()
         },
         Semantics {
             navigation: Some(Orientation::Vertical),
+            ..Default::default()
+        },
+        Semantics {
+            id: Some(SemanticId::new("navigation-trigger").unwrap()),
+            controls: Some(SemanticId::new("navigation-content").unwrap()),
+            expanded: Some(false),
+            navigation_item: true,
+            navigation_panel: Some(glory_render::NavigationPanel::Trigger),
+            ..Default::default()
+        },
+        Semantics {
+            id: Some(SemanticId::new("navigation-content").unwrap()),
+            navigation: Some(Orientation::Vertical),
+            navigation_panel: Some(glory_render::NavigationPanel::Content),
+            ..Default::default()
+        },
+        Semantics {
+            id: Some(SemanticId::new("navigation-content").unwrap()),
+            navigation: Some(Orientation::Vertical),
+            navigation_panel: Some(glory_render::NavigationPanel::Content),
+            layer: Some(glory_render::Layer {
+                modal: false,
+                focus: glory_render::LayerFocus::Preserve,
+                placement: glory_render::LayerPlacement::AnchorStart,
+                anchor: Some(SemanticId::new("navigation-trigger").unwrap()),
+                ..Default::default()
+            }),
             ..Default::default()
         },
     ];
@@ -398,13 +801,63 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
             Props::Button(ButtonProps::default()),
             Props::Input(InputProps::default()),
             Props::Check(CheckProps::default()),
+            Props::Check(CheckProps {
+                mode: glory_render::CheckMode::Radio,
+                ..Default::default()
+            }),
         ] {
             let mut base = Descriptor::new(props);
+            if metadata.slider.is_some() && matches!(base.props, Props::View) {
+                base.role = Some(Role::Slider);
+                base.focus = FocusMode::TabStop;
+            }
+            if metadata.splitter.is_some() && matches!(base.props, Props::View) {
+                base.role = Some(Role::Separator);
+                base.focus = FocusMode::TabStop;
+            }
             if metadata.layer.is_some() && matches!(base.props, Props::View) {
-                base.role = Some(Role::Dialog);
+                let mut decision = base.clone();
+                decision.role = Some(Role::AlertDialog);
+                decision.focus = FocusMode::Programmatic;
+                decision.semantics = Some(Box::new(metadata.clone()));
+                if decision.validate().is_ok() {
+                    bases.push(decision);
+                }
+                if metadata
+                    .layer
+                    .as_ref()
+                    .is_some_and(|layer| layer.focus == glory_render::LayerFocus::Preserve)
+                {
+                    let mut tooltip = base.clone();
+                    tooltip.role = Some(Role::Tooltip);
+                    tooltip.semantics = Some(Box::new(metadata.clone()));
+                    if tooltip.validate().is_ok() {
+                        bases.push(tooltip);
+                    }
+                }
+                base.role = Some(if metadata.navigation.is_some() {
+                    Role::Menu
+                } else {
+                    Role::Dialog
+                });
                 base.focus = FocusMode::Programmatic;
             }
+            if metadata.navigation_panel == Some(glory_render::NavigationPanel::Content)
+                && matches!(base.props, Props::View)
+            {
+                base.role = Some(Role::Group);
+                base.focus = FocusMode::Auto;
+            }
             base.semantics = Some(Box::new(metadata.clone()));
+            if metadata.navigation_panel.is_some()
+                && (matches!(base.props, Props::Button(_))
+                    && metadata.navigation_panel == Some(glory_render::NavigationPanel::Trigger)
+                    || matches!(base.props, Props::View)
+                        && metadata.navigation_panel
+                            == Some(glory_render::NavigationPanel::Content))
+            {
+                base.validate().unwrap();
+            }
             if base.validate().is_ok() {
                 bases.push(base);
             }
@@ -414,6 +867,10 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
         Role::TabList,
         Role::TabPanel,
         Role::RadioGroup,
+        Role::Toolbar,
+        Role::Banner,
+        Role::ContentInfo,
+        Role::Menu,
         Role::Heading(1),
         Role::Heading(6),
         Role::Heading(0),
@@ -454,10 +911,34 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
             Role::ColumnHeader,
             Role::Cell,
             Role::Dialog,
+            Role::AlertDialog,
+            Role::Tooltip,
         ]
         .into_iter()
         .map(|role| Patch::Role(Change::Set(Some(role)))),
     );
+    for (revision, current) in [(0, 0), (0, 1), (1, 2)] {
+        patches.push(Patch::Semantics(Change::Set(Some(Box::new(Semantics {
+            id: Some(SemanticId::new("oracle-sheet").unwrap()),
+            layer: Some(Layer {
+                placement: LayerPlacement::Bottom,
+                sheet: Some(SheetConfig {
+                    fractions: vec![0.25, 0.5, 1.0],
+                    current,
+                    max_extent: 640.0,
+                    settle_millis: 180,
+                    dismissible: true,
+                    revision,
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        })))));
+    }
+    patches.push(Patch::Semantics(Change::Set(Some(Box::new(Semantics {
+        sheet_grip: true,
+        ..Default::default()
+    })))));
     let (mut accepted, mut rejected) = (0, 0);
     for limit in [
         style::Limit::None,
@@ -477,6 +958,20 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
             base.style = style::Style {
                 width: Some(style::Length::Px(0.0)),
                 background: Some(style::Color(8, 9, 10, 255)),
+                display: Some(style::Display::Grid),
+                grid_columns: Some(style::GridTracks::Tracks(vec![
+                    style::GridTrack::Fr(1.0),
+                    style::GridTrack::Auto,
+                ])),
+                grid_rows: Some(style::GridTracks::Tracks(vec![style::GridTrack::Px(20.0)])),
+                grid_column: Some(style::GridPlacement::At { start: 1, span: 2 }),
+                grid_row: Some(style::GridPlacement::Span(1)),
+                aspect_ratio: Some(style::AspectRatio::Ratio(2.0)),
+                object_fit: Some(style::ObjectFit::Cover),
+                pointer_events: Some(style::PointerEvents::None),
+                box_shadow: Some(style::BoxShadow::None),
+                flex_wrap: Some(style::FlexWrap::Wrap),
+                text_overflow: Some(style::TextOverflow::Ellipsis),
                 ..Default::default()
             };
         }
@@ -487,54 +982,74 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
                     &shape(&next)?,
                     matches!(update, Patch::Checked(Change::Set(_) | Change::Clear)),
                     matches!(update, Patch::CheckMode(Change::Set(_) | Change::Clear)),
+                    matches!(
+                        update,
+                        Patch::SelectSelection {
+                            keys: Change::Set(_) | Change::Clear,
+                            ..
+                        }
+                    ),
                 )
             });
-            let runtime = RuntimeId::new();
-            let id = NodeIds::new(runtime).allocate();
-            let mut mapper = Mapper::new(runtime);
-            let mut sink = Record::default();
-            mapper
-                .apply(
-                    &[
-                        Mutation::Create {
-                            id,
-                            node: Box::new(base.clone()),
-                        },
-                        Mutation::Place {
-                            id,
-                            parent: None,
-                            before: None,
-                        },
-                    ],
+            for planned in [false, true] {
+                let runtime = RuntimeId::new();
+                let id = NodeIds::new(runtime).allocate();
+                let mut mapper = Mapper::new(runtime);
+                let mut sink = Record::default();
+                mapper
+                    .apply(
+                        &[
+                            if planned {
+                                Mutation::CreatePlan {
+                                    plan: Plan::new(vec![PlanNode {
+                                        parent: None,
+                                        descriptor: base.clone(),
+                                    }])
+                                    .unwrap(),
+                                    ids: vec![id],
+                                }
+                            } else {
+                                Mutation::Create {
+                                    id,
+                                    node: Box::new(base.clone()),
+                                }
+                            },
+                            Mutation::Place {
+                                id,
+                                parent: None,
+                                before: None,
+                            },
+                        ],
+                        &mut sink,
+                    )
+                    .unwrap();
+                let receipt = mapper.receipt();
+                let stats = mapper.tree().stats();
+                let ops = sink.0.len();
+                let actual = mapper.apply(
+                    &[Mutation::Patch {
+                        id,
+                        patch: update.clone(),
+                    }],
                     &mut sink,
-                )
-                .unwrap();
-            let receipt = mapper.receipt();
-            let stats = mapper.tree().stats();
-            let ops = sink.0.len();
-            let actual = mapper.apply(
-                &[Mutation::Patch {
-                    id,
-                    patch: update.clone(),
-                }],
-                &mut sink,
-            );
-            match expected {
-                Ok(expected) => {
-                    accepted += 1;
-                    assert_eq!(actual.unwrap().applied, receipt.applied + 1);
-                    let Some(Op::Patch { edits, .. }) = sink.0.last() else {
-                        panic!()
-                    };
-                    assert_eq!(edits, &expected, "{:?}/{update:?}", base.props);
-                }
-                Err(_) => {
-                    rejected += 1;
-                    assert!(actual.is_err(), "{:?}/{update:?}", base.props);
-                    assert_eq!(mapper.tree().node(id).unwrap().descriptor, base);
-                    assert_eq!(mapper.tree().stats(), stats);
-                    assert_eq!(mapper.receipt(), receipt);
-                    assert_eq!(sink.0.len(), ops);
+                );
+                match &expected {
+                    Ok(expected) => {
+                        accepted += 1;
+                        assert_eq!(actual.unwrap().applied, receipt.applied + 1);
+                        let Some(Op::Patch { edits, .. }) = sink.0.last() else {
+                            panic!()
+                        };
+                        assert_eq!(edits, expected, "{:?}/{update:?}", base.props);
+                    }
+                    Err(_) => {
+                        rejected += 1;
+                        assert!(actual.is_err(), "{:?}/{update:?}", base.props);
+                        assert_eq!(mapper.tree().node(id).unwrap().descriptor, base);
+                        assert_eq!(mapper.tree().stats(), stats);
+                        assert_eq!(mapper.receipt(), receipt);
+                        assert_eq!(sink.0.len(), ops);
+                    }
                 }
             }
         }
@@ -576,11 +1091,12 @@ fn mapper_metadata_keeps_large_unrelated_payloads_and_emits_no_value_property() 
                 &mut sink,
             )
             .unwrap();
-        let pointer = |mapper: &Mapper| match &mapper.tree().node(id).unwrap().descriptor.props {
-            Props::Input(input) => input.value.as_ptr(),
-            Props::Text(text) => text.content.as_ptr(),
-            _ => unreachable!(),
-        };
+        let pointer =
+            |mapper: &Mapper| match &mapper.tree().node(id).unwrap().descriptor.view().props {
+                Props::Input(input) => input.value.as_ptr(),
+                Props::Text(text) => text.content.as_ptr(),
+                _ => unreachable!(),
+            };
         let original = pointer(&mapper);
         for patch in [
             Patch::Name(Change::Set(Some("Name".into()))),

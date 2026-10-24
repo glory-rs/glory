@@ -91,7 +91,7 @@ fn mapping_preflight_uses_staged_descriptors_and_allows_changes_with_the_same_ta
     );
     assert_eq!(app.stats(), stats);
     assert_eq!(
-        app.tree().node(id).unwrap().descriptor.role,
+        app.tree().node(id).unwrap().descriptor.view().role,
         Some(Role::Status)
     );
     app.flush().unwrap();

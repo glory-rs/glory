@@ -11,7 +11,7 @@ pub use children::Children;
 
 #[derive(Clone, Debug)]
 pub struct Node {
-    pub descriptor: Descriptor,
+    pub descriptor: LiveDescriptor,
     pub parent: Option<NodeId>,
     pub children: Children,
     pub placed: bool,
@@ -25,7 +25,7 @@ pub struct Node {
 /// This borrowed view is for validation, never a snapshot or host-tree lookup.
 #[derive(Clone, Copy, Debug)]
 pub enum Subtree<'a> {
-    New(&'a Descriptor),
+    New(DescriptorView<'a>),
     Plan(&'a Plan),
     Existing(NodeId),
 }
@@ -59,10 +59,11 @@ pub struct PreparedPatch<'a> {
     tree: &'a mut Memory,
     id: NodeId,
     inverse: Option<Patch>,
+    fields_before: u8,
 }
 impl PreparedPatch<'_> {
-    pub fn descriptor(&self) -> &Descriptor {
-        &self.tree.nodes[&self.id].descriptor
+    pub fn descriptor(&self) -> DescriptorView<'_> {
+        self.tree.nodes[&self.id].descriptor.view()
     }
     /// Inverse field patch, with Keep preserved and Clear materialized as Set.
     pub fn previous(&self) -> &Patch {
@@ -105,6 +106,12 @@ impl Drop for PreparedPatch<'_> {
                 .descriptor
                 .swap_patch(&mut inverse)
                 .expect("validated inverse");
+            self.tree
+                .nodes
+                .get_mut(&self.id)
+                .expect("prepared node")
+                .descriptor
+                .restore_fields(self.fields_before);
         }
     }
 }
@@ -138,7 +145,7 @@ impl Memory {
     /// semantic ancestors; never infer membership for descendant editors.
     pub fn navigation(&self, id: NodeId) -> Option<(NodeId, Orientation)> {
         let node = self.node(id).ok()?;
-        if !node.descriptor.semantics.as_ref()?.navigation_item {
+        if !node.descriptor.view().semantics.as_ref()?.navigation_item {
             return None;
         }
         let mut parent = node.parent;
@@ -146,6 +153,7 @@ impl Memory {
             let node = self.node(id).ok()?;
             if let Some(axis) = node
                 .descriptor
+                .view()
                 .semantics
                 .as_ref()
                 .and_then(|s| s.navigation)
@@ -157,8 +165,14 @@ impl Memory {
         None
     }
 
-    fn validate_name(&self, descriptor: &Descriptor, own: Option<NodeId>) -> Result<(), Error> {
-        if let Some(name) = descriptor.semantic_id()
+    fn validate_name<'a>(
+        &self,
+        descriptor: impl Into<DescriptorView<'a>>,
+        own: Option<NodeId>,
+    ) -> Result<(), Error> {
+        let descriptor = descriptor.into();
+        self.validate_choice_reference(descriptor)?;
+        if let Some(name) = descriptor.view().semantic_id()
             && self.names.get(name).is_some_and(|id| Some(*id) != own)
         {
             return Err(Error::InvalidProps("duplicate semantic id"));
@@ -191,6 +205,7 @@ impl Memory {
     /// a lowering adapter, then committed, or dropped if adapter checks fail.
     pub fn prepare_patch(&mut self, id: NodeId, patch: &Patch) -> Result<PreparedPatch<'_>, Error> {
         self.node(id)?;
+        let fields_before = self.nodes[&id].descriptor.field_mask();
         let mut inverse = patch.clone();
         self.nodes
             .get_mut(&id)
@@ -201,7 +216,37 @@ impl Memory {
             tree: self,
             id,
             inverse: Some(inverse),
+            fields_before,
         };
+        if matches!(patch, Patch::Role(_))
+            && prepared.descriptor().role == Some(Role::Separator)
+            && !prepared.tree.nodes[&id].children.is_empty()
+        {
+            return Err(Error::InvalidProps(
+                "passive separators cannot contain children",
+            ));
+        }
+        if matches!(patch, Patch::Role(_))
+            && matches!(
+                prepared.descriptor().role,
+                Some(Role::Tooltip | Role::ProgressBar | Role::Slider)
+            )
+        {
+            for child in prepared.tree.nodes[&id].children.iter().copied() {
+                prepared
+                    .tree
+                    .validate_child(Subtree::Existing(child), Some(id))?;
+            }
+        }
+        if matches!(patch, Patch::Semantics(_) | Patch::Role(_)) {
+            let descriptor = prepared.descriptor();
+            prepared.tree.validate_choice_patch(id)?;
+            let role_transition = matches!(prepared.previous(), Patch::Role(Change::Set(old)) if *old == Some(Role::Listbox) || descriptor.role == Some(Role::Listbox));
+            let changed_owner = matches!(prepared.previous(), Patch::Semantics(Change::Set(previous)) if previous.as_ref().and_then(|s| s.id.as_ref()) != descriptor.semantic_id());
+            if role_transition || descriptor.role == Some(Role::Listbox) && changed_owner {
+                prepared.tree.validate_choice_contents(id)?;
+            }
+        }
         if matches!(patch, Patch::Semantics(_)) {
             if let Patch::Semantics(Change::Set(previous)) = prepared.previous()
                 && previous.as_ref().and_then(|s| s.document_part)
@@ -223,7 +268,7 @@ impl Memory {
                         prepared.tree.nodes[&id].children.iter().copied().collect();
                     while let Some(child) = pending.pop() {
                         let node = &prepared.tree.nodes[&child];
-                        if node.descriptor.field_part() == Some(crate::FieldPart::Form) {
+                        if node.descriptor.view().field_part() == Some(crate::FieldPart::Form) {
                             return Err(Error::InvalidPlacement("forms cannot be nested"));
                         }
                         pending.extend(node.children.iter().copied());
@@ -236,9 +281,11 @@ impl Memory {
                 }
             }
         }
-        prepared
-            .tree
-            .validate_child(Subtree::Existing(id), prepared.tree.nodes[&id].parent)?;
+        prepared.tree.validate_child_inner(
+            Subtree::Existing(id),
+            prepared.tree.nodes[&id].parent,
+            false,
+        )?;
         Ok(prepared)
     }
 
@@ -255,12 +302,14 @@ impl Memory {
             let Ok(node) = self.node(id) else {
                 return false;
             };
-            if !node.descriptor.props.enabled()
-                || node.descriptor.semantics.as_ref().is_some_and(|s| {
-                    matches!(
-                        s.field_part,
-                        Some(crate::FieldPart::Fieldset | crate::FieldPart::Form)
-                    ) && s.disabled
+            if !node.descriptor.view().props.enabled()
+                || node.descriptor.view().semantics.as_ref().is_some_and(|s| {
+                    s.inert
+                        || matches!(
+                            s.field_part,
+                            Some(crate::FieldPart::Fieldset | crate::FieldPart::Form)
+                        ) && s.disabled
+                        || (s.splitter.is_some() || s.slider.is_some()) && s.disabled
                 })
             {
                 return false;
@@ -276,12 +325,36 @@ impl Memory {
             let Some(node) = nodes.get(&id) else {
                 return false;
             };
-            if !node.placed || node.suspended || node.descriptor.hidden() {
+            if !node.placed || node.suspended || node.descriptor.view().hidden() {
                 return false;
             }
             cursor = node.parent;
         }
         true
+    }
+
+    /// Current semantic ancestry only; inert keeps layout, owners and queries.
+    pub fn inert(&self, id: NodeId) -> bool {
+        Self::inert_in(&self.nodes, id)
+    }
+    fn inert_in(nodes: &NodeMap<Node>, id: NodeId) -> bool {
+        let mut cursor = Some(id);
+        while let Some(id) = cursor {
+            let Some(node) = nodes.get(&id) else {
+                return false;
+            };
+            if node
+                .descriptor
+                .view()
+                .semantics
+                .as_ref()
+                .is_some_and(|s| s.inert)
+            {
+                return true;
+            }
+            cursor = node.parent;
+        }
+        false
     }
 
     fn prune_events(&mut self) {
@@ -295,7 +368,38 @@ impl Memory {
     /// False means an embedded origin was retired or is no longer active.
     /// Malformed live origins/payloads are errors; no callback or mutation runs.
     pub fn validate_event(&self, id: NodeId, event: &Event) -> Result<bool, Error> {
-        Self::event_in(&self.nodes, self.runtime, id, event)
+        if !Self::event_in(&self.nodes, self.runtime, id, event)? {
+            return Ok(false);
+        }
+        if matches!(
+            event,
+            Event::Choice {
+                command: crate::ChoiceCommand::RemoveLast,
+                ..
+            }
+        ) {
+            let owner = self
+                .node(id)?
+                .descriptor
+                .view()
+                .semantics
+                .as_ref()
+                .and_then(|value| value.controls.as_ref())
+                .and_then(|name| self.named(name));
+            let Some(owner) = owner else { return Ok(false) };
+            let owner = self.node(owner)?.descriptor.view();
+            if owner.role != Some(crate::Role::Listbox)
+                || !owner
+                    .semantics
+                    .as_ref()
+                    .is_some_and(|value| value.listbox_multiple)
+            {
+                return Err(Error::InvalidEvent(
+                    "remove-last requires its live multiple listbox",
+                ));
+            }
+        }
+        Ok(true)
     }
 
     fn event_in(
@@ -311,6 +415,58 @@ impl Memory {
             nodes.get(&id).ok_or(Error::NodeGone(id))
         };
         let target = get(id)?;
+        let interactive = || {
+            !event.is_user_interaction()
+                || !(Self::inert_in(nodes, id)
+                    || event
+                        .origin()
+                        .filter(|origin| *origin != id)
+                        .is_some_and(|origin| Self::inert_in(nodes, origin)))
+        };
+        if let Event::Sheet { revision, .. } = event {
+            event.validate_payload(id, &target.descriptor)?;
+            if target
+                .descriptor
+                .view()
+                .semantics
+                .as_ref()
+                .and_then(|s| s.layer.as_ref())
+                .and_then(|l| l.sheet.as_ref())
+                .is_some_and(|sheet| *revision < sheet.revision)
+            {
+                return Ok(false);
+            }
+        }
+        if let Event::Pointer { related, .. } | Event::PointerWithin { related, .. } = event {
+            event.validate_payload(id, &target.descriptor)?;
+            if let Some(related) = related {
+                let source = match get(*related) {
+                    Ok(node) => node,
+                    Err(Error::NodeGone(_)) => return Ok(false),
+                    Err(error) => return Err(error),
+                };
+                if matches!(source.descriptor.view().props, Props::Group) {
+                    return Err(Error::InvalidEvent(
+                        "pointer related origin has no physical box",
+                    ));
+                }
+                if !Self::active_in(nodes, *related) {
+                    return Ok(false);
+                }
+                let mut cursor = Some(*related);
+                while let Some(current) = cursor {
+                    if current == id {
+                        return Ok(false);
+                    }
+                    cursor = nodes.get(&current).and_then(|node| node.parent);
+                }
+            }
+            if matches!(event, Event::Pointer { .. }) {
+                return Ok(
+                    (Self::active_in(nodes, id) || event.is_terminal_loss()) && interactive()
+                );
+            }
+        }
         if let Event::Submit {
             submitter: Some(submitter),
         } = event
@@ -323,6 +479,7 @@ impl Memory {
             };
             if source
                 .descriptor
+                .view()
                 .semantics
                 .as_ref()
                 .and_then(|s| s.form_action)
@@ -332,14 +489,25 @@ impl Memory {
                     "submit origin requires a submit button",
                 ));
             }
-            if !source.descriptor.activation_enabled() || !Self::active_in(nodes, *submitter) {
+            if !source.descriptor.view().activation_enabled() || !Self::active_in(nodes, *submitter)
+            {
                 return Ok(false);
             }
         }
-        if target.descriptor.readonly()
+        if target.descriptor.view().readonly()
             && matches!(
                 event,
-                Event::ValueChanged { .. } | Event::Commit { .. } | Event::CheckedChanged(_)
+                Event::ValueChanged { .. }
+                    | Event::Commit { .. }
+                    | Event::CheckedChanged(_)
+                    | Event::SelectChanged { .. }
+                    | Event::Range { .. }
+                    | Event::Drag {
+                        phase: crate::DragPhase::Start
+                            | crate::DragPhase::Move
+                            | crate::DragPhase::Drop,
+                        ..
+                    }
             )
         {
             event.validate_payload(id, &target.descriptor)?;
@@ -353,13 +521,59 @@ impl Memory {
                 Err(error) => return Err(error),
             };
             EventKind::Drag.validate_target(&source.descriptor)?;
-            return Ok(Self::active_in(nodes, *from) || *phase == crate::DragPhase::Cancel);
+            return Ok(
+                (Self::active_in(nodes, *from) || *phase == crate::DragPhase::Cancel)
+                    && interactive(),
+            );
         }
         // Navigation's explicit origin must be exactly the target, even if a
         // mismatched embedded identity has already been retired.
-        if matches!(event, Event::Navigate { .. } | Event::Keyboard { .. }) {
+        if let Event::NavigationPanel { command, .. } = event {
+            let mut cursor = Some(id);
+            let mut inside = false;
+            while let Some(current) = cursor {
+                let node = get(current)?;
+                if node
+                    .descriptor
+                    .view()
+                    .semantics
+                    .as_ref()
+                    .and_then(|s| s.navigation_panel)
+                    == Some(crate::NavigationPanel::Content)
+                {
+                    inside = true;
+                    break;
+                }
+                cursor = node.parent;
+            }
+            if matches!(
+                command,
+                crate::NavigationPanelCommand::Close | crate::NavigationPanelCommand::Open
+            ) && !inside
+                || matches!(
+                    command,
+                    crate::NavigationPanelCommand::First | crate::NavigationPanelCommand::Last
+                ) && inside
+            {
+                return Err(Error::InvalidEvent(
+                    "navigation panel command disagrees with its mounted content level",
+                ));
+            }
+        }
+        if matches!(
+            event,
+            Event::Navigate { .. }
+                | Event::Keyboard { .. }
+                | Event::ScrollKeyboard { .. }
+                | Event::Range { .. }
+                | Event::Typeahead { .. }
+                | Event::Menu { .. }
+                | Event::NavigationPanel { .. }
+                | Event::Choice { .. }
+                | Event::Tags { .. }
+        ) {
             event.validate_payload(id, &target.descriptor)?;
-            return Ok(true);
+            return Ok(interactive());
         }
         if let Some(origin) = event.origin() {
             let source = match get(origin) {
@@ -367,7 +581,7 @@ impl Memory {
                 Err(Error::NodeGone(_)) => return Ok(false),
                 Err(error) => return Err(error),
             };
-            if matches!(source.descriptor.props, Props::Group) {
+            if matches!(source.descriptor.view().props, Props::Group) {
                 return Err(Error::InvalidEvent("event origin has no physical box"));
             }
             if matches!(event, Event::Anchor { .. }) && origin == id {
@@ -377,9 +591,10 @@ impl Memory {
             while cursor != Some(id) {
                 if matches!(event, Event::Submit { .. })
                     && cursor.and_then(|id| nodes.get(&id)).is_some_and(|node| {
-                        node.descriptor.field_part() == Some(crate::FieldPart::Fieldset)
+                        node.descriptor.view().field_part() == Some(crate::FieldPart::Fieldset)
                             && node
                                 .descriptor
+                                .view()
                                 .semantics
                                 .as_ref()
                                 .is_some_and(|s| s.disabled)
@@ -394,19 +609,17 @@ impl Memory {
                     return Err(Error::InvalidEvent("event origin is outside its target"));
                 }
             }
-            if !Self::active_in(nodes, origin)
-                && !matches!(event, Event::FocusWithin { focused: false, .. })
-            {
+            if !Self::active_in(nodes, origin) && !event.is_terminal_loss() {
                 return Ok(false);
             }
         }
         event.validate_payload(id, &target.descriptor)?;
-        Ok(true)
+        Ok(interactive())
     }
 
     pub fn push_event(&mut self, id: NodeId, event: Event) -> Result<(), Error> {
         let node = self.node(id)?;
-        if matches!(event, Event::Activate) && !node.descriptor.activation_enabled() {
+        if matches!(event, Event::Activate) && !node.descriptor.view().activation_enabled() {
             return Err(Error::InvalidProps("activation is disabled"));
         }
         if !self.validate_event(id, &event)? {
@@ -421,7 +634,15 @@ impl Memory {
                 | Event::Submit { .. }
                 | Event::Reset
                 | Event::Keyboard { .. }
+                | Event::ScrollKeyboard { .. }
+                | Event::Range { .. }
+                | Event::Typeahead { .. }
+                | Event::Menu { .. }
+                | Event::NavigationPanel { .. }
+                | Event::Choice { .. }
+                | Event::Tags { .. }
                 | Event::CheckedChanged(_)
+                | Event::SelectChanged { .. }
                 | Event::ValueChanged { .. }
                 | Event::Commit { .. }
         ) && !self.enabled(id)
@@ -488,16 +709,35 @@ impl Memory {
     /// modifying state. Ordinary moves visit ancestors only; only restricted
     /// interactive/button contexts require examining the child's live subtree.
     pub fn validate_child(&self, child: Subtree<'_>, parent: Option<NodeId>) -> Result<(), Error> {
+        self.validate_child_inner(child, parent, true)
+    }
+
+    fn validate_child_inner(
+        &self,
+        child: Subtree<'_>,
+        parent: Option<NodeId>,
+        choice: bool,
+    ) -> Result<(), Error> {
         let descriptor = match child {
             Subtree::New(d) => d,
-            Subtree::Plan(plan) => &plan.nodes()[0].descriptor,
-            Subtree::Existing(id) => &self.node(id)?.descriptor,
+            Subtree::Plan(plan) => plan.nodes()[0].descriptor.view(),
+            Subtree::Existing(id) => self.node(id)?.descriptor.view(),
         };
+        if let Some(parent) = parent
+            && self.node(parent)?.descriptor.view().role == Some(Role::Separator)
+        {
+            return Err(Error::InvalidProps(
+                "passive separators cannot contain children",
+            ));
+        }
         self.validate_document_placement(child, parent)?;
+        if choice {
+            self.validate_choice_child(child, parent)?;
+        }
         if descriptor.field_part() == Some(crate::FieldPart::Legend)
-            && parent
-                .and_then(|id| self.node(id).ok())
-                .is_none_or(|node| node.descriptor.field_part() != Some(crate::FieldPart::Fieldset))
+            && parent.and_then(|id| self.node(id).ok()).is_none_or(|node| {
+                node.descriptor.view().field_part() != Some(crate::FieldPart::Fieldset)
+            })
         {
             return Err(Error::InvalidPlacement(
                 "legend requires a direct fieldset parent",
@@ -510,23 +750,28 @@ impl Memory {
         let mut interactive_ancestor = false;
         let mut button_ancestor = false;
         let mut form_ancestor = false;
+        let mut tooltip_ancestor = false;
         while let Some(ancestor) = cursor {
             if matches!(child, Subtree::Existing(id) if ancestor == id) {
                 return Err(Error::InvalidPlacement("tree cycle"));
             }
             let node = self.node(ancestor)?;
-            if cursor == parent && !node.descriptor.props.accepts_children() {
+            if cursor == parent && !node.descriptor.view().props.accepts_children() {
                 return Err(Error::InvalidProps(
                     "leaf component cannot contain children",
                 ));
             }
-            interactive_ancestor |= node.descriptor.props.interactive()
+            interactive_ancestor |= node.descriptor.view().props.interactive()
                 || matches!(
-                    node.descriptor.field_part(),
+                    node.descriptor.view().field_part(),
                     Some(crate::FieldPart::Label | crate::FieldPart::Legend)
                 );
-            button_ancestor |= matches!(node.descriptor.props, Props::Button(_));
-            form_ancestor |= node.descriptor.field_part() == Some(crate::FieldPart::Form);
+            button_ancestor |= matches!(node.descriptor.view().props, Props::Button(_));
+            form_ancestor |= node.descriptor.view().field_part() == Some(crate::FieldPart::Form);
+            tooltip_ancestor |= matches!(
+                node.descriptor.view().role,
+                Some(Role::Tooltip | Role::ProgressBar | Role::Slider)
+            );
             cursor = node.parent;
         }
         // Most placements (including ordinary list moves) need no subtree scan.
@@ -548,27 +793,32 @@ impl Memory {
                 Subtree::Existing(id) => self.node(id)?.parent != parent,
                 _ => true,
             };
-        if !interactive_ancestor && !button_ancestor && !form_scan {
+        if !interactive_ancestor && !button_ancestor && !form_scan && !tooltip_ancestor {
             return Ok(());
         }
-        let check = |descriptor: &Descriptor| {
+        let check = |descriptor: DescriptorView<'_>| {
             if form_scan && descriptor.field_part() == Some(crate::FieldPart::Form) {
                 return Err(Error::InvalidPlacement("forms cannot be nested"));
             }
-            crate::plan::validate_context(descriptor, interactive_ancestor, button_ancestor)
+            crate::plan::validate_context(
+                descriptor,
+                interactive_ancestor,
+                button_ancestor,
+                tooltip_ancestor,
+            )
         };
         match child {
             Subtree::New(descriptor) => check(descriptor)?,
             Subtree::Plan(plan) => {
                 for node in plan.nodes() {
-                    check(&node.descriptor)?;
+                    check(node.descriptor.view())?;
                 }
             }
             Subtree::Existing(id) => {
                 let mut pending = vec![id];
                 while let Some(id) = pending.pop() {
                     let node = self.node(id)?;
-                    check(&node.descriptor)?;
+                    check(node.descriptor.view())?;
                     pending.extend(node.children.iter().copied());
                 }
             }
@@ -584,29 +834,30 @@ impl Memory {
         let mut boxed_parent = parent;
         while let Some(id) = boxed_parent {
             let node = self.node(id)?;
-            if !matches!(node.descriptor.props, Props::Group) {
+            if !matches!(node.descriptor.view().props, Props::Group) {
                 break;
             }
             boxed_parent = node.parent;
         }
         let parent = boxed_parent
-            .map(|id| self.node(id).map(|node| &node.descriptor))
+            .map(|id| self.node(id).map(|node| node.descriptor.view()))
             .transpose()?;
-        let check =
-            |descriptor: &Descriptor| crate::document::validate_child(descriptor, parent, false);
+        let check = |descriptor: DescriptorView<'_>| {
+            crate::document::validate_child(descriptor, parent, false)
+        };
         match child {
             Subtree::New(descriptor) => check(descriptor)?,
             Subtree::Existing(id) => {
                 // Only transparent ranges change the physical parent of their
                 // contents. Stop at boxed nodes; never scan business sources.
                 let node = self.node(id)?;
-                check(&node.descriptor)?;
-                if matches!(node.descriptor.props, Props::Group) {
+                check(node.descriptor.view())?;
+                if matches!(node.descriptor.view().props, Props::Group) {
                     let mut pending = node.children.iter().copied().collect::<Vec<_>>();
                     while let Some(id) = pending.pop() {
                         let node = self.node(id)?;
-                        check(&node.descriptor)?;
-                        if matches!(node.descriptor.props, Props::Group) {
+                        check(node.descriptor.view())?;
+                        if matches!(node.descriptor.view().props, Props::Group) {
                             pending.extend(node.children.iter().copied());
                         }
                     }
@@ -616,13 +867,13 @@ impl Memory {
                 for node in plan.nodes() {
                     let mut cursor = node.parent;
                     while let Some(index) = cursor {
-                        if !matches!(plan.nodes()[index].descriptor.props, Props::Group) {
+                        if !matches!(plan.nodes()[index].descriptor.view().props, Props::Group) {
                             break;
                         }
                         cursor = plan.nodes()[index].parent;
                     }
                     if cursor.is_none() {
-                        check(&node.descriptor)?;
+                        check(node.descriptor.view())?;
                     }
                 }
             }
@@ -732,8 +983,8 @@ impl Memory {
                     // the complete identity/name check above precedes mutation.
                     // Fresh nodes need no unlink, ancestor walk or temporary Box.
                     let id = ids[index];
-                    let descriptor = node.descriptor.clone();
-                    if let Some(name) = descriptor.semantic_id() {
+                    let descriptor = LiveDescriptor::plan(plan, index);
+                    if let Some(name) = descriptor.view().semantic_id() {
                         self.names.insert(name.clone(), id);
                     }
                     self.generations.insert(id.slot(), (id.generation(), true));
@@ -779,16 +1030,16 @@ impl Memory {
                     }
                 }
                 let mut descriptor = node.as_ref().clone();
-                self.validate_name(node, None)?;
+                self.validate_name(node.as_ref(), None)?;
                 descriptor.normalize_input()?;
-                if let Some(name) = descriptor.semantic_id() {
+                if let Some(name) = descriptor.view().semantic_id() {
                     self.names.insert(name.clone(), *id);
                 }
                 self.generations.insert(id.slot(), (id.generation(), true));
                 self.nodes.insert(
                     *id,
                     Node {
-                        descriptor,
+                        descriptor: LiveDescriptor::owned(descriptor),
                         parent: None,
                         children: Children::default(),
                         placed: false,
@@ -820,7 +1071,7 @@ impl Memory {
                 let mut pending = vec![*id];
                 while let Some(id) = pending.pop() {
                     let node = self.nodes.remove(&id).expect("owned subtree");
-                    if let Some(name) = node.descriptor.semantic_id() {
+                    if let Some(name) = node.descriptor.view().semantic_id() {
                         self.names.remove(name);
                     }
                     self.generations
@@ -841,7 +1092,7 @@ impl Memory {
 
 impl Render for Memory {
     fn listen(&mut self, node: NodeId, kind: EventKind, enabled: bool) -> Result<(), Error> {
-        let descriptor = &self.node(node)?.descriptor;
+        let descriptor = self.node(node)?.descriptor.view();
         if enabled {
             kind.validate_target(descriptor)?;
         }

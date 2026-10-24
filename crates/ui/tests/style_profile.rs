@@ -91,13 +91,13 @@ fn rejected_values_preserve_committed_style_and_bindings_can_recover() {
     ));
     assert!(applied.borrow().is_empty());
     assert_eq!(
-        app.tree().node(node).unwrap().descriptor.style.width,
+        app.tree().node(node).unwrap().descriptor.view().style.width,
         Some(Length::Px(10.0))
     );
     style.revise(|style| style.width = Some(Length::Px(20.0)));
     app.flush().unwrap();
     assert_eq!(
-        app.tree().node(node).unwrap().descriptor.style.width,
+        app.tree().node(node).unwrap().descriptor.view().style.width,
         Some(Length::Px(20.0))
     );
     assert!(matches!(
@@ -112,7 +112,7 @@ fn rejected_values_preserve_committed_style_and_bindings_can_recover() {
         .unwrap();
     app.flush().unwrap();
     assert_eq!(
-        app.tree().node(node).unwrap().descriptor.style,
+        *app.tree().node(node).unwrap().descriptor.view().style,
         Style::new()
     );
     let invalid = Style::new().width(Length::Px(f64::NAN));
@@ -130,4 +130,25 @@ fn rejected_values_preserve_committed_style_and_bindings_can_recover() {
             .unwrap_err(),
         UiError::Render(Error::NodeGone(retired))
     );
+}
+
+#[test]
+fn reactive_initial_styles_are_preflighted_before_identity_or_host_queue_changes() {
+    let (app, applied) = app(Support::NONE);
+    let source = app.scope().cage(Style::new().width(Length::Px(20.0)));
+    let before = (app.stats(), app.tree().stats());
+    assert!(matches!(
+        app.mount(view().style(source)),
+        Err(UiError::Render(Error::UnsupportedStyle {
+            requirement: Unsupported {
+                property: Property::Width,
+                value: None
+            },
+            ..
+        }))
+    ));
+    assert_eq!((app.stats(), app.tree().stats()), before);
+    assert!(applied.borrow().is_empty());
+    app.mount(text().content("still usable")).unwrap();
+    assert_eq!(app.tree().roots()[0].slot(), 0);
 }

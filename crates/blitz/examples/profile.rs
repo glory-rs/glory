@@ -131,7 +131,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         tree.node(root.children[0])?
                             .children
                             .iter()
-                            .map(|id| (*id, tree.node(*id).unwrap().descriptor.item.unwrap().index))
+                            .map(|id| {
+                                (
+                                    *id,
+                                    tree.node(*id)
+                                        .unwrap()
+                                        .descriptor
+                                        .view()
+                                        .item
+                                        .unwrap()
+                                        .index,
+                                )
+                            })
                             .collect()
                     };
                     let verified = Rc::new(Cell::new(0usize));
@@ -262,7 +273,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         // rows reached after eviction. No source-data scan.
                         let tree = app.tree();
                         for &id in &tree.node(tree.node(root)?.children[0])?.children {
-                            let index = tree.node(id)?.descriptor.item.unwrap().index;
+                            let index = tree.node(id)?.descriptor.view().item.unwrap().index;
                             let engine = renderer.engine_id(id, glory_html::Part::Main)?;
                             let bounds = renderer
                                 .inspect(|doc| doc.get_client_bounding_rect(engine).unwrap());

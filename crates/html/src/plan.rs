@@ -34,6 +34,25 @@ impl PlanShape {
         let mut nodes = 0;
         let mut bytes = 0;
         for shape in &self.shapes {
+            if let Some(options) = &shape.select_options {
+                bytes += options.placeholder.as_ref().map_or(0, String::len);
+                nodes += usize::from(options.placeholder.is_some());
+                for entry in options.entries.iter() {
+                    let opts = match entry {
+                        glory_render::SelectEntry::Option(option) => std::slice::from_ref(option),
+                        glory_render::SelectEntry::Group(group) => {
+                            nodes += 1;
+                            bytes += group.label.len();
+                            group.options.as_slice()
+                        }
+                    };
+                    for option in opts {
+                        nodes += 1;
+                        bytes +=
+                            option.key.as_str().len() + option.label.len() + option.value.len();
+                    }
+                }
+            }
             for piece in &shape.pieces {
                 nodes += 1;
                 match &piece.kind {
@@ -49,6 +68,7 @@ impl PlanShape {
                             .map(|v| match v {
                                 Property::Text(v) => v.len(),
                                 Property::Bool(_) => 0,
+                                Property::SelectedKeys(keys) => keys.iter().map(String::len).sum(),
                             })
                             .sum::<usize>();
                     }

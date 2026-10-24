@@ -107,7 +107,7 @@ impl Frame {
             // The manifest is already trusted serialized JSON. Avoid parsing
             // and rebuilding its complete node tree only to wrap it for HTML.
             std::borrow::Cow::Owned(format!(
-                "{{\"version\":1,\"kind\":\"start\",\"sequence\":0,\"data_id\":{},\"nodes\":{}}}",
+                "{{\"version\":2,\"kind\":\"start\",\"sequence\":0,\"data_id\":{},\"nodes\":{}}}",
                 serde_json::to_string(&bootstrap.data_id)?,
                 self.initial.as_deref().expect("shell manifest")
             ))
@@ -182,7 +182,7 @@ struct Renderer {
 impl Render for Renderer {
     fn preflight(
         &self,
-        node: &glory_render::Descriptor,
+        node: glory_render::DescriptorView<'_>,
         patch: Option<&glory_render::Patch>,
     ) -> Result<(), glory_render::Error> {
         glory_html::preflight(node, patch)
@@ -208,7 +208,7 @@ impl Render for Renderer {
         enabled: bool,
     ) -> Result<(), glory_render::Error> {
         let mapper = self.mapper.borrow();
-        let descriptor = &mapper.tree().node(node)?.descriptor;
+        let descriptor = mapper.tree().node(node)?.descriptor.view();
         if enabled {
             kind.validate_target(descriptor)?;
         }
@@ -288,7 +288,7 @@ pub fn stream_with<W: Widget>(
     app.mount_with(|| factory(app.scope(), &resources))?;
     let mapper = mapper.expect("renderer created");
     let shell = format!(
-        "<!--gly:stream:1-->{}<!--gly:/stream:1-->",
+        "<!--gly:stream:2-->{}<!--gly:/stream:2-->",
         mapper.borrow().html()?
     );
     let initial = {
@@ -374,7 +374,7 @@ impl Stream {
             let edits = self.edits.borrow_mut().take();
             if !edits.is_empty() {
                 let body = serde_json::to_string(
-                    &json!({"version":1,"kind":"patch","sequence":self.sequence,"ops":edits}),
+                    &json!({"version":2,"kind":"patch","sequence":self.sequence,"ops":edits}),
                 )?;
                 return Poll::Ready(self.frame(FrameKind::Patch, body));
             }
@@ -391,7 +391,7 @@ impl Stream {
                     .map(|(old, new)| [old.to_string(), new.to_string()])
                     .collect();
                 let body = format!(
-                    "{{\"version\":1,\"kind\":\"end\",\"sequence\":{},\"html_version\":{},\"rekey\":{},\"resources\":{resources}}}",
+                    "{{\"version\":2,\"kind\":\"end\",\"sequence\":{},\"html_version\":{},\"rekey\":{},\"resources\":{resources}}}",
                     self.sequence,
                     glory_html::FORMAT_VERSION,
                     serde_json::to_string(&pairs)?

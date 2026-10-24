@@ -1,0 +1,71 @@
+name: semantic-counter
+
+on:
+  pull_request:
+  push:
+
+jobs:
+  counter:
+    runs-on: windows-latest
+    env:
+      CARGO_HOME: D:/BuildCache/glory-counter-ci/cargo
+      CARGO_TARGET_DIR: D:/BuildCache/glory-counter-ci/target
+      TEMP: D:/BuildCache/glory-counter-ci/tmp
+      TMP: D:/BuildCache/glory-counter-ci/tmp
+      PYTHONPYCACHEPREFIX: D:/BuildCache/glory-counter-ci/pycache
+    steps:
+      - name: Prepare D drive build directories
+        shell: pwsh
+        run: New-Item -ItemType Directory -Force $env:CARGO_HOME, $env:CARGO_TARGET_DIR, $env:TEMP | Out-Null
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Verify Cargo target and shared component
+        shell: pwsh
+        run: |
+          $metadata = cargo metadata --locked --manifest-path examples/counter/Cargo.toml --no-deps --format-version 1 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'cargo metadata failed' }
+          if ([IO.Path]::GetFullPath($metadata.target_directory) -ne [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)) { throw 'Unexpected Cargo target directory' }
+          cargo fmt --manifest-path examples/counter/Cargo.toml -- --check
+          if ($LASTEXITCODE -ne 0) { throw 'Counter formatting failed' }
+          cargo test --locked --manifest-path examples/counter/Cargo.toml
+          if ($LASTEXITCODE -ne 0) { throw 'Counter tests failed' }
+          cargo clippy --locked --manifest-path examples/counter/Cargo.toml --features desktop --all-targets -- -D warnings
+          if ($LASTEXITCODE -ne 0) { throw 'Counter desktop clippy failed' }
+          cargo clippy --locked --manifest-path examples/counter/Cargo.toml --features web --lib --target wasm32-unknown-unknown -- -D warnings
+          if ($LASTEXITCODE -ne 0) { throw 'Counter Web clippy failed' }
+      - name: Build desktop and Web entries
+        shell: pwsh
+        run: |
+          cargo install wasm-bindgen-cli --version 0.2.129 --locked --root D:/BuildCache/glory-counter-ci/tools
+          if ($LASTEXITCODE -ne 0) { throw 'wasm-bindgen CLI installation failed' }
+          ./examples/counter/build.ps1 -Platform desktop -BuildRoot D:/BuildCache/glory-counter-ci
+          ./examples/counter/build.ps1 -Platform web -BuildRoot D:/BuildCache/glory-counter-ci -Bindgen D:/BuildCache/glory-counter-ci/tools/bin/wasm-bindgen.exe
+      - name: Browser acceptance
+        shell: pwsh
+        run: |
+          npm --prefix tests/playwright install --package-lock=false
+          if ($LASTEXITCODE -ne 0) { throw 'Playwright installation failed' }
+          npm --prefix tests/playwright exec -- playwright install chromium
+          if ($LASTEXITCODE -ne 0) { throw 'Chromium installation failed' }
+          $server = Start-Process python -ArgumentList @('-m', 'http.server', '8790', '--bind', '127.0.0.1', '--directory', 'D:/BuildCache/glory-counter-ci/counter-web') -WindowStyle Hidden -PassThru
+          try {
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 30; $attempt++) {
+              try { Invoke-WebRequest http://127.0.0.1:8790 -UseBasicParsing | Out-Null; $ready = $true; break }
+              catch { Start-Sleep -Seconds 1 }
+            }
+            if (-not $ready) { throw 'Counter server did not start' }
+            $env:GLORY_COUNTER_URL = 'http://127.0.0.1:8790'
+            npm --prefix tests/playwright run test:counter -- --output D:/BuildCache/glory-counter-ci/playwright
+            if ($LASTEXITCODE -ne 0) { throw 'Counter browser acceptance failed' }
+          }
+          finally { Stop-Process -Id $server.Id -ErrorAction SilentlyContinue }

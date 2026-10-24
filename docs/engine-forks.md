@@ -5,7 +5,7 @@ vendor、副本补丁树或子模块；应用无需添加全局 Cargo patch。
 
 | Fork | 上游基线 | Glory 固定提交 | 维护范围 |
 |---|---|---|---|
-| [glory-rs/blitz](https://github.com/glory-rs/blitz) | `92b11f1b` / beta.4 | [b40cdfc2](https://github.com/glory-rs/blitz/commit/b40cdfc2c9b5a000759275b673e4ed8aadd68f78) | 资源生命周期、增量失效、焦点、密码显示、IME、阶段计时和 inline 样式差分失效 |
+| [glory-rs/blitz](https://github.com/glory-rs/blitz) | `92b11f1b` / beta.4 | [fa10341f](https://github.com/glory-rs/blitz/commit/fa10341fd05899041079b30ab66363f89ccf0404) | 资源生命周期、增量失效、焦点、密码显示、IME、阶段计时、inline 样式差分失效及隐藏子树销毁缓存回收 |
 | [glory-rs/taffy](https://github.com/glory-rs/taffy) | `eb645069` / 0.15.0 | [dd7914fb](https://github.com/glory-rs/taffy/commit/dd7914fba2e6e0b5d8a2c8854d764a2ade817efd) | 小数 flex 因子的 gap 计算与回归测试 |
 
 恢复上游包名 blitz-dom/traits/paint/shell、stylo_taffy、taffy；Glory 自己的
@@ -41,3 +41,24 @@ Glory 的语义、原生几何/窗口回归。合入上游后也通过审查过�
 
 这些依赖尚未发布到 crates.io；当前保证的是 Git 源构建。早期实施记录中的本地
 源码校验和命令仅为历史证据，当前复现以本页和检查脚本为准。
+
+2026-10-24 的隐藏子树销毁回归来自 Sapid NavLink 的 Unmount 面板。销毁节点时
+按记录的 layout parent / out-of-flow containing block 清除布局、hoisted 和派生
+paint 缓存；不扫描文档，也不经已经删除的 DOM 祖先传播失效。公开的非空
+remove-all 入口另标记仍存活的父节点结构失效，防止祖先 stacking context 重放
+已删除条目。旧提交的混合 inline/block、隐藏祖先及 hoisted 回归实际失败；新提交
+100 项库测试、parallel profile 5 项、样式差分 5 项及销毁矩阵 4 项通过。
+矩阵覆盖 block/flex/grid/contents、root-first、隐藏前后时序、remove/remove-all、
+匿名盒、Parley embedded box、祖先 stacking 缓存和代次复用；日志在
+`D:/BuildCache/sapid/engine-hidden-all.log` 与 `engine-hidden-parallel.log`。
+适配器/组件真实原生验收仍独立执行，不由 fork 库测试推断。
+
+同日的图像终态扩展为每个存活 img consumer 分配不回绕的 ImageRequestId，独立于
+URL 共享 fetch。只有实际消费、缓存命中或明确 admission/no-provider 失败后才记录
+一次 Loaded/Failed；旧 consumer、旧请求、移除/复用身份和已 drain 后的重复结果均
+不能重新发布。每个存活 img 至多保留一个 consumer 和一个待领取终态，无历史 URL
+集合。计数耗尽返回 None；适配器安装时映射该已捕获语义 revision 的 Failed。
+真实 fork 的 106 项库测试分别在顺序与 parallel-construct 配置全部通过，含六项
+图像消费/ABA/共享请求/预算/退休/FIFO/重复完成回归。对应日志：
+`D:/BuildCache/sapid/engine-image-observation.log`、`engine-image-observation-parallel.log`。
+宿主事件、Web decode Promise 和 Sapid fallback 仍由各自的实际验收确认。

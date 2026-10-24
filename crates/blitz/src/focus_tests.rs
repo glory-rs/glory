@@ -551,7 +551,7 @@ fn huge_fixed_and_measured_lists_pin_native_editors_and_navigate_without_source_
                 == value
         }));
         assert!(
-            matches!(&app.app.tree().node(editor).unwrap().descriptor.props, glory_render::Props::Input(input) if input.value == value)
+            matches!(&app.app.tree().node(editor).unwrap().descriptor.view().props, glory_render::Props::Input(input) if input.value == value)
         );
         let before = app
             .app
@@ -559,6 +559,7 @@ fn huge_fixed_and_measured_lists_pin_native_editors_and_navigate_without_source_
             .node(row)
             .unwrap()
             .descriptor
+            .view()
             .item
             .unwrap()
             .index;
@@ -572,6 +573,7 @@ fn huge_fixed_and_measured_lists_pin_native_editors_and_navigate_without_source_
                 .node(row)
                 .unwrap()
                 .descriptor
+                .view()
                 .item
                 .unwrap()
                 .index,
@@ -601,6 +603,7 @@ fn huge_fixed_and_measured_lists_pin_native_editors_and_navigate_without_source_
                 .node(end)
                 .unwrap()
                 .descriptor
+                .view()
                 .item
                 .unwrap()
                 .index,
@@ -618,6 +621,7 @@ fn huge_fixed_and_measured_lists_pin_native_editors_and_navigate_without_source_
                 .node(first)
                 .unwrap()
                 .descriptor
+                .view()
                 .item
                 .unwrap()
                 .index,

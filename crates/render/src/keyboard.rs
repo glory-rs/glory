@@ -1,4 +1,4 @@
-//! Finite application commands; hosts never expose arbitrary typed characters.
+//! Finite application commands and explicitly opted-in scalar typeahead input.
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum KeyboardCommand {
@@ -21,7 +21,18 @@ pub struct KeyboardInput<'a> {
     pub editable: bool,
 }
 
-impl KeyboardInput<'_> {
+impl<'a> KeyboardInput<'a> {
+    /// Space remains native activation; editing, composition and command chords
+    /// never become collection search. Shift may produce an uppercase scalar.
+    pub fn typeahead(self, at_millis: u64) -> Option<&'a str> {
+        (!self.editable
+            && !self.composing
+            && !self.control
+            && !self.meta
+            && !self.alt
+            && crate::validate_typeahead(self.key, at_millis).is_ok())
+        .then_some(self.key)
+    }
     pub fn command(self) -> Option<KeyboardCommand> {
         if self.repeat || self.composing || self.alt {
             return None;

@@ -6,6 +6,9 @@ use glory_style::Style;
 
 use crate::{Change, Error, normalize_text};
 mod live;
+pub use live::LiveDescriptor;
+mod view;
+pub use view::DescriptorView;
 
 /// Process-local, typed mapping metadata. It is deliberately not a wire format.
 #[derive(Clone, Default)]
@@ -72,8 +75,16 @@ pub enum Purpose {
 /// control/text/image semantics rather than impersonating unrelated widgets.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Role {
+    /// Interactive numeric range control; finite configuration is required.
+    Slider,
+    /// Read-only numeric or indeterminate progress, never a range input.
+    ProgressBar,
+    /// Passive document boundary; resizing/focus belongs to a future splitter.
+    Separator,
     Group,
     Main,
+    Banner,
+    ContentInfo,
     Section,
     Navigation,
     List,
@@ -87,9 +98,16 @@ pub enum Role {
     Cell,
     /// A named dialog. Modality and focus management belong to the host.
     Dialog,
+    /// A modal decision with an explicit safe initial action.
+    AlertDialog,
+    /// Passive supplemental description; its descendants cannot be interactive.
+    Tooltip,
     TabList,
     TabPanel,
     RadioGroup,
+    Toolbar,
+    Menu,
+    Listbox,
     Heading(u8),
 }
 
@@ -179,8 +197,16 @@ impl Default for CheckProps {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ImageProps {
     pub source: String,
+    /// Monotonic program request identity, independent of URL equality.
+    pub revision: u64,
     /// None is explicitly decorative; Some("") is an empty description.
     pub alternative: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ImageStatus {
+    Loaded,
+    Failed,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -189,7 +215,7 @@ pub struct LinkProps {
     pub label: String,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub enum Props {
     #[default]
     View,
@@ -197,8 +223,10 @@ pub enum Props {
     Text(TextProps),
     Button(ButtonProps),
     Input(InputProps),
+    Select(crate::SelectProps),
     Check(CheckProps),
     Image(ImageProps),
+    Graphic(crate::GraphicProps),
     Link(LinkProps),
 }
 
@@ -206,7 +234,7 @@ impl Props {
     pub fn interactive(&self) -> bool {
         matches!(
             self,
-            Self::Button(_) | Self::Input(_) | Self::Check(_) | Self::Link(_)
+            Self::Button(_) | Self::Input(_) | Self::Select(_) | Self::Check(_) | Self::Link(_)
         )
     }
 
@@ -214,6 +242,7 @@ impl Props {
         match self {
             Self::Button(p) => p.enabled,
             Self::Input(p) => p.enabled,
+            Self::Select(p) => p.enabled,
             Self::Check(p) => p.enabled,
             _ => true,
         }
@@ -258,49 +287,40 @@ pub struct ItemPosition {
 }
 
 impl Descriptor {
+    #[inline]
+    pub fn view(&self) -> DescriptorView<'_> {
+        self.into()
+    }
     pub fn semantic_id(&self) -> Option<&crate::SemanticId> {
-        self.semantics.as_ref().and_then(|s| s.id.as_ref())
+        self.view().semantic_id()
     }
     pub fn hidden(&self) -> bool {
-        self.semantics.as_ref().is_some_and(|s| s.hidden)
+        self.view().hidden()
     }
     pub fn activation_enabled(&self) -> bool {
-        self.props.enabled() && !self.semantics.as_ref().is_some_and(|s| s.disabled)
+        self.view().activation_enabled()
     }
     pub fn readonly(&self) -> bool {
-        self.semantics.as_ref().is_some_and(|s| s.readonly)
+        self.view().readonly()
     }
     pub fn field_part(&self) -> Option<crate::FieldPart> {
-        self.semantics.as_ref().and_then(|s| s.field_part)
+        self.view().field_part()
     }
     pub fn document_part(&self) -> Option<crate::DocumentPart> {
-        self.semantics.as_ref().and_then(|s| s.document_part)
+        self.view().document_part()
     }
+    pub fn effective_role(&self) -> Option<Role> {
+        self.view().effective_role()
+    }
+    pub fn validate(&self) -> Result<(), Error> {
+        self.view().validate()
+    }
+
     pub fn new(props: Props) -> Self {
         Self {
             props,
             ..Self::default()
         }
-    }
-
-    /// Naming an otherwise generic View creates an accessible group; unnamed
-    /// generic Views remain only layout boxes. Explicit structural roles win.
-    pub fn effective_role(&self) -> Option<Role> {
-        if self.document_part().is_some() {
-            return None;
-        }
-        if self.field_part() == Some(crate::FieldPart::Form) {
-            return None;
-        }
-        self.role.or_else(|| {
-            (matches!(self.props, Props::View)
-                && (self.name.is_some()
-                    || self
-                        .semantics
-                        .as_ref()
-                        .is_some_and(|s| s.labelled_by.is_some())))
-            .then_some(Role::Group)
-        })
     }
 
     /// Canonicalize stored editable text without changing a program's explicit
@@ -316,10 +336,22 @@ impl Descriptor {
                 input.value = value;
             }
         }
+        if let Props::Image(image) = &mut self.props
+            && let std::borrow::Cow::Owned(source) = normalize_text(&image.source, true)
+        {
+            image.source = source;
+        }
         Ok(())
     }
 
     fn validate_input_revision(&self, next: &Self) -> Result<(), Error> {
+        if let (Props::Graphic(old), Props::Graphic(new)) = (&self.props, &next.props) {
+            new.transition_from(old)?;
+        }
+        crate::sheet::revision(
+            self.semantics.as_ref().and_then(|s| s.layer.as_ref()),
+            next.semantics.as_ref().and_then(|s| s.layer.as_ref()),
+        )?;
         if let (Props::Input(old), Props::Input(next)) = (&self.props, &next.props)
             && (next.revision < old.revision
                 || next.revision == old.revision
@@ -330,89 +362,25 @@ impl Descriptor {
                 incoming: next.revision,
             });
         }
-        Ok(())
-    }
-
-    pub fn validate(&self) -> Result<(), Error> {
-        self.validate_fields(true, true, true)
-    }
-
-    // Live descriptors are already canonical/validated. A field patch only
-    // needs to rescan payloads it changes; cross-field constraints always run.
-    fn validate_fields(&self, input: bool, style: bool, classes: bool) -> Result<(), Error> {
-        if let Some(semantics) = &self.semantics {
-            semantics.validate(self)?;
-        }
-        if matches!(self.role, Some(Role::Heading(level)) if !(1..=6).contains(&level)) {
-            return Err(Error::InvalidProps("heading level must be 1..=6"));
-        }
-        if style {
-            self.style.validate().map_err(Error::InvalidProps)?;
-        }
-        if let Some(item) = self.item
-            && (self.role != Some(Role::ListItem)
-                || item.index == usize::MAX
-                || item.count.is_some_and(|count| item.index >= count))
+        if let (Props::Select(old), Props::Select(next)) = (&self.props, &next.props)
+            && (next.selection.revision < old.selection.revision
+                || next.selection.revision == old.selection.revision
+                    && next.selection.keys != old.selection.keys)
         {
-            return Err(Error::InvalidProps(
-                "item position requires listitem role and a valid index/total",
-            ));
+            return Err(Error::SelectRevision {
+                current: old.selection.revision,
+                incoming: next.selection.revision,
+            });
         }
-        if self.props == Props::Group && (self.focus != FocusMode::Auto || self.item.is_some()) {
-            return Err(Error::InvalidProps(
-                "group has no focus box or item position",
-            ));
-        }
-        if matches!(&self.props, Props::Text(TextProps { kind: TextKind::Heading(level), .. }) if !(1..=6).contains(level))
+        if let (Props::Image(old), Props::Image(next)) = (&self.props, &next.props)
+            && (next.revision < old.revision
+                || next.revision == old.revision
+                    && normalize_text(&old.source, true).as_ref() != next.source)
         {
-            return Err(Error::InvalidProps("heading level must be 1..=6"));
-        }
-        if matches!(&self.props, Props::Input(p) if p.multiline && p.purpose != Purpose::Text) {
-            return Err(Error::InvalidProps("multiline input requires text purpose"));
-        }
-        if input
-            && matches!(&self.props, Props::Input(p) if !p.multiline && p.value.contains(['\r', '\n']))
-        {
-            return Err(Error::InvalidProps(
-                "single-line input cannot contain line breaks",
-            ));
-        }
-        if self.props == Props::Group
-            && (self.style != Style::default()
-                || !self.classes.is_empty()
-                || self.role.is_some()
-                || self.name.is_some())
-        {
-            return Err(Error::InvalidProps(
-                "group has no style box or accessibility role",
-            ));
-        }
-        if self.role.is_some() && !matches!(self.props, Props::View) {
-            return Err(Error::InvalidProps("structural roles require a view"));
-        }
-        if self.name.is_some()
-            && matches!(&self.props, Props::Text(text) if !matches!(text.kind, TextKind::Heading(_)))
-        {
-            return Err(Error::InvalidProps(
-                "only heading text accepts an accessible name",
-            ));
-        }
-        if matches!(&self.props, Props::Image(image) if image.alternative.is_none())
-            && (self.name.is_some() || self.focus != FocusMode::Auto)
-        {
-            return Err(Error::InvalidProps(
-                "decorative image has no name or focus target",
-            ));
-        }
-        if classes
-            && self
-                .classes
-                .iter()
-                .any(|class| class.is_empty() || class.chars().any(char::is_whitespace))
-        {
-            return Err(Error::InvalidProps(
-                "classes must be individual nonempty tokens",
-            ));
+            return Err(Error::ImageRevision {
+                current: old.revision,
+                incoming: next.revision,
+            });
         }
         Ok(())
     }
@@ -464,12 +432,29 @@ impl Descriptor {
                     p.revision = revision;
                 }
             }
+            (Patch::Enabled(change), Props::Select(p)) => change.apply_or(&mut p.enabled, true),
+            (Patch::SelectSelection { keys, revision }, Props::Select(p)) => {
+                if !matches!(keys, Change::Keep) {
+                    keys.apply(&mut p.selection.keys);
+                    p.selection.revision = revision;
+                }
+            }
             (Patch::Purpose(change), Props::Input(p)) => change.apply(&mut p.purpose),
             (Patch::Multiline(change), Props::Input(p)) => change.apply(&mut p.multiline),
             (Patch::Checked(change), Props::Check(p)) => change.apply(&mut p.checked),
             (Patch::CheckMode(change), Props::Check(p)) => change.apply(&mut p.mode),
-            (Patch::Source(change), Props::Image(p)) => change.apply(&mut p.source),
+            (Patch::Source { source, revision }, Props::Image(p)) => {
+                if !matches!(source, Change::Keep) {
+                    source.apply(&mut p.source);
+                    p.revision = revision;
+                }
+            }
             (Patch::Alternative(change), Props::Image(p)) => change.apply(&mut p.alternative),
+            (Patch::Graphic(change), Props::Graphic(p)) => match change {
+                Change::Keep => {}
+                Change::Clear => *p = crate::GraphicProps::default(),
+                Change::Set(value) => *p = *value,
+            },
             (Patch::Target(change), Props::Link(p)) => change.apply(&mut p.target),
             (Patch::Classes(change), _) => change.apply(&mut self.classes),
             (Patch::Style(change), _) => match change {
@@ -503,14 +488,22 @@ pub enum Patch {
         value: Change<String>,
         revision: u64,
     },
+    SelectSelection {
+        keys: Change<Vec<crate::SemanticId>>,
+        revision: u64,
+    },
     Purpose(Change<Purpose>),
     Multiline(Change<bool>),
     /// An explicit Set/Clear also synchronizes the host control property when
     /// the semantic value is equal (for example a rejected native toggle).
     Checked(Change<bool>),
     CheckMode(Change<CheckMode>),
-    Source(Change<String>),
+    Source {
+        source: Change<String>,
+        revision: u64,
+    },
     Alternative(Change<Option<String>>),
+    Graphic(Change<Box<crate::GraphicProps>>),
     Target(Change<String>),
     Classes(Change<Vec<String>>),
     Style(Change<Box<Style>>),

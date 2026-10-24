@@ -168,6 +168,7 @@ fn image_rows(app: &App) -> Vec<(usize, glory_render::NodeId)> {
             tree.node(*node)
                 .unwrap()
                 .descriptor
+                .view()
                 .item
                 .map(|item| (item.index, *node))
         })
@@ -813,7 +814,7 @@ fn external_import_font_and_background_complete_through_the_same_document_pipeli
     assert_eq!(renderer.resource_stats().cached_images, 1);
     let node = app.tree().roots()[0];
     assert!(matches!(
-        app.tree().node(node).unwrap().descriptor.props,
+        app.tree().node(node).unwrap().descriptor.view().props,
         Props::View
     ));
     let physical = renderer.engine_id(node, Part::Main).unwrap();

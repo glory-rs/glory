@@ -41,9 +41,20 @@ fn property(value: Property) -> Value {
     match value {
         Property::Text(value) => json!(value),
         Property::Bool(value) => json!(value),
+        Property::SelectedKeys(keys) => json!(keys),
     }
 }
 pub(super) fn shape(shape: Shape) -> Value {
+    fn option(value: &glory_render::SelectOption) -> Value {
+        json!({"key":value.key.as_str(),"label":value.label,"value":value.value,"disabled":value.disabled})
+    }
+    let options = shape.select_options.as_ref().map(|config| {
+        let entries: Vec<_> = config.entries.iter().map(|entry| match entry {
+            glory_render::SelectEntry::Option(value) => option(value),
+            glory_render::SelectEntry::Group(group) => json!({"label":group.label,"disabled":group.disabled,"options":group.options.iter().map(option).collect::<Vec<_>>()})
+        }).collect();
+        json!({"entries":entries,"placeholder":config.placeholder})
+    });
     let pieces: Vec<_> = shape
         .pieces
         .into_iter()
@@ -67,7 +78,7 @@ pub(super) fn shape(shape: Shape) -> Value {
             value
         })
         .collect();
-    json!({"pieces":pieces,"children":shape.children.map(|part|part.name()),"control":shape.control.map(|part|part.name()),"revision":shape.revision})
+    json!({"pieces":pieces,"options":options,"children":shape.children.map(|part|part.name()),"control":shape.control.map(|part|part.name()),"revision":shape.revision})
 }
 impl Sink for Edits {
     fn apply(&mut self, op: Op) -> Result<(), Error> {

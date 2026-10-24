@@ -12,8 +12,10 @@ pub use app::{App, Error, Mounted, Result, Scope, Settle, UiStats, WeakScope, Wi
 pub use builders::*;
 pub use control::{Each, When, each, when};
 pub use glory_render::{
-    DismissReason, Event, EventKind, FieldPart, FocusMode, FormAction, FormControl, LinkOpen, ItemPosition,
-    Layer, LayerPlacement, Navigation, Orientation, Purpose, Role, SemanticId, Semantics, TextKind,
+    Current, DismissReason, Event, EventKind, FieldPart, FocusMode, FormAction, FormControl,
+    ItemPosition, Layer, LayerPlacement, LinkOpen, Navigation, NavigationPanel,
+    NavigationPanelCommand, Orientation, Purpose, RangeCommand, RangeValue, Role, ScrollAxes,
+    ScrollCommand, ScrollMetrics, ScrollMovement, SemanticId, Semantics, SliderValue, TextKind,
 };
 pub use list::{List, list};
 

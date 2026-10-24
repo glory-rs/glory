@@ -39,7 +39,7 @@ async (hostPage) => {
       firstMarker: document.getElementById('stream-root').firstChild.nodeValue, blocks: document.querySelectorAll('script[data-gly-stream]').length,
       resources: JSON.parse(document.getElementById('stream-data').textContent).records.length, injected: window.streamInjected === 1, frames: window.streamFrames }));
     check(ended.editor === 'typed while streaming' && ended.check && ended.sameRow && ended.middle && ended.middleDraft === 'middle draft' && ended.hidden, JSON.stringify(ended));
-    check(ended.active === 0 && ended.writes === 0 && ended.focused && ended.selection.join() === '1,4' && ended.firstMarker === 'gly:v:3' && ended.blocks === 0 && ended.resources === 2 && !ended.injected, JSON.stringify(ended));
+    check(ended.active === 0 && ended.writes === 0 && ended.focused && ended.selection.join() === '1,4' && ended.firstMarker === 'gly:v:4' && ended.blocks === 0 && ended.resources === 2 && !ended.injected, JSON.stringify(ended));
     const anchor = () => page.evaluate(() => { const list = document.querySelector('[role=list]'), top = list.getBoundingClientRect().top + list.clientTop; return [...list.querySelectorAll('[role=listitem]')].map(node => ({ text: node.textContent, top: node.getBoundingClientRect().top - top, bottom: node.getBoundingClientRect().bottom - top })).find(row => row.top <= 0.1 && row.bottom > 0.1); });
     const before = await anchor();
     await page.evaluate(() => window.demo.stream_hydrate());
