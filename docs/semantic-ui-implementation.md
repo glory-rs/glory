@@ -4,6 +4,8 @@
 
 第三方代码维护已按2026-10-23用户要求改为glory-rs组织fork及完整Git revision，见[引擎依赖维护](engine-forks.md)。仓库中不保留vendor。下文早期本地源码目录、包名和校验脚本是当时的历史记录，已被当前Git依赖及scripts/check-engine-forks.py替代，不是当前复现入口。
 
+2026-10-25 [Plan 批量准备优化](plan-batch-preparation-optimization-2026-10-25.md)保留共享声明摘要和严格单调 slot 的批内唯一性证明，乱序保留 HashSet 回退；两份 Memory、完整身份和当前上下文校验不变。千行创建/替换 Script 改善 7.5%/4.2%，5,000 行看板初始化改善 6.0%；万行不稳定、密集更新回退另列。最终同批 1,800 样本，Windows/Linux 908/907、27 组浏览器及 64/1024 真实行高验收通过。直接组装子树实验未保留。
+
 2026-10-24 原生 viewport top-layer 扩展已由 genuine Blitz fork、driver 和独立实际
 consumer 验证：Dialog/AlertDialog Manage、非 modal Dialog Preserve、十二种锚点定位、
 modal 焦点/AX/滚动及关闭清理均有证据。全部 native targets 195 通过计数/45 结果报告

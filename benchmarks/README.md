@@ -1,5 +1,10 @@
 # Glory / Leptos / Dioxus: current semantic browser benchmark
 
+本轮[Plan 准备与批次身份校验优化](../docs/plan-batch-preparation-optimization-2026-10-25.md)：
+八份独立构建，最终三版本同批 1,800 样本；千行创建 / 替换 Script 改善 **7.5% / 4.2%**，
+5,000 行看板初始化改善 **6.0%**。万行轮间不稳定、全量更新 3–6% 回退均保留；
+Windows/Linux 908/907、27 浏览器、64/1024 真实行高和实窗/UIA 回归通过。
+
 新增[持续局部更新应用场景](../docs/portfolio-scenarios-benchmark-2026-10-25.md)：
 模拟持仓看板，1,000 / 5,000 行，Glory 与 Dioxus 父列表/行组件两种组织，
 三个独立构建、1,152 个正式样本、完整数据/身份/几何及逐像素验收。

@@ -16,9 +16,96 @@ pub struct PlanNode {
 }
 
 #[derive(Clone, Debug)]
-pub struct Plan(Rc<[PlanNode]>);
+pub struct Plan(Rc<Declaration>);
 #[derive(Clone, Debug)]
-pub struct WeakPlan(Weak<[PlanNode]>);
+pub struct WeakPlan(Weak<Declaration>);
+
+/// Only facts about the immutable declaration. No identity, live parent,
+/// adapter configuration or instance override may enter this shared storage.
+#[derive(Debug)]
+struct Declaration {
+    nodes: Box<[PlanNode]>,
+    facts: Box<[Facts]>,
+    layers: usize,
+    focus_scopes: usize,
+    semantic_nodes: Box<[usize]>,
+    document_roots: Box<[usize]>,
+    choice_roots: Box<[usize]>,
+    external_options: bool,
+}
+#[derive(Debug)]
+pub(crate) struct Facts {
+    pub layer: bool,
+    pub live_names: bool,
+    // A plan contains at most 256 nodes; zero means no declared focus scope.
+    pub focus_nodes: u16,
+}
+impl Declaration {
+    fn new(nodes: Vec<PlanNode>) -> Self {
+        let mut facts = Vec::with_capacity(nodes.len());
+        let mut semantic_nodes = Vec::new();
+        let mut document_roots = Vec::new();
+        let mut choice_roots = Vec::new();
+        let mut document_contexts = Vec::with_capacity(nodes.len());
+        let mut choice_contexts = Vec::with_capacity(nodes.len());
+        let mut layers = 0;
+        let mut focus_scopes = 0;
+        let mut external_options = false;
+        for (index, node) in nodes.iter().enumerate() {
+            let d = node.descriptor.view();
+            let layer = d.semantics.as_ref().is_some_and(|s| s.layer.is_some());
+            let focus = crate::focus_scope::declared(d);
+            let live_names = d.semantics.is_some();
+            layers += usize::from(layer);
+            focus_scopes += usize::from(focus);
+            facts.push(Facts {
+                layer,
+                live_names,
+                focus_nodes: u16::from(focus),
+            });
+            if live_names {
+                semantic_nodes.push(index);
+            }
+            let exposed = node.parent.is_none_or(|parent| {
+                document_contexts[parent] && matches!(nodes[parent].descriptor.props, Props::Group)
+            });
+            document_contexts.push(exposed);
+            if exposed {
+                document_roots.push(index);
+            }
+            let owned = node.parent.is_some_and(|parent| choice_contexts[parent]);
+            let option = d.semantics.as_ref().is_some_and(|s| s.option.is_some());
+            if !owned {
+                external_options |= option;
+                if option || d.props.interactive() || d.role == Some(crate::Role::Listbox) {
+                    choice_roots.push(index);
+                }
+            }
+            choice_contexts.push(owned || d.role == Some(crate::Role::Listbox));
+        }
+        if focus_scopes > 0 {
+            let mut sizes = vec![1u16; nodes.len()];
+            for (index, node) in nodes.iter().enumerate().rev() {
+                if let Some(parent) = node.parent {
+                    sizes[parent] += sizes[index];
+                }
+                if facts[index].focus_nodes != 0 {
+                    facts[index].focus_nodes = sizes[index];
+                }
+            }
+        }
+        Self {
+            nodes: nodes.into_boxed_slice(),
+            facts: facts.into_boxed_slice(),
+            layers,
+            focus_scopes,
+            semantic_nodes: semantic_nodes.into_boxed_slice(),
+            document_roots: document_roots.into_boxed_slice(),
+            choice_roots: choice_roots.into_boxed_slice(),
+            external_options,
+        }
+    }
+}
 impl Plan {
     /// One root followed by its descendants in parent-before-child order.
     /// Construction validates the complete declaration once; instances still
@@ -100,12 +187,33 @@ impl Plan {
                     ),
             ));
         }
-        let plan = Self(nodes.into());
+        let plan = Self(Rc::new(Declaration::new(nodes)));
         crate::choice::validate_plan_owners(&plan, None, true)?;
         Ok(plan)
     }
     pub fn nodes(&self) -> &[PlanNode] {
-        &self.0
+        &self.0.nodes
+    }
+    pub(crate) fn facts(&self, index: usize) -> &Facts {
+        &self.0.facts[index]
+    }
+    pub(crate) fn layers(&self) -> usize {
+        self.0.layers
+    }
+    pub(crate) fn focus_scopes(&self) -> usize {
+        self.0.focus_scopes
+    }
+    pub(crate) fn semantic_nodes(&self) -> &[usize] {
+        &self.0.semantic_nodes
+    }
+    pub(crate) fn document_roots(&self) -> &[usize] {
+        &self.0.document_roots
+    }
+    pub(crate) fn choice_roots(&self) -> &[usize] {
+        &self.0.choice_roots
+    }
+    pub(crate) fn external_options(&self) -> bool {
+        self.0.external_options
     }
     pub fn same(&self, other: &Self) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
@@ -114,7 +222,7 @@ impl Plan {
         WeakPlan(Rc::downgrade(&self.0))
     }
     pub fn identity(&self) -> usize {
-        Rc::as_ptr(&self.0) as *const PlanNode as usize
+        Rc::as_ptr(&self.0) as usize
     }
 }
 impl WeakPlan {

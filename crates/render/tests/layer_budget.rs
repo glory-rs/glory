@@ -18,6 +18,67 @@ fn descriptor(index: usize) -> Descriptor {
 }
 
 #[test]
+fn plan_layer_admission_uses_each_memorys_current_budget_after_retirement() {
+    let runtime = RuntimeId::new();
+    let mut ids = NodeIds::new(runtime);
+    let mut full = Memory::new(runtime);
+    let mut empty = Memory::new(runtime);
+    let mut last = None;
+    for index in 0..MAX_LAYERS - 1 {
+        let id = ids.allocate();
+        full.apply(&[Mutation::Create {
+            id,
+            node: Box::new(descriptor(index)),
+        }])
+        .unwrap();
+        last = Some(id);
+    }
+    let plan = Plan::new(vec![
+        PlanNode {
+            parent: None,
+            descriptor: Descriptor::new(Props::Group),
+        },
+        PlanNode {
+            parent: Some(0),
+            descriptor: descriptor(MAX_LAYERS),
+        },
+        PlanNode {
+            parent: Some(0),
+            descriptor: descriptor(MAX_LAYERS + 1),
+        },
+    ])
+    .unwrap();
+    let instance: Vec<_> = (0..3).map(|_| ids.allocate()).collect();
+    let before = (full.stats(), full.receipt(), full.len());
+    assert!(full.validate_child(Subtree::Plan(&plan), None).is_err());
+    assert!(
+        full.apply(&[Mutation::CreatePlan {
+            plan: plan.clone(),
+            ids: instance.clone()
+        }])
+        .is_err()
+    );
+    assert_eq!((full.stats(), full.receipt(), full.len()), before);
+    empty.validate_child(Subtree::Plan(&plan), None).unwrap();
+    empty
+        .apply(&[Mutation::CreatePlan {
+            plan: plan.clone(),
+            ids: (0..3).map(|_| ids.allocate()).collect(),
+        }])
+        .unwrap();
+    assert_eq!(empty.layers(), 2);
+    full.apply(&[Mutation::Dispose { id: last.unwrap() }])
+        .unwrap();
+    full.validate_child(Subtree::Plan(&plan), None).unwrap();
+    full.apply(&[Mutation::CreatePlan {
+        plan,
+        ids: instance,
+    }])
+    .unwrap();
+    assert_eq!(full.layers(), MAX_LAYERS);
+}
+
+#[test]
 fn layer_budget_is_live_transactional_and_shared_with_placement_preflight() {
     let runtime = RuntimeId::new();
     let mut ids = NodeIds::new(runtime);

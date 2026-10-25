@@ -1481,18 +1481,13 @@ impl Memory {
             self.validate_name(descriptor, None)?;
         }
         if let Subtree::Plan(plan) = child {
-            for node in plan.nodes() {
-                self.validate_name(&node.descriptor, None)?;
+            for &index in plan.semantic_nodes() {
+                self.validate_name(&plan.nodes()[index].descriptor, None)?;
             }
         }
         match child {
             Subtree::New(descriptor) => self.admit_layers(usize::from(layer(descriptor)))?,
-            Subtree::Plan(plan) => self.admit_layers(
-                plan.nodes()
-                    .iter()
-                    .filter(|node| layer(node.descriptor.view()))
-                    .count(),
-            )?,
+            Subtree::Plan(plan) => self.admit_layers(plan.layers())?,
             Subtree::Existing(_) => {}
         }
         if form_ancestor && descriptor.field_part() == Some(crate::FieldPart::Form) {
@@ -1576,17 +1571,8 @@ impl Memory {
                 }
             }
             Subtree::Plan(plan) => {
-                for node in plan.nodes() {
-                    let mut cursor = node.parent;
-                    while let Some(index) = cursor {
-                        if !matches!(plan.nodes()[index].descriptor.view().props, Props::Group) {
-                            break;
-                        }
-                        cursor = plan.nodes()[index].parent;
-                    }
-                    if cursor.is_none() {
-                        check(node.descriptor.view())?;
-                    }
+                for &index in plan.document_roots() {
+                    check(plan.nodes()[index].descriptor.view())?;
                 }
             }
         }
@@ -1675,10 +1661,16 @@ impl Memory {
                 if ids.len() != plan.nodes().len() {
                     return Err(Error::InvalidProps("plan identity count"));
                 }
-                let mut slots = std::collections::HashSet::with_capacity(ids.len());
-                for (id, node) in ids.iter().zip(plan.nodes()) {
+                // Strict slot order proves uniqueness for the whole batch.
+                // Fresh/recycled runs need no temporary hash allocation. An
+                // arbitrary caller still gets the original per-slot checks.
+                let ordered = ids.windows(2).all(|pair| pair[0].slot() < pair[1].slot())
+                    || ids.windows(2).all(|pair| pair[0].slot() > pair[1].slot());
+                let mut slots =
+                    (!ordered).then(|| std::collections::HashSet::with_capacity(ids.len()));
+                for (index, (id, node)) in ids.iter().zip(plan.nodes()).enumerate() {
                     self.check_runtime(*id)?;
-                    if !slots.insert(id.slot()) {
+                    if slots.as_mut().is_some_and(|slots| !slots.insert(id.slot())) {
                         return Err(Error::InvalidPlacement("duplicate plan slot"));
                     }
                     if self.nodes.contains_key(id) {
@@ -1692,38 +1684,22 @@ impl Memory {
                             return Err(Error::StaleNode(*id));
                         }
                     }
-                    self.validate_name(&node.descriptor, None)?;
-                }
-                self.admit_layers(
-                    plan.nodes()
-                        .iter()
-                        .filter(|node| layer(node.descriptor.view()))
-                        .count(),
-                )?;
-                let scope_count = plan
-                    .nodes()
-                    .iter()
-                    .filter(|node| crate::focus_scope::declared(node.descriptor.view()))
-                    .count();
-                self.admit_focus_scopes(scope_count)?;
-                let mut focus_sizes = Vec::new();
-                if scope_count > 0 {
-                    focus_sizes.resize(ids.len(), 1usize);
-                    for (index, node) in plan.nodes().iter().enumerate().rev() {
-                        if let Some(parent) = node.parent {
-                            focus_sizes[parent] += focus_sizes[index];
-                        }
+                    if plan.facts(index).live_names {
+                        self.validate_name(&node.descriptor, None)?;
                     }
                 }
+                self.admit_layers(plan.layers())?;
+                self.admit_focus_scopes(plan.focus_scopes())?;
                 for (index, node) in plan.nodes().iter().enumerate() {
                     // The immutable declaration checked content/topology once;
                     // the complete identity/name check above precedes mutation.
                     // Fresh nodes need no unlink, ancestor walk or temporary Box.
                     let id = ids[index];
                     let descriptor = LiveDescriptor::plan(plan, index);
-                    self.layers += usize::from(layer(descriptor.view()));
-                    if crate::focus_scope::declared(descriptor.view()) {
-                        self.focus_scopes.insert(id, focus_sizes[index]);
+                    let facts = plan.facts(index);
+                    self.layers += usize::from(facts.layer);
+                    if facts.focus_nodes != 0 {
+                        self.focus_scopes.insert(id, usize::from(facts.focus_nodes));
                     }
                     if let Some(name) = descriptor.view().semantic_id() {
                         self.names.insert(name.clone(), id);

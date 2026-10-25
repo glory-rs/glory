@@ -1,5 +1,16 @@
 # Performance Notes
 
+## Plan preparation and batch identity checks — 2026-10-25
+
+最新同批改进见 [Plan 优化报告](plan-batch-preparation-optimization-2026-10-25.md)：
+共享不可变声明事实，严格升/降序 slot 证明批内唯一性，乱序保留原校验。
+千行创建 **20.349→18.827 ms（-7.5%）**，替换 **30.104→28.829 ms（-4.2%）**，
+5,000 行看板初始化 **87.492→82.236 ms（-6.0%）**。万行轮间不稳定，
+密集更新有 3–6% 回退；没有把这些结果统称为全面提速。
+八份独立构建、最终 1,800 样本、完整身份/几何/42 张 PNG；Windows/Linux
+908/907、27 浏览器及 64/1024 真实行高、实窗/UIA 回归通过。
+下方旧版本数据保留为历史，当前跨框架版本对照另见[稳定版报告](framework-benchmark-latest-stable-2026-10-25.md)。
+
 ## Bulk creation and Dioxus design analysis — 2026-10-24
 
 保留固定参数的同步 Web 创建桥接：原型克隆、class/style、身份/live 一次提交，其他属性与受控输入保留通用路径。

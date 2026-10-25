@@ -417,6 +417,17 @@ pub(crate) fn validate_plan_owners(
     owner: Option<&SemanticId>,
     pending: bool,
 ) -> Result<(), crate::Error> {
+    if !pending {
+        // Internal owners were validated before this immutable Plan escaped.
+        // Only open declaration boundaries depend on the proposed live owner.
+        if owner.is_none() && !plan.external_options() {
+            return Ok(());
+        }
+        for &index in plan.choice_roots() {
+            check_child(plan.nodes()[index].descriptor.view(), owner)?;
+        }
+        return Ok(());
+    }
     let mut contexts = Vec::with_capacity(plan.nodes().len());
     for node in plan.nodes() {
         let context = node.parent.map_or(owner, |parent| contexts[parent]);
@@ -434,19 +445,5 @@ pub(crate) fn validate_plan_owners(
 }
 
 pub(crate) fn plan_external_options(plan: &crate::Plan) -> bool {
-    let mut contexts = Vec::with_capacity(plan.nodes().len());
-    for node in plan.nodes() {
-        let context = node.parent.is_some_and(|parent| contexts[parent]);
-        if !context
-            && node
-                .descriptor
-                .semantics
-                .as_ref()
-                .is_some_and(|s| s.option.is_some())
-        {
-            return true;
-        }
-        contexts.push(context || node.descriptor.role == Some(crate::Role::Listbox));
-    }
-    false
+    plan.external_options()
 }

@@ -161,11 +161,7 @@ impl Memory {
     ) -> Result<(), Error> {
         let additional = match child {
             Subtree::New(descriptor) => usize::from(declared(descriptor)),
-            Subtree::Plan(plan) => plan
-                .nodes()
-                .iter()
-                .filter(|node| declared(node.descriptor.view()))
-                .count(),
+            Subtree::Plan(plan) => plan.focus_scopes(),
             Subtree::Existing(_) => 0,
         };
         self.admit_focus_scopes(additional)?;
