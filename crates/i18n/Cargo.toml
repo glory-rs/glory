@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 description = "Explicit Fluent catalogs and owned reactive messages for Glory"
-homepage = "https://glory.taidge.com"
+homepage = "https://glory.taidge.org"
 repository.workspace = true
 
 [dependencies]
