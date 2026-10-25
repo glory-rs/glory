@@ -62,8 +62,10 @@ Taffy 维护分支仍固定 dd7914fba2e6e0b5d8a2c8854d764a2ade817efd。组织 fo
 - 两个固定 fork 的库/附加测试合计 440 次通过（不同 feature 配置之间有重复执行，不作为独立场景数）。
 - 真实 Windows shell、AccessKit shell 和独立 UIA 客户端各一组通过；UIA 覆盖两个隔离窗口、Invoke/Toggle/SetValue/Focus、密码和虚拟行显示及清理。
 - Playwright 1.64.1 驱动 Chromium 155.0.8059.84：全部 27 组实际浏览器验收通过，包含 CSR、SSR adoption 与渐进流。
+  独立 PR 分支重新生成的 WASM/SSR/stream 产物也重复通过全部 27 组。
 - counter/semantic-web 原生测试和 Web 构建通过；已变更示例/基准的 WASM Clippy 与 counter desktop Clippy 通过。
 - actionlint 1.7.12 检查全部工作流通过；Git diff 空白检查通过。
 
-日志位于 D:/BuildCache/glory-dependencies。GitHub 托管 runner 的结果以 PR Checks 为准。
+日志位于 D:/BuildCache/glory-dependencies。仓库 GitHub Actions 设置为 enabled=false，
+本次没有托管 runner 的检查结果；未更改这个仓库设置。上列结果均为实际本地验收。
 操作系统 IME、读屏器播报、Android 设备和 Linux 窗口不由 Windows/Chromium 结果推断。
