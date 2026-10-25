@@ -31,6 +31,10 @@ Its README includes build/run commands and the current platform boundaries.
   gates, bindings/effects, per-Runtime scheduling, logical scopes and tasks.
 - `glory-resource`: optional request-scoped named resource registry and
   versioned JSON snapshots with explicit schemas and bounded input.
+- [`glory-i18n`](crates/i18n): opt-in Fluent catalogs, explicit language sources
+  and Owner-owned reactive messages. Enable facade feature `i18n`; core and
+  default/HTML/SSR graphs remain independent of localization. Routing and SSR
+  language negotiation belong to the application.
 - `glory-ui`: App/Widget/Scope, view/group/text/button/input/check/image/link
   builders, each/when, and lazily indexed fixed or measured-height lists.
   Sparse Fenwick metadata stays bounded by the measurement cache and window.

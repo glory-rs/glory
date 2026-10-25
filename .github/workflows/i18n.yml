@@ -1,0 +1,46 @@
+name: i18n
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  i18n:
+    runs-on: windows-latest
+    env:
+      CARGO_HOME: D:/BuildCache/glory-i18n-ci/cargo
+      CARGO_TARGET_DIR: D:/BuildCache/glory-i18n-ci/target
+      RUSTUP_HOME: D:/BuildCache/glory-i18n-ci/rustup
+      TEMP: D:/BuildCache/glory-i18n-ci/tmp
+      TMP: D:/BuildCache/glory-i18n-ci/tmp
+      CARGO_INCREMENTAL: '0'
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Prepare D drive and Rust
+        run: |
+          New-Item -ItemType Directory -Force $env:CARGO_HOME,$env:CARGO_TARGET_DIR,$env:RUSTUP_HOME,$env:TEMP | Out-Null
+          rustup toolchain install 1.98.0 --profile minimal --component clippy,rustfmt --target wasm32-unknown-unknown
+          if ($LASTEXITCODE -ne 0) { throw 'Rust installation failed' }
+          rustup default 1.98.0
+          if ($LASTEXITCODE -ne 0) { throw 'Rust selection failed' }
+      - name: Verify target, behavior and opt-in dependency boundary
+        run: |
+          $meta = cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0 -or [IO.Path]::GetFullPath($meta.target_directory) -ne [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)) { throw 'Unexpected Cargo target' }
+          cargo fmt -p glory-i18n -- --check
+          if ($LASTEXITCODE -ne 0) { throw 'Formatting failed' }
+          cargo test --locked -p glory-i18n
+          if ($LASTEXITCODE -ne 0) { throw 'Tests failed' }
+          cargo clippy --locked -p glory-i18n --all-targets -- -D warnings
+          if ($LASTEXITCODE -ne 0) { throw 'Clippy failed' }
+          cargo check --locked -p glory --no-default-features --features i18n,web,ssr,hydrate --target wasm32-unknown-unknown
+          if ($LASTEXITCODE -ne 0) { throw 'WASM integration failed' }
+          foreach ($features in @('', 'html', 'ssr')) {
+            $arguments = @('tree','--locked','-p','glory','--no-default-features','-e','normal')
+            if ($features) { $arguments += @('--features',$features) }
+            $tree = cargo @arguments
+            if ($LASTEXITCODE -ne 0 -or "$tree" -match '\bglory-i18n v|\bfluent-(bundle|syntax|langneg) v') { throw "Localization leaked into default/$features graph" }
+          }

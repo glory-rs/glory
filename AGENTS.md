@@ -7,8 +7,9 @@ The user authorized the breaking semantic rewrite in
 report and `docs/semantic-ui-implementation.md`; do not preserve the former
 HTML API/feature/wire format through compatibility aliases.
 
-The active workspace currently contains style, render, core, resource, ui,
-html, web, ssr, blitz and glory.
+The active workspace currently contains style, render, core, resource, i18n, ui,
+html, web, ssr, blitz and glory. The opt-in i18n package was authorized after
+the semantic rewrite; see `crates/i18n/README.md` for its boundaries.
 Old adapter/tool directories and unreferenced old core sources are extraction
 references, not supported workspace packages. Migrate useful behavior/tests,
 then remove obsolete sources as the implementation progresses. Do not count a
@@ -63,6 +64,10 @@ reduced workspace check as proof that those adapters/platforms work.
   Depends on core/serde; no HTML/HTTP/browser. Facade feature `resources` enables
   it and forwards to already-selected web/ssr adapters. Core/default facade/HTML
   mapper must not acquire a serde dependency through this optional integration.
+- `glory-i18n`: opt-in Fluent resources and app-local static/Cage/Bond language
+  selection. Catalogs are immutable; reactive messages belong to explicit Owners.
+  No routing, HTML, host discovery, global locale or implicit message cache.
+  Keep Fluent out of core and default facade/HTML/SSR graphs.
 - `glory-ui`: Rust builders and control flow, including windowed list logic.
   Measurement batches coalesce by key at the first notification's FIFO position,
   replacing its final index/height. Apply in that order before assigning eviction
