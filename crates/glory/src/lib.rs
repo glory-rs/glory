@@ -3,6 +3,8 @@
 pub use glory_blitz as blitz;
 pub use glory_core as core;
 pub use glory_core::{Bond, Cage, Lotus, Owner, Resource, ResourceSeed, ResourceState, Runtime};
+#[cfg(feature = "i18n")]
+pub use glory_i18n as i18n;
 pub use glory_render as render;
 #[cfg(feature = "resources")]
 pub use glory_resource as resources;

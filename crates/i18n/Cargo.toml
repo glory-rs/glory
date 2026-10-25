@@ -1,0 +1,18 @@
+[package]
+name = "glory-i18n"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Explicit Fluent catalogs and owned reactive messages for Glory"
+homepage = "https://glory.taidge.com"
+repository.workspace = true
+
+[dependencies]
+glory-core = { path = "../core", version = "0.3.1" }
+fluent-bundle = "=0.16.0"
+fluent-syntax = "=0.12.0"
+unic-langid = "=0.9.6"
+
+[lints]
+workspace = true
