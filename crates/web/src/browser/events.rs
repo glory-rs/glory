@@ -463,14 +463,27 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
     }
     match name {
         "click" => {
+            if dom.suppress_click.replace(false) {
+                event.prevent_default();
+                return Ok(());
+            }
+            // Modified link gestures retain native new-tab/window/download behavior.
+            // Ordinary activation still queues the application's semantic request.
+            if element.has_attribute("data-gly-link-request")
+                && event.dyn_ref::<web_sys::MouseEvent>().is_some_and(|click| {
+                    click.button() != 0
+                        || click.ctrl_key()
+                        || click.meta_key()
+                        || click.shift_key()
+                        || click.alt_key()
+                })
+            {
+                return Ok(());
+            }
             if element.has_attribute("data-gly-form-action")
                 || element.has_attribute("data-gly-link-request")
             {
                 event.prevent_default();
-            }
-            if dom.suppress_click.replace(false) {
-                event.prevent_default();
-                return Ok(());
             }
             // A custom slider remains a physical focusable View. Native label
             // association does not focus divs, so perform only this host default;

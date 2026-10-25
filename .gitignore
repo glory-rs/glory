@@ -11,6 +11,8 @@ debug.log
 !/benchmarks/glory/Cargo.lock
 !/benchmarks/leptos/Cargo.lock
 !/benchmarks/dioxus/Cargo.lock
+!/benchmarks/scenarios/glory/Cargo.lock
+!/benchmarks/scenarios/dioxus/Cargo.lock
 
 **/node_modules
 **/package-lock.json

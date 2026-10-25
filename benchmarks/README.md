@@ -1,11 +1,20 @@
 # Glory / Leptos / Dioxus: current semantic browser benchmark
 
+新增[持续局部更新应用场景](../docs/portfolio-scenarios-benchmark-2026-10-25.md)：
+模拟持仓看板，1,000 / 5,000 行，Glory 与 Dioxus 父列表/行组件两种组织，
+三个独立构建、1,152 个正式样本、完整数据/身份/几何及逐像素验收。
+5,000 行单行更新 Script 为 **0.179 / 2.237 / 0.120 ms**；行组件版 Dioxus 仍更快，
+初始化和大面积更新也保留 Glory 的不利结果。该场景补充下方批量测试，不替换原 workload。
+
 最新三框架独立重跑见 [2026-10-25 最新稳定版对照](../docs/framework-benchmark-latest-stable-2026-10-25.md)：
 Glory 当前源码、**Leptos 0.8.22 / Dioxus 0.7.10**（registry 稳定版复核），三个全新 target。
 相同九项、正反两轮 **648 个**正式样本，数据、完整后代身份、万行几何及六处截图一致。
 Glory / Leptos / Dioxus 的千行创建 Script 为 **19.391 / 13.241 / 4.388 ms**，
 替换千行为 **29.980 / 20.257 / 7.548 ms**，万行为 **230.614 / 168.170 / 44.815 ms**。
 报告保留 Leptos 连续流程选行异常，另列 72 个独立诊断样本和正常选行结果，不混入主表。
+
+针对上述当前构建的[深入 Dioxus 分析](../docs/dioxus-performance-analysis-2026-10-25.md)，
+另做桥接/DOM 计数、CPU 采样和显式 GC 后的主机引用观察；探针结果不混入正式时间。
 
 上轮实测见 [HTML / DOM 映射与桥接优化报告](../docs/html-dom-bridge-optimization-2026-10-25.md)：
 10 份独立性能构建，首批 1,296 / 最终 1,512 个正式样本，分批统计。

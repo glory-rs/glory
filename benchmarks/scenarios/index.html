@@ -1,0 +1,7 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Portfolio updates</title><link rel="stylesheet" href="./style.css"></head>
+<body><main id="main"></main><script type="module">
+window.scenarioCount=()=>Number(new URL(location.href).searchParams.get('n')||1000);
+import init,* as app from './app.js';
+await init();window.scenarioStats=()=>JSON.parse(app.stats());window.scenarioReady=true;
+</script></body></html>

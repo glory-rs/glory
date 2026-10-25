@@ -15,6 +15,12 @@ Start here when evaluating or extending Glory:
   explicit remaining R0 work.
 - [Current browser framework comparison](performance.md): semantic Glory/Leptos/Dioxus
   full-row workloads, independent builds, actual results and explicit historical boundaries.
+- [Latest stable framework comparison](framework-benchmark-latest-stable-2026-10-25.md):
+  independent builds of current Glory, Leptos 0.8.22 and Dioxus 0.7.10, identity and pixel checks.
+- [Why Dioxus is fast in bulk workloads](dioxus-performance-analysis-2026-10-25.md):
+  current source paths, bridge/DOM counts, reactive granularity, post-GC host references and Glory priorities.
+- [Persistent portfolio update scenarios](portfolio-scenarios-benchmark-2026-10-25.md):
+  Glory versus coarse and row-local Dioxus, two scales, independent builds and full data/identity/pixel evidence.
 - [Bulk creation and Dioxus design](bulk-create-dioxus-2026-10-24.md): fixed DOM creation bridge,
   independent paired/cross-framework results, rejected experiments, full regression and static-plan priorities.
 - [HTML mapping and DOM creation](performance.md#html-mapping-and-dom-creation--2026-10-23):

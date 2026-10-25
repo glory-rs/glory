@@ -1,0 +1,13 @@
+body { margin: 12px; font: 14px Arial, sans-serif; color: #182333; background: white; }
+* { box-sizing: border-box; }
+button { font: inherit; margin: 0 6px 8px 0; padding: 4px 8px; }
+.toolbar { width: 1100px; }
+#main .total { display: block; width: 880px; height: 32px; padding: 6px; font-variant-numeric: tabular-nums; }
+.viewport { width: 900px; height: 480px; overflow: auto; border: 1px solid #888; overflow-anchor: none; }
+.quotes { width: 880px; }
+.quote { display: grid; grid-template-columns: 240px 200px 160px 280px; height: 28px; border-bottom: 1px solid #eee; }
+.quote span { display: block; padding: 5px 12px; height: 28px; font-variant-numeric: tabular-nums; }
+.quote .price, .quote .quantity, .quote .amount { text-align: right; }
+.quote.up .price { color: #006b32; }
+.quote.down .price { color: #b00020; }
+.quote.selected { background: #dbeaff; }
