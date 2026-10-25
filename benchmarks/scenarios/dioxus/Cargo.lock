@@ -130,14 +130,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
 
 [[package]]
-name = "scenario-dioxus"
-version = "0.0.0"
-dependencies = [
- "dioxus",
- "wasm-bindgen",
-]
-
-[[package]]
 name = "bitflags"
 version = "2.13.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2181,6 +2173,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
 dependencies = [
  "winapi-util",
+]
+
+[[package]]
+name = "scenario-dioxus"
+version = "0.0.0"
+dependencies = [
+ "dioxus",
+ "wasm-bindgen",
 ]
 
 [[package]]

@@ -1,19 +1,36 @@
+name: format
 on:
   push:
-    branches:
-      - '*'
-      - '!release'
-
-name: format
-
+    branches-ignore: [release]
+  pull_request:
+permissions:
+  contents: read
 jobs:
   format:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
+    env:
+      CARGO_HOME: D:/BuildCache/glory-format-ci/cargo
+      CARGO_TARGET_DIR: D:/BuildCache/glory-format-ci/target
+      RUSTUP_HOME: D:/BuildCache/glory-format-ci/rustup
+      TEMP: D:/BuildCache/glory-format-ci/tmp
+      TMP: D:/BuildCache/glory-format-ci/tmp
+    defaults:
+      run:
+        shell: pwsh
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-      - uses: mbrobbel/rustfmt-check@master
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Format current workspace and migrated examples
+        run: |
+          New-Item -ItemType Directory -Force $env:CARGO_HOME,$env:CARGO_TARGET_DIR,$env:RUSTUP_HOME,$env:TEMP | Out-Null
+          rustup toolchain install 1.98.0 --profile minimal --component rustfmt
+          if ($LASTEXITCODE) { throw 'Rust installation failed' }
+          rustup default 1.98.0
+          if ($LASTEXITCODE) { throw 'Rust selection failed' }
+          $meta = cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json
+          if ($LASTEXITCODE -or [IO.Path]::GetFullPath($meta.target_directory) -ne [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)) { throw 'Unexpected Cargo target' }
+          cargo fmt --all -- --check
+          if ($LASTEXITCODE) { throw 'Workspace formatting failed' }
+          foreach ($manifest in @('examples/counter/Cargo.toml','examples/semantic-web/Cargo.toml')) {
+            cargo fmt --manifest-path $manifest -- --check
+            if ($LASTEXITCODE) { throw "Formatting failed: $manifest" }
+          }

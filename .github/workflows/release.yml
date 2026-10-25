@@ -11,12 +11,12 @@ jobs:
   git-tag:
     runs-on: ubuntu-latest
     steps:
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           components: rustfmt, clippy
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Get releasing version
         working-directory: .
@@ -27,7 +27,7 @@ jobs:
          --limit 1 | sed -nE 's/^[^"]*"//; s/".*//1p' -) >> $GITHUB_ENV
 
       - name: Auto tag latest version
-        uses: bullrich/commit-autotag@main
+        uses: bullrich/commit-autotag@365442a73444d9b59ae92b051e19f4b4281f42fa # v1.0.1
         if: env.NEXT_VERSION != env.PREV_VERSION
         env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
@@ -51,12 +51,12 @@ jobs:
         glory|crates/glory
         glory-cli|crates/cli
     steps:
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           components: rustfmt, clippy
 
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Get workspace version
         run: echo NEXT_VERSION=$(sed -nE 's/^\s*version = "(.*?)"/\1/p' Cargo.toml) >> $GITHUB_ENV
