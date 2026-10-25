@@ -12,20 +12,22 @@ jobs:
       CARGO_TARGET_DIR: D:/BuildCache/glory-counter-ci/target
       TEMP: D:/BuildCache/glory-counter-ci/tmp
       TMP: D:/BuildCache/glory-counter-ci/tmp
+      npm_config_cache: D:/BuildCache/glory-counter-ci/npm-cache
+      PLAYWRIGHT_BROWSERS_PATH: D:/BuildCache/glory-counter-ci/browsers
       PYTHONPYCACHEPREFIX: D:/BuildCache/glory-counter-ci/pycache
     steps:
       - name: Prepare D drive build directories
         shell: pwsh
         run: New-Item -ItemType Directory -Force $env:CARGO_HOME, $env:CARGO_TARGET_DIR, $env:TEMP | Out-Null
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           targets: wasm32-unknown-unknown
           components: rustfmt, clippy
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: '3.x'
       - name: Verify Cargo target and shared component

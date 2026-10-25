@@ -12,6 +12,6 @@
     "test:hot-reload": "playwright test --project=hot-reload"
   },
   "devDependencies": {
-    "@playwright/test": "^1.54.0"
+    "@playwright/test": "^1.64.1"
   }
 }

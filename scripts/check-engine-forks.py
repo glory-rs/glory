@@ -56,7 +56,12 @@ def main():
     record = json.loads((root / "docs/engine-forks.json").read_text(encoding="utf-8"))
     metadata = json.loads(output("cargo", "metadata", "--locked", "--all-features", "--format-version", "1", "--manifest-path", str(root / "Cargo.toml")))
     assert Path(metadata["target_directory"]).resolve() == paths["CARGO_TARGET_DIR"]
-    assert len(metadata["workspace_members"]) == 10
+    members = set(metadata["workspace_members"])
+    member_names = {package["name"] for package in metadata["packages"] if package["id"] in members}
+    assert member_names == {
+        "glory", "glory-style", "glory-render", "glory-core", "glory-resource",
+        "glory-i18n", "glory-ui", "glory-html", "glory-web", "glory-ssr", "glory-blitz",
+    }, member_names
     lock = tomllib.loads((root / "Cargo.lock").read_text(encoding="utf-8"))
     for fork in record["forks"]:
         assert len(fork["rev"]) == 40 and all(c in "0123456789abcdef" for c in fork["rev"])
@@ -84,7 +89,7 @@ def main():
                 if package["name"] in fork["packages"]:
                     assert package.get("source") == expected, (lockfile, package)
     assert not (root / "vendor").exists(), "Engine sources belong in the organization forks"
-    print("Verified two immutable glory-rs Git forks, six engine/layout packages, one shared type identity per package; ten Glory workspace crates.")
+    print(f"Verified two immutable glory-rs Git forks, six engine/layout packages, one shared type identity per package; {len(member_names)} Glory workspace crates.")
 
 
 if __name__ == "__main__":

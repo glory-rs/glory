@@ -1,11 +1,15 @@
 # 引擎依赖维护
 
+2026-10-25：维护分支保留既有修复并升级 winit 至 0.31.0-beta.4，移除已不可达的
+IME 事件兜底并增加五类事件转换回归。当前完整提交见下表；依赖和开放 PR 的
+核对记录见 [dependency-update-2026-10-25.md](dependency-update-2026-10-25.md)。
+
 第三方源码修改在 glory-rs 组织的真正 GitHub fork 中维护。Glory 仓库不保留
 vendor、副本补丁树或子模块；应用无需添加全局 Cargo patch。
 
 | Fork | 上游基线 | Glory 固定提交 | 维护范围 |
 |---|---|---|---|
-| [glory-rs/blitz](https://github.com/glory-rs/blitz) | `92b11f1b` / beta.4 | [c127fd96](https://github.com/glory-rs/blitz/commit/c127fd9699a89ff8ecba0c8d8c9eccb3330627af) | 资源生命周期、增量失效、焦点、密码显示、IME、阶段计时、inline 样式差分失效、隐藏子树销毁与移动缓存回收及真正的文档顶层 |
+| [glory-rs/blitz](https://github.com/glory-rs/blitz) | `92b11f1b` / beta.4 | [c850a2ae](https://github.com/glory-rs/blitz/commit/c850a2aee1a8cb49eee1386120807751d7480559) | 资源生命周期、增量失效、焦点、密码显示、IME、阶段计时、inline 样式差分失效、隐藏子树销毁与移动缓存回收及真正的文档顶层 |
 | [glory-rs/taffy](https://github.com/glory-rs/taffy) | `eb645069` / 0.15.0 | [dd7914fb](https://github.com/glory-rs/taffy/commit/dd7914fba2e6e0b5d8a2c8854d764a2ade817efd) | 小数 flex 因子的 gap 计算与回归测试 |
 
 恢复上游包名 blitz-dom/traits/paint/shell、stylo_taffy、taffy；Glory 自己的

@@ -19,7 +19,7 @@
     {
       "name": "blitz",
       "git": "https://github.com/glory-rs/blitz",
-      "rev": "c127fd9699a89ff8ecba0c8d8c9eccb3330627af",
+      "rev": "c850a2aee1a8cb49eee1386120807751d7480559",
       "upstream": "https://github.com/DioxusLabs/blitz",
       "upstream_rev": "92b11f1bd8ab7975411328b0406a95a09445b4e7",
       "packages": [
@@ -38,6 +38,12 @@
         "--lib"
       ],
       "extra_tests": [
+        [
+          "-p",
+          "blitz-shell",
+          "--no-default-features",
+          "--lib"
+        ],
         [
           "-p",
           "blitz-dom",

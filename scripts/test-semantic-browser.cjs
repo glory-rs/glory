@@ -9,7 +9,7 @@ fs.mkdirSync(path.join(out,'driver-source'));
 fs.copyFileSync(__filename,path.join(out,'driver-source','test-semantic-browser.cjs'));
 const base=option('--base','http://127.0.0.1:8792'),stream=option('--stream','http://127.0.0.1:8793');
 const source=path.resolve(option('--source',path.resolve(__dirname,'../examples/semantic-web')));
-const {chromium}=require('../tests/playwright/node_modules/playwright');
+const {chromium}=require(option('--playwright','../tests/playwright/node_modules/playwright'));
 (async()=>{
  const browser=await chromium.launch({headless:true,executablePath:option('--browser','C:/Program Files/Google/Chrome/Application/chrome.exe'),downloadsPath:path.join(out,'downloads')});
  const context=await browser.newContext(),host=await context.newPage(),results=[];

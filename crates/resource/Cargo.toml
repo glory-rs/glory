@@ -8,8 +8,8 @@ description = "Explicit request-scoped resource snapshots for Glory"
 
 [dependencies]
 glory-core = { path = "../core", version = "0.3.1" }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
 
 [lints]
 workspace = true

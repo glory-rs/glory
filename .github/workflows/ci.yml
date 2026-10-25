@@ -1,322 +1,81 @@
-name: ci
+name: semantic-ui
 
 on:
   pull_request:
   push:
-    branches:
-      - '*'
-      - '!release'
+    branches-ignore: [release]
+
+permissions:
+  contents: read
 
 jobs:
-  rust:
-    runs-on: ubuntu-latest
+  semantic-ui:
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      CARGO_HOME: D:/BuildCache/glory-semantic-ui/cargo
+      CARGO_TARGET_DIR: D:/BuildCache/glory-semantic-ui/target
+      RUSTUP_HOME: D:/BuildCache/glory-semantic-ui/rustup
+      TEMP: D:/BuildCache/glory-semantic-ui/tmp
+      TMP: D:/BuildCache/glory-semantic-ui/tmp
+      PYTHONPYCACHEPREFIX: D:/BuildCache/glory-semantic-ui/pycache
+      npm_config_cache: D:/BuildCache/glory-semantic-ui/npm-cache
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+      CARGO_BUILD_JOBS: '2'
+    defaults:
+      run:
+        shell: pwsh
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
-          components: rustfmt, clippy
-
-      - name: Check formatting
-        run: cargo fmt --all --check
-
-      - name: Test core default
-        run: cargo test -p glory-core --lib
-
-      - name: Test core SSR
-        run: cargo test -p glory-core --lib --features web-ssr
-
-      - name: Test command backend
-        run: cargo test -p glory-core --features backend-command --test command_backend
-
-      - name: Test SSR runtime flavors
-        run: cargo test -p glory-core --features web-ssr --test ssr_runtime_flavors
-
-      - name: Test server functions
-        run: cargo test -p glory-serverfn
-
-      - name: Test server function adapters
-        run: cargo test -p glory-serverfn --features "salvo axum actix"
-
-      - name: Test CLI
-        run: cargo test -p glory-cli
-
-      # These crates all carry real test suites that CI never ran, so a
-      # regression in any of them only showed up locally.
-      - name: Test routing
-        run: cargo test -p glory-routing --lib
-
-      - name: Test routing (feature-gated integration tests)
-        run: cargo test -p glory --features routing
-
-      - name: Test LiveView
-        run: cargo test -p glory-liveview --features "salvo axum actix"
-
-      - name: Test hot reload
-        run: cargo test -p glory-hot-reload
-
-      - name: Test desktop
-        run: cargo test -p glory-desktop
-
-      - name: Doc tests
-        run: cargo test --doc -p glory-core --features web-ssr
-
-      - name: Check public feature set
-        run: cargo check -p glory --features "web-ssr backend-command routing server-fn"
-
-      - name: Clippy core SSR
-        run: cargo clippy -p glory-core --lib --features web-ssr -- -D warnings
-
-      - name: Clippy server functions
-        run: cargo clippy -p glory-serverfn --all-targets -- -D warnings
-
-      - name: Clippy CLI
-        run: cargo clippy -p glory-cli --lib --no-default-features -- -D warnings
-
-      - name: Clippy routing
-        run: cargo clippy -p glory-routing --all-targets -- -D warnings
-
-      - name: Clippy LiveView
-        run: cargo clippy -p glory-liveview --all-targets --features "salvo axum actix" -- -D warnings
-
-      - name: Clippy desktop
-        run: cargo clippy -p glory-desktop --all-targets --features runtime -- -D warnings
-
-      - name: Clippy native
-        run: cargo clippy -p glory-native --all-targets --features blitz -- -D warnings
-
-      - name: Clippy command backend
-        run: cargo clippy -p glory-core --all-targets --features backend-command -- -D warnings
-
-  feature-guards:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - name: web-csr and web-ssr are mutually exclusive
-        shell: bash
-        run: |
-          set +e
-          cargo check -p glory-core --features "web-csr web-ssr" >output.log 2>&1
-          status=$?
-          set -e
-          test "$status" -ne 0
-          grep -q "features \`web-csr\` and \`web-ssr\` are mutually exclusive" output.log
-
-      - name: backend-command requires multi-holder scheduler
-        shell: bash
-        run: |
-          set +e
-          cargo check -p glory-core --features "backend-command single-app" >output.log 2>&1
-          status=$?
-          set -e
-          test "$status" -ne 0
-          grep -q "feature \`backend-command\` requires the multi-holder scheduler" output.log
-
-      - name: backend-command can combine with web-ssr
-        run: cargo check -p glory-core --features "web-ssr backend-command"
-
-  browser-e2e:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
+          node-version: 24
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
-          targets: wasm32-unknown-unknown
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Install Playwright
+          python-version: '3.x'
+      - name: Prepare D drive tools and compiler
         run: |
-          npm --prefix tests/playwright install --package-lock=false
-          npm --prefix tests/playwright exec -- playwright install --with-deps chromium
-
-      # The migrated counter uses the current semantic hosts and has its own
-      # workflow (counter.yml). The remaining fixtures below are legacy apps.
-
-      - name: Start SSR hydration example
-        shell: bash
+          New-Item -ItemType Directory -Force $env:CARGO_HOME,$env:CARGO_TARGET_DIR,$env:RUSTUP_HOME,$env:TEMP | Out-Null
+          rustup toolchain install 1.98.0 --profile minimal --component clippy,rustfmt --target wasm32-unknown-unknown
+          if ($LASTEXITCODE) { throw 'Rust installation failed' }
+          rustup default 1.98.0
+          if ($LASTEXITCODE) { throw 'Rust selection failed' }
+          $meta = cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json
+          if ($LASTEXITCODE -or [IO.Path]::GetFullPath($meta.target_directory) -ne [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)) { throw 'Unexpected Cargo target' }
+          cargo install wasm-bindgen-cli --version 0.2.129 --locked --root D:/BuildCache/glory-semantic-ui/tools
+          if ($LASTEXITCODE) { throw 'WASM tools installation failed' }
+          'D:/BuildCache/glory-semantic-ui/tools/bin' >> $env:GITHUB_PATH
+      - name: Test active workspace, forks, Windows hosts and WASM
+        run: ./scripts/check-semantic-ui.ps1 -Web -Window
+      - name: Install browser driver and build streaming fixture
         run: |
-          cargo run -p glory-cli -- --manifest-path examples/ssr-simple-salvo/Cargo.toml serve --address 127.0.0.1 --port 4102 --no-open --no-reload > ssr.log 2>&1 &
-          echo $! > ssr.pid
-          for i in {1..120}; do
-            if curl -fsS http://127.0.0.1:4102 >/dev/null; then
-              exit 0
-            fi
-            sleep 1
-          done
-          cat ssr.log
-          exit 1
-
-      - name: Start router example
-        shell: bash
+          npm install --prefix D:/BuildCache/glory-semantic-ui/browser --no-save --package-lock=false playwright@1.64.1
+          if ($LASTEXITCODE) { throw 'Playwright installation failed' }
+          cargo build --locked --manifest-path examples/semantic-web/Cargo.toml --bin stream_fixture
+          if ($LASTEXITCODE) { throw 'Stream fixture build failed' }
+      - name: Actual Chromium acceptance
         run: |
-          cargo run -p glory-cli -- --manifest-path examples/router-basic/Cargo.toml serve --address 127.0.0.1 --port 4103 --no-open --no-reload > router.log 2>&1 &
-          for i in {1..120}; do
-            if curl -fsS http://127.0.0.1:4103 >/dev/null; then exit 0; fi
-            sleep 1
-          done
-          cat router.log
-          exit 1
-
-      - name: Start fullstack example
-        shell: bash
-        run: |
-          cargo run -p glory-cli -- --manifest-path examples/todomvc-fullstack/Cargo.toml serve --address 127.0.0.1 --port 4104 --no-open --no-reload > fullstack.log 2>&1 &
-          for i in {1..180}; do
-            if curl -fsS http://127.0.0.1:4104 >/dev/null; then exit 0; fi
-            sleep 1
-          done
-          cat fullstack.log
-          exit 1
-
-      - name: Start liveview example
-        shell: bash
-        run: |
-          cargo run --manifest-path examples/liveview-salvo/Cargo.toml > liveview.log 2>&1 &
-          for i in {1..120}; do
-            if curl -fsS http://127.0.0.1:8080 >/dev/null; then exit 0; fi
-            sleep 1
-          done
-          cat liveview.log
-          exit 1
-
-      - name: Run browser e2e tests
-        env:
-          GLORY_SSR_URL: http://127.0.0.1:4102
-          GLORY_ROUTER_URL: http://127.0.0.1:4103
-          GLORY_FULLSTACK_URL: http://127.0.0.1:4104
-          GLORY_LIVEVIEW_URL: http://127.0.0.1:8080
-        run: npm --prefix tests/playwright run test -- --project=ssr-hydration --project=web-csr-routing --project=fullstack-serverfn --project=liveview
-
-      - name: Dump server logs
+          $web = Start-Process python -ArgumentList @('-m','http.server','8792','--bind','127.0.0.1','--directory','D:/BuildCache/glory-semantic-ui/web-demo') -WindowStyle Hidden -PassThru
+          $stream = Start-Process "$env:CARGO_TARGET_DIR/debug/stream_fixture.exe" -ArgumentList @('D:/BuildCache/glory-semantic-ui/web-demo','127.0.0.1:8793') -WindowStyle Hidden -PassThru
+          try {
+            foreach ($url in @('http://127.0.0.1:8792','http://127.0.0.1:8793/page')) {
+              $ready = $false
+              for ($attempt = 0; $attempt -lt 30; $attempt++) {
+                try { Invoke-WebRequest $url -UseBasicParsing | Out-Null; $ready = $true; break }
+                catch { Start-Sleep -Seconds 1 }
+              }
+              if (-not $ready) { throw "Fixture did not start: $url" }
+            }
+            node scripts/test-semantic-browser.cjs --out D:/BuildCache/glory-semantic-ui/browser-validation --playwright D:/BuildCache/glory-semantic-ui/browser/node_modules/playwright
+            if ($LASTEXITCODE) { throw 'Browser acceptance failed' }
+          }
+          finally {
+            Stop-Process -Id $web.Id,$stream.Id -ErrorAction SilentlyContinue
+          }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
-        shell: bash
-        run: |
-          cat ssr.log || true
-          cat router.log || true
-          cat fullstack.log || true
-          cat liveview.log || true
-
-  cross-platform:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - name: Check core (default)
-        run: cargo check -p glory-core --lib
-
-      - name: Test core (default)
-        run: cargo test -p glory-core --lib
-
-      - name: Test core (SSR)
-        run: cargo test -p glory-core --lib --features web-ssr
-
-      - name: Test server functions
-        run: cargo test -p glory-serverfn
-
-  benches:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - name: Compile benchmarks (no run)
-        run: cargo bench -p glory-core --no-run
-
-  all-features:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - name: Install cargo-all-features
-        run: cargo install cargo-all-features --locked
-
-      - name: Check feature combinations
-        run: cargo check-all-features -p glory-core -p glory -p glory-routing -p glory-serverfn -p glory-liveview
-
-  # `examples/` is excluded from the workspace, so nothing in CI compiled it.
-  # A dependency bump in the workspace (salvo 0.93 -> 0.94) silently broke
-  # eight examples this way, and only the e2e job noticed, indirectly.
-  examples:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - uses: Swatinem/rust-cache@v2
-
-      - name: Check SSR examples
-        run: |
-          set -euo pipefail
-          for example in hackernews-salvo todomvc-fullstack file-upload ssr-simple-salvo ssr-modes-salvo tailwind-salvo realtime-notify; do
-            echo "::group::$example"
-            cargo check --manifest-path "examples/$example/Cargo.toml" --no-default-features --features web-ssr
-            echo "::endgroup::"
-          done
-
-      - name: Check LiveView and desktop examples
-        run: |
-          set -euo pipefail
-          cargo check --manifest-path examples/liveview-salvo/Cargo.toml
-          cargo check --manifest-path examples/desktop-counter/Cargo.toml
-
-  msrv:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - name: Install cargo-msrv
-        run: cargo install cargo-msrv --locked
-
-      - name: Verify MSRV (glory-core)
-        run: cargo msrv verify --path crates/core
-
-  semver:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Check semver compatibility
-        uses: obi1kenobi/cargo-semver-checks-action@v2
         with:
-          package: glory-core, glory-routing, glory
-
-  native-screenshot:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - name: Install software Vulkan (lavapipe) + deps
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools libvulkan1 xvfb \
-            libwayland-dev libxkbcommon-dev libfontconfig1-dev
-
-      - name: Native render + screenshot regression (software Vulkan)
-        env:
-          VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.x86_64.json
-          LIBGL_ALWAYS_SOFTWARE: "1"
-          WGPU_BACKEND: vulkan
-        run: |
-          xvfb-run -a cargo test -p glory-native --features shell -- --include-ignored screenshot
+          name: semantic-ui-browser-evidence
+          path: D:/BuildCache/glory-semantic-ui/browser-validation

@@ -14,7 +14,7 @@ glory = { path = "../../crates/glory", features = ["web", "ssr", "hydrate", "res
 glory-render = { path = "../../crates/render", features = ["conformance"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-serde_json = "1"
+serde_json = "1.0.154"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "=0.2.129"
