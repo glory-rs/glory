@@ -20,31 +20,31 @@ glory-html = { path = "../html", version = "0.3.1" }
 glory-render = { path = "../render", version = "0.3.1" }
 glory-core = { path = "../core", version = "0.3.1", optional = true }
 glory-ui = { path = "../ui", version = "0.3.1", optional = true }
-blitz-dom = { git = "https://github.com/glory-rs/blitz", rev = "c127fd9699a89ff8ecba0c8d8c9eccb3330627af", version = "=0.3.0-beta.4", default-features = false, features = ["system-fonts", "complex-scripts"] }
-blitz-traits = { git = "https://github.com/glory-rs/blitz", rev = "c127fd9699a89ff8ecba0c8d8c9eccb3330627af", version = "=0.3.0-beta.4", default-features = false }
-image = { version = "0.25.6", default-features = false, features = ["png", "jpeg", "webp"] }
+blitz-dom = { git = "https://github.com/glory-rs/blitz", rev = "c850a2aee1a8cb49eee1386120807751d7480559", version = "=0.3.0-beta.4", default-features = false, features = ["system-fonts", "complex-scripts"] }
+blitz-traits = { git = "https://github.com/glory-rs/blitz", rev = "c850a2aee1a8cb49eee1386120807751d7480559", version = "=0.3.0-beta.4", default-features = false }
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
 # Typed visibility returned by Blitz's public computed-style API. Keep this
 # engine detail inside the adapter; glory-style remains the portable value crate.
 style = { package = "stylo", version = "=0.22.0", default-features = false }
-blitz-paint = { git = "https://github.com/glory-rs/blitz", rev = "c127fd9699a89ff8ecba0c8d8c9eccb3330627af", version = "=0.3.0-beta.4", default-features = false, optional = true }
+blitz-paint = { git = "https://github.com/glory-rs/blitz", rev = "c850a2aee1a8cb49eee1386120807751d7480559", version = "=0.3.0-beta.4", default-features = false, optional = true }
 anyrender = { version = "=0.14.0", optional = true }
 kurbo = { version = "=0.13.1", optional = true }
 peniko = { version = "=0.6.1", optional = true }
 anyrender_vello_cpu = { version = "=0.18.0", optional = true }
 
 [target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))'.dependencies]
-accesskit = { version = "=0.25.0", optional = true }
-accesskit_xplat = { version = "=0.2.0", optional = true }
+accesskit = { version = "=0.25.1", optional = true }
+accesskit_xplat = { version = "=0.2.1", optional = true }
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider"], optional = true }
-rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"], optional = true }
-rustls-platform-verifier = { version = "0.7", optional = true }
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"], optional = true }
+rustls-platform-verifier = { version = "0.7.1", optional = true }
 cap-std = { version = "=4.0.3", optional = true }
 cap-fs-ext = { version = "=4.0.3", optional = true }
-percent-encoding = { version = "2.3", optional = true }
-tokio = { version = "1", default-features = false, features = ["rt", "net", "sync", "time", "macros"], optional = true }
-blitz-shell = { git = "https://github.com/glory-rs/blitz", rev = "c127fd9699a89ff8ecba0c8d8c9eccb3330627af", version = "=0.3.0-beta.4", default-features = false, optional = true }
-winit = { version = "=0.31.0-beta.3", optional = true }
-keyboard-types = { version = "0.8", optional = true }
+percent-encoding = { version = "2.3.2", optional = true }
+tokio = { version = "1.54.1", default-features = false, features = ["rt", "net", "sync", "time", "macros"], optional = true }
+blitz-shell = { git = "https://github.com/glory-rs/blitz", rev = "c850a2aee1a8cb49eee1386120807751d7480559", version = "=0.3.0-beta.4", default-features = false, optional = true }
+winit = { version = "=0.31.0-beta.4", optional = true }
+keyboard-types = { version = "0.8.3", optional = true }
 softbuffer_window_renderer = { version = "=0.9.0", optional = true }
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
@@ -55,11 +55,11 @@ fontique = { version = "=0.12.0", default-features = false, features = ["fontcon
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 glory-render = { path = "../render", version = "0.3.1", features = ["conformance"] }
 glory-ui = { path = "../ui", version = "0.3.1" }
-png = "0.18"
+png = "0.18.1"
 
 [target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))'.dev-dependencies]
-accesskit_consumer = "=0.39.0"
-rcgen = { version = "0.14", default-features = false, features = ["crypto", "ring"] }
+accesskit_consumer = "=0.39.1"
+rcgen = { version = "0.14.10", default-features = false, features = ["crypto", "ring"] }
 
 [[example]]
 name = "raster"
