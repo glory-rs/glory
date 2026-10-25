@@ -53,7 +53,11 @@ impl Collapses {
     pub fn update(&mut self, tree: &Memory, mutations: &[Mutation]) -> Vec<NodeId> {
         let mut changed = BTreeSet::new();
         for id in mutations.iter().flat_map(|mutation| match mutation {
-            Mutation::Create { id, .. } | Mutation::Patch { id, .. } => std::slice::from_ref(id),
+            Mutation::Create { id, .. }
+            | Mutation::Patch {
+                id,
+                patch: glory_render::Patch::Semantics(_),
+            } => std::slice::from_ref(id),
             Mutation::CreatePlan { ids, .. } => ids.as_slice(),
             _ => &[],
         }) {
@@ -75,6 +79,10 @@ impl Collapses {
                     self.ready.remove(id);
                     changed.insert(*id);
                 }
+            } else if self.live.remove(id).is_some() {
+                self.pending.remove(id);
+                self.ready.remove(id);
+                changed.insert(*id);
             }
         }
         // Only current motion members are inspected, following their current

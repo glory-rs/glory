@@ -116,7 +116,11 @@ impl Dom {
         let mut touched: BTreeSet<_> = state.live.keys().copied().collect();
         for mutation in mutations {
             match mutation {
-                Mutation::Create { id, .. } | Mutation::Patch { id, .. } => {
+                Mutation::Create { id, .. }
+                | Mutation::Patch {
+                    id,
+                    patch: glory_render::Patch::Semantics(_),
+                } => {
                     touched.insert(*id);
                 }
                 Mutation::CreatePlan { ids, .. } => touched.extend(ids.iter().copied()),

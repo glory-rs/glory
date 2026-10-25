@@ -74,9 +74,11 @@ impl Layers {
         for id in mutations
             .iter()
             .flat_map(|mutation| match mutation {
-                Mutation::Create { id, .. } | Mutation::Patch { id, .. } => {
-                    std::slice::from_ref(id)
-                }
+                Mutation::Create { id, .. }
+                | Mutation::Patch {
+                    id,
+                    patch: glory_render::Patch::Semantics(_),
+                } => std::slice::from_ref(id),
                 Mutation::CreatePlan { ids, .. } => ids.as_slice(),
                 _ => &[],
             })

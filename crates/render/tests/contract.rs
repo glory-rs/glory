@@ -171,6 +171,22 @@ fn invalid_structure_and_patches_leave_the_previous_node_intact() {
         .unwrap();
     assert!(memory.apply(&[place(input, Some(group))]).is_err());
     assert!(!memory.node(input).unwrap().placed);
+    memory
+        .apply(&[
+            Mutation::Patch {
+                id: text,
+                patch: Patch::Text(Change::Set("inline".into())),
+            },
+            Mutation::Patch {
+                id: text,
+                patch: Patch::Classes(Change::Set(vec!["label".into()])),
+            },
+            Mutation::Patch {
+                id: button,
+                patch: Patch::Label(Change::Set("action".into())),
+            },
+        ])
+        .unwrap();
     assert!(
         memory
             .apply(&[Mutation::Patch {
@@ -181,7 +197,14 @@ fn invalid_structure_and_patches_leave_the_previous_node_intact() {
     );
     assert_eq!(
         *memory.node(text).unwrap().descriptor.view().props,
-        Props::Text(TextProps::default())
+        Props::Text(TextProps {
+            content: "inline".into(),
+            ..TextProps::default()
+        })
+    );
+    assert_eq!(
+        memory.node(text).unwrap().descriptor.view().classes,
+        &vec!["label".to_string()]
     );
     assert!(
         memory

@@ -670,11 +670,13 @@ impl Memory {
                 }
             }
         }
-        prepared.tree.validate_child_inner(
-            Subtree::Existing(id),
-            prepared.tree.nodes[&id].parent,
-            false,
-        )?;
+        if !matches!(patch, Patch::Text(_) | Patch::Label(_) | Patch::Classes(_)) {
+            prepared.tree.validate_child_inner(
+                Subtree::Existing(id),
+                prepared.tree.nodes[&id].parent,
+                false,
+            )?;
+        }
         Ok(prepared)
     }
 

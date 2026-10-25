@@ -76,7 +76,11 @@ impl Sheets {
             self.dirty = true;
         }
         for id in mutations.iter().flat_map(|mutation| match mutation {
-            Mutation::Create { id, .. } | Mutation::Patch { id, .. } => std::slice::from_ref(id),
+            Mutation::Create { id, .. }
+            | Mutation::Patch {
+                id,
+                patch: glory_render::Patch::Semantics(_),
+            } => std::slice::from_ref(id),
             Mutation::CreatePlan { ids, .. } => ids.as_slice(),
             _ => &[],
         }) {
@@ -102,6 +106,8 @@ impl Sheets {
                     self.dirty = true;
                     self.live.insert(*id, next);
                 }
+            } else {
+                self.dirty |= self.live.remove(id).is_some();
             }
         }
         self.live.retain(|id, state| {
