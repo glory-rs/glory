@@ -10,6 +10,7 @@ debug.log
 !/examples/counter/Cargo.lock
 !/benchmarks/glory/Cargo.lock
 !/benchmarks/wasm-size/Cargo.lock
+!/benchmarks/role-patches/Cargo.lock
 !/benchmarks/leptos/Cargo.lock
 !/benchmarks/dioxus/Cargo.lock
 !/benchmarks/scenarios/glory/Cargo.lock

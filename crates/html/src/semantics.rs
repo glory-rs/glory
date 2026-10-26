@@ -1,6 +1,38 @@
 //! Shared full-shape and field-local lowering for finite widget metadata.
 use glory_render::{Role, Semantics};
+use std::borrow::Cow;
 use std::collections::BTreeMap;
+
+fn direction(value: glory_render::Direction) -> &'static str {
+    match value {
+        glory_render::Direction::Ltr => "ltr",
+        glory_render::Direction::Rtl => "rtl",
+    }
+}
+
+// These ARIA coordinates have the same wire rules for progress, spinbuttons,
+// sliders and splitters. Missing coordinates stay absent; exact business text
+// remains separate from the finite numeric coordinates.
+fn range_attributes(
+    attrs: &mut BTreeMap<&'static str, String>,
+    min: Option<f64>,
+    max: Option<f64>,
+    current: Option<f64>,
+    text: Option<&str>,
+) {
+    for (name, value) in [
+        ("aria-valuemin", min),
+        ("aria-valuemax", max),
+        ("aria-valuenow", current),
+    ] {
+        if let Some(value) = value {
+            attrs.insert(name, value.to_string());
+        }
+    }
+    if let Some(text) = text {
+        attrs.insert("aria-valuetext", text.to_owned());
+    }
+}
 
 pub(crate) fn translation_style(motion: Option<glory_render::TranslationMotion>) -> String {
     motion.map_or_else(String::new, |motion| {
@@ -9,30 +41,96 @@ pub(crate) fn translation_style(motion: Option<glory_render::TranslationMotion>)
     })
 }
 
+pub(crate) const ROLE_ATTRIBUTE_COUNT: usize = 5;
+
+/// Complete dependency set for a Role patch, in attribute-name order.
+/// Read only the finite facets that can override these keys. In particular,
+/// do not lower names, relations, range text, sheets or any other payload.
+/// Values are canonical ASCII tokens or a generated integer, never user text.
+pub(crate) fn role_attributes(
+    value: Option<&Semantics>,
+    role: Option<Role>,
+) -> [(&'static str, Option<Cow<'static, str>>); ROLE_ATTRIBUTE_COUNT] {
+    let mut name = role.map(crate::mapping::role_name);
+    let mut level = None;
+    let mut multiple = None;
+    let mut modal = None;
+    let mut orientation = None;
+    if let Some(value) = value {
+        if let Some(item) = value.tree_item {
+            level = Some(item.level.to_string());
+        }
+        multiple = match role {
+            Some(Role::Grid) => Some(value.grid_multiple),
+            Some(Role::Listbox) => Some(value.listbox_multiple),
+            _ => value.tree_navigation.map(|tree| tree.multiple),
+        };
+        orientation = value.separator_axis;
+        if let Some(slider) = &value.slider {
+            orientation = Some(slider.axis);
+        }
+        if matches!(
+            role,
+            Some(Role::TabList | Role::RadioGroup | Role::Toolbar | Role::Menubar)
+        ) && let Some(axis) = value.navigation
+        {
+            orientation = Some(axis);
+        }
+        if matches!(role, Some(Role::Dialog | Role::AlertDialog)) {
+            modal = value.layer.as_ref().map(|layer| layer.modal);
+        }
+        // Preserve the full mapper's intrinsic override precedence.
+        if value.combobox.is_some() {
+            name = Some("combobox");
+        }
+        if value.option.is_some() {
+            name = Some("option");
+        }
+        if value.tab {
+            name = Some("tab");
+        }
+        if let Some(item) = &value.menu_item {
+            name = Some(match item.kind {
+                glory_render::MenuItemKind::Action => "menuitem",
+                glory_render::MenuItemKind::Checkbox => "menuitemcheckbox",
+                glory_render::MenuItemKind::Radio => "menuitemradio",
+            });
+        }
+    }
+    if level.is_none()
+        && let Some(Role::Heading(heading)) = role
+    {
+        level = Some(heading.to_string());
+    }
+    let flag = |value| Cow::Borrowed(if value { "true" } else { "false" });
+    [
+        ("aria-level", level.map(Cow::Owned)),
+        ("aria-modal", modal.map(flag)),
+        ("aria-multiselectable", multiple.map(flag)),
+        (
+            "aria-orientation",
+            orientation.map(|axis| Cow::Borrowed(axis.as_str())),
+        ),
+        ("role", name.map(Cow::Borrowed)),
+    ]
+}
+
 pub(crate) fn attributes(
     value: Option<&Semantics>,
     role: Option<Role>,
 ) -> BTreeMap<&'static str, String> {
     let mut attrs = BTreeMap::new();
-    if let Some(role) = role {
-        attrs.insert("role", crate::mapping::role_name(role).into());
-    }
-    if let Some(Role::Heading(level)) = role {
-        attrs.insert("aria-level", level.to_string());
+    for (name, value) in role_attributes(value, role) {
+        if let Some(value) = value {
+            attrs.insert(name, value.into_owned());
+        }
     }
     let Some(value) = value else { return attrs };
     if let Some(placeholder) = &value.placeholder {
         attrs.insert("placeholder", placeholder.clone());
     }
     if let Some(environment) = &value.environment {
-        attrs.insert(
-            "dir",
-            match environment.direction {
-                glory_render::Direction::Ltr => "ltr",
-                glory_render::Direction::Rtl => "rtl",
-            }
-            .into(),
-        );
+        attrs.insert("dir", direction(environment.direction).into());
         attrs.insert("lang", environment.language.as_str().into());
     }
     if let Some(scope) = &value.focus_scope {
@@ -52,29 +150,11 @@ pub(crate) fn attributes(
         attrs.insert("aria-checked", checked.as_str().into());
     }
     if let Some(tree) = value.tree_navigation {
-        attrs.insert(
-            "data-gly-tree-navigation",
-            if tree.direction == glory_render::Direction::Rtl {
-                "rtl"
-            } else {
-                "ltr"
-            }
-            .into(),
-        );
+        attrs.insert("data-gly-tree-navigation", direction(tree.direction).into());
         attrs.insert("data-gly-tree-typeahead", tree.typeahead.to_string());
-        attrs.insert("aria-multiselectable", tree.multiple.to_string());
-        attrs.insert(
-            "dir",
-            if tree.direction == glory_render::Direction::Rtl {
-                "rtl"
-            } else {
-                "ltr"
-            }
-            .into(),
-        );
+        attrs.insert("dir", direction(tree.direction).into());
     }
     if let Some(item) = value.tree_item {
-        attrs.insert("aria-level", item.level.to_string());
         attrs.insert("aria-posinset", (u32::from(item.position) + 1).to_string());
         attrs.insert("aria-setsize", item.count.to_string());
         attrs.insert("data-gly-tree-item", String::new());
@@ -218,7 +298,6 @@ pub(crate) fn attributes(
         attrs.insert("data-gly-inert", String::new());
     }
     if let Some(kind) = value.combobox {
-        attrs.insert("role", "combobox".into());
         attrs.insert(
             "data-gly-combobox",
             match kind {
@@ -234,25 +313,17 @@ pub(crate) fn attributes(
         }
     }
     if let Some(option) = &value.option {
-        attrs.insert("role", "option".into());
         attrs.insert("data-gly-option-owner", option.owner.as_str().into());
         attrs.insert("form", option.owner.as_str().into());
     }
-    if role == Some(Role::Grid) {
-        attrs.insert("aria-multiselectable", value.grid_multiple.to_string());
-    }
-    if role == Some(Role::Listbox) {
-        attrs.insert("aria-multiselectable", value.listbox_multiple.to_string());
-    }
     if let Some(progress) = &value.progress {
-        attrs.insert("aria-valuemin", progress.min.to_string());
-        attrs.insert("aria-valuemax", progress.max.to_string());
-        if let Some(current) = progress.current {
-            attrs.insert("aria-valuenow", current.to_string());
-        }
-        if let Some(text) = &progress.value_text {
-            attrs.insert("aria-valuetext", text.clone());
-        }
+        range_attributes(
+            &mut attrs,
+            Some(progress.min),
+            Some(progress.max),
+            progress.current,
+            progress.value_text.as_deref(),
+        );
     }
     if let Some(busy) = value.busy {
         attrs.insert("aria-busy", busy.to_string());
@@ -270,63 +341,44 @@ pub(crate) fn attributes(
             .into(),
         );
     }
-    if let Some(axis) = value.separator_axis {
-        attrs.insert("aria-orientation", axis.as_str().into());
-    }
     if let Some(spin) = &value.spinbutton {
         attrs.insert("data-gly-spinbutton", String::new());
-        if let Some(min) = spin.min {
-            attrs.insert("aria-valuemin", min.to_string());
-        }
-        if let Some(max) = spin.max {
-            attrs.insert("aria-valuemax", max.to_string());
-        }
-        if let Some(now) = spin.value {
-            attrs.insert("aria-valuenow", now.to_string());
-        }
-        if let Some(text) = &spin.value_text {
-            attrs.insert("aria-valuetext", text.clone());
-        }
+        range_attributes(
+            &mut attrs,
+            spin.min,
+            spin.max,
+            spin.value,
+            spin.value_text.as_deref(),
+        );
         attrs.insert("data-gly-spin-increase", spin.can_increase.to_string());
         attrs.insert("data-gly-spin-decrease", spin.can_decrease.to_string());
     }
     if let Some(slider) = &value.slider {
-        attrs.insert("aria-valuemin", slider.range.min.to_string());
-        attrs.insert("aria-valuemax", slider.range.max.to_string());
-        attrs.insert("aria-valuenow", slider.range.value.to_string());
-        attrs.insert("aria-orientation", slider.axis.as_str().into());
-        attrs.insert(
-            "dir",
-            match slider.direction {
-                glory_render::Direction::Ltr => "ltr",
-                glory_render::Direction::Rtl => "rtl",
-            }
-            .into(),
+        range_attributes(
+            &mut attrs,
+            Some(slider.range.min),
+            Some(slider.range.max),
+            Some(slider.range.value),
+            slider.value_text.as_deref(),
         );
+        attrs.insert("dir", direction(slider.direction).into());
         attrs.insert("data-gly-slider", String::new());
-        if let Some(text) = &slider.value_text {
-            attrs.insert("aria-valuetext", text.clone());
-        }
     }
     if let Some(range) = value.splitter {
-        attrs.insert("aria-valuemin", range.min.to_string());
-        attrs.insert("aria-valuemax", range.max.to_string());
-        attrs.insert("aria-valuenow", range.value.to_string());
+        range_attributes(
+            &mut attrs,
+            Some(range.min),
+            Some(range.max),
+            Some(range.value),
+            None,
+        );
         attrs.insert("data-gly-splitter", String::new());
     }
     if let Some(axes) = value.scroll_keyboard {
         attrs.insert("data-gly-scroll-keyboard", axes.as_str().into());
     }
-    if let Some(direction) = value.grid_navigation {
-        attrs.insert(
-            "data-gly-grid-navigation",
-            if direction == glory_render::Direction::Rtl {
-                "rtl"
-            } else {
-                "ltr"
-            }
-            .into(),
-        );
+    if let Some(grid_direction) = value.grid_navigation {
+        attrs.insert("data-gly-grid-navigation", direction(grid_direction).into());
     }
     if value.link_request {
         attrs.insert("data-gly-link-request", String::new());
@@ -418,19 +470,7 @@ pub(crate) fn attributes(
     if value.field_part == Some(glory_render::FieldPart::Fieldset) && value.disabled {
         attrs.insert("disabled", String::new());
     }
-    if value.tab {
-        attrs.insert("role", "tab".into());
-    }
     if let Some(item) = &value.menu_item {
-        attrs.insert(
-            "role",
-            match item.kind {
-                glory_render::MenuItemKind::Action => "menuitem",
-                glory_render::MenuItemKind::Checkbox => "menuitemcheckbox",
-                glory_render::MenuItemKind::Radio => "menuitemradio",
-            }
-            .into(),
-        );
         attrs.insert("form", item.owner.as_str().into());
         attrs.insert("data-gly-menu-item", String::new());
     }
@@ -486,9 +526,6 @@ pub(crate) fn attributes(
         }
         attrs.insert("popover", "manual".into());
         attrs.insert("data-gly-layer", layer.placement.as_str().into());
-        if matches!(role, Some(Role::Dialog | Role::AlertDialog)) {
-            attrs.insert("aria-modal", layer.modal.to_string());
-        }
     }
     for (name, state) in [
         ("aria-expanded", value.expanded),
@@ -519,20 +556,7 @@ pub(crate) fn attributes(
     }
     if let Some(axis) = value.navigation {
         attrs.insert("data-gly-navigation", axis.as_str().into());
-        attrs.insert(
-            "dir",
-            match value.navigation_direction {
-                glory_render::Direction::Ltr => "ltr",
-                glory_render::Direction::Rtl => "rtl",
-            }
-            .into(),
-        );
-        if matches!(
-            role,
-            Some(Role::TabList | Role::RadioGroup | Role::Toolbar | Role::Menubar)
-        ) {
-            attrs.insert("aria-orientation", axis.as_str().into());
-        }
+        attrs.insert("dir", direction(value.navigation_direction).into());
     }
     if value.typeahead {
         attrs.insert("data-gly-typeahead", String::new());

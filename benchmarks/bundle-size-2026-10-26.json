@@ -1,0 +1,801 @@
+{
+  "schema": 1,
+  "recorded": "2026-10-26T03:09:06.635Z",
+  "contract": "semantic-rows-v1",
+  "source": {
+    "snapshot": "D:\\BuildCache\\glory-benchmark-wasm-20261026\\source-20261026-110144-346",
+    "gitHead": "6f08a1265d27d036a4ee692ae67ba29d2da71af6",
+    "workingChanges": "",
+    "inputDigest": "13c1f74849645187c51529eb1dd649145473583cedc327d315939d619e154432"
+  },
+  "versions": {
+    "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18)\nbinary: rustc\ncommit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea\ncommit-date: 2026-08-18\nhost: x86_64-pc-windows-msvc\nrelease: 1.98.0\nLLVM version: 22.1.8",
+    "cargo": "cargo 1.98.0 (797e8a9bc 2026-08-05)",
+    "node": "v24.3.0",
+    "binaryen": "wasm-opt version 132 (version_132)",
+    "wasmBindgen": "0.2.129"
+  },
+  "profile": {
+    "optLevel": 3,
+    "lto": true,
+    "codegenUnits": 1
+  },
+  "optimizer": "-Oz --enable-bulk-memory --enable-reference-types",
+  "compression": {
+    "brotliQuality": 11,
+    "gzipLevel": 9
+  },
+  "scope": "Actual rows benchmark; JS includes entry and transitively imported relative JS snippets, separately compressed; common harness, CSS and HTML excluded.",
+  "cases": [
+    {
+      "name": "glory",
+      "version": "0.3.1",
+      "packageId": "path+file:///D:/BuildCache/glory-benchmark-wasm-20261026/source-20261026-110144-346/crates/glory#0.3.1",
+      "lockSha256": "525dc12ee93e6251ea131f638e1b6a7a8dc637b5760d2766d927f365ba085fb8",
+      "rustc": {
+        "bytes": 2851240,
+        "brotli": 520599,
+        "gzip": 778330,
+        "sha256": "37e4fe367131498aab8e5710663558c746bcd522a4974c14e971e6c1062e1daa"
+      },
+      "bindgen": {
+        "bytes": 1860970,
+        "brotli": 399727,
+        "gzip": 555491,
+        "sha256": "f3b1385c2e13766039bc0e50dcc61c27697434600eb6b92235b7cced664dd4c9"
+      },
+      "stripped": {
+        "bytes": 1587767,
+        "brotli": 376956,
+        "gzip": 518740,
+        "sha256": "2c254f8ae72fc0686d73afdfe8a16947aff86cf035e71c6ea60e52c717b9980b"
+      },
+      "optimized": {
+        "bytes": 1425214,
+        "brotli": 376223,
+        "gzip": 512781,
+        "sha256": "878a867532c05ed39182e057f3eced223d2bc9af42d7bd55ad6b543d61ddd932"
+      },
+      "js": {
+        "bytes": 60648,
+        "brotli": 8934,
+        "gzip": 10480,
+        "sha256": "0d4ece2953997710c6acaab95e4df05da95b6d6ce6efca454625b7cdc4fa83ca",
+        "files": [
+          {
+            "path": "app.js",
+            "bytes": 58659,
+            "brotli": 8180,
+            "gzip": 9587,
+            "sha256": "7159fa5585881042719cebcb85d8dab2d9bfc81c44f600fcfdbfe4e785dab17e"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "bindgen": [
+          {
+            "id": 1,
+            "payloadBytes": 767,
+            "encodedBytes": 770,
+            "sha256": "c68d025069ce0bcef9da4f758c8c890cc21679ef4c12102b53e3144c54f43c4e"
+          },
+          {
+            "id": 2,
+            "payloadBytes": 10832,
+            "encodedBytes": 10835,
+            "sha256": "c7dbd4ad05e326a0932603eece5f6022ef5f584febb3e3672d920c361373ed41"
+          },
+          {
+            "id": 3,
+            "payloadBytes": 1542,
+            "encodedBytes": 1545,
+            "sha256": "9c768b19a050bf350b982f753684935845831e64ef56d46ab99905dcef276f16"
+          },
+          {
+            "id": 4,
+            "payloadBytes": 11,
+            "encodedBytes": 13,
+            "sha256": "b9669f367f5f4792b4490e7193cb5f32c8acfeef80e65f0c492dce746ba6bf11"
+          },
+          {
+            "id": 5,
+            "payloadBytes": 3,
+            "encodedBytes": 5,
+            "sha256": "e3c4e8c4be74ea7897d60436685f5014a88654a4f415f7e08b959984bf15f5d0"
+          },
+          {
+            "id": 6,
+            "payloadBytes": 25,
+            "encodedBytes": 27,
+            "sha256": "3f4ac89a14c5b5ea91cf43a53422c736b786766cfe5faddc54b8ce472c9a4abf"
+          },
+          {
+            "id": 7,
+            "payloadBytes": 916,
+            "encodedBytes": 919,
+            "sha256": "b9b4069e792eefb1fa3eed8408ddd7318aaae9e5b935bdc6696e17349fe887de"
+          },
+          {
+            "id": 9,
+            "payloadBytes": 517,
+            "encodedBytes": 520,
+            "sha256": "be39bfb883c1c5824ecb3834d27f79dc1f2c933323ea40f3e3f66e13126bc3c7"
+          },
+          {
+            "id": 10,
+            "payloadBytes": 1495231,
+            "encodedBytes": 1495235,
+            "sha256": "746091dfa641ccc36539774b7f67d7f0b0713ed8a5abdbddf483cf3fc7fd710c"
+          },
+          {
+            "id": 11,
+            "payloadBytes": 76971,
+            "encodedBytes": 76975,
+            "sha256": "041303aad6265dc5248832eb9941b6e5905113d77cef8305520b30127bd4e8a4"
+          },
+          {
+            "id": 0,
+            "name": "name",
+            "payloadBytes": 273837,
+            "encodedBytes": 273841,
+            "sha256": "f05b5c5185005cc1ebe7e12c5d4aa18611c51f71270b001dc8de9aba270fdb9e"
+          },
+          {
+            "id": 0,
+            "name": "producers",
+            "payloadBytes": 124,
+            "encodedBytes": 126,
+            "sha256": "5349359afa1778d0d8c567fa09601cda2ce1fbb4cc12a020275fcd608b9cbc81"
+          },
+          {
+            "id": 0,
+            "name": "target_features",
+            "payloadBytes": 148,
+            "encodedBytes": 151,
+            "sha256": "97ceea95e0687b14437e21c205ebb40eea27aa5ecaa971f7d87601e3aa213bfd"
+          }
+        ],
+        "optimized": [
+          {
+            "id": 1,
+            "payloadBytes": 655,
+            "encodedBytes": 658,
+            "sha256": "83558b575f696275e7cc4c4fd4b018d20730b6b5040f4bd84c5083513b431c33"
+          },
+          {
+            "id": 2,
+            "payloadBytes": 10740,
+            "encodedBytes": 10743,
+            "sha256": "c9284e1ba9b2dca6cc5903071c22d5c88a3c76662eca03ff910eb94b873aee95"
+          },
+          {
+            "id": 3,
+            "payloadBytes": 1103,
+            "encodedBytes": 1106,
+            "sha256": "e7c20ffead4868a98a7b1bcb062f47deabfe0ef7bd639acf52c6366ead98b7c1"
+          },
+          {
+            "id": 4,
+            "payloadBytes": 11,
+            "encodedBytes": 13,
+            "sha256": "b9669f367f5f4792b4490e7193cb5f32c8acfeef80e65f0c492dce746ba6bf11"
+          },
+          {
+            "id": 5,
+            "payloadBytes": 3,
+            "encodedBytes": 5,
+            "sha256": "e3c4e8c4be74ea7897d60436685f5014a88654a4f415f7e08b959984bf15f5d0"
+          },
+          {
+            "id": 6,
+            "payloadBytes": 25,
+            "encodedBytes": 27,
+            "sha256": "3f4ac89a14c5b5ea91cf43a53422c736b786766cfe5faddc54b8ce472c9a4abf"
+          },
+          {
+            "id": 7,
+            "payloadBytes": 916,
+            "encodedBytes": 919,
+            "sha256": "209ab35e48cc238cf33c73bfd98a6a1449de1e6a812de0d29468b0a21185996f"
+          },
+          {
+            "id": 9,
+            "payloadBytes": 517,
+            "encodedBytes": 520,
+            "sha256": "9a3c253b93a814c2d0f9714e0b0b9e0be52ebd16ecb4a8e912eb52c802528de9"
+          },
+          {
+            "id": 12,
+            "payloadBytes": 1,
+            "encodedBytes": 3,
+            "sha256": "83891d7fe85c33e52c8b4e5814c92fb6a3b9467299200538a6babaa8b452d879"
+          },
+          {
+            "id": 10,
+            "payloadBytes": 1334189,
+            "encodedBytes": 1334193,
+            "sha256": "c728ed910380232d456ca88f60c5ad46c04be0ae368bb2565a2a72edd9e639db"
+          },
+          {
+            "id": 11,
+            "payloadBytes": 76738,
+            "encodedBytes": 76742,
+            "sha256": "9a746765ce7e77f3024247c586027c154f841f5bbf108e2e08c827c5649ea7f1"
+          },
+          {
+            "id": 0,
+            "name": "producers",
+            "payloadBytes": 124,
+            "encodedBytes": 126,
+            "sha256": "5349359afa1778d0d8c567fa09601cda2ce1fbb4cc12a020275fcd608b9cbc81"
+          },
+          {
+            "id": 0,
+            "name": "target_features",
+            "payloadBytes": 148,
+            "encodedBytes": 151,
+            "sha256": "436e14b8b97dd381f16be421a6f633e615c441207f9de33379f9604cb6c23723"
+          }
+        ]
+      },
+      "profile": {
+        "opt_level": "3",
+        "debuginfo": 0,
+        "debug_assertions": false,
+        "overflow_checks": false,
+        "test": false
+      }
+    },
+    {
+      "name": "dioxus",
+      "version": "0.7.10",
+      "packageId": "registry+https://github.com/rust-lang/crates.io-index#dioxus@0.7.10",
+      "lockSha256": "b945c32ec883d0ad02577827b12ed98dc30e6cf54d8f6cd02dca1d0ea9428986",
+      "rustc": {
+        "bytes": 1468947,
+        "brotli": 235035,
+        "gzip": 352442,
+        "sha256": "069b850aeb31e04bb45e75f18be4bbae68d884af9721a3abb8698c3a18c8fcd1"
+      },
+      "bindgen": {
+        "bytes": 457470,
+        "brotli": 112423,
+        "gzip": 144497,
+        "sha256": "d31826528c08edf9a0c95bc97893733d949f2a2c6afbe49b401c84938f29c36b"
+      },
+      "stripped": {
+        "bytes": 351644,
+        "brotli": 101182,
+        "gzip": 128850,
+        "sha256": "f78c50506d118c3645a09d87bcd05f43b2d84a0950ed67107d3f0abde1010544"
+      },
+      "optimized": {
+        "bytes": 317164,
+        "brotli": 99109,
+        "gzip": 125714,
+        "sha256": "bacb5f7352e32ad928569c8a3c24f62e27a35934f518ffe433c4d23f6a60a60c"
+      },
+      "js": {
+        "bytes": 49916,
+        "brotli": 9381,
+        "gzip": 10769,
+        "sha256": "b36182d580d44ffeffdb26dbb363b29b1a267cbd826039e9b317ae66639053a8",
+        "files": [
+          {
+            "path": "app.js",
+            "bytes": 27174,
+            "brotli": 4927,
+            "gzip": 5690,
+            "sha256": "01d35ed5682959853458eef7d5796f6456950291453829775522f70fcfa89abb"
+          },
+          {
+            "path": "snippets/dioxus-interpreter-js-20451f6aefec841d/inline0.js",
+            "bytes": 20855,
+            "brotli": 3897,
+            "gzip": 4400,
+            "sha256": "cd533b7b9f2192fa535f92f4f266d03d47c23105cf500498d0bc8d6cc90dc6cf"
+          },
+          {
+            "path": "snippets/dioxus-interpreter-js-20451f6aefec841d/src/js/set_attribute.js",
+            "bytes": 1887,
+            "brotli": 557,
+            "gzip": 679,
+            "sha256": "5b56995f71fe629934f4ab5eb292d5cfccd9d99037eb9a39ede5078c78db88df"
+          }
+        ]
+      },
+      "sections": {
+        "bindgen": [
+          {
+            "id": 1,
+            "payloadBytes": 389,
+            "encodedBytes": 392,
+            "sha256": "fd10a995ba553f9f1a06d2b497792e958beabbb5a77de3b262a2e224ec9b1d20"
+          },
+          {
+            "id": 2,
+            "payloadBytes": 3503,
+            "encodedBytes": 3506,
+            "sha256": "7f78e1e52b9d4cc5cc5b73d3fae67842740592f9996f13d0f41cb79bb51c87a8"
+          },
+          {
+            "id": 3,
+            "payloadBytes": 699,
+            "encodedBytes": 702,
+            "sha256": "9aafb50a89a82c66fc6aeae0ef8b32c5086f4e499e9a34dded7eedf9dbfd6cba"
+          },
+          {
+            "id": 4,
+            "payloadBytes": 11,
+            "encodedBytes": 13,
+            "sha256": "f622d1bcb2d8e9c48e0a53ce2ed80fd27a303030cd9a6632d5b7e1a375d4280a"
+          },
+          {
+            "id": 5,
+            "payloadBytes": 3,
+            "encodedBytes": 5,
+            "sha256": "f0b84402ff5181a6f998d07e5832d16de5bd3ea4e32e542da814690a734e0950"
+          },
+          {
+            "id": 6,
+            "payloadBytes": 31,
+            "encodedBytes": 33,
+            "sha256": "8c2aa69c260c19e3c12ff665d138c0d5dc3d2adb105ca74d298520efdd757d3e"
+          },
+          {
+            "id": 7,
+            "payloadBytes": 636,
+            "encodedBytes": 639,
+            "sha256": "943f91c57a41857cd2ede0016eca3e60aada52e5d4dfb32882c412ec921f7523"
+          },
+          {
+            "id": 9,
+            "payloadBytes": 561,
+            "encodedBytes": 564,
+            "sha256": "7f72f82efca2d14f982e14d08e3f921b567bd02f92b786dd38431312779a3d04"
+          },
+          {
+            "id": 10,
+            "payloadBytes": 311246,
+            "encodedBytes": 311250,
+            "sha256": "3bade984a0c7764866d5b0874df17b0f61bd7d570bc02f3e24e2e8b98e6bb350"
+          },
+          {
+            "id": 11,
+            "payloadBytes": 34087,
+            "encodedBytes": 34091,
+            "sha256": "14c0bd0497ec2dc5dad4e56d55633fbe9b75eaa233c1690050f18cd7a2f8bf7f"
+          },
+          {
+            "id": 0,
+            "name": "name",
+            "payloadBytes": 105986,
+            "encodedBytes": 105990,
+            "sha256": "b1fc406c6a7eee6fb7c65c02f4f39473f2b695aa4981474227fb57b99db6e229"
+          },
+          {
+            "id": 0,
+            "name": "producers",
+            "payloadBytes": 124,
+            "encodedBytes": 126,
+            "sha256": "5349359afa1778d0d8c567fa09601cda2ce1fbb4cc12a020275fcd608b9cbc81"
+          },
+          {
+            "id": 0,
+            "name": "target_features",
+            "payloadBytes": 148,
+            "encodedBytes": 151,
+            "sha256": "97ceea95e0687b14437e21c205ebb40eea27aa5ecaa971f7d87601e3aa213bfd"
+          }
+        ],
+        "optimized": [
+          {
+            "id": 1,
+            "payloadBytes": 361,
+            "encodedBytes": 364,
+            "sha256": "973d9f466491e55e244e52c6e90bea08f5f86602417b3b1dd566fb2712a74380"
+          },
+          {
+            "id": 2,
+            "payloadBytes": 3503,
+            "encodedBytes": 3506,
+            "sha256": "4c3e5769439dcce50c573311dcb4a8663706844851137a2ce8f14a293f2489ef"
+          },
+          {
+            "id": 3,
+            "payloadBytes": 518,
+            "encodedBytes": 521,
+            "sha256": "11660fa3af769d257a91dad12e9e978c5aabee3a5ff6dfa8c488219a8914315f"
+          },
+          {
+            "id": 4,
+            "payloadBytes": 11,
+            "encodedBytes": 13,
+            "sha256": "f622d1bcb2d8e9c48e0a53ce2ed80fd27a303030cd9a6632d5b7e1a375d4280a"
+          },
+          {
+            "id": 5,
+            "payloadBytes": 3,
+            "encodedBytes": 5,
+            "sha256": "f0b84402ff5181a6f998d07e5832d16de5bd3ea4e32e542da814690a734e0950"
+          },
+          {
+            "id": 6,
+            "payloadBytes": 31,
+            "encodedBytes": 33,
+            "sha256": "8c2aa69c260c19e3c12ff665d138c0d5dc3d2adb105ca74d298520efdd757d3e"
+          },
+          {
+            "id": 7,
+            "payloadBytes": 636,
+            "encodedBytes": 639,
+            "sha256": "c416420409969427dda1b14a00f5d047d53a3ab66dee894285d7fd660a07c4f4"
+          },
+          {
+            "id": 9,
+            "payloadBytes": 560,
+            "encodedBytes": 563,
+            "sha256": "b9b38d397797a43f2056d91a9ec49f8622024c3c5e7c20ce18c24f4b96516021"
+          },
+          {
+            "id": 12,
+            "payloadBytes": 1,
+            "encodedBytes": 3,
+            "sha256": "86be9a55762d316a3026c2836d044f5fc76e34da10e1b45feee5f18be7edb177"
+          },
+          {
+            "id": 10,
+            "payloadBytes": 277980,
+            "encodedBytes": 277984,
+            "sha256": "7a28f3a341889d4a5de6a527aaed00462bec6334e714b6e4b6419521bc433600"
+          },
+          {
+            "id": 11,
+            "payloadBytes": 33244,
+            "encodedBytes": 33248,
+            "sha256": "7266b3bb650463e2c731eb798638a24ae0d3f2c72057b03d35118944c89a3752"
+          },
+          {
+            "id": 0,
+            "name": "producers",
+            "payloadBytes": 124,
+            "encodedBytes": 126,
+            "sha256": "5349359afa1778d0d8c567fa09601cda2ce1fbb4cc12a020275fcd608b9cbc81"
+          },
+          {
+            "id": 0,
+            "name": "target_features",
+            "payloadBytes": 148,
+            "encodedBytes": 151,
+            "sha256": "436e14b8b97dd381f16be421a6f633e615c441207f9de33379f9604cb6c23723"
+          }
+        ]
+      },
+      "profile": {
+        "opt_level": "3",
+        "debuginfo": 0,
+        "debug_assertions": false,
+        "overflow_checks": false,
+        "test": false
+      }
+    },
+    {
+      "name": "leptos",
+      "version": "0.8.22",
+      "packageId": "registry+https://github.com/rust-lang/crates.io-index#leptos@0.8.22",
+      "lockSha256": "7ff3756dbcbf73040833db49fe40bc466bed5438a63cfb9c92974544515fd8eb",
+      "rustc": {
+        "bytes": 1553159,
+        "brotli": 205971,
+        "gzip": 334322,
+        "sha256": "70dc90d6fa06b130c75bfc725643e58ca0d3b8469d65b4e8af1ffe08a5913bf3"
+      },
+      "bindgen": {
+        "bytes": 279406,
+        "brotli": 52824,
+        "gzip": 68995,
+        "sha256": "4c65e88eb86279c80b5bd9267b0751d935b6eb2540f8c693726bd5a0f90f51ca"
+      },
+      "stripped": {
+        "bytes": 172868,
+        "brotli": 44468,
+        "gzip": 56544,
+        "sha256": "4dc210a5a69d5430ba3b876da672134de1e1fe7a15845d880eafa4750a66bdeb"
+      },
+      "optimized": {
+        "bytes": 155008,
+        "brotli": 43438,
+        "gzip": 54567,
+        "sha256": "a01c1f0f17d4d6ea819dab3485a29a5eb0d1532b0c002148420dd00ad84f76c8"
+      },
+      "js": {
+        "bytes": 30134,
+        "brotli": 5309,
+        "gzip": 6094,
+        "sha256": "e3251c2f31bb2edb9a3e40dd132327589030c547a2fdbbdb28cb4fd65b911741",
+        "files": [
+          {
+            "path": "app.js",
+            "bytes": 30134,
+            "brotli": 5309,
+            "gzip": 6094,
+            "sha256": "b8d1d71a35ba7c2032fb25f1dfd551449e6456db8d9c7e581bdd7b5c7e8e744c"
+          }
+        ]
+      },
+      "sections": {
+        "bindgen": [
+          {
+            "id": 1,
+            "payloadBytes": 325,
+            "encodedBytes": 328,
+            "sha256": "bdac0f0f179848e4ee4f07783a31cd8b25db39713e1ea0e9309f50767f3fee91"
+          },
+          {
+            "id": 2,
+            "payloadBytes": 3286,
+            "encodedBytes": 3289,
+            "sha256": "fd9353fb006cd0ba3496b6219037ab958768766d5bb2a547ca09ef9bfb534bd0"
+          },
+          {
+            "id": 3,
+            "payloadBytes": 456,
+            "encodedBytes": 459,
+            "sha256": "9dc15c89c96aa80f5bab5f75b564e19a4ffb692ecbb0f46279699d27be945709"
+          },
+          {
+            "id": 4,
+            "payloadBytes": 11,
+            "encodedBytes": 13,
+            "sha256": "85c6b5e6f676f005b1b537ee34f13cf718a05c076d8c426445efe06f5cb1869e"
+          },
+          {
+            "id": 5,
+            "payloadBytes": 3,
+            "encodedBytes": 5,
+            "sha256": "f0b84402ff5181a6f998d07e5832d16de5bd3ea4e32e542da814690a734e0950"
+          },
+          {
+            "id": 6,
+            "payloadBytes": 33,
+            "encodedBytes": 35,
+            "sha256": "4764c93d1d49017fc7292a433dfa8b3e1ccf9ae231178f7a1da4dfd1c837577e"
+          },
+          {
+            "id": 7,
+            "payloadBytes": 1513,
+            "encodedBytes": 1516,
+            "sha256": "ee4bead420a91e20454db405b2400bb56498f48e8e6cab3237ef16bd845ca6bf"
+          },
+          {
+            "id": 9,
+            "payloadBytes": 339,
+            "encodedBytes": 342,
+            "sha256": "b2405b8f9714cc8bb81430330c5af2731a8439a61f6059983611a764a6e8d190"
+          },
+          {
+            "id": 10,
+            "payloadBytes": 152772,
+            "encodedBytes": 152776,
+            "sha256": "7e864c6cef4bea89f7c9cfa58c7c4c793791595bc60436cd91170f1ac7670d67"
+          },
+          {
+            "id": 11,
+            "payloadBytes": 13706,
+            "encodedBytes": 13709,
+            "sha256": "285799b37ada090b010e3f8b80490dbf9ec05582413c12c719c173d38722cc04"
+          },
+          {
+            "id": 0,
+            "name": "name",
+            "payloadBytes": 106618,
+            "encodedBytes": 106622,
+            "sha256": "dd153f03b139aff0e06fa9d6feac7235644fbf72a726d21c9f480afdd46bf6f4"
+          },
+          {
+            "id": 0,
+            "name": "producers",
+            "payloadBytes": 124,
+            "encodedBytes": 126,
+            "sha256": "5349359afa1778d0d8c567fa09601cda2ce1fbb4cc12a020275fcd608b9cbc81"
+          },
+          {
+            "id": 0,
+            "name": "__wasm_split_unstable",
+            "payloadBytes": 25,
+            "encodedBytes": 27,
+            "sha256": "a416640601782cc68593cd2b5da1ea9868b5e050d5872dab34e72b937316ac10"
+          },
+          {
+            "id": 0,
+            "name": "target_features",
+            "payloadBytes": 148,
+            "encodedBytes": 151,
+            "sha256": "97ceea95e0687b14437e21c205ebb40eea27aa5ecaa971f7d87601e3aa213bfd"
+          }
+        ],
+        "optimized": [
+          {
+            "id": 1,
+            "payloadBytes": 309,
+            "encodedBytes": 312,
+            "sha256": "fe1175b5dea77c570c0816cbf00b76f1c3f18e5ff59a283bb18a44dad1301465"
+          },
+          {
+            "id": 2,
+            "payloadBytes": 3286,
+            "encodedBytes": 3289,
+            "sha256": "b460f8b6f5f85c0a9653e9a55ba1b58601cff2bbe91a7e30600e0656c6445389"
+          },
+          {
+            "id": 3,
+            "payloadBytes": 337,
+            "encodedBytes": 340,
+            "sha256": "55e4c091d3366b925ca9901eeddce1f5efcbeb791f86d63ae7cd7a6fd8555831"
+          },
+          {
+            "id": 4,
+            "payloadBytes": 11,
+            "encodedBytes": 13,
+            "sha256": "85c6b5e6f676f005b1b537ee34f13cf718a05c076d8c426445efe06f5cb1869e"
+          },
+          {
+            "id": 5,
+            "payloadBytes": 3,
+            "encodedBytes": 5,
+            "sha256": "f0b84402ff5181a6f998d07e5832d16de5bd3ea4e32e542da814690a734e0950"
+          },
+          {
+            "id": 6,
+            "payloadBytes": 33,
+            "encodedBytes": 35,
+            "sha256": "4764c93d1d49017fc7292a433dfa8b3e1ccf9ae231178f7a1da4dfd1c837577e"
+          },
+          {
+            "id": 7,
+            "payloadBytes": 1513,
+            "encodedBytes": 1516,
+            "sha256": "36b685124db5b1e21f00e8eb71088284b1085e723f0c004b82e570923ca44d64"
+          },
+          {
+            "id": 9,
+            "payloadBytes": 336,
+            "encodedBytes": 339,
+            "sha256": "2f9c470f30bee1cf5c4911055082bc30944b30bd6cfd04e608cbd4fbae128313"
+          },
+          {
+            "id": 12,
+            "payloadBytes": 1,
+            "encodedBytes": 3,
+            "sha256": "ca358758f6d27e6cf45272937977a748fd88391db679ceda7dc7bf1f005ee879"
+          },
+          {
+            "id": 10,
+            "payloadBytes": 135161,
+            "encodedBytes": 135165,
+            "sha256": "ed40e6a2995ddd7a5152b5e52695a972e3b30838c5fb13cd006432d9bd0c33c1"
+          },
+          {
+            "id": 11,
+            "payloadBytes": 13676,
+            "encodedBytes": 13679,
+            "sha256": "68eeb578e0066082770339db6ed8b05763e0a57c772a853444720b75379400f4"
+          },
+          {
+            "id": 0,
+            "name": "producers",
+            "payloadBytes": 124,
+            "encodedBytes": 126,
+            "sha256": "5349359afa1778d0d8c567fa09601cda2ce1fbb4cc12a020275fcd608b9cbc81"
+          },
+          {
+            "id": 0,
+            "name": "__wasm_split_unstable",
+            "payloadBytes": 25,
+            "encodedBytes": 27,
+            "sha256": "a416640601782cc68593cd2b5da1ea9868b5e050d5872dab34e72b937316ac10"
+          },
+          {
+            "id": 0,
+            "name": "target_features",
+            "payloadBytes": 148,
+            "encodedBytes": 151,
+            "sha256": "436e14b8b97dd381f16be421a6f633e615c441207f9de33379f9604cb6c23723"
+          }
+        ]
+      },
+      "profile": {
+        "opt_level": "3",
+        "debuginfo": 0,
+        "debug_assertions": false,
+        "overflow_checks": false,
+        "test": false
+      }
+    }
+  ],
+  "browser": {
+    "version": "155.0.8059.84",
+    "cases": [
+      {
+        "name": "glory",
+        "stage": "bindgen",
+        "sha256": "f3b1385c2e13766039bc0e50dcc61c27697434600eb6b92235b7cced664dd4c9",
+        "passed": true,
+        "seededData": true,
+        "keyedIdentity": true,
+        "all10000RowsMounted": true,
+        "cleanup": true,
+        "pixelsEqual": true
+      },
+      {
+        "name": "dioxus",
+        "stage": "bindgen",
+        "sha256": "d31826528c08edf9a0c95bc97893733d949f2a2c6afbe49b401c84938f29c36b",
+        "passed": true,
+        "seededData": true,
+        "keyedIdentity": true,
+        "all10000RowsMounted": true,
+        "cleanup": true,
+        "pixelsEqual": true
+      },
+      {
+        "name": "leptos",
+        "stage": "bindgen",
+        "sha256": "4c65e88eb86279c80b5bd9267b0751d935b6eb2540f8c693726bd5a0f90f51ca",
+        "passed": true,
+        "seededData": true,
+        "keyedIdentity": true,
+        "all10000RowsMounted": true,
+        "cleanup": true,
+        "pixelsEqual": true
+      },
+      {
+        "name": "glory",
+        "stage": "optimized",
+        "sha256": "878a867532c05ed39182e057f3eced223d2bc9af42d7bd55ad6b543d61ddd932",
+        "passed": true,
+        "seededData": true,
+        "keyedIdentity": true,
+        "all10000RowsMounted": true,
+        "cleanup": true,
+        "pixelsEqual": true
+      },
+      {
+        "name": "dioxus",
+        "stage": "optimized",
+        "sha256": "bacb5f7352e32ad928569c8a3c24f62e27a35934f518ffe433c4d23f6a60a60c",
+        "passed": true,
+        "seededData": true,
+        "keyedIdentity": true,
+        "all10000RowsMounted": true,
+        "cleanup": true,
+        "pixelsEqual": true
+      },
+      {
+        "name": "leptos",
+        "stage": "optimized",
+        "sha256": "a01c1f0f17d4d6ea819dab3485a29a5eb0d1532b0c002148420dd00ad84f76c8",
+        "passed": true,
+        "seededData": true,
+        "keyedIdentity": true,
+        "all10000RowsMounted": true,
+        "cleanup": true,
+        "pixelsEqual": true
+      }
+    ]
+  }
+}

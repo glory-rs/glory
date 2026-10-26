@@ -1,0 +1,1014 @@
+{
+  "schema": 1,
+  "recorded": "2026-10-26T04:26:38.022Z",
+  "scope": "Role-only field projection; preceding mapping cleanup already included in before",
+  "evidenceRoot": "D:/BuildCache/glory-role-patches-20261026",
+  "changedLibraryInputs": [
+    "crates/html/src/lib.rs",
+    "crates/html/src/patch.rs",
+    "crates/html/src/role_tests.rs",
+    "crates/html/src/semantics.rs"
+  ],
+  "profile": {
+    "optLevel": 3,
+    "lto": true,
+    "codegenUnits": 1
+  },
+  "environment": {
+    "node": "v24.3.0",
+    "os": "Windows 11 Pro",
+    "cpu": "Intel(R) Core(TM) i7-14700KF",
+    "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18)\nbinary: rustc\ncommit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea\ncommit-date: 2026-08-18\nhost: x86_64-pc-windows-msvc\nrelease: 1.98.0\nLLVM version: 22.1.8",
+    "browser": "155.0.8059.84"
+  },
+  "protocol": {
+    "pairs": 2048,
+    "samples": 20,
+    "rounds": 4,
+    "warmups": 5,
+    "optimizer": "Binaryen 132.0.0 -Oz --enable-bulk-memory --enable-reference-types"
+  },
+  "performance": {
+    "summary": [
+      {
+        "case": "plain",
+        "mode": "native",
+        "result": {
+          "patches": 4096,
+          "edits": 4096,
+          "checksum": "14094441215333828608"
+        },
+        "before": {
+          "medianNs": 308.7646484375,
+          "q1Ns": 306.1279296875,
+          "q3Ns": 313.5009765625
+        },
+        "after": {
+          "medianNs": 183.251953125,
+          "q1Ns": 180.615234375,
+          "q3Ns": 186.328125
+        },
+        "changePercent": -40.649956511425636
+      },
+      {
+        "case": "plain",
+        "mode": "wasm",
+        "result": {
+          "patches": 4096,
+          "edits": 4096,
+          "checksum": "14094441215333828608"
+        },
+        "before": {
+          "medianNs": 390.6250058207661,
+          "q1Ns": 341.79689828306437,
+          "q3Ns": 488.28125
+        },
+        "after": {
+          "medianNs": 268.5546933207661,
+          "q1Ns": 244.140625,
+          "q3Ns": 292.9687616415322
+        },
+        "changePercent": -31.249999534338723
+      },
+      {
+        "case": "heading",
+        "mode": "native",
+        "result": {
+          "patches": 4096,
+          "edits": 4096,
+          "checksum": "13165404447431233536"
+        },
+        "before": {
+          "medianNs": 407.71484375,
+          "q1Ns": 401.8310546875,
+          "q3Ns": 424.5849609375
+        },
+        "after": {
+          "medianNs": 205.2490234375,
+          "q1Ns": 202.5634765625,
+          "q3Ns": 210.302734375
+        },
+        "changePercent": -49.658682634730546
+      },
+      {
+        "case": "heading",
+        "mode": "wasm",
+        "result": {
+          "patches": 4096,
+          "edits": 4096,
+          "checksum": "13165404447431233536"
+        },
+        "before": {
+          "medianNs": 439.4531133584678,
+          "q1Ns": 415.0390450377017,
+          "q3Ns": 512.6952892169356
+        },
+        "after": {
+          "medianNs": 219.72658578306437,
+          "q1Ns": 219.7265566792339,
+          "q3Ns": 244.140625
+        },
+        "changePercent": -49.99999337726152
+      },
+      {
+        "case": "navigation",
+        "mode": "native",
+        "result": {
+          "patches": 4096,
+          "edits": 8192,
+          "checksum": "4760317139454722048"
+        },
+        "before": {
+          "medianNs": 717.5048828125,
+          "q1Ns": 708.0810546875,
+          "q3Ns": 736.083984375
+        },
+        "after": {
+          "medianNs": 248.33984375,
+          "q1Ns": 245.5322265625,
+          "q3Ns": 265.283203125
+        },
+        "changePercent": -65.38841062982749
+      },
+      {
+        "case": "navigation",
+        "mode": "wasm",
+        "result": {
+          "patches": 4096,
+          "edits": 8192,
+          "checksum": "4760317139454722048"
+        },
+        "before": {
+          "medianNs": 854.4921875,
+          "q1Ns": 830.0781191792339,
+          "q3Ns": 927.7343633584678
+        },
+        "after": {
+          "medianNs": 292.9687616415322,
+          "q1Ns": 292.9687325377017,
+          "q3Ns": 317.3828299622983
+        },
+        "changePercent": -65.71428435189384
+      },
+      {
+        "case": "grid",
+        "mode": "native",
+        "result": {
+          "patches": 4096,
+          "edits": 8192,
+          "checksum": "10390469377239138304"
+        },
+        "before": {
+          "medianNs": 503.125,
+          "q1Ns": 493.505859375,
+          "q3Ns": 530.4443359375
+        },
+        "after": {
+          "medianNs": 258.837890625,
+          "q1Ns": 252.294921875,
+          "q3Ns": 283.88671875
+        },
+        "changePercent": -48.55395962732919
+      },
+      {
+        "case": "grid",
+        "mode": "wasm",
+        "result": {
+          "patches": 4096,
+          "edits": 8192,
+          "checksum": "10390469377239138304"
+        },
+        "before": {
+          "medianNs": 634.7656017169356,
+          "q1Ns": 585.9375232830644,
+          "q3Ns": 683.5937383584678
+        },
+        "after": {
+          "medianNs": 292.9687616415322,
+          "q1Ns": 292.9687325377017,
+          "q3Ns": 317.3828008584678
+        },
+        "changePercent": -53.84615031925166
+      },
+      {
+        "case": "relations",
+        "mode": "native",
+        "result": {
+          "patches": 4096,
+          "edits": 4096,
+          "checksum": "14094441215333828608"
+        },
+        "before": {
+          "medianNs": 1517.87109375,
+          "q1Ns": 1495.7763671875,
+          "q3Ns": 1565.576171875
+        },
+        "after": {
+          "medianNs": 226.708984375,
+          "q1Ns": 221.09375,
+          "q3Ns": 277.5146484375
+        },
+        "changePercent": -85.0640159557357
+      },
+      {
+        "case": "relations",
+        "mode": "wasm",
+        "result": {
+          "patches": 4096,
+          "edits": 4096,
+          "checksum": "14094441215333828608"
+        },
+        "before": {
+          "medianNs": 1806.640619179234,
+          "q1Ns": 1757.8125116415322,
+          "q3Ns": 1879.8827950377017
+        },
+        "after": {
+          "medianNs": 268.5546933207661,
+          "q1Ns": 244.140625,
+          "q3Ns": 268.5546933207661
+        },
+        "changePercent": -85.13513476505517
+      },
+      {
+        "case": "dialog",
+        "mode": "native",
+        "result": {
+          "patches": 4096,
+          "edits": 4096,
+          "checksum": "2722667416772751360"
+        },
+        "before": {
+          "medianNs": 885.5712890625,
+          "q1Ns": 855.126953125,
+          "q3Ns": 926.318359375
+        },
+        "after": {
+          "medianNs": 225.830078125,
+          "q1Ns": 223.8525390625,
+          "q3Ns": 228.955078125
+        },
+        "changePercent": -74.49893860447165
+      },
+      {
+        "case": "dialog",
+        "mode": "wasm",
+        "result": {
+          "patches": 4096,
+          "edits": 4096,
+          "checksum": "2722667416772751360"
+        },
+        "before": {
+          "medianNs": 1000.9765683207661,
+          "q1Ns": 976.5625,
+          "q3Ns": 1074.2187732830644
+        },
+        "after": {
+          "medianNs": 292.9687325377017,
+          "q1Ns": 268.5546933207661,
+          "q3Ns": 292.9687616415322
+        },
+        "changePercent": -70.73170923179703
+      },
+      {
+        "case": "same_role",
+        "mode": "native",
+        "result": {
+          "patches": 4096,
+          "edits": 0,
+          "checksum": "0"
+        },
+        "before": {
+          "medianNs": 1400.439453125,
+          "q1Ns": 1381.8359375,
+          "q3Ns": 1432.12890625
+        },
+        "after": {
+          "medianNs": 130.859375,
+          "q1Ns": 128.4423828125,
+          "q3Ns": 134.130859375
+        },
+        "changePercent": -90.65583487326104
+      },
+      {
+        "case": "same_role",
+        "mode": "wasm",
+        "result": {
+          "patches": 4096,
+          "edits": 0,
+          "checksum": "0"
+        },
+        "before": {
+          "medianNs": 1684.5703357830644,
+          "q1Ns": 1660.1562674622983,
+          "q3Ns": 1757.8125116415322
+        },
+        "after": {
+          "medianNs": 170.89844914153218,
+          "q1Ns": 170.89842003770173,
+          "q3Ns": 195.31248835846782
+        },
+        "changePercent": -89.85507191291654
+      },
+      {
+        "case": "named_reset",
+        "mode": "native",
+        "result": {
+          "patches": 4096,
+          "edits": 0,
+          "checksum": "0"
+        },
+        "before": {
+          "medianNs": 1377.2216796875,
+          "q1Ns": 1360.2294921875,
+          "q3Ns": 1408.2763671875
+        },
+        "after": {
+          "medianNs": 127.734375,
+          "q1Ns": 126.07421875,
+          "q3Ns": 130.7373046875
+        },
+        "changePercent": -90.72521316764461
+      },
+      {
+        "case": "named_reset",
+        "mode": "wasm",
+        "result": {
+          "patches": 4096,
+          "edits": 0,
+          "checksum": "0"
+        },
+        "before": {
+          "medianNs": 1708.984375,
+          "q1Ns": 1660.1562383584678,
+          "q3Ns": 1757.8125116415322
+        },
+        "after": {
+          "medianNs": 170.89844914153218,
+          "q1Ns": 170.89842003770173,
+          "q3Ns": 195.31251746229827
+        },
+        "changePercent": -89.99999931880406
+      }
+    ],
+    "artifacts": {
+      "before": {
+        "native": "b7d32465f90fdb331f339c6b88b8bc6df607b21b02c98c15e98d353c124836fd",
+        "wasm": "7991b0f523d6ffbf7eb983f7ea3d37d671ceabc222bd90163cde4abb8ebf2ee1",
+        "inputs": "2fbd4547c62b13101b201ca19afaea3d8ea2aae48228357851eb9ca9f258b470"
+      },
+      "after": {
+        "native": "2344115af50909acb06113e0129b5ea5fb24caf12afc0ffceb9153720a68fd7e",
+        "wasm": "c21a2a0c85ece028501bf01ff3fda123b7ae043aab589348784f401cc5222201",
+        "inputs": "867ff35f4cddf9dbd4854b68b9b190b20627229534effdda76ce2bdb1ffaaa1a"
+      }
+    },
+    "raw": "D:/BuildCache/glory-role-patches-20261026/performance.json",
+    "rawSha256": "bd1f89d7185be053301ce6cc6a1fab08ddf7a084dc743d42af2e21d30b7a0b08"
+  },
+  "applicationSize": {
+    "before": {
+      "source": {
+        "snapshot": "D:\\BuildCache\\glory-role-patches-20261026\\inputs-before",
+        "compiledAt": "D:\\BuildCache\\glory-role-patches-20261026\\source",
+        "gitHead": "6f08a1265d27d036a4ee692ae67ba29d2da71af6",
+        "workingChanges": " M .gitignore\n M benchmarks/README.md\n M benchmarks/snapshot.py\n M benchmarks/wasm-size/javascript.cjs\n M crates/html/src/lib.rs\n M crates/html/src/mapping.rs\n M crates/html/src/semantics.rs\n M docs/wasm-size-quality-review.md\n?? benchmarks/bundle-attribution-2026-10-26.json\n?? benchmarks/bundle-size-2026-10-26.json\n?? benchmarks/bundle-size-browser.cjs\n?? benchmarks/bundle-size.cjs\n?? benchmarks/role-patches/\n?? crates/html/src/semantics_tests.rs\n?? docs/framework-benchmark-size-analysis-2026-10-26.md\n?? docs/framework-benchmark-wasm-size-2026-10-26.md\n",
+        "inputDigest": "727c96ebe853bd53f883b62ddb880b2b51bf97a6afe2571f8866cf8e9fb2f809"
+      },
+      "versions": {
+        "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18)\nbinary: rustc\ncommit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea\ncommit-date: 2026-08-18\nhost: x86_64-pc-windows-msvc\nrelease: 1.98.0\nLLVM version: 22.1.8",
+        "cargo": "cargo 1.98.0 (797e8a9bc 2026-08-05)",
+        "node": "v24.3.0",
+        "binaryen": "wasm-opt version 132 (version_132)",
+        "wasmBindgen": "0.2.129"
+      },
+      "profile": {
+        "optLevel": 3,
+        "lto": true,
+        "codegenUnits": 1
+      },
+      "optimizer": "-Oz --enable-bulk-memory --enable-reference-types",
+      "compression": {
+        "brotliQuality": 11,
+        "gzipLevel": 9
+      },
+      "bindgen": {
+        "bytes": 1852963,
+        "brotli": 399754,
+        "gzip": 555449,
+        "sha256": "72a9a10e295297b2f6f776ca5562f3a57601c4f18afe87bca6c5d6d589c165a3"
+      },
+      "optimized": {
+        "bytes": 1417887,
+        "brotli": 376131,
+        "gzip": 512757,
+        "sha256": "7e2ef982a3663271f271b932f9e0c16041b4d035c977e087893abfa056d164c1"
+      },
+      "js": {
+        "bytes": 60648,
+        "brotli": 8934,
+        "gzip": 10480,
+        "sha256": "0d4ece2953997710c6acaab95e4df05da95b6d6ce6efca454625b7cdc4fa83ca",
+        "files": [
+          {
+            "path": "app.js",
+            "bytes": 58659,
+            "brotli": 8180,
+            "gzip": 9587,
+            "sha256": "7159fa5585881042719cebcb85d8dab2d9bfc81c44f600fcfdbfe4e785dab17e"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "reportSha256": "5a1238fb0063dc0307ad90832366b0bf82a2e44f3257adecb7802ed38e19a485"
+    },
+    "after": {
+      "source": {
+        "snapshot": "D:\\BuildCache\\glory-role-patches-20261026\\inputs-after",
+        "compiledAt": "D:\\BuildCache\\glory-role-patches-20261026\\source",
+        "gitHead": "6f08a1265d27d036a4ee692ae67ba29d2da71af6",
+        "workingChanges": " M .gitignore\n M benchmarks/README.md\n M benchmarks/snapshot.py\n M benchmarks/wasm-size/javascript.cjs\n M crates/html/src/lib.rs\n M crates/html/src/mapping.rs\n M crates/html/src/patch.rs\n M crates/html/src/semantics.rs\n M docs/wasm-size-quality-review.md\n?? benchmarks/bundle-attribution-2026-10-26.json\n?? benchmarks/bundle-size-2026-10-26.json\n?? benchmarks/bundle-size-browser.cjs\n?? benchmarks/bundle-size.cjs\n?? benchmarks/role-patches/\n?? crates/html/src/role_tests.rs\n?? crates/html/src/semantics_tests.rs\n?? docs/framework-benchmark-size-analysis-2026-10-26.md\n?? docs/framework-benchmark-wasm-size-2026-10-26.md\n",
+        "inputDigest": "09101d2b960b00aece80e62e3f0c1d8a68ee2d64ed75ff75cd067cfe9a4d3b9c"
+      },
+      "versions": {
+        "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18)\nbinary: rustc\ncommit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea\ncommit-date: 2026-08-18\nhost: x86_64-pc-windows-msvc\nrelease: 1.98.0\nLLVM version: 22.1.8",
+        "cargo": "cargo 1.98.0 (797e8a9bc 2026-08-05)",
+        "node": "v24.3.0",
+        "binaryen": "wasm-opt version 132 (version_132)",
+        "wasmBindgen": "0.2.129"
+      },
+      "profile": {
+        "optLevel": 3,
+        "lto": true,
+        "codegenUnits": 1
+      },
+      "optimizer": "-Oz --enable-bulk-memory --enable-reference-types",
+      "compression": {
+        "brotliQuality": 11,
+        "gzipLevel": 9
+      },
+      "bindgen": {
+        "bytes": 1845014,
+        "brotli": 400775,
+        "gzip": 556074,
+        "sha256": "c5def3153505fa9e079976846530bf9a9c134cc7f5813d8cc868d3c60d05e130"
+      },
+      "optimized": {
+        "bytes": 1411391,
+        "brotli": 376383,
+        "gzip": 513260,
+        "sha256": "d85ed0e5188e77b6aac48604a170aecd79a6cf3494861010dab8b502263d9b27"
+      },
+      "js": {
+        "bytes": 60648,
+        "brotli": 8934,
+        "gzip": 10480,
+        "sha256": "0d4ece2953997710c6acaab95e4df05da95b6d6ce6efca454625b7cdc4fa83ca",
+        "files": [
+          {
+            "path": "app.js",
+            "bytes": 58659,
+            "brotli": 8180,
+            "gzip": 9587,
+            "sha256": "7159fa5585881042719cebcb85d8dab2d9bfc81c44f600fcfdbfe4e785dab17e"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "reportSha256": "5b58758c54f4df39abd99e3374a95fd44dd06f14ba86614129f6cd73223a2d70"
+    }
+  },
+  "correctness": {
+    "roleAccepted": 3990,
+    "roleRejected": 3578,
+    "legacyProjectionComparisons": 83968,
+    "createAndSharedPlan": true,
+    "exactFullShapeDiff": true,
+    "editCountsAndChecksumsMatch": true,
+    "defaultAndAllFeatureHtmlTestsAndClippy": true,
+    "sharedGloryAndSapidChecks": true
+  },
+  "checks": {
+    "beforeBundleBrowser": {
+      "contract": "semantic-rows-v1",
+      "recorded": "2026-10-26T04:21:01.400Z",
+      "cases": [
+        {
+          "name": "glory",
+          "stage": "bindgen",
+          "sha256": "72a9a10e295297b2f6f776ca5562f3a57601c4f18afe87bca6c5d6d589c165a3",
+          "passed": true,
+          "seededData": true,
+          "keyedIdentity": true,
+          "all10000RowsMounted": true,
+          "cleanup": true,
+          "pixelsEqual": true
+        },
+        {
+          "name": "glory",
+          "stage": "optimized",
+          "sha256": "7e2ef982a3663271f271b932f9e0c16041b4d035c977e087893abfa056d164c1",
+          "passed": true,
+          "seededData": true,
+          "keyedIdentity": true,
+          "all10000RowsMounted": true,
+          "cleanup": true,
+          "pixelsEqual": true
+        }
+      ],
+      "browser": "155.0.8059.84"
+    },
+    "afterBundleBrowser": {
+      "contract": "semantic-rows-v1",
+      "recorded": "2026-10-26T04:21:22.847Z",
+      "cases": [
+        {
+          "name": "glory",
+          "stage": "bindgen",
+          "sha256": "c5def3153505fa9e079976846530bf9a9c134cc7f5813d8cc868d3c60d05e130",
+          "passed": true,
+          "seededData": true,
+          "keyedIdentity": true,
+          "all10000RowsMounted": true,
+          "cleanup": true,
+          "pixelsEqual": true
+        },
+        {
+          "name": "glory",
+          "stage": "optimized",
+          "sha256": "d85ed0e5188e77b6aac48604a170aecd79a6cf3494861010dab8b502263d9b27",
+          "passed": true,
+          "seededData": true,
+          "keyedIdentity": true,
+          "all10000RowsMounted": true,
+          "cleanup": true,
+          "pixelsEqual": true
+        }
+      ],
+      "browser": "155.0.8059.84"
+    },
+    "semantics": {
+      "browser": "155.0.8059.84",
+      "results": [
+        {
+          "file": "semantics-acceptance.js",
+          "passed": true
+        }
+      ],
+      "evidence": "D:/BuildCache/glory-role-patches-20261026/browser-semantics-verified/evidence.json"
+    },
+    "plan": {
+      "browser": "155.0.8059.84",
+      "results": [
+        {
+          "file": "plan-acceptance.js",
+          "passed": true
+        }
+      ],
+      "evidence": "D:/BuildCache/glory-role-patches-20261026/browser-plan-verified/evidence.json"
+    },
+    "bulkIntegrity": {
+      "evidence": "D:/BuildCache/glory-role-patches-20261026/bulk-integrity-verified/evidence.json",
+      "sha256": "93653105709477d47a708c56cfca50ee74d91aa673344ef33d6ced0c894b7fdf"
+    },
+    "html-default.log": {
+      "path": "D:/BuildCache/glory-role-patches-20261026/html-default.log",
+      "sha256": "57623f4944ae6b9efd92d05280f77436df53e6def35c43153e11542c9da03805"
+    },
+    "html-all.log": {
+      "path": "D:/BuildCache/glory-role-patches-20261026/html-all.log",
+      "sha256": "e1b99cd55f529c9acbef7d832d2e37a54cd323929283f6d280e41d5b60bbfb3b"
+    },
+    "html-clippy.log": {
+      "path": "D:/BuildCache/glory-role-patches-20261026/html-clippy.log",
+      "sha256": "8075c4959a37178cfc908ff253c1eab5a3d7e64cbb9eb2e19cd0863e31edcd75"
+    },
+    "shared-check.log": {
+      "path": "D:/BuildCache/glory-role-patches-20261026/shared-check.log",
+      "sha256": "cfd9f390892816e24aaceb099e7ca95ea3b97fa96900ea388999d35f8f7df139"
+    },
+    "role-tests.log": {
+      "path": "D:/BuildCache/glory-role-patches-20261026/role-tests.log",
+      "sha256": "12ee2b720e293c63d9028e49431ef3ebc4deb8bcafcbaebf7021dbac58bcbe85"
+    },
+    "fixture-clippy.log": {
+      "path": "D:/BuildCache/glory-role-patches-20261026/fixture-clippy.log",
+      "sha256": "f04c874b87f685d8ad9ddab994a67dc7488ca673a0454d864a0485fcda12c71a"
+    },
+    "fixture-wasm-clippy.log": {
+      "path": "D:/BuildCache/glory-role-patches-20261026/fixture-wasm-clippy.log",
+      "sha256": "c03b80dd248ee7ceb5a0cf5a33fde6863f6f4edcf7fd34bb9d621f562a1685d8"
+    }
+  },
+  "minimumRegressionGuard": {
+    "isolatesRoleChange": false,
+    "profile": {
+      "optLevel": "z",
+      "lto": true,
+      "codegenUnits": 1,
+      "strip": "debuginfo"
+    },
+    "baseline": "benchmarks/wasm-size/baseline.json",
+    "report": "D:/BuildCache/sapid/wasm-size/runs/role-fields-20261026/report.json",
+    "reportSha256": "d32949cab07b9c4bb1dd418d7e6c5affe33ad2596faa37840352bc77ca7c84e0",
+    "cases": [
+      {
+        "name": "glory-minimal",
+        "optimized": {
+          "bytes": 894630,
+          "brotli": 282468,
+          "gzip": 355271,
+          "sha256": "eaad68cd5b0879dee6e3641ff544d733c79a83138085d29c7173b5bf22cfe732"
+        }
+      },
+      {
+        "name": "glory-text",
+        "optimized": {
+          "bytes": 915505,
+          "brotli": 288433,
+          "gzip": 363015,
+          "sha256": "d71adb8fedde2728522e92e48e0dbc605fb8072933af40311cf0e0795f804a48"
+        }
+      }
+    ],
+    "browserPassed": true
+  },
+  "applicationPerformance": {
+    "scope": "Full semantic-rows-v1 final Binaryen WASM, actual DOM, two reversed-order rounds, 3 warmups/12 measured samples per operation per round",
+    "raw": "D:/BuildCache/glory-role-patches-20261026/rows-performance/evidence.json",
+    "rawSha256": "c05f710552489d0b84445e24c5aa6f7a60dd5c0723806c79830ad6736b77a1c0",
+    "totalSamples": 432,
+    "summary": [
+      {
+        "key": "create_1k",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 17.896500000000024,
+            "q1": 17.476999999999965,
+            "q3": 18.446999999999992
+          },
+          "elapsedMs": {
+            "median": 44.19999998807907,
+            "q1": 43.300000071525574,
+            "q3": 46.10000002384186
+          },
+          "roundScriptMedians": [
+            18.1485,
+            17.5825
+          ]
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 18.840499999999984,
+            "q1": 18.016000000000005,
+            "q3": 19.38999999999996
+          },
+          "elapsedMs": {
+            "median": 45.65000003576279,
+            "q1": 44.89999997615814,
+            "q3": 46.5
+          },
+          "roundScriptMedians": [
+            18.056500000000003,
+            19.31749999999999
+          ]
+        },
+        "scriptChangePercent": 5.274774397228277
+      },
+      {
+        "key": "replace_1k",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 27.781,
+            "q1": 26.805999999999997,
+            "q3": 28.895000000000003
+          },
+          "elapsedMs": {
+            "median": 54.84999996423721,
+            "q1": 53.5,
+            "q3": 56.200000047683716
+          },
+          "roundScriptMedians": [
+            28.088500000000018,
+            26.999500000000012
+          ]
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 28.488499999999917,
+            "q1": 27.22100000000005,
+            "q3": 29.670000000000087
+          },
+          "elapsedMs": {
+            "median": 56.30000001192093,
+            "q1": 53.700000047683716,
+            "q3": 57.799999952316284
+          },
+          "roundScriptMedians": [
+            28.470499999999955,
+            28.962999999999905
+          ]
+        },
+        "scriptChangePercent": 2.5467045822681555
+      },
+      {
+        "key": "update_10th",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.49149999999997807,
+            "q1": 0.43400000000004546,
+            "q3": 0.5379999999999274
+          },
+          "elapsedMs": {
+            "median": 11.150000035762787,
+            "q1": 8.800000071525574,
+            "q3": 12.5
+          },
+          "roundScriptMedians": [
+            0.47400000000008546,
+            0.49149999999997807
+          ]
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.47200000000002795,
+            "q1": 0.444000000000111,
+            "q3": 0.5270000000001662
+          },
+          "elapsedMs": {
+            "median": 9.949999988079071,
+            "q1": 8.5,
+            "q3": 12.399999976158142
+          },
+          "roundScriptMedians": [
+            0.48000000000003595,
+            0.4650000000000487
+          ]
+        },
+        "scriptChangePercent": -3.967446592055135
+      },
+      {
+        "key": "select_row",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.6284999999999208,
+            "q1": 0.580000000000247,
+            "q3": 0.7129999999997416
+          },
+          "elapsedMs": {
+            "median": 7.699999928474426,
+            "q1": 6.700000047683716,
+            "q3": 9.899999976158142
+          },
+          "roundScriptMedians": [
+            0.6785000000000263,
+            0.5985000000000573
+          ]
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.6324999999999248,
+            "q1": 0.5789999999998852,
+            "q3": 0.6759999999998989
+          },
+          "elapsedMs": {
+            "median": 7.700000047683716,
+            "q1": 7.200000047683716,
+            "q3": 10.100000023841858
+          },
+          "roundScriptMedians": [
+            0.644000000000089,
+            0.6085000000002339
+          ]
+        },
+        "scriptChangePercent": 0.6364359586323864
+      },
+      {
+        "key": "swap_rows",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.36049999999998583,
+            "q1": 0.3329999999999167,
+            "q3": 0.37799999999998946
+          },
+          "elapsedMs": {
+            "median": 8.300000011920929,
+            "q1": 6.800000071525574,
+            "q3": 9.800000071525574
+          },
+          "roundScriptMedians": [
+            0.36400000000003097,
+            0.3475000000001671
+          ]
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.36799999999992394,
+            "q1": 0.34699999999965314,
+            "q3": 0.39200000000017
+          },
+          "elapsedMs": {
+            "median": 9.5,
+            "q1": 6.900000095367432,
+            "q3": 10.899999976158142
+          },
+          "roundScriptMedians": [
+            0.38800000000005497,
+            0.35700000000016274
+          ]
+        },
+        "scriptChangePercent": 2.0804438279995674
+      },
+      {
+        "key": "remove_row",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.33349999999976454,
+            "q1": 0.3230000000002953,
+            "q3": 0.34199999999984243
+          },
+          "elapsedMs": {
+            "median": 8.800000011920929,
+            "q1": 7.5,
+            "q3": 11.200000047683716
+          },
+          "roundScriptMedians": [
+            0.33850000000001934,
+            0.3315000000001511
+          ]
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.34850000000008485,
+            "q1": 0.332000000000221,
+            "q3": 0.36199999999997345
+          },
+          "elapsedMs": {
+            "median": 9.799999952316284,
+            "q1": 7.899999976158142,
+            "q3": 11.399999976158142
+          },
+          "roundScriptMedians": [
+            0.34949999999978054,
+            0.3445000000001919
+          ]
+        },
+        "scriptChangePercent": 4.497751124537008
+      },
+      {
+        "key": "append_1k",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 20.205999999999946,
+            "q1": 19.543000000000088,
+            "q3": 20.78099999999994
+          },
+          "elapsedMs": {
+            "median": 50.90000003576279,
+            "q1": 48.60000002384186,
+            "q3": 54.60000002384186
+          },
+          "roundScriptMedians": [
+            19.77349999999989,
+            20.443999999999907
+          ]
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 20.58300000000002,
+            "q1": 19.492000000000065,
+            "q3": 21.154000000000117
+          },
+          "elapsedMs": {
+            "median": 51.75,
+            "q1": 49.199999928474426,
+            "q3": 55.60000002384186
+          },
+          "roundScriptMedians": [
+            20.394500000000093,
+            20.896500000000096
+          ]
+        },
+        "scriptChangePercent": 1.8657824408595092
+      },
+      {
+        "key": "create_10k",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 223.38499999999948,
+            "q1": 215.39399999999986,
+            "q3": 229.19300000000044
+          },
+          "elapsedMs": {
+            "median": 496.85000002384186,
+            "q1": 457.8000000715256,
+            "q3": 544.3000000715256
+          },
+          "roundScriptMedians": [
+            219.11149999999992,
+            228.09049999999996
+          ]
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 219.18599999999964,
+            "q1": 211.7349999999991,
+            "q3": 226.3439999999992
+          },
+          "elapsedMs": {
+            "median": 483.89999997615814,
+            "q1": 460.89999997615814,
+            "q3": 524.8000000715256
+          },
+          "roundScriptMedians": [
+            224.51449999999974,
+            213.5330000000004
+          ]
+        },
+        "scriptChangePercent": -1.8797143944310757
+      },
+      {
+        "key": "clear_1k",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 14.641499999999752,
+            "q1": 13.683999999999585,
+            "q3": 15.14799999999994
+          },
+          "elapsedMs": {
+            "median": 16.5,
+            "q1": 15.199999928474426,
+            "q3": 18.600000023841858
+          },
+          "roundScriptMedians": [
+            14.42000000000121,
+            14.821999999999669
+          ]
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 14.042499999999514,
+            "q1": 13.739999999998531,
+            "q3": 14.461999999999975
+          },
+          "elapsedMs": {
+            "median": 17.69999998807907,
+            "q1": 14.5,
+            "q3": 19.399999976158142
+          },
+          "roundScriptMedians": [
+            14.246999999999233,
+            13.977500000000198
+          ]
+        },
+        "scriptChangePercent": -4.091110883449433
+      }
+    ],
+    "acceptanceAndViewportPixelsEqual": true,
+    "profilingSeparatedFromTimings": true
+  }
+}

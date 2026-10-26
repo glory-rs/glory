@@ -506,12 +506,8 @@ fn shape_view(descriptor: glory_render::DescriptorView<'_>) -> Result<Shape, Err
     if let Some(name) = &descriptor.name {
         attrs(&mut shape, control).insert("aria-label", name.clone());
     }
-    if let Some(role) = descriptor.effective_role() {
-        attrs(&mut shape, Part::Main).insert("role", role_name(role).into());
-    }
-    if let Some(Role::Heading(level)) = descriptor.role {
-        attrs(&mut shape, Part::Main).insert("aria-level", level.to_string());
-    }
+    // Semantic role and heading metadata are lowered once, by the same path
+    // used for patches. Intrinsic control roles were set above.
     attrs(&mut shape, control).extend(crate::semantics::attributes(
         descriptor.semantics.as_deref(),
         descriptor.effective_role(),

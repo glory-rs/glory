@@ -14,7 +14,7 @@ files = [root/'Cargo.toml', root/'Cargo.lock']
 for member in members:
     files.extend(p for p in (root/member).rglob('*') if p.is_file() and 'target' not in p.parts)
 files.extend(root/'benchmarks'/name for name in ['data.rs','bench-harness.js','semantic.css'])
-for app in ['glory','leptos','dioxus']:
+for app in ['glory','leptos','dioxus','role-patches']:
     base=root/'benchmarks'/app
     files.extend(base/name for name in ['Cargo.toml','Cargo.lock','index.html'])
     files.extend(base.glob('src/**/*.rs'))

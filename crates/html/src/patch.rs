@@ -110,6 +110,43 @@ fn semantics(
     }
 }
 
+fn role_change(
+    edits: &mut Vec<Edit>,
+    part: Part,
+    metadata: Option<&glory_render::Semantics>,
+    old: Option<Role>,
+    new: Option<Role>,
+) {
+    if old == new {
+        return;
+    }
+    let old = crate::semantics::role_attributes(metadata, old);
+    let new = crate::semantics::role_attributes(metadata, new);
+    let mut removed = [None; crate::semantics::ROLE_ATTRIBUTE_COUNT];
+    for (index, ((name, old), (_, new))) in old.into_iter().zip(new).enumerate() {
+        if old == new {
+            continue;
+        }
+        match new {
+            Some(value) => edits.push(Edit::Attribute {
+                part,
+                name,
+                value: Some(value.into_owned()),
+            }),
+            None => removed[index] = Some(name),
+        }
+    }
+    // Match full-shape difference ordering: changed present attributes first,
+    // then removals, each in name order. The projection is already canonical.
+    for name in removed.into_iter().flatten() {
+        edits.push(Edit::Attribute {
+            part,
+            name,
+            value: None,
+        });
+    }
+}
+
 pub(crate) fn lower(next: glory_render::DescriptorView<'_>, inverse: &Patch) -> Vec<Edit> {
     let mut edits = Vec::new();
     // Every accepted Group patch leaves its boxless shape empty.
@@ -272,17 +309,12 @@ pub(crate) fn lower(next: glory_render::DescriptorView<'_>, inverse: &Patch) -> 
         Patch::Role(change) => {
             let old = *old!(change);
             let old = glory_render::DescriptorView { role: old, ..next }.effective_role();
-            semantics(
+            role_change(
                 &mut edits,
                 control,
                 next.semantics.as_deref(),
-                next.semantics.as_deref(),
                 old,
                 next.effective_role(),
-                match next.props {
-                    Props::Input(p) if !p.multiline => Some(p.purpose),
-                    _ => None,
-                },
             );
         }
         Patch::Semantics(change) => {

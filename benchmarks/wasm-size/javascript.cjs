@@ -3,7 +3,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const crypto=require('node:crypto');
 const zlib=require('node:zlib');
-function javascriptMetrics(dir) {
+function javascriptMetrics(dir, entry='fixture.js') {
   const seen=new Set(),files=[];
   function visit(file) {
     if(seen.has(file)) return;
@@ -19,7 +19,7 @@ function javascriptMetrics(dir) {
     for(const match of source.matchAll(/\bfrom\s*['"](\.[^'"]+\.js)['"]/g)) visit(path.resolve(path.dirname(file),match[1]));
     for(const match of source.matchAll(/\bimport\s*['"](\.[^'"]+\.js)['"]/g)) visit(path.resolve(path.dirname(file),match[1]));
   }
-  visit(path.resolve(dir,'fixture.js'));
+  visit(path.resolve(dir,entry));
   files.sort((a,b)=>a.path.localeCompare(b.path,'en'));
   return {bytes:files.reduce((n,file)=>n+file.bytes,0),brotli:files.reduce((n,file)=>n+file.brotli,0),gzip:files.reduce((n,file)=>n+file.gzip,0),sha256:crypto.createHash('sha256').update(JSON.stringify(files)).digest('hex'),files};
 }

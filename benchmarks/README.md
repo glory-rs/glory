@@ -1,5 +1,25 @@
 # Glory / Leptos / Dioxus: current semantic browser benchmark
 
+[2026-10-26 当前三框架重跑](../docs/framework-benchmark-rerun-2026-10-26.md)：
+包含 Role 优化的 Glory、锁定的 Leptos 0.8.22 / Dioxus 0.7.10，三个全新独立 target，
+正反两轮 648 个样本。千行创建 Script 为 **18.962 / 14.355 / 4.507 ms**；
+统一 −Oz WASM 为 **1,412,608 / 155,008 / 317,164 B**。数据、完整身份、万行几何
+及六处画面一致；保留 Leptos 连续流程选行异常和另外 72 个独立诊断样本。
+
+[Role 字段依赖优化与前后测量](../docs/role-patch-lowering-2026-10-26.md)：
+Role 更新复用固定五属性投影，保留完整差分和独立旧规则校验；WASM 更新内核耗时
+下降 31%–90%，完整应用 WASM 减少 6,496 B，Brotli 增加 252 B。内核时间不代表整页帧率。
+
+[体积差距的具体代码分析与去重](../docs/framework-benchmark-size-analysis-2026-10-26.md)：
+最终函数归因、同源码 Rust 3/z 诊断、HTML role/数值/方向映射去重及同路径 A/B。
+保留性能配置和完整能力；去重的 WASM 减少 6,215 B，Brotli 增加 94 B，明确记录质量收益与体积边界。
+
+当前应用的[WASM 体积实测（2026-10-26）](../docs/framework-benchmark-wasm-size-2026-10-26.md)：
+独立重建 Glory 0.3.1 / Dioxus 0.7.10 / Leptos 0.8.22，保留性能配置。
+统一 Binaryen `-Oz` 后 WASM 为 **1,425,214 / 317,164 / 155,008 B**；
+WASM+全部 JS 的 Brotli 为 **385,157 / 108,490 / 48,747 B**。
+原始发布流程、调试名称、同口径压缩及六项浏览器验收分别记录；下方折叠区的旧体积表不适用。
+
 本轮[Plan 准备与批次身份校验优化](../docs/plan-batch-preparation-optimization-2026-10-25.md)：
 八份独立构建，最终三版本同批 1,800 样本；千行创建 / 替换 Script 改善 **7.5% / 4.2%**，
 5,000 行看板初始化改善 **6.0%**。万行轮间不稳定、全量更新 3–6% 回退均保留；
@@ -120,7 +140,7 @@ subsequently [fixed](../docs/anchor-residual-fix-2026-10-23.md). Use `bulk-compa
 and `summarize-bulk.py` for the paired run; the report includes exact commands.
 
 The active workload is **semantic-rows-v1**. It compares Glory's new public Rust
-builders and full keyed `each` with Leptos 0.8.19 and Dioxus 0.7.9. All three
+builders and full keyed `each` with Leptos 0.8.22 and Dioxus 0.7.10. All three
 use the same seeded Rust generator, div/button/span element structure and CSS.
 Framework-specific attributes and comment markers remain measured overhead.
 The operations are create 1k/10k, replace, update every tenth label, select,

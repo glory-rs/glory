@@ -27,6 +27,11 @@ mod patch_tests;
 #[cfg(test)]
 mod placeholder_tests;
 mod semantics;
+#[cfg(test)]
+mod semantics_tests;
+
+#[cfg(test)]
+mod role_tests;
 mod serialize;
 #[cfg(feature = "css")]
 mod sheets;

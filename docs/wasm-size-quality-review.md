@@ -5,6 +5,11 @@ The acceptance criterion is an independent improvement in correctness,
 maintainability or a required capability boundary. A smaller initial download
 alone does not justify an architectural change.
 
+The later [benchmark attribution and lowering cleanup](framework-benchmark-size-analysis-2026-10-26.md)
+identified duplicated role/range/direction lowering within the existing HTML
+boundary. It consolidates that source logic without implementing either of
+the architectural changes rejected below; its measured benchmark Brotli size does not improve.
+
 ## Decisions
 
 | Candidate | Independent code-quality evidence | Decision |

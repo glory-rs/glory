@@ -1,0 +1,2791 @@
+{
+  "schema": 1,
+  "recorded": "2026-10-26T03:43:57.721Z",
+  "method": "Binaryen -Oz with names; every non-custom section verified against the measured stripped module. Function bodies charged to enclosing symbols, including inlined callees; not exclusive crate or removable sizes.",
+  "baseline": {
+    "snapshot": "D:\\BuildCache\\glory-benchmark-wasm-20261026\\source-20261026-110144-346",
+    "gitHead": "6f08a1265d27d036a4ee692ae67ba29d2da71af6",
+    "workingChanges": "",
+    "inputDigest": "13c1f74849645187c51529eb1dd649145473583cedc327d315939d619e154432"
+  },
+  "frameworks": {
+    "glory": {
+      "final": {
+        "path": "D:/BuildCache/glory-benchmark-wasm-20261026/bundle-size/glory/optimized.wasm",
+        "bytes": 1425214,
+        "sha256": "878a867532c05ed39182e057f3eced223d2bc9af42d7bd55ad6b543d61ddd932"
+      },
+      "nonCustomSectionsIdentical": true,
+      "sections": [
+        {
+          "id": 1,
+          "payloadBytes": 655,
+          "encodedBytes": 658,
+          "sha256": "83558b575f696275e7cc4c4fd4b018d20730b6b5040f4bd84c5083513b431c33"
+        },
+        {
+          "id": 2,
+          "payloadBytes": 10740,
+          "encodedBytes": 10743,
+          "sha256": "c9284e1ba9b2dca6cc5903071c22d5c88a3c76662eca03ff910eb94b873aee95"
+        },
+        {
+          "id": 3,
+          "payloadBytes": 1103,
+          "encodedBytes": 1106,
+          "sha256": "e7c20ffead4868a98a7b1bcb062f47deabfe0ef7bd639acf52c6366ead98b7c1"
+        },
+        {
+          "id": 4,
+          "payloadBytes": 11,
+          "encodedBytes": 13,
+          "sha256": "b9669f367f5f4792b4490e7193cb5f32c8acfeef80e65f0c492dce746ba6bf11"
+        },
+        {
+          "id": 5,
+          "payloadBytes": 3,
+          "encodedBytes": 5,
+          "sha256": "e3c4e8c4be74ea7897d60436685f5014a88654a4f415f7e08b959984bf15f5d0"
+        },
+        {
+          "id": 6,
+          "payloadBytes": 25,
+          "encodedBytes": 27,
+          "sha256": "3f4ac89a14c5b5ea91cf43a53422c736b786766cfe5faddc54b8ce472c9a4abf"
+        },
+        {
+          "id": 7,
+          "payloadBytes": 916,
+          "encodedBytes": 919,
+          "sha256": "209ab35e48cc238cf33c73bfd98a6a1449de1e6a812de0d29468b0a21185996f"
+        },
+        {
+          "id": 9,
+          "payloadBytes": 517,
+          "encodedBytes": 520,
+          "sha256": "9a3c253b93a814c2d0f9714e0b0b9e0be52ebd16ecb4a8e912eb52c802528de9"
+        },
+        {
+          "id": 12,
+          "payloadBytes": 1,
+          "encodedBytes": 3,
+          "sha256": "83891d7fe85c33e52c8b4e5814c92fb6a3b9467299200538a6babaa8b452d879"
+        },
+        {
+          "id": 10,
+          "payloadBytes": 1334189,
+          "encodedBytes": 1334193,
+          "sha256": "c728ed910380232d456ca88f60c5ad46c04be0ae368bb2565a2a72edd9e639db"
+        },
+        {
+          "id": 11,
+          "payloadBytes": 76738,
+          "encodedBytes": 76742,
+          "sha256": "9a746765ce7e77f3024247c586027c154f841f5bbf108e2e08c827c5649ea7f1"
+        },
+        {
+          "id": 0,
+          "payloadBytes": 124,
+          "encodedBytes": 126,
+          "sha256": "5349359afa1778d0d8c567fa09601cda2ce1fbb4cc12a020275fcd608b9cbc81",
+          "name": "producers"
+        },
+        {
+          "id": 0,
+          "payloadBytes": 148,
+          "encodedBytes": 151,
+          "sha256": "436e14b8b97dd381f16be421a6f633e615c441207f9de33379f9604cb6c23723",
+          "name": "target_features"
+        }
+      ],
+      "functionBytes": 1332333,
+      "functionCount": 1101,
+      "enclosingSymbols": [
+        {
+          "name": "glory_web",
+          "bytes": 362508,
+          "functions": 126
+        },
+        {
+          "name": "alloc",
+          "bytes": 209882,
+          "functions": 250
+        },
+        {
+          "name": "glory_html",
+          "bytes": 179332,
+          "functions": 22
+        },
+        {
+          "name": "glory_render",
+          "bytes": 163188,
+          "functions": 106
+        },
+        {
+          "name": "core",
+          "bytes": 127673,
+          "functions": 208
+        },
+        {
+          "name": "glory_ui",
+          "bytes": 118489,
+          "functions": 42
+        },
+        {
+          "name": "bench_glory",
+          "bytes": 48024,
+          "functions": 22
+        },
+        {
+          "name": "glory_core",
+          "bytes": 45539,
+          "functions": 34
+        },
+        {
+          "name": "hashbrown",
+          "bytes": 21536,
+          "functions": 24
+        },
+        {
+          "name": "generated",
+          "bytes": 15365,
+          "functions": 36
+        },
+        {
+          "name": "glory_style",
+          "bytes": 12512,
+          "functions": 12
+        },
+        {
+          "name": "dlmalloc",
+          "bytes": 7748,
+          "functions": 6
+        },
+        {
+          "name": "std",
+          "bytes": 6860,
+          "functions": 24
+        },
+        {
+          "name": "js_sys",
+          "bytes": 4107,
+          "functions": 42
+        },
+        {
+          "name": "wasm_bindgen",
+          "bytes": 3079,
+          "functions": 38
+        },
+        {
+          "name": "compiler_builtins",
+          "bytes": 2579,
+          "functions": 2
+        },
+        {
+          "name": "web_sys",
+          "bytes": 2304,
+          "functions": 104
+        },
+        {
+          "name": "__rustc",
+          "bytes": 969,
+          "functions": 2
+        },
+        {
+          "name": "trim_matches",
+          "bytes": 639,
+          "functions": 1
+        }
+      ],
+      "structuralBodies": [
+        {
+          "name": "remaining bodies",
+          "bytes": 1010633,
+          "functions": 714
+        },
+        {
+          "name": "BTree collection implementations",
+          "bytes": 168989,
+          "functions": 152
+        },
+        {
+          "name": "destruction glue",
+          "bytes": 61931,
+          "functions": 114
+        },
+        {
+          "name": "formatting / number conversion symbols",
+          "bytes": 36861,
+          "functions": 81
+        },
+        {
+          "name": "Clone implementations",
+          "bytes": 24635,
+          "functions": 10
+        },
+        {
+          "name": "hash collection implementations",
+          "bytes": 21536,
+          "functions": 24
+        },
+        {
+          "name": "dlmalloc implementation",
+          "bytes": 7748,
+          "functions": 6
+        }
+      ],
+      "webModules": [
+        {
+          "name": "browser entry / Renderer",
+          "bytes": 146019,
+          "functions": 15
+        },
+        {
+          "name": "events",
+          "bytes": 80661,
+          "functions": 20
+        },
+        {
+          "name": "dom",
+          "bytes": 51604,
+          "functions": 32
+        },
+        {
+          "name": "layers",
+          "bytes": 44159,
+          "functions": 20
+        },
+        {
+          "name": "rich",
+          "bytes": 15246,
+          "functions": 13
+        },
+        {
+          "name": "frame",
+          "bytes": 8315,
+          "functions": 8
+        },
+        {
+          "name": "sheet",
+          "bytes": 4954,
+          "functions": 2
+        },
+        {
+          "name": "input_edit",
+          "bytes": 3375,
+          "functions": 4
+        },
+        {
+          "name": "select",
+          "bytes": 3180,
+          "functions": 3
+        },
+        {
+          "name": "swipe",
+          "bytes": 1623,
+          "functions": 2
+        },
+        {
+          "name": "images",
+          "bytes": 867,
+          "functions": 1
+        },
+        {
+          "name": "files",
+          "bytes": 793,
+          "functions": 2
+        },
+        {
+          "name": "translation",
+          "bytes": 719,
+          "functions": 2
+        },
+        {
+          "name": "collapse",
+          "bytes": 555,
+          "functions": 1
+        },
+        {
+          "name": "clipboard",
+          "bytes": 438,
+          "functions": 1
+        }
+      ],
+      "largestFunctions": [
+        {
+          "index": 216,
+          "bytes": 70845,
+          "name": "glory_html::semantics::attributes"
+        },
+        {
+          "index": 608,
+          "bytes": 68096,
+          "name": "<glory_web::browser::events::Listeners>::new::{closure#2}"
+        },
+        {
+          "index": 217,
+          "bytes": 56637,
+          "name": "<glory_web::browser::Renderer as glory_render::Render>::apply"
+        },
+        {
+          "index": 219,
+          "bytes": 46082,
+          "name": "<glory_html::Mapper>::apply::<glory_web::browser::dom::Sink>"
+        },
+        {
+          "index": 218,
+          "bytes": 43779,
+          "name": "<glory_web::browser::Renderer as glory_render::Render>::drain"
+        },
+        {
+          "index": 246,
+          "bytes": 30264,
+          "name": "<glory_web::browser::Renderer as glory_render::Render>::action"
+        },
+        {
+          "index": 220,
+          "bytes": 29152,
+          "name": "bench_glory::main"
+        },
+        {
+          "index": 394,
+          "bytes": 20572,
+          "name": "<glory_ui::control::Each<bench_glory::browser::Row, usize> as glory_ui::app::Widget>::build::{closure#0}"
+        },
+        {
+          "index": 221,
+          "bytes": 19546,
+          "name": "<glory_web::browser::layers::document::DocumentLayers>::sync"
+        },
+        {
+          "index": 228,
+          "bytes": 19544,
+          "name": "<glory_render::props::view::DescriptorView>::validate_fields"
+        },
+        {
+          "index": 225,
+          "bytes": 17460,
+          "name": "<glory_ui::builders::Element>::build"
+        },
+        {
+          "index": 222,
+          "bytes": 16887,
+          "name": "glory_html::mapping::shape_view"
+        }
+      ]
+    },
+    "dioxus": {
+      "final": {
+        "path": "D:/BuildCache/glory-benchmark-wasm-20261026/bundle-size/dioxus/optimized.wasm",
+        "bytes": 317164,
+        "sha256": "bacb5f7352e32ad928569c8a3c24f62e27a35934f518ffe433c4d23f6a60a60c"
+      },
+      "nonCustomSectionsIdentical": true,
+      "sections": [
+        {
+          "id": 1,
+          "payloadBytes": 361,
+          "encodedBytes": 364,
+          "sha256": "973d9f466491e55e244e52c6e90bea08f5f86602417b3b1dd566fb2712a74380"
+        },
+        {
+          "id": 2,
+          "payloadBytes": 3503,
+          "encodedBytes": 3506,
+          "sha256": "4c3e5769439dcce50c573311dcb4a8663706844851137a2ce8f14a293f2489ef"
+        },
+        {
+          "id": 3,
+          "payloadBytes": 518,
+          "encodedBytes": 521,
+          "sha256": "11660fa3af769d257a91dad12e9e978c5aabee3a5ff6dfa8c488219a8914315f"
+        },
+        {
+          "id": 4,
+          "payloadBytes": 11,
+          "encodedBytes": 13,
+          "sha256": "f622d1bcb2d8e9c48e0a53ce2ed80fd27a303030cd9a6632d5b7e1a375d4280a"
+        },
+        {
+          "id": 5,
+          "payloadBytes": 3,
+          "encodedBytes": 5,
+          "sha256": "f0b84402ff5181a6f998d07e5832d16de5bd3ea4e32e542da814690a734e0950"
+        },
+        {
+          "id": 6,
+          "payloadBytes": 31,
+          "encodedBytes": 33,
+          "sha256": "8c2aa69c260c19e3c12ff665d138c0d5dc3d2adb105ca74d298520efdd757d3e"
+        },
+        {
+          "id": 7,
+          "payloadBytes": 636,
+          "encodedBytes": 639,
+          "sha256": "c416420409969427dda1b14a00f5d047d53a3ab66dee894285d7fd660a07c4f4"
+        },
+        {
+          "id": 9,
+          "payloadBytes": 560,
+          "encodedBytes": 563,
+          "sha256": "b9b38d397797a43f2056d91a9ec49f8622024c3c5e7c20ce18c24f4b96516021"
+        },
+        {
+          "id": 12,
+          "payloadBytes": 1,
+          "encodedBytes": 3,
+          "sha256": "86be9a55762d316a3026c2836d044f5fc76e34da10e1b45feee5f18be7edb177"
+        },
+        {
+          "id": 10,
+          "payloadBytes": 277980,
+          "encodedBytes": 277984,
+          "sha256": "7a28f3a341889d4a5de6a527aaed00462bec6334e714b6e4b6419521bc433600"
+        },
+        {
+          "id": 11,
+          "payloadBytes": 33244,
+          "encodedBytes": 33248,
+          "sha256": "7266b3bb650463e2c731eb798638a24ae0d3f2c72057b03d35118944c89a3752"
+        },
+        {
+          "id": 0,
+          "payloadBytes": 124,
+          "encodedBytes": 126,
+          "sha256": "5349359afa1778d0d8c567fa09601cda2ce1fbb4cc12a020275fcd608b9cbc81",
+          "name": "producers"
+        },
+        {
+          "id": 0,
+          "payloadBytes": 148,
+          "encodedBytes": 151,
+          "sha256": "436e14b8b97dd381f16be421a6f633e615c441207f9de33379f9604cb6c23723",
+          "name": "target_features"
+        }
+      ],
+      "functionBytes": 277180,
+      "functionCount": 516,
+      "enclosingSymbols": [
+        {
+          "name": "dioxus_core",
+          "bytes": 98746,
+          "functions": 102
+        },
+        {
+          "name": "core",
+          "bytes": 42458,
+          "functions": 114
+        },
+        {
+          "name": "dioxus_web",
+          "bytes": 27613,
+          "functions": 19
+        },
+        {
+          "name": "alloc",
+          "bytes": 25690,
+          "functions": 69
+        },
+        {
+          "name": "rustc_demangle",
+          "bytes": 17557,
+          "functions": 26
+        },
+        {
+          "name": "bench_dioxus",
+          "bytes": 10317,
+          "functions": 3
+        },
+        {
+          "name": "dlmalloc",
+          "bytes": 7747,
+          "functions": 6
+        },
+        {
+          "name": "anyhow",
+          "bytes": 7353,
+          "functions": 14
+        },
+        {
+          "name": "std",
+          "bytes": 6798,
+          "functions": 26
+        },
+        {
+          "name": "generated",
+          "bytes": 5753,
+          "functions": 28
+        },
+        {
+          "name": "hashbrown",
+          "bytes": 4535,
+          "functions": 3
+        },
+        {
+          "name": "js_sys",
+          "bytes": 3353,
+          "functions": 19
+        },
+        {
+          "name": "parking_lot",
+          "bytes": 2906,
+          "functions": 5
+        },
+        {
+          "name": "dioxus_core_types",
+          "bytes": 2390,
+          "functions": 1
+        },
+        {
+          "name": "generational_box",
+          "bytes": 2122,
+          "functions": 6
+        },
+        {
+          "name": "wasm_bindgen",
+          "bytes": 2029,
+          "functions": 20
+        },
+        {
+          "name": "dioxus_signals",
+          "bytes": 1884,
+          "functions": 6
+        },
+        {
+          "name": "dioxus_interpreter_js",
+          "bytes": 1627,
+          "functions": 6
+        },
+        {
+          "name": "parking_lot_core",
+          "bytes": 1315,
+          "functions": 6
+        },
+        {
+          "name": "sledgehammer_utils",
+          "bytes": 1183,
+          "functions": 1
+        },
+        {
+          "name": "futures_channel",
+          "bytes": 984,
+          "functions": 3
+        },
+        {
+          "name": "__rustc",
+          "bytes": 966,
+          "functions": 2
+        },
+        {
+          "name": "smallvec",
+          "bytes": 767,
+          "functions": 2
+        },
+        {
+          "name": "rustc_hash",
+          "bytes": 541,
+          "functions": 2
+        },
+        {
+          "name": "web_sys",
+          "bytes": 490,
+          "functions": 25
+        },
+        {
+          "name": "dioxus_html",
+          "bytes": 56,
+          "functions": 2
+        }
+      ],
+      "structuralBodies": [
+        {
+          "name": "remaining bodies",
+          "bytes": 211562,
+          "functions": 371
+        },
+        {
+          "name": "formatting / number conversion symbols",
+          "bytes": 26112,
+          "functions": 82
+        },
+        {
+          "name": "destruction glue",
+          "bytes": 14365,
+          "functions": 41
+        },
+        {
+          "name": "BTree collection implementations",
+          "bytes": 12859,
+          "functions": 13
+        },
+        {
+          "name": "dlmalloc implementation",
+          "bytes": 7747,
+          "functions": 6
+        },
+        {
+          "name": "hash collection implementations",
+          "bytes": 4535,
+          "functions": 3
+        }
+      ],
+      "webModules": [],
+      "largestFunctions": [
+        {
+          "index": 68,
+          "bytes": 14313,
+          "name": "<dioxus_core::nodes::VNode>::diff_node::<dioxus_web::dom::WebsysDom>"
+        },
+        {
+          "index": 87,
+          "bytes": 10557,
+          "name": "<dioxus_web::dom::WebsysDom as dioxus_core::mutations::WriteMutations>::set_attribute"
+        },
+        {
+          "index": 70,
+          "bytes": 8715,
+          "name": "<dioxus_core::virtual_dom::VirtualDom>::run_and_diff_scope::<dioxus_web::dom::WebsysDom>"
+        },
+        {
+          "index": 69,
+          "bytes": 8572,
+          "name": "bench_dioxus::App"
+        },
+        {
+          "index": 71,
+          "bytes": 7167,
+          "name": "<dioxus_web::dom::WebsysDom>::new::{closure#0}"
+        },
+        {
+          "index": 73,
+          "bytes": 6982,
+          "name": "dioxus_web::launch::launch_virtual_dom::{closure#0}"
+        },
+        {
+          "index": 72,
+          "bytes": 6593,
+          "name": "<dioxus_core::nodes::VNode>::create_component_node::<dioxus_web::dom::WebsysDom>"
+        },
+        {
+          "index": 74,
+          "bytes": 6458,
+          "name": "<dioxus_core::virtual_dom::VirtualDom>::run_scope"
+        },
+        {
+          "index": 75,
+          "bytes": 6400,
+          "name": "<dioxus_core::nodes::VNode>::create::<dioxus_web::dom::WebsysDom>"
+        },
+        {
+          "index": 553,
+          "bytes": 5549,
+          "name": "<anyhow::error::ErrorImpl<dioxus_core::error_boundary::CapturedPanic> as core::fmt::Debug>::fmt"
+        },
+        {
+          "index": 76,
+          "bytes": 4738,
+          "name": "<dlmalloc::dlmalloc::Dlmalloc<dlmalloc::sys::System>>::malloc"
+        },
+        {
+          "index": 77,
+          "bytes": 4372,
+          "name": "dioxus_core::error_boundary::ErrorBoundary"
+        }
+      ]
+    },
+    "leptos": {
+      "final": {
+        "path": "D:/BuildCache/glory-benchmark-wasm-20261026/bundle-size/leptos/optimized.wasm",
+        "bytes": 155008,
+        "sha256": "a01c1f0f17d4d6ea819dab3485a29a5eb0d1532b0c002148420dd00ad84f76c8"
+      },
+      "nonCustomSectionsIdentical": true,
+      "sections": [
+        {
+          "id": 1,
+          "payloadBytes": 309,
+          "encodedBytes": 312,
+          "sha256": "fe1175b5dea77c570c0816cbf00b76f1c3f18e5ff59a283bb18a44dad1301465"
+        },
+        {
+          "id": 2,
+          "payloadBytes": 3286,
+          "encodedBytes": 3289,
+          "sha256": "b460f8b6f5f85c0a9653e9a55ba1b58601cff2bbe91a7e30600e0656c6445389"
+        },
+        {
+          "id": 3,
+          "payloadBytes": 337,
+          "encodedBytes": 340,
+          "sha256": "55e4c091d3366b925ca9901eeddce1f5efcbeb791f86d63ae7cd7a6fd8555831"
+        },
+        {
+          "id": 4,
+          "payloadBytes": 11,
+          "encodedBytes": 13,
+          "sha256": "85c6b5e6f676f005b1b537ee34f13cf718a05c076d8c426445efe06f5cb1869e"
+        },
+        {
+          "id": 5,
+          "payloadBytes": 3,
+          "encodedBytes": 5,
+          "sha256": "f0b84402ff5181a6f998d07e5832d16de5bd3ea4e32e542da814690a734e0950"
+        },
+        {
+          "id": 6,
+          "payloadBytes": 33,
+          "encodedBytes": 35,
+          "sha256": "4764c93d1d49017fc7292a433dfa8b3e1ccf9ae231178f7a1da4dfd1c837577e"
+        },
+        {
+          "id": 7,
+          "payloadBytes": 1513,
+          "encodedBytes": 1516,
+          "sha256": "36b685124db5b1e21f00e8eb71088284b1085e723f0c004b82e570923ca44d64"
+        },
+        {
+          "id": 9,
+          "payloadBytes": 336,
+          "encodedBytes": 339,
+          "sha256": "2f9c470f30bee1cf5c4911055082bc30944b30bd6cfd04e608cbd4fbae128313"
+        },
+        {
+          "id": 12,
+          "payloadBytes": 1,
+          "encodedBytes": 3,
+          "sha256": "ca358758f6d27e6cf45272937977a748fd88391db679ceda7dc7bf1f005ee879"
+        },
+        {
+          "id": 10,
+          "payloadBytes": 135161,
+          "encodedBytes": 135165,
+          "sha256": "ed40e6a2995ddd7a5152b5e52695a972e3b30838c5fb13cd006432d9bd0c33c1"
+        },
+        {
+          "id": 11,
+          "payloadBytes": 13676,
+          "encodedBytes": 13679,
+          "sha256": "68eeb578e0066082770339db6ed8b05763e0a57c772a853444720b75379400f4"
+        },
+        {
+          "id": 0,
+          "payloadBytes": 124,
+          "encodedBytes": 126,
+          "sha256": "5349359afa1778d0d8c567fa09601cda2ce1fbb4cc12a020275fcd608b9cbc81",
+          "name": "producers"
+        },
+        {
+          "id": 0,
+          "payloadBytes": 25,
+          "encodedBytes": 27,
+          "sha256": "a416640601782cc68593cd2b5da1ea9868b5e050d5872dab34e72b937316ac10",
+          "name": "__wasm_split_unstable"
+        },
+        {
+          "id": 0,
+          "payloadBytes": 148,
+          "encodedBytes": 151,
+          "sha256": "436e14b8b97dd381f16be421a6f633e615c441207f9de33379f9604cb6c23723",
+          "name": "target_features"
+        }
+      ],
+      "functionBytes": 134658,
+      "functionCount": 335,
+      "enclosingSymbols": [
+        {
+          "name": "core",
+          "bytes": 18393,
+          "functions": 72
+        },
+        {
+          "name": "tachys",
+          "bytes": 17846,
+          "functions": 26
+        },
+        {
+          "name": "bench_leptos",
+          "bytes": 15782,
+          "functions": 6
+        },
+        {
+          "name": "reactive_graph",
+          "bytes": 13392,
+          "functions": 20
+        },
+        {
+          "name": "js_sys",
+          "bytes": 12421,
+          "functions": 36
+        },
+        {
+          "name": "std",
+          "bytes": 11484,
+          "functions": 33
+        },
+        {
+          "name": "leptos",
+          "bytes": 10040,
+          "functions": 3
+        },
+        {
+          "name": "alloc",
+          "bytes": 8668,
+          "functions": 40
+        },
+        {
+          "name": "dlmalloc",
+          "bytes": 7745,
+          "functions": 6
+        },
+        {
+          "name": "generated",
+          "bytes": 6316,
+          "functions": 33
+        },
+        {
+          "name": "wasm_bindgen",
+          "bytes": 4443,
+          "functions": 33
+        },
+        {
+          "name": "indexmap",
+          "bytes": 4207,
+          "functions": 4
+        },
+        {
+          "name": "hashbrown",
+          "bytes": 1536,
+          "functions": 1
+        },
+        {
+          "name": "__rustc",
+          "bytes": 964,
+          "functions": 2
+        },
+        {
+          "name": "any_spawner",
+          "bytes": 466,
+          "functions": 4
+        },
+        {
+          "name": "rustc_hash",
+          "bytes": 440,
+          "functions": 1
+        },
+        {
+          "name": "web_sys",
+          "bytes": 394,
+          "functions": 13
+        },
+        {
+          "name": "send_wrapper",
+          "bytes": 121,
+          "functions": 2
+        }
+      ],
+      "structuralBodies": [
+        {
+          "name": "remaining bodies",
+          "bytes": 108312,
+          "functions": 261
+        },
+        {
+          "name": "destruction glue",
+          "bytes": 11988,
+          "functions": 42
+        },
+        {
+          "name": "dlmalloc implementation",
+          "bytes": 7745,
+          "functions": 6
+        },
+        {
+          "name": "formatting / number conversion symbols",
+          "bytes": 4430,
+          "functions": 24
+        },
+        {
+          "name": "hash collection implementations",
+          "bytes": 1536,
+          "functions": 1
+        },
+        {
+          "name": "Clone implementations",
+          "bytes": 647,
+          "functions": 1
+        }
+      ],
+      "webModules": [],
+      "largestFunctions": [
+        {
+          "index": 66,
+          "bytes": 10924,
+          "name": "bench_leptos::main"
+        },
+        {
+          "index": 67,
+          "bytes": 8883,
+          "name": "<leptos::for_loop::__component_for<bench_leptos::__component_app::{closure#7}, alloc::vec::Vec<bench_leptos::Row>, bench_leptos::Row, bench_leptos::__component_app::{closure#9}, leptos::into_view::View<tachys::html::element::HtmlElement<tachys::html::element::elements::Div, (tachys::html::class::Class<&str>, tachys::html::attribute::Attr<tachys::html::attribute::key::Role, &str>, tachys::html::class::Class<(&str, bench_leptos::__component_app::{closure#9}::{closure#3})>), ((tachys::html::element::HtmlElement<tachys::html::element::elements::Div, (tachys::html::class::Class<&str>, tachys::html::attribute::Attr<tachys::html::attribute::key::Role, &str>), (tachys::html::element::HtmlElement<tachys::html::element::elements::Span, (), (usize,)>,)>, tachys::html::element::HtmlElement<tachys::html::element::elements::Div, (tachys::html::class::Class<&str>, tachys::html::attribute::Attr<tachys::html::attribute::key::Role, &str>), (tachys::html::element::HtmlElement<tachys::html::element::elements::Button, (tachys::html::class::Class<&str>, tachys::html::event::On<tachys::html::event::click, bench_leptos::__component_app::{closure#9}::{closure#1}>), (bench_leptos::__component_app::{closure#9}::{closure#0},)>,)>, tachys::html::element::HtmlElement<tachys::html::element::elements::Div, (tachys::html::class::Class<&str>, tachys::html::attribute::Attr<tachys::html::attribute::key::Role, &str>), (tachys::html::element::HtmlElement<tachys::html::element::elements::Button, (tachys::html::class::Class<&str>, tachys::html::event::On<tachys::html::event::click, bench_leptos::__component_app::{closure#9}::{closure#2}>), (&str,)>,)>, tachys::html::InertElement),)>>, bench_leptos::__component_app::{closure#8}, usize>::{closure#1} as tachys::view::Render>::build::{closure#0}"
+        },
+        {
+          "index": 68,
+          "bytes": 7807,
+          "name": "<tachys::reactive_graph::owned::OwnedView<leptos::into_view::View<tachys::html::element::HtmlElement<tachys::html::element::elements::Div, (tachys::html::class::Class<&str>, tachys::html::attribute::Attr<tachys::html::attribute::key::Role, &str>, tachys::html::class::Class<(&str, bench_leptos::__component_app::{closure#9}::{closure#3})>), ((tachys::html::element::HtmlElement<tachys::html::element::elements::Div, (tachys::html::class::Class<&str>, tachys::html::attribute::Attr<tachys::html::attribute::key::Role, &str>), (tachys::html::element::HtmlElement<tachys::html::element::elements::Span, (), (usize,)>,)>, tachys::html::element::HtmlElement<tachys::html::element::elements::Div, (tachys::html::class::Class<&str>, tachys::html::attribute::Attr<tachys::html::attribute::key::Role, &str>), (tachys::html::element::HtmlElement<tachys::html::element::elements::Button, (tachys::html::class::Class<&str>, tachys::html::event::On<tachys::html::event::click, bench_leptos::__component_app::{closure#9}::{closure#1}>), (bench_leptos::__component_app::{closure#9}::{closure#0},)>,)>, tachys::html::element::HtmlElement<tachys::html::element::elements::Div, (tachys::html::class::Class<&str>, tachys::html::attribute::Attr<tachys::html::attribute::key::Role, &str>), (tachys::html::element::HtmlElement<tachys::html::element::elements::Button, (tachys::html::class::Class<&str>, tachys::html::event::On<tachys::html::event::click, bench_leptos::__component_app::{closure#9}::{closure#2}>), (&str,)>,)>, tachys::html::InertElement),)>>> as tachys::view::Render>::build"
+        },
+        {
+          "index": 69,
+          "bytes": 4738,
+          "name": "<dlmalloc::dlmalloc::Dlmalloc<dlmalloc::sys::System>>::malloc"
+        },
+        {
+          "index": 74,
+          "bytes": 4304,
+          "name": "<tachys::html::event::On<_, _>>::attach::attach_inner"
+        },
+        {
+          "index": 71,
+          "bytes": 2878,
+          "name": "js_sys::futures::future_to_promise::<core::panic::unwind_safe::AssertUnwindSafe<futures_util::future::try_future::UnwrapOrElse<futures_util::abortable::Abortable<<wasm_streams::readable::into_underlying_byte_source::IntoUnderlyingByteSource>::pull::{closure#0}>, <wasm_streams::readable::into_underlying_byte_source::IntoUnderlyingByteSource>::pull::{closure#1}>>>::{closure#0}::{closure#0}"
+        },
+        {
+          "index": 96,
+          "bytes": 2675,
+          "name": "wasm_bindgen::cache::intern::intern_str"
+        },
+        {
+          "index": 70,
+          "bytes": 2384,
+          "name": "<alloc::sync::Arc<std::sync::poison::rwlock::RwLock<reactive_graph::owner::OwnerInner>>>::drop_slow"
+        },
+        {
+          "index": 106,
+          "bytes": 2336,
+          "name": "<indexmap::map::IndexMap<usize, (), core::hash::BuildHasherDefault<rustc_hash::FxHasher>>>::insert_full"
+        },
+        {
+          "index": 73,
+          "bytes": 2094,
+          "name": "<reactive_graph::effect::render_effect::RenderEffect<tachys::view::keyed::KeyedState<usize, core::mem::drop<usize>, tachys::reactive_graph::owned::OwnedView<leptos::into_view::View<tachys::html::element::HtmlElement<tachys::html::element::elements::Div, (tachys::html::class::Class<&str>, tachys::html::attribute::Attr<tachys::html::attribute::key::Role, &str>, tachys::html::class::Class<(&str, bench_leptos::__component_app::{closure#9}::{closure#3})>), ((tachys::html::element::HtmlElement<tachys::html::element::elements::Div, (tachys::html::class::Class<&str>, tachys::html::attribute::Attr<tachys::html::attribute::key::Role, &str>), (tachys::html::element::HtmlElement<tachys::html::element::elements::Span, (), (usize,)>,)>, tachys::html::element::HtmlElement<tachys::html::element::elements::Div, (tachys::html::class::Class<&str>, tachys::html::attribute::Attr<tachys::html::attribute::key::Role, &str>), (tachys::html::element::HtmlElement<tachys::html::element::elements::Button, (tachys::html::class::Class<&str>, tachys::html::event::On<tachys::html::event::click, bench_leptos::__component_app::{closure#9}::{closure#1}>), (bench_leptos::__component_app::{closure#9}::{closure#0},)>,)>, tachys::html::element::HtmlElement<tachys::html::element::elements::Div, (tachys::html::class::Class<&str>, tachys::html::attribute::Attr<tachys::html::attribute::key::Role, &str>), (tachys::html::element::HtmlElement<tachys::html::element::elements::Button, (tachys::html::class::Class<&str>, tachys::html::event::On<tachys::html::event::click, bench_leptos::__component_app::{closure#9}::{closure#2}>), (&str,)>,)>, tachys::html::InertElement),)>>>>>>::new_with_value_erased::{closure#1}"
+        },
+        {
+          "index": 72,
+          "bytes": 2044,
+          "name": "<reactive_graph::effect::render_effect::RenderEffect<tachys::view::strings::StringState>>::new_with_value_erased::{closure#1}"
+        },
+        {
+          "index": 75,
+          "bytes": 1955,
+          "name": "<reactive_graph::effect::render_effect::RenderEffect<(web_sys::features::gen_DomTokenList::DomTokenList, bool)>>::new_with_value_erased::{closure#1}"
+        }
+      ]
+    }
+  },
+  "diagnostic": {
+    "note": "Only Rust opt-level changed from 3 to z against the same original frozen source and source path. Not a benchmark configuration change or cross-framework z comparison.",
+    "profile": {
+      "opt_level": "z",
+      "debuginfo": 0,
+      "debug_assertions": false,
+      "overflow_checks": false,
+      "test": false
+    },
+    "wasm": {
+      "bytes": 899197,
+      "brotli": 288799,
+      "gzip": 360803,
+      "sha256": "eded0d6623b397eb347b89763a82c979630adbb72c3f76433096d37effad6eba"
+    },
+    "attribution": {
+      "final": {
+        "path": "D:/BuildCache/glory-benchmark-analysis-20261026/profile-z/optimized.wasm",
+        "bytes": 899197,
+        "sha256": "eded0d6623b397eb347b89763a82c979630adbb72c3f76433096d37effad6eba"
+      },
+      "nonCustomSectionsIdentical": true,
+      "sections": [
+        {
+          "id": 1,
+          "payloadBytes": 851,
+          "encodedBytes": 854,
+          "sha256": "5b4687513f3fc7993a6bb78ae6a2abcacc440e1733a8c358d07bf0e982e15c0f"
+        },
+        {
+          "id": 2,
+          "payloadBytes": 10740,
+          "encodedBytes": 10743,
+          "sha256": "514220b1d475d9e07a5240a4066233df0f7e43981de36dd1841b13736cdf2225"
+        },
+        {
+          "id": 3,
+          "payloadBytes": 2207,
+          "encodedBytes": 2210,
+          "sha256": "96a1e26c5813d0c1fb01feed9fc6269488fac547157ca418f4020dd5106651a4"
+        },
+        {
+          "id": 4,
+          "payloadBytes": 11,
+          "encodedBytes": 13,
+          "sha256": "6eeeb55fb92456a905a9ea2b20a3f3962fc0555b4708ad3e607757dbda05dc4d"
+        },
+        {
+          "id": 5,
+          "payloadBytes": 3,
+          "encodedBytes": 5,
+          "sha256": "e3c4e8c4be74ea7897d60436685f5014a88654a4f415f7e08b959984bf15f5d0"
+        },
+        {
+          "id": 6,
+          "payloadBytes": 25,
+          "encodedBytes": 27,
+          "sha256": "77b7abf1ed77a1f0f51cfa6473b3ee9e2124fda2b75a03aa2f998e332c807962"
+        },
+        {
+          "id": 7,
+          "payloadBytes": 916,
+          "encodedBytes": 919,
+          "sha256": "e431ebf42dc03675d874089bd00ed4193b58d69ef347499250fb50a9eb7ae324"
+        },
+        {
+          "id": 9,
+          "payloadBytes": 611,
+          "encodedBytes": 614,
+          "sha256": "06bd2f900aa6babf624654198055f99c3131b18e4c79e495211b56c86367bd58"
+        },
+        {
+          "id": 12,
+          "payloadBytes": 1,
+          "encodedBytes": 3,
+          "sha256": "9652595f37edd08c51dfa26567e6cd76e6fa2709c3e578478ca398d316837a7a"
+        },
+        {
+          "id": 10,
+          "payloadBytes": 808928,
+          "encodedBytes": 808932,
+          "sha256": "dd523e2e4f34c2df507f2ee231b935658582bf800bf029c6f6efe690354e7cc7"
+        },
+        {
+          "id": 11,
+          "payloadBytes": 74588,
+          "encodedBytes": 74592,
+          "sha256": "deee13648e78b419a2b8ab8076ae58f0ce9b4c6490f272af90726c39d3f81424"
+        },
+        {
+          "id": 0,
+          "payloadBytes": 124,
+          "encodedBytes": 126,
+          "sha256": "5349359afa1778d0d8c567fa09601cda2ce1fbb4cc12a020275fcd608b9cbc81",
+          "name": "producers"
+        },
+        {
+          "id": 0,
+          "payloadBytes": 148,
+          "encodedBytes": 151,
+          "sha256": "436e14b8b97dd381f16be421a6f633e615c441207f9de33379f9604cb6c23723",
+          "name": "target_features"
+        }
+      ],
+      "functionBytes": 805859,
+      "functionCount": 2205,
+      "enclosingSymbols": [
+        {
+          "name": "glory_web",
+          "bytes": 212882,
+          "functions": 152
+        },
+        {
+          "name": "alloc",
+          "bytes": 144912,
+          "functions": 720
+        },
+        {
+          "name": "glory_render",
+          "bytes": 107744,
+          "functions": 184
+        },
+        {
+          "name": "core",
+          "bytes": 82340,
+          "functions": 544
+        },
+        {
+          "name": "glory_ui",
+          "bytes": 69929,
+          "functions": 63
+        },
+        {
+          "name": "glory_html",
+          "bytes": 64329,
+          "functions": 40
+        },
+        {
+          "name": "bench_glory",
+          "bytes": 33724,
+          "functions": 26
+        },
+        {
+          "name": "glory_core",
+          "bytes": 27929,
+          "functions": 50
+        },
+        {
+          "name": "generated",
+          "bytes": 15087,
+          "functions": 78
+        },
+        {
+          "name": "hashbrown",
+          "bytes": 13338,
+          "functions": 89
+        },
+        {
+          "name": "dlmalloc",
+          "bytes": 7134,
+          "functions": 6
+        },
+        {
+          "name": "std",
+          "bytes": 5777,
+          "functions": 34
+        },
+        {
+          "name": "glory_style",
+          "bytes": 4751,
+          "functions": 10
+        },
+        {
+          "name": "web_sys",
+          "bytes": 4006,
+          "functions": 102
+        },
+        {
+          "name": "js_sys",
+          "bytes": 3256,
+          "functions": 44
+        },
+        {
+          "name": "wasm_bindgen",
+          "bytes": 3194,
+          "functions": 43
+        },
+        {
+          "name": "compiler_builtins",
+          "bytes": 2579,
+          "functions": 2
+        },
+        {
+          "name": "__rustc",
+          "bytes": 1001,
+          "functions": 3
+        },
+        {
+          "name": "trim_matches",
+          "bytes": 330,
+          "functions": 1
+        },
+        {
+          "name": "once_cell",
+          "bytes": 314,
+          "functions": 1
+        },
+        {
+          "name": "contains",
+          "bytes": 295,
+          "functions": 3
+        },
+        {
+          "name": "futures_core",
+          "bytes": 272,
+          "functions": 1
+        },
+        {
+          "name": "futures_util",
+          "bytes": 255,
+          "functions": 3
+        },
+        {
+          "name": "to_vec_in",
+          "bytes": 192,
+          "functions": 2
+        },
+        {
+          "name": "split_once",
+          "bytes": 112,
+          "functions": 1
+        },
+        {
+          "name": "partition_point",
+          "bytes": 86,
+          "functions": 1
+        },
+        {
+          "name": "starts_with",
+          "bytes": 50,
+          "functions": 1
+        },
+        {
+          "name": "then_some",
+          "bytes": 41,
+          "functions": 1
+        }
+      ],
+      "structuralBodies": [
+        {
+          "name": "remaining bodies",
+          "bytes": 588405,
+          "functions": 1258
+        },
+        {
+          "name": "BTree collection implementations",
+          "bytes": 125940,
+          "functions": 444
+        },
+        {
+          "name": "destruction glue",
+          "bytes": 26936,
+          "functions": 283
+        },
+        {
+          "name": "formatting / number conversion symbols",
+          "bytes": 25303,
+          "functions": 86
+        },
+        {
+          "name": "Clone implementations",
+          "bytes": 18803,
+          "functions": 39
+        },
+        {
+          "name": "hash collection implementations",
+          "bytes": 13338,
+          "functions": 89
+        },
+        {
+          "name": "dlmalloc implementation",
+          "bytes": 7134,
+          "functions": 6
+        }
+      ],
+      "webModules": [
+        {
+          "name": "browser entry / Renderer",
+          "bytes": 82317,
+          "functions": 15
+        },
+        {
+          "name": "events",
+          "bytes": 52617,
+          "functions": 19
+        },
+        {
+          "name": "dom",
+          "bytes": 26325,
+          "functions": 42
+        },
+        {
+          "name": "layers",
+          "bytes": 25517,
+          "functions": 28
+        },
+        {
+          "name": "rich",
+          "bytes": 10438,
+          "functions": 15
+        },
+        {
+          "name": "frame",
+          "bytes": 5291,
+          "functions": 9
+        },
+        {
+          "name": "sheet",
+          "bytes": 2637,
+          "functions": 2
+        },
+        {
+          "name": "input_edit",
+          "bytes": 2227,
+          "functions": 4
+        },
+        {
+          "name": "select",
+          "bytes": 1676,
+          "functions": 3
+        },
+        {
+          "name": "swipe",
+          "bytes": 989,
+          "functions": 3
+        },
+        {
+          "name": "files",
+          "bytes": 985,
+          "functions": 5
+        },
+        {
+          "name": "images",
+          "bytes": 538,
+          "functions": 1
+        },
+        {
+          "name": "translation",
+          "bytes": 466,
+          "functions": 2
+        },
+        {
+          "name": "file_document",
+          "bytes": 383,
+          "functions": 1
+        },
+        {
+          "name": "clipboard",
+          "bytes": 200,
+          "functions": 1
+        },
+        {
+          "name": "collapse",
+          "bytes": 190,
+          "functions": 1
+        },
+        {
+          "name": "scroll_into_view",
+          "bytes": 86,
+          "functions": 1
+        }
+      ],
+      "largestFunctions": [
+        {
+          "index": 979,
+          "bytes": 46083,
+          "name": "<glory_web::browser::events::Listeners>::new::{closure#2}"
+        },
+        {
+          "index": 217,
+          "bytes": 28380,
+          "name": "<glory_html::Mapper>::apply::<glory_web::browser::dom::Sink>"
+        },
+        {
+          "index": 216,
+          "bytes": 28372,
+          "name": "<glory_web::browser::Renderer as glory_render::Render>::apply"
+        },
+        {
+          "index": 218,
+          "bytes": 26634,
+          "name": "<glory_web::browser::Renderer as glory_render::Render>::drain"
+        },
+        {
+          "index": 224,
+          "bytes": 18859,
+          "name": "<glory_web::browser::Renderer as glory_render::Render>::action"
+        },
+        {
+          "index": 219,
+          "bytes": 17053,
+          "name": "bench_glory::main"
+        },
+        {
+          "index": 390,
+          "bytes": 13117,
+          "name": "<glory_ui::control::Each<bench_glory::browser::Row, usize> as glory_ui::app::Widget>::build::{closure#0}"
+        },
+        {
+          "index": 220,
+          "bytes": 12944,
+          "name": "<glory_render::props::view::DescriptorView>::validate_fields"
+        },
+        {
+          "index": 221,
+          "bytes": 11610,
+          "name": "<glory_web::browser::layers::document::DocumentLayers>::sync"
+        },
+        {
+          "index": 222,
+          "bytes": 9655,
+          "name": "glory_html::semantics::attributes"
+        },
+        {
+          "index": 225,
+          "bytes": 8215,
+          "name": "<glory_ui::builders::WidgetFn<bench_glory::browser::ui::{closure#7}::{closure#0}> as glory_ui::app::Widget>::build"
+        },
+        {
+          "index": 223,
+          "bytes": 7815,
+          "name": "<glory_render::memory::Memory>::prepare_patch"
+        }
+      ]
+    },
+    "browserIntegrity": [
+      {
+        "variant": "profile-z",
+        "passed": true
+      }
+    ]
+  },
+  "cleanup": {
+    "before": {
+      "source": {
+        "snapshot": "D:\\BuildCache\\glory-benchmark-analysis-20261026\\inputs-before",
+        "compiledAt": "D:\\BuildCache\\glory-benchmark-analysis-20261026\\source",
+        "gitHead": "6f08a1265d27d036a4ee692ae67ba29d2da71af6",
+        "workingChanges": " M benchmarks/README.md\n M benchmarks/wasm-size/javascript.cjs\n?? benchmarks/bundle-size-2026-10-26.json\n?? benchmarks/bundle-size-browser.cjs\n?? benchmarks/bundle-size.cjs\n?? docs/framework-benchmark-wasm-size-2026-10-26.md\n",
+        "inputDigest": "13c1f74849645187c51529eb1dd649145473583cedc327d315939d619e154432"
+      },
+      "metrics": {
+        "name": "glory",
+        "version": "0.3.1",
+        "packageId": "path+file:///D:/BuildCache/glory-benchmark-analysis-20261026/source/crates/glory#0.3.1",
+        "lockSha256": "525dc12ee93e6251ea131f638e1b6a7a8dc637b5760d2766d927f365ba085fb8",
+        "rustc": {
+          "bytes": 2850387,
+          "brotli": 520828,
+          "gzip": 777056,
+          "sha256": "02967a750a56f4785aa15127dcce26b57f24f705f3f0c81b70dd13e8945514cd"
+        },
+        "bindgen": {
+          "bytes": 1860141,
+          "brotli": 399739,
+          "gzip": 555467,
+          "sha256": "ff3c3e62432a85174713037f25aa5130a9ff841ab9ea102280bbcafd213b71da"
+        },
+        "stripped": {
+          "bytes": 1586938,
+          "brotli": 377155,
+          "gzip": 518736,
+          "sha256": "17f2f03eb78862ffe724a4bcb92e66006b683ad36844db375beaf546b716b069"
+        },
+        "optimized": {
+          "bytes": 1424391,
+          "brotli": 376307,
+          "gzip": 512783,
+          "sha256": "5e5d99af9addba03c542ecfeb2aa0adbf0d1488316f9ad5038d971a5b9e5534b"
+        },
+        "js": {
+          "bytes": 60648,
+          "brotli": 8934,
+          "gzip": 10480,
+          "sha256": "0d4ece2953997710c6acaab95e4df05da95b6d6ce6efca454625b7cdc4fa83ca",
+          "files": [
+            {
+              "path": "app.js",
+              "bytes": 58659,
+              "brotli": 8180,
+              "gzip": 9587,
+              "sha256": "7159fa5585881042719cebcb85d8dab2d9bfc81c44f600fcfdbfe4e785dab17e"
+            },
+            {
+              "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+              "bytes": 1609,
+              "brotli": 598,
+              "gzip": 692,
+              "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+            },
+            {
+              "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+              "bytes": 380,
+              "brotli": 156,
+              "gzip": 201,
+              "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+            }
+          ]
+        },
+        "sections": {
+          "bindgen": [
+            {
+              "id": 1,
+              "payloadBytes": 767,
+              "encodedBytes": 770,
+              "sha256": "c68d025069ce0bcef9da4f758c8c890cc21679ef4c12102b53e3144c54f43c4e"
+            },
+            {
+              "id": 2,
+              "payloadBytes": 10832,
+              "encodedBytes": 10835,
+              "sha256": "c7dbd4ad05e326a0932603eece5f6022ef5f584febb3e3672d920c361373ed41"
+            },
+            {
+              "id": 3,
+              "payloadBytes": 1542,
+              "encodedBytes": 1545,
+              "sha256": "7c6c9171e4f80b0875972fd4676bcc8443b5dad1c617d11bb09b399b87081c87"
+            },
+            {
+              "id": 4,
+              "payloadBytes": 11,
+              "encodedBytes": 13,
+              "sha256": "b9669f367f5f4792b4490e7193cb5f32c8acfeef80e65f0c492dce746ba6bf11"
+            },
+            {
+              "id": 5,
+              "payloadBytes": 3,
+              "encodedBytes": 5,
+              "sha256": "e3c4e8c4be74ea7897d60436685f5014a88654a4f415f7e08b959984bf15f5d0"
+            },
+            {
+              "id": 6,
+              "payloadBytes": 25,
+              "encodedBytes": 27,
+              "sha256": "3e75b148cd5bf87ad43d272eb4ec5501872bc3e4f9e719b34e314a0f8b9777a0"
+            },
+            {
+              "id": 7,
+              "payloadBytes": 916,
+              "encodedBytes": 919,
+              "sha256": "b9b4069e792eefb1fa3eed8408ddd7318aaae9e5b935bdc6696e17349fe887de"
+            },
+            {
+              "id": 9,
+              "payloadBytes": 517,
+              "encodedBytes": 520,
+              "sha256": "5791c2150eb3251fed8daa926df077bbc390d50e062e6cc7fe89994b883b3f4b"
+            },
+            {
+              "id": 10,
+              "payloadBytes": 1495202,
+              "encodedBytes": 1495206,
+              "sha256": "cf0c7b5361fe92e7991501579c90b6cce2d15e322b6a41847f2937fd96689984"
+            },
+            {
+              "id": 11,
+              "payloadBytes": 76171,
+              "encodedBytes": 76175,
+              "sha256": "441411adc22bfffab8e2299dcb863559abbe0abab1158c7383963b8f6b5b40d3"
+            },
+            {
+              "id": 0,
+              "name": "name",
+              "payloadBytes": 273837,
+              "encodedBytes": 273841,
+              "sha256": "91d69f8943acbed9d98fbfcead0793301bd49dcce57ed90925c1dc1ff2b7a067"
+            },
+            {
+              "id": 0,
+              "name": "producers",
+              "payloadBytes": 124,
+              "encodedBytes": 126,
+              "sha256": "5349359afa1778d0d8c567fa09601cda2ce1fbb4cc12a020275fcd608b9cbc81"
+            },
+            {
+              "id": 0,
+              "name": "target_features",
+              "payloadBytes": 148,
+              "encodedBytes": 151,
+              "sha256": "97ceea95e0687b14437e21c205ebb40eea27aa5ecaa971f7d87601e3aa213bfd"
+            }
+          ],
+          "optimized": [
+            {
+              "id": 1,
+              "payloadBytes": 655,
+              "encodedBytes": 658,
+              "sha256": "83558b575f696275e7cc4c4fd4b018d20730b6b5040f4bd84c5083513b431c33"
+            },
+            {
+              "id": 2,
+              "payloadBytes": 10740,
+              "encodedBytes": 10743,
+              "sha256": "c9284e1ba9b2dca6cc5903071c22d5c88a3c76662eca03ff910eb94b873aee95"
+            },
+            {
+              "id": 3,
+              "payloadBytes": 1103,
+              "encodedBytes": 1106,
+              "sha256": "e7c20ffead4868a98a7b1bcb062f47deabfe0ef7bd639acf52c6366ead98b7c1"
+            },
+            {
+              "id": 4,
+              "payloadBytes": 11,
+              "encodedBytes": 13,
+              "sha256": "b9669f367f5f4792b4490e7193cb5f32c8acfeef80e65f0c492dce746ba6bf11"
+            },
+            {
+              "id": 5,
+              "payloadBytes": 3,
+              "encodedBytes": 5,
+              "sha256": "e3c4e8c4be74ea7897d60436685f5014a88654a4f415f7e08b959984bf15f5d0"
+            },
+            {
+              "id": 6,
+              "payloadBytes": 25,
+              "encodedBytes": 27,
+              "sha256": "3e75b148cd5bf87ad43d272eb4ec5501872bc3e4f9e719b34e314a0f8b9777a0"
+            },
+            {
+              "id": 7,
+              "payloadBytes": 916,
+              "encodedBytes": 919,
+              "sha256": "209ab35e48cc238cf33c73bfd98a6a1449de1e6a812de0d29468b0a21185996f"
+            },
+            {
+              "id": 9,
+              "payloadBytes": 517,
+              "encodedBytes": 520,
+              "sha256": "854f80a80e11ae48d2788c4e25e79f10b6db1e39047f30bf932633ccf9ecdbcb"
+            },
+            {
+              "id": 12,
+              "payloadBytes": 1,
+              "encodedBytes": 3,
+              "sha256": "83891d7fe85c33e52c8b4e5814c92fb6a3b9467299200538a6babaa8b452d879"
+            },
+            {
+              "id": 10,
+              "payloadBytes": 1334164,
+              "encodedBytes": 1334168,
+              "sha256": "8faf920b7b267fcceb69ef11f7b367a25ec3429568ead01a13e9ccec05baec9c"
+            },
+            {
+              "id": 11,
+              "payloadBytes": 75940,
+              "encodedBytes": 75944,
+              "sha256": "4e739daadd33317d27e13a49071dbd5d34da7f5ede7fa60daff4abb6ac3c23b2"
+            },
+            {
+              "id": 0,
+              "name": "producers",
+              "payloadBytes": 124,
+              "encodedBytes": 126,
+              "sha256": "5349359afa1778d0d8c567fa09601cda2ce1fbb4cc12a020275fcd608b9cbc81"
+            },
+            {
+              "id": 0,
+              "name": "target_features",
+              "payloadBytes": 148,
+              "encodedBytes": 151,
+              "sha256": "436e14b8b97dd381f16be421a6f633e615c441207f9de33379f9604cb6c23723"
+            }
+          ]
+        },
+        "profile": {
+          "opt_level": "3",
+          "debuginfo": 0,
+          "debug_assertions": false,
+          "overflow_checks": false,
+          "test": false
+        }
+      },
+      "attribution": {
+        "final": {
+          "path": "D:/BuildCache/glory-benchmark-analysis-20261026/ab-before/bundle-size/glory/optimized.wasm",
+          "bytes": 1424391,
+          "sha256": "5e5d99af9addba03c542ecfeb2aa0adbf0d1488316f9ad5038d971a5b9e5534b"
+        },
+        "nonCustomSectionsIdentical": true,
+        "functionBytes": 1332308,
+        "functionCount": 1101,
+        "enclosingSymbols": [
+          {
+            "name": "glory_web",
+            "bytes": 362508,
+            "functions": 126
+          },
+          {
+            "name": "alloc",
+            "bytes": 209882,
+            "functions": 250
+          },
+          {
+            "name": "glory_html",
+            "bytes": 179331,
+            "functions": 22
+          },
+          {
+            "name": "glory_render",
+            "bytes": 163188,
+            "functions": 106
+          },
+          {
+            "name": "core",
+            "bytes": 127673,
+            "functions": 208
+          },
+          {
+            "name": "glory_ui",
+            "bytes": 118491,
+            "functions": 42
+          },
+          {
+            "name": "bench_glory",
+            "bytes": 48006,
+            "functions": 22
+          },
+          {
+            "name": "glory_core",
+            "bytes": 45537,
+            "functions": 34
+          },
+          {
+            "name": "hashbrown",
+            "bytes": 21536,
+            "functions": 24
+          },
+          {
+            "name": "generated",
+            "bytes": 15359,
+            "functions": 36
+          },
+          {
+            "name": "glory_style",
+            "bytes": 12512,
+            "functions": 12
+          },
+          {
+            "name": "dlmalloc",
+            "bytes": 7748,
+            "functions": 6
+          },
+          {
+            "name": "std",
+            "bytes": 6860,
+            "functions": 24
+          },
+          {
+            "name": "js_sys",
+            "bytes": 4107,
+            "functions": 42
+          },
+          {
+            "name": "wasm_bindgen",
+            "bytes": 3079,
+            "functions": 38
+          },
+          {
+            "name": "compiler_builtins",
+            "bytes": 2579,
+            "functions": 2
+          },
+          {
+            "name": "web_sys",
+            "bytes": 2304,
+            "functions": 104
+          },
+          {
+            "name": "__rustc",
+            "bytes": 969,
+            "functions": 2
+          },
+          {
+            "name": "trim_matches",
+            "bytes": 639,
+            "functions": 1
+          }
+        ],
+        "structuralBodies": [
+          {
+            "name": "remaining bodies",
+            "bytes": 1010610,
+            "functions": 714
+          },
+          {
+            "name": "BTree collection implementations",
+            "bytes": 168989,
+            "functions": 152
+          },
+          {
+            "name": "destruction glue",
+            "bytes": 61931,
+            "functions": 114
+          },
+          {
+            "name": "formatting / number conversion symbols",
+            "bytes": 36861,
+            "functions": 81
+          },
+          {
+            "name": "Clone implementations",
+            "bytes": 24633,
+            "functions": 10
+          },
+          {
+            "name": "hash collection implementations",
+            "bytes": 21536,
+            "functions": 24
+          },
+          {
+            "name": "dlmalloc implementation",
+            "bytes": 7748,
+            "functions": 6
+          }
+        ],
+        "largestFunctions": [
+          {
+            "index": 216,
+            "bytes": 70845,
+            "name": "glory_html::semantics::attributes"
+          },
+          {
+            "index": 608,
+            "bytes": 68096,
+            "name": "<glory_web::browser::events::Listeners>::new::{closure#2}"
+          },
+          {
+            "index": 217,
+            "bytes": 56637,
+            "name": "<glory_web::browser::Renderer as glory_render::Render>::apply"
+          },
+          {
+            "index": 219,
+            "bytes": 46082,
+            "name": "<glory_html::Mapper>::apply::<glory_web::browser::dom::Sink>"
+          },
+          {
+            "index": 218,
+            "bytes": 43779,
+            "name": "<glory_web::browser::Renderer as glory_render::Render>::drain"
+          },
+          {
+            "index": 246,
+            "bytes": 30264,
+            "name": "<glory_web::browser::Renderer as glory_render::Render>::action"
+          },
+          {
+            "index": 220,
+            "bytes": 29152,
+            "name": "bench_glory::main"
+          },
+          {
+            "index": 394,
+            "bytes": 20570,
+            "name": "<glory_ui::control::Each<bench_glory::browser::Row, usize> as glory_ui::app::Widget>::build::{closure#0}"
+          },
+          {
+            "index": 221,
+            "bytes": 19546,
+            "name": "<glory_web::browser::layers::document::DocumentLayers>::sync"
+          },
+          {
+            "index": 228,
+            "bytes": 19544,
+            "name": "<glory_render::props::view::DescriptorView>::validate_fields"
+          },
+          {
+            "index": 225,
+            "bytes": 17462,
+            "name": "<glory_ui::builders::Element>::build"
+          },
+          {
+            "index": 222,
+            "bytes": 16886,
+            "name": "glory_html::mapping::shape_view"
+          }
+        ]
+      }
+    },
+    "after": {
+      "source": {
+        "snapshot": "D:\\BuildCache\\glory-benchmark-analysis-20261026\\inputs-after",
+        "compiledAt": "D:\\BuildCache\\glory-benchmark-analysis-20261026\\source",
+        "gitHead": "6f08a1265d27d036a4ee692ae67ba29d2da71af6",
+        "workingChanges": " M benchmarks/README.md\n M benchmarks/wasm-size/javascript.cjs\n M crates/html/src/lib.rs\n M crates/html/src/mapping.rs\n M crates/html/src/semantics.rs\n?? benchmarks/bundle-size-2026-10-26.json\n?? benchmarks/bundle-size-browser.cjs\n?? benchmarks/bundle-size.cjs\n?? crates/html/src/semantics_tests.rs\n?? docs/framework-benchmark-wasm-size-2026-10-26.md\n",
+        "inputDigest": "1c0b7a9831157712c5732687dc6f482c8d3e7f782be8df839e562a5c5fbeaddb"
+      },
+      "metrics": {
+        "name": "glory",
+        "version": "0.3.1",
+        "packageId": "path+file:///D:/BuildCache/glory-benchmark-analysis-20261026/source/crates/glory#0.3.1",
+        "lockSha256": "525dc12ee93e6251ea131f638e1b6a7a8dc637b5760d2766d927f365ba085fb8",
+        "rustc": {
+          "bytes": 2843170,
+          "brotli": 519804,
+          "gzip": 777121,
+          "sha256": "4d98ef5b22a6e232c6e5b84cebbfec362864403424725798775a25c520d37f15"
+        },
+        "bindgen": {
+          "bytes": 1853250,
+          "brotli": 399907,
+          "gzip": 555425,
+          "sha256": "2e97d62ae1f996a3c4e2d178020ee51c29dd745cd82e9fce95ba622e06f83e4c"
+        },
+        "stripped": {
+          "bytes": 1579987,
+          "brotli": 376816,
+          "gzip": 518669,
+          "sha256": "5aacae7ce897f746208496d63ffe0b24f99b3cb96fc51bd6d1db497a700135fc"
+        },
+        "optimized": {
+          "bytes": 1418176,
+          "brotli": 376401,
+          "gzip": 512813,
+          "sha256": "d1cbe9a5249590cf934384da9b06b5549a7f23b068de5660a960664c2a93e71d"
+        },
+        "js": {
+          "bytes": 60648,
+          "brotli": 8934,
+          "gzip": 10480,
+          "sha256": "0d4ece2953997710c6acaab95e4df05da95b6d6ce6efca454625b7cdc4fa83ca",
+          "files": [
+            {
+              "path": "app.js",
+              "bytes": 58659,
+              "brotli": 8180,
+              "gzip": 9587,
+              "sha256": "7159fa5585881042719cebcb85d8dab2d9bfc81c44f600fcfdbfe4e785dab17e"
+            },
+            {
+              "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+              "bytes": 1609,
+              "brotli": 598,
+              "gzip": 692,
+              "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+            },
+            {
+              "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+              "bytes": 380,
+              "brotli": 156,
+              "gzip": 201,
+              "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+            }
+          ]
+        },
+        "sections": {
+          "bindgen": [
+            {
+              "id": 1,
+              "payloadBytes": 779,
+              "encodedBytes": 782,
+              "sha256": "d6627ae3b69ba939abe60aaa91da496331cffe2a9f5d49f9a18fd7b6b809585d"
+            },
+            {
+              "id": 2,
+              "payloadBytes": 10832,
+              "encodedBytes": 10835,
+              "sha256": "a54d736286bfdffbee872f06d6718c92d9780757940aae8c1f92f2e4ee3a1aa3"
+            },
+            {
+              "id": 3,
+              "payloadBytes": 1543,
+              "encodedBytes": 1546,
+              "sha256": "944a395df0d81c8bd8571a945a1edcf25d7bbb3c0881b55d088bf3c40c756380"
+            },
+            {
+              "id": 4,
+              "payloadBytes": 11,
+              "encodedBytes": 13,
+              "sha256": "b9669f367f5f4792b4490e7193cb5f32c8acfeef80e65f0c492dce746ba6bf11"
+            },
+            {
+              "id": 5,
+              "payloadBytes": 3,
+              "encodedBytes": 5,
+              "sha256": "e3c4e8c4be74ea7897d60436685f5014a88654a4f415f7e08b959984bf15f5d0"
+            },
+            {
+              "id": 6,
+              "payloadBytes": 25,
+              "encodedBytes": 27,
+              "sha256": "e264f2ba07da8bf6504d9bd94f1e9da805798ef273f7aef5b792ae4224fb365c"
+            },
+            {
+              "id": 7,
+              "payloadBytes": 916,
+              "encodedBytes": 919,
+              "sha256": "9ddc5fae9256cd3b0b33b97ad1e3cc7228d1de5513ab1377f2034a30d5df44f3"
+            },
+            {
+              "id": 9,
+              "payloadBytes": 517,
+              "encodedBytes": 520,
+              "sha256": "94604710875240ee5e55cf0894edf61fc0c97fc2a032bcc760433cd0b148db1c"
+            },
+            {
+              "id": 10,
+              "payloadBytes": 1488510,
+              "encodedBytes": 1488514,
+              "sha256": "8f337b53509e728bba94a2438ef666768b62e952c088a020e3f7b26ecaac8880"
+            },
+            {
+              "id": 11,
+              "payloadBytes": 75899,
+              "encodedBytes": 75903,
+              "sha256": "78bacf2b9f935db8bde9fe21b0b6e5c445e808c5417207ddebb087cb6972335a"
+            },
+            {
+              "id": 0,
+              "name": "name",
+              "payloadBytes": 273897,
+              "encodedBytes": 273901,
+              "sha256": "a0c49019e0861c1214383e2ed8c7121b33359bd6b8bf1c1590867a4e68c99941"
+            },
+            {
+              "id": 0,
+              "name": "producers",
+              "payloadBytes": 124,
+              "encodedBytes": 126,
+              "sha256": "5349359afa1778d0d8c567fa09601cda2ce1fbb4cc12a020275fcd608b9cbc81"
+            },
+            {
+              "id": 0,
+              "name": "target_features",
+              "payloadBytes": 148,
+              "encodedBytes": 151,
+              "sha256": "97ceea95e0687b14437e21c205ebb40eea27aa5ecaa971f7d87601e3aa213bfd"
+            }
+          ],
+          "optimized": [
+            {
+              "id": 1,
+              "payloadBytes": 667,
+              "encodedBytes": 670,
+              "sha256": "827be5b72bde9159eeb999f15045f81249f9a6cfc86e7334a9b36002055799bc"
+            },
+            {
+              "id": 2,
+              "payloadBytes": 10740,
+              "encodedBytes": 10743,
+              "sha256": "c9284e1ba9b2dca6cc5903071c22d5c88a3c76662eca03ff910eb94b873aee95"
+            },
+            {
+              "id": 3,
+              "payloadBytes": 1104,
+              "encodedBytes": 1107,
+              "sha256": "ac73630a2aa64eafe686b8dac4a5cf5d00cefb302b10659673ed9a1b18e93f84"
+            },
+            {
+              "id": 4,
+              "payloadBytes": 11,
+              "encodedBytes": 13,
+              "sha256": "b9669f367f5f4792b4490e7193cb5f32c8acfeef80e65f0c492dce746ba6bf11"
+            },
+            {
+              "id": 5,
+              "payloadBytes": 3,
+              "encodedBytes": 5,
+              "sha256": "e3c4e8c4be74ea7897d60436685f5014a88654a4f415f7e08b959984bf15f5d0"
+            },
+            {
+              "id": 6,
+              "payloadBytes": 25,
+              "encodedBytes": 27,
+              "sha256": "e264f2ba07da8bf6504d9bd94f1e9da805798ef273f7aef5b792ae4224fb365c"
+            },
+            {
+              "id": 7,
+              "payloadBytes": 916,
+              "encodedBytes": 919,
+              "sha256": "7b47e563b6641f125697ea4065cdc249be1d685ef9bea4960b6c14beb0dad933"
+            },
+            {
+              "id": 9,
+              "payloadBytes": 517,
+              "encodedBytes": 520,
+              "sha256": "365c5d56712dd35e7ea81daf051cfaccf1af3f3aa619bb182c92e2cd0cad3f29"
+            },
+            {
+              "id": 12,
+              "payloadBytes": 1,
+              "encodedBytes": 3,
+              "sha256": "83891d7fe85c33e52c8b4e5814c92fb6a3b9467299200538a6babaa8b452d879"
+            },
+            {
+              "id": 10,
+              "payloadBytes": 1328208,
+              "encodedBytes": 1328212,
+              "sha256": "691b5bd888196c3d046f373e28e4c657c6f72dd481eb46cdccc338ac746e1aee"
+            },
+            {
+              "id": 11,
+              "payloadBytes": 75668,
+              "encodedBytes": 75672,
+              "sha256": "404b91ebec03a12e6553f6ccb5ff3550bbbe76b635d1ddf667e231f0bec331e5"
+            },
+            {
+              "id": 0,
+              "name": "producers",
+              "payloadBytes": 124,
+              "encodedBytes": 126,
+              "sha256": "5349359afa1778d0d8c567fa09601cda2ce1fbb4cc12a020275fcd608b9cbc81"
+            },
+            {
+              "id": 0,
+              "name": "target_features",
+              "payloadBytes": 148,
+              "encodedBytes": 151,
+              "sha256": "436e14b8b97dd381f16be421a6f633e615c441207f9de33379f9604cb6c23723"
+            }
+          ]
+        },
+        "profile": {
+          "opt_level": "3",
+          "debuginfo": 0,
+          "debug_assertions": false,
+          "overflow_checks": false,
+          "test": false
+        }
+      },
+      "attribution": {
+        "final": {
+          "path": "D:/BuildCache/glory-benchmark-analysis-20261026/ab-after/bundle-size/glory/optimized.wasm",
+          "bytes": 1418176,
+          "sha256": "d1cbe9a5249590cf934384da9b06b5549a7f23b068de5660a960664c2a93e71d"
+        },
+        "nonCustomSectionsIdentical": true,
+        "sections": [
+          {
+            "id": 1,
+            "payloadBytes": 667,
+            "encodedBytes": 670,
+            "sha256": "827be5b72bde9159eeb999f15045f81249f9a6cfc86e7334a9b36002055799bc"
+          },
+          {
+            "id": 2,
+            "payloadBytes": 10740,
+            "encodedBytes": 10743,
+            "sha256": "c9284e1ba9b2dca6cc5903071c22d5c88a3c76662eca03ff910eb94b873aee95"
+          },
+          {
+            "id": 3,
+            "payloadBytes": 1104,
+            "encodedBytes": 1107,
+            "sha256": "ac73630a2aa64eafe686b8dac4a5cf5d00cefb302b10659673ed9a1b18e93f84"
+          },
+          {
+            "id": 4,
+            "payloadBytes": 11,
+            "encodedBytes": 13,
+            "sha256": "b9669f367f5f4792b4490e7193cb5f32c8acfeef80e65f0c492dce746ba6bf11"
+          },
+          {
+            "id": 5,
+            "payloadBytes": 3,
+            "encodedBytes": 5,
+            "sha256": "e3c4e8c4be74ea7897d60436685f5014a88654a4f415f7e08b959984bf15f5d0"
+          },
+          {
+            "id": 6,
+            "payloadBytes": 25,
+            "encodedBytes": 27,
+            "sha256": "e264f2ba07da8bf6504d9bd94f1e9da805798ef273f7aef5b792ae4224fb365c"
+          },
+          {
+            "id": 7,
+            "payloadBytes": 916,
+            "encodedBytes": 919,
+            "sha256": "7b47e563b6641f125697ea4065cdc249be1d685ef9bea4960b6c14beb0dad933"
+          },
+          {
+            "id": 9,
+            "payloadBytes": 517,
+            "encodedBytes": 520,
+            "sha256": "365c5d56712dd35e7ea81daf051cfaccf1af3f3aa619bb182c92e2cd0cad3f29"
+          },
+          {
+            "id": 12,
+            "payloadBytes": 1,
+            "encodedBytes": 3,
+            "sha256": "83891d7fe85c33e52c8b4e5814c92fb6a3b9467299200538a6babaa8b452d879"
+          },
+          {
+            "id": 10,
+            "payloadBytes": 1328208,
+            "encodedBytes": 1328212,
+            "sha256": "691b5bd888196c3d046f373e28e4c657c6f72dd481eb46cdccc338ac746e1aee"
+          },
+          {
+            "id": 11,
+            "payloadBytes": 75668,
+            "encodedBytes": 75672,
+            "sha256": "404b91ebec03a12e6553f6ccb5ff3550bbbe76b635d1ddf667e231f0bec331e5"
+          },
+          {
+            "id": 0,
+            "payloadBytes": 124,
+            "encodedBytes": 126,
+            "sha256": "5349359afa1778d0d8c567fa09601cda2ce1fbb4cc12a020275fcd608b9cbc81",
+            "name": "producers"
+          },
+          {
+            "id": 0,
+            "payloadBytes": 148,
+            "encodedBytes": 151,
+            "sha256": "436e14b8b97dd381f16be421a6f633e615c441207f9de33379f9604cb6c23723",
+            "name": "target_features"
+          }
+        ],
+        "functionBytes": 1326351,
+        "functionCount": 1102,
+        "enclosingSymbols": [
+          {
+            "name": "glory_web",
+            "bytes": 362508,
+            "functions": 126
+          },
+          {
+            "name": "alloc",
+            "bytes": 209882,
+            "functions": 250
+          },
+          {
+            "name": "glory_html",
+            "bytes": 173374,
+            "functions": 23
+          },
+          {
+            "name": "glory_render",
+            "bytes": 163188,
+            "functions": 106
+          },
+          {
+            "name": "core",
+            "bytes": 127673,
+            "functions": 208
+          },
+          {
+            "name": "glory_ui",
+            "bytes": 118491,
+            "functions": 42
+          },
+          {
+            "name": "bench_glory",
+            "bytes": 48006,
+            "functions": 22
+          },
+          {
+            "name": "glory_core",
+            "bytes": 45537,
+            "functions": 34
+          },
+          {
+            "name": "hashbrown",
+            "bytes": 21536,
+            "functions": 24
+          },
+          {
+            "name": "generated",
+            "bytes": 15359,
+            "functions": 36
+          },
+          {
+            "name": "glory_style",
+            "bytes": 12512,
+            "functions": 12
+          },
+          {
+            "name": "dlmalloc",
+            "bytes": 7748,
+            "functions": 6
+          },
+          {
+            "name": "std",
+            "bytes": 6860,
+            "functions": 24
+          },
+          {
+            "name": "js_sys",
+            "bytes": 4107,
+            "functions": 42
+          },
+          {
+            "name": "wasm_bindgen",
+            "bytes": 3079,
+            "functions": 38
+          },
+          {
+            "name": "compiler_builtins",
+            "bytes": 2579,
+            "functions": 2
+          },
+          {
+            "name": "web_sys",
+            "bytes": 2304,
+            "functions": 104
+          },
+          {
+            "name": "__rustc",
+            "bytes": 969,
+            "functions": 2
+          },
+          {
+            "name": "trim_matches",
+            "bytes": 639,
+            "functions": 1
+          }
+        ],
+        "structuralBodies": [
+          {
+            "name": "remaining bodies",
+            "bytes": 1004653,
+            "functions": 715
+          },
+          {
+            "name": "BTree collection implementations",
+            "bytes": 168989,
+            "functions": 152
+          },
+          {
+            "name": "destruction glue",
+            "bytes": 61931,
+            "functions": 114
+          },
+          {
+            "name": "formatting / number conversion symbols",
+            "bytes": 36861,
+            "functions": 81
+          },
+          {
+            "name": "Clone implementations",
+            "bytes": 24633,
+            "functions": 10
+          },
+          {
+            "name": "hash collection implementations",
+            "bytes": 21536,
+            "functions": 24
+          },
+          {
+            "name": "dlmalloc implementation",
+            "bytes": 7748,
+            "functions": 6
+          }
+        ],
+        "webModules": [
+          {
+            "name": "browser entry / Renderer",
+            "bytes": 146019,
+            "functions": 15
+          },
+          {
+            "name": "events",
+            "bytes": 80661,
+            "functions": 20
+          },
+          {
+            "name": "dom",
+            "bytes": 51604,
+            "functions": 32
+          },
+          {
+            "name": "layers",
+            "bytes": 44159,
+            "functions": 20
+          },
+          {
+            "name": "rich",
+            "bytes": 15246,
+            "functions": 13
+          },
+          {
+            "name": "frame",
+            "bytes": 8315,
+            "functions": 8
+          },
+          {
+            "name": "sheet",
+            "bytes": 4954,
+            "functions": 2
+          },
+          {
+            "name": "input_edit",
+            "bytes": 3375,
+            "functions": 4
+          },
+          {
+            "name": "select",
+            "bytes": 3180,
+            "functions": 3
+          },
+          {
+            "name": "swipe",
+            "bytes": 1623,
+            "functions": 2
+          },
+          {
+            "name": "images",
+            "bytes": 867,
+            "functions": 1
+          },
+          {
+            "name": "files",
+            "bytes": 793,
+            "functions": 2
+          },
+          {
+            "name": "translation",
+            "bytes": 719,
+            "functions": 2
+          },
+          {
+            "name": "collapse",
+            "bytes": 555,
+            "functions": 1
+          },
+          {
+            "name": "clipboard",
+            "bytes": 438,
+            "functions": 1
+          }
+        ],
+        "largestFunctions": [
+          {
+            "index": 609,
+            "bytes": 68096,
+            "name": "<glory_web::browser::events::Listeners>::new::{closure#2}"
+          },
+          {
+            "index": 216,
+            "bytes": 64196,
+            "name": "glory_html::semantics::attributes"
+          },
+          {
+            "index": 217,
+            "bytes": 56637,
+            "name": "<glory_web::browser::Renderer as glory_render::Render>::apply"
+          },
+          {
+            "index": 219,
+            "bytes": 46082,
+            "name": "<glory_html::Mapper>::apply::<glory_web::browser::dom::Sink>"
+          },
+          {
+            "index": 218,
+            "bytes": 43779,
+            "name": "<glory_web::browser::Renderer as glory_render::Render>::drain"
+          },
+          {
+            "index": 246,
+            "bytes": 30264,
+            "name": "<glory_web::browser::Renderer as glory_render::Render>::action"
+          },
+          {
+            "index": 220,
+            "bytes": 29152,
+            "name": "bench_glory::main"
+          },
+          {
+            "index": 395,
+            "bytes": 20570,
+            "name": "<glory_ui::control::Each<bench_glory::browser::Row, usize> as glory_ui::app::Widget>::build::{closure#0}"
+          },
+          {
+            "index": 221,
+            "bytes": 19546,
+            "name": "<glory_web::browser::layers::document::DocumentLayers>::sync"
+          },
+          {
+            "index": 228,
+            "bytes": 19544,
+            "name": "<glory_render::props::view::DescriptorView>::validate_fields"
+          },
+          {
+            "index": 225,
+            "bytes": 17462,
+            "name": "<glory_ui::builders::Element>::build"
+          },
+          {
+            "index": 224,
+            "bytes": 15643,
+            "name": "glory_html::mapping::shape_view"
+          }
+        ]
+      }
+    },
+    "changedInputs": [
+      {
+        "name": "crates/html/src/lib.rs",
+        "before": "9f7838bbeef9cb1cc827ef62585cd52cbe804d26e0f605a317140bb0e71a6d5a",
+        "after": "c8c8a5818c68ce8af06c5158eb6877b1c7076de6d4e9fd5529c2c12a47ccc8d9"
+      },
+      {
+        "name": "crates/html/src/mapping.rs",
+        "before": "fceb6daaa407d19da808a31de8d2fb9f55481f8c0c44d28fc2b3f66491dbe9ba",
+        "after": "81732ee13aec2e5b9b88a9db1a0703371738cd8d06b8163f3583dea6d734e871"
+      },
+      {
+        "name": "crates/html/src/semantics.rs",
+        "before": "e87a24a7d4fda8132056da2b52d45de93f9028d920efe695c38e798ef7108f12",
+        "after": "1ecd48382b469afd0b969ef645e1fb512cf1fcb574d600c882d9257dd1d8d5a2"
+      },
+      {
+        "name": "crates/html/src/semantics_tests.rs",
+        "before": null,
+        "after": "da815844f2492455bd53f7d4bf13950e1208269a97df00afd3d9c27055766a07"
+      }
+    ],
+    "delta": {
+      "wasm": -6215,
+      "brotli": 94,
+      "gzip": 30
+    },
+    "checks": {
+      "beforeBrowser": {
+        "contract": "semantic-rows-v1",
+        "recorded": "2026-10-26T03:38:22.215Z",
+        "cases": [
+          {
+            "name": "glory",
+            "stage": "bindgen",
+            "sha256": "ff3c3e62432a85174713037f25aa5130a9ff841ab9ea102280bbcafd213b71da",
+            "passed": true,
+            "seededData": true,
+            "keyedIdentity": true,
+            "all10000RowsMounted": true,
+            "cleanup": true,
+            "pixelsEqual": true
+          },
+          {
+            "name": "glory",
+            "stage": "optimized",
+            "sha256": "5e5d99af9addba03c542ecfeb2aa0adbf0d1488316f9ad5038d971a5b9e5534b",
+            "passed": true,
+            "seededData": true,
+            "keyedIdentity": true,
+            "all10000RowsMounted": true,
+            "cleanup": true,
+            "pixelsEqual": true
+          }
+        ],
+        "browser": "155.0.8059.84"
+      },
+      "afterBrowser": {
+        "contract": "semantic-rows-v1",
+        "recorded": "2026-10-26T03:38:22.204Z",
+        "cases": [
+          {
+            "name": "glory",
+            "stage": "bindgen",
+            "sha256": "2e97d62ae1f996a3c4e2d178020ee51c29dd745cd82e9fce95ba622e06f83e4c",
+            "passed": true,
+            "seededData": true,
+            "keyedIdentity": true,
+            "all10000RowsMounted": true,
+            "cleanup": true,
+            "pixelsEqual": true
+          },
+          {
+            "name": "glory",
+            "stage": "optimized",
+            "sha256": "d1cbe9a5249590cf934384da9b06b5549a7f23b068de5660a960664c2a93e71d",
+            "passed": true,
+            "seededData": true,
+            "keyedIdentity": true,
+            "all10000RowsMounted": true,
+            "cleanup": true,
+            "pixelsEqual": true
+          }
+        ],
+        "browser": "155.0.8059.84"
+      },
+      "integrity": [
+        {
+          "variant": "ab-before",
+          "passed": true
+        },
+        {
+          "variant": "ab-after",
+          "passed": true
+        }
+      ],
+      "semantics": [
+        {
+          "file": "semantics-acceptance.js",
+          "passed": true
+        }
+      ],
+      "plan": [
+        {
+          "file": "plan-acceptance.js",
+          "passed": true
+        }
+      ],
+      "minimalGate": {
+        "report": {
+          "schema": 1,
+          "label": "quality-lowering",
+          "versions": {
+            "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18)\nbinary: rustc\ncommit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea\ncommit-date: 2026-08-18\nhost: x86_64-pc-windows-msvc\nrelease: 1.98.0\nLLVM version: 22.1.8",
+            "cargo": "cargo 1.98.0 (797e8a9bc 2026-08-05)",
+            "bindgen": "wasm-bindgen 0.2.129",
+            "binaryen": "wasm-opt version 132 (version_132)",
+            "node": "v24.3.0"
+          },
+          "sourceDigest": "dd0b878784b907c490a9d3917acf7604cf7e1cde4d2f4608cc439f584858e7e4",
+          "verifiedTarget": "D:\\BuildCache\\sapid\\wasm-size\\target",
+          "profile": {
+            "optLevel": "z",
+            "lto": true,
+            "codegenUnits": 1,
+            "strip": "debuginfo"
+          },
+          "optimizer": "-Oz --enable-bulk-memory --enable-reference-types",
+          "compression": {
+            "brotliQuality": 11,
+            "gzipLevel": 9
+          },
+          "jsScope": "wasm-bindgen entry and transitively imported JS snippets; per-resource compression; excludes test loader",
+          "cases": [
+            {
+              "name": "glory-minimal",
+              "features": [
+                "minimal"
+              ],
+              "reference": "empty",
+              "bindgen": {
+                "bytes": 2122556,
+                "brotli": 327559,
+                "gzip": 435408,
+                "sha256": "693b5ed817b5d993edfb20d9e1a5adea7bb574db0fa8100514e2e7f4b4b92d5d"
+              },
+              "optimized": {
+                "bytes": 893657,
+                "brotli": 282053,
+                "gzip": 354781,
+                "sha256": "1c8483ad0f19b1d0e4394e36b3cee9720cb3c6c518023afbb4eceecdac2bf941"
+              },
+              "js": {
+                "bytes": 59232,
+                "brotli": 8816,
+                "gzip": 10347,
+                "sha256": "fb86774e57fa8afa28712aaa2fa3456db5a9cced756647438fdfd5a21bff884b",
+                "files": [
+                  {
+                    "path": "fixture.js",
+                    "bytes": 57243,
+                    "brotli": 8062,
+                    "gzip": 9454,
+                    "sha256": "d37f6ad76cb76a4aebc1e0f5638a93916d2bfeac4677fa7fc0ab8d1fb7547bb7"
+                  },
+                  {
+                    "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+                    "bytes": 1609,
+                    "brotli": 598,
+                    "gzip": 692,
+                    "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+                  },
+                  {
+                    "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+                    "bytes": 380,
+                    "brotli": 156,
+                    "gzip": 201,
+                    "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+                  }
+                ]
+              },
+              "sections": {
+                "0": 272,
+                "1": 789,
+                "2": 11604,
+                "3": 2224,
+                "4": 11,
+                "5": 3,
+                "6": 25,
+                "7": 900,
+                "9": 579,
+                "10": 798757,
+                "11": 78448,
+                "12": 1
+              },
+              "buildMs": 25731,
+              "rustcFresh": false
+            },
+            {
+              "name": "glory-text",
+              "features": [
+                "base"
+              ],
+              "reference": "empty",
+              "bindgen": {
+                "bytes": 2209889,
+                "brotli": 333878,
+                "gzip": 445815,
+                "sha256": "f63c6f43c7250bdc7c24665c80e56a8570af45d404ae13186d9fa6c0c633d747"
+              },
+              "optimized": {
+                "bytes": 914532,
+                "brotli": 287755,
+                "gzip": 362529,
+                "sha256": "f2fc060e8684b344f59af7df5429c1c3853fcf69ae187452e4721f0ae986f8e7"
+              },
+              "js": {
+                "bytes": 59232,
+                "brotli": 8816,
+                "gzip": 10347,
+                "sha256": "8c07519ba38a4a48c94d00f8a6d70671b1c774d9ef9327e15b977ddc4f4d5fe9",
+                "files": [
+                  {
+                    "path": "fixture.js",
+                    "bytes": 57243,
+                    "brotli": 8062,
+                    "gzip": 9454,
+                    "sha256": "81402048bb467b4e41db5ad3945b4e0b3c78957501769da2b388711fa2f88c31"
+                  },
+                  {
+                    "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+                    "bytes": 1609,
+                    "brotli": 598,
+                    "gzip": 692,
+                    "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+                  },
+                  {
+                    "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+                    "bytes": 380,
+                    "brotli": 156,
+                    "gzip": 201,
+                    "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+                  }
+                ]
+              },
+              "sections": {
+                "0": 272,
+                "1": 820,
+                "2": 11604,
+                "3": 2297,
+                "4": 11,
+                "5": 3,
+                "6": 25,
+                "7": 900,
+                "9": 605,
+                "10": 818732,
+                "11": 79218,
+                "12": 1
+              },
+              "buildMs": 15976,
+              "rustcFresh": false
+            }
+          ],
+          "lockSha256": "0dddefecb2d0b30d1b6443048237fa31ba5eb0c990bd55ee307bb9d02e9517e8"
+        },
+        "comparison": [
+          {
+            "name": "glory-minimal",
+            "wasm": -435,
+            "brotli": -93,
+            "js": 0,
+            "unusedPremiumGrowth": null
+          },
+          {
+            "name": "glory-text",
+            "wasm": -435,
+            "brotli": -51,
+            "js": 0,
+            "unusedPremiumGrowth": null
+          }
+        ],
+        "browser": {
+          "browser": "155.0.8059.84",
+          "sourceDigest": "dd0b878784b907c490a9d3917acf7604cf7e1cde4d2f4608cc439f584858e7e4",
+          "cases": [
+            {
+              "name": "glory-minimal",
+              "sha256": "1c8483ad0f19b1d0e4394e36b3cee9720cb3c6c518023afbb4eceecdac2bf941",
+              "mounted": 0,
+              "errors": [],
+              "passed": true
+            },
+            {
+              "name": "glory-text",
+              "sha256": "f2fc060e8684b344f59af7df5429c1c3853fcf69ae187452e4721f0ae986f8e7",
+              "mounted": 1,
+              "errors": [],
+              "passed": true
+            }
+          ]
+        }
+      },
+      "library": {
+        "htmlAllFeaturesTests": true,
+        "htmlStrictClippy": true,
+        "sapidCheckScript": true,
+        "sharedGloryTestsAndStrictClippy": true
+      }
+    }
+  }
+}
