@@ -168,18 +168,6 @@ mod tests {
         );
     }
 
-    /// Every message this server can send must be handled by the browser
-    /// reload client that `glory-core` injects. `build_error` in particular was
-    /// sent for a while with no consumer anywhere, so the overlay it was meant
-    /// to trigger never appeared.
-    #[test]
-    fn browser_client_handles_every_message_kind() {
-        const CLIENT: &str = include_str!("../../../core/src/web/utils/ssr.rs");
-        for kind in ["full", "style", "functions", "build_error"] {
-            assert!(CLIENT.contains(&format!("'{kind}'")), "reload client does not handle `{kind}`");
-        }
-    }
-
     #[test]
     fn build_error_variant_serializes_with_snake_case_tag() {
         let msg = BrowserReloadMessage::BuildError {

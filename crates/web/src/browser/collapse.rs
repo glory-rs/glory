@@ -5,9 +5,7 @@ use super::{
     dom::{Dom, Entry},
 };
 use futures_util::future::{AbortHandle, Abortable};
-use glory_render::{
-    CollapseConfig, Error, Event, EventKind, Input, Mutation, NodeId, memory::Memory,
-};
+use glory_render::{CollapseConfig, Error, Event, EventKind, Input, NodeId, memory::Memory};
 use std::{
     collections::{BTreeMap, BTreeSet},
     rc::Rc,
@@ -50,25 +48,14 @@ fn visible(tree: &Memory, id: NodeId) -> bool {
             .is_none_or(|parent| tree.active(parent) && !tree.inert(parent))
 }
 impl Collapses {
-    pub fn update(&mut self, tree: &Memory, mutations: &[Mutation]) -> Vec<NodeId> {
+    pub fn update(
+        &mut self,
+        tree: &Memory,
+        changes: &crate::semantic_changes::Changes<'_>,
+    ) -> Vec<NodeId> {
         let mut changed = BTreeSet::new();
-        for id in mutations.iter().flat_map(|mutation| match mutation {
-            Mutation::Create { id, .. }
-            | Mutation::Patch {
-                id,
-                patch: glory_render::Patch::Semantics(_),
-            } => std::slice::from_ref(id),
-            Mutation::CreatePlan { ids, .. } => ids.as_slice(),
-            _ => &[],
-        }) {
-            let Ok(node) = tree.node(*id) else { continue };
-            if let Some(config) = node
-                .descriptor
-                .view()
-                .semantics
-                .as_ref()
-                .and_then(|s| s.collapse)
-            {
+        for (id, semantics) in changes {
+            if let Some(config) = semantics.and_then(|s| s.collapse) {
                 let next = Accepted {
                     config,
                     visible: visible(tree, *id),
@@ -181,8 +168,12 @@ impl Dom {
             state.ready.remove(&id);
         }
     }
-    pub(super) fn update_collapses(&self, tree: &Memory, mutations: &[Mutation]) {
-        let changed = self.collapses.borrow_mut().update(tree, mutations);
+    pub(super) fn update_collapses(
+        &self,
+        tree: &Memory,
+        changes: &crate::semantic_changes::Changes<'_>,
+    ) {
+        let changed = self.collapses.borrow_mut().update(tree, changes);
         for id in changed {
             let Ok(entry) = self.entry(id) else { continue };
             let current = self.collapses.borrow().live.get(&id).copied();

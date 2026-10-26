@@ -1,5 +1,12 @@
 # Glory / Leptos / Dioxus: current semantic browser benchmark
 
+[2026-10-26 批量路径热点与质量优化](../docs/bulk-lifecycle-quality-2026-10-26.md)：
+合并四个控制器的批次元数据提取、复用 Memory 退休身份清单；四轮绑核 A/B 共 864
+样本，千行创建 / 替换 / 清空改善 **4.5% / 5.4% / 2.8%**，万行改善 **6.7%**。
+另重建三框架测 648 样本，千行创建 Glory / Leptos / Dioxus 为
+**18.351 / 15.202 / 4.472 ms**。保留小操作回退、初次漂移数据、Leptos 选行异常，
+以及 Dioxus 清空后活动解释器保留峰值离树行引用的独立观察。
+
 [2026-10-26 当前三框架重跑](../docs/framework-benchmark-rerun-2026-10-26.md)：
 包含 Role 优化的 Glory、锁定的 Leptos 0.8.22 / Dioxus 0.7.10，三个全新独立 target，
 正反两轮 648 个样本。千行创建 Script 为 **18.962 / 14.355 / 4.507 ms**；

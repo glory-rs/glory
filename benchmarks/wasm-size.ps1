@@ -26,13 +26,6 @@ $candidateCases = @(
     Wasm = 'examples/counter/target/wasm32-unknown-unknown/{0}/counter.wasm'
   },
   [PSCustomObject]@{
-    Name = 'router-basic'
-    Variant = 'web-csr+routing'
-    Manifest = 'examples/router-basic/Cargo.toml'
-    Features = @()
-    Wasm = 'examples/router-basic/target/wasm32-unknown-unknown/{0}/router-basic.wasm'
-  },
-  [PSCustomObject]@{
     Name = 'todomvc-fullstack'
     Variant = 'web-csr+server-fn'
     Manifest = 'examples/todomvc-fullstack/Cargo.toml'

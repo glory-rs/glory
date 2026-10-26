@@ -31,7 +31,6 @@ categories = [
 
 [workspace.dependencies]
 glory-core = { version = "0.3.1", path = "crates/core", default-features = false }       #
-glory-routing = { version = "0.3.1", path = "crates/routing", default-features = false }
 glory-hot-reload = { version = "0.3.1", path = "crates/hot-reload" }
 glory-macros = { version = "0.3.1", path = "crates/macros" }
 glory-serverfn = { version = "0.3.1", path = "crates/serverfn", default-features = false }

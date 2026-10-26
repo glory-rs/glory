@@ -2,13 +2,17 @@
 
 Date: 2026-06-12
 
+This is a historical host-integration recipe, not an implemented mobile host
+for the current semantic runtime. Its former context and command-wire APIs
+have been removed; current host work must follow the semantic event contract.
+
 Glory does not expose first-class camera, gallery, contacts, share-sheet, or
 permission APIs yet. Keep those integrations in the generated mobile app until
 real-device validation and user needs justify a stable wrapper.
 
 ## Recommended Shape
 
-Use an app-owned bridge object and store its handle in `Truck`:
+Use an app-owned bridge object and pass its handle explicitly to widgets:
 
 ```rust
 #[derive(Clone)]
@@ -23,9 +27,9 @@ impl MobileBridge {
 }
 ```
 
-Widgets read the bridge from `Truck` and call it from event handlers. Native
-callbacks should revise a `Cage` owned by the app or dispatch a typed
-command-backend event with data in `EventData::extra`.
+Widgets retain the bridge handle and call it from event handlers. Native
+callbacks enqueue owned results; the UI loop applies them to a `Cage` owned by
+the app. Foreign callbacks must not synchronously reenter the UI runtime.
 
 Keep platform handles out of reusable widgets. Pass plain app state, such as the
 selected file URI or permission status, back into widgets through `Cage` values.
@@ -52,7 +56,7 @@ iOS:
 ## Camera Or Gallery Picker
 
 Prefer returning a file URI, content URI, or copied app-cache path instead of raw
-bytes. Large media payloads should stay outside `EventData`; pass a handle/path
+bytes. Large media payloads should stay outside event payloads; pass a handle/path
 through the bridge and let application code load it deliberately.
 
 Android:

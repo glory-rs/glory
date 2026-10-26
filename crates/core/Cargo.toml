@@ -5,7 +5,7 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 description = "Owned incremental runtime for Glory semantic UI"
-# Retired HTML integration tests/benches are migrated separately.
+# Keep the runtime's integration tests and benches explicit.
 autotests = false
 autobenches = false
 
@@ -47,6 +47,10 @@ workspace = true
 [[test]]
 name = 'graph_stats'
 path = 'tests/graph_stats.rs'
+
+[[test]]
+name = "task_host"
+path = "tests/task_host.rs"
 
 [[bench]]
 name = "graph"

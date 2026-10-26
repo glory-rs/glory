@@ -69,28 +69,19 @@ impl Sheets {
     pub fn needs_frame(&self) -> bool {
         self.dirty || self.gesture.is_some()
     }
-    pub fn update(&mut self, tree: &glory_render::memory::Memory, mutations: &[Mutation]) {
-        if mutations.iter().any(|mutation| matches!(mutation, Mutation::Patch { id, patch: glory_render::Patch::Style(_) } if self.live.contains_key(id))) {
+    pub fn update(
+        &mut self,
+        tree: &glory_render::memory::Memory,
+        mutations: &[Mutation],
+        changes: &crate::semantic_changes::Changes<'_>,
+    ) {
+        if !self.live.is_empty() && mutations.iter().any(|mutation| matches!(mutation, Mutation::Patch { id, patch: glory_render::Patch::Style(_) } if self.live.contains_key(id))) {
             // A mapper Style edit replaces the attribute. Reinstall only the
             // current private sheet declarations, without retaining old CSS.
             self.dirty = true;
         }
-        for id in mutations.iter().flat_map(|mutation| match mutation {
-            Mutation::Create { id, .. }
-            | Mutation::Patch {
-                id,
-                patch: glory_render::Patch::Semantics(_),
-            } => std::slice::from_ref(id),
-            Mutation::CreatePlan { ids, .. } => ids.as_slice(),
-            _ => &[],
-        }) {
-            let Ok(node) = tree.node(*id) else { continue };
-            if let Some(layer) = node
-                .descriptor
-                .view()
-                .semantics
-                .as_ref()
-                .and_then(|s| s.layer.as_ref())
+        for (id, semantics) in changes {
+            if let Some(layer) = semantics.and_then(|s| s.layer.as_ref())
                 && let Some(config) = &layer.sheet
             {
                 let next = Accepted {

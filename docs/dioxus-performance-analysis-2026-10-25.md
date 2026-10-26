@@ -107,7 +107,7 @@ Glory 的当前实现则为每行建立：
 
 所以这里同时比较了框架和应用的惯用建模方式。不能把 60,003 对两个 Signal 当作框架所有分配量的比较，也不能把差距全部归给某个 Signal 内部锁或 HashSet。Dioxus 换成细粒度行组件/Signal 后，构造成本和更新成本都会改变，需要另建对照。
 
-源码：[Dioxus benchmark](../benchmarks/dioxus/src/main.rs)、[Glory benchmark](../benchmarks/glory/src/main.rs)、[Rows::mount](../crates/ui/src/control.rs)、[Signal](https://github.com/DioxusLabs/dioxus/blob/57d6794ad60b949e5bd8aa282f6f8c3dc97a365e/packages/signals/src/signal.rs)。活动 Core Scope 在 [runtime.rs](../crates/core/src/runtime.rs)，旧 core/src/scope.rs 是提取参考，不是当前实现。
+源码：[Dioxus benchmark](../benchmarks/dioxus/src/main.rs)、[Glory benchmark](../benchmarks/glory/src/main.rs)、[Rows::mount](../crates/ui/src/control.rs)、[Signal](https://github.com/DioxusLabs/dioxus/blob/57d6794ad60b949e5bd8aa282f6f8c3dc97a365e/packages/signals/src/signal.rs)。活动 Core Scope 在 [runtime.rs](../crates/core/src/runtime.rs)，旧 core/src/scope.rs 已于 2026-10-26 随旧运行时删除。
 
 ## 5. 替换走专门的 keyed 快路，LIS 不是这项优势的主要原因
 

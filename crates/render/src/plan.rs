@@ -203,7 +203,10 @@ impl Plan {
     pub(crate) fn focus_scopes(&self) -> usize {
         self.0.focus_scopes
     }
-    pub(crate) fn semantic_nodes(&self) -> &[usize] {
+    /// Declaration indices with a Semantics payload, in construction order.
+    /// Adapters can inspect those immutable facets without visiting every
+    /// instance. Live overrides still arrive through explicit field patches.
+    pub fn semantic_nodes(&self) -> &[usize] {
         &self.0.semantic_nodes
     }
     pub(crate) fn document_roots(&self) -> &[usize] {

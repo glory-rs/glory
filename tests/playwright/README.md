@@ -34,8 +34,6 @@ are not evidence that those examples support the current semantic architecture.
 Environment variables:
 
 - `GLORY_COUNTER_URL`: semantic counter Web entry.
-- `GLORY_ROUTER_URL`: CSR `router-basic` example.
-- `GLORY_SSR_URL`: SSR + hydration example such as `ssr-simple-salvo`.
 - `GLORY_FULLSTACK_URL`: fullstack server-function example such as
   `todomvc-fullstack`.
 - `GLORY_HOT_RELOAD_URL`: any app served through `glory serve` with reload

@@ -61,6 +61,7 @@ def main():
     assert member_names == {
         "glory", "glory-style", "glory-render", "glory-core", "glory-resource",
         "glory-i18n", "glory-ui", "glory-html", "glory-web", "glory-ssr", "glory-blitz",
+        "glory-salvo",
     }, member_names
     lock = tomllib.loads((root / "Cargo.lock").read_text(encoding="utf-8"))
     for fork in record["forks"]:

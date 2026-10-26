@@ -502,13 +502,8 @@ impl Mapper {
                     Op::Suspend { id: *id }
                 }
                 Mutation::Dispose { id } => {
-                    let mut subtree = Vec::new();
-                    let mut pending = vec![*id];
-                    while let Some(id) = pending.pop() {
-                        pending.extend(self.tree.node(id)?.children.iter().copied());
-                        subtree.push(id);
-                    }
-                    receipt = self.tree.apply(std::slice::from_ref(mutation))?;
+                    let (accepted, subtree) = self.tree.dispose(*id)?;
+                    receipt = accepted;
                     for id in &subtree {
                         self.keys.remove(id);
                     }

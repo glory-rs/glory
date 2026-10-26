@@ -1808,38 +1808,55 @@ impl Memory {
                 self.prune_events();
                 self.stats.suspended += 1;
             }
-            Mutation::Dispose { id } => {
-                self.node(*id)?;
-                let focus_ancestors = self.scope_ancestors(self.node(*id)?.parent)?;
-                self.unlink(*id);
-                let mut pending = vec![*id];
-                let mut focus_removed = 0usize;
-                while let Some(id) = pending.pop() {
-                    let node = self.nodes.remove(&id).expect("owned subtree");
-                    self.focus_scopes.remove(&id);
-                    focus_removed += 1;
-                    self.layers -= usize::from(layer(node.descriptor.view()));
-                    if let Some(name) = node.descriptor.view().semantic_id() {
-                        self.names.remove(name);
-                    }
-                    self.generations
-                        .get_mut(&id.slot())
-                        .expect("known identity")
-                        .1 = false;
-                    pending.extend(node.children);
-                    self.stats.disposed += 1;
-                }
-                for root in focus_ancestors {
-                    *self
-                        .focus_scopes
-                        .get_mut(&root)
-                        .expect("surviving scope ancestor") -= focus_removed;
-                }
-                // Pending native/browser events carry identities too. Do not
-                // deliver an event whose target was destroyed in this batch.
-                self.prune_events();
+            Mutation::Dispose { id } => self.retire(*id, None)?,
+        }
+        Ok(())
+    }
+
+    /// Apply one Dispose and return its retired identities in traversal order.
+    /// Adapters use the removal itself to reclaim their identity-indexed state,
+    /// instead of first walking the same subtree to build a second inventory.
+    /// Includes detached/suspended descendants; rejection preserves the receipt.
+    pub fn dispose(&mut self, id: NodeId) -> Result<(Receipt, Vec<NodeId>), Error> {
+        let mut retired = Vec::new();
+        self.retire(id, Some(&mut retired))?;
+        self.receipt.applied += 1;
+        Ok((self.receipt, retired))
+    }
+
+    fn retire(&mut self, id: NodeId, mut retired: Option<&mut Vec<NodeId>>) -> Result<(), Error> {
+        let parent = self.node(id)?.parent;
+        let focus_ancestors = self.scope_ancestors(parent)?;
+        self.unlink(id);
+        let mut pending = vec![id];
+        let mut focus_removed = 0usize;
+        while let Some(id) = pending.pop() {
+            let node = self.nodes.remove(&id).expect("owned subtree");
+            self.focus_scopes.remove(&id);
+            focus_removed += 1;
+            self.layers -= usize::from(layer(node.descriptor.view()));
+            if let Some(name) = node.descriptor.view().semantic_id() {
+                self.names.remove(name);
+            }
+            self.generations
+                .get_mut(&id.slot())
+                .expect("known identity")
+                .1 = false;
+            pending.extend(node.children);
+            self.stats.disposed += 1;
+            if let Some(retired) = &mut retired {
+                retired.push(id);
             }
         }
+        for root in focus_ancestors {
+            *self
+                .focus_scopes
+                .get_mut(&root)
+                .expect("surviving scope ancestor") -= focus_removed;
+        }
+        // Pending native/browser events carry identities too. Do not deliver
+        // an event whose target was destroyed by this operation.
+        self.prune_events();
         Ok(())
     }
 }

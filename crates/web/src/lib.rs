@@ -5,6 +5,8 @@ mod browser;
 mod clipboard_state;
 #[cfg(any(target_arch = "wasm32", test))]
 mod file_reads;
+#[cfg(any(target_arch = "wasm32", test))]
+mod semantic_changes;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 #[path = "browser/templates.rs"]
 mod template_tests;

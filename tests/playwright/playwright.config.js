@@ -22,16 +22,6 @@ module.exports = defineConfig({
       use: desktop,
     },
     {
-      name: "web-csr-routing",
-      testMatch: "routing.spec.js",
-      use: desktop,
-    },
-    {
-      name: "ssr-hydration",
-      testMatch: "ssr-hydration.spec.js",
-      use: desktop,
-    },
-    {
       name: "fullstack-serverfn",
       testMatch: "fullstack-serverfn.spec.js",
       use: desktop,

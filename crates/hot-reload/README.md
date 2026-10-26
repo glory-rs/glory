@@ -16,9 +16,8 @@ marked closures move or change.
 - `HotReloadFunctions` — scans those markers so `glory-cli serve
   --hot-reload` can emit function replacement websocket events.
 - `patch.js` — the client-side reload runtime that dispatches
-  `glory:function-reload` events. Embedded into SSR HTML via
-  `glory_hot_reload::HOT_RELOAD_JS` (see
-  `crates/core/src/web/utils/ssr.rs`).
+  `glory:function-reload` events. The former Core SSR injection has been
+  removed; the current semantic SSR host does not install this client.
 - Unit tests cover function marker scanning, stable reload payloads, and
   runtime relinking.
 

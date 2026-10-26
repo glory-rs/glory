@@ -2271,3 +2271,17 @@ Salvo chunked TCP、pending I/O 断开取消、暂停 TCP 读取后的背压）�
 all-features 测试通过。真实 Chromium 执行 examples/ssr-acceptance.js，先读到两个
 pending，约 361ms 只更新 fast、约 1208ms 更新 slow 后 End，两个资源种子完整，
 controller active=0，无 CSP/页面错误。
+
+## 2026-10-26：浏览器批次元数据与退休身份
+
+`Plan::semantic_nodes` 公开声明中带 Semantics 的构造索引，复用既有不可变事实；
+不保存实例身份或业务访问历史。Web 在 Mapper 完成后只提取一次当前已提交的
+元数据变更，layer / sheet / collapse / translation 共用借用视图。Clear 保留
+None 项，重复更新按最终已提交值合并，退休世代不进入视图；拒绝后缀不能提供
+未提交的配置。结构、可见性、Style 和存活成员的独立检查继续保留。
+
+`Memory::dispose` 与普通 Dispose 共用同一个退休实现，可同时返回完整退休身份，
+供 Mapper 移除 HTML key 和下游宿主状态，避免先行重扫子树。挂起后代、遍历顺序、
+名称、FocusScope、世代水位、事件清理和 receipt 语义不变；两份 Memory 和全部
+节点身份仍保留。实现、约束及前后测量见
+[批量路径质量优化报告](bulk-lifecycle-quality-2026-10-26.md)。

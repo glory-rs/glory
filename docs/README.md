@@ -39,6 +39,10 @@ Start here when evaluating or extending Glory:
   fix, 64/1024 real-height caches, settled pixel/node identity and complete regression evidence.
 - [Engine forks](engine-forks.md): immutable glory-rs Blitz/Taffy Git dependencies,
   source provenance, fork tests and the prohibition on vendoring.
+- [API guide](api-guide.md): current semantic entry points, ownership and hosts.
+- [Renderer author guide](renderer-author-guide.md): semantic mutations,
+  preflight, query watermarks and adapter conformance.
+- [Release readiness](release-readiness.md): current workspace and platform checks.
 
 The documents above describe the active rewrite. The guides below retain
 material from the previous architecture; check the implementation evidence before
@@ -46,8 +50,6 @@ using their API or platform-support claims.
 
 - [Project completion and improvement report](project-improvement-report-2026-10-13.md):
   assessment dated 2026-10-13, verified gaps, priorities, and release criteria.
-- [API guide](api-guide.md): builder API, reactivity, widgets, SSR, server
-  functions, styling, and runnable example commands.
 - [Fullstack notes](fullstack.md): server functions, request context, server
   state/cache, preloaded state, streaming helpers, and multipart helpers.
 - [Server function adapter recipes](serverfn-adapter-recipes.md): Salvo, Axum,
@@ -74,13 +76,9 @@ using their API or platform-support claims.
   `Cage<T>`/`Bond<T>` handle tradeoffs and revisit triggers.
 - [LiveView protocol](liveview.md): server-held command-stream session model
   and WebSocket message shapes.
-- [Third-party renderer guide](renderer-author-guide.md): command stream,
-  event, query, lifecycle, batching, and conformance rules for custom renderers.
 - [Performance notes](performance.md): wasm size, Criterion benches, and local
   benchmark report scripts.
 - [Wasm split evaluation](wasm-split-evaluation.md): current size thresholds
   and why split-wasm is deferred.
-- [Release readiness](release-readiness.md): feature matrix and required checks
-  before cutting a release.
 - [Multi-platform rendering plan](multi-platform-rendering-plan.md): current
   renderer status and next platform stages.

@@ -2,9 +2,7 @@
 //! native listeners enqueue requests and never call application handlers.
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
-use glory_render::{
-    DismissReason, Error, Event, Layer, LayerFocus, LayerPlacement, Mutation, NodeId,
-};
+use glory_render::{DismissReason, Error, Event, Layer, LayerFocus, LayerPlacement, NodeId};
 use wasm_bindgen::JsCast;
 use web_sys::{Element, KeyboardEvent, Node};
 
@@ -53,7 +51,11 @@ impl Drop for Working<'_> {
     }
 }
 impl Layers {
-    pub fn update(&mut self, tree: &glory_render::memory::Memory, mutations: &[Mutation]) {
+    pub fn update(
+        &mut self,
+        tree: &glory_render::memory::Memory,
+        changes: &crate::semantic_changes::Changes<'_>,
+    ) {
         self.scope_declarations.clear();
         for id in tree.focus_scope_roots() {
             if tree.active(id)
@@ -71,33 +73,13 @@ impl Layers {
                 self.scope_declarations.insert(id, config.clone());
             }
         }
-        for id in mutations
-            .iter()
-            .flat_map(|mutation| match mutation {
-                Mutation::Create { id, .. }
-                | Mutation::Patch {
-                    id,
-                    patch: glory_render::Patch::Semantics(_),
-                } => std::slice::from_ref(id),
-                Mutation::CreatePlan { ids, .. } => ids.as_slice(),
-                _ => &[],
-            })
-            .copied()
-        {
-            if let Ok(node) = tree.node(id) {
-                match node
-                    .descriptor
-                    .view()
-                    .semantics
-                    .as_ref()
-                    .and_then(|s| s.layer.clone())
-                {
-                    Some(layer) => {
-                        self.declarations.insert(id, layer);
-                    }
-                    None => {
-                        self.declarations.remove(&id);
-                    }
+        for (&id, semantics) in changes {
+            match semantics.and_then(|s| s.layer.clone()) {
+                Some(layer) => {
+                    self.declarations.insert(id, layer);
+                }
+                None => {
+                    self.declarations.remove(&id);
                 }
             }
         }

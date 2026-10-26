@@ -1,12 +1,9 @@
 //! One current WAAPI object per live inert translation. All computed-style
 //! reads precede animation writes; callbacks only request a host observation.
 use super::{backend, dom::Dom};
-use glory_render::{Error, Mutation, NodeId, TranslationKind, TranslationMotion, memory::Memory};
+use glory_render::{Error, NodeId, TranslationKind, TranslationMotion, memory::Memory};
 use js_sys::{Array, Object, Reflect};
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    rc::Rc,
-};
+use std::{collections::BTreeMap, rc::Rc};
 use wasm_bindgen::{JsCast, JsValue, closure::Closure};
 use web_sys::{Element, Event, MediaQueryList};
 
@@ -111,30 +108,14 @@ fn animation(
     Ok(value)
 }
 impl Dom {
-    pub(super) fn update_translations(self: &Rc<Self>, tree: &Memory, mutations: &[Mutation]) {
+    pub(super) fn update_translations(
+        self: &Rc<Self>,
+        tree: &Memory,
+        changes: &crate::semantic_changes::Changes<'_>,
+    ) {
         let mut state = self.translations.borrow_mut();
-        let mut touched: BTreeSet<_> = state.live.keys().copied().collect();
-        for mutation in mutations {
-            match mutation {
-                Mutation::Create { id, .. }
-                | Mutation::Patch {
-                    id,
-                    patch: glory_render::Patch::Semantics(_),
-                } => {
-                    touched.insert(*id);
-                }
-                Mutation::CreatePlan { ids, .. } => touched.extend(ids.iter().copied()),
-                _ => {}
-            }
-        }
-        for id in touched {
-            let next = tree.node(id).ok().and_then(|node| {
-                node.descriptor
-                    .view()
-                    .semantics
-                    .as_deref()
-                    .and_then(|s| s.translation)
-            });
+        for (&id, semantics) in changes {
+            let next = semantics.and_then(|s| s.translation);
             if let Some(next) = next {
                 if let Some(current) = state.live.get_mut(&id) {
                     current.next = next;
@@ -152,6 +133,10 @@ impl Dom {
                 state.live.remove(&id);
             }
         }
+        // Structural edits can retire a member without a metadata patch.
+        // Recheck only live controllers, never rebuild a union of all created
+        // semantic identities just to discover that most have no translation.
+        state.live.retain(|id, _| tree.node(*id).is_ok());
         state.pending = !state.live.is_empty();
         if state.live.is_empty() {
             let retired = std::mem::take(&mut *state);

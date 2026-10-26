@@ -10,8 +10,9 @@ HTML API/feature/wire format through compatibility aliases.
 The active workspace currently contains style, render, core, resource, i18n, ui,
 html, web, ssr, blitz, glory and salvo-adapter. The opt-in i18n package was authorized after
 the semantic rewrite; see `crates/i18n/README.md` for its boundaries.
-Old adapter/tool directories and unreferenced old core sources are extraction
-references, not supported workspace packages. Migrate useful behavior/tests,
+Old adapter/tool directories are extraction references, not supported workspace
+packages. Truck, the old core runtime and its routing package/examples have
+been removed. Migrate useful behavior/tests from remaining references,
 then remove obsolete sources as the implementation progresses. Do not count a
 reduced workspace check as proof that those adapters/platforms work.
 
@@ -642,8 +643,8 @@ resource-snapshot-acceptance}.js.
 The sixth script, stream-acceptance.js, uses the live native fixture's /page
 and /reverse endpoints with CSP, typed drafts, fallback moves and hydration.
 Browser builds alone do not run that acceptance function. Current runtime tests are explicitly
-listed in core/Cargo.toml; retired HTML test modules are not silently enabled.
-Port their meaningful scenarios to the new stack before declaring completion.
+listed in core/Cargo.toml, including task_host. The old HTML test modules were
+removed; current UI/SSR/Web suites cover semantic behavior, not the retired wire.
 For native transport acceptance, run the independent example binary
 `cargo run --manifest-path examples/semantic-web/Cargo.toml --bin stream_fixture`
 then `python scripts/check-semantic-stream.py` (localhost:8789). This fixture
