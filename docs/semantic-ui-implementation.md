@@ -72,14 +72,22 @@ CLI 的 15 项测试和严格 Clippy、counter 的 3 项测试、Web release bun
 feature/target 严格 Clippy 通过。工具作为独立项加入统一检查与格式 CI。
 提交前按用户要求统一复核全部改动，修正先前阻断门禁的格式差异，并为两个
 仅供 hydration 使用的 Web helper/import 补上 feature 限定。
-`check-semantic-ui.ps1 -Web` 完整通过：CLI 15 项、fork 440 项、当前工作区
+实验产物的 `check-semantic-ui.ps1 -Web` 曾完整通过：CLI 15 项、fork 440 项、
 960 项测试通过（2 项既有忽略），fmt、native/WASM 全 feature/target 严格
 Clippy 和 Web fixture 构建通过。使用 D: 项目缓存内的 wasm-bindgen 0.2.129，
 未依赖全局的旧版本。counter 的 3 项测试和 Web/desktop 严格 Clippy 通过；
 Web 的无默认 feature 与全 feature WASM 严格 Clippy 分别通过。
-当前产物的 29 组真实 Chrome 验收全部通过，覆盖跨 mutation 字段提交的
+该实验产物的 29 组真实 Chrome 验收全部通过，覆盖跨 mutation 字段提交的
 内存增长和故障前缀、Plan 局部退休、输入/接管/stream 等路径。
-补齐的字段提交基准汇总来自原始 864 样本与独立过桥计数，不重新拼选样本。
+跨 mutation 字段提交随后因两版测量回退撤回，生产代码恢复到此前的 Plan
+宿主目标；上述 960 项/29 组是实验产物的证据，不作为当前启用该实验的声明。
+最终字段提交报告和完整基准 JSON 保留实验、撤回结论与来源摘要。
+撤回后的生产源码再次通过 `check-semantic-ui.ps1 -Web`：CLI 15 项、fork
+440 项、工作区 956 项测试通过（2 项既有忽略），fmt、native/WASM 全
+feature/target 严格 Clippy 与浏览器 fixture 构建通过。逐文件恢复摘要与
+检查期间的源码快照一致。当前生产产物的 28 组真实 Chrome 验收全部通过，
+对应证据在 `D:/BuildCache/glory-project-cli/restored/browser-foundation-final`；
+没有将已删除的实验浏览器探针算入当前验收数量。
 日志、metadata、浏览器与哈希验收证据位于
 `D:/BuildCache/glory-project-cli`，全部构建缓存和临时文件也位于 D:。
 

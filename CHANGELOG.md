@@ -18,9 +18,10 @@ run, watch/reload, diagnostics, checks and Web/server bundles. Tool and compiler
 caches stay on D:, and Web builds select the resolved wasm-bindgen version.
 
 Web Plans retain original physical parts, release partially retired members,
-and batch bounded local-field writes across mutations. Identity validation,
-controlled-input barriers and successful-prefix receipts remain in Rust; SSR
-and Blitz retain their ordinary sequential sink behavior.
+and batch typed local-field edits within individual patches. Identity validation,
+controlled-input barriers and successful-prefix receipts remain in Rust.
+The cross-mutation field submission experiment was reverted after paired
+measurements showed regressions; its results remain documented separately.
 
 See the [implementation ledger](docs/semantic-ui-implementation.md) for delivered
 behavior, validation and remaining work. Earlier unreleased notes described

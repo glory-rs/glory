@@ -2545,7 +2545,8 @@
     "No claim that import-count reduction equals an equivalent CPU speedup.",
     "Live JS Arrays, per-node instance addressing and fixed retirement masks have memory/size costs; externref capacity is not RSS.",
     "Leptos selection anomaly retained in primary timings; 72 independent diagnostics reported separately.",
-    "Dioxus still materially faster for bulk operations; identity/validation/lifecycle capabilities were preserved."
+    "Dioxus still materially faster for bulk operations; identity/validation/lifecycle capabilities were preserved.",
+    "The experimental production code and added tests were reverted after both cohorts; the active implementation remains the pre-experiment version. The larger instance/mount/retirement batch design was not implemented in this experiment."
   ],
   "environment": {
     "scope": "System CPU load and active compiler process IDs sampled outside each A/B timing context; unrelated jobs were never changed.",
@@ -3125,7 +3126,8 @@
     "reason": "Two measured cohorts did not establish a worthwhile overall performance improvement; replacement, selection and clear regressed despite fewer bridge/decoder calls. Production implementation restored to the before snapshot.",
     "patch": {
       "path": "D:\\BuildCache\\glory-submit-plan-20261026\\experiment.patch",
-      "sha256": "8f846f3fed5d23738b09b2584f76237b878af675688145eaf5c0c31410f46497"
+      "sha256": "35567c38d43e85e7650f61709cebc20e6ff6feaead76115c1aced0d6e18e7644",
+      "applyCommand": "git apply --ignore-space-change D:\\BuildCache\\glory-submit-plan-20261026\\experiment.patch"
     },
     "restoredFiles": {
       "crates/render/src/memory.rs": "e693e1b15383579edcfa619935fe0c6db0057f36de98fd8ea4d1fd7d52d01d5f",
@@ -3143,7 +3145,18 @@
       "sha256": "d92492bdea2e2cfc7e09adfc80f0af059bcecc529e3bb3c0c80abd15843a5503"
     },
     "firstCohortInputs": "D:\\BuildCache\\glory-submit-plan-20261026\\inputs-after-first-cohort\\inputs.json",
-    "frozenExperimentSource": "D:\\BuildCache\\glory-submit-plan-20261026\\source"
+    "frozenExperimentSource": "D:\\BuildCache\\glory-submit-plan-20261026\\source",
+    "postRestoreChecks": {
+      "restored-tests.log": {
+        "path": "D:\\BuildCache\\glory-submit-plan-20261026\\restored-tests.log",
+        "sha256": "adb5bf58ff6e72fd5f138f39a6a017ce81d55d36b280c2cdb6241d2f0bfee671"
+      },
+      "restored-clippy.log": {
+        "path": "D:\\BuildCache\\glory-submit-plan-20261026\\restored-clippy.log",
+        "sha256": "768c922746bc1918ea2e551d24a1bf415fa60d47b96617f1cf2aa5877ac65d7e"
+      }
+    },
+    "activeGitHeadAfterRestore": "29ff73a60e3f431290a74a32f8cfb3ec2243f864"
   },
   "protocol": {
     "eligible": [

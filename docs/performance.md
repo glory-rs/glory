@@ -1,11 +1,11 @@
 # Performance Notes
 
-## 跨 mutation 字段提交 — 2026-10-26
+## 跨 mutation 字段提交试验（已撤回）— 2026-10-26
 
-[字段提交报告](field-submit-plan-2026-10-26.md)记录 Text/Label/Classes 的
-有界宿主提交、精确后缀恢复、屏障和成功前缀。千行创建 WASM→JS 从 5,034
-降至 3,065，DOM 工作量保持不变；调用次数变化不代表同等比例提速。
-同路径四轮 864 个正式样本及独立计数见
+[字段提交报告](field-submit-plan-2026-10-26.md)记录已撤回的 Text/Label/Classes
+跨 mutation 提交实验。过桥和解码调用下降，但两轮测量没有建立值得启用的
+整体收益，替换、选行和清空出现回退；当前实现已恢复到实验前的 Plan 宿主目标。
+两版配对测量、三框架结果及独立计数见
 [结果汇总](../benchmarks/field-submit-results-2026-10-26.json)。
 
 ## Plan physical parts and seed rows — 2026-10-25

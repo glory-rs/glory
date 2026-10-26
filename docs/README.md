@@ -27,8 +27,8 @@ Start here when evaluating or extending Glory:
   lazy original-node handles, partial retirement and independent bridge/GC measurements.
 - [Typed Plan host goals](plan-host-goals-2026-10-26.md):
   finite field/placement/removal calls, controlled-input barriers and memory-growth recovery.
-- [Cross-mutation field submission](field-submit-plan-2026-10-26.md):
-  bounded local-field journals, exact successful prefixes and paired measurement provenance.
+- [Cross-mutation field submission experiment](field-submit-plan-2026-10-26.md):
+  reverted after paired measurements; journal/prefix validation and experimental results remain documented.
 - [Bulk creation and Dioxus design](bulk-create-dioxus-2026-10-24.md): fixed DOM creation bridge,
   independent paired/cross-framework results, rejected experiments, full regression and static-plan priorities.
 - [HTML mapping and DOM creation](performance.md#html-mapping-and-dom-creation--2026-10-23):
