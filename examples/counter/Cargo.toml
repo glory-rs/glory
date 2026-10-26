@@ -5,6 +5,9 @@ edition = "2024"
 publish = false
 
 [workspace]
+resolver = "2"
+members = ["tools/glory"]
+default-members = ["."]
 
 [lib]
 crate-type = ["cdylib", "rlib"]

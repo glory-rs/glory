@@ -1,7 +1,6 @@
 name: format
 on:
   push:
-    branches-ignore: [release]
   pull_request:
 permissions:
   contents: read
@@ -30,7 +29,7 @@ jobs:
           if ($LASTEXITCODE -or [IO.Path]::GetFullPath($meta.target_directory) -ne [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)) { throw 'Unexpected Cargo target' }
           cargo fmt --all -- --check
           if ($LASTEXITCODE) { throw 'Workspace formatting failed' }
-          foreach ($manifest in @('examples/counter/Cargo.toml','examples/semantic-web/Cargo.toml')) {
+          foreach ($manifest in @('tools/cli/Cargo.toml','examples/counter/Cargo.toml','examples/semantic-web/Cargo.toml')) {
             cargo fmt --manifest-path $manifest -- --check
             if ($LASTEXITCODE) { throw "Formatting failed: $manifest" }
           }

@@ -23,7 +23,7 @@ modal 焦点/AX/滚动及关闭清理均有证据。全部 native targets 195 �
 - [ ] R5：Blitz 无窗口文档与 shell、Windows/Linux 验收。文档/CPU 像素、shell、焦点/选区/导航和受控编辑/组合协议、资源内核、桌面 HTTP/包/文件挂载 Loader、共享请求/完成背压及固有 PNG 高度锚点已有证据；可选AccessKit桥和Windows UIA的编辑/激活/虚拟行显示请求也已实测，范围见末节。真实OS IME、Unix AT-SPI客户端、读屏器/完整文本接口及Android资源仍待完成，不能以合成输入或局部预算代替它们。
 - [ ] R6：Android Activity/Surface/IME/恢复/打包与设备验收。
 - [ ] R7：惰性验证、字段依赖、样式缓存、性能与资源观测。Blitz 帧级视觉 revision/缓冲复用、固定聚合阶段计时/重复基线，以及绘制前有预算的本地观察已有实现；引擎内部/呈现时间分解、字段依赖、样式缓存仍待完成。
-- [ ] 清理旧依赖、feature、示例、CLI 和文档；只留新公开架构。
+- [x] 清理旧依赖、feature、示例、CLI 和文档；只留新公开架构。2026-10-26 删除剩余 9 个未支持的旧包及相关入口；历史评估保留 Git 固定链接。平台与其余架构目标不因此标为完成。
 
 R8 的其他工具包按报告作为后续按需适配项，不用空 crate 或未运行的平台宣称已支持。
 
@@ -44,6 +44,76 @@ R8 的其他工具包按报告作为后续按需适配项，不用空 crate 或�
 - [x] 至少百万条数据的算法、实际浏览器 DOM 数量、滚动行为与清理验收；性能报告区分算法、响应式和布局成本。当前浏览器验收不声称帧率。
 
 ## 当前实施
+
+2026-10-26 按用户要求比较 Prisma Client Rust 的项目内 CLI 安装方式后，
+新增独立的 `tools/cli` 工具 workspace，仅提供 `glory-cli` 库接口，尚未发布。
+每个应用以私有 `tools/glory` 小程序调用它，与应用共用 Cargo.lock；生成
+`bin/glory.ps1`、WSL `bin/glory` 和 Cargo alias。入口在编译工具前设置
+D: Cargo/cache/temp 和原生 target，应用编译使用独立的 app-target，避免
+外层 Cargo run 占用构建锁。普通项目推导入口、features、index/public；
+仅覆盖项写入 package.metadata.glory，不新增配置文件。
+
+本轮提供 doctor/print/build/run/serve/check/fmt/bundle/init，检查框架版本
+与 Git 来源，按已解析版本安装项目内 wasm-bindgen。Web serve 支持源文件/
+资产监听、刷新、错误显示和失败保留上次输出；Web/server 发布目录带 SHA-256
+清单。counter 已接入共享锁与项目命令，其旧 build.ps1 改为转发入口。
+此实现不恢复删除的旧 CLI、RSX/hot-patch 或全局工具安装；不宣称交付原生
+安装器、Android 打包、SSG、Binaryen 优化或 SSR 开发代理。
+最终方案、Prisma 比较和操作见 [工具说明](../tools/cli/README.md)。
+
+CLI 的 15 项测试和严格 Clippy、counter 的 3 项测试、Web release bundle
+以及真实 SSR 小项目的 run/server bundle 均通过；两个 bundle 的全部文件
+哈希核对通过，发布文件中无开发刷新脚本。真实 Chrome 在 D: 临时 counter
+副本验证 CSS 刷新、编译失败时旧应用仍可点击、已接受输出不被覆盖、错误源码
+不阻止 doctor、修复后刷新，pageErrors 为空。WSL 仅检查入口语法和当前
+`//localhost/D$` 本地 D 盘挂载识别，没有把它记为 Linux 编译/窗口验收。
+根 runtime metadata 仍为 12 包、217 targets，依赖/features/target 定义
+逐项一致；工作区全部 feature 测试 956 通过、2 项既有忽略，fmt 与全部
+feature/target 严格 Clippy 通过。工具作为独立项加入统一检查与格式 CI。
+提交前按用户要求统一复核全部改动，修正先前阻断门禁的格式差异，并为两个
+仅供 hydration 使用的 Web helper/import 补上 feature 限定。
+`check-semantic-ui.ps1 -Web` 完整通过：CLI 15 项、fork 440 项、当前工作区
+960 项测试通过（2 项既有忽略），fmt、native/WASM 全 feature/target 严格
+Clippy 和 Web fixture 构建通过。使用 D: 项目缓存内的 wasm-bindgen 0.2.129，
+未依赖全局的旧版本。counter 的 3 项测试和 Web/desktop 严格 Clippy 通过；
+Web 的无默认 feature 与全 feature WASM 严格 Clippy 分别通过。
+当前产物的 29 组真实 Chrome 验收全部通过，覆盖跨 mutation 字段提交的
+内存增长和故障前缀、Plan 局部退休、输入/接管/stream 等路径。
+补齐的字段提交基准汇总来自原始 864 样本与独立过桥计数，不重新拼选样本。
+日志、metadata、浏览器与哈希验收证据位于
+`D:/BuildCache/glory-project-cli`，全部构建缓存和临时文件也位于 D:。
+
+2026-10-26 继续完成旧源码退出：删除 CLI/cli-harnesses、macros、serverfn、
+hot-reload、desktop/native/liveview/tui 共 9 个非活动包，剩余旧示例、旧基准
+wrapper、16 份旧指南以及旧发布/移动端 CI；同时删除门面未加载的 cfg 与 CSS
+测试残件。本轮删除 191 个文件，根 workspace.dependencies 的全部声明经核对
+均无活动消费者，已整体移除。现有语义基准、测量证据和预先存在的源码修改保留；
+历史评估的 37 处旧路径改为已核对存在的 Git 固定链接，旧测量指令移入 Git 历史。
+
+前后 metadata 保持相同的 12 个包、217 个 target，依赖、features 和 target
+定义逐项一致；其余活动 Rust 源码哈希不变。`check-semantic-ui.ps1` 通过：
+fork 440 项、工作区 954 项测试通过（2 项既有忽略），fmt 和全 feature/target
+严格 Clippy 通过。工作区 WASM 全 feature/target 严格 Clippy、counter 的 3 项
+测试及 semantic-web 的 WASM 全 target 编译检查通过；9 个保留的独立示例/基准
+清单均通过 locked metadata。Playwright 保留 counter 项目，测试发现通过。
+本次未执行真实浏览器/窗口/OS 输入验收。审计、日志和构建缓存均位于 D:，证据根
+目录为 `D:/BuildCache/glory-legacy-cleanup-20261026`。
+
+2026-10-26 按用户要求移除 Truck 与关联旧架构：删除未加载的旧 Core
+scope/view/node/reflow/web/renderer、旧 HTML/command 测试和基准、旧 routing
+包及五个依赖它的示例；同步清理 Routable/Store 旧派生、旧浏览器测试入口、
+失效路径和指南。现有新运行时源文件与工作区包/依赖/原有 target 保持；
+`core/tests/task_host.rs` 继续由 runtime 测试引入，不重复登记。当前语义 UI/SSR/Web 测试承担新的行为契约，
+不保留旧 wire 兼容测试，也不声称已交付旧路由功能；CLI/serverfn/其他旧 adapter
+仍属于未支持的提取参考。此次是 Truck 调用链清理，不将整体旧架构退出项勾为完成。
+
+最终 metadata 对照保持 12 个包、217 个 target，包依赖、features 和 target
+定义全部一致。`check-semantic-ui.ps1` 通过：独立 fork 440 项测试、工作区全部
+feature 测试、fmt 与全 target 严格 Clippy；撤去重复测试登记后的最终工作区
+复验为 952 通过、2 忽略，`task_host` 只在 runtime 中执行一次。WASM 工作区
+全部 feature/target 编译检查及保留的 Playwright 项目发现通过；此次没有重跑
+浏览器或实际窗口/OS 输入验收。日志、前后 metadata、删除清单和未触及源码哈希
+位于 `D:/BuildCache/glory-truck-cleanup`，编译缓存与临时文件也全部在 D:。
 
 2026-10-25 新增 `each_seed` 明确同 key 只消费首次 T，省去 item/index Cage 和
 data Owner；普通 `each` 保持活更新语义。普通 Part 销毁/挂起省去单元素范围 Vec，

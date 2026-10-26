@@ -1,4 +1,4 @@
-use std::cell::{Cell, RefCell};
+use std::cell::{Cell, OnceCell, RefCell};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
 
@@ -15,30 +15,67 @@ use templates::Templates;
 #[path = "plans.rs"]
 mod plans;
 
-// HTML has exactly four typed parts. Keep live DOM handles inline rather
-// than allocating a BTreeMap node for each semantic node.
+// HTML has exactly four typed parts. Explicit plans keep their original
+// physical nodes together and only cross the bridge for parts actually used.
+// The cache never searches a live DOM path (editing/moves cannot retarget it).
 #[derive(Default)]
-pub(super) struct Parts([Option<Node>; 4]);
+pub(super) struct Parts {
+    nodes: [OnceCell<Node>; 4],
+    planned: Option<(Rc<plans::Instance>, usize)>,
+}
 impl Parts {
     fn index(part: Part) -> usize {
-        match part {
-            Part::Main => 0,
-            Part::Control => 1,
-            Part::Content => 2,
-            Part::Picker => 3,
+        plans::part_index(part)
+    }
+    fn planned(instance: Rc<plans::Instance>, member: usize) -> Self {
+        Self {
+            nodes: Default::default(),
+            planned: Some((instance, member)),
         }
     }
+    fn contains(&self, part: Part) -> bool {
+        self.nodes[Self::index(part)].get().is_some()
+            || self
+                .planned
+                .as_ref()
+                .is_some_and(|(instance, member)| instance.address(*member, part).is_some())
+    }
+    fn target(&self, part: Part) -> Option<plans::Target<'_>> {
+        let (instance, member) = self.planned.as_ref()?;
+        instance.target(*member, part)
+    }
     pub fn get(&self, part: &Part) -> Option<&Node> {
-        self.0[Self::index(*part)].as_ref()
+        let slot = &self.nodes[Self::index(*part)];
+        if let Some(node) = slot.get() {
+            return Some(node);
+        }
+        let (instance, member) = self.planned.as_ref()?;
+        let address = instance.address(*member, *part)?;
+        Some(slot.get_or_init(|| instance.node(address)))
     }
     fn insert(&mut self, part: Part, node: Node) {
-        self.0[Self::index(part)] = Some(node);
+        self.nodes[Self::index(part)] = OnceCell::from(node);
     }
     pub fn values(&self) -> impl Iterator<Item = &Node> {
-        self.0.iter().flatten()
+        [Part::Main, Part::Control, Part::Content, Part::Picker]
+            .into_iter()
+            .filter_map(|part| self.get(&part))
     }
     fn is_empty(&self) -> bool {
-        self.0.iter().all(Option::is_none)
+        [Part::Main, Part::Control, Part::Content, Part::Picker]
+            .iter()
+            .all(|part| !self.contains(*part))
+    }
+    fn retire(&self) {
+        if let Some((instance, member)) = &self.planned {
+            instance.retire(*member);
+        }
+    }
+    fn flush_retired(&self) -> Result<(), Error> {
+        if let Some((instance, _)) = &self.planned {
+            instance.flush_retired()?;
+        }
+        Ok(())
     }
 }
 #[cfg(feature = "hydrate")]
@@ -690,7 +727,7 @@ impl Dom {
             )
         } else {
             let root = shape.root_part()?;
-            if parts.get(&root).is_none() {
+            if !parts.contains(root) {
                 return Err(Error::Unsupported("HTML physical root"));
             }
             Boundary::Part(root)
@@ -761,6 +798,10 @@ impl Dom {
         before: Option<NodeId>,
     ) -> Result<(), Error> {
         let entry = self.entry(id)?;
+        if self.place_detached_plan(&entry, parent, before)? {
+            entry.parent.set(parent);
+            return Ok(());
+        }
         let semantic_parent = parent;
         let (parent, end) = if let Some(parent) = parent {
             let parent = self.entry(parent)?;
@@ -829,7 +870,16 @@ impl Dom {
     }
     fn patch(&self, id: NodeId, edits: Vec<Edit>) -> Result<(), Error> {
         let entry = self.entry(id)?;
-        for edit in edits {
+        let mut edits = edits.into_iter();
+        loop {
+            if let Some((instance, member)) = &entry.parts.planned {
+                let consumed = instance.fields(*member, edits.as_slice())?;
+                if consumed != 0 {
+                    edits.nth(consumed - 1);
+                    continue;
+                }
+            }
+            let Some(edit) = edits.next() else { break };
             match edit {
                 Edit::Revision(revision) => {
                     entry.editing.borrow_mut().requested = revision;
@@ -913,11 +963,25 @@ impl Dom {
             }
             Ok(())
         };
-        if let Boundary::Part(_) = entry.boundary {
-            remove(entry.first())
+        let result = if let Boundary::Part(part) = entry.boundary {
+            if let Some(target) = entry.parts.target(part) {
+                target.remove()
+            } else {
+                remove(entry.first())
+            }
         } else {
             range(&entry).and_then(|nodes| nodes.iter().try_for_each(remove))
+        };
+        // Mark the whole semantic retirement before clearing any shared Array.
+        // Full instances need no clearing bridge; partial instances clear their
+        // retired slots once, even while unrelated members remain mounted.
+        for entry in &removed {
+            entry.parts.retire();
         }
+        let retired = removed
+            .iter()
+            .try_for_each(|entry| entry.parts.flush_retired());
+        result.and(retired)
     }
     pub fn clear(&self) {
         self.rich_pending.borrow_mut().clear();

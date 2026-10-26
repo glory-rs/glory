@@ -5,6 +5,12 @@ mod browser;
 mod clipboard_state;
 #[cfg(any(target_arch = "wasm32", test))]
 mod file_reads;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+#[path = "browser/plan_fields.rs"]
+mod plan_fields_tests;
+#[cfg(all(test, not(target_arch = "wasm32")))]
+#[path = "browser/plan_parts.rs"]
+mod plan_parts_tests;
 #[cfg(any(target_arch = "wasm32", test))]
 mod semantic_changes;
 #[cfg(all(test, not(target_arch = "wasm32")))]

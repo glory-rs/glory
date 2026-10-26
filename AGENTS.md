@@ -10,11 +10,18 @@ HTML API/feature/wire format through compatibility aliases.
 The active workspace currently contains style, render, core, resource, i18n, ui,
 html, web, ssr, blitz, glory and salvo-adapter. The opt-in i18n package was authorized after
 the semantic rewrite; see `crates/i18n/README.md` for its boundaries.
-Old adapter/tool directories are extraction references, not supported workspace
-packages. Truck, the old core runtime and its routing package/examples have
-been removed. Migrate useful behavior/tests from remaining references,
-then remove obsolete sources as the implementation progresses. Do not count a
-reduced workspace check as proof that those adapters/platforms work.
+Truck, the old core runtime, routing, CLI/macros/serverfn/hot-reload and the old
+desktop/native/liveview/tui adapters and examples have been removed. Only the
+12 active runtime packages and migrated examples/benchmarks are supported. The
+new `tools/cli` is a separate library-only host tooling workspace, explicitly
+authorized after the cleanup. It must not depend on runtime crates or enter
+the facade/default/HTML/SSR/WASM runtime graphs. Applications own a tiny private
+workspace executable and shared Cargo.lock; bin launchers set D: caches and the
+native tool target before Cargo. The canonical check script also verifies CLI
+metadata, fmt, tests and Clippy independently of the runtime workspace. Historical
+design and measurement reports may refer to removed sources through Git history;
+they do not advertise current APIs or platform acceptance. Do not reintroduce
+retired feature aliases or count compilation as proof of platform acceptance.
 
 - `glory-style`: explicit style declarations, no runtime/engine dependencies.
   Optional css pins cssparser 0.38.0 and provides immutable finite Sheet rules;
@@ -392,7 +399,7 @@ reduced workspace check as proof that those adapters/platforms work.
   package names, repository structure and licenses. Pin full Git commit SHAs;
   do not use moving branch dependencies or application-level global patches.
 - The six engine/layout packages use glory-rs/blitz and glory-rs/taffy Git
-  revisions recorded in docs/engine-forks.json. They stay outside the ten-package
+  revisions recorded in docs/engine-forks.json. They stay outside the twelve-package
   workspace. Run python scripts/check-engine-forks.py --test to verify Cargo's
   resolved sources/lock and run fork-owned tests in separate clean Git checkouts
   under the D: build root. Do not edit Cargo's managed Git checkouts. Update the
@@ -643,8 +650,9 @@ resource-snapshot-acceptance}.js.
 The sixth script, stream-acceptance.js, uses the live native fixture's /page
 and /reverse endpoints with CSP, typed drafts, fallback moves and hydration.
 Browser builds alone do not run that acceptance function. Current runtime tests are explicitly
-listed in core/Cargo.toml, including task_host. The old HTML test modules were
-removed; current UI/SSR/Web suites cover semantic behavior, not the retired wire.
+listed in core/Cargo.toml; task_host is included by tests/runtime.rs. The old
+HTML test modules were removed; current UI/SSR/Web suites cover semantic
+behavior, not the retired wire.
 For native transport acceptance, run the independent example binary
 `cargo run --manifest-path examples/semantic-web/Cargo.toml --bin stream_fixture`
 then `python scripts/check-semantic-stream.py` (localhost:8789). This fixture

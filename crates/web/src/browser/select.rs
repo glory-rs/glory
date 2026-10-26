@@ -2,7 +2,9 @@
 use glory_html::SelectOptions;
 use glory_render::{Error, SelectEntry, SelectOption, SemanticId};
 use wasm_bindgen::{JsCast, JsValue};
-use web_sys::{Document, Element, Node};
+#[cfg(feature = "hydrate")]
+use web_sys::Node;
+use web_sys::{Document, Element};
 
 use super::backend;
 
@@ -152,6 +154,7 @@ pub fn create(
     Ok(())
 }
 
+#[cfg(feature = "hydrate")]
 pub fn validate_children(
     document: &Document,
     element: &Element,

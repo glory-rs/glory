@@ -8,6 +8,12 @@
 
 本文保留初始评估与目标设计；§2 的“基线”指上述提交，不代表重构后的工作树。实施和实际验证独立记录在[实施记录](semantic-ui-implementation.md)，不能把目标结构当作完成证据。标有“提案/拟议”的接口仍按提案阅读；§6.2 的基础用法已按当前源码修订。
 
+2026-10-26 工具补充：旧 CLI 已随旧架构移除；经用户另行授权，新建的
+[项目内 CLI 库](../tools/cli/README.md) 位于独立 `tools/cli` workspace。
+应用拥有私有 runner、共享 Cargo.lock 和 bin 入口，不为运行时增加工具依赖。
+它只编排当前 Web/desktop/server 宿主，不引入另一套 UI 生命周期；完整方案、
+已验收命令与未实现的打包能力见该说明及实施记录。
+
 **当前对照（2026-10-23）**：活动 workspace 已有 style/render/core/resource/ui/html/web/ssr/blitz/glory 十包，八组件、直接依赖运行时、窗口化列表与显式行预算、有界焦点保留、逻辑键盘导航与位置/总数元数据、类型化 inline 样式 profile、HTML/DOM、资源快照及渐进输出接管已有实现。Blitz 文档/CPU 绘制和可选桌面 shell 已接通；Windows、Ubuntu WSL 的 X11/Wayland 窗口链路已运行，含一亿行定高/变高列表、surface 恢复、尺寸同步、异步唤醒及关闭回收。当前 shell 源码还已有焦点、UTF-16 选区查询和列表键盘导航；受控编辑事件与原生组合协议也已接通；资源内核、provider 注入、有界图片缓存与可选桌面 HTTP/包资产 Loader 也已接通；共享请求/完成背压也已接通；固有 PNG 高度锚点与持续导航已有跨后端验收；显式文件挂载已接通；Windows UIA 语义树与动作桥已接入，Linux AT-SPI 客户端、屏幕阅读器、真实 OS IME 及 Android 资源仍待完成，详见 §11.5–§11.10。Android 宿主、更广样式语法/主题/非HTML resolver与完整能力审计、真实平台辅助技术验收、R7 优化和旧代码清理仍未完成；Android cargo check 继续只证明编译。
 
 ### 决策速览
@@ -108,21 +114,21 @@
 |---|---|---|
 | G01 | [core/lib.rs](../crates/core/src/lib.rs)，`pub mod web`、全局 ViewTree、`is_server/is_browser` | core 仍暴露 Web；`is_server()` 等于非 browser，桌面原生也可能被归为 server |
 | G02 | [core/Cargo.toml](../crates/core/Cargo.toml)，features 和 dependencies | `web-csr` 隐式开启 `single-app`；`web-sys/js-sys` 是无条件依赖；特性决定核心类型与调度形态 |
-| G03 | [node/mod.rs](../crates/core/src/node/mod.rs)，第 26、37 行 | `Node` 是按 cfg 选择的 `web_sys::Element` 或 `CommandNode`，不是每个运行实例选择的抽象呈现对象 |
-| G04 | [scope.rs](../crates/core/src/scope.rs)，第 75 行起 | Scope 同时管理 Owner、子 View、DOM anchor、parent/render Node，逻辑树与物理呈现位置耦合 |
-| G05 | [renderer/mod.rs](../crates/core/src/renderer/mod.rs)，第 111 行起 | `Renderer` 有关联 Node/Event 类型，但方法仍是 create_element、attribute、class、set_html |
-| G06 | [renderer/command.rs](../crates/core/src/renderer/command.rs)，第 55 行起 | wire 指令主要是 HTML/DOM 操作；`SetProperty` 的值为 String；不能直接代表 TextField 的完整语义 |
-| G07 | [web/widgets/mod.rs](../crates/core/src/web/widgets/mod.rs)，`generate_tags!` | API 以大量 HTML/SVG/MathML 元素工厂组织，不是有限语义组件目录 |
-| G08 | [CSR Element](../crates/core/src/web/widgets/csr.rs)，第 325 行起 | Element 构造阶段就调用 `document().create_element`，后端与节点结构在 builder 配置完成前已绑定 |
-| G09 | [共享命令 Element](../crates/core/src/web/widgets/ssr.rs)，第 128 行起 | 名为 ssr.rs，实际也服务非浏览器命令目标；构造阶段即分配 CommandNode |
-| G10 | [web/style.rs](../crates/core/src/web/style.rs)、[styling.md](styling.md) | 已有 class、scoped CSS、CSS module；没有跨后端 computed style 与布局契约 |
-| G11 | [web/events/mod.rs](../crates/core/src/web/events/mod.rs) | 以 DOM 事件名和 web_sys 类型为中心；backend-command 时改为 EventData，尚无统一 Activate 等控件事件 |
-| G12 | [ServerHolder](../crates/core/src/web/holders/server.rs)、[ssr_dom.rs](../crates/core/src/renderer/ssr_dom.rs) | SSR 已回放命令流；这是可以复用的 HTML 序列化路径，不必另建一套组件逻辑 |
-| G13 | [CSR hydrate](../crates/core/src/web/widgets/csr.rs)，第 72 行起 | hydration 按标签名与 gly-id 查询，映射一致性、额外 wrapper、Text fragment 都会影响接管 |
-| G14 | [native/blitz_consumer.rs](../crates/native/src/blitz_consumer.rs)、[native/Cargo.toml](../crates/native/Cargo.toml) | 已有 HTML/CSS 原生引擎接入，依赖 Blitz/Vello 路线；它不是任意原生工具包适配器 |
-| G15 | [reflow/bond.rs](../crates/core/src/reflow/bond.rs)、[web/attr.rs](../crates/core/src/web/attr.rs) | Bond 有缓存及相等门控，但订阅透传来源；属性注入按 is_revising 判断，尚未完全形成独立 Binding 边界 |
-| G16 | [reflow/store.rs](../crates/core/src/reflow/store.rs)，第 73、89 行 | CageLens 投影根 Cage 的读取和修改，不等于字段级订阅 |
-| G17 | [spawn.rs](../crates/core/src/spawn.rs)、[effect.rs](../crates/core/src/reflow/effect.rs)、[Suspense](../crates/core/src/widgets/suspense.rs) | 异步执行、资源 hydration、SSR 占位符机制也需要随拆层迁移；不能只移动 web 目录 |
+| G03 | [node/mod.rs](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/src/node/mod.rs)，第 26、37 行 | `Node` 是按 cfg 选择的 `web_sys::Element` 或 `CommandNode`，不是每个运行实例选择的抽象呈现对象 |
+| G04 | [scope.rs](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/src/scope.rs)，第 75 行起 | Scope 同时管理 Owner、子 View、DOM anchor、parent/render Node，逻辑树与物理呈现位置耦合 |
+| G05 | [renderer/mod.rs](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/src/renderer/mod.rs)，第 111 行起 | `Renderer` 有关联 Node/Event 类型，但方法仍是 create_element、attribute、class、set_html |
+| G06 | [renderer/command.rs](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/src/renderer/command.rs)，第 55 行起 | wire 指令主要是 HTML/DOM 操作；`SetProperty` 的值为 String；不能直接代表 TextField 的完整语义 |
+| G07 | [web/widgets/mod.rs](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/src/web/widgets/mod.rs)，`generate_tags!` | API 以大量 HTML/SVG/MathML 元素工厂组织，不是有限语义组件目录 |
+| G08 | [CSR Element](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/src/web/widgets/csr.rs)，第 325 行起 | Element 构造阶段就调用 `document().create_element`，后端与节点结构在 builder 配置完成前已绑定 |
+| G09 | [共享命令 Element](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/src/web/widgets/ssr.rs)，第 128 行起 | 名为 ssr.rs，实际也服务非浏览器命令目标；构造阶段即分配 CommandNode |
+| G10 | [web/style.rs](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/src/web/style.rs)、[styling.md](https://github.com/glory-rs/glory/blob/d31a8591dc626a303b1106285dff11f8e6162a28/docs/styling.md) | 已有 class、scoped CSS、CSS module；没有跨后端 computed style 与布局契约 |
+| G11 | [web/events/mod.rs](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/src/web/events/mod.rs) | 以 DOM 事件名和 web_sys 类型为中心；backend-command 时改为 EventData，尚无统一 Activate 等控件事件 |
+| G12 | [ServerHolder](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/src/web/holders/server.rs)、[ssr_dom.rs](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/src/renderer/ssr_dom.rs) | SSR 已回放命令流；这是可以复用的 HTML 序列化路径，不必另建一套组件逻辑 |
+| G13 | [CSR hydrate](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/src/web/widgets/csr.rs)，第 72 行起 | hydration 按标签名与 gly-id 查询，映射一致性、额外 wrapper、Text fragment 都会影响接管 |
+| G14 | [native/blitz_consumer.rs](https://github.com/glory-rs/glory/blob/d31a8591dc626a303b1106285dff11f8e6162a28/crates/native/src/blitz_consumer.rs)、[native/Cargo.toml](https://github.com/glory-rs/glory/blob/d31a8591dc626a303b1106285dff11f8e6162a28/crates/native/Cargo.toml) | 已有 HTML/CSS 原生引擎接入，依赖 Blitz/Vello 路线；它不是任意原生工具包适配器 |
+| G15 | [reflow/bond.rs](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/src/reflow/bond.rs)、[web/attr.rs](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/src/web/attr.rs) | Bond 有缓存及相等门控，但订阅透传来源；属性注入按 is_revising 判断，尚未完全形成独立 Binding 边界 |
+| G16 | [reflow/store.rs](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/src/reflow/store.rs)，第 73、89 行 | CageLens 投影根 Cage 的读取和修改，不等于字段级订阅 |
+| G17 | [spawn.rs](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/src/spawn.rs)、[effect.rs](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/src/reflow/effect.rs)、[Suspense](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/src/widgets/suspense.rs) | 异步执行、资源 hydration、SSR 占位符机制也需要随拆层迁移；不能只移动 web 目录 |
 
 当前文档关于多平台“地基已经完成”的结论，针对的是 HTML/DOM 命令流的多消费者方案。用户现在要求新增语义控件层，因此要重新界定抽象范围；这不是否定已有后端工作。
 
@@ -248,25 +254,26 @@ CSR/hydrate   static/stream    WebView / Blitz
 
 ### 5.2 最终物理组织与当前落地状态
 
-| 名称（前十包已存在，CLI 待重接） | 内容 |
+| 名称（12 个活动包） | 内容 |
 |---|---|
 | `glory-style` | 叶子层：样式值、资源标识、支持 profile；不引用 runtime。重型 CSS parser/resolver 按需启用 |
 | `glory-render` | 语义节点/props/event/query、Render trait、能力与提交数据；依赖 style，不依赖 core 或某个引擎 |
 | `glory-core` | Cage/Bond/Lotus、实例/Scope、Binding、Owner/Task、调度与宿主服务端口；依赖 render |
 | `glory-resource` | 可选的请求级命名资源注册表、显式 schema 与 JSON 快照；依赖 core/serde，无 HTML/HTTP/DOM。2026-10-22 实施时从 core/HTML mapper 单独分出 |
+| `glory-i18n` | 可选 Fluent 资源与应用本地语言选择；目录不可变，响应式消息归明确 Owner，不进入默认 core/HTML/SSR 依赖图 |
 | `glory-ui` | 纯 Rust 短名称组件 builder、内容模型、控制流；依赖 core/render/style |
 | `glory-html` | 将 render 操作映射为 HTML 模型与 DOM 操作；HTML 扩展、默认样式、稳定接管格式；不依赖 browser/runtime |
 | `glory-web` | browser DOM、浏览器事件/IME、任务宿主、hydration；依赖 html/core，平台依赖按 wasm 目标隔离 |
 | `glory-ssr` | HTML 序列化、请求级资源快照、流式边界；依赖 html/core，不依赖 web、窗口或 GPU |
+| `glory-salvo` | 外层 Salvo HTTP 集成，消费语义 SSR；可选流式响应保持请求本地执行、按 body 需求拉取和取消 |
 | `glory-blitz` | render→HTML mapper→Blitz 文档；事件/资源/无障碍桥；可选 shell 启用窗口和绘制 |
 | `glory` | 公共门面，重导出 ui/core，feature 选择宿主；不自行拥有第二份 Runtime |
-| `glory-cli` | 构建、资源、Android/iOS/桌面打包与签名编排；不参与语义树更新 |
 
 依赖图的关键边：`style ← render ← core ← ui`；html 只依赖 render/style，web/ssr/blitz 在最外层组装 core + html。HTML 扩展 trait 可以让 html 额外依赖 ui 来实现，但会增加不必要耦合；推荐由门面或独立 `ui::ext` 集成模块完成扩展，把 HtmlOptions 作为已注册的类型化配置插入，不让 ui/core 依赖 html。首版应选择一种实现并写依赖测试，不保留两种平行机制。
 
 具体推荐：`glory-html` 保持纯 mapper；`glory` 门面在 `html` feature 下定义 `HtmlTextExt` 等扩展，依赖 ui 和 html 并连接两者。直接使用低层 crates 的集成者可调用类型化 backend option setter；无需另开一个仅含几行 trait 的 crate。
 
-目录采用短名称，与现有 workspace 风格一致：当前活动包为 `crates/{style,render,core,resource,ui,html,web,ssr,blitz,glory}`；`crates/cli` 待按新入口重接。路由、宏、devtools、热更新等作为外围工具包按实际职责保留或调整，依赖新的端口；它们不进入 render/style 的反向依赖，也不为了此次拆层全部再建一份。resource 单独提供可选序列化，避免 core/HTML mapper 因资源快照而依赖 serde。
+目录采用短名称，与现有 workspace 风格一致：当前活动包为 `crates/{style,render,core,resource,i18n,ui,html,web,ssr,blitz,glory,salvo-adapter}`。旧 CLI、路由、宏、serverfn、devtools、热更新与 command adapter 源码已于 2026-10-26 清理；未来外围工具按实际需求依赖新端口实现，不保留旧运行时或 wire 兼容层。resource 单独提供可选序列化，避免 core/HTML mapper 因资源快照而依赖 serde。
 
 `glory-render` 中的 Node/Props/Mutation 是稳定职责边界，但 v1 类型本身允许随开发修改；协议 freeze 仅在实际远程通道交付时进行。core 不包含 HtmlOptions/GTK Widget/Blitz Node 等具体类型。响应式样式 builder 在 ui 中求值为 style patch，style 值层不反向依赖 Lotus。
 
@@ -1784,7 +1791,7 @@ style 保留 Glory 的小规模公共值类型，适配层负责转换为目标�
 
 ### 13.4 旧架构退出与发布组织的完成条件
 
-“不考虑兼容”落实为一套公开入口和受支持构建图。当前已缩小活动 workspace，但 manifest 中仍有旧工具依赖项，仓库内也保留提取参考及历史文档；这不是重构已收尾的证据。以下是后续工作清单，本次仅修订报告，未删除这些文件。
+“不考虑兼容”落实为一套公开入口和受支持构建图。2026-10-26 已清理未使用的旧 Core、工具/适配包、示例、CI 与 workspace 依赖声明，活动入口仅描述当前语义架构。下表保留退出标准；实际清理范围和验证见实施记录。历史评估的旧源码链接固定到 Git 历史，不表示这些包仍受支持；此清理也不代表所有平台与架构目标已经交付。
 
 | 范围 | 处理方式 | 完成条件 |
 |---|---|---|

@@ -27,82 +27,71 @@ The desktop entry targets Windows, Linux and macOS; Android still needs a mobile
 host. Platform device/OS input acceptance follows Glory's adapter support, not
 the fact that the shared component compiles.
 
-## Windows
+## Project-local commands
 
-Run from the repository root. `build.ps1` places Cargo's registry/Git cache,
-target, temporary files and Web output under `D:/BuildCache/glory-semantic-ui`,
-checks Cargo metadata's actual target directory, and restores the calling
-environment afterwards. `-BuildRoot` accepts another directory under
-`D:/BuildCache`. Use Ctrl+C to stop the Web server or close the desktop window.
+This example owns a small `counter-tools` workspace package, a shared Cargo.lock,
+a `cargo glory` alias, and `bin/` launchers. It depends on the new library-only
+`glory-cli` through a repository-relative path. No global Glory CLI is installed.
+The tool package does not depend on the application's library, so it can start
+and diagnose the project even when application Rust code fails to compile.
 
-Desktop:
-
-```powershell
-./examples/counter/build.ps1 -Platform desktop -Run
-```
-
-Web prerequisites are Rust's `wasm32-unknown-unknown` target, Python and
-`wasm-bindgen-cli 0.2.129` (matching the locked WASM library). If the CLI is not
-already available, install it with its caches, temporary files and binary on D:
+Windows (from the repository root):
 
 ```powershell
-$env:CARGO_HOME = 'D:/BuildCache/glory-semantic-ui/cargo'
-$env:CARGO_TARGET_DIR = 'D:/BuildCache/glory-semantic-ui/target'
-$env:TEMP = 'D:/BuildCache/glory-semantic-ui/tmp'
-$env:TMP = $env:TEMP
-New-Item -ItemType Directory -Force $env:CARGO_HOME, $env:TEMP | Out-Null
-cargo metadata --manifest-path examples/counter/Cargo.toml --no-deps --format-version 1
-cargo install wasm-bindgen-cli --version 0.2.129 --locked --root D:/BuildCache/glory-semantic-ui/tools
+./examples/counter/bin/glory.ps1 doctor
+./examples/counter/bin/glory.ps1 serve --platform web
+./examples/counter/bin/glory.ps1 run --platform desktop
+./examples/counter/bin/glory.ps1 build --platform web --release
+./examples/counter/bin/glory.ps1 bundle --platform web
 ```
 
-Build and serve at <http://127.0.0.1:8790>:
+The Web server uses loopback port 8080 by default (`--port` overrides it).
+`serve` watches sources/assets and refreshes the page after a successful build.
+A failed rebuild preserves the previous output and displays compiler errors.
+A refresh starts a new app; reactive state is not preserved across rebuilds.
+`run --platform web` starts the server without watching.
 
-```powershell
-./examples/counter/build.ps1 -Platform web -Run -Bindgen D:/BuildCache/glory-semantic-ui/tools/bin/wasm-bindgen.exe
-```
+No extra project configuration is needed here: the CLI infers the cdylib Web
+entry, the `web` feature, and the unique desktop binary's required features.
+See [the tool package README](../../tools/cli/README.md) for manifest overrides,
+other applications, workspace selection and reproducible tool installation.
 
-Omit `-Run` to build only. Serve the generated `counter-web` directory over HTTP;
-opening `index.html` directly from the filesystem does not load WASM modules.
-The old Trunk configuration, `web-csr` / `web-ssr` features and Salvo asset server
-have been removed. This example uses client rendering; SSR/hydration have their
-own host setup in `../semantic-web`.
+The launchers set caches, native tool output and temporary files under
+`D:/BuildCache/glory-projects/<project-path-hash>` before Cargo starts. Application
+builds use a separate `app-target` directory. `GLORY_BUILD_ROOT` can select another
+project directory under D:/BuildCache. A matching wasm-bindgen is installed in
+that project's versioned tools directory on first build. No global bindgen is
+selected implicitly; `--bindgen` accepts an explicitly supplied, checked binary.
 
-## Linux / WSL
-
-In WSL first verify `/mnt/d` is mounted from D:, then set all build paths there:
+For WSL, first verify the D: mount, then use the shell launcher:
 
 ```sh
-findmnt -T /mnt/d/BuildCache
-export CARGO_HOME=/mnt/d/BuildCache/glory-semantic-ui/cargo
-export CARGO_TARGET_DIR=/mnt/d/BuildCache/glory-semantic-ui/linux-counter-target
-export TMPDIR=/mnt/d/BuildCache/glory-semantic-ui/tmp
-mkdir -p "$CARGO_HOME" "$TMPDIR"
-cargo metadata --manifest-path examples/counter/Cargo.toml --no-deps --format-version 1
-cargo run --locked --manifest-path examples/counter/Cargo.toml --features desktop --bin counter-desktop
+sh ./examples/counter/bin/glory doctor
+sh ./examples/counter/bin/glory serve --platform web
 ```
 
-Check that metadata reports the configured target directory. Linux needs a
-display server, system fonts and Fontconfig. For Web, build the library with
-`--features web --lib --target wasm32-unknown-unknown`, run the matching
-`wasm-bindgen --target web` on `counter.wasm`, and copy `index.html` alongside
-the generated `counter.js` / `counter_bg.wasm` before serving that directory.
+With an already configured D: Cargo environment, `cargo glory ...` also works
+inside the example. It is a project alias for the private tool package. Prefer
+the bin launcher when Cargo's default target is configured for cross-compilation.
+
+`build.ps1` remains a small forwarding convenience for existing CI commands;
+`-BuildRoot` selects the CLI build root and `-Bindgen` passes an explicit binary.
+Its Web output is now `<BuildRoot>/web-debug`, or `web-release` in release mode.
+Desktop installers, mobile hosts and Rust hot-patching are not implemented.
 
 ## Checks
 
-With the D: environment above:
+Set Cargo home, target and temporary directories on D: and verify metadata first.
+Then the shared component can still be tested directly:
 
 ```powershell
 cargo test --locked --manifest-path examples/counter/Cargo.toml
-cargo clippy --locked --manifest-path examples/counter/Cargo.toml --features desktop --all-targets -- -D warnings
-cargo clippy --locked --manifest-path examples/counter/Cargo.toml --features web --lib --target wasm32-unknown-unknown -- -D warnings
+./examples/counter/bin/glory.ps1 check --platform web
+./examples/counter/bin/glory.ps1 check --platform desktop
+./examples/counter/bin/glory.ps1 fmt --check
 ```
 
-The Rust tests drive semantic events through the shared component, including
-controlled input revisions and independent mount/cleanup behavior. The existing
-Playwright counter project checks real browser buttons, typing, normalization
-and reload. With the Web server running and Playwright installed:
-
-```powershell
-$env:GLORY_COUNTER_URL = 'http://127.0.0.1:8790'
-npm --prefix tests/playwright run test:counter -- --output D:/BuildCache/glory-semantic-ui/counter-playwright
-```
+The dedicated Playwright counter project verifies actual buttons, controlled
+input, Enter commits and reset. The CLI package also has a disposable-project
+browser acceptance driver for rebuild/error recovery. OS IME, screen-reader and
+other device acceptance follow the adapters' documented boundaries.

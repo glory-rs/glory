@@ -47,10 +47,10 @@ jobs:
       - name: Build desktop and Web entries
         shell: pwsh
         run: |
-          cargo install wasm-bindgen-cli --version 0.2.129 --locked --root D:/BuildCache/glory-counter-ci/tools
-          if ($LASTEXITCODE -ne 0) { throw 'wasm-bindgen CLI installation failed' }
+          $env:GLORY_BUILD_ROOT = 'D:/BuildCache/glory-counter-ci'
+          ./examples/counter/bin/glory.ps1 doctor
           ./examples/counter/build.ps1 -Platform desktop -BuildRoot D:/BuildCache/glory-counter-ci
-          ./examples/counter/build.ps1 -Platform web -BuildRoot D:/BuildCache/glory-counter-ci -Bindgen D:/BuildCache/glory-counter-ci/tools/bin/wasm-bindgen.exe
+          ./examples/counter/build.ps1 -Platform web -BuildRoot D:/BuildCache/glory-counter-ci
       - name: Browser acceptance
         shell: pwsh
         run: |
@@ -58,7 +58,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Playwright installation failed' }
           npm --prefix tests/playwright exec -- playwright install chromium
           if ($LASTEXITCODE -ne 0) { throw 'Chromium installation failed' }
-          $server = Start-Process python -ArgumentList @('-m', 'http.server', '8790', '--bind', '127.0.0.1', '--directory', 'D:/BuildCache/glory-counter-ci/counter-web') -WindowStyle Hidden -PassThru
+          $server = Start-Process python -ArgumentList @('-m', 'http.server', '8790', '--bind', '127.0.0.1', '--directory', 'D:/BuildCache/glory-counter-ci/web-debug') -WindowStyle Hidden -PassThru
           try {
             $ready = $false
             for ($attempt = 0; $attempt -lt 30; $attempt++) {

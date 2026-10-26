@@ -5,9 +5,7 @@
   "scripts": {
     "test": "playwright test",
     "list": "playwright test --list",
-    "test:counter": "playwright test --project=counter",
-    "test:fullstack": "playwright test --project=fullstack-serverfn",
-    "test:hot-reload": "playwright test --project=hot-reload"
+    "test:counter": "playwright test --project=counter"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1"

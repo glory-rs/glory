@@ -48,10 +48,6 @@ workspace = true
 name = 'graph_stats'
 path = 'tests/graph_stats.rs'
 
-[[test]]
-name = "task_host"
-path = "tests/task_host.rs"
-
 [[bench]]
 name = "graph"
 path = "benches/graph.rs"

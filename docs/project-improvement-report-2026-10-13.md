@@ -1,5 +1,9 @@
 # Glory 项目完成度与改进报告
 
+历史评估：本文的旧 Core/routing 源码链接对应下方记录的基线提交；这些文件
+已于 2026-10-26 清理，可从 Git 历史查阅。当前状态见
+[语义 UI 实施记录](semantic-ui-implementation.md)。
+
 Glory 已形成可用于开发应用的 Web 主干，并有较完整的多后端架构。当前适合定位为 **Web beta 候选框架，桌面和 LiveView 为实验能力，原生和移动端继续验证**。功能广度已明显超过早期原型，但仍有状态回收、流式 SSR、发布门禁和平台运行验证方面的缺口，不宜宣称全平台稳定可用。
 
 近期最有价值的工作是补齐运行正确性和发布闭环。尤其是本次复现的两项问题：holder 销毁后部分框架状态不释放；流式 SSR 在无 runtime 或单线程 Tokio runtime 下 panic。这些问题应先于新增平台和 API 处理。
@@ -53,7 +57,7 @@ resource: payload_drop_count=0
 
 对照组使用 `ctx.cage(...)`，其值按预期释放。`ctx.provide_cage(...)` 和 `resource_in(...)` 的值没有释放。当前 `Cage` 为 Copy handle，底层 slot 由 `Box::leak` 分配，必须通过 Owner invalidation 才能释放值并进入复用池；丢弃 Truck 中的 handle 不会释放其 payload。
 
-代码位置：[scope.rs](../crates/core/src/scope.rs) 第 340–346 行；[effect.rs](../crates/core/src/reflow/effect.rs) 第 140、190 行；[cage.rs](../crates/core/src/reflow/cage.rs) 第 361–389 行。`resource_hydratable_in`、Loader 和 Suspense 也存在直接创建 Cage 的路径，应一并检查其所有权，不能从两项复现推定其他路径已验证。
+代码位置：[scope.rs](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/src/scope.rs) 第 340–346 行；[effect.rs](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/src/reflow/effect.rs) 第 140、190 行；[cage.rs](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/src/reflow/cage.rs) 第 361–389 行。`resource_hydratable_in`、Loader 和 Suspense 也存在直接创建 Cage 的路径，应一并检查其所有权，不能从两项复现推定其他路径已验证。
 
 **影响：** SSR 请求重复创建 app 状态和 resource 时，值可能一直保留；CSR 长会话反复挂载组件也有累积风险。free-list 已修复“失效后不复用”的问题，但无法回收从未 invalidated 的值。
 
@@ -71,9 +75,9 @@ resource: payload_drop_count=0
 | Tokio current-thread | panic，`can call blocking only when running on the multi-threaded runtime` |
 | Tokio multi-thread | 成功 |
 
-根因在 [spawn.rs](../crates/core/src/spawn.rs) 第 126–138 行：`run_deferred_batch` 的生产分支直接调用 `block_in_place` 和 `Handle::current()`。普通 SSR 已按 runtime 类型分支处理，streaming 分支没有同步处理。
+根因在 [spawn.rs](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/src/spawn.rs) 第 126–138 行：`run_deferred_batch` 的生产分支直接调用 `block_in_place` 和 `Handle::current()`。普通 SSR 已按 runtime 类型分支处理，streaming 分支没有同步处理。
 
-现有 [ssr_runtime_flavors.rs](../crates/core/tests/ssr_runtime_flavors.rs) 的 3 项测试本次通过，但它们调用普通 `ServerHolder::new`。流式 snapshot 单测则走 `cfg(test)` 下的 LocalPool 分支，因而没有覆盖消费者实际调用的生产分支。
+现有 [ssr_runtime_flavors.rs](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/tests/ssr_runtime_flavors.rs) 的 3 项测试本次通过，但它们调用普通 `ServerHolder::new`。流式 snapshot 单测则走 `cfg(test)` 下的 LocalPool 分支，因而没有覆盖消费者实际调用的生产分支。
 
 **改进：** 统一普通与流式路径的 executor 策略；用公开 API 集成测试覆盖三种 runtime，测试中引入异步 resource。同步 fallback 要区分立即可完成的 Future 和依赖 Tokio timer/I/O 的 Future，不能仅用字符串常量验证全部异步行为。
 
@@ -81,7 +85,7 @@ resource: payload_drop_count=0
 
 ### R3 P0 文档构建与 feature 矩阵配置冲突
 
-**复现确认与代码确认。** [routing manifest](../crates/routing/Cargo.toml) 第 15–16 行仍是 `docs.rs all-features = true`，但 core 明确拒绝 `web-csr + web-ssr`。本次 `cargo check -p glory-routing --all-features --offline` 退出码为 101，命中互斥错误，说明文档配置指定了无法编译的组合。正式 docs.rs 构建仍需使用实际 rustdoc 命令验收。
+**复现确认与代码确认。** [routing manifest](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/routing/Cargo.toml) 第 15–16 行仍是 `docs.rs all-features = true`，但 core 明确拒绝 `web-csr + web-ssr`。本次 `cargo check -p glory-routing --all-features --offline` 退出码为 101，命中互斥错误，说明文档配置指定了无法编译的组合。正式 docs.rs 构建仍需使用实际 rustdoc 命令验收。
 
 [glory manifest](../crates/glory/Cargo.toml) 已有显式 docs.rs feature 集合，但它的 `cargo-all-features` 元数据被注释。[CI](../.github/workflows/ci.yml) 第 277 行却将该包纳入组合检查。依赖 core 的 skip 配置不能替代对 facade 自身配置的核查，本次直接构建 facade 的互斥组合同样退出 101；组合工具的完整执行结果仍需确认。
 
@@ -91,7 +95,7 @@ resource: payload_drop_count=0
 
 ### R4 P0 发布流程没有依赖同一提交的质量结果
 
-**代码确认。** [release.yml](../.github/workflows/release.yml) 中 publish 仅 `needs: git-tag`。tag 在 package/dry-run 之前创建；[ci.yml](../.github/workflows/ci.yml) 和 format workflow 又排除 `release` 分支。当前发布工作流本身没有 fmt、定向测试、feature 和浏览器质量任务，因此不能保证待发布提交已通过完整门禁。
+**代码确认。** [release.yml](https://github.com/glory-rs/glory/blob/d31a8591dc626a303b1106285dff11f8e6162a28/.github/workflows/release.yml) 中 publish 仅 `needs: git-tag`。tag 在 package/dry-run 之前创建；[ci.yml](../.github/workflows/ci.yml) 和 format workflow 又排除 `release` 分支。当前发布工作流本身没有 fmt、定向测试、feature 和浏览器质量任务，因此不能保证待发布提交已通过完整门禁。
 
 依赖顺序发布、package、dry-run 和等待 registry 可见已经存在，应保留。风险在于质量结果未绑定发布提交，以及上游发布成功、下游失败时缺乏完整的交付状态。
 
@@ -103,7 +107,7 @@ resource: payload_drop_count=0
 
 ### R5 P1 实现真正提前输出的 SSR 流
 
-**代码确认。** [server.rs](../crates/core/src/web/holders/server.rs) 第 145–214 行先构造 `Vec<HtmlChunk>`，其中 `drive_deferred()` 等资源完成，之后才返回 `stream::iter`。Axum/Actix 的适配入口还先收集 chunks 再交给响应 body。当前可以产生 placeholder/patch 和分块 body，但慢资源仍推迟响应交付，不能兑现资源未完成时客户端已收到 shell 的效果。
+**代码确认。** [server.rs](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/src/web/holders/server.rs) 第 145–214 行先构造 `Vec<HtmlChunk>`，其中 `drive_deferred()` 等资源完成，之后才返回 `stream::iter`。Axum/Actix 的适配入口还先收集 chunks 再交给响应 body。当前可以产生 placeholder/patch 和分块 body，但慢资源仍推迟响应交付，不能兑现资源未完成时客户端已收到 shell 的效果。
 
 **改进：** 在专用本地 executor 驱动 `!Send` widget tree，通过有界 channel 向响应 body 交出 shell 和随后完成的 patch；加入客户端断连取消、deadline 和错误传播。优先完成一个适配器的网络契约，再复用到其他适配器。
 
@@ -121,13 +125,13 @@ resource: payload_drop_count=0
 | patch 配置没有形成完整出站治理 | `max_pending_patches` 仅用于 OutboundBuffer helper；适配器循环未使用它；helper 超限时 `tail.extend(batch)` | 限制 pending bytes/commands 和慢消费者处理时长；不能仅限制批次数后任由单批增大 |
 | 恢复凭据与身份关系未定义 | 随机 token 是 bearer credential；manager 按 token 恢复，没有用户身份绑定参数；客户端默认 token 留在内存 | 提供宿主 auth/identity hook，明确 token 轮换、注销、跨刷新和部署实例策略；错误身份不得恢复 |
 
-主要代码：[LiveView runtime](../crates/liveview/src/lib.rs) 第 149–176、491–561、951–977、1188 行；[客户端](../crates/liveview/src/liveview_client.js)。已有随机 token、Origin 校验、heartbeat 和 session Close 清理继续保留。这些改进是 LiveView 公开服务的准入条件，核心 Web 发版可先将其标为 experimental。
+主要代码：[LiveView runtime](https://github.com/glory-rs/glory/blob/d31a8591dc626a303b1106285dff11f8e6162a28/crates/liveview/src/lib.rs) 第 149–176、491–561、951–977、1188 行；[客户端](https://github.com/glory-rs/glory/blob/d31a8591dc626a303b1106285dff11f8e6162a28/crates/liveview/src/liveview_client.js)。已有随机 token、Origin 校验、heartbeat 和 session Close 清理继续保留。这些改进是 LiveView 公开服务的准入条件，核心 Web 发版可先将其标为 experimental。
 
 ### R7 P1 补上能发现运行问题的浏览器测试
 
-**代码确认。** [wasm_behavior.rs](../crates/core/tests/wasm_behavior.rs) 和 wasm CSR smoke 已存在，但当前 CI workflow 未显式运行这两套 wasm-bindgen 测试。普通 Rust 测试和 Playwright 示例 smoke 不会自动执行它们。其注释“在 CI 执行”与实际接线不一致。
+**代码确认。** [wasm_behavior.rs](https://github.com/glory-rs/glory/blob/d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb/crates/core/tests/wasm_behavior.rs) 和 wasm CSR smoke 已存在，但当前 CI workflow 未显式运行这两套 wasm-bindgen 测试。普通 Rust 测试和 Playwright 示例 smoke 不会自动执行它们。其注释“在 CI 执行”与实际接线不一致。
 
-当前 [hot-reload spec](../tests/playwright/tests/hot-reload.spec.js) 仅断言脚本包含 `new WebSocket` 和 `/live_reload`；[LiveView spec](../tests/playwright/tests/liveview.spec.js) 仅覆盖点击一次后的变化；routing/hydration 用例主要覆盖普通导航。
+当前 [hot-reload spec](https://github.com/glory-rs/glory/blob/d31a8591dc626a303b1106285dff11f8e6162a28/tests/playwright/tests/hot-reload.spec.js) 仅断言脚本包含 `new WebSocket` 和 `/live_reload`；[LiveView spec](https://github.com/glory-rs/glory/blob/d31a8591dc626a303b1106285dff11f8e6162a28/tests/playwright/tests/liveview.spec.js) 仅覆盖点击一次后的变化；routing/hydration 用例主要覆盖普通导航。
 
 **改进：** 接入版本匹配的 wasm-bindgen runner，显式执行两套测试并断言用例数量非零；热重载测试实际修改样例源文件并验证更新和状态恢复；LiveView 覆盖断线、恢复、过期、新 session 重建；路由覆盖 back/forward、scroll、query 和 hydration mismatch。CI 所需 URL 缺失时应失败，避免将 skip 视作覆盖。
 
@@ -135,11 +139,11 @@ resource: payload_drop_count=0
 
 ### R8 P1 将平台冒烟从脚本存在提升为真实结果
 
-**代码确认。** [mobile workflow](../.github/workflows/mobile-device-smoke.yml) 第 106 行在 iOS smoke 命令末尾使用 `|| true`；启动模拟器也可能忽略失败。即使安装或启动失败，job 仍可能成功。现有 [mobile validation](mobile-validation.md) 保存的是 6 月的本机记录，不能说明当前版本设备验证完成。
+**代码确认。** [mobile workflow](https://github.com/glory-rs/glory/blob/d31a8591dc626a303b1106285dff11f8e6162a28/.github/workflows/mobile-device-smoke.yml) 第 106 行在 iOS smoke 命令末尾使用 `|| true`；启动模拟器也可能忽略失败。即使安装或启动失败，job 仍可能成功。现有 [mobile validation](https://github.com/glory-rs/glory/blob/d31a8591dc626a303b1106285dff11f8e6162a28/docs/mobile-validation.md) 保存的是 6 月的本机记录，不能说明当前版本设备验证完成。
 
 **改进：** 让 iOS smoke 的失败退出码或结果 JSON 控制 job 结果；检查正确模拟器已启动、`.app` 存在、bundle id 匹配。Android/iOS 继续增加计数器点击、前后台恢复、键盘输入和资源加载验证。Desktop 测真窗口、eval/query、资产协议和安装包；Native 测输入/焦点/IME、图片和卸载。
 
-已有 Native GPU 截图任务值得保留，但当前 [screenshot.rs](../crates/native/tests/screenshot.rs) 主要验证 buffer 非空和中心像素蓝色占优；增加多场景截图或布局断言，才能发现布局、文字和交互回归。
+已有 Native GPU 截图任务值得保留，但当前 [screenshot.rs](https://github.com/glory-rs/glory/blob/d31a8591dc626a303b1106285dff11f8e6162a28/crates/native/tests/screenshot.rs) 主要验证 buffer 非空和中心像素蓝色占优；增加多场景截图或布局断言，才能发现布局、文字和交互回归。
 
 **验收：** 平台结果关联具体 SHA、工具链、设备/模拟器与产物；blocked 和 failed 不能包装成 validated。Mobile 的设备结果是其平台发版准入条件，非核心 Web 的强制阻塞。
 

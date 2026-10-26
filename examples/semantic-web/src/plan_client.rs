@@ -6,6 +6,190 @@ type Result<T = ()> = std::result::Result<T, JsValue>;
 thread_local! { static APP: RefCell<Option<(WebApp, State)>> = const { RefCell::new(None) }; }
 pub(crate) fn clear() {
     drop(APP.with(|app| app.borrow_mut().take()));
+    drop(PARTS_PROBE.with(|app| app.borrow_mut().take()));
+}
+
+struct PartsProbe {
+    web: WebApp,
+    owner: glory::ui::Scope,
+    victim_owner: Option<glory::ui::Scope>,
+    declaration: glory::ui::Plan,
+    instance: glory::ui::PlanInstance,
+    victims: Vec<glory::ui::PlanPart>,
+    survivor: glory::ui::PlanPart,
+    activated: std::rc::Rc<std::cell::Cell<usize>>,
+}
+thread_local! { static PARTS_PROBE: RefCell<Option<PartsProbe>> = const { RefCell::new(None) }; }
+
+/// A live, maximum-size Plan with independently retired members. Each command
+/// returns before JS inspects/GCs it, so this probe holds no retired DOM handles.
+#[wasm_bindgen]
+pub fn plan_parts_probe(stage: u8) -> Result<usize> {
+    use glory::prelude::*;
+    use glory::render::{Descriptor, Props};
+    if stage == 0 {
+        crate::browser::unmount();
+        clear();
+        let root = web_sys::window()
+            .unwrap()
+            .document()
+            .unwrap()
+            .get_element_by_id("app")
+            .unwrap();
+        let web = glory::web::launch(root, group()).map_err(js)?;
+        let app = web.app();
+        let owner = app.scope().child().map_err(js)?;
+        let children: Vec<_> = (3..=255)
+            .map(|index| {
+                let text = text()
+                    .content(format!("member {index}"))
+                    .class(format!("bank-member-{index}"));
+                match index {
+                    31 => text.mark("31"),
+                    32 => text.mark("32"),
+                    63 => text.mark("63"),
+                    64 => text.mark("64"),
+                    127 => text.mark("127"),
+                    128 => text.mark("128"),
+                    254 => text.mark("254"),
+                    255 => text.mark("255"),
+                    _ => text,
+                }
+            })
+            .collect();
+        let declaration = plan(
+            view()
+                .class("bank-probe")
+                .mark("root")
+                .fill((
+                    glory::ui::file()
+                        .class("bank-victim-file")
+                        .label("Victim")
+                        .mark("file"),
+                    button()
+                        .class("bank-survivor")
+                        .label("original")
+                        .mark("survivor"),
+                ))
+                .fill(children),
+        )
+        .map_err(js)?;
+        let survivor = declaration.part("survivor").map_err(js)?;
+        let victims = ["file", "31", "32", "63", "64", "127", "128", "254", "255"]
+            .into_iter()
+            .map(|name| declaration.part(name).map_err(js))
+            .collect::<std::result::Result<Vec<_>, JsValue>>()?;
+        let instance = owner.instantiate(&declaration).map_err(js)?;
+        let activated = std::rc::Rc::new(std::cell::Cell::new(0));
+        let count = activated.clone();
+        instance
+            .on(&survivor, activate, move |_| count.set(count.get() + 1))
+            .map_err(js)?;
+        let victim_owner = app.scope().child().map_err(js)?;
+        let mut descriptor = Descriptor::new(Props::View);
+        descriptor.classes = vec!["bank-victims".into()];
+        let target = victim_owner.create(descriptor).map_err(js)?;
+        for part in &victims {
+            owner
+                .place(instance.node(part).map_err(js)?, Some(target), None)
+                .map_err(js)?;
+        }
+        app.flush().map_err(js)?;
+        PARTS_PROBE.with(|probe| {
+            *probe.borrow_mut() = Some(PartsProbe {
+                web,
+                owner,
+                victim_owner: Some(victim_owner),
+                declaration,
+                instance,
+                victims,
+                survivor,
+                activated,
+            })
+        });
+        return Ok(0);
+    }
+    if stage == 4 {
+        clear();
+        return Ok(0);
+    }
+    PARTS_PROBE.with(|probe| {
+        let mut probe = probe.borrow_mut();
+        let probe = probe.as_mut().ok_or_else(|| js("missing parts probe"))?;
+        match stage {
+            1 => {
+                probe
+                    .victim_owner
+                    .take()
+                    .ok_or_else(|| js("already retired"))?
+                    .dispose();
+                probe.web.app().flush().map_err(js)?;
+                for part in &probe.victims {
+                    assert!(
+                        probe
+                            .web
+                            .app()
+                            .tree()
+                            .node(probe.instance.node(part).map_err(js)?)
+                            .is_err()
+                    );
+                    assert!(probe.instance.text(part, "stale".to_owned()).is_err());
+                }
+            }
+            2 => {
+                probe
+                    .instance
+                    .label(&probe.survivor, "survived".to_owned())
+                    .map_err(js)?;
+                let replacement = probe.owner.instantiate(&probe.declaration).map_err(js)?;
+                replacement
+                    .label(&probe.survivor, "fresh".to_owned())
+                    .map_err(js)?;
+                probe.web.app().flush().map_err(js)?;
+            }
+            3 => {}
+            5..=7 => {
+                use glory::render::{Change, Patch, Role};
+                let root = probe.declaration.part("root").map_err(js)?;
+                if stage == 5 {
+                    probe
+                        .instance
+                        .patch(&root, Patch::Name(Change::Set(Some("标题🙂中\"\\".into()))))
+                        .map_err(js)?;
+                }
+                let role = match stage {
+                    5 => Change::Set(Some(Role::Heading(3))),
+                    6 => Change::Set(Some(Role::Grid)),
+                    _ => Change::Clear,
+                };
+                probe.instance.patch(&root, Patch::Role(role)).map_err(js)?;
+                probe.web.app().flush().map_err(js)?;
+            }
+            8 => {
+                use glory::render::{Change, Patch, Role};
+                let root = probe.declaration.part("root").map_err(js)?;
+                probe
+                    .instance
+                    .label(&probe.survivor, "prefix🙂".to_owned())
+                    .map_err(js)?;
+                probe
+                    .instance
+                    .patch(&root, Patch::Role(Change::Set(Some(Role::Heading(2)))))
+                    .map_err(js)?;
+                probe
+                    .instance
+                    .label(&probe.survivor, "suffix must not run".to_owned())
+                    .map_err(js)?;
+                assert!(probe.web.app().flush().is_err());
+                assert!(matches!(
+                    probe.web.app().flush(),
+                    Err(glory::ui::Error::Faulted)
+                ));
+            }
+            _ => return Err(js("unknown parts probe stage")),
+        }
+        Ok(probe.activated.get())
+    })
 }
 fn js(error: impl std::fmt::Display) -> JsValue {
     error.to_string().into()

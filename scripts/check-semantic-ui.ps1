@@ -24,6 +24,14 @@ try {
         throw "Unexpected build directory: $actualTarget"
     }
     Write-Output "Verified target: $actualTarget"
+    $toolMetadata = cargo metadata --locked --manifest-path tools/cli/Cargo.toml --no-deps --format-version 1 | ConvertFrom-Json
+    if ($LASTEXITCODE -ne 0 -or [IO.Path]::GetFullPath($toolMetadata.target_directory) -ne $expectedTarget) { throw 'Unexpected CLI target directory' }
+    cargo fmt --manifest-path tools/cli/Cargo.toml -- --check
+    if ($LASTEXITCODE -ne 0) { throw 'project CLI formatting failed' }
+    cargo test --locked --manifest-path tools/cli/Cargo.toml
+    if ($LASTEXITCODE -ne 0) { throw 'project CLI tests failed' }
+    cargo clippy --locked --manifest-path tools/cli/Cargo.toml --all-targets -- -D warnings
+    if ($LASTEXITCODE -ne 0) { throw 'project CLI clippy failed' }
     python scripts/check-engine-forks.py --test
     if ($LASTEXITCODE -ne 0) { throw 'pinned engine fork verification/tests failed' }
 

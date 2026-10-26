@@ -15,6 +15,5 @@ The current entry points are:
   progressive HTML through the current HTTP adapter; see its README.
 
 The old routing, HN, SSR-mode and Tailwind examples were removed with the former
-Core context/holder runtime. Other retained examples still use retired APIs and
-are extraction references, not supported tutorials. Do not use the old CLI or
-`web-csr` / `web-ssr` feature names to build the current examples.
+Core context/holder runtime. The remaining legacy examples and CLI have also
+been removed. Use the build scripts above for the current standalone examples.

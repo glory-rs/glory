@@ -1,0 +1,2 @@
+[alias]
+glory = "run --locked -p counter-tools --"

@@ -3,7 +3,6 @@ name: semantic-ui
 on:
   pull_request:
   push:
-    branches-ignore: [release]
 
 permissions:
   contents: read

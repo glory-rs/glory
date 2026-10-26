@@ -6,6 +6,7 @@ debug.log
 /**/dist
 **/Cargo.lock
 !/Cargo.lock
+!/tools/cli/Cargo.lock
 !/examples/semantic-web/Cargo.lock
 !/examples/counter/Cargo.lock
 !/benchmarks/glory/Cargo.lock

@@ -35,5 +35,7 @@ windowed list API instead of cloning or scanning the entire source on scroll.
 
 See the [semantic contract](semantic-ui-contract.md) for supported properties,
 events, queries, styles and adapter limits, and the [implementation ledger](semantic-ui-implementation.md)
-for verified behavior and remaining work. Legacy routing, server-function and
-CLI sources are not current facade features or supported application entry points.
+for verified behavior and remaining work. The former routing, server-function
+and CLI sources have been removed; they are not facade features. The new
+[project-local CLI](../tools/cli/README.md) provides separate host tooling,
+locked by each application through its own small workspace executable.

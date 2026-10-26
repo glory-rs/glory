@@ -23,6 +23,12 @@ Start here when evaluating or extending Glory:
   Glory versus coarse and row-local Dioxus, two scales, independent builds and full data/identity/pixel evidence.
 - [Plan preparation and batch identity optimization](plan-batch-preparation-optimization-2026-10-25.md):
   shared immutable facts, ordered-slot checks, independent paired measurements, dense-update tradeoffs and full regression.
+- [Plan physical parts and bridge batching](plan-bridge-batching-2026-10-26.md):
+  lazy original-node handles, partial retirement and independent bridge/GC measurements.
+- [Typed Plan host goals](plan-host-goals-2026-10-26.md):
+  finite field/placement/removal calls, controlled-input barriers and memory-growth recovery.
+- [Cross-mutation field submission](field-submit-plan-2026-10-26.md):
+  bounded local-field journals, exact successful prefixes and paired measurement provenance.
 - [Bulk creation and Dioxus design](bulk-create-dioxus-2026-10-24.md): fixed DOM creation bridge,
   independent paired/cross-framework results, rejected experiments, full regression and static-plan priorities.
 - [HTML mapping and DOM creation](performance.md#html-mapping-and-dom-creation--2026-10-23):
@@ -40,45 +46,14 @@ Start here when evaluating or extending Glory:
 - [Engine forks](engine-forks.md): immutable glory-rs Blitz/Taffy Git dependencies,
   source provenance, fork tests and the prohibition on vendoring.
 - [API guide](api-guide.md): current semantic entry points, ownership and hosts.
+- [Project-local CLI](../tools/cli/README.md): library-based tooling, shared
+  application lockfile, bin launchers, build/preview and version diagnostics.
 - [Renderer author guide](renderer-author-guide.md): semantic mutations,
   preflight, query watermarks and adapter conformance.
 - [Release readiness](release-readiness.md): current workspace and platform checks.
 
-The documents above describe the active rewrite. The guides below retain
-material from the previous architecture; check the implementation evidence before
-using their API or platform-support claims.
-
-- [Project completion and improvement report](project-improvement-report-2026-10-13.md):
-  assessment dated 2026-10-13, verified gaps, priorities, and release criteria.
-- [Fullstack notes](fullstack.md): server functions, request context, server
-  state/cache, preloaded state, streaming helpers, and multipart helpers.
-- [Server function adapter recipes](serverfn-adapter-recipes.md): Salvo, Axum,
-  and Actix routes for streaming, SSE, uploads, and cookie sessions.
-- [Server function native extractor decision](serverfn-extractor-decision.md):
-  why `#[server]` remains adapter-neutral and native extractors stay in custom
-  framework routes for now.
-- [Styling notes](styling.md): scoped styles with `web::scoped_css`.
-- [HTML/event coverage audit](html-event-coverage-audit.md): current parity
-  against local Dioxus `packages/html`, including SVG/MathML and event gaps.
-- [Desktop guide](desktop.md): desktop runtime configuration, protocol, menu,
-  multi-window, and remote server functions.
-- [Platform APIs](platform-apis.md): window configuration, menus, file-dialog
-  integration points, node queries, mobile viewport lifecycle, and event payloads.
-- [Mobile device validation](mobile-validation.md): Android/iOS runtime smoke
-  procedure and `scripts/mobile-device-smoke.ps1` usage.
-- [Mobile crate architecture decision](mobile-architecture-decision.md): why
-  mobile stays as transparent host templates for now.
-- [Mobile native bridge recipes](mobile-native-recipes.md): permissions,
-  camera/gallery, and share-sheet integration patterns.
-- [Devtools protocol](devtools.md): reactive graph snapshots, command queue
-  snapshots, protocol messages, and static inspector panel rendering.
-- [Reactivity copy handle decision](reactivity-copy-handles.md): current
-  `Cage<T>`/`Bond<T>` handle tradeoffs and revisit triggers.
-- [LiveView protocol](liveview.md): server-held command-stream session model
-  and WebSocket message shapes.
-- [Performance notes](performance.md): wasm size, Criterion benches, and local
-  benchmark report scripts.
-- [Wasm split evaluation](wasm-split-evaluation.md): current size thresholds
-  and why split-wasm is deferred.
-- [Multi-platform rendering plan](multi-platform-rendering-plan.md): current
-  renderer status and next platform stages.
+Dated architecture assessments and performance reports are historical evidence,
+not current API guides. Removed source links in those reports point to pinned
+Git history. The [2026-10-13 assessment](project-improvement-report-2026-10-13.md)
+records the pre-rewrite baseline; the implementation ledger records the current
+state and remaining platform work.

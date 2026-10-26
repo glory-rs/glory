@@ -8,8 +8,15 @@ This branch is an intentionally breaking implementation in progress. The
 [architecture report](docs/semantic-ui-rendering-architecture-report-2026-10-21.md)
 defines the target; the [implementation ledger](docs/semantic-ui-implementation.md)
 records what actually works. The active Salvo integration is documented below;
-remaining old HTML examples and adapter sources are extraction references and
-are not supported entry points for the new core.
+the old HTML runtime, CLI, server functions and command adapters have been
+removed. Current examples use the semantic API; historical reports remain in
+Git history and the implementation ledger.
+
+The new [project-local tools](tools/cli/README.md) are a library-only tooling
+package. Applications own their executable and lock the CLI with their other
+dependencies. The [counter](examples/counter/README.md) includes `bin/glory.ps1`
+and `bin/glory` launchers for build, preview, watch/reload and diagnostics; no
+global Glory CLI installation is required.
 
 The migrated [counter example](examples/counter) shares one semantic component,
 state, event handlers and typed styles between Web and Blitz desktop hosts.
@@ -358,8 +365,8 @@ Use separate target directories for the two builds. The example verifies real
 24/28/32px row heights and compares final pixel sequences outside the timer.
 Its default measurement budget retains the current window; `--measure-limit N`
 can exercise larger caches, whose eviction may change later estimated windows.
-The active workspace is explicitly selected in Cargo.toml; excluded old
-adapters and their old test modules are not covered by these commands.
+The active workspace is explicitly selected in Cargo.toml. Standalone examples
+and benchmarks require their own documented build and acceptance commands.
 
 Rust 1.94 or later is declared. Current verification uses Rust 1.98; foundation
 checks also cover wasm32-unknown-unknown, aarch64-linux-android and

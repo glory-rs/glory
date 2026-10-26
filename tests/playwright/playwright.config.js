@@ -21,20 +21,5 @@ module.exports = defineConfig({
       testMatch: "counter.spec.js",
       use: desktop,
     },
-    {
-      name: "fullstack-serverfn",
-      testMatch: "fullstack-serverfn.spec.js",
-      use: desktop,
-    },
-    {
-      name: "hot-reload",
-      testMatch: "hot-reload.spec.js",
-      use: desktop,
-    },
-    {
-      name: "liveview",
-      testMatch: "liveview.spec.js",
-      use: desktop,
-    },
   ],
 });

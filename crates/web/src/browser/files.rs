@@ -376,6 +376,7 @@ impl Dom {
     }
     /// Called only after complete subtree validation/adoption. The validation
     /// plan stores bounded numeric identities, never speculative File handles.
+    #[cfg(feature = "hydrate")]
     pub(super) fn adopt_files(
         &self,
         mapper: &mut glory_html::Mapper,
