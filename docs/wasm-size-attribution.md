@@ -160,20 +160,21 @@ The repository does retain other regex references:
 
 ## Next optimization targets
 
-The evidence favors separating optional host capabilities and reducing repeated
-internal collection implementations. Merely adding more widget-level Cargo
-features does not sever the common renderer's references. Disabling a heavy
-capability needs to remove its reachability across the host/mapping/validation
-boundary while preserving finite target checks and typed rejection behavior.
-Removing a listener registration alone is insufficient when the shared dispatcher
-and renderer still reference that implementation.
+The attribution identifies possible size targets, not approved design changes.
+The subsequent [code-quality review](wasm-size-quality-review.md) found no
+independent quality justification for a new host-capability selection mechanism
+or merging unrelated typed collections. Those changes are not being implemented.
+The domains already have module boundaries, and generic collection instances
+are not duplicate handwritten algorithms.
 
-After that, assess compact formatting/error paths and remaining clone/glue
-duplication. The allocator itself is only 7,275 B of named function bodies;
-switching allocators or hunting for regex cannot address the main floor here.
-All potential savings must be measured with the same matrix. These body counts
-are attribution evidence, not promises that a specific number of bytes can be
-removed without changing capabilities or runtime behavior.
+Keep the explicit renderer coordination and typed collections. Revisit them
+for concrete ownership, correctness, maintenance or host requirements rather
+than an initial-download target. Ordinary removal of demonstrated redundant
+work or shared invariant logic can still be valuable, but the body-size tables
+do not establish that redundancy. The allocator itself is only 7,275 B of named
+function bodies; switching allocators or hunting for regex cannot address the
+main floor here. Potential changes must preserve behavior and be measured with
+the same matrix; these counts are not removable-size estimates.
 
 ## Reproduce without recompiling Rust
 
