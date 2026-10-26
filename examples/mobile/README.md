@@ -1,12 +1,13 @@
 # Mobile counter
 
-Android NativeActivity and iOS UIKit hosts mount the same `counter::Counter`
+Android NativeActivity/GameActivity and iOS UIKit hosts mount the same `counter::Counter`
 component used by Web and desktop. The application owns its entry point and
 event loop; no process-global AndroidApp or second reactive runtime is installed.
 The standalone workspace depends on the existing facade and counter library,
 so the runtime workspace retains twelve packages.
 
-Android uses the shell's CPU renderer and winit's `android-native-activity` glue.
+Android uses the shell's CPU renderer with explicitly selected Winit Activity glue.
+NativeActivity remains the default; GameActivity adds real GameTextInput composition.
 `Shell::android(app)` requires the AndroidApp passed to this invocation's
 `android_main`. `Shell::from_event_loop` also accepts an explicitly configured
 event loop. iOS uses `Shell::new` on the application's UIKit main thread.
@@ -81,6 +82,38 @@ The Winit fork retires the Activity loop on Destroy and holds an exclusive
 permit until that loop's fields drop. A new Activity can then create its own
 loop; overlapping loops remain rejected. Versions and fork-owned tests are in
 [engine-forks.json](../../docs/engine-forks.json).
+
+## Android GameActivity on macOS
+
+With the installed NDK r27d, SDK 36, JDK and Gradle 9.1.0:
+
+```sh
+GLORY_ANDROID_FEATURES=ime-probe sh examples/mobile/build-android-game.sh
+# Ordinary shared Counter: omit GLORY_ANDROID_FEATURES.
+```
+
+This explicitly disables default features and selects `android-game-activity`.
+Never enable it together with `android-native-activity`. The matching Java AAR
+and Rust android-activity glue both use GameActivity 4.4.0. The small Java subclass
+only loads the native library; it contains no app UI, WebView or second runtime.
+Gradle dependency locks and SHA-256 verification metadata are committed. Ordinary
+builds verify them; `GLORY_UPDATE_GRADLE_LOCKS=1` is an explicit maintainer update.
+
+The script requires existing tools and puts builds, Java/Gradle homes, temporary
+staging and the debug key under `/Volumes/Data/Caches/glory/android`. Override
+`ANDROID_HOME`, `ANDROID_NDK_HOME`, `JAVA_HOME` and `GLORY_GRADLE` as needed.
+It validates AArch64/JNI entry symbols, ELF LOAD alignment of at least 16 KiB and
+APK signing before publishing `package-game-aarch64-debug/glory-counter.apk`.
+This checks ELF compatibility; a 4 KiB emulator does not prove 16 KiB runtime
+acceptance. Debug signing is not a production release.
+
+GameTextInput sends real UTF-16 selection/composition state to Winit. A bounded
+safe-Rust translator produces validated preedit, commit, cancel and surrounding
+deletions; it refuses unsupported selection-only moves or autocorrection beyond
+the selected range. Android/JVM effects run after releasing the session lock.
+The same focused-editor context policy as UIKit keeps password text private and
+preserves live marked text across app acknowledgements. NativeActivity does not
+acquire GameActivity composition support by sharing this example.
 
 ## iOS
 
@@ -160,19 +193,26 @@ An additional opt-in view makes nonempty replacement/cancellation reproducible:
 GLORY_IOS_FEATURES=ime-probe sh examples/mobile/build-ios.sh
 ```
 
-It starts with `ABCDZ`. Tap **Select middle** (the existing exact-program-selection
-contract is ASCII), type `ni`, then delete both preedit letters: both the visible
-value and native text context must return to `ABCDZ` with `BCD` selected. Type
+It starts with `A中😀Z`. Tap **Select middle**, type `ni`, then delete both preedit
+letters: both the visible value and native text context must return to `A中😀Z`
+with `中😀` selected (UTF-16 offsets 1..4). Type
 `nihao` and choose `你好`: the result must be `A你好Z` with status Idle. **Restore**
 returns to the original fixture; **Reset** tests a differing program value.
 The ordinary counter build excludes this view. Its feature selection is recorded
 in `build.json`. Native IME callbacks invalidate the context acknowledgement
 cache so equal-value cancellation can restore the native store and selection.
 
+The app-owned Swift scene delegate observes docked keyboard frames only for its
+own key window and updates the root controller's additional safe-area inset.
+Winit's existing layout event refreshes the native viewport; no semantic model
+translation or keyboard-sized padding is injected into Glory. Floating keyboards
+are ignored. `keyboard-probe` places an input near the bottom for real show/hide
+acceptance; select it separately from `ime-probe`. Twelve standalone Swift tests
+cover clipping, safe areas, undocked frames and the minimum retained viewport.
+
 **Open gaps:** arbitrary native selection gestures, selection rectangles and
 unrequested autocorrection outside the application's current selection are not
-advertised by this IME bridge. VoiceOver, keyboard avoidance for controls
-near the bottom of the viewport, reconnecting a disconnected scene, signed
+advertised by this IME bridge. VoiceOver, reconnecting a disconnected scene, signed
 device installation, App Store icons/distribution and real-device networking/
 permissions remain separate work. A simulator pass does not close those items.
 

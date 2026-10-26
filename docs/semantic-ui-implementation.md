@@ -2430,3 +2430,23 @@ CLI 支持 Mac 数据盘缓存和 `.app` 结构/签名/完整哈希；生产签�
 真实 Counter WASM 从 2,107,005 压到 570,130 字节，解压及全部清单哈希一致，
 浏览器启动/按钮交互通过；CLI 25 项测试与严格 Clippy 通过。指纹、图片转换、
 Brotli 和 WASM 分包仍独立待办。
+
+## 2026-10-27：移动输入与 Unicode 程序选区
+
+共用输入选区改为校验当前值的 UTF-16 scalar 边界；文本/密码支持 CJK/emoji
+正反向选区，半代理对在入队前拒绝，Blitz shaped-cluster 内部位置明确 Unsupported。
+原生选区替换/预编辑取消、revision、方向与失败后恢复有独立回归；CSR/SSR 夹具
+保留真实输入对象。详见 feature-gap report 当日记录及 semantic-web Unicode 夹具。
+
+iOS scene 宿主增加 docked keyboard safe-area 避让和独立的底部输入探针，十二项
+Swift 几何测试进入 Apple gate。实测发现按下时键盘移动编辑器、抬起时错误合成
+空白点击的问题；genuine Blitz fork 增加受限触摸处理和实际布局回归测试，关闭
+修复可复现失败。完整场景重连、VoiceOver 和签名设备验收继续开放。
+
+Android 保留默认 NativeActivity，显式新增 GameActivity 4.4.0 选择与 Mac 打包脚本，
+不可同时启用两种 Activity。Winit 安全 Rust bridge 翻译真实 GameTextInput state，
+限制缓冲大小、校验 UTF-16/UTF-8 边界并在锁外调用 Android。用户同意许可后安装
+隔离 NDK/ARM 镜像；ARM64 模拟器真实 Gboard 拼音通过预编辑、取消恢复非空 Unicode
+选区、候选提交、汉字/emoji 删除、物理字符不重复以及同进程 Home/旋转。记录在
+`/Volumes/Data/Caches/glory/android/unicode-ime/`。模拟器页大小 4 KiB；16 KiB ELF 对齐
+检查、真机/16 KiB runtime 和 TalkBack 分开保留。所有运行时新代码仍为安全 Rust。

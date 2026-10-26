@@ -2,15 +2,16 @@
 
 Glory 的主要缺口集中在移动平台交付、桌面分发、应用级导航与文档服务、开发调试工具。响应式内核、浏览器渲染、SSR、水合、流式资源传递和常用交互组件已经有实现；不能把旧架构删除的能力、README 未列出的能力和真实缺口混为一谈。本轮按现有语义架构补齐，SSR 的 HTTP 框架集成只支持 Salvo。
 
-## 当前进度（Apple 主机补齐后）
+## 当前进度（2026-10-27，移动输入补齐后）
 
 下方“起始状态”和 Windows 会话记录保留为比较基线；当前主机已是 Apple Silicon
-Mac，最新证据见文末 Apple/IME 记录，不能继续把“没有 Mac”当作当前状态。
+Mac，最新证据见文末 Apple/移动输入记录，不能继续把“没有 Mac”当作当前状态。
 
 | 项目 | 当前结果 | 未关闭边界 |
 |---|---|---|
 | macOS | CPU 真窗口/缩放/清理、实际 AX 读取和编辑、可重定位签名 `.app` | VoiceOver 朗读、Developer ID/公证的凭据验收、外部机器安装 |
-| iOS | 模拟器/设备链接、UIScene、CPU 窗口、包资产、触摸和真实拼音 IME、同进程恢复/旋转 | 真机签名安装、VoiceOver、任意选择手势/rects、Unicode 程序选区、键盘避让与完整场景重连 |
+| iOS | 模拟器/设备链接、UIScene、CPU 窗口、包资产、真实拼音 IME、Unicode 程序选区、底部键盘避让、同进程恢复/旋转 | 真机签名安装、VoiceOver、任意选择手势/rects、完整场景重连 |
+| Android | NativeActivity 基线；新增明确选择的 GameActivity、ARM64 模拟器真实拼音预编辑/提交/取消、Unicode 选区、汉字/emoji 删除 | 真机/16 KiB 内核运行、TalkBack、AssetManager/网络与权限、生产分发 |
 | 桌面开发 | native watch、错误保留旧进程、成功重启与退出回收 | 状态保持、真正 Rust 热补丁、检查器 |
 | Web 发布 | 可复现 gzip、哈希清单、预览协商/HEAD/身份回退 | 指纹命名、Brotli/图片转换、WASM 分包 |
 
@@ -246,7 +247,7 @@ Winit UIKit 严格 Clippy（--no-deps）通过。完整原生选择手势、sele
 超出当前选择的系统自动更正仍不宣称支持；没有用这次 IME 补齐替代完整文本选择
 或 VoiceOver 验收。
 
-新增仅应用测试使用的 `ime-probe` 可选视图，沿用当前 ASCII 程序选区契约选择
+前轮新增仅应用测试使用的 `ime-probe` 可选视图，沿用当时 ASCII 程序选区契约选择
 `ABCDZ` 的 `BCD`。实际系统键盘将其预编辑为 `AniZ`，删除预编辑后恢复
 `ABCDZ`、原选区和 Idle；不重新选择即可再次输入并提交为 `A你好Z`。
 原值恢复后的标签像素与起始截图相同，原生 AX 文本上下文也回到 `ABCDZ`。
@@ -284,8 +285,93 @@ Clippy 检查。当前钥匙串未发现可用发布签名身份，也没有连�
 `web-compression-browser.png`。指纹命名、Brotli、图片转换和 WASM 分包尚未实现。
 
 
-还未关闭：iOS VoiceOver、视口底部键盘避让、scene disconnect/reconnect、真机权限/
+还未关闭：iOS VoiceOver、scene disconnect/reconnect、真机权限/
 网络/签名安装/App Store 资产；macOS VoiceOver/生产公证及其他系统安装器；应用级
 history/嵌套路由/返回恢复、动态文档头、Salvo 类型化调用、发布资产优化、WASM 分包、
 GPU 和真正热补丁等。整体差距保持开放，不以本次 Apple 纵向链路或桌面 watch
 替代这些实现和验收。
+
+## 2026-10-27：Unicode 选区、键盘视口和 Android 中文输入
+
+### 共用程序选区
+
+移除起始版本的 ASCII 限制。有限协议仍以 UTF-16 code unit 定址，对当前受控值
+进行无分配的 scalar 边界转换；半代理对、倒序范围和越界在队列变更前拒绝。
+Blitz 在修改编辑器前检查实际 shaped cluster 边界，不能精确表达的组合字符/ZWJ
+内部位置返回 Unsupported，保留旧选区，不静默舍入。选区方向和输入 revision
+仍有独立验证，不能把过期的选区应用到后来的值。
+
+Web CSR 与真实 SSR adoption 使用同一 Rust 输入表单：文本和密码的 `A中😀Z`
+均可选择 UTF-16 1..4 的 `中😀`，正反方向保持；3..3 的半代理对拒绝后选区不变，
+后续合法选择可继续，水合保留输入对象。夹具和可重复脚本分别是
+`examples/semantic-web/unicode-selection.html`、`unicode-selection-acceptance.js`。
+浏览器记录在 `/Volumes/Data/Caches/glory/unicode-selection-web/`。iOS 真实拼音
+也完成同一非空 Unicode 选区的预编辑、取消恢复和再次候选替换，原始截图与 JSON
+在 `/Volumes/Data/Caches/glory/unicode-selection-ios/`。此处补齐 supersedes
+前轮 ASCII 探针的能力边界，前轮失败和验收记录继续保留。
+
+### iOS 底部键盘避让
+
+应用拥有的 Swift scene delegate 只观察本场景 key window 的本地 docked keyboard，
+将底部遮挡换算为 root controller 的额外 safe-area inset，复用 Winit 布局事件刷新
+内容视口。浮动键盘不缩小整页；无效/极端矩形拒绝或裁剪，至少保留一个 point。
+监听器在 disconnect/deinit 解除，闭包弱引用 scene delegate。没有向 Glory
+运行时加入 unsafe、平台键盘尺寸或另一套模型。
+
+最终复验暴露并修复了真实触摸时序问题：按下底部输入框会打开键盘并使控件上移，
+手指在旧位置抬起时，Blitz 原先合成空白 Click、立即使编辑器失焦。现在仅对
+“静止手指、原先按下并聚焦的文本编辑器已移出释放目标”抑制该错误点击；后续
+主动点击空白仍正常失焦。fork 回归测试使用真实布局/视口缩小，在关闭修复时
+明确失败、开启后通过；普通引擎 117 项测试通过。
+
+`keyboard-probe` 与 `ime-probe` 分开选择。前者将输入框固定在视口底部，检验
+实际系统键盘显示/收起、输入框随可用高度移动和输入继续可用；十二项 Swift
+几何测试已纳入 Apple 规范 gate。最终无诊断构建还通过竖屏键盘显示、
+带键盘旋转和旋转后继续提交中文。横屏输入框中心实测上移 204pt，收起后复位。记录在 `/Volumes/Data/Caches/glory/keyboard-ios-final/`。
+这不代表任意遮挡区域自动滚动、完整 scene 重连或真机验收。
+
+### Android GameActivity 与真实拼音
+
+保留默认 NativeActivity 路径，新增显式的互斥 Activity 选择。`android-game-activity`
+及 facade 对应 feature 使用同版本 GameActivity 4.4.0 Java AAR/Rust glue。
+应用 Java 子类只加载库；实际 UI 仍由 Rust → Blitz/Stylo/Taffy/Parley →
+AnyRender/Vello CPU → 原生 surface 绘制，没有 WebView/HTML 页面套壳。
+引擎内部复用 DOM/CSS 数据结构不等于在浏览器中运行。
+
+Winit genuine fork 用安全 Rust 将 GameTextInput 的 UTF-16 state 转成经过校验的
+UTF-8 Preedit/Commit/Cancel/DeleteSurrounding，提供受限的 focused-editor context，
+密码不导出周边文本，输入通知先限制大小再复制。拒绝无法表达的原生选区移动和
+超出当前选区的自动更正；Android/JVM 调用在 session mutex 释放后执行。Glory
+运行时没有新增 unsafe，既有 UIKit 窄桥接例外没有扩大到 Android。
+
+用户同意许可后，NDK r27d、Android 36 ARM64 Google Play 镜像和 Gradle 9.1.0
+安装在数据盘隔离缓存，下载核对官方摘要。Mac GameActivity 打包脚本验证 JNI
+入口、AArch64、16 KiB ELF LOAD 对齐和 APK 签名；Gradle lock 与 SHA-256 依赖
+验证元数据已提交到源码。普通构建严格验证，不临时放宽校验。最终 APK 使用
+调试签名，不作为商店发行包。
+
+实际 Android 36 ARM64 模拟器、Gboard 简体拼音（开启 Inline composing）、CUA
+原生点击/物理键验收：`A中😀Z` 选中 1..4 → `AniZ`/Composing → 删空预编辑恢复
+原值、Idle 与原生 1..4 选区 → 无需重选再次输入并选择 `你好` 得到 `A你好Z`。
+随后真实退格得到 `A你Z`，物理 `x` 只产生一次预编辑，取消后恢复；末尾退格从
+`A中😀Z` → `A中😀` → `A中`，未残留半代理对。Home/恢复及旋转保留 PID 4244
+和值/包资产。软件键验收没有用 `adb input` 注入替代。记录在
+`/Volumes/Data/Caches/glory/android/unicode-ime/result.json`、同目录原始 PNG 和日志。
+接入最终触摸修复后的 APK 另以 PID 4592 复验预编辑/取消恢复/再次提交通过。
+
+该 AVD 的内核页大小是 4096，不能把 ELF 对齐检查写成 16 KiB 运行通过；ARM64
+模拟器也不是真实 ARM64 设备。ADB 37.0.1 在本机启动出现 libunwind 崩溃，隔离
+使用官方 ADB 36.0.2 后可运行；没有据此宣称上游通用故障。模拟器只修改测试
+所需键盘设置，镜像及 Gradle/JDK 写目录位于数据盘缓存。
+
+### 验证与下一批缺口
+
+本轮全工作区含文档测试共 967 项通过，native/WASM 全工作区严格 Clippy 通过；
+三个固定 SHA fork 的独立测试、UIKit 两个 target 及 Android Native/Game 两条
+编译路径通过。Apple 模拟器和 Android Game APK 均实际重新链接、打包、签名验证。
+这些检查与真实输入验收分别记录，不能互相替代。
+
+继续优先补软件可完成的 iOS scene disconnect/reconnect、移动资产/联网与权限接口，
+随后处理应用级 history/嵌套路由/返回恢复、动态文档头、Salvo 类型化调用与开发
+检查器。VoiceOver/TalkBack、签名真机安装、16 KiB 设备、商店分发、GPU、真正热补丁
+和完整原生选择手势仍开放。整体差距没有关闭。

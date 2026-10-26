@@ -106,7 +106,7 @@ ValueChanged和Commit { value, revision }都携带产生输入时的程序屏障
 
 Web读值时修复非规范主机文本并保留UTF-16选区；正常规范值不写回DOM。hydration验证阶段只计算规范观察，整个形状验证成功后才修复值，不让后续节点错误破坏先前输入。规范等价程序回写只确认版本，保留选区/preedit；原生输入的UTF-8游标偏移由共用规则转换。
 
-### 可选有界编辑与精确 ASCII 选区
+### 可选有界编辑与精确 UTF-16 选区
 
 `Semantics.input_edit: Option<InputEditCapture>` 是单行 Input 的显式 opt-in，
 `max_bytes` 必须为 1..=4096，当前程序值也受同一预算约束。它拒绝与
@@ -128,9 +128,10 @@ Insert/DeleteBackward/DeleteForward/Replace 意图，以及 composing 状态。
 
 `Action::SelectText { node, revision, selection }` 与
 `Scope::set_input_selection` 只接受真实 Input，并要求 input capability、
-存活身份、精确当前程序 revision 和有序范围。当前 Web/Blitz 实现明确仅接受
-ASCII 程序值（因此 UTF-8/UTF-16 边界一致）；非 ASCII 选区返回 Unsupported，
-不把近似字素边界当精确支持。readonly 输入仍可选择。SSR/无输入驱动的
+存活身份、精确当前程序 revision 和有序 UTF-16 范围。程序值支持 CJK/emoji，
+但范围必须位于 Unicode scalar 边界；半代理对、越界和倒序在入队前拒绝。
+Blitz 还校验实际 shaped cluster 边界，不能精确表达的内部位置返回 Unsupported，
+保留原选区，不静默舍入。readonly 输入仍可选择。SSR/无输入驱动的
 参考宿主明确拒绝。执行时再次校验当前物理值/组合状态及宿主能力；已被
 较新程序值替代的 queued action 被跳过，不能改变新输入的光标。
 
@@ -139,6 +140,8 @@ Sapid MaskInput 在这一有限协议上实现 raw/display 映射、同 tick 当
 物理文本；只有实际格式变化才写文本并恢复映射选区。原生实际 key/IME
 协议、ASCII 双向选区、36 项既有输入回归及 Chromium148 四主题 CSR/水合
 Mask 12 项已验收；这些不证明实际 OS IME 或 Unicode 字素选择能力。
+后续文本/密码的 Unicode 双向程序选区、CSR/SSR 身份保持及移动系统拼音验收，
+见 2026-10-27 的功能差距报告；任意原生选择手势仍是独立边界。
 
 ## 查询、动作与能力
 

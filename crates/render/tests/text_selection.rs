@@ -1,6 +1,6 @@
 use glory_render::*;
 #[test]
-fn exact_ascii_selection_requires_live_value_revision_ordered_ranges_and_a_real_input() {
+fn exact_selection_requires_live_value_revision_ordered_ranges_and_a_real_input() {
     let id = NodeIds::new(RuntimeId::new()).allocate();
     let node = Descriptor::new(Props::Input(InputProps {
         value: "000001".into(),
@@ -64,14 +64,57 @@ fn exact_ascii_selection_requires_live_value_revision_ordered_ranges_and_a_real_
             value: value.into(),
             ..Default::default()
         }));
-        assert!(matches!(
+        assert!(
             Action::SelectText {
                 node: id,
                 revision: 0,
                 selection: TextSelection::default()
             }
-            .validate_target(&node),
-            Err(Error::Unsupported(_))
-        ));
+            .validate_target(&node)
+            .is_ok()
+        );
+    }
+}
+
+#[test]
+fn unicode_selection_converts_utf16_without_splitting_surrogates_or_allocating_a_buffer() {
+    for (text, start, end, bytes) in [
+        ("", 0, 0, 0..0),
+        ("A中😀Z", 1, 4, 1..8),
+        ("A中😀Z", 4, 4, 8..8),
+        ("A中😀Z", 0, 5, 0..9),
+        ("e\u{301}", 1, 2, 1..3),
+        ("👩\u{200d}💻", 0, 5, 0..11),
+        ("אב", 1, 2, 2..4),
+    ] {
+        assert_eq!(
+            TextSelection {
+                start,
+                end,
+                ..Default::default()
+            }
+            .byte_range(text)
+            .unwrap(),
+            bytes
+        );
+    }
+    for (start, end) in [
+        (3, 3),
+        (1, 3),
+        (3, 4),
+        (4, 1),
+        (0, 6),
+        (usize::MAX, usize::MAX),
+    ] {
+        assert!(
+            TextSelection {
+                start,
+                end,
+                ..Default::default()
+            }
+            .byte_range("A中😀Z")
+            .is_err(),
+            "{start}..{end}"
+        );
     }
 }

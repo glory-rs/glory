@@ -15,6 +15,10 @@ cargo fmt --manifest-path tools/cli/Cargo.toml --all -- --check
 cargo test --locked --manifest-path tools/cli/Cargo.toml
 cargo clippy --locked --manifest-path tools/cli/Cargo.toml --all-targets -- -D warnings
 cargo fmt --manifest-path examples/mobile/Cargo.toml --all -- --check
+xcrun swiftc -module-cache-path "$GLORY_BUILD_ROOT/SwiftHostModules" \
+    examples/mobile/ios/SceneDelegate.swift examples/mobile/ios/tests/main.swift \
+    -o "$GLORY_BUILD_ROOT/keyboard-geometry-tests"
+"$GLORY_BUILD_ROOT/keyboard-geometry-tests"
 for mode in "$@"; do
     case "$mode" in
         --window) GLORY_MACOS_WINDOW=1 cargo test --locked -p glory-blitz --features shell,accesskit --test macos_window ;;

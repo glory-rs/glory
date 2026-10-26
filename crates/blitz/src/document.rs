@@ -1755,7 +1755,8 @@ impl Render for Renderer {
                     ));
                 }
                 let control = state.dom.control(node)?;
-                {
+                state.dom.resolve();
+                let bytes = {
                     let input = state
                         .dom
                         .doc
@@ -1764,11 +1765,6 @@ impl Render for Renderer {
                         .and_then(|e| e.text_input_data())
                         .ok_or(Error::Unsupported("Blitz text editor unavailable"))?;
                     let text = input.editor.raw_text();
-                    if !text.is_ascii() {
-                        return Err(Error::Unsupported(
-                            "exact selection currently requires ASCII input text",
-                        ));
-                    }
                     let glory_render::Props::Input(expected) =
                         state.mapper.tree().node(node)?.descriptor.view().props
                     else {
@@ -1777,13 +1773,40 @@ impl Render for Renderer {
                     if text != expected.value {
                         return Err(Error::Unsupported("text selection value changed"));
                     }
-                    selection.validate(text.len())?;
-                }
+                    let bytes = selection.byte_range(text)?;
+                    // Parley's cursor snaps to shaped cluster starts. Validate
+                    // both endpoints against the actual layout before touching
+                    // selection, so combining/ZWJ interiors cannot be rounded.
+                    let layout = input
+                        .editor
+                        .try_layout()
+                        .ok_or(Error::Unsupported("text selection layout unavailable"))?;
+                    let mut start = bytes.start == 0 || bytes.start == text.len();
+                    let mut end = bytes.end == 0 || bytes.end == text.len();
+                    for cluster in layout
+                        .lines()
+                        .flat_map(|line| line.runs())
+                        .flat_map(|run| run.clusters())
+                    {
+                        let index = cluster.text_range().start;
+                        start |= index == bytes.start;
+                        end |= index == bytes.end;
+                        if start && end {
+                            break;
+                        }
+                    }
+                    if !start || !end {
+                        return Err(Error::Unsupported(
+                            "exact selection inside a shaped text cluster",
+                        ));
+                    }
+                    bytes
+                };
                 let (anchor, focus) =
                     if selection.direction == glory_render::SelectionDirection::Backward {
-                        (selection.end, selection.start)
+                        (bytes.end, bytes.start)
                     } else {
-                        (selection.start, selection.end)
+                        (bytes.start, bytes.end)
                     };
                 state.dom.doc.with_text_input(control, |mut driver| {
                     driver.select_byte_range(anchor, focus)

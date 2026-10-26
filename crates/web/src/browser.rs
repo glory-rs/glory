@@ -319,7 +319,8 @@ impl Render for Renderer {
             let target = self.dom.entry(node)?.control()?;
             let current = js_sys::Reflect::get(&target, &"value".into()).map_err(backend)?;
             if !current.is_string()
-                || js_sys::JsString::from(current.clone()).length() as usize != expected.value.len()
+                || js_sys::JsString::from(current.clone()).length() as usize
+                    != expected.value.encode_utf16().count()
                 || current.as_string().as_deref() != Some(expected.value.as_str())
             {
                 return Err(Error::Unsupported("text selection value changed"));
@@ -524,12 +525,7 @@ fn perform(dom: &Dom, action: Action) -> Result<(), Error> {
                 .map_err(backend)?
                 .as_string()
                 .ok_or(Error::Unsupported("selection on this node"))?;
-            if !raw.is_ascii() {
-                return Err(Error::Unsupported(
-                    "exact selection currently requires ASCII input text",
-                ));
-            }
-            selection.validate(raw.len())?;
+            selection.byte_range(&raw)?;
             let method = js_sys::Reflect::get(&target, &"setSelectionRange".into())
                 .map_err(backend)?
                 .dyn_into::<js_sys::Function>()

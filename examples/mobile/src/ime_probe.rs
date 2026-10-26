@@ -1,15 +1,21 @@
 //! Opt-in native IME acceptance view; absent from the ordinary shared counter.
 use glory::prelude::*;
 
+const ORIGINAL: &str = "A中😀Z";
+
 pub(crate) fn fixture() -> impl Widget {
     widget(|scope| {
-        let value = scope.cage(String::from("ABCDZ"));
+        let value = scope.cage(String::from(ORIGINAL));
         let node = scope.cage(None);
         let composing = scope.cage(false);
         let weak = scope.downgrade();
         let echo = weak.clone();
         scope.effect(move || {
             let current = value.get();
+            eprintln!(
+                "Glory IME probe value={current:?}, composing={}",
+                composing.get()
+            );
             if let Some(node) = node.get()
                 && let Some(scope) = echo.upgrade()
                 && let Err(error) = scope.set_input_value(node, current)
@@ -45,7 +51,7 @@ pub(crate) fn fixture() -> impl Widget {
                     .name("IME probe value")
                     .node_ref(node)
                     .style(controls.clone().width(Length::Px(240.)))
-                    .value("ABCDZ")
+                    .value(ORIGINAL)
                     .on(value_changed, move |event| {
                         if let Event::ValueChanged { value: next, .. } = event {
                             value.revise(|value| *value = next);
@@ -62,8 +68,9 @@ pub(crate) fn fixture() -> impl Widget {
                         button()
                             .label("Select middle")
                             .style(controls.clone())
-                            .enabled(value.map(|v| v.is_ascii() && v.len() >= 4))
+                            .enabled(value.map(|v| v == ORIGINAL))
                             .on(activate, move |_| {
+                                eprintln!("Glory IME probe select middle");
                                 if let (Some(scope), Some(node)) = (weak.upgrade(), node.get()) {
                                     let result = scope
                                         .action(glory::render::Action::Focus(node))
@@ -85,11 +92,17 @@ pub(crate) fn fixture() -> impl Widget {
                         button()
                             .label("Restore")
                             .style(controls.clone())
-                            .on(activate, move |_| value.revise(|v| *v = "ABCDZ".into())),
+                            .on(activate, move |_| {
+                                eprintln!("Glory IME probe restore");
+                                value.revise(|v| *v = ORIGINAL.into());
+                            }),
                         button()
                             .label("Reset")
                             .style(controls)
-                            .on(activate, move |_| value.revise(|v| *v = "RESET".into())),
+                            .on(activate, move |_| {
+                                eprintln!("Glory IME probe reset");
+                                value.revise(|v| *v = "RESET".into());
+                            }),
                     )),
             ))
             .show_in(scope)

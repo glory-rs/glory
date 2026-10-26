@@ -417,6 +417,10 @@ changes do not dirty frames. Once attached, let the shell own that clock.
 
 Desktop shells target Windows/Linux/macOS. Mobile shells use explicit AndroidApp
 and app-owned UIKit scene entry paths, documented in the mobile example.
+Android chooses one of `android-native-activity` (existing path) or
+`android-game-activity` (GameTextInput IME). Do not enable both on Android.
+Program input selection accepts scalar-safe UTF-16 CJK/emoji ranges in both
+directions; actual shaped-cluster interiors are refused before selection changes.
 `tests/macos_window.rs` is a separate AppKit main-thread process; opt in with
 `GLORY_MACOS_WINDOW=1`. It checks presented frames, native resizing and Owner
 cleanup. `Shell::window_stats` reads live surface/frame counters without invalidation;

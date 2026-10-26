@@ -178,7 +178,7 @@ fn native_opt_in_edit_captures_current_selection_intent_and_ime_without_the_lega
 }
 
 #[test]
-fn native_select_text_preserves_direction_and_revision_and_explicitly_refuses_unicode_boundaries() {
+fn native_select_text_preserves_direction_revision_and_refuses_subcluster_positions() {
     use super::focus_tests::{focus, selection, settle};
     use glory_render::{Action, SelectionDirection, TextSelection};
     for masked in [false, true] {
@@ -249,21 +249,111 @@ fn native_select_text_preserves_direction_and_revision_and_explicitly_refuses_un
         assert_eq!(app.renderer.stats(), before);
         app.app.scope().set_input_value(id, "e\u{301}").unwrap();
         app.app.flush().unwrap();
-        let before = app.app.stats();
-        assert!(
+        settle(&mut app);
+        let before = selection(&mut app, id);
+        let revision = {
+            let tree = app.app.tree();
+            let glory_render::Props::Input(p) = tree.node(id).unwrap().descriptor.view().props
+            else {
+                panic!()
+            };
+            p.revision
+        };
+        assert!(matches!(
+            app.renderer.clone().action(Action::SelectText {
+                node: id,
+                revision,
+                selection: TextSelection {
+                    start: 1,
+                    end: 1,
+                    ..Default::default()
+                },
+            }),
+            Err(glory_render::Error::Unsupported(_))
+        ));
+        assert_eq!(selection(&mut app, id), before);
+    }
+}
+
+#[test]
+fn native_unicode_selection_round_trips_direction_cancel_and_cjk_replacement() {
+    use super::focus_tests::{focus, selection, settle};
+    use glory_render::{SelectionDirection, TextSelection};
+    for masked in [false, true] {
+        for direction in [SelectionDirection::Forward, SelectionDirection::Backward] {
+            let mut app = WindowApp::new();
+            let model = app.app.scope().cage("A中😀Z".to_owned());
+            let node = app.app.scope().cage(None);
+            app.mount(
+                input()
+                    .value(model)
+                    .node_ref(node)
+                    .purpose(if masked {
+                        glory_render::Purpose::Password
+                    } else {
+                        glory_render::Purpose::Text
+                    })
+                    .on(EventKind::ValueChanged, move |event| {
+                        if let Event::ValueChanged { value, .. } = event {
+                            model.revise(|v| *v = value);
+                        }
+                    }),
+            )
+            .unwrap();
+            let id = node.get().unwrap();
+            focus(&mut app, id);
             app.app
                 .scope()
                 .set_input_selection(
                     id,
                     TextSelection {
                         start: 1,
-                        end: 1,
-                        ..Default::default()
-                    }
+                        end: 4,
+                        direction,
+                    },
                 )
-                .is_err()
-        );
-        assert_eq!(app.app.stats(), before);
+                .unwrap();
+            app.app.flush().unwrap();
+            settle(&mut app);
+            assert_eq!(selection(&mut app, id), (1, 4));
+            let physical = app.renderer.engine_id(id, Part::Main).unwrap();
+            app.renderer.inspect(|doc| {
+                let s = doc
+                    .get_node(physical)
+                    .unwrap()
+                    .element_data()
+                    .unwrap()
+                    .text_input_data()
+                    .unwrap()
+                    .editor
+                    .raw_selection();
+                let expected = if direction == SelectionDirection::Backward {
+                    (8, 1)
+                } else {
+                    (1, 8)
+                };
+                assert_eq!((s.anchor().index(), s.focus().index()), expected);
+            });
+            app.handle_ui_event(UiEvent::Ime(BlitzImeEvent::Preedit(
+                "ni".into(),
+                Some((2, 2)),
+            )));
+            settle(&mut app);
+            assert_eq!(model.get(), "AniZ");
+            app.handle_ui_event(UiEvent::Ime(BlitzImeEvent::Preedit(String::new(), None)));
+            settle(&mut app);
+            assert_eq!(model.get(), "A中😀Z");
+            assert_eq!(selection(&mut app, id), (1, 4));
+            app.handle_ui_event(UiEvent::Ime(BlitzImeEvent::Preedit(
+                "nihao".into(),
+                Some((5, 5)),
+            )));
+            settle(&mut app);
+            app.handle_ui_event(UiEvent::Ime(BlitzImeEvent::Commit("你好".into())));
+            settle(&mut app);
+            assert_eq!(model.get(), "A你好Z");
+            assert_eq!(selection(&mut app, id), (3, 3));
+        }
     }
 }
 

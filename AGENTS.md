@@ -140,20 +140,26 @@ retired feature aliases or count compilation as proof of platform acceptance.
   origins/roots and job/body/deadline budgets. Shared resource leases
   also bound requests/completed results and charged payloads. Optional accesskit
   (facade blitz-accesskit) adds a semantic tree/action bridge; Windows UIA has
-  actual client acceptance. Android AssetManager/network transport, OS IME, Unix AT-SPI clients and
+  actual client acceptance. Android AssetManager/network transport, Unix AT-SPI clients and
   screen-reader/text-selection acceptance remain pending. Facade
   `blitz` is optional and must not enter default/HTML/SSR dependency graphs.
   Linux Fontique uses fontconfig-dlopen; cross-checks do not prove runtime font
   availability or display-server acceptance.
   Optional shell also has explicit AndroidApp and UIKit entry paths; see
   examples/mobile. Android emulator evidence stays separate from real-device,
-  CJK composition, AssetManager/network transport and accessibility acceptance.
+  AssetManager/network transport and accessibility acceptance. GameActivity has
+  ARM64 emulator system-pinyin preedit/commit/cancel evidence; NativeActivity's
+  baseline keyboard evidence does not imply the same CJK support.
   Android embedded CSS/PNG has actual emulator pixel/lifecycle evidence. iOS now has
   simulator/device linking and actual iOS 27 simulator pixel, touch, software-key,
   Home/restore and rotation evidence. The app-owned Swift scene bridge forwards
   actual UIKit lifecycle events; the Winit fork attaches windows to UIWindowScene.
   UIKit now has a narrowly authorized UITextInput bridge, bounded surrounding
   context and real pinyin preedit/candidate/commit/cancel/restore evidence.
+  Android GameActivity is an explicit opt-in alternative to NativeActivity;
+  its safe GameTextInput bridge provides bounded current-editor context and
+  validated UTF-16/UTF-8 composition/deletion translation. Never enable both
+  Activity features for an Android build. NativeActivity retains its prior path.
   Arbitrary native selection gestures, VoiceOver and signed device installation
   remain open. Passwords export empty context; never overwrite live marked text
   with acknowledgements or native purpose changes.
@@ -389,6 +395,11 @@ retired feature aliases or count compilation as proof of platform acceptance.
   after later commits. App validates QueryValue kind, finite geometry and ordered
   selections before callbacks. Selection offsets are UTF-16 code units; native
   adapters convert at the boundary. Duplicate/retired tokens never call back twice.
+- Program text selections validate scalar boundaries against the current value,
+  including CJK/emoji and both directions. Half-surrogate endpoints are rejected
+  before queue changes. Native hosts additionally refuse shaped-cluster interiors
+  without rounding or changing the prior selection; this is not native drag/handle
+  selection support.
 - Blitz Groups use offline parks and comment ranges, never a layout wrapper.
   Dispose reclaims separately suspended descendants and engine identities.
   Controlled props pending first attachment must be replayed through descendants;

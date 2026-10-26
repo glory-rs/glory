@@ -15,7 +15,11 @@ name = "counter-ios"
 path = "src/ios.rs"
 
 [features]
+default = ["android-native-activity"]
+android-native-activity = ["glory/blitz-android-native-activity"]
+android-game-activity = ["glory/blitz-android-game-activity"]
 ime-probe = []
+keyboard-probe = []
 
 [dependencies]
 counter = { path = "../counter" }

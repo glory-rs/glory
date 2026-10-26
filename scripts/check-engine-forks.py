@@ -27,7 +27,7 @@ def build_environment():
     return paths
 
 
-def test_fork(fork, directory, target):
+def test_fork(fork, directory, target, android):
     if not directory.exists():
         run("git", "clone", "--filter=blob:none", "--no-checkout", fork["git"], str(directory))
     else:
@@ -52,13 +52,19 @@ def test_fork(fork, directory, target):
     if sys.platform == "darwin":
         for arguments in fork.get("apple_checks", []):
             run("cargo", "check", "--locked", "--manifest-path", manifest, *arguments)
+    if android:
+        for arguments in fork.get("android_checks", []):
+            run("cargo", "check", "--locked", "--manifest-path", manifest, *arguments)
     assert not output("git", "-C", str(directory), "status", "--porcelain"), directory
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--test", action="store_true", help="also run engine unit tests in separate Git checkouts under the D: build root")
+    parser.add_argument("--android", action="store_true", help="with --test, also check native/game Activity targets using an explicitly installed NDK")
     options = parser.parse_args()
+    if options.android and not options.test:
+        parser.error("--android requires --test")
     paths = build_environment()
     root = Path(__file__).resolve().parents[1]
     record = json.loads((root / "docs/engine-forks.json").read_text(encoding="utf-8"))
@@ -83,7 +89,7 @@ def main():
         if options.test:
             directory = paths["CARGO_TARGET_DIR"].parent / "engine-forks" / fork["name"]
             directory.parent.mkdir(parents=True, exist_ok=True)
-            test_fork(fork, directory, paths["CARGO_TARGET_DIR"])
+            test_fork(fork, directory, paths["CARGO_TARGET_DIR"], options.android)
     retired = {"glory-blitz-dom", "glory-blitz-traits", "glory-blitz-paint", "glory-blitz-shell", "glory-taffy", "glory-stylo-taffy"}
     for lockfile in (
         root / "Cargo.lock",

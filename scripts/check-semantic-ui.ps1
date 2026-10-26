@@ -92,7 +92,7 @@ try {
         if ($mobileGraph | Select-String '^(reqwest|rustls|rustls-platform-verifier|cap-std|cap-fs-ext) v') {
             throw 'offline mobile graph acquired desktop transport dependencies'
         }
-        cargo clippy --locked -p glory-blitz --all-features --target aarch64-linux-android --no-deps -- -D warnings
+        cargo clippy --locked -p glory-blitz --no-default-features --features css,assets,raster,accesskit,android-native-activity --target aarch64-linux-android --no-deps -- -D warnings
         if ($LASTEXITCODE -ne 0) { throw 'Android adapter Clippy failed' }
         & "$taskWorkspace/examples/mobile/build-android.ps1" -Target x86_64-linux-android
         & "$taskWorkspace/examples/mobile/build-android.ps1" -Target aarch64-linux-android

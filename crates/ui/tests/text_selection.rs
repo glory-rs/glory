@@ -104,6 +104,63 @@ fn reference_host_refuses_selection_before_queue_without_a_real_input_driver() {
 }
 
 #[test]
+fn unicode_current_value_selection_rejects_half_surrogates_before_queue_and_supersedes_old_intents()
+{
+    let actions = Rc::new(RefCell::new(Vec::new()));
+    let out = actions.clone();
+    let app = App::new(move |runtime| Capture {
+        tree: Memory::new(runtime),
+        actions: out,
+    });
+    let node = app.scope().cage(None);
+    app.mount(input().value("A中😀Z").node_ref(node)).unwrap();
+    let id = node.get().unwrap();
+    let before = app.stats();
+    assert!(
+        app.scope()
+            .set_input_selection(
+                id,
+                TextSelection {
+                    start: 3,
+                    end: 3,
+                    ..Default::default()
+                }
+            )
+            .is_err()
+    );
+    assert_eq!(app.stats(), before);
+    app.scope()
+        .set_input_selection(
+            id,
+            TextSelection {
+                start: 1,
+                end: 4,
+                direction: SelectionDirection::Backward,
+            },
+        )
+        .unwrap();
+    app.flush().unwrap();
+    assert!(matches!(
+        actions.borrow().as_slice(),
+        [Action::SelectText {
+            selection: TextSelection {
+                start: 1,
+                end: 4,
+                direction: SelectionDirection::Backward
+            },
+            ..
+        }]
+    ));
+    actions.borrow_mut().clear();
+    app.scope()
+        .set_input_selection(id, TextSelection::default())
+        .unwrap();
+    app.scope().set_input_value(id, "另一😀值").unwrap();
+    app.flush().unwrap();
+    assert!(actions.borrow().is_empty());
+}
+
+#[test]
 fn readonly_opted_in_edit_does_not_reach_generic_handlers_but_composition_cleanup_does() {
     let app = App::memory();
     let r = app.scope().cage(None);

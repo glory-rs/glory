@@ -1549,8 +1549,9 @@ impl Scope {
         })?;
         Ok(request)
     }
-    /// Queue an exact ASCII selection using this Input's current program
+    /// Queue an exact UTF-16 selection using this Input's current program
     /// revision. Call after set_input_value when formatting changed the value.
+    /// Surrogate interiors are invalid; a host may refuse subcluster positions.
     pub fn set_input_selection(
         &self,
         node: NodeId,

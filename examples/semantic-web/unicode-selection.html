@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Unicode selection acceptance</title></head>
+<body>
+<h1>Unicode selection</h1>
+<p id="mode"></p>
+<button id="write">Write Unicode</button>
+<button id="forward">Select forward</button>
+<button id="backward">Select backward</button>
+<button id="invalid">Reject half surrogate</button>
+<output id="result">Ready</output>
+<div id="input-ssr"><!--INPUT_SNAPSHOT--></div><div id="app"></div>
+<script type="module">
+import init, * as demo from './glory_semantic_web.js';
+await init();
+const hydrate = new URL(location.href).searchParams.has('hydrate');
+document.getElementById(hydrate ? 'app' : 'input-ssr').hidden = true;
+const originalInput = document.querySelector('#input-ssr .input-slot-0');
+demo.input_mount(hydrate);
+document.getElementById('mode').textContent = hydrate
+  ? `SSR hydration (input ${originalInput === document.querySelector('#input-ssr .input-slot-0') ? 'preserved' : 'REPLACED'})` : 'CSR';
+const result = document.getElementById('result');
+document.getElementById('write').onclick = () => {
+  demo.input_write(0, 'A中😀Z', 'auto');
+  demo.input_write(1, 'A中😀Z', 'auto');
+  result.textContent = 'Unicode written';
+};
+function select(backwards) {
+  demo.input_select(0, 1, 4, backwards);
+  demo.input_select(1, 1, 4, backwards);
+  result.textContent = backwards ? 'Backward accepted' : 'Forward accepted';
+}
+document.getElementById('forward').onclick = () => select(false);
+document.getElementById('backward').onclick = () => select(true);
+document.getElementById('invalid').onclick = () => {
+  try { demo.input_select(0, 3, 3, false); result.textContent = 'ERROR: accepted half surrogate'; }
+  catch (error) { result.textContent = `Rejected: ${error}`; }
+};
+</script></body></html>

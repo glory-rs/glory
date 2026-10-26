@@ -23,6 +23,8 @@ blitz-assets = ["blitz", "glory-blitz/assets"]
 blitz-paint = ["blitz", "glory-blitz/paint"]
 blitz-raster = ["blitz-paint", "glory-blitz/raster"]
 blitz-shell = ["blitz-paint", "glory-blitz/shell"]
+blitz-android-native-activity = ["blitz-shell", "glory-blitz/android-native-activity"]
+blitz-android-game-activity = ["blitz-shell", "glory-blitz/android-game-activity"]
 blitz-accesskit = ["blitz-shell", "glory-blitz/accesskit"]
 
 [dependencies]

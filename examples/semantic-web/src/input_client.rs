@@ -14,6 +14,37 @@ fn js(error: impl std::fmt::Display) -> JsValue {
     error.to_string().into()
 }
 #[wasm_bindgen]
+pub fn input_select(index: usize, start: usize, end: usize, backwards: bool) -> Result {
+    APP.with(|app| {
+        let app = app.borrow();
+        let (web, _) = app.as_ref().ok_or_else(|| js("unmounted"))?;
+        let tree = web.app().tree();
+        let node = *tree
+            .node(tree.roots()[0])
+            .map_err(js)?
+            .children
+            .get(index)
+            .ok_or_else(|| js("index"))?;
+        drop(tree);
+        web.app()
+            .scope()
+            .set_input_selection(
+                node,
+                glory::render::TextSelection {
+                    start,
+                    end,
+                    direction: if backwards {
+                        glory::render::SelectionDirection::Backward
+                    } else {
+                        glory::render::SelectionDirection::Forward
+                    },
+                },
+            )
+            .map_err(js)?;
+        web.app().flush().map_err(js)
+    })
+}
+#[wasm_bindgen]
 pub fn input_mount(hydrate: bool) -> Result {
     crate::browser::unmount();
     let root = web_sys::window()

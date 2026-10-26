@@ -9,6 +9,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::write(std::path::Path::new(&directory).join("ssr.html"), page)?;
     let input_snapshot =
         glory::ssr::snapshot_with(|scope| glory_semantic_web::input_form::ui(scope).0)?;
+    std::fs::write(
+        std::path::Path::new(&directory).join("unicode-selection.html"),
+        include_str!("../../unicode-selection.html")
+            .replace("<!--INPUT_SNAPSHOT-->", &input_snapshot.html),
+    )?;
     let input_page = format!(
         "<!doctype html><html><head><meta charset=\"utf-8\"><title>Input contract</title><style data-gly-base=\"v1\">{}</style></head><body><div id=\"input-ssr\">{}</div><script type=\"module\">import init,* as demo from './glory_semantic_web.js';await init();window.demo=demo;window.ready=true;</script></body></html>",
         glory::html::BASE_CSS,

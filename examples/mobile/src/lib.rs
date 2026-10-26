@@ -9,6 +9,10 @@ use std::{collections::BTreeMap, sync::Arc};
 
 #[cfg(feature = "ime-probe")]
 mod ime_probe;
+#[cfg(feature = "keyboard-probe")]
+mod keyboard_probe;
+#[cfg(all(feature = "ime-probe", feature = "keyboard-probe"))]
+compile_error!("select one mobile acceptance view");
 
 /// One package worker per document, including every recreated Android Activity.
 pub fn counter_window() -> std::result::Result<(WindowApp, Arc<Loader>), Box<dyn std::error::Error>>
@@ -32,10 +36,12 @@ pub fn counter_window() -> std::result::Result<(WindowApp, Arc<Loader>), Box<dyn
         ..Default::default()
     });
     window.renderer().set_css("@import url('theme.css');");
-    #[cfg(not(feature = "ime-probe"))]
+    #[cfg(not(any(feature = "ime-probe", feature = "keyboard-probe")))]
     let content = counter::Counter;
     #[cfg(feature = "ime-probe")]
     let content = ime_probe::fixture();
+    #[cfg(feature = "keyboard-probe")]
+    let content = keyboard_probe::fixture();
     window.mount(
         group().fill((
             content,

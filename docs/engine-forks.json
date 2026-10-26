@@ -19,7 +19,7 @@
     {
       "name": "blitz",
       "git": "https://github.com/glory-rs/blitz",
-      "rev": "54e070d591ec387be40b2a25500376aa796f15ef",
+      "rev": "6d52bb22da982422716db7d75b434778811ba5cf",
       "upstream": "https://github.com/DioxusLabs/blitz",
       "upstream_rev": "92b11f1bd8ab7975411328b0406a95a09445b4e7",
       "packages": [
@@ -104,6 +104,17 @@
           "--lib",
           "layout_move_tests"
         ]
+      ],
+      "android_checks": [
+        [
+          "-p",
+          "blitz-shell",
+          "--target",
+          "aarch64-linux-android",
+          "--no-default-features",
+          "--features",
+          "android-game-activity"
+        ]
       ]
     },
     {
@@ -130,12 +141,13 @@
         "winit-win32",
         "winit-x11"
       ],
-      "rev": "edfaacd7c88feed241d12f7b2bb6b61271e513c4",
+      "rev": "3b6f5a09697acb936567af64e53c915b0b1a2af9",
       "upstream": "https://github.com/rust-windowing/winit",
       "upstream_rev": "d597ced770f3263f66ab901cc27bf7984e314465",
       "rustc_tests": [
         "winit-android/src/event_loop_lifetime.rs",
-        "winit-uikit/src/text_input_model.rs"
+        "winit-uikit/src/text_input_model.rs",
+        "winit-android/src/text_input_model.rs"
       ],
       "tests": [
         "-p",
@@ -154,6 +166,24 @@
           "winit-uikit",
           "--target",
           "aarch64-apple-ios"
+        ]
+      ],
+      "android_checks": [
+        [
+          "-p",
+          "winit-android",
+          "--target",
+          "aarch64-linux-android",
+          "--features",
+          "native-activity"
+        ],
+        [
+          "-p",
+          "winit-android",
+          "--target",
+          "aarch64-linux-android",
+          "--features",
+          "game-activity"
         ]
       ]
     }

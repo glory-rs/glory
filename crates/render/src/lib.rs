@@ -331,13 +331,15 @@ pub enum Action {
     /// Reveal one current physical box using nearest alignment and instant
     /// scrolling, without focus or a logical collection controller.
     ScrollIntoView(NodeId),
-    /// Select an exact range in the current ASCII Input value. A stale revision
-    /// is rejected; Unicode/surrogate/grapheme addressing is explicitly deferred.
+    /// Select a range in the current rich document at its accepted revision.
     SelectRich {
         node: NodeId,
         revision: u64,
         selection: RichSelection,
     },
+    /// Select an exact UTF-16 range in the current Input value. Stale revisions
+    /// and offsets inside surrogate pairs are rejected. A host may refuse
+    /// positions inside a shaped cluster; it must never silently clamp them.
     SelectText {
         node: NodeId,
         revision: u64,
@@ -479,12 +481,7 @@ impl Action {
                     incoming: revision,
                 });
             }
-            if !input.value.is_ascii() {
-                return Err(Error::Unsupported(
-                    "exact selection currently requires ASCII input text",
-                ));
-            }
-            selection.validate(input.value.len())?;
+            selection.byte_range(&input.value)?;
         }
         if matches!(self, Self::Focus(_))
             && node.semantics.as_ref().is_some_and(|s| s.menubar_item)
