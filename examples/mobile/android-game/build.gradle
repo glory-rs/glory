@@ -7,6 +7,18 @@ if (!output || !nativeLibraries || !debugKey) {
     throw new GradleException('Use build-android-game.sh with explicit data-volume outputs')
 }
 layout.buildDirectory = file(output)
+def prepareGloryAssets = tasks.register('prepareGloryAssets', Sync) {
+    from file('../assets')
+    into layout.buildDirectory.dir('glory-assets/glory')
+    doLast {
+        if ((System.getenv('GLORY_ANDROID_FEATURES') ?: '').tokenize(', ').contains('android-assets-probe')) {
+            def nested = layout.buildDirectory.file('glory-assets/glory/中文/组合.txt').get().asFile
+            nested.parentFile.mkdirs()
+            nested.setText('中文😀 asset probe', 'UTF-8')
+        }
+    }
+    inputs.property('assetProbe', (System.getenv('GLORY_ANDROID_FEATURES') ?: '').tokenize(', ').contains('android-assets-probe'))
+}
 android {
     namespace 'rs.glory.counter'
     compileSdk 36
@@ -28,6 +40,7 @@ android {
         }
     }
     sourceSets.main.jniLibs.srcDirs = [nativeLibraries]
+    sourceSets.main.assets.srcDirs = [layout.buildDirectory.dir('glory-assets')]
     // android-activity compiles its matching 4.4.0 C++ glue; do not link the AAR's.
     buildFeatures { prefab false }
     packaging { jniLibs { useLegacyPackaging true } }
@@ -36,6 +49,7 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 }
+tasks.named('preBuild').configure { dependsOn prepareGloryAssets }
 dependencies {
     implementation 'androidx.games:games-activity:4.4.0'
     implementation 'androidx.appcompat:appcompat:1.7.1'

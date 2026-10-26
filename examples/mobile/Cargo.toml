@@ -18,6 +18,8 @@ path = "src/ios.rs"
 default = ["android-native-activity"]
 android-native-activity = ["glory/blitz-android-native-activity"]
 android-game-activity = ["glory/blitz-android-game-activity"]
+android-assets = ["glory/blitz-android-assets"]
+android-assets-probe = ["android-assets"]
 ime-probe = []
 keyboard-probe = []
 

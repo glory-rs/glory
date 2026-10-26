@@ -11,7 +11,7 @@ Mac，最新证据见文末 Apple/移动输入记录，不能继续把“没有 
 |---|---|---|
 | macOS | CPU 真窗口/缩放/清理、实际 AX 读取和编辑、可重定位签名 `.app` | VoiceOver 朗读、Developer ID/公证的凭据验收、外部机器安装 |
 | iOS | 模拟器/设备链接、UIScene、CPU 窗口、包资产、真实拼音 IME、Unicode 程序选区、底部键盘避让、同进程恢复/旋转、单窗口场景断开重连 | 真机签名安装、VoiceOver、任意选择手势/rects、多 Glory 场景及进程终止后的状态持久化 |
-| Android | NativeActivity 基线；新增明确选择的 GameActivity、ARM64 模拟器真实拼音预编辑/提交/取消、Unicode 选区、汉字/emoji 删除 | 真机/16 KiB 内核运行、TalkBack、AssetManager/网络与权限、生产分发 |
+| Android | NativeActivity 基线；明确选择的 GameActivity、ARM64 模拟器真实拼音预编辑/提交/取消、Unicode 选区、汉字/emoji 删除、APK AssetManager 读取 | 真机/16 KiB 内核运行、TalkBack、移动网络与权限、生产分发 |
 | 桌面开发 | native watch、错误保留旧进程、成功重启与退出回收 | 状态保持、真正 Rust 热补丁、检查器 |
 | Web 发布 | 可复现 gzip、哈希清单、预览协商/HEAD/身份回退 | 指纹命名、Brotli/图片转换、WASM 分包 |
 
@@ -398,3 +398,30 @@ Swift 回归覆盖重复/过期回调和 1,000 轮状态转换；普通模拟器
 一次运行遇到系统 backboardd respawn，没有把该运行计入成功。当前能力限于同进程
 单 Glory 窗口重连，不声称进程死亡持久化或多个独立 Glory scene。后续继续补
 Android AssetManager、移动联网/权限及原生控件，读屏和正式分发仍未关闭。
+
+## 2026-10-27：Android APK AssetManager
+
+新增独立可选 `glory-blitz/android-assets`（facade `blitz-android-assets`），由应用
+显式传入当前 AndroidApp 的 application AssetManager 和 APK 前缀。`asset://android/`
+映射前缀内路径；`asset://app/` 内存包保持独立。URL 分段单次 UTF-8 解码，拒绝
+分隔符、控制字符、空/dot 段；前缀单独拼接，不会被 URL 的父目录归一化越过。
+无全局 AndroidApp、环境文件权限或新 unsafe；网络和权限仍是独立缺口。
+
+挂载文件与 APK 共用有界 blocking admission/分块读取。异步取消不能提前归还仍
+运行的 OS 读取许可；长度和实际字节预算、deadline、逐块取消、prepare/解码准入
+及关闭撤权继续有效。`file_active`/`file_peak_active` 包含 APK 读取，不声称 OS 调用
+可中断，也不把 Loader stopped 等同于所有阻塞调用已退出。
+
+GameActivity 工程把原 CSS/PNG 打包到 `assets/glory/`；应用启用该功能时清空嵌入式
+包，强制 CSS 和图片走 AssetManager。ARM64 Android 16 模拟器实际读到 deflate CSS、
+中文路径文件和 PNG，missing/非法 URL/body limit/prepare/close 探针通过。独立只读
+脚本核对已安装 APK 的 SHA-256 与本次 build.json 相同，再校验进程日志、绿色 PNG
+和 CSS 尺寸/位置；不使用按键注入。证据为
+`/Volumes/Data/Caches/glory/android/asset-manager-acceptance/probe.json`、同名 PNG、
+probe-logcat.txt 和保留的 probe.apk。小数 DPI 的 logical edge rounding 与抗锯齿
+边缘单独处理；没有把看见任何绿色当作样式定位通过。
+
+当前全工作区含文档测试 970 项通过，Android 应用/适配器严格 Clippy 和
+实际 ARM64 APK 链接/签名通过。新增通用回归覆盖增长文件的实际字节限制、提前
+拒绝、分块取消和 APK 路径；原 200 个取消等待者不扩张 blocking worker 的回归
+继续通过。网络/权限、真机/16 KiB runtime、TalkBack 和生产签名分发仍未关闭。

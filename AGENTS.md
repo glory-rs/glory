@@ -140,7 +140,10 @@ retired feature aliases or count compilation as proof of platform acceptance.
   origins/roots and job/body/deadline budgets. Shared resource leases
   also bound requests/completed results and charged payloads. Optional accesskit
   (facade blitz-accesskit) adds a semantic tree/action bridge; Windows UIA has
-  actual client acceptance. Android AssetManager/network transport, Unix AT-SPI clients and
+  actual client acceptance. Optional android-assets (facade blitz-android-assets)
+  binds an explicit application AssetManager/prefix under asset://android/;
+  bounded APK streaming and ARM64 emulator CSS/PNG/Unicode evidence exist.
+  Mobile network transport, Unix AT-SPI clients and
   screen-reader/text-selection acceptance remain pending. Facade
   `blitz` is optional and must not enter default/HTML/SSR dependency graphs.
   Linux Fontique uses fontconfig-dlopen; cross-checks do not prove runtime font
@@ -470,6 +473,17 @@ retired feature aliases or count compilation as proof of platform acceptance.
   JoinSet entries and never poll an idle loader timer. Keep user handlers and
   destructors outside state locks; cancellation revokes future acceptance, not a
   handler that has already begun. No UI state crosses onto the transport runtime.
+- Optional android-assets includes package and binds an explicit application
+  AssetManager plus validated APK prefix under asset://android/. Never discover
+  a global AndroidApp, use raw JNI pointers or fall back to the embedded package.
+  Decode path components once; reject controls, separators and empty/dot parts.
+  Prefix joining is independent of URL normalization. Use safe streaming NDK
+  reads on the shared bounded blocking pool, not whole-asset mapping. Declared
+  and actual body limits, deadline/cancellation checks and prepare admission all
+  apply. file_active/file_peak_active include APK reads; closing async jobs does
+  not interrupt an OS call or refund its blocking permit early. The generated
+  Unicode asset and native acceptance code belong only to android-assets-probe;
+  ordinary APKs must exclude them. This feature grants no network/file mounts.
 - Engine ResourceHandler admission uses document-local, non-wrapping request
   leases. Requests, charged completion bytes and encoded input have independent
   limits. Providers await NetHandler::prepare before decode; synchronous providers

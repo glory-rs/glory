@@ -9,6 +9,8 @@ use std::{io, time::Instant};
 mod desktop;
 
 pub(super) struct Transport {
+    #[cfg(all(feature = "android-assets", target_os = "android"))]
+    android: Option<super::android::Android>,
     #[cfg(all(
         feature = "assets",
         any(target_os = "windows", target_os = "linux", target_os = "macos")
@@ -38,10 +40,20 @@ impl Transport {
                     "HTTP and file mounts require desktop assets; this target supports package assets only",
                 ));
             }
-            Ok(Self {})
+            Ok(Self {
+                #[cfg(all(feature = "android-assets", target_os = "android"))]
+                android: config
+                    .android
+                    .clone()
+                    .map(|assets| super::android::Android::new(assets, config.limits.workers)),
+            })
         }
     }
     pub fn file_counts(&self) -> (usize, usize) {
+        #[cfg(all(feature = "android-assets", target_os = "android"))]
+        if let Some(android) = &self.android {
+            return android.counts();
+        }
         #[cfg(all(
             feature = "assets",
             any(target_os = "windows", target_os = "linux", target_os = "macos")
@@ -58,6 +70,10 @@ impl Transport {
         }
     }
     pub fn close(&self) {
+        #[cfg(all(feature = "android-assets", target_os = "android"))]
+        if let Some(android) = &self.android {
+            android.close();
+        }
         #[cfg(all(
             feature = "assets",
             any(target_os = "windows", target_os = "linux", target_os = "macos")
@@ -78,6 +94,17 @@ impl Transport {
                 .cloned()
                 .map(|bytes| (url.to_string(), bytes))
                 .ok_or_else(|| "asset package miss".into());
+        }
+        #[cfg(all(feature = "android-assets", target_os = "android"))]
+        if url.scheme() == "asset" && url.host_str() == Some("android") {
+            let android = self
+                .android
+                .as_ref()
+                .ok_or("Android AssetManager not configured")?;
+            let bytes = android
+                .read(&url, config.limits.body_bytes, deadline)
+                .await?;
+            return Ok((url.to_string(), bytes));
         }
         #[cfg(all(
             feature = "assets",

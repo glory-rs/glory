@@ -1581,6 +1581,7 @@ dependencies = [
  "image",
  "keyboard-types",
  "kurbo",
+ "ndk",
  "peniko",
  "percent-encoding",
  "png",

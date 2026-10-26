@@ -2461,3 +2461,16 @@ Swift 应用宿主用当前 scene token 防止重复/过期生命周期通知。
 PID/window/value，软件键继续编辑、断开期间旋转、键盘和 safe-area 恢复及包资产
 像素通过。Swift 重复/过期回调与 1,000 轮测试通过。证据及失败边界见缺口报告和
 移动工程 README；不扩大为多 Glory 窗口或进程死亡持久化。
+
+## 2026-10-27：显式 Android APK 资产能力
+
+`android-assets`/facade `blitz-android-assets` 在原 package Loader 上增加显式
+AssetManager 和 APK 前缀，命名空间为 asset://android/；不依赖 shell、全局
+AndroidApp 或新 unsafe。安全 NDK streaming API 与 mounted files 共用 blocking
+许可/计数和有界分块读取；逐块取消/deadline、实际 body budget、prepare 和文档
+关闭撤权保持。Android 网络和权限没有随此 feature 开放。
+
+ARM64 模拟器中实际 APK probe 通过压缩 CSS、中文路径、PNG、缺失/拒绝、限额、
+prepare 和 close；Counter 内存包为空时仍显示正确样式/图片。capture 脚本核对
+已安装 APK 哈希、PID 日志与实际像素，证据和边界见缺口报告。全工作区 970 项
+通过，独立 blocking 取消许可回归仍有效；真机、TalkBack 和移动网络继续推进。

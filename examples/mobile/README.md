@@ -17,8 +17,9 @@ own bounded Loader, including a recreated Android Activity. Its imported CSS
 positions and sizes the PNG badge; neither is supplied by a synchronous decode
 shortcut. Queue/deadline/encoded-byte budgets and engine decode admission apply.
 Package-only builds reject HTTP origins and file mounts and exclude desktop
-HTTP/TLS/filesystem dependencies. Android AssetManager, networking and AccessKit
-are still separate gaps. iOS has Apple-host build and simulator evidence; see the iOS boundaries below.
+HTTP/TLS/filesystem dependencies. Optional Android AssetManager support is described
+below; networking, permissions and mobile accessibility remain separate gaps.
+iOS has Apple-host build and simulator evidence; see the iOS boundaries below.
 
 ## Android
 
@@ -114,6 +115,42 @@ the selected range. Android/JVM effects run after releasing the session lock.
 The same focused-editor context policy as UIKit keeps password text private and
 preserves live marked text across app acknowledgements. NativeActivity does not
 acquire GameActivity composition support by sharing this example.
+
+### APK assets through AssetManager
+
+`GLORY_ANDROID_FEATURES=android-assets sh examples/mobile/build-android-game.sh`
+selects the facade's `blitz-android-assets`. Gradle stages the same CSS/PNG files
+under `assets/glory/` in its data-volume output. The app binds the explicit
+`app.asset_manager()` with prefix `glory`, uses base URL `asset://android/` and
+leaves the embedded package empty. No fallback masks a failed APK read. This
+application-scoped manager remains valid across Activity recreation; it retains
+no Activity. NDK calls use safe Rust with no additional JNI bridge.
+
+The existing Loader budgets apply to APK reads and decode admission. Paths decode
+UTF-8 once; decoded separators, controls and empty/dot components are refused.
+The prefix is separate from URL normalization. Streaming reads enforce declared
+and actual byte limits and check cancellation/deadline between bounded chunks;
+blocking admission remains held until the actual OS operation ends. Close stops
+new work and revokes publication, without claiming to interrupt OS calls.
+
+For actual asset acceptance, use `GLORY_ANDROID_FEATURES=android-assets-probe`.
+Only this feature adds a generated Unicode-path test asset and native acceptance
+code. Install/launch the APK on an owned `Glory_` emulator, then run:
+
+```sh
+python3 examples/mobile/capture-android-assets.py \
+  --adb /Volumes/Data/Caches/glory/android/adb36/platform-tools/adb \
+  --serial emulator-5580 \
+  --package /Volumes/Data/Caches/glory/android/package-game-aarch64-debug \
+  --out /Volumes/Data/Caches/glory/android/asset-manager-acceptance
+```
+
+The fixture checks real compressed CSS/Unicode reads, PNG, missing and refused
+URLs, body limits, decode admission and close cancellation before mounting Counter.
+The read-only capture verifies the installed APK against its manifest and checks
+actual badge pixels, CSS dimensions/position and PID-specific success logs.
+It does not inject input or establish network/permission/device acceptance.
+ARM64 Android 16 emulator evidence is under the output directory above.
 
 ## iOS
 

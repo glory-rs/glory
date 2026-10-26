@@ -17,6 +17,8 @@ mod loader;
 /// Transport hooks stay in this adapter; core/UI do not depend on engine types.
 #[cfg(not(target_arch = "wasm32"))]
 pub mod assets {
+    #[cfg(all(feature = "android-assets", target_os = "android"))]
+    pub use crate::loader::AndroidAssets;
     #[cfg(all(feature = "package", not(target_arch = "wasm32")))]
     pub use crate::loader::{LoadConfig, LoadLimits, LoadStats, Loader};
     pub use blitz_dom::{ResourceLimits, ResourceStats};

@@ -11,6 +11,7 @@ default = []
 css = ["glory-html/css"]
 package = ["dep:tokio"]
 assets = ["package", "tokio/net", "dep:reqwest", "dep:rustls", "dep:rustls-platform-verifier", "dep:cap-std", "dep:cap-fs-ext", "dep:percent-encoding"]
+android-assets = ["package", "dep:ndk", "dep:percent-encoding"]
 paint = ["dep:blitz-paint", "dep:anyrender", "dep:kurbo", "dep:peniko", "blitz-dom/custom-widget", "blitz-paint/custom-widget"]
 raster = ["paint", "dep:anyrender_vello_cpu"]
 shell = ["paint", "dep:glory-core", "dep:glory-ui", "dep:blitz-shell", "dep:winit", "dep:keyboard-types", "dep:anyrender_vello_cpu", "dep:softbuffer_window_renderer"]
@@ -24,6 +25,7 @@ glory-render = { path = "../render", version = "0.3.1" }
 glory-core = { path = "../core", version = "0.3.1", optional = true }
 glory-ui = { path = "../ui", version = "0.3.1", optional = true }
 tokio = { version = "1.54.1", default-features = false, features = ["rt", "sync", "time", "macros"], optional = true }
+percent-encoding = { version = "2.3.2", optional = true }
 blitz-dom = { git = "https://github.com/glory-rs/blitz", rev = "6d52bb22da982422716db7d75b434778811ba5cf", version = "=0.3.0-beta.4", default-features = false, features = ["system-fonts", "complex-scripts"] }
 blitz-traits = { git = "https://github.com/glory-rs/blitz", rev = "6d52bb22da982422716db7d75b434778811ba5cf", version = "=0.3.0-beta.4", default-features = false }
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
@@ -44,7 +46,9 @@ rustls = { version = "0.23.46", default-features = false, features = ["ring", "s
 rustls-platform-verifier = { version = "0.7.1", optional = true }
 cap-std = { version = "=4.0.3", optional = true }
 cap-fs-ext = { version = "=4.0.3", optional = true }
-percent-encoding = { version = "2.3.2", optional = true }
+
+[target.'cfg(target_os = "android")'.dependencies]
+ndk = { version = "=0.9.0", default-features = false, optional = true }
 
 [target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos", target_os = "android", target_os = "ios"))'.dependencies]
 blitz-shell = { git = "https://github.com/glory-rs/blitz", rev = "6d52bb22da982422716db7d75b434778811ba5cf", version = "=0.3.0-beta.4", default-features = false, optional = true }

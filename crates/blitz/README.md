@@ -9,7 +9,8 @@ The shell also exposes `Shell::android(AndroidApp)` and `Shell::from_event_loop`
 its existing `Shell::new` supports the UIKit entry path. The
 [mobile example](../../examples/mobile/README.md) records Android emulator
 packaging/interaction checks and Apple-host iOS simulator/pinyin IME evidence. Optional `package`
-provides the same bounded offline Loader on desktop and mobile; HTTP/file
+provides the same bounded offline Loader on desktop and mobile. Optional
+`android-assets` adds explicit APK AssetManager reads; HTTP/file
 transport and AccessKit remain desktop integrations.
 
 ```rust
@@ -280,6 +281,36 @@ bundle discovery is installed. The mobile example embeds CSS and PNG bytes.
 Desktop `assets` (facade: `blitz-assets`) includes `package` and adds explicit
 HTTP(S) origins and mounted-file transport. Run the packaged CSS/window/list example with
 `cargo run --locked -p glory-blitz --example assets --features assets,shell`.
+
+Android `android-assets` (facade: `blitz-android-assets`) includes `package` and
+exposes `AndroidAssets` on Android. Bind this invocation's application-scoped
+`AndroidApp::asset_manager()` with an explicit APK prefix:
+
+```rust,ignore
+let assets = AndroidAssets::new(app.asset_manager(), "glory")?;
+let config = LoadConfig { android: Some(assets), ..Default::default() };
+// asset://android/theme.css reads assets/glory/theme.css from the APK.
+```
+
+An empty prefix explicitly grants all APK assets. Nonempty prefixes have bounded,
+validated components. URL components decode UTF-8 once and refuse separators,
+controls and empty/dot components; URL normalization cannot escape the separately
+joined prefix. Unicode names are supported. The in-memory `asset://app/` map is
+independent and provides no fallback. No ambient filesystem, permission lookup,
+global AndroidApp or new unsafe bridge is introduced. HTTP and file mounts remain
+unsupported on Android. The safe NDK streaming API opens/closes each Asset on one
+bounded blocking worker, checks declared length before allocation and enforces
+actual encoded bytes, cancellation and deadline between chunks. Cancelling an
+async waiter does not return admission until its actual blocking operation exits;
+`file_active`/`file_peak_active` include APK reads. OS calls are not interruptible.
+Responses still await `NetHandler::prepare` before the normal decode pipeline.
+
+The mobile `android-assets-probe` fixture checks compressed CSS/Unicode paths,
+PNG, missing/refused URLs, body limits, decode admission and close cancellation
+through the real ARM64 emulator AssetManager, then mounts Counter with no embedded
+entries. Its read-only capture script verifies the installed APK hash, success
+log and actual CSS/PNG pixels. These are emulator asset checks, not networking,
+permission, interaction or real-device acceptance; see the mobile README.
 
 HTTP(S) requires explicit exact origins in `LoadConfig::origins`. An origin
 includes scheme/host/effective port and has path `/`. Every redirect is checked;

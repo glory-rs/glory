@@ -13,11 +13,23 @@ use blitz_traits::net::{Body, Bytes, Method, NetHandler, NetProvider, Request, U
 use tokio::sync::Notify;
 use tokio::task::JoinSet;
 
+#[cfg(all(feature = "android-assets", any(target_os = "android", test)))]
+mod android;
+#[cfg(any(
+    all(
+        feature = "assets",
+        any(target_os = "windows", target_os = "linux", target_os = "macos")
+    ),
+    all(feature = "android-assets", any(target_os = "android", test))
+))]
+mod blocking;
 #[cfg(all(
     feature = "assets",
     any(target_os = "windows", target_os = "linux", target_os = "macos")
 ))]
 mod files;
+#[cfg(all(feature = "android-assets", target_os = "android"))]
+pub use android::AndroidAssets;
 mod transport;
 use transport::Transport;
 
@@ -62,6 +74,10 @@ pub struct LoadConfig {
     /// Handles are opened at construction, not re-resolved for each request.
     /// Nonempty mounts require the desktop `assets` feature and target.
     pub mounts: BTreeMap<String, PathBuf>,
+    /// Explicit application AssetManager and APK subdirectory, served under
+    /// `asset://android/`. No ambient files, Activity lookup or JNI is used.
+    #[cfg(all(feature = "android-assets", target_os = "android"))]
+    pub android: Option<AndroidAssets>,
     pub limits: LoadLimits,
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -74,7 +90,7 @@ pub struct LoadStats {
     pub failed: u64,
     pub rejected: u64,
     pub cancelled: u64,
-    /// Actual blocking file operations, including cancelled reads that have
+    /// Actual blocking file/APK operations, including cancelled reads that have
     /// not returned from the OS yet. Independent of transport active jobs.
     pub file_active: usize,
     pub file_peak_active: usize,
@@ -373,9 +389,7 @@ impl LoadConfig {
         }
         if url.scheme() == "asset"
             && url.port().is_none()
-            && url
-                .host_str()
-                .is_some_and(|host| host == "app" || self.mounts.contains_key(host))
+            && url.host_str().is_some_and(|host| self.asset_host(host))
         {
             return Ok(());
         }
@@ -388,6 +402,13 @@ impl LoadConfig {
             return Ok(());
         }
         Err("asset URL outside allowed origins/package".into())
+    }
+    fn asset_host(&self, host: &str) -> bool {
+        #[cfg(all(feature = "android-assets", target_os = "android"))]
+        if host == "android" && self.android.is_some() {
+            return true;
+        }
+        host == "app" || self.mounts.contains_key(host)
     }
 }
 
