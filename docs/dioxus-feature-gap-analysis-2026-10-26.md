@@ -14,6 +14,7 @@ Mac，最新证据见文末 Apple/移动输入记录，不能继续把“没有 
 | Android | NativeActivity 基线；明确选择的 GameActivity、ARM64 模拟器真实拼音预编辑/提交/取消、Unicode 选区、汉字/emoji 删除、APK AssetManager 读取、HTTP(S)/系统证书校验与真实连接取消 | 真机/16 KiB 内核运行、TalkBack、运行时权限及真机网络、生产分发 |
 | 桌面开发 | native watch、错误保留旧进程、成功重启与退出回收 | 状态保持、真正 Rust 热补丁、检查器 |
 | Web 发布 | 可复现 gzip、哈希清单、预览协商/HEAD/身份回退 | 指纹命名、Brotli/图片转换、WASM 分包 |
+| 运行时权限 | 有界 Owner future/driver API；Android 安全 JNI；iOS Swift 宿主；SDK 控制的授权状态查询 | iOS Rust 应用连接待最小 FFI 声明授权；真实系统弹窗选择、真机及其他权限类别 |
 
 整体差距仍未关闭。签名身份/设备等外部条件和仍需实现的软件功能分别保留，
 没有用模拟器或编译结果替代完整平台交付。
@@ -462,3 +463,42 @@ HTTP 测试单独运行，package-only 和 desktop assets 回归通过。iOS 模
 device 可执行文件实际链接，Android 网络 APK 链接/签名及锁定依赖构建通过。
 这关闭的是移动资产 Loader 的 HTTP(S)/平台 TLS/取消实现缺口；运行时权限、
 真机网络/离线及无线环境、TalkBack/VoiceOver、原生控件和正式分发继续保留。
+
+## 2026-10-27：有界权限服务与原生宿主（部分完成）
+
+新增可选 permissions/facade blitz-permissions，提供六类权限的显式 driver、query/
+request future、状态和错误。默认最多八个 pending future、120 秒 deadline；只对
+存活等待者登记 timer。构造 future 不请求 OS，首次 poll 才准入。准入在 foreign
+driver 调用前保留，防止重入绕过预算；native poll 内关闭会撤销未交付结果。
+Owner 退休直接丢弃 future，取消回执，不保留 Owner 或恢复已关闭服务。
+
+Android 的应用自有 Java host 弱持有 Activity，合并主线程消息并限制每轮工作，
+native prompt 同时最多一个。取消 reply record 后，实际 OS prompt 仍保留许可到
+回调；Activity 销毁关闭 host，过期/外来 request code 和 record 身份不能发布结果。
+非权限构建不声明敏感权限或初始化 coordinator；Android 29+ PhotosAdd 表示 scoped
+MediaStore 添加自己的媒体，不是任意文件写权限。rationale 返回原始 OS 值，不凭
+false 推断永久拒绝。见 [Android 官方请求流程](https://developer.android.com/training/permissions/requesting)。
+
+iOS 原生实现位于应用 Swift 宿主：AVFoundation、Photos、CoreLocation、通知；
+校验用途描述，区分 Limited/Restricted/Provisional/Ephemeral，弱 client 防迟到回执，
+单 prompt 与 32 个不可中断查询独立计数。Swift ledger 实测取消不提前归还许可、
+旧回调不覆盖复用 ID、32 query slot 和 1,000 次 client 退休。Apple SDK 模拟器和
+arm64 device 都实际链接。Rust 应用连接仍等待一处仅含整数的最小 FFI 声明授权；
+尚未新增该声明或其他 unsafe。不能把 Swift 宿主等同 Rust iOS 权限全链路完成。
+
+ARM64 Android SDK 状态测试验证初始 Denied、照片部分选择/近似定位 Limited、全部
+Granted 及恢复；Swift iOS query probe 验证 SDK grant/revoke/reset 的真实 native
+状态。证据为 `/Volumes/Data/Caches/glory/permissions/{android,ios}-query-result.json`
+与各阶段日志/截图，测试后已恢复权限。它们不证明真实弹窗选择；相机/通知等
+未由 iOS SDK 调整的类别也没有伪称完成。UI 自动化上次因 Mac 锁屏中断，尚未确认恢复。
+
+八项新 Rust 回归覆盖 Owner 取消、重入准入、poll 内关闭、deadline、200 个预算拒绝
+及恢复、scalar 校验和 ID 耗尽。当前全工作区 978 项、native/WASM 严格 Clippy 通过。
+权限缺口继续开放，直到 Rust iOS 连接及真实授权弹窗/设备流程有对应证据。
+
+复核补上 Android 照片状态的边界：完整图片/视频权限均 Granted 时，不要求同时
+授予 selected-only 权限；只授予一种媒体或仅所选媒体仍为 Limited。八种组合的
+独立 JVM 回归已接入 GameActivity 构建，ARM64 模拟器实际验证 full-without-selected、
+image-only、selected-only、none，结束后恢复原授权状态。证据为
+`permissions/android-photo-fix-result.json`。普通 Android/iOS 包重新构建，分别确认
+无敏感权限且 coordinator 关闭、无权限用途描述及桥接导出；功能不会隐式进入普通包。

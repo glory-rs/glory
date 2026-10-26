@@ -386,9 +386,10 @@ budgets, document ownership, bounded decode admission, cancel/close
 and real imported CSS/PNG layout and CPU pixels. The Android example checks that
 same embedded CSS/PNG path through its actual shell and Activity recreation.
 The canonical script also checks the package-only production dependency graph.
-These budgets do not claim total process memory. Android AssetManager/network
-transport, deployment/CDN behavior, broader OS input/accessibility and performance
-timing remain pending. Desktop transports are target-gated away from Android/WASM;
+These budgets do not claim total process memory. Android AssetManager and mobile
+HTTP(S) transport have the separate simulator evidence above. Deployment/CDN behavior,
+broader OS input/accessibility and real-device acceptance remain pending. Mounted
+files remain desktop-only and native transports are excluded from WASM;
 macOS has actual window/AX evidence and iOS has simulator CSS/PNG, keyboard/pinyin,
 Home/resume and rotation evidence; signed devices and production Apple
 distribution remain separate.
@@ -521,3 +522,49 @@ default seeks can keep the physical scroll position at the segment center.
 Use identical benchmark source and independent targets for before/after builds,
 then `scripts/compare-semantic-profile.py` verifies final image sequences and
 mounted budgets outside timing. Necessary measurement/anchor feedback remains.
+
+### Owned permission services
+
+Optional `permissions` (facade `blitz-permissions`) exposes a local `Permissions`
+service with explicit `PermissionDriver` injection. It supports Camera, Microphone,
+PhotosRead, PhotosAdd, LocationWhenInUse and Notifications, with typed status,
+rationale and errors. A query never asks for authorization. Constructing a future
+has no native effect; its first poll admits it. Request from an application user
+action after explaining its purpose, following the [Android permission workflow](https://developer.android.com/training/permissions/requesting).
+
+The defaults are eight pending futures, a 120-second deadline and a 20ms pending
+poll interval. Only live pending futures register timers. Admission is reserved
+before a foreign driver call, so synchronous reentry cannot exceed the budget.
+Closing during a native poll revokes a reply before delivery. IDs never wrap.
+Use an existing `Owner::spawn`; Owner retirement drops the future and calls native
+cancel without retaining the Owner. Close the service on its host's cleanup;
+clones share that closed state and cannot reopen it.
+
+Cancellation withdraws delivery, not an OS dialog. Native hosts retain their
+actual prompt/query permits until the operation ends. `PermissionStats::waiting`
+is the local future count; `NativeStats` separately reports live reply records,
+active prompts and uncancellable queries. No history of completed IDs is retained.
+
+`AndroidPermissions::new(env, host)` accepts an explicit app-owned Java v1 host.
+The example host holds its Activity weakly, runs bounded batches on Java main,
+allows one native prompt, and closes on Activity destruction. Its bounded records
+and request codes reject stale/unrelated results; callbacks never invoke Rust
+business code. SDK-controlled ARM64 emulator queries cover Denied, Granted,
+selected-photo Limited and approximate-location Limited, with zero remaining jobs.
+Android's Denied also covers an initial unrequested permission. The rationale flag
+is the OS value; false does not establish a permanent denial.
+
+PhotosAdd on Android 29+ means adding app-owned media through scoped MediaStore,
+which needs no general storage grant. It grants no mounted-file or arbitrary
+filesystem access. PhotosRead and Location Limited keep their partial semantics.
+Permission state does not start capture, recording, photo reads or location updates.
+
+The iOS app-owned Swift host implements the same scalar service, usage-description
+checks and native authorization APIs. A weak-client ledger bounds uncancellable
+queries and retains prompt admission after cancellation; it has stale-result and
+1,000-client-retirement tests. SDK-controlled simulator queries cover authorization,
+refusal and reset. The Rust application connection is still pending approval for
+one application-only integer FFI declaration; runtime crates contain no new unsafe.
+The Swift host alone does not establish end-to-end Rust iOS permissions. Actual
+dialog choices, restricted/provisional/ephemeral cases and real devices remain
+separate acceptance, as do other platform-specific permission categories.

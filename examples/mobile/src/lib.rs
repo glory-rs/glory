@@ -11,13 +11,26 @@ use std::{collections::BTreeMap, sync::Arc};
 mod android_assets_probe;
 #[cfg(feature = "network-probe")]
 mod network_probe;
+#[cfg(feature = "permissions-probe")]
+mod permissions_probe;
+#[cfg(all(feature = "permissions-probe", not(target_os = "android")))]
+compile_error!(
+    "permissions-probe currently targets Android; permissions-host-probe checks the Swift iOS host"
+);
+#[cfg(all(feature = "permissions-host-probe", not(target_os = "ios")))]
+compile_error!("permissions-host-probe runs the Swift iOS host; Android uses permissions-probe");
+#[cfg(all(
+    feature = "permissions-probe",
+    any(feature = "ime-probe", feature = "keyboard-probe")
+))]
+compile_error!("select one mobile acceptance view");
 #[cfg(all(
     target_os = "android",
-    feature = "network",
+    any(feature = "network", feature = "permissions"),
     not(feature = "android-game-activity")
 ))]
 compile_error!(
-    "the network example requires the GameActivity application context bridge; select --no-default-features --features android-game-activity,network"
+    "mobile JNI services require the example's GameActivity host; select --no-default-features --features android-game-activity"
 );
 #[cfg(feature = "ime-probe")]
 mod ime_probe;
@@ -58,12 +71,18 @@ fn asset_window(
         ..Default::default()
     });
     window.renderer().set_css("@import url('theme.css');");
-    #[cfg(not(any(feature = "ime-probe", feature = "keyboard-probe")))]
+    #[cfg(not(any(
+        feature = "ime-probe",
+        feature = "keyboard-probe",
+        feature = "permissions-probe"
+    )))]
     let content = counter::Counter;
     #[cfg(feature = "ime-probe")]
     let content = ime_probe::fixture();
     #[cfg(feature = "keyboard-probe")]
     let content = keyboard_probe::fixture();
+    #[cfg(all(feature = "permissions-probe", target_os = "android"))]
+    let content = permissions_probe::fixture(android_permissions()?);
     window.mount(
         group().fill((
             content,
@@ -166,6 +185,28 @@ fn android_tls() -> Result<glory::blitz::assets::AndroidTls, Box<dyn std::error:
             )?
             .l()?;
         Ok(glory::blitz::assets::AndroidTls::new(env, context)?)
+    })
+}
+
+#[cfg(all(feature = "permissions-probe", target_os = "android"))]
+fn android_permissions()
+-> Result<glory::blitz::permissions::Permissions, Box<dyn std::error::Error>> {
+    use glory::blitz::permissions::{AndroidPermissions, PermissionLimits, Permissions};
+    use jni::{JavaVM, jni_sig, jni_str};
+    JavaVM::singleton()?.attach_current_thread(|env| -> Result<_, Box<dyn std::error::Error>> {
+        let class = env.load_class(jni_str!("rs.glory.counter.GloryGameActivity"))?;
+        let host = env
+            .call_static_method(
+                class,
+                jni_str!("gloryPermissionHost"),
+                jni_sig!(() -> JObject),
+                &[],
+            )?
+            .l()?;
+        Ok(Permissions::new(
+            AndroidPermissions::new(env, host)?,
+            PermissionLimits::default(),
+        )?)
     })
 }
 

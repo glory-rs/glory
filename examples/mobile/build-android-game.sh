@@ -15,6 +15,7 @@ compiler="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin"
 [ -x "$gradle" ] && [ -x "$compiler/aarch64-linux-android28-clang" ] && [ -x "$JAVA_HOME/bin/java" ] || {
     echo 'Set GLORY_GRADLE, ANDROID_NDK_HOME and JAVA_HOME to installed tools' >&2; exit 1;
 }
+sh "$repo/examples/mobile/check-android-permissions.sh"
 export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$compiler/aarch64-linux-android28-clang"
 export CC_aarch64_linux_android="$compiler/aarch64-linux-android28-clang"
 export CXX_aarch64_linux_android="$compiler/aarch64-linux-android28-clang++"
@@ -32,6 +33,13 @@ print(versions[0] if versions else '')
 PY
 )
 export GLORY_ANDROID_TLS_VERSION="$tls_version"
+permission_host=$(python3 - "$GLORY_BUILD_ROOT/game-metadata.json" <<'PY'
+import json,sys
+m=json.load(open(sys.argv[1])); ids={p['id'] for p in m['packages'] if p['name']=='glory-blitz'}
+print('1' if any(n['id'] in ids and 'permissions' in n['features'] for n in m['resolve']['nodes']) else '0')
+PY
+)
+export GLORY_ANDROID_PERMISSION_HOST="$permission_host"
 cargo rustc --locked --manifest-path examples/mobile/Cargo.toml --lib --target aarch64-linux-android --no-default-features --features "$features" -- -C link-arg=-Wl,-z,max-page-size=16384
 library="$CARGO_TARGET_DIR/aarch64-linux-android/debug/libglory_mobile_counter.so"
 "$compiler/llvm-readelf" -h "$library" | grep -q 'AArch64'
@@ -63,6 +71,14 @@ ET.register_namespace('android','http://schemas.android.com/apk/res/android')
 tree=ET.parse(sys.argv[1]); root=tree.getroot()
 if os.environ.get('GLORY_ANDROID_TLS_VERSION'):
     root.insert(0,ET.Element('uses-permission',{'{http://schemas.android.com/apk/res/android}name':'android.permission.INTERNET'}))
+if os.environ.get('GLORY_ANDROID_PERMISSION_HOST')=='1':
+    android='{http://schemas.android.com/apk/res/android}'
+    for name,maximum in [('CAMERA',None),('RECORD_AUDIO',None),('READ_EXTERNAL_STORAGE','32'),('WRITE_EXTERNAL_STORAGE','28'),('READ_MEDIA_IMAGES',None),('READ_MEDIA_VIDEO',None),('READ_MEDIA_VISUAL_USER_SELECTED',None),('ACCESS_COARSE_LOCATION',None),('ACCESS_FINE_LOCATION',None),('POST_NOTIFICATIONS',None)]:
+        attrs={android+'name':'android.permission.'+name}
+        if maximum: attrs[android+'maxSdkVersion']=maximum
+        root.insert(0,ET.Element('uses-permission',attrs))
+    for name in ['camera','microphone']:
+        root.insert(0,ET.Element('uses-feature',{android+'name':'android.hardware.'+name,android+'required':'false'}))
 tree.write(sys.argv[2],encoding='utf-8',xml_declaration=True)
 PY
 set -- assembleDebug

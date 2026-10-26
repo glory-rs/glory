@@ -211,6 +211,58 @@ server socket events; pass actual safe-area offsets for a rotated/notched device
 Evidence is under `/Volumes/Data/Caches/glory/mobile-network/`. This does not
 establish runtime permission prompts, device radios/offline behavior or stores.
 
+### Runtime permissions
+
+`GLORY_ANDROID_FEATURES=permissions-probe sh examples/mobile/build-android-game.sh`
+builds the explicit six-permission acceptance view. It uses facade
+`blitz-permissions`, the safe JNI `AndroidPermissions` driver and an app-owned Java
+host. Startup queries authorization only. Buttons request the corresponding OS
+permission; no camera/microphone/photo/location content is accessed. The cancel
+button revokes result delivery and does not promise to dismiss a system dialog.
+
+Requests belong to ordinary Owner tasks. Cleanup closes the service; dropping a
+pending future cancels its reply record without refunding an active OS prompt.
+Java retains the Activity weakly, bounds clients/records, uses one coalesced main
+message and processes at most sixteen operations per turn. It checks manifest
+declarations, requires a resumed Activity for a new prompt, scopes callbacks to
+their exact request and clears the service on Activity destruction. Native stats
+remain distinct from the Rust pending-future count.
+
+Only permission-enabled builds add the CAMERA/RECORD_AUDIO/media/location/
+notification manifest declarations and initialize the Java coordinator. Legacy
+storage permissions are capped at their relevant SDK levels. The optional camera
+and microphone hardware declarations do not require that hardware for installation.
+NativeActivity is not this example's Java host; select GameActivity explicitly.
+
+The build runs `check-android-permissions.sh` to check all eight image/video/
+selected-grant combinations on the JVM. PhotosRead is Granted when both full
+media grants exist, independently of the optional selected-only permission;
+one media kind or selected access is Limited. ARM64 SDK-state queries separately
+verify these states in `permissions/android-photo-fix-result.json`. Ordinary
+Android/iOS builds were rebuilt and checked for absent sensitive permission
+declarations/usage strings and disabled/excluded native permission hosts.
+
+`GLORY_IOS_FEATURES=permissions-host-probe sh examples/mobile/build-ios.sh` builds
+the app-owned Swift implementation and its query-only scene probe. It uses
+AVFoundation, Photos, CoreLocation and UserNotifications. Permission-enabled bundles
+include explicit example usage descriptions; ordinary bundles exclude them and
+the host code. The Swift ledger tests cover cancelled/retired clients, stale replies,
+32 uncancellable query slots and 1,000 client retirements. Device code links as well.
+
+The Swift host is prepared, but the Rust iOS permission connection is not installed:
+it awaits the separate approval for an application-only integer FFI declaration.
+`permissions-probe` therefore targets Android; `permissions-host-probe` targets iOS.
+Neither the Swift query probe nor a compiled request API counts as actual dialog
+acceptance. The native request APIs follow [Apple's media authorization model](https://developer.apple.com/documentation/avfoundation/requesting-authorization-to-capture-and-save-media).
+
+Evidence under `/Volumes/Data/Caches/glory/permissions/` distinguishes SDK-controlled
+queries from dialog choices. Android phases verify selected-photo/coarse-location
+Limited, full Granted and restored Denied; iOS Swift phases verify SDK-granted,
+denied and reset authorization. Every phase finishes without native reply records,
+prompts or queries. SDK state was restored afterward. Actual dialog choices and
+device acceptance remain open; UI automation last stopped at a locked Mac and
+has not resumed with confirmed access.
+
 ## iOS
 
 `src/ios.rs`, `ios/Info.plist` and `ios/SceneDelegate.swift` define the UIKit

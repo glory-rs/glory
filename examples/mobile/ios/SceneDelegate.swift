@@ -211,6 +211,9 @@ final class GlorySceneDelegate: NSObject, UIWindowSceneDelegate {
             #endif
         }
         FileHandle.standardError.write(Data("Glory UIKit scene active\n".utf8))
+        #if GLORY_PERMISSION_HOST_PROBE
+        gloryPermissionsHostProbe()
+        #endif
     }
     func sceneWillResignActive(_ scene: UIScene) {
         guard GlorySceneHost.lifecycle.owns(ObjectIdentifier(scene)) else { return }

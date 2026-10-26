@@ -149,6 +149,11 @@ retired feature aliases or count compilation as proof of platform acceptance.
   Runtime permissions, real-device networks, Unix AT-SPI clients and
   screen-reader/text-selection acceptance remain pending. Facade
   `blitz` is optional and must not enter default/HTML/SSR dependency graphs.
+  Optional permissions (facade blitz-permissions) has explicit drivers and
+  Owner-cancellable local futures. Android safe JNI and the app's Swift host
+  have SDK-controlled authorization-query evidence, separately from actual
+  permission-dialog acceptance. The Rust iOS application connection awaits a
+  separate minimal FFI declaration exception; none is authorized by this note.
   Linux Fontique uses fontconfig-dlopen; cross-checks do not prove runtime font
   availability or display-server acceptance.
   Optional shell also has explicit AndroidApp and UIKit entry paths; see
@@ -485,6 +490,19 @@ retired feature aliases or count compilation as proof of platform acceptance.
   No global AndroidApp or crypto provider installation. iOS uses Security.framework.
   Explicit HTTP origins grant cleartext; HTTPS still verifies chains/hostnames.
   Keep protocol/HTTP tests runnable under network alone, without cap-std/assets.
+- Permissions are explicit host capabilities, not render nodes or ambient grants.
+  Creating a future must not query/request the OS before its first poll. Reserve
+  local admission before foreign driver calls; revalidate close/deadline after
+  polling. Owner retirement drops the future and revokes delivery. Never claim
+  that dropping a future dismisses an OS dialog or refunds an uncancellable query.
+  NativeStats distinguishes records/prompts/queries from local waiting futures.
+  Driver callbacks only update bounded native records, never Rust UI state.
+  Android hosts hold Activities weakly, coalesce their main messages, bound each
+  turn and close on Activity destruction; old callbacks cannot target a successor.
+  Swift records hold clients weakly and retain actual prompt/query admission until
+  native completion. No completed-ID history or persisted authorization cache.
+  Usage strings and sensitive manifest permissions belong only to opted-in app
+  builds. SDK grant/revoke/reset checks are not actual dialog/device acceptance.
 - Optional android-assets includes package and binds an explicit application
   AssetManager plus validated APK prefix under asset://android/. Never discover
   a global AndroidApp, use raw JNI pointers or fall back to the embedded package.

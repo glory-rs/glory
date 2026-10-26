@@ -19,6 +19,10 @@ xcrun swiftc -module-cache-path "$GLORY_BUILD_ROOT/SwiftHostModules" \
     examples/mobile/ios/SceneDelegate.swift examples/mobile/ios/tests/main.swift \
     -o "$GLORY_BUILD_ROOT/keyboard-geometry-tests"
 "$GLORY_BUILD_ROOT/keyboard-geometry-tests"
+xcrun swiftc -module-cache-path "$GLORY_BUILD_ROOT/SwiftHostModules" \
+    examples/mobile/ios/Permissions.swift examples/mobile/ios/permissions-tests/main.swift \
+    -o "$GLORY_BUILD_ROOT/permission-ledger-tests"
+"$GLORY_BUILD_ROOT/permission-ledger-tests"
 for mode in "$@"; do
     case "$mode" in
         --window) GLORY_MACOS_WINDOW=1 cargo test --locked -p glory-blitz --features shell,accesskit --test macos_window ;;

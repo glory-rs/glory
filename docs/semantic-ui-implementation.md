@@ -2490,3 +2490,17 @@ Android 初次 250ms 建连前超时的观察失败保留，三秒后复验实�
 Cargo/Gradle 版本、哈希和可选 INTERNET manifest 由构建脚本关联；普通包独立。
 全工作区 970 项、native/WASM 严格 Clippy 及独立 network/package/assets gates
 通过。证据及未关闭的权限/真机/读屏/分发边界见 gap report 和移动 README。
+
+## 2026-10-27：有界权限 future 与宿主（未全部关闭）
+
+permissions/facade blitz-permissions 提供显式 PermissionDriver、query/request 和
+Owner 可取消的本地 future；无 UI 状态跨线程，无自动权限请求。准入在外部调用前
+保留，driver 重入或 poll 时关闭不能绕过预算或发布已撤权结果。八个新回归通过，
+全工作区 978 项及 native/WASM 严格 Clippy 通过。
+
+Android safe JNI host 弱持有 Activity、限定主线程批次/回执/单 prompt，销毁关闭；
+iOS 应用 Swift ledger 弱 client、独立 native query/prompt 许可，不因取消提前归还。
+实际 SDK 状态查询验证 Android Limited/Granted/Denied、iOS grant/revoke/reset，
+原始证据保存在数据盘 permissions/。用途描述与 manifest 权限只由 opt-in 构建加入。
+Swift 宿主已经编译及链接，但 Rust iOS 连接仍待应用级最小整数 FFI 声明授权；
+真实系统弹窗选择因 UI 锁屏仍待验收。没有新增 unsafe 或关闭整体权限缺口。

@@ -26,13 +26,13 @@ export SDKROOT=$(xcrun --sdk "$sdk" --show-sdk-path)
 export IPHONEOS_DEPLOYMENT_TARGET=15.0
 build="$GLORY_BUILD_ROOT"
 cd "$project"
-cargo metadata --locked --no-deps --format-version 1 > "$build/metadata.json"
+if [ -n "${GLORY_IOS_FEATURES:-}" ]; then set -- --features "$GLORY_IOS_FEATURES"; else set --; fi
+cargo metadata --locked --filter-platform "$target" --format-version 1 "$@" > "$build/metadata.json"
 python3 - "$build/metadata.json" "$CARGO_TARGET_DIR" <<'PY'
 import json,pathlib,sys
 actual=pathlib.Path(json.load(open(sys.argv[1]))["target_directory"]).resolve()
 assert actual == pathlib.Path(sys.argv[2]).resolve(), f"Unexpected Cargo target: {actual}"
 PY
-if [ -n "${GLORY_IOS_FEATURES:-}" ]; then set -- --features "$GLORY_IOS_FEATURES"; else set --; fi
 cargo build --locked --bin counter-ios --target "$target" $release "$@"
 # Construct a fresh bundle; obsolete signature/resources cannot survive a rebuild.
 package="$build/ios-$target-$profile$scene_suffix"
@@ -42,6 +42,18 @@ app="$stage/Payload/GloryCounter.app"
 mkdir -p "$app"
 cp "$CARGO_TARGET_DIR/$target/$profile/counter-ios" "$app/counter-ios"
 cp "$project/ios/Info.plist" "$app/Info.plist"
+python3 - "$build/metadata.json" "$app/Info.plist" <<'PY'
+import json,plistlib,sys
+m=json.load(open(sys.argv[1])); ids={p['id'] for p in m['packages'] if p['name']=='glory-blitz'}
+if any(n['id'] in ids and 'permissions' in n['features'] for n in m['resolve']['nodes']):
+    with open(sys.argv[2],'rb') as file: info=plistlib.load(file)
+    info.update(NSCameraUsageDescription='Glory permission acceptance checks camera authorization without capturing images.',
+        NSMicrophoneUsageDescription='Glory permission acceptance checks microphone authorization without recording audio.',
+        NSPhotoLibraryUsageDescription='Glory permission acceptance checks photo-library authorization without reading your photos.',
+        NSPhotoLibraryAddUsageDescription='Glory permission acceptance checks photo-add authorization without saving media.',
+        NSLocationWhenInUseUsageDescription='Glory permission acceptance checks foreground location authorization without requesting coordinates.')
+    with open(sys.argv[2],'wb') as file: plistlib.dump(info,file)
+PY
 if [ -n "$scene_suffix" ]; then
     /usr/libexec/PlistBuddy -c 'Set :UIApplicationSceneManifest:UIApplicationSupportsMultipleScenes true' "$app/Info.plist"
     /usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier rs.glory.counter.sceneprobe' "$app/Info.plist"

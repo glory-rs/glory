@@ -19,6 +19,7 @@ fn xcrun(args: &[&str]) -> String {
 
 fn main() {
     println!("cargo:rerun-if-changed=ios/SceneDelegate.swift");
+    println!("cargo:rerun-if-changed=ios/Permissions.swift");
     println!("cargo:rerun-if-env-changed=DEVELOPER_DIR");
     println!("cargo:rerun-if-env-changed=GLORY_IOS_SCENE_MULTI");
     println!("cargo:rerun-if-env-changed=GLORY_MOBILE_NETWORK_ORIGIN");
@@ -63,6 +64,25 @@ fn main() {
         .arg("ios/SceneDelegate.swift")
         .arg("-o")
         .arg(&object);
+    if env::var_os("CARGO_FEATURE_PERMISSIONS").is_some() {
+        compiler_command.args([
+            "-whole-module-optimization",
+            "-D",
+            "GLORY_PERMISSION_HOST",
+            "ios/Permissions.swift",
+        ]);
+        for framework in [
+            "AVFoundation",
+            "Photos",
+            "CoreLocation",
+            "UserNotifications",
+        ] {
+            println!("cargo:rustc-link-lib=framework={framework}");
+        }
+    }
+    if env::var_os("CARGO_FEATURE_PERMISSIONS_HOST_PROBE").is_some() {
+        compiler_command.args(["-D", "GLORY_PERMISSION_HOST_PROBE"]);
+    }
     if env::var("GLORY_IOS_SCENE_MULTI").as_deref() == Ok("1") {
         assert!(simulator, "scene probe is simulator-only");
         compiler_command.args(["-D", "GLORY_SCENE_PROBE"]);

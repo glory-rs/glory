@@ -14,6 +14,10 @@ pub use document::*;
 #[cfg(all(feature = "package", not(target_arch = "wasm32")))]
 mod loader;
 
+/// Explicit application-owned mobile permissions; no implicit permission prompts.
+#[cfg(all(feature = "permissions", not(target_arch = "wasm32")))]
+pub mod permissions;
+
 /// Transport hooks stay in this adapter; core/UI do not depend on engine types.
 #[cfg(not(target_arch = "wasm32"))]
 pub mod assets {
