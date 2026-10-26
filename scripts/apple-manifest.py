@@ -14,4 +14,5 @@ for path in sorted(root.rglob('*')):
         files.append(dict(path=path.relative_to(root).as_posix(), bytes=len(data),
                           sha256=hashlib.sha256(data).hexdigest()))
 (root / 'build.json').write_text(json.dumps(dict(format=1, target=sys.argv[2],
-    profile=sys.argv[3], features=os.environ.get("GLORY_IOS_FEATURES", "").split(), files=files), indent=2) + '\n')
+    profile=sys.argv[3], features=os.environ.get("GLORY_IOS_FEATURES", "").split(),
+    scene_probe_multi=os.environ.get("GLORY_IOS_SCENE_MULTI") == "1", files=files), indent=2) + '\n')

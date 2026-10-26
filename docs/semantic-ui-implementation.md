@@ -2450,3 +2450,14 @@ Android 保留默认 NativeActivity，显式新增 GameActivity 4.4.0 选择与 
 选区、候选提交、汉字/emoji 删除、物理字符不重复以及同进程 Home/旋转。记录在
 `/Volumes/Data/Caches/glory/android/unicode-ime/`。模拟器页大小 4 KiB；16 KiB ELF 对齐
 检查、真机/16 KiB runtime 和 TalkBack 分开保留。所有运行时新代码仍为安全 Rust。
+
+## 2026-10-27：同进程 UIKit scene 重连
+
+Swift 应用宿主用当前 scene token 防止重复/过期生命周期通知。断开时解除原窗口
+关联并暂停 surface；后继 scene 重新挂接 Winit 持有的相同窗口，更新尺寸并恢复
+仍存活的弱 native responder。无第二个 Rust loop/document，无新增 unsafe。
+独立 simulator-only scene-probe 通过 UIKit 真正销毁/激活 session，纯 UIKit anchor
+仅负责保持测试进程存活；普通构建没有按钮或多场景配置。iPad 实测两轮重连保持
+PID/window/value，软件键继续编辑、断开期间旋转、键盘和 safe-area 恢复及包资产
+像素通过。Swift 重复/过期回调与 1,000 轮测试通过。证据及失败边界见缺口报告和
+移动工程 README；不扩大为多 Glory 窗口或进程死亡持久化。

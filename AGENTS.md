@@ -154,6 +154,10 @@ retired feature aliases or count compilation as proof of platform acceptance.
   simulator/device linking and actual iOS 27 simulator pixel, touch, software-key,
   Home/restore and rotation evidence. The app-owned Swift scene bridge forwards
   actual UIKit lifecycle events; the Winit fork attaches windows to UIWindowScene.
+  The app-owned Swift host also reattaches that same single window after scene
+  disconnect/reconnect; an isolated iPad simulator fixture has real UIKit session
+  destruction/reactivation evidence. Multiple independent Glory scenes and
+  process-death persistence are separate capabilities.
   UIKit now has a narrowly authorized UITextInput bridge, bounded surrounding
   context and real pinyin preedit/candidate/commit/cancel/restore evidence.
   Android GameActivity is an explicit opt-in alternative to NativeActivity;

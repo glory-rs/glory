@@ -10,7 +10,7 @@ Mac，最新证据见文末 Apple/移动输入记录，不能继续把“没有 
 | 项目 | 当前结果 | 未关闭边界 |
 |---|---|---|
 | macOS | CPU 真窗口/缩放/清理、实际 AX 读取和编辑、可重定位签名 `.app` | VoiceOver 朗读、Developer ID/公证的凭据验收、外部机器安装 |
-| iOS | 模拟器/设备链接、UIScene、CPU 窗口、包资产、真实拼音 IME、Unicode 程序选区、底部键盘避让、同进程恢复/旋转 | 真机签名安装、VoiceOver、任意选择手势/rects、完整场景重连 |
+| iOS | 模拟器/设备链接、UIScene、CPU 窗口、包资产、真实拼音 IME、Unicode 程序选区、底部键盘避让、同进程恢复/旋转、单窗口场景断开重连 | 真机签名安装、VoiceOver、任意选择手势/rects、多 Glory 场景及进程终止后的状态持久化 |
 | Android | NativeActivity 基线；新增明确选择的 GameActivity、ARM64 模拟器真实拼音预编辑/提交/取消、Unicode 选区、汉字/emoji 删除 | 真机/16 KiB 内核运行、TalkBack、AssetManager/网络与权限、生产分发 |
 | 桌面开发 | native watch、错误保留旧进程、成功重启与退出回收 | 状态保持、真正 Rust 热补丁、检查器 |
 | Web 发布 | 可复现 gzip、哈希清单、预览协商/HEAD/身份回退 | 指纹命名、Brotli/图片转换、WASM 分包 |
@@ -375,3 +375,26 @@ UTF-8 Preedit/Commit/Cancel/DeleteSurrounding，提供受限的 focused-editor c
 随后处理应用级 history/嵌套路由/返回恢复、动态文档头、Salvo 类型化调用与开发
 检查器。VoiceOver/TalkBack、签名真机安装、16 KiB 设备、商店分发、GPU、真正热补丁
 和完整原生选择手势仍开放。整体差距没有关闭。
+
+## 2026-10-27：iOS 单窗口场景重连
+
+应用自有 Swift 宿主现在在 scene disconnect 时分离 Winit 持有的原窗口，暂停
+CPU surface，清除键盘 inset；新 scene 连接时重新挂接同一窗口并恢复尺寸。
+仅当前 scene 可以驱动生命周期，重复及迟到回调不会暂停后继 scene。原生焦点以
+弱引用保存，激活后恢复仍存活的 responder；不保留旧 scene，不创建第二个 Rust
+event loop、文档或运行时，也没有增加 unsafe。
+
+独立编译的 simulator scene-probe 使用不同 bundle ID，通过真正的 UIKit
+requestSceneSessionDestruction/Activation 验收；普通包不包含测试按钮或多场景配置。
+一个纯 UIKit anchor 保持进程存活，不持有 Rust 文档。iPad Air M4/iOS 27 实测两次
+断开重连均保持 PID 12711 和原窗口标识，文本 17 恢复后软件键继续编辑为 177；
+再次断开期间旋转，新场景恢复 177、原生键盘和 safe-area inset。原始截图/JSON
+位于 `/Volumes/Data/Caches/glory/scene-final-acceptance/`，日志为
+`scene-clean-final-console.log`。两组 label 像素相等，CSS/PNG 位置与方向一致。
+Swift 回归覆盖重复/过期回调和 1,000 轮状态转换；普通模拟器包及 arm64 device
+可执行文件均已实际链接。设备链接仍不等于签名真机运行。
+
+失败证据继续保留：iPhone 模拟器拒绝多场景销毁；销毁最后 scene 可能终止进程；
+一次运行遇到系统 backboardd respawn，没有把该运行计入成功。当前能力限于同进程
+单 Glory 窗口重连，不声称进程死亡持久化或多个独立 Glory scene。后续继续补
+Android AssetManager、移动联网/权限及原生控件，读屏和正式分发仍未关闭。

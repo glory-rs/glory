@@ -123,6 +123,13 @@ delegate forwards actual scene lifecycle callbacks to Winit, and Shell creates
 its surface after scene activation. The pinned Winit fork associates its existing
 window with the connected UIWindowScene before making it visible. Inactivation
 releases the CPU surface; activation resumes the same semantic document and Loader.
+Disconnect detaches the Winit-owned window from its old scene. A later scene
+reattaches that same window, resets the viewport and restores a still-live weak
+native first responder after activation. Only the current scene may publish
+lifecycle events; duplicate and stale callbacks cannot suspend a successor.
+This is a single-Glory-window, same-process contract. Process termination does
+not persist application state, and independent simultaneous Glory scenes are
+not supported by this example.
 No additional reactive runtime or unsafe code is introduced in Glory. The Winit
 UIKit protocol bridge has the narrowly authorized exception recorded in AGENTS.md.
 
@@ -212,9 +219,33 @@ cover clipping, safe areas, undocked frames and the minimum retained viewport.
 
 **Open gaps:** arbitrary native selection gestures, selection rectangles and
 unrequested autocorrection outside the application's current selection are not
-advertised by this IME bridge. VoiceOver, reconnecting a disconnected scene, signed
+advertised by this IME bridge. VoiceOver, signed
 device installation, App Store icons/distribution and real-device networking/
 permissions remain separate work. A simulator pass does not close those items.
+
+### Scene disconnect/reconnect acceptance
+
+`GLORY_IOS_SCENE_MULTI=1 sh examples/mobile/build-ios.sh` builds a separate
+simulator-only `-scene-probe` package with bundle ID `rs.glory.counter.sceneprobe`.
+Launch it with `SIMCTL_CHILD_GLORY_IOS_SCENE_PROBE=1`. This compile-time fixture
+enables multiple UIKit scenes and shows native acceptance controls. Ordinary
+packages contain neither these controls nor the additional scene configuration.
+
+On an owned iPad simulator, tap **Keep process alive**, then **Open Glory scene**.
+Edit the counter using its real software keyboard, tap **Discard scene**, then
+reopen the fixture's anchor and **Open Glory scene**. Discard calls UIKit's actual
+scene-session destruction API. The native anchor keeps the process alive while
+the Glory scene is absent; it creates no Rust event loop or document. Destroying
+the last scene may terminate the process, and the tested iPhone simulator refused
+scene-session destruction. Neither outcome is counted as reconnect acceptance.
+
+The iPad Air M4/iOS 27 run reconnected twice with the same PID and native window,
+preserved `17`, accepted a software key to produce `177`, and restored `177`
+after another disconnect and rotation to landscape. Keyboard restoration and
+safe-area insets were observed, and `capture-ios.py --same-label` checked retained
+text and CSS/PNG pixels. Evidence: `/Volumes/Data/Caches/glory/scene-final-acceptance/`
+and `scene-clean-final-console.log`. Pure host tests cover duplicate/stale callbacks
+and 1,000 reconnects; these do not replace the actual UIKit run.
 
 The Windows canonical gate accepts `-Android` to check the adapter and build both
 APKs. Add `-AndroidSerial emulator-5582` to install the newly built x86_64 APK on

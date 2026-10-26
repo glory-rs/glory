@@ -15,6 +15,13 @@ case "$target" in
 esac
 profile=${GLORY_IOS_PROFILE:-debug}
 case "$profile" in debug) release= ;; release) release=--release ;; *) echo 'Invalid profile' >&2; exit 1;; esac
+scene_suffix=
+case "${GLORY_IOS_SCENE_MULTI:-0}" in
+    0) ;;
+    1) [ "$sdk" = iphonesimulator ] || { echo 'Scene destruction fixture is simulator-only' >&2; exit 1; }
+       scene_suffix=-scene-probe ;;
+    *) echo 'Invalid GLORY_IOS_SCENE_MULTI' >&2; exit 1 ;;
+esac
 export SDKROOT=$(xcrun --sdk "$sdk" --show-sdk-path)
 export IPHONEOS_DEPLOYMENT_TARGET=15.0
 build="$GLORY_BUILD_ROOT"
@@ -28,13 +35,18 @@ PY
 if [ -n "${GLORY_IOS_FEATURES:-}" ]; then set -- --features "$GLORY_IOS_FEATURES"; else set --; fi
 cargo build --locked --bin counter-ios --target "$target" $release "$@"
 # Construct a fresh bundle; obsolete signature/resources cannot survive a rebuild.
-package="$build/ios-$target-$profile"
+package="$build/ios-$target-$profile$scene_suffix"
 stage=$(mktemp -d "$build/ios-stage.XXXXXX")
 trap '[ -e "$stage/previous" ] || rm -rf "$stage"' EXIT HUP INT TERM
 app="$stage/Payload/GloryCounter.app"
 mkdir -p "$app"
 cp "$CARGO_TARGET_DIR/$target/$profile/counter-ios" "$app/counter-ios"
 cp "$project/ios/Info.plist" "$app/Info.plist"
+if [ -n "$scene_suffix" ]; then
+    /usr/libexec/PlistBuddy -c 'Set :UIApplicationSceneManifest:UIApplicationSupportsMultipleScenes true' "$app/Info.plist"
+    /usr/libexec/PlistBuddy -c 'Set :CFBundleIdentifier rs.glory.counter.sceneprobe' "$app/Info.plist"
+    /usr/libexec/PlistBuddy -c 'Set :CFBundleDisplayName Glory Scene Probe' "$app/Info.plist"
+fi
 /usr/libexec/PlistBuddy -c "Add :CFBundleSupportedPlatforms array" "$app/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :CFBundleSupportedPlatforms:0 string $platform" "$app/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :DTPlatformName string $sdk" "$app/Info.plist"
