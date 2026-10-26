@@ -19,7 +19,7 @@
     {
       "name": "blitz",
       "git": "https://github.com/glory-rs/blitz",
-      "rev": "6d52bb22da982422716db7d75b434778811ba5cf",
+      "rev": "251e4e288b287c77c59538425b09f25824c35821",
       "upstream": "https://github.com/DioxusLabs/blitz",
       "upstream_rev": "92b11f1bd8ab7975411328b0406a95a09445b4e7",
       "packages": [
@@ -94,6 +94,13 @@
           "--no-default-features",
           "--test",
           "top_layers"
+        ],
+        [
+          "-p",
+          "blitz-paint",
+          "--no-default-features",
+          "--test",
+          "indeterminate"
         ],
         [
           "-p",

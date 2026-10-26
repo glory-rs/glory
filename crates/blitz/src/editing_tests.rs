@@ -871,3 +871,146 @@ fn checkbox_label_and_control_report_one_typed_change_and_program_updates_work()
     assert_eq!(changed.borrow().len(), 2);
     assert!(!native(&app));
 }
+
+#[test]
+fn mixed_check_pointer_label_and_space_clear_only_the_live_mixed_state_once() {
+    use glory_render::CheckMode;
+    for initially_checked in [false, true] {
+        let mut app = WindowApp::new();
+        let checked = app.app.scope().cage(initially_checked);
+        let seen = Rc::new(RefCell::new(Vec::new()));
+        let events = seen.clone();
+        app.mount(
+            check()
+                .mode(CheckMode::Mixed)
+                .checked(checked)
+                .label("Mixed")
+                .on(glory_ui::events::checked_changed, move |event| {
+                    events.borrow_mut().push(event.clone());
+                    if let Event::CheckedChanged(next) = event {
+                        checked.revise(|v| *v = next);
+                    }
+                }),
+        )
+        .unwrap();
+        let node = app.app.tree().roots()[0];
+        settle(&mut app);
+        let control = app.renderer.engine_id(node, Part::Control).unwrap();
+        let mixed = |app: &WindowApp| {
+            app.renderer.inspect(|doc| {
+                doc.get_node(control)
+                    .unwrap()
+                    .element_data()
+                    .unwrap()
+                    .checkbox_input_indeterminate()
+                    .unwrap()
+            })
+        };
+        for (index, part) in [Some(Part::Main), Some(Part::Control), None]
+            .into_iter()
+            .enumerate()
+        {
+            // Re-arm with a real property change, like assigning indeterminate
+            // again in a browser. Updating checked alone must preserve it.
+            for mode in [CheckMode::Checkbox, CheckMode::Mixed] {
+                app.app
+                    .scope()
+                    .patch(node, Patch::CheckMode(Change::Set(mode)))
+                    .unwrap();
+            }
+            checked.revise(|v| *v = initially_checked);
+            settle(&mut app);
+            assert!(mixed(&app));
+            if let Some(part) = part {
+                let target = app.renderer.engine_id(node, part).unwrap();
+                let event = app.renderer.inspect(|doc| {
+                    doc.get_node(target)
+                        .unwrap()
+                        .synthetic_click_event_data(Modifiers::empty())
+                });
+                let renderer = app.renderer.clone();
+                EventDriver::new(&mut app, Events(renderer))
+                    .handle_dom_event(DomEvent::new(target, DomEventData::Click(event)));
+            } else {
+                focus(&mut app, node);
+                key(&mut app, Key::Character(" ".into()), Modifiers::empty());
+                assert!(mixed(&app), "Space acts on release");
+                app.handle_ui_event(UiEvent::KeyUp(BlitzKeyEvent {
+                    key: Key::Character(" ".into()),
+                    code: keyboard_types::Code::Space,
+                    modifiers: Modifiers::empty(),
+                    location: keyboard_types::Location::Standard,
+                    is_auto_repeating: false,
+                    is_composing: false,
+                    state: blitz_traits::events::KeyState::Released,
+                    text: None,
+                }));
+            }
+            settle(&mut app);
+            assert!(!mixed(&app));
+            assert_eq!(checked.get(), !initially_checked);
+            assert_eq!(seen.borrow().len(), index + 1);
+            assert_eq!(
+                seen.borrow()[index],
+                Event::CheckedChanged(!initially_checked)
+            );
+            assert_eq!(
+                app.renderer.engine_id(node, Part::Control).unwrap(),
+                control
+            );
+        }
+        app.app
+            .scope()
+            .patch(node, Patch::CheckMode(Change::Set(CheckMode::Checkbox)))
+            .unwrap();
+        app.app
+            .scope()
+            .patch(node, Patch::CheckMode(Change::Set(CheckMode::Mixed)))
+            .unwrap();
+        app.app
+            .scope()
+            .patch(node, Patch::Enabled(Change::Set(false)))
+            .unwrap();
+        settle(&mut app);
+        let event = app.renderer.inspect(|doc| {
+            doc.get_node(control)
+                .unwrap()
+                .synthetic_click_event_data(Modifiers::empty())
+        });
+        let renderer = app.renderer.clone();
+        EventDriver::new(&mut app, Events(renderer))
+            .handle_dom_event(DomEvent::new(control, DomEventData::Click(event)));
+        settle(&mut app);
+        assert!(mixed(&app));
+        assert_eq!(seen.borrow().len(), 3);
+        app.app
+            .scope()
+            .patch(node, Patch::Enabled(Change::Set(true)))
+            .unwrap();
+        app.app
+            .scope()
+            .patch(
+                node,
+                Patch::Semantics(Change::Set(Some(Box::new(glory_render::Semantics {
+                    readonly: true,
+                    ..Default::default()
+                })))),
+            )
+            .unwrap();
+        settle(&mut app);
+        let event = app.renderer.inspect(|doc| {
+            doc.get_node(control)
+                .unwrap()
+                .synthetic_click_event_data(Modifiers::empty())
+        });
+        let renderer = app.renderer.clone();
+        EventDriver::new(&mut app, Events(renderer))
+            .handle_dom_event(DomEvent::new(control, DomEventData::Click(event)));
+        settle(&mut app);
+        assert!(
+            mixed(&app),
+            "readonly activation preserves the live mixed state"
+        );
+        assert_eq!(seen.borrow().len(), 3);
+    }
+}

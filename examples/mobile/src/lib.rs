@@ -9,10 +9,21 @@ use std::{collections::BTreeMap, sync::Arc};
 
 #[cfg(all(feature = "android-assets-probe", target_os = "android"))]
 mod android_assets_probe;
+#[cfg(feature = "controls-probe")]
+mod controls_probe;
 #[cfg(feature = "network-probe")]
 mod network_probe;
 #[cfg(feature = "permissions-probe")]
 mod permissions_probe;
+#[cfg(all(
+    feature = "controls-probe",
+    any(
+        feature = "ime-probe",
+        feature = "keyboard-probe",
+        feature = "permissions-probe"
+    )
+))]
+compile_error!("select one mobile acceptance view");
 #[cfg(all(feature = "permissions-probe", not(target_os = "android")))]
 compile_error!(
     "permissions-probe currently targets Android; permissions-host-probe checks the Swift iOS host"
@@ -74,7 +85,8 @@ fn asset_window(
     #[cfg(not(any(
         feature = "ime-probe",
         feature = "keyboard-probe",
-        feature = "permissions-probe"
+        feature = "permissions-probe",
+        feature = "controls-probe"
     )))]
     let content = counter::Counter;
     #[cfg(feature = "ime-probe")]
@@ -83,6 +95,8 @@ fn asset_window(
     let content = keyboard_probe::fixture();
     #[cfg(all(feature = "permissions-probe", target_os = "android"))]
     let content = permissions_probe::fixture(android_permissions()?);
+    #[cfg(feature = "controls-probe")]
+    let content = controls_probe::fixture();
     window.mount(
         group().fill((
             content,

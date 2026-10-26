@@ -94,6 +94,14 @@ GLORY_ANDROID_FEATURES=ime-probe sh examples/mobile/build-android-game.sh
 # Ordinary shared Counter: omit GLORY_ANDROID_FEATURES.
 ```
 
+`GLORY_ANDROID_FEATURES=controls-probe` or `GLORY_IOS_FEATURES=controls-probe`
+selects the shared native checkbox fixture for the corresponding build script.
+It shows unchecked/checked references and an interactive mixed checkbox. Click
+the mixed control or press/release Space: it becomes a boolean check and updates
+the status once. **Restore mixed** restores its dash without replacing the node.
+Select this view separately from the IME, keyboard and permission views. Ordinary
+Counter builds exclude it; no permission service or sensitive declaration is enabled.
+
 This explicitly disables default features and selects `android-game-activity`.
 Never enable it together with `android-native-activity`. The matching Java AAR
 and Rust android-activity glue both use GameActivity 4.4.0. The small Java subclass

@@ -127,6 +127,11 @@ retired feature aliases or count compilation as proof of platform acceptance.
   and queued activation/focus/navigation/editing. WindowApp supports controlled
   text/check events, UTF-16 selection and native IME protocol; the standalone
   Renderer has no input driver.
+  Mixed checkboxes use an independent live indeterminate property and native dash
+  painting. Program checkedness preserves it; pointer/Space/AT activation clears
+  it while toggling checked once. Mode Clear resets it without replacing the
+  control. AccessKit reads the actual native mixed/boolean state. Radio groups
+  remain unsupported; do not infer them from checkbox support.
   Password uses the pinned local engine's grapheme-to-bullet display projection.
   Raw editor bytes remain for values/IME/UTF-16 selection; use display_editor for
   layout, pointer navigation, selection paint, caret and scrolling. Never paint

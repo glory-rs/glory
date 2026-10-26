@@ -462,6 +462,13 @@ multiline Enter remains native. Button/checkbox Space activates on release and
 cancels when focus changes. WindowApp's enabled capability describes this
 protocol implementation, not successful OS IME or assistive-technology acceptance.
 
+`CheckMode::Mixed` has a live indeterminate property independent of checkedness.
+The CPU renderer draws a dash; program checked updates preserve mixed, while
+click/Space/AccessKit activation clears it and emits one boolean change. Mode
+changes and Clear preserve control identity. The AX tree reads the current native
+mixed state, including after activation. Radio groups remain unsupported. These
+engine/adapter checks do not establish screen-reader speech or device acceptance.
+
 Surface suspension preserves App/document; zero dimensions release CPU/surface
 buffers and later resize restores them. Closing a window drops App and cancels
 its tasks before the executor. CPU dimensions are checked before allocation

@@ -76,13 +76,22 @@ pub(crate) fn fixture(service: Permissions) -> impl Widget {
         col()
             .style(Style {
                 font_size: Some(14.),
+                display: Some(Display::Flex),
+                flex_direction: Some(FlexDirection::Column),
+                align: Some(Align::Start),
+                font_family: Some(vec![Family::Sans]),
                 ..Style::new().padding(Edges::all(24.)).gap(8.)
             })
             .fill((
                 text().content("Permission Probe"),
                 text().content("Checks authorization only; no images, audio, photos or coordinates are accessed."),
                 text().content(status),
-                col().style(Style::new().gap(8.)).fill(rows),
+                col().style(Style {
+                    display: Some(Display::Flex),
+                    flex_direction: Some(FlexDirection::Column),
+                    align: Some(Align::Start),
+                    ..Style::new().gap(8.)
+                }).fill(rows),
                 button()
                     .label("Cancel result delivery")
                     .on(activate, move |_| {

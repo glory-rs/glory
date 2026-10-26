@@ -1333,6 +1333,7 @@ fn activate_control(state: &mut State, id: NodeId) {
             .and_then(|element| element.checkbox_input_checked())
     {
         let mut mutation = state.dom.doc.mutate();
+        mutation.set_input_indeterminate(control, false);
         if checked {
             mutation.clear_attribute(control, attr("checked"));
         } else {

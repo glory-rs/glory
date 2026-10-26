@@ -2,7 +2,7 @@
 
 Glory 的主要缺口集中在移动平台交付、桌面分发、应用级导航与文档服务、开发调试工具。响应式内核、浏览器渲染、SSR、水合、流式资源传递和常用交互组件已经有实现；不能把旧架构删除的能力、README 未列出的能力和真实缺口混为一谈。本轮按现有语义架构补齐，SSR 的 HTTP 框架集成只支持 Salvo。
 
-## 当前进度（2026-10-27，移动输入补齐后）
+## 当前进度（2026-10-27，移动服务与原生控件补齐中）
 
 下方“起始状态”和 Windows 会话记录保留为比较基线；当前主机已是 Apple Silicon
 Mac，最新证据见文末 Apple/移动输入记录，不能继续把“没有 Mac”当作当前状态。
@@ -15,6 +15,7 @@ Mac，最新证据见文末 Apple/移动输入记录，不能继续把“没有 
 | 桌面开发 | native watch、错误保留旧进程、成功重启与退出回收 | 状态保持、真正 Rust 热补丁、检查器 |
 | Web 发布 | 可复现 gzip、哈希清单、预览协商/HEAD/身份回退 | 指纹命名、Brotli/图片转换、WASM 分包 |
 | 运行时权限 | 有界 Owner future/driver API；Android 安全 JNI；iOS Swift 宿主；SDK 控制的授权状态查询 | iOS Rust 应用连接待最小 FFI 声明授权；真实系统弹窗选择、真机及其他权限类别 |
+| 原生控件 | Checkbox/Switch 及 Mixed 三态绘制、受控更新、点击/Space/AX 激活；Android/iOS 模拟器三态初始显示 | radio、select、combobox、placeholder、菜单、富文本、文件/语义剪贴板等仍开放；实际读屏单独验收 |
 
 整体差距仍未关闭。签名身份/设备等外部条件和仍需实现的软件功能分别保留，
 没有用模拟器或编译结果替代完整平台交付。
@@ -502,3 +503,28 @@ Granted 及恢复；Swift iOS query probe 验证 SDK grant/revoke/reset 的真�
 image-only、selected-only、none，结束后恢复原授权状态。证据为
 `permissions/android-photo-fix-result.json`。普通 Android/iOS 包重新构建，分别确认
 无敏感权限且 coordinator 关闭、无权限用途描述及桥接导出；功能不会隐式进入普通包。
+
+## 2026-10-27：原生三态 checkbox
+
+真正的 [Blitz fork 251e4e28](https://github.com/glory-rs/blitz/commit/251e4e288b287c77c59538425b09f25824c35821)
+为 checkbox 增加独立的 indeterminate property、CPU 横杠绘制及 `:indeterminate`
+样式失效。checked 的程序更新不会清除 mixed；用户激活会清除 mixed 并翻转一次
+checked。类型离开 checkbox 时清除该状态，不增加历史记录、全局表或 unsafe。
+Glory 不再拒绝 CheckMode::Mixed，保留控制节点身份、模式 Clear 和已接受查询水位；
+键盘 Space、标签与 AccessKit 激活复用正确的状态变化，禁用/只读控件不改变值。
+AX 树读取实际 native mixed/boolean 状态，不仅根据声明输出 Mixed。
+
+旧实现下两项新适配器回归明确因 Unsupported 失败，日志为
+`permissions/mixed-adapter-before.log`；修复后通过。新回归还覆盖 checked/mixed 独立性、
+模式切换/清除、1×/2× CPU 像素、原生 Click/标签/Space、只读/禁用和 AX 动作。
+全工作区 981 项、native/WASM 严格 Clippy 通过；三个固定 fork 的干净独立检出测试和
+来源检查通过，Blitz 默认/并行各 118 项及两项真实 CPU 绘制测试通过。Fork 单独严格
+Clippy 仍有原有 needless_return/result_large_err 诊断；仅命令行排除这两项后通过，
+没有给运行时代码新增 lint 例外，也没有把它写成 fork 全图严格 Clippy 通过。
+
+共享 `controls-probe` 构建在 Android ARM64 和 iOS 模拟器实际启动，原始截图可见
+空框、勾选和横杠三种状态，证据为 `/Volumes/Data/Caches/glory/native-checks/result.json`
+及同目录 PNG。普通两端包另已构建，arm64 iOS device 可执行文件按部署目标 15.0
+实际链接；这些分别是模拟器初始显示和设备链接证据，不替代真实触摸/读屏/签名设备。
+UI 自动化尚未从上次锁屏中断恢复；未用 SDK 注入点击代替。radio、select、placeholder、
+菜单、文件/剪贴板、富文本及应用服务等其他缺口继续保留。

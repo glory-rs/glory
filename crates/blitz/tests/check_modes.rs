@@ -4,6 +4,58 @@ use glory_html::Part;
 use glory_render::*;
 use glory_ui::{App, check};
 
+#[cfg(feature = "raster")]
+#[test]
+fn semantic_mixed_properties_reach_cpu_pixels_at_both_dpi_scales() {
+    use glory_blitz::Raster;
+    for scale in [1., 2.] {
+        let mut renderer = None;
+        let app = App::new(|runtime| {
+            let host = Renderer::new(runtime);
+            host.set_viewport((120. * scale) as u32, (64. * scale) as u32, scale)
+                .unwrap();
+            renderer = Some(host.clone());
+            host
+        });
+        let renderer = renderer.unwrap();
+        let mode = app.scope().cage(CheckMode::Checkbox);
+        let checked = app.scope().cage(false);
+        app.mount(check().label("State").mode(mode).checked(checked))
+            .unwrap();
+        let mut raster = Raster::new();
+        let mut frames = Vec::new();
+        for (m, c) in [
+            (CheckMode::Checkbox, false),
+            (CheckMode::Checkbox, true),
+            (CheckMode::Mixed, true),
+            (CheckMode::Mixed, false),
+            (CheckMode::Checkbox, false),
+            (CheckMode::Checkbox, true),
+        ] {
+            mode.revise(|v| *v = m);
+            checked.revise(|v| *v = c);
+            app.flush().unwrap();
+            raster.draw(&renderer).unwrap();
+            frames.push(raster.pixels().to_vec());
+        }
+        assert!(frames[0] != frames[1], "boolean states differ");
+        assert!(frames[1] != frames[2], "mixed differs from checked");
+        assert!(frames[0] != frames[2], "mixed differs from unchecked");
+        assert!(
+            frames[2] == frames[3],
+            "mixed painting is independent of checkedness"
+        );
+        assert!(
+            frames[0] == frames[4],
+            "clearing mixed restores unchecked pixels"
+        );
+        assert!(
+            frames[1] == frames[5],
+            "clearing mixed restores checked pixels"
+        );
+    }
+}
+
 #[test]
 fn native_typeahead_rejection_matches_preflight_direct_apply_listen_and_query_prefix() {
     let runtime = RuntimeId::new();
@@ -68,7 +120,7 @@ fn native_typeahead_rejection_matches_preflight_direct_apply_listen_and_query_pr
 }
 
 #[test]
-fn mixed_is_rejected_before_app_allocation_or_patch_and_switch_keeps_real_checked_identity() {
+fn mixed_and_boolean_modes_share_a_control_and_preserve_the_independent_checked_value() {
     let mut renderer = None;
     let app = App::new(|runtime| {
         let host = Renderer::new(runtime);
@@ -76,109 +128,104 @@ fn mixed_is_rejected_before_app_allocation_or_patch_and_switch_keeps_real_checke
         host
     });
     let renderer = renderer.unwrap();
-    let before = app.stats();
-    for mode in [CheckMode::Mixed, CheckMode::Radio] {
-        assert!(app.mount(check().mode(mode)).is_err());
-    }
-    assert_eq!(app.stats().nodes, before.nodes);
-    assert_eq!(renderer.stats().nodes, 0);
+    let mode = app.scope().cage(CheckMode::Mixed);
     let checked = app.scope().cage(false);
-    app.mount(
-        check()
-            .mode(CheckMode::Switch)
-            .checked(checked)
-            .label("Notifications"),
-    )
-    .unwrap();
+    app.mount(check().mode(mode).checked(checked).label("Notifications"))
+        .unwrap();
     let id = app.tree().roots()[0];
     let physical = renderer.engine_id(id, Part::Control).unwrap();
-    let before = app.stats();
-    assert!(
-        app.scope()
-            .patch(id, Patch::CheckMode(Change::Set(CheckMode::Mixed)))
-            .is_err()
-    );
-    assert_eq!(app.stats(), before);
+    let states = [
+        (CheckMode::Mixed, false, true),
+        (CheckMode::Mixed, true, true),
+        (CheckMode::Checkbox, true, false),
+        (CheckMode::Switch, false, false),
+        (CheckMode::Mixed, false, true),
+    ];
+    for (next_mode, next_checked, mixed) in states {
+        mode.revise(|value| *value = next_mode);
+        checked.revise(|value| *value = next_checked);
+        app.flush().unwrap();
+        app.request(Query::Bounds(id), |_| {}).unwrap();
+        app.pump().unwrap();
+        assert_eq!(renderer.engine_id(id, Part::Control).unwrap(), physical);
+        renderer.inspect(|doc| {
+            let element = doc.get_node(physical).unwrap().element_data().unwrap();
+            assert_eq!(element.checkbox_input_checked(), Some(next_checked));
+            assert_eq!(element.checkbox_input_indeterminate().unwrap(), mixed);
+        });
+    }
+    app.scope()
+        .patch(id, Patch::CheckMode(Change::Clear))
+        .unwrap();
+    app.flush().unwrap();
     app.request(Query::Bounds(id), |_| {}).unwrap();
     app.pump().unwrap();
-    checked.revise(|checked| *checked = true);
-    app.flush().unwrap();
-    assert_eq!(renderer.engine_id(id, Part::Control).unwrap(), physical);
     renderer.inspect(|doc| {
-        assert_eq!(
-            doc.get_node(physical)
+        assert!(
+            !doc.get_node(physical)
                 .unwrap()
                 .element_data()
                 .unwrap()
-                .checkbox_input_checked(),
-            Some(true)
+                .checkbox_input_indeterminate()
+                .unwrap()
         )
     });
 }
+
 #[test]
-fn direct_mixed_rejection_keeps_prefix_and_query_watermark_then_accepts_switch() {
+fn direct_mixed_create_patch_and_clear_keep_the_accepted_query_watermark() {
     let runtime = RuntimeId::new();
     let mut renderer = Renderer::new(runtime);
     let mut ids = NodeIds::new(runtime);
     let id = ids.allocate();
-    let later = ids.allocate();
-    assert_eq!(
-        renderer.apply(&[
+    renderer
+        .apply(&[
             Mutation::Create {
                 id,
-                node: Box::new(Descriptor::new(Props::Check(CheckProps::default())))
+                node: Box::new(Descriptor::new(Props::Check(CheckProps {
+                    mode: CheckMode::Mixed,
+                    ..Default::default()
+                }))),
             },
             Mutation::Place {
                 id,
                 parent: None,
-                before: None
+                before: None,
             },
-            Mutation::Patch {
-                id,
-                patch: Patch::CheckMode(Change::Set(CheckMode::Mixed))
-            },
-            Mutation::Create {
-                id: later,
-                node: Box::new(Descriptor::new(Props::View))
-            },
-        ]),
-        Err(Error::Unsupported("native indeterminate checks"))
-    );
-    assert_eq!(renderer.stats().applied, 2);
-    assert_eq!(renderer.stats().nodes, 1);
-    renderer.request(Query::Bounds(id), QueryToken(1)).unwrap();
-    let mut inputs = Vec::new();
-    renderer.drain(&mut inputs);
-    assert!(matches!(
-        inputs.as_slice(),
-        [Input::Response {
-            applied: 2,
-            token: QueryToken(1),
-            result: Ok(QueryValue::Bounds(_))
-        }]
-    ));
-    let before = renderer.stats();
-    assert_eq!(
-        renderer.apply(&[Mutation::Create {
-            id: later,
-            node: Box::new(Descriptor::new(Props::Check(CheckProps {
-                mode: CheckMode::Mixed,
-                ..Default::default()
-            })))
-        }]),
-        Err(Error::Unsupported("native indeterminate checks"))
-    );
-    assert_eq!(renderer.stats(), before);
-    assert_eq!(
+        ])
+        .unwrap();
+    let physical = renderer.engine_id(id, Part::Control).unwrap();
+    for (index, mode) in [CheckMode::Checkbox, CheckMode::Mixed, CheckMode::Switch]
+        .into_iter()
+        .enumerate()
+    {
         renderer
             .apply(&[Mutation::Patch {
                 id,
-                patch: Patch::CheckMode(Change::Set(CheckMode::Switch))
+                patch: Patch::CheckMode(Change::Set(mode)),
             }])
-            .unwrap()
-            .applied,
-        3
-    );
+            .unwrap();
+        renderer
+            .request(Query::Bounds(id), QueryToken(index as u64))
+            .unwrap();
+        let mut inputs = Vec::new();
+        renderer.drain(&mut inputs);
+        assert!(
+            matches!(inputs.as_slice(),[Input::Response { applied,result:Ok(QueryValue::Bounds(_)),..}] if *applied==3+index as u64)
+        );
+        assert_eq!(renderer.engine_id(id, Part::Control).unwrap(), physical);
+        renderer.inspect(|doc| {
+            assert_eq!(
+                doc.get_node(physical)
+                    .unwrap()
+                    .element_data()
+                    .unwrap()
+                    .checkbox_input_indeterminate()
+                    .unwrap(),
+                mode == CheckMode::Mixed
+            )
+        });
+    }
 }
 
 #[test]

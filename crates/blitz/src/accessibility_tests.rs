@@ -75,6 +75,64 @@ fn nodes(tree: &Consumer) -> Vec<NodeRef<'_>> {
 }
 
 #[test]
+fn mixed_checks_publish_native_mixed_then_boolean_state_after_assistive_activation() {
+    use glory_render::{Change, CheckMode, Event, Patch};
+    for initial in [false, true] {
+        let app = WindowApp::new();
+        let checked = app.app.scope().cage(initial);
+        let calls = Rc::new(Cell::new(0));
+        let changed = calls.clone();
+        app.mount(
+            check()
+                .label("Mixed checkbox")
+                .mode(CheckMode::Mixed)
+                .checked(checked)
+                .on(glory_ui::events::checked_changed, move |event| {
+                    if let Event::CheckedChanged(next) = event {
+                        changed.set(changed.get() + 1);
+                        checked.revise(|v| *v = next);
+                    }
+                }),
+        )
+        .unwrap();
+        let node = app.app.tree().roots()[0];
+        let update = build(&app, true);
+        let target = id(&app, node);
+        let native = update.nodes.iter().find(|(id, _)| *id == target).unwrap();
+        assert_eq!(native.1.role(), AxRole::CheckBox);
+        assert_eq!(native.1.toggled(), Some(Toggled::Mixed));
+        assert!(action(&app, &request(target, AxAction::Click, None)).unwrap());
+        let update = build(&app, true);
+        let native = update.nodes.iter().find(|(id, _)| *id == target).unwrap();
+        assert_eq!(
+            native.1.toggled(),
+            Some(if initial {
+                Toggled::False
+            } else {
+                Toggled::True
+            })
+        );
+        assert_eq!(checked.get(), !initial);
+        assert_eq!(calls.get(), 1);
+        for mode in [CheckMode::Checkbox, CheckMode::Mixed] {
+            app.app
+                .scope()
+                .patch(node, Patch::CheckMode(Change::Set(mode)))
+                .unwrap();
+        }
+        app.app
+            .scope()
+            .patch(node, Patch::Enabled(Change::Set(false)))
+            .unwrap();
+        let update = build(&app, true);
+        let native = update.nodes.iter().find(|(id, _)| *id == target).unwrap();
+        assert_eq!(native.1.toggled(), Some(Toggled::Mixed));
+        assert!(!action(&app, &request(target, AxAction::Click, None)).unwrap());
+        assert_eq!(calls.get(), 1);
+    }
+}
+
+#[test]
 fn composite_roles_states_and_live_named_relations_reach_accesskit() {
     use glory_render::{Change, Orientation, Patch, SemanticId, Semantics};
     let app = WindowApp::new();

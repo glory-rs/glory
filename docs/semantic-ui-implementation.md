@@ -2504,3 +2504,15 @@ iOS 应用 Swift ledger 弱 client、独立 native query/prompt 许可，不因�
 原始证据保存在数据盘 permissions/。用途描述与 manifest 权限只由 opt-in 构建加入。
 Swift 宿主已经编译及链接，但 Rust iOS 连接仍待应用级最小整数 FFI 声明授权；
 真实系统弹窗选择因 UI 锁屏仍待验收。没有新增 unsafe 或关闭整体权限缺口。
+
+## 2026-10-27：原生 Mixed checkbox
+
+Glory 固定真正 Blitz fork 251e4e288b287c77c59538425b09f25824c35821，增加独立
+indeterminate property、`:indeterminate` 失效和 CPU 横杠；程序 checked 更新保留
+mixed，点击/标签/Space/AX 激活清除 mixed 并只发布一次 boolean change。模式更新和
+Clear 保留物理身份，AX 读取实际原生状态，禁用/只读不变。未引入新 unsafe。
+旧实现下两项回归失败，当前全工作区 981 项与 native/WASM 严格 Clippy 通过，固定
+fork 干净检出测试通过。Android/iOS `controls-probe` 实际显示三态，截图/JSON 在
+`/Volumes/Data/Caches/glory/native-checks/`；真实输入/读屏和签名设备另验收。
+radio、select、placeholder、菜单、富文本、文件/剪贴板及应用导航等仍开放；整体
+目标没有因一个控件补齐而关闭。详细证据和 fork Clippy 边界见缺口报告。

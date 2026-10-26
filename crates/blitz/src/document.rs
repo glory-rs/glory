@@ -122,8 +122,7 @@ fn check_layer<'a>(
     Ok(())
 }
 
-/// The pinned native engine has no indeterminate editor state. Never publish
-/// an AX mixed state while displaying a plain boolean checkbox.
+/// Keep native control admission in sync with actual engine and input support.
 fn check_mode<'a>(
     node: impl Into<glory_render::DescriptorView<'a>>,
     patch: Option<&glory_render::Patch>,
@@ -178,9 +177,6 @@ fn check_mode<'a>(
         Some(Patch::CheckMode(Change::Clear)) => CheckMode::default(),
         _ => check.mode,
     };
-    if mode == CheckMode::Mixed {
-        return Err(Error::Unsupported("native indeterminate checks"));
-    }
     if mode == CheckMode::Radio {
         return Err(Error::Unsupported("native radio groups"));
     }
@@ -598,7 +594,11 @@ impl Dom {
             }
             // Blitz beta.4 parses the controlled checked attribute as bool.
             // Empty HTML boolean attributes only initialize it on attachment.
-            ("indeterminate", Property::Bool(false)) => {}
+            ("indeterminate", Property::Bool(value)) => {
+                if !m.set_input_indeterminate(node, *value) {
+                    return Err(invariant("indeterminate requires a native checkbox"));
+                }
+            }
             ("checked", Property::Bool(true)) => m.set_attribute(node, attr(name), "true"),
             ("disabled", Property::Bool(true)) => m.set_attribute(node, attr(name), ""),
             ("disabled" | "checked", Property::Bool(false)) => m.clear_attribute(node, attr(name)),

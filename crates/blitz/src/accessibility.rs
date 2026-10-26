@@ -414,15 +414,21 @@ impl Tree {
                     if d.name.is_none() {
                         node.set_label(normalize_text(&p.label, true).into_owned());
                     }
-                    let checked = state
+                    let element = state
                         .dom
                         .control(id)
                         .ok()
                         .and_then(|control| state.dom.doc.get_node(control))
-                        .and_then(|node| node.element_data())
+                        .and_then(|node| node.element_data());
+                    let checked = element
                         .and_then(|element| element.checkbox_input_checked())
                         .unwrap_or(p.checked);
-                    node.set_toggled(if checked {
+                    let mixed = element
+                        .and_then(|element| element.checkbox_input_indeterminate())
+                        .unwrap_or(false);
+                    node.set_toggled(if mixed {
+                        Toggled::Mixed
+                    } else if checked {
                         Toggled::True
                     } else {
                         Toggled::False
