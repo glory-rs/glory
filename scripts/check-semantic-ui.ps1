@@ -2,10 +2,11 @@ param([switch]$Bench, [switch]$Web, [switch]$Window, [switch]$Android, [string]$
 
 $ErrorActionPreference = 'Stop'
 if ($AndroidSerial -and -not $Android) { throw '-AndroidSerial requires -Android' }
+if ($AndroidSerial -and $AndroidSerial -notmatch '^emulator-\d+$') { throw '-AndroidSerial requires an explicitly selected owned emulator' }
 $taskBuildRoot = 'D:/BuildCache/glory-semantic-ui'
 $taskWorkspace = Split-Path -Parent $PSScriptRoot
 $savedEnvironment = @{}
-foreach ($name in @('CARGO_HOME', 'CARGO_TARGET_DIR', 'TEMP', 'TMP', 'CARGO_PROFILE_BENCH_OPT_LEVEL', 'PYTHONPYCACHEPREFIX')) {
+foreach ($name in @('CARGO_HOME', 'CARGO_TARGET_DIR', 'TEMP', 'TMP', 'CARGO_PROFILE_BENCH_OPT_LEVEL', 'PYTHONPYCACHEPREFIX', 'ANDROID_USER_HOME')) {
     $savedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
 }
 
@@ -46,6 +47,13 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'semantic formatting failed' }
     cargo test --locked --workspace --all-features
     if ($LASTEXITCODE -ne 0) { throw 'semantic tests failed' }
+    cargo test --locked -p glory-blitz --no-default-features --features package,raster --test package
+    if ($LASTEXITCODE -ne 0) { throw 'package-only resource tests failed' }
+    $packageGraph = cargo tree --locked -p glory --no-default-features --features blitz-package --edges normal,build --prefix none
+    if ($LASTEXITCODE -ne 0) { throw 'package dependency graph failed' }
+    if ($packageGraph | Select-String '^(reqwest|rustls|rustls-platform-verifier|cap-std|cap-fs-ext) v') {
+        throw 'package-only graph acquired desktop transport dependencies'
+    }
     cargo clippy --locked --workspace --all-features --all-targets -- -D warnings
     if ($LASTEXITCODE -ne 0) { throw 'semantic clippy failed' }
 
@@ -79,11 +87,20 @@ try {
         if ($LASTEXITCODE -ne 0 -or [IO.Path]::GetFullPath($mobileMetadata.target_directory) -ne $expectedTarget) { throw 'Unexpected mobile target directory' }
         cargo fmt --manifest-path examples/mobile/Cargo.toml -- --check
         if ($LASTEXITCODE -ne 0) { throw 'Mobile formatting failed' }
+        $mobileGraph = cargo tree --locked --manifest-path examples/mobile/Cargo.toml --target aarch64-linux-android --edges normal,build --prefix none
+        if ($LASTEXITCODE -ne 0) { throw 'mobile dependency graph failed' }
+        if ($mobileGraph | Select-String '^(reqwest|rustls|rustls-platform-verifier|cap-std|cap-fs-ext) v') {
+            throw 'offline mobile graph acquired desktop transport dependencies'
+        }
         cargo clippy --locked -p glory-blitz --all-features --target aarch64-linux-android --no-deps -- -D warnings
         if ($LASTEXITCODE -ne 0) { throw 'Android adapter Clippy failed' }
         & "$taskWorkspace/examples/mobile/build-android.ps1" -Target x86_64-linux-android
         & "$taskWorkspace/examples/mobile/build-android.ps1" -Target aarch64-linux-android
         if ($AndroidSerial) {
+            $env:ANDROID_USER_HOME = "$taskBuildRoot/android-home"
+            New-Item -ItemType Directory -Force $env:ANDROID_USER_HOME | Out-Null
+            & "$env:ANDROID_HOME/platform-tools/adb.exe" -s $AndroidSerial install --no-incremental -r D:/BuildCache/glory-mobile/package-x86_64-linux-android-debug/glory-counter.apk
+            if ($LASTEXITCODE -ne 0) { throw 'Android APK installation failed' }
             python examples/mobile/accept-android.py --serial $AndroidSerial --out "$taskBuildRoot/android-acceptance"
             if ($LASTEXITCODE -ne 0) { throw 'Android emulator acceptance failed' }
         } else {

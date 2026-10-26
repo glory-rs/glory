@@ -47,6 +47,15 @@ def label(image):
     return hashlib.sha256(image.crop((50, 140, 350, 210)).tobytes()).hexdigest()
 
 
+def package_badge(image):
+    # The PNG owns this color; only the imported package stylesheet gives the
+    # 1x1 image its 32-DIP box and top/right placement. Both must have loaded.
+    x, y = image.width - 105, 105
+    pixels = image.crop((x - 24, y - 24, x + 24, y + 24)).convert("RGB")
+    histogram = pixels.getcolors(48 * 48) or []
+    return sum(count for count, color in histogram if all(abs(a - b) <= 2 for a, b in zip(color, (20, 180, 90)))) > 2200
+
+
 def tap(x, y):
     adb("shell", "input", "tap", str(x), str(y))
     time.sleep(0.5)
@@ -97,6 +106,7 @@ try:
             raise RuntimeError("counter did not draw at the expected emulator dimensions")
         time.sleep(1)
     pid = adb("shell", "pidof", package)
+    initial = wait_screen("package-assets", package_badge)
     zero = label(initial)
     tap(380, 400)  # +1
     one = wait_screen("plus", lambda image: label(image) != zero)
@@ -124,13 +134,13 @@ try:
     adb("shell", "am", "start", "-n", activity)
     time.sleep(1)
     assert adb("shell", "pidof", package) == pid, "backgrounding restarted the process"
-    wait_screen("resumed", lambda image: label(image) == before)
+    wait_screen("resumed", lambda image: label(image) == before and package_badge(image))
     adb("shell", "wm", "user-rotation", "lock", "1")
     time.sleep(1)
-    wait_screen("landscape", lambda image: image.size == (2400, 1080) and label(image) == before)
+    wait_screen("landscape", lambda image: image.size == (2400, 1080) and label(image) == before and package_badge(image))
     adb("shell", "wm", "user-rotation", "lock", "0")
     time.sleep(1)
-    wait_screen("portrait-restored", lambda image: image.size == (1080, 2400) and label(image) == before)
+    wait_screen("portrait-restored", lambda image: image.size == (1080, 2400) and label(image) == before and package_badge(image))
     tap(130, 400)  # Clear after recreation
     assert label(screen("clear")) == zero, "input did not recover after surface recreation"
     # Finish the Activity, then recreate it without force-stopping the process.
@@ -138,13 +148,14 @@ try:
     adb("shell", "input", "keyevent", "4")
     time.sleep(1)
     adb("shell", "am", "start", "-n", activity)
-    wait_screen("activity-recreated", lambda image: image.size == (1080, 2400) and label(image) == zero)
+    wait_screen("activity-recreated", lambda image: image.size == (1080, 2400) and label(image) == zero and package_badge(image))
     assert adb("shell", "pidof", package) == pid, "Activity test unexpectedly used a new process"
     tap(380, 400)
     assert label(screen("recreated-plus")) == label(one), "recreated Activity cannot receive input"
     logs = adb("logcat", "-d", f"--pid={pid}", "-v", "brief")
     (root / "application.log").write_text(logs, encoding="utf-8")
     assert "panicked at" not in logs and "FATAL EXCEPTION" not in logs, "application faulted"
+    assert re.search(r"Glory mobile assets:.*completed: 2,.*closed: true", logs), "retired Activity did not complete and close its package loader"
     result = {
         "serial": args.serial, "pid": pid,
         "android": adb("shell", "getprop", "ro.build.version.release"),
@@ -154,6 +165,7 @@ try:
         "same_process_resume": True, "rotation_restoration": True,
         "post_resume_input": True,
         "same_process_activity_recreation": True,
+        "package_css_and_png_pixels": True, "retired_package_loader_closed": True,
         "software_key_point": [key_x, key_y],
         "scope": "1080x2400 emulator, Gboard numeric key, pixel restoration; no CJK/AT/device claim",
     }

@@ -1,10 +1,9 @@
 //! UIKit event loop; iOS launches this executable from its application bundle.
 #[cfg(target_os = "ios")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use glory::blitz::shell::{Shell, WindowApp, WindowAttributes};
+    use glory::blitz::shell::{Shell, WindowAttributes};
     let mut shell = Shell::new()?;
-    let window = WindowApp::new();
-    window.mount(counter::Counter)?;
+    let (window, _loader) = glory_mobile_counter::counter_window()?;
     shell.add_window(
         window,
         WindowAttributes::default().with_title("Glory Counter"),

@@ -10,8 +10,14 @@ Android uses the shell's CPU renderer and winit's `android-native-activity` glue
 `Shell::android(app)` requires the AndroidApp passed to this invocation's
 `android_main`. `Shell::from_event_loop` also accepts an explicitly configured
 event loop. iOS uses `Shell::new` on the application's UIKit main thread.
-The runtime's optional desktop `assets` and `accesskit` integrations remain
-desktop-only; enabling those flags does not install mobile implementations.
+The application selects `blitz-package` and embeds `assets/theme.css` and
+`assets/badge.png` as immutable `asset://app/` resources. Each document gets its
+own bounded Loader, including a recreated Android Activity. Its imported CSS
+positions and sizes the PNG badge; neither is supplied by a synchronous decode
+shortcut. Queue/deadline/encoded-byte budgets and engine decode admission apply.
+Package-only builds reject HTTP origins and file mounts and exclude desktop
+HTTP/TLS/filesystem dependencies. Android AssetManager, networking and AccessKit
+are still separate gaps. iOS uses the same source path but remains unverified.
 
 ## Android
 
@@ -63,10 +69,12 @@ instead of assuming the Android Studio profile's keyboard height, and temporaril
 enables software input alongside a hardware keyboard. It verifies visible touch updates, injected editing,
 system keyboard visibility and an actual software-key tap, same-process
 background resume, rotation restoration, subsequent input, and Activity close
-and recreation inside the same process. Rotation waits for a final frame;
+and recreation inside the same process. It checks the packaged PNG's actual
+color and CSS-sized position before and after lifecycle changes, and the retired
+document's Loader close log. Rotation waits for a final frame;
 Android's transition may briefly scale the old buffer. Full screenshots and
 application logs are retained alongside the result. These tests do not establish
-CJK composition, TalkBack, device permissions, network/asset transport or real
+CJK composition, TalkBack, device permissions, AssetManager/network transport or real
 arm64-device support.
 
 The Winit fork retires the Activity loop on Destroy and holds an exclusive
@@ -96,7 +104,8 @@ UIKit lifecycle/input/safe areas, VoiceOver and simulator/device runtime checks
 remain required before claiming iOS support.
 
 The Windows canonical gate accepts `-Android` to check the adapter and build both
-APKs. Add `-AndroidSerial emulator-5582` for an explicitly selected, already
-running owned emulator; APK builds alone are reported separately from runtime
+APKs. Add `-AndroidSerial emulator-5582` to install the newly built x86_64 APK on
+an explicitly selected, already running owned emulator and run acceptance;
+APK builds alone are reported separately from runtime
 acceptance. The native adapter check uses `--no-deps` because the current Android
 Clippy diagnoses already-const thread locals in core.

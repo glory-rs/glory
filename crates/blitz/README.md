@@ -8,8 +8,9 @@ window host with CPU presentation; the headless default creates no window/GPU.
 The shell also exposes `Shell::android(AndroidApp)` and `Shell::from_event_loop`;
 its existing `Shell::new` supports the UIKit entry path. The
 [mobile example](../../examples/mobile/README.md) records Android emulator
-packaging/interaction checks and the unverified iOS path. Desktop Loader and
-AccessKit flags do not provide mobile implementations.
+packaging/interaction checks and the unverified iOS path. Optional `package`
+provides the same bounded offline Loader on desktop and mobile; HTTP/file
+transport and AccessKit remain desktop integrations.
 
 ```rust
 use glory::{App, prelude::*};
@@ -265,12 +266,19 @@ actual PNG geometry/pixels and a 100-million-row fixed/measured list with unique
 image URLs. It bounds reuse/pending/waiter tables, cancels abandoned rows and
 checks suspend/resume, stale completion, invalid input and close cleanup.
 
-The optional desktop `assets` feature adds `assets::{Loader, LoadConfig,
-LoadLimits, LoadStats}` (facade: `blitz-assets`). A Loader belongs to one document;
+The optional native `package` feature adds `assets::{Loader, LoadConfig,
+LoadLimits, LoadStats}` (facade: `blitz-package`). A Loader belongs to one document;
 put it in `Config::provider`. `asset://app/` serves the explicitly supplied,
 immutable `LoadConfig::package`; keys are encoded paths such as `/theme.css`.
-Choose that base URL for package-relative stylesheets/images. There is no implicit
-filesystem access. Run the packaged CSS/window/list example with
+Choose that base URL for package-relative stylesheets/images, with bytes supplied
+by `include_bytes!` or the application's own packaging. Desktop, Android and iOS
+use the same queue, deadlines, decode admission and cancellation. Package-only
+builds reject HTTP origins and file mounts at construction, and do not compile
+the HTTP/TLS/filesystem transport dependencies. No Android AssetManager or UIKit
+bundle discovery is installed. The mobile example embeds CSS and PNG bytes.
+
+Desktop `assets` (facade: `blitz-assets`) includes `package` and adds explicit
+HTTP(S) origins and mounted-file transport. Run the packaged CSS/window/list example with
 `cargo run --locked -p glory-blitz --example assets --features assets,shell`.
 
 HTTP(S) requires explicit exact origins in `LoadConfig::origins`. An origin
@@ -313,10 +321,15 @@ submits 2000 imports plus 400 image failures and holds only four request/results
 critical-CSS rejection, lease/waker reentry and actual payload-before-wake drop
 order have separate regressions. The huge-list test also bounds request leases
 and completion charges, and requires both to return to zero after clearing.
-These budgets do not claim total process memory. File mounts, the Android resource bridge, intrinsic image-height
-anchor acceptance, deployment/CDN behavior, actual OS input/accessibility and
-performance timing remain pending. The desktop loader is target-gated away from
-Android/WASM; macOS is cfg-enabled but has no compile/runtime evidence in this stage.
+`tests/package.rs` separately checks package-only configuration rejection,
+budgets, document ownership, bounded decode admission, cancel/close
+and real imported CSS/PNG layout and CPU pixels. The Android example checks that
+same embedded CSS/PNG path through its actual shell and Activity recreation.
+The canonical script also checks the package-only production dependency graph.
+These budgets do not claim total process memory. Android AssetManager/network
+transport, deployment/CDN behavior, broader OS input/accessibility and performance
+timing remain pending. Desktop transports are target-gated away from Android/WASM;
+macOS/iOS have no compile/runtime evidence in this stage.
 
 `tests/document.rs` runs real CSS/box/text layout on Windows and Ubuntu/WSL, including a
 100-million-row indexed source with fixed and measured variable heights, far

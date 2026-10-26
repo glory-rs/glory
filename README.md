@@ -83,8 +83,9 @@ limited to Salvo.
   Password supports grapheme masking with matching pointer/caret/scroll geometry,
   raw controlled values and IME protocol. Web/SSR retain HTML password support.
   Config supports explicit resource
-  providers with bounded engine caches and cancellation. Optional `blitz-assets` supplies a
-  desktop HTTP(S)/embedded-package/mounted-file loader with explicit origins,
+  providers with bounded engine caches and cancellation. Optional `blitz-package`
+  supplies an offline embedded-byte loader shared by desktop and mobile;
+  `blitz-assets` adds desktop HTTP(S)/mounted-file transport with explicit origins,
   directory roots and transport
   budgets. Shared request/completion leases keep decoded results bounded while
   the host is paused. Measured lists preserve anchors and navigation visibility

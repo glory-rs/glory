@@ -88,7 +88,13 @@ pub fn controller_probe(command: u8) -> Result<String> {
             )?;
             let file = create(
                 &children,
-                Props::File(Default::default()),
+                Props::File(glory::render::FileProps {
+                    configuration: glory::render::FileConfig {
+                        drop: true,
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                }),
                 "controller-file",
             )?;
             let ended = ended.clone();

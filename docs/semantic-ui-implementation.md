@@ -2387,3 +2387,21 @@ Android 适配器严格 Clippy 为 --no-deps，已有 core const thread-local �
 用户确认暂无 Mac。iOS 入口、plist 与模拟器包脚本仅通过语法/元数据检查，未在
 Apple SDK 编译或运行。Android arm64 真机、CJK 组合输入、移动资产/无障碍、
 iOS 签名/生命周期/输入及桌面安装器仍待补齐；不据此关闭完整平台目标。
+
+## 2026-10-26：移动端嵌入式资产
+
+新增可选 glory-blitz/package 和 facade blitz-package。不可变 asset://app 字节、
+队列/期限、取消和 NetHandler::prepare 解码准入复用原有 Loader；HTTP/TLS、DNS
+及挂载文件移到桌面后端，assets 包含 package。包专用构建拒绝 origins/mounts，
+生产依赖图没有 reqwest/Rustls/cap-std；默认/HTML/SSR/WASM 不获取加载器。
+
+mobile Counter 用 include_bytes 嵌入 CSS 和 PNG，每个文档（含重建 Activity）
+各有独立 Loader。包专用 6 项测试、桌面 Loader 9 项回归、工作区 all-features
+测试和 native/WASM 严格 Clippy 通过。规范脚本新增包专用测试和生产依赖图 gate。
+Android 16 x86_64 实际运行验证 CSS/PNG 像素、Gboard/触摸/编辑、后台/旋转及
+同进程 Activity 重建；旧文档 completed=2、closed/stopped=true，队列/活动为零。
+证据在 D:/BuildCache/glory-mobile/package-assets-acceptance-retry/result.json。
+启动时 System UI 弹窗造成的首轮失败截图单独保留，稳定后完整复验通过。
+
+这不包含 Android AssetManager/动态资产或联网权限；CJK、TalkBack、arm64 真机
+和 iOS Apple SDK 构建/运行仍待验收。SSR 集成继续只提供 Salvo。

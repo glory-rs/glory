@@ -86,7 +86,7 @@ Android 16 x86_64 的 APK 已安装并实际运行。`D:/BuildCache/glory-mobile
 
 示例提供 UIKit Rust 入口、Info.plist 和 `build-ios.sh`。脚本验证 macOS/Xcode、D: 远程挂载与 Cargo 实际目录，生成 ad-hoc 签名的模拟器 `.app`。当前仅检查 shell 语法和 plist 内容；没有 Apple SDK 编译结果。用户确认暂时没有 Mac，故不声称 iOS 可运行或已验收。
 
-后续需要 Mac 上的构建/安装/启动、UIKit 暂停恢复/尺寸与安全区、软键盘/CJK/VoiceOver、真机签名和 IPA 分发。Android 还缺真机、CJK 组合输入、TalkBack、包资产/联网 Loader 和权限等覆盖；桌面缺各系统安装器与 macOS 本机验收。这些均未被本轮勾选完成。
+后续需要 Mac 上的构建/安装/启动、UIKit 暂停恢复/尺寸与安全区、软键盘/CJK/VoiceOver、真机签名和 IPA 分发。Android 还缺真机、CJK 组合输入、TalkBack、AssetManager/联网 Loader 和权限等覆盖；嵌入式包资产的后续补齐见下节。桌面缺各系统安装器与 macOS 本机验收。这些均未被本轮勾选完成。
 
 ### 检查结果
 
@@ -98,4 +98,18 @@ Android 16 x86_64 的 APK 已安装并实际运行。`D:/BuildCache/glory-mobile
 - x86_64 和 aarch64 的原生库均实际链接、打包和 debug 签名验证通过；aarch64 仍只是产物构建，没有真机运行结论。
 - 仓库 `start-emulator.ps1` 从全新 AVD 配置启动的 Android 16 复验通过，最终结果为 `D:/BuildCache/glory-mobile/repro-emulator/acceptance-final/result.json`，包含同进程 Activity 重建。初次固定键盘坐标误中工具栏后，脚本改为等待真实键盘画面并按其顶部定位数字键；仍要求软件键点击后实际更新值，没有改用按键注入冒充。
 
-上述新增 gate 可由 `check-semantic-ui.ps1 -Android` 构建两种 ABI；提供 `-AndroidSerial` 才运行所选模拟器。没有请求模拟器验收时，脚本只报告 APK 构建。iOS、真实 Android 设备、移动资产/无障碍和桌面安装器仍按前述清单继续补齐，整体功能差距不标为关闭。
+上述新增 gate 可由 `check-semantic-ui.ps1 -Android` 构建两种 ABI；提供 `-AndroidSerial` 才运行所选模拟器。没有请求模拟器验收时，脚本只报告 APK 构建。iOS、真实 Android 设备、AssetManager/网络/无障碍和桌面安装器仍按前述清单继续补齐，整体功能差距不标为关闭。
+
+## 后续补齐：移动端离线 CSS/图片
+
+新增 `glory-blitz/package`（facade `blitz-package`），将已有 Loader 的包字节、限额队列、超时、取消和引擎解码准入抽为 native 共用路径。桌面 `assets` 包含该能力并继续提供原有 HTTP/挂载文件后端；没有复制第二套加载调度器。每个文档独立持有 Loader，关闭后不复用。`asset://app/` 从应用显式提供的不可变字节映射解析资源，默认 runtime、HTML、SSR 和 WASM 不因此引入加载器。
+
+包专用构建拒绝非空 origins/mounts，生产依赖图排除了 reqwest、Rustls 和 cap-std/cap-fs-ext。移动示例用 `include_bytes!` 嵌入 CSS 和 PNG，相对 URL 由配置的 base URL 解析；CSS import 和图片依然经过 `NetHandler::prepare`，遵守引擎请求/解码/完成结果预算。没有 AssetManager、环境路径查找或网络权限的隐式授权。
+
+验证：包专用 6 项测试通过，覆盖独立配置预算、文档归属、异步 decode 准入、队列满拒绝、取消/关闭不迟发，以及实际 CSS 布局和 CPU PNG 像素；原桌面加载器 9 项网络/资源回归通过。native 全工作区 all-features 测试和严格 Clippy、WASM 全工作区严格 Clippy通过。规范检查脚本增加包专用测试和 native/Android 生产依赖图检查。
+
+Android 16 x86_64 实际 APK 通过完整交互、Gboard 数字键、后台恢复、横竖屏和同进程 Activity 重建；每一阶段均检查嵌入式绿色 PNG 的像素及导入 CSS 决定的位置/尺寸。退出文档日志为 completed=2、failed/rejected=0、queued/active=0、closed/stopped=true。证据：`D:/BuildCache/glory-mobile/package-assets-acceptance-retry/result.json`、同目录截图和 application.log。首轮截图保留在 `package-assets-acceptance`，因模拟器启动时 System UI 无响应弹窗遮挡而失败；系统稳定后完整重跑通过，未放宽像素断言。
+
+本轮工作区共 964 项测试通过（含文档测试）；Android aarch64 适配器严格 Clippy（--no-deps）通过，x86_64/arm64 两个 APK 都重新链接、打包并验证签名。指定 -AndroidSerial 的规范 gate 现在会先安装本次 x86_64 APK，再运行像素/交互验收，避免测试残留旧安装包。
+
+这是嵌入式离线资产链路的补齐。Android AssetManager/动态资产、联网及权限、CJK/TalkBack 和 arm64 真机仍待验收；iOS 共用源码但仍没有 Apple SDK 构建/运行结果。SSR 继续仅集成 Salvo。

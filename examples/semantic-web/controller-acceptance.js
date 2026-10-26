@@ -6,6 +6,7 @@ async function controllerAcceptance(page) {
     tab.on('pageerror', error => errors.push(error.message));
     tab.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
     try {
+        await tab.route('**/favicon.ico', route => route.fulfill({ status: 204, body: '' }));
         await tab.goto('http://127.0.0.1:8788');
         await tab.waitForFunction(() => window.ready);
         const result = await tab.evaluate(async () => {
@@ -16,6 +17,10 @@ async function controllerAcceptance(page) {
             const input = document.querySelector('input[type=file]');
             check(editor && input, 'rich and file controls mounted');
             const token = editor.getAttribute('data-gly-node');
+            const focusRoot = document.querySelector('.controller-fieldset').parentElement;
+            editor.focus();
+            document.querySelector('.controller-other').focus();
+            check(focusRoot.contains(document.activeElement), 'focus scope contains external focus');
             let reads = 0;
             const get = editor.getAttribute;
             editor.getAttribute = function (name) {
@@ -59,19 +64,34 @@ async function controllerAcceptance(page) {
             stage(17, false);
             stage(18, true);
             stage(14, true);
-
-            const data = new DataTransfer();
-            data.items.add(new File(['abc'], 'probe.txt', { type: 'text/plain' }));
-            input.files = data.files;
-            input.dispatchEvent(new Event('change', { bubbles: true }));
-            check(run(20).validFiles === 1, 'native file selection accepted');
+            window.__controllerProbe = { editor, input, trusted: false };
+            document.querySelector('.controller-file').addEventListener('drop', event => {
+                window.__controllerProbe.trusted = event.isTrusted;
+            }, { once: true });
+            return { unrelatedReads, inheritedChanges: true, stableIdentities: true };
+        });
+        // Chromium must deliver a trusted native drop. Synthetic events are
+        // correctly refused by the adapter. The driver already copied this
+        // script under its D: artifact directory; its first bytes are "asy".
+        const box = await tab.locator('.controller-file').boundingBox();
+        assert(box && box.width > 0 && box.height > 0, 'file drop target has a box');
+        const cdp = await context.newCDPSession(tab);
+        const data = { items: [], files: [page.__GLORY_ARTIFACT_DIR + '/driver-source/controller-acceptance.js'], dragOperationsMask: 1 };
+        for (const type of ['dragEnter', 'dragOver', 'drop']) {
+            await cdp.send('Input.dispatchDragEvent', { type, x: box.x + box.width / 2, y: box.y + box.height / 2, data });
+        }
+        const fileResult = await tab.evaluate(async () => {
+            const check = (value, message) => { if (!value) throw new Error(message); };
+            const run = command => JSON.parse(window.demo.controller_probe(command));
+            const { editor, input, trusted } = window.__controllerProbe;
+            check(trusted && run(20).validFiles === 1, 'trusted native file drop accepted');
             const selected = run(1);
             check(selected.validFiles === 1, 'unrelated update preserves file rights');
             run(19);
             for (let i = 0; i < 100 && run(20).read === 'pending'; i++) {
                 await new Promise(resolve => setTimeout(resolve, 10));
             }
-            check(run(20).read === '[97, 98, 99]', 'selected file bytes remain readable');
+            check(run(20).read === '[97, 115, 121]', 'selected file bytes remain readable');
             const retired = run(12);
             check(retired.validFiles === 0, 'configuration revision revokes selected tokens');
             check(input === document.querySelector('input[type=file]'), 'file control identity retained');
@@ -79,10 +99,11 @@ async function controllerAcceptance(page) {
             window.demo.controller_probe(255);
             check(!oldEditor.isConnected && !input.isConnected, 'all controls removed');
             check(document.querySelector('#app').childNodes.length === 0, 'application released');
-            return { unrelatedReads, inheritedChanges: true, compositionEnds: retired.ends, fileRead: selected.files, stableIdentities: true };
+            delete window.__controllerProbe;
+            return { compositionEnds: retired.ends, filesRead: selected.files, trustedDrop: true, revokedConfiguration: true };
         });
         assert(errors.length === 0, JSON.stringify(errors));
-        return result;
+        return { ...result, ...fileResult };
     } finally {
         await context.close();
     }

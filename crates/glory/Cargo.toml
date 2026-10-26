@@ -18,6 +18,7 @@ resources = ["dep:glory-resource", "glory-web?/resources", "glory-ssr?/resources
 i18n = ["dep:glory-i18n"]
 stream = ["ssr", "resources", "glory-ssr/stream", "glory-web?/stream"]
 blitz = ["html", "dep:glory-blitz"]
+blitz-package = ["blitz", "glory-blitz/package"]
 blitz-assets = ["blitz", "glory-blitz/assets"]
 blitz-paint = ["blitz", "glory-blitz/paint"]
 blitz-raster = ["blitz-paint", "glory-blitz/raster"]

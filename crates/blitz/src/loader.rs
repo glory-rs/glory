@@ -1,8 +1,7 @@
-//! Document-owned desktop transport. Only encoded bytes and handlers cross the
+//! Document-owned bounded asset workers. Only encoded bytes and handlers cross the
 //! worker boundary; no Runtime, Cage, App or native window lives on that thread.
 use std::collections::{BTreeMap, VecDeque};
 use std::io;
-use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::{
     Arc, Mutex,
@@ -14,7 +13,13 @@ use blitz_traits::net::{Body, Bytes, Method, NetHandler, NetProvider, Request, U
 use tokio::sync::Notify;
 use tokio::task::JoinSet;
 
+#[cfg(all(
+    feature = "assets",
+    any(target_os = "windows", target_os = "linux", target_os = "macos")
+))]
 mod files;
+mod transport;
+use transport::Transport;
 
 /// Independent of the document's decoded-image and registered-font budgets.
 #[derive(Clone, Debug)]
@@ -47,6 +52,7 @@ impl Default for LoadLimits {
 pub struct LoadConfig {
     /// Exact HTTP(S) origins, including effective port. Entries must be origin
     /// URLs with path `/`, no credentials, query or fragment. Empty denies HTTP.
+    /// Nonempty origins require the desktop `assets` feature and target.
     pub origins: Vec<Url>,
     /// Encoded paths such as `/theme.css` served under `asset://app/`.
     /// Immutable owned bytes, not a history cache or filesystem mount.
@@ -54,6 +60,7 @@ pub struct LoadConfig {
     /// Read-only directory capabilities exposed as `asset://name/path`.
     /// Names are lowercase ASCII labels (not `app`); roots must be absolute.
     /// Handles are opened at construction, not re-resolved for each request.
+    /// Nonempty mounts require the desktop `assets` feature and target.
     pub mounts: BTreeMap<String, PathBuf>,
     pub limits: LoadLimits,
 }
@@ -117,7 +124,7 @@ struct State {
 }
 struct Inner {
     config: LoadConfig,
-    files: files::Files,
+    transport: Transport,
     state: Mutex<State>,
     notify: Notify,
     stopped: AtomicBool,
@@ -132,44 +139,13 @@ pub struct Loader {
 impl Loader {
     pub fn new(config: LoadConfig) -> io::Result<Self> {
         validate(&config)?;
-        let files = files::Files::new(&config.mounts, config.limits.workers)?;
         let runtime = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()?;
-        // An explicit provider avoids changing Rustls's process-global default.
-        let provider = Arc::new(rustls::crypto::ring::default_provider());
-        let verifier =
-            rustls_platform_verifier::Verifier::new(provider.clone()).map_err(io::Error::other)?;
-        let tls = rustls::ClientConfig::builder_with_provider(provider)
-            .with_safe_default_protocol_versions()
-            .map_err(io::Error::other)?
-            .dangerous()
-            .with_custom_certificate_verifier(Arc::new(verifier))
-            .with_no_client_auth();
-        // Use the platform certificate/hostname verifier; no process-global
-        // provider installation or accept-invalid-certificates switch.
-        let client = {
-            let _guard = runtime.enter();
-            reqwest::Client::builder()
-                .tls_backend_preconfigured(tls)
-                .redirect(reqwest::redirect::Policy::none())
-                .retry(reqwest::retry::never())
-                .no_proxy()
-                .no_gzip()
-                .no_brotli()
-                .no_deflate()
-                .no_zstd()
-                .referer(false)
-                .pool_max_idle_per_host(0)
-                .dns_resolver(Arc::new(Resolver::new(&config.origins)))
-                .connect_timeout(config.limits.timeout)
-                .read_timeout(config.limits.timeout)
-                .build()
-                .map_err(io::Error::other)?
-        };
+        let transport = Transport::new(&config, &runtime)?;
         let inner = Arc::new(Inner {
             config,
-            files,
+            transport,
             state: Mutex::new(State::default()),
             notify: Notify::new(),
             stopped: AtomicBool::new(false),
@@ -178,7 +154,7 @@ impl Loader {
         std::thread::Builder::new()
             .name("glory-assets".into())
             .spawn(move || {
-                runtime.block_on(run(worker.clone(), client));
+                runtime.block_on(run(worker.clone()));
                 // OS getaddrinfo is not abortable. Resolution is single-flight
                 // once per allowed host, and never retains UI/document state.
                 runtime.shutdown_timeout(Duration::ZERO);
@@ -187,13 +163,14 @@ impl Loader {
         Ok(Self { inner })
     }
     pub fn stats(&self) -> LoadStats {
+        let (file_active, file_peak_active) = self.inner.transport.file_counts();
         let state = self.inner.state.lock().expect("asset state");
         LoadStats {
             queued: state.queue.len(),
             active: state.running.len(),
             stopped: self.inner.stopped.load(Ordering::Acquire),
-            file_active: self.inner.files.active(),
-            file_peak_active: self.inner.files.peak(),
+            file_active,
+            file_peak_active,
             ..state.stats
         }
     }
@@ -212,7 +189,7 @@ impl Loader {
             (removed, running)
         };
         drop(removed);
-        self.inner.files.close();
+        self.inner.transport.close();
         for cancel in running {
             cancel.cancel();
         }
@@ -414,7 +391,7 @@ impl LoadConfig {
     }
 }
 
-async fn run(inner: Arc<Inner>, client: reqwest::Client) {
+async fn run(inner: Arc<Inner>) {
     let mut tasks = JoinSet::new();
     loop {
         while tasks.try_join_next().is_some() {}
@@ -480,7 +457,7 @@ async fn run(inner: Arc<Inner>, client: reqwest::Client) {
             );
         }
         for job in launch {
-            tasks.spawn(work(inner.clone(), client.clone(), job));
+            tasks.spawn(work(inner.clone(), job));
         }
         if closed && tasks.is_empty() {
             break;
@@ -509,7 +486,7 @@ impl Drop for RunningGuard {
         self.inner.notify.notify_one();
     }
 }
-async fn work(inner: Arc<Inner>, client: reqwest::Client, mut job: Job) {
+async fn work(inner: Arc<Inner>, mut job: Job) {
     let _guard = RunningGuard {
         inner: inner.clone(),
         id: job.id,
@@ -534,7 +511,7 @@ async fn work(inner: Arc<Inner>, client: reqwest::Client, mut job: Job) {
         biased;
         _ = cancelled => None,
         result = tokio::time::timeout_at(job.deadline.into(), async {
-            let (url, bytes) = load(&inner, &client, job.request.url.clone(), job.deadline).await?;
+            let (url, bytes) = inner.transport.load(&inner.config, job.request.url.clone(), job.deadline).await?;
             job.handler.prepare(&url, &bytes).await?;
             Ok((url, bytes))
         }) => {
@@ -571,166 +548,5 @@ async fn work(inner: Arc<Inner>, client: reqwest::Client, mut job: Job) {
             Ok((url, bytes)) => job.handler.bytes(url, bytes),
             Err(error) => job.handler.error(job.request.url.to_string(), error),
         }
-    }
-}
-async fn load(
-    inner: &Inner,
-    client: &reqwest::Client,
-    mut url: Url,
-    deadline: Instant,
-) -> Result<(String, Bytes), String> {
-    let config = &inner.config;
-    for hop in 0..=config.limits.redirects {
-        config.check(&url)?;
-        if url.scheme() == "asset" {
-            if url.host_str() != Some("app") {
-                let bytes = inner
-                    .files
-                    .read(&url, config.limits.body_bytes, deadline)
-                    .await?;
-                return Ok((url.to_string(), bytes));
-            }
-            return config
-                .package
-                .get(url.path())
-                .cloned()
-                .map(|bytes| (url.to_string(), bytes))
-                .ok_or_else(|| "asset package miss".into());
-        }
-        let mut response = client
-            .get(url.clone())
-            .header("accept-encoding", "identity")
-            .send()
-            .await
-            .map_err(http_error)?;
-        if matches!(response.status().as_u16(), 301 | 302 | 303 | 307 | 308) {
-            if hop == config.limits.redirects {
-                return Err("asset redirect limit".into());
-            }
-            let location = response
-                .headers()
-                .get("location")
-                .and_then(|value| value.to_str().ok())
-                .ok_or("asset redirect location")?;
-            if location.len() > config.limits.url_bytes {
-                return Err("asset redirect URL length".into());
-            }
-            let next = url.join(location).map_err(|_| "asset redirect URL")?;
-            if url.scheme() == "https" && next.scheme() != "https" {
-                return Err("asset redirect TLS downgrade".into());
-            }
-            url = next;
-            // HTTP cannot redirect into the embedded package namespace.
-            if !matches!(url.scheme(), "http" | "https") {
-                return Err("asset redirect scheme".into());
-            }
-            continue;
-        }
-        if !response.status().is_success() {
-            return Err("asset HTTP status".into());
-        }
-        if response
-            .headers()
-            .get("content-encoding")
-            .is_some_and(|value| value.as_bytes() != b"identity")
-        {
-            return Err("asset encoded content unsupported".into());
-        }
-        if response
-            .content_length()
-            .is_some_and(|size| size > config.limits.body_bytes as u64)
-        {
-            return Err("asset body budget".into());
-        }
-        let mut bytes = Vec::new();
-        while let Some(chunk) = response.chunk().await.map_err(http_error)? {
-            if chunk.len() > config.limits.body_bytes.saturating_sub(bytes.len()) {
-                return Err("asset body budget".into());
-            }
-            bytes
-                .try_reserve(chunk.len())
-                .map_err(|_| "asset body allocation")?;
-            bytes.extend_from_slice(&chunk);
-        }
-        return Ok((url.to_string(), bytes.into()));
-    }
-    Err("asset redirect limit".into())
-}
-
-fn http_error(error: reqwest::Error) -> String {
-    if error.is_timeout() {
-        "asset deadline"
-    } else {
-        "asset HTTP request/body"
-    }
-    .into()
-}
-
-// Repeated cancellation must not spawn an unbounded queue of uncancellable
-// system resolver calls. At most one lookup per configured host per Loader;
-// positive and negative results remain fixed until this document closes.
-#[derive(Default)]
-struct LookupState {
-    started: bool,
-    result: Option<Result<Vec<SocketAddr>, String>>,
-}
-#[derive(Default)]
-struct Lookup {
-    state: Mutex<LookupState>,
-    notify: Notify,
-}
-struct Resolver(BTreeMap<String, Arc<Lookup>>);
-impl Resolver {
-    fn new(origins: &[Url]) -> Self {
-        Self(
-            origins
-                .iter()
-                .filter_map(|origin| origin.host_str())
-                .map(|host| (host.to_owned(), Arc::new(Lookup::default())))
-                .collect(),
-        )
-    }
-}
-impl reqwest::dns::Resolve for Resolver {
-    fn resolve(&self, name: reqwest::dns::Name) -> reqwest::dns::Resolving {
-        let host = name.as_str().to_owned();
-        let lookup = self.0.get(&host).cloned();
-        Box::pin(async move {
-            let lookup = lookup.ok_or_else(|| {
-                io::Error::new(io::ErrorKind::PermissionDenied, "asset DNS origin")
-            })?;
-            loop {
-                let notified = lookup.notify.notified();
-                let (start, result) = {
-                    let mut state = lookup.state.lock().expect("asset DNS");
-                    let start = !state.started;
-                    state.started = true;
-                    (start, state.result.clone())
-                };
-                if let Some(result) = result {
-                    let addresses = result.map_err(io::Error::other)?;
-                    return Ok(Box::new(addresses.into_iter()) as reqwest::dns::Addrs);
-                }
-                if start {
-                    let (lookup, host) = (lookup.clone(), host.clone());
-                    tokio::spawn(async move {
-                        let result = tokio::net::lookup_host((host.as_str(), 0))
-                            .await
-                            .map(|addresses| addresses.take(16).collect::<Vec<_>>())
-                            .map_err(|_| "asset DNS lookup".to_owned())
-                            .and_then(|addresses| {
-                                if addresses.is_empty() {
-                                    Err("asset DNS empty".into())
-                                } else {
-                                    Ok(addresses)
-                                }
-                            });
-                        lookup.state.lock().expect("asset DNS").result = Some(result);
-                        lookup.notify.notify_waiters();
-                    });
-                }
-                notified.await;
-            }
-        })
     }
 }

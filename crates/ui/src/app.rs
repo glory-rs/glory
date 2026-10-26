@@ -92,13 +92,16 @@ struct Present {
 
 impl Present {
     fn register_nodes(&mut self, owner: InstanceId, nodes: &[NodeId]) {
+        if nodes.is_empty() {
+            return;
+        }
         for &node in nodes {
             self.node_owners.insert(node, owner);
         }
         let owned = self.owners.entry(owner).or_default();
         let first = owned.nodes.is_empty();
         owned.nodes.extend(nodes.iter().copied());
-        self.node_owner_count += usize::from(first && !owned.nodes.is_empty());
+        self.node_owner_count += usize::from(first);
     }
 
     fn take_owner(&mut self, owner: InstanceId) -> Option<Owned> {

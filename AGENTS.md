@@ -135,18 +135,20 @@ retired feature aliases or count compilation as proof of platform acceptance.
   requests do not replace actual OS IME or assistive-technology acceptance.
   Config exposes an explicit base URL/provider and bounded resource limits;
   the default installs no HTTP/filesystem transport.
-  Optional desktop assets adds document-owned HTTP(S)/package/mounted-file Loader
-  with explicit origins/roots and job/body/deadline budgets. Shared resource leases
+  Optional package adds a document-owned immutable-byte Loader on native targets;
+  desktop assets includes it and adds HTTP(S)/mounted-file transport with explicit
+  origins/roots and job/body/deadline budgets. Shared resource leases
   also bound requests/completed results and charged payloads. Optional accesskit
   (facade blitz-accesskit) adds a semantic tree/action bridge; Windows UIA has
-  actual client acceptance. Android assets, OS IME, Unix AT-SPI clients and
+  actual client acceptance. Android AssetManager/network transport, OS IME, Unix AT-SPI clients and
   screen-reader/text-selection acceptance remain pending. Facade
   `blitz` is optional and must not enter default/HTML/SSR dependency graphs.
   Linux Fontique uses fontconfig-dlopen; cross-checks do not prove runtime font
   availability or display-server acceptance.
   Optional shell also has explicit AndroidApp and UIKit entry paths; see
   examples/mobile. Android emulator evidence stays separate from real-device,
-  CJK composition, mobile assets and accessibility acceptance. iOS has no
+  CJK composition, AssetManager/network transport and accessibility acceptance.
+  Android embedded CSS/PNG has actual emulator pixel/lifecycle evidence. iOS has no
   Apple-host compilation or runtime evidence yet.
 
 ## Design rules
@@ -429,7 +431,11 @@ retired feature aliases or count compilation as proof of platform acceptance.
   successful registration budget. Providers must honor cancellation/close and
   bound encoded bodies, jobs, queues, deadlines and URL/redirect policy; the
   injected test provider is not a production transport.
-- Desktop `glory-blitz/assets` (facade blitz-assets) owns one Loader per document.
+- Native `glory-blitz/package` (facade blitz-package) owns one Loader per document.
+  Desktop assets (facade blitz-assets) includes package and adds HTTP/file transport.
+  Package-only builds reject nonempty origins/mounts and exclude desktop transport
+  dependencies. Do not bypass NetHandler::prepare when serving immutable bytes;
+  queue, deadline, cancellation and decode/result budgets still apply on mobile.
   Never share one across independent WindowApps or reopen it after close. Empty
   origins denies HTTP; no implicit file/data URL or environment proxy access.
   Validate every redirect and preserve original request ownership separately

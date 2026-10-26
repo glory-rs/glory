@@ -16,7 +16,7 @@ path = "src/ios.rs"
 
 [dependencies]
 counter = { path = "../counter" }
-glory = { path = "../../crates/glory", features = ["blitz-shell"] }
+glory = { path = "../../crates/glory", features = ["blitz-shell", "blitz-package"] }
 
 [lints.rust]
 unsafe_code = "deny"
