@@ -21,6 +21,9 @@ pub(crate) fn attributes(
         attrs.insert("aria-level", level.to_string());
     }
     let Some(value) = value else { return attrs };
+    if let Some(placeholder) = &value.placeholder {
+        attrs.insert("placeholder", placeholder.clone());
+    }
     if let Some(environment) = &value.environment {
         attrs.insert(
             "dir",

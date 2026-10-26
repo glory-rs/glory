@@ -1,5 +1,138 @@
 # Performance Notes
 
+## Plan physical parts and seed rows — 2026-10-25
+
+本轮保留显式 `each_seed` 和普通 Part 销毁/挂起减分配，撤回按需 JS Part 数组实验。
+对 Dioxus 差距的判断仍以[源码和独立计数分析](dioxus-performance-analysis-2026-10-25.md)
+为基础：两者已经整行深克隆，剩余差别主要是克隆后的实例登记、跨边界访问、
+动态字段首写和响应图构造/退休。不能把调用次数比换算成耗时比，也不能通过保留
+离树 DOM 引用来改善清空成绩。当前修改没有重新测量 Dioxus。
+
+### 实现与语义边界
+
+- 完整 Runtime/slot/generation、两份 Memory、HTML key 和全部语义 Entry 仍保留。
+  控件 property、selection、composition 仍走原有受控路径。没有通用 opcode VM，
+  没有延迟 host work，也没有改变每操作成功前缀/receipt/query 屏障。
+- 普通 Part 的销毁/挂起不再建立单元素范围 Vec；销毁后的事件/布局待处理项通过
+  代次校验的活 Entry 表过滤，省去每次退休临时 HashSet。Group 保持注释范围处理。
+- `each_seed(items, key, factory)` 只把首次出现的 T 交给行工厂。相同 key 的新 T
+  和新 index 不通知该行；移除后重新插入会建立新 Owner 和 seed。工厂及其隐式派生
+  仍属于该行 Owner。普通 `each` 的 item/index 活更新语义保持不变。
+
+标准 rows 应用本来就只对 item 做一次 `get_untracked` 且忽略 index，因此可以
+明确迁移到 `each_seed`。label Cage、selected Bond、事件处理和数据生成算法保持不变。
+这属于应用 API 迁移，必须和不改应用的内部优化分开比较。
+
+### 保留版结果与验收
+
+基线 `aecbe360bd0731f118af31e653f6df2b26ef7576`；保留版是 each_seed 应用迁移加
+普通 Part 退休/挂起减分配，没有 JS Part 数组。两个独立 target，先冻结源码，再
+构建；保留版因 Clippy 的 let-and-return 清理在自己的 target 内重编 web/app，
+没有跨版本复制产物。最终 512 个输入与当前源码逐一匹配。
+[构建审计](D:/BuildCache/glory-parts-20261025/kept-audit.json)。
+
+每操作相邻交错 before/kept，轮换先后并在第二轮反转；每轮新 context，每项 3 次
+热身、12 次测量，共 **432 样本**，保留所有慢样本。Chrome 155.0.8059.84，
+1280×900 / DPR 1，独占本任务的浏览器进程，CDP 取得其进程 ID 后固定 affinity
+65535 / AboveNormal。机器上有其他并行构建；本轮环境漂移明显，结果不代表无噪声
+的绝对性能或统计显著性。未重新跑 Dioxus，不拼接旧时间计算新倍数。
+
+ScriptDuration 中位数，ms；正百分比为变慢：
+
+| 操作 | before | 保留版 | 变化 |
+|---|---:|---:|---:|
+| 创建千行 | 25.102 | 25.658 | +2.2% |
+| 替换千行 | 42.821 | 41.169 | -3.9% |
+| 更新每十行 | 0.797 | 0.746 | -6.3% |
+| 选行 | 0.814 | 0.840 | +3.1% |
+| 交换行 | 0.748 | 0.477 | -36.2% |
+| 删除行 | 0.769 | 0.512 | -33.4% |
+| 追加千行 | 24.787 | 24.616 | -0.7% |
+| 创建万行 | 310.714 | 308.506 | -0.7% |
+| 清空千行 | 19.044 | 17.267 | -9.3% |
+
+交换两轮 before→kept 为 **0.732→0.447 / 0.878→0.550**，删除为
+**0.710→0.463 / 0.892→0.558**，方向一致。清空两轮 **18.793→19.693 /
+19.294→16.395**，不能声称稳定降低 9.3%。创建千行两轮都略快，但合并中位数反而
+略慢，说明 pooled median 在分布漂移时不能替代相邻样本/逐轮观察。替换、局部更新、
+追加也有方向混合；万行不足 1%，不宣称批量创建已经明显改善。
+
+明确的结构收益是万行 graph **60,003→40,003**，Owner **20,013→10,013**；
+完整语义节点仍为 80,010。清空后仍为 graph 3 / Owner 13 / UI nodes 10。
+[最终原始样本](D:/BuildCache/glory-parts-20261025/kept-interleaved/evidence.json)、
+[逐轮与 p10/p90](D:/BuildCache/glory-parts-20261025/kept-summary.json)。
+
+UI / Render / HTML **442 项测试通过**，其中新增 seed 初值、重排保持本地状态、
+移除重插、工厂构造上下文与资源退休、精确图节点/Owner 减量测试。最终 WASM
+all-features/all-targets 严格 Clippy 与 workspace fmt 通过。最终浏览器 **27/27**
+通过，包含 CSR、SSR、stream、hydrate、受控编辑、查询和 Owner 清理。额外覆盖完整的
+存续 Element/Text/语义 ID、全部万行矩形及清空；Plan 增补部分退休、旧 ID 拒绝、
+新实例隔离、属性 Clear、实际 Bounds 查询和挂起/恢复。测试这些仍有价值，虽 JS
+Part 候选撤回也予以保留。没有在本轮重新宣称 Linux/Blitz/OS IME/屏幕阅读器验收。
+[单元测试](D:/BuildCache/glory-parts-20261025/tests.txt)、
+[严格 Clippy](D:/BuildCache/glory-parts-20261025/kept-clippy.txt)、
+[完整身份和几何](D:/BuildCache/glory-parts-20261025/kept-integrity/evidence.json)、
+[最终 Plan 浏览器验收](D:/BuildCache/glory-parts-20261025/kept-plan/evidence.json)、
+[最终 27 组浏览器验收](D:/BuildCache/glory-parts-20261025/kept-browser/evidence.json)、
+[相同数据与六处 PNG 哈希对照](D:/BuildCache/glory-parts-20261025/kept-pixels/evidence.json)。
+
+### 撤回的 JS Part 实验
+
+候选让每个 Plan 实例持有一个 JS Part 数组；文本/属性在 JS 中直接取 Part，
+Rust 在结构操作、输入和查询时才取回 Node，偏移/范围在声明级共享。部分删除清空
+自身单元，整实例退休一次清空数组。其功能与清引用验收通过，但减少 ABI 调用
+没有带来稳定的时间收益，因此最终源码恢复原来的 Array.get / Parts 句柄路径。
+
+以下是**撤回候选**的独立探针，不能当作保留实现的指标。千行创建：
+
+| 指标 | before | JS Part 候选、原 Each 应用 | 候选再使用 each_seed |
+|---|---:|---:|---:|
+| WASM→JS 调用 | 19,034 | 8,034 | 8,034 |
+| Array.get | 11,000 | 1,000 | 1,000 |
+| JS→WASM externref allocator 调用 | 1,010 | 1,010 | 1,010 |
+| JS→WASM malloc 调用 | 2 | 2 | 2 |
+| 深克隆 / setAttribute / insertBefore | 1,000 / 9,000 / 1,000 | 相同 | 相同 |
+| 直接 Node externref 句柄 | 11,054 | 1,054 | 1,054 |
+| 活 Plan 数组 / 数组中的 Node 引用 | 0 / 0 | 1,000 / 11,000 | 1,000 / 11,000 |
+| 万行 graph / Owner | 60,003 / 20,013 | 相同 | 40,003 / 10,013 |
+
+句柄减少不是 DOM 对象减少，也不是总堆或 RSS 降幅。新路径仍通过 JS 数组持有全部
+物理部件，并保留按需取得的 Node 引用。清空千行调用数 **2,034→3,034**，包括
+每实例的一次数组清引用；不隐藏这一新增工作。
+
+创建万行→清空→GC→再次创建/清空千行后，三版的表内离树行引用均为 0；活图回到 3，
+UI 节点回到 10，Owner 回到 13。新路径活 Part 数组/数组内 Node 引用均回到 0。
+这里只统计框架可达句柄及 Part 数组，不将 JS 引擎 GC 时点、容量或 RSS 混为一谈。
+详见 [双向 ABI 与引用计数](D:/BuildCache/glory-parts-20261025/counts.json)。额外探针
+刻意持有数组：部分删除的两个单元均为 null、三个剩余 Part 可用；最终三个实例
+数组长度均为 0，见 [引用验收](D:/BuildCache/glory-parts-20261025/retention.json)。
+
+长轮次初测存在明显漂移：before 千行创建两轮 20.122 / 39.450 ms，不采用合并
+百分比作为保留依据。随后每个操作交错运行 before / 候选 / 候选+seed，每项三次
+热身、每轮十二样本、两轮反转并轮换顺序，648 样本。原 sample/setup/action/settle/
+snapshot/CDP 边界不改，只增加单操作入口，数据摘要逐样本一致。
+
+仅 JS Part 候选的万行创建两轮为 **329.254 / 314.570 ms**，均慢于同轮 before
+**322.787 / 303.584 ms**；局部文本更新 **0.725 / 0.718 ms**，也慢于 before
+**0.633 / 0.652 ms**。其他场景混合且有漂移；不把较少的调用/句柄包装成已实现的
+加速，也不将所有差值直接归因于 JS 数组。实验还包括 Each 新模式的内部枚举与
+销毁减分配，原应用没有启用 seed；这些因素及共享机器噪声都存在。
+[初测原始数据](D:/BuildCache/glory-parts-20261025/final/evidence.json)、
+[交错复核](D:/BuildCache/glory-parts-20261025/interleaved/evidence.json)、
+[逐轮分布](D:/BuildCache/glory-parts-20261025/interleaved-summary.json)。
+
+### 尚未完成的批量路径
+
+最终仍是一行一次 clone、逐 Part 返回和一次 insertBefore，没有实现
+跨多实例的一次创建/挂接。完整实例登记、11 个 Part 的 JS 寻址、8 个语义身份属性、
+两份 Memory 和动态字段首写仍有成本。下一步应在明确每个操作成功水位的前提下做
+有限的多实例创建/挂接协议，不能在提交尾部统一执行所有 DOM 操作而丢失失败前缀。
+
+Plan 初始动态字段一次初始化、class token/String/Edit 多层复制和发布临时 Vec
+也没有在本轮消除。前者需要在真实 Binding 依赖上下文中采集初值，并让两份 Memory
+独立验证；不能把 untracked 首读当成订阅，不能跨 query/action/input 屏障折叠。
+本轮优先完成语义风险较小的 seed 入口，并用独立应用组识别其收益。
+
 ## Plan preparation and batch identity checks — 2026-10-25
 
 最新同批改进见 [Plan 优化报告](plan-batch-preparation-optimization-2026-10-25.md)：

@@ -184,49 +184,57 @@ pub struct Document {
     pub nonce: Option<String>,
 }
 pub fn render_document(widget: impl Widget, document: &Document) -> glory_ui::Result<String> {
-    // Validate all sheets before constructing widgets or executing business
-    // factories. Compiling assets must not partially mount a failed request.
-    #[cfg(feature = "css")]
-    let css = document
-        .sheets
-        .iter()
-        .map(|value| glory_html::sheet(value, glory_render::style::Profile::HTML))
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|err| Error::Backend(err.to_string()))?;
-    let body = render(widget)?;
-    let mut html = String::from("<!doctype html><html");
-    if let Some(lang) = &document.lang {
-        html.push_str(&format!(" lang=\"{}\"", glory_html::escape(lang)));
-    }
-    let nonce = document
-        .nonce
-        .as_ref()
-        .map(|value| format!(" nonce=\"{}\"", glory_html::escape(value)))
-        .unwrap_or_default();
-    html.push_str(&format!(
+    let mut html = document.opening_html()?;
+    html.push_str(&render(widget)?);
+    html.push_str("</body></html>");
+    Ok(html)
+}
+impl Document {
+    /// Shared document prefix for complete and progressive HTML responses.
+    /// Validates styles before mounting UI; append body content and closing tags.
+    pub fn opening_html(&self) -> glory_ui::Result<String> {
+        let document = self;
+        // Validate all sheets before constructing widgets or executing business
+        // factories. Compiling assets must not partially mount a failed request.
+        #[cfg(feature = "css")]
+        let css = document
+            .sheets
+            .iter()
+            .map(|value| glory_html::sheet(value, glory_render::style::Profile::HTML))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|err| Error::Backend(err.to_string()))?;
+        let mut html = String::from("<!doctype html><html");
+        if let Some(lang) = &document.lang {
+            html.push_str(&format!(" lang=\"{}\"", glory_html::escape(lang)));
+        }
+        let nonce = document
+            .nonce
+            .as_ref()
+            .map(|value| format!(" nonce=\"{}\"", glory_html::escape(value)))
+            .unwrap_or_default();
+        html.push_str(&format!(
         "><head><meta charset=\"utf-8\"><title>{}</title><style data-gly-base=\"v1\"{nonce}>{}</style>",
         glory_html::escape(&document.title),
         glory_html::BASE_CSS
     ));
-    let mut seen = std::collections::HashSet::new();
-    #[cfg(feature = "css")]
-    for value in &css {
-        html.push_str(&format!(
-            "<style data-gly-sheet=\"v1\"{nonce}>{value}</style>"
-        ));
+        let mut seen = std::collections::HashSet::new();
+        #[cfg(feature = "css")]
+        for value in &css {
+            html.push_str(&format!(
+                "<style data-gly-sheet=\"v1\"{nonce}>{value}</style>"
+            ));
+        }
+        for href in document
+            .stylesheets
+            .iter()
+            .filter(|href| seen.insert(href.as_str()))
+        {
+            html.push_str(&format!(
+                "<link rel=\"stylesheet\" href=\"{}\">",
+                glory_html::escape(href)
+            ));
+        }
+        html.push_str("</head><body>");
+        Ok(html)
     }
-    for href in document
-        .stylesheets
-        .iter()
-        .filter(|href| seen.insert(href.as_str()))
-    {
-        html.push_str(&format!(
-            "<link rel=\"stylesheet\" href=\"{}\">",
-            glory_html::escape(href)
-        ));
-    }
-    html.push_str("</head><body>");
-    html.push_str(&body);
-    html.push_str("</body></html>");
-    Ok(html)
 }

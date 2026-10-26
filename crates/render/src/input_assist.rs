@@ -1,4 +1,18 @@
 //! Finite input hints. Hosts never retrieve a code or credential on this basis.
+pub const MAX_INPUT_PLACEHOLDER_BYTES: usize = 4096;
+
+/// Validate a presentation hint without rewriting an editor's business value.
+pub fn validate_input_placeholder(value: &str, multiline: bool) -> Result<(), crate::Error> {
+    if value.len() > MAX_INPUT_PLACEHOLDER_BYTES
+        || value.contains(['\0', '\r'])
+        || (!multiline && value.contains('\n'))
+    {
+        return Err(crate::Error::InvalidProps(
+            "invalid bounded input placeholder",
+        ));
+    }
+    Ok(())
+}
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum InputAutofill {
     Off,

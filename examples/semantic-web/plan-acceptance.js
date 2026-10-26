@@ -68,7 +68,8 @@ async (hostPage) => {
     assert(await page.locator('#plan-ssr .plan-2 .plan-editor').inputValue() === 'other 2', 'post-adoption plan creation');
     await page.evaluate(() => window.demo.plan_edit('swap'));
     assert(await verifyFile('#plan-ssr'), 'adopted File parts replaced on move');
+    await page.evaluate(() => window.demo.plan_parts_lifecycle());
     assert(errors.length === 0, errors.join('\n'));
-    return { instances: 3, keyedIdentity: true, selection: true, composition: true, isolatedPrototype: true, groupFallback: true, fileParts: true, controlRoot: true, hydration: true };
+    return { instances: 3, keyedIdentity: true, selection: true, composition: true, isolatedPrototype: true, groupFallback: true, fileParts: true, controlRoot: true, hydration: true, partialRetirement: true, lazyQuery: true };
   } finally { await page.close(); }
 }

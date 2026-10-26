@@ -156,6 +156,14 @@ fn choice_stream_retains_focus_preserving_intrinsics_and_live_active_descendant(
                     .semantics(scope.bond(move || {
                         Some(Box::new(Semantics {
                             id: Some(SemanticId::new("stream-tags-editor").unwrap()),
+                            placeholder: Some(
+                                if ready.get() {
+                                    "Ready tags"
+                                } else {
+                                    "Add tags"
+                                }
+                                .into(),
+                            ),
                             tags_input: Some(if ready.get() {
                                 glory_render::TagSeparators::EnterCommaSemicolon
                             } else {
@@ -227,6 +235,8 @@ fn choice_stream_retains_focus_preserving_intrinsics_and_live_active_descendant(
     assert!(poll(&mut stream).is_pending());
     gate.resolve(Ok("ready".into()));
     let patch = frame(&mut stream);
+    assert!(shell.body().contains("placeholder=\"Add tags\""));
+    assert!(patch.body().contains("placeholder") && patch.body().contains("Ready tags"));
     for marker in [
         "aria-activedescendant",
         "stream-choice-beta",

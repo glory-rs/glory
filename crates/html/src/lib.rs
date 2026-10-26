@@ -24,6 +24,8 @@ mod focus_scope_tests;
 mod menubar_tests;
 #[cfg(test)]
 mod patch_tests;
+#[cfg(test)]
+mod placeholder_tests;
 mod semantics;
 mod serialize;
 #[cfg(feature = "css")]

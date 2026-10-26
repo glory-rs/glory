@@ -1,0 +1,71 @@
+[package]
+name = "glory-wasm-size"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+resolver = "2"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+base = ["dep:glory", "glory/web"]
+button = ["base"]
+minimal = ["base"]
+css = ["base", "glory/css"]
+hydrate = ["base", "glory/hydrate"]
+resources = ["base", "glory/resources"]
+i18n = ["base", "glory/i18n"]
+ssr = ["base", "glory/ssr"]
+stream = ["base", "glory/stream"]
+all-glory = ["css", "hydrate", "resources", "i18n", "ssr", "stream"]
+use-css = ["css"]
+use-hydrate = ["hydrate"]
+use-resources = ["resources"]
+use-i18n = ["i18n"]
+use-ssr = ["ssr"]
+use-stream = ["stream", "hydrate"]
+embed-stream-script = ["stream"]
+sapid = ["base", "dep:sapid"]
+sapid-button = ["sapid"]
+charts = ["sapid", "sapid/charts"]
+chat = ["sapid", "sapid/chat"]
+code = ["sapid", "sapid/code"]
+files = ["sapid", "sapid/files"]
+editor = ["sapid", "sapid/editor"]
+json = ["sapid", "sapid/json"]
+dates = ["sapid", "sapid/dates"]
+all-sapid = ["charts", "chat", "code", "files", "editor", "json", "dates"]
+use-charts = ["charts"]
+use-chat = ["chat"]
+use-code = ["code"]
+use-files = ["files"]
+use-editor = ["editor"]
+use-json = ["json"]
+use-dates = ["dates"]
+gen-snapshot = ["base", "glory/ssr", "glory/resources", "dep:serde_json"]
+
+[dependencies]
+glory = { path = "../../crates/glory", default-features = false, optional = true }
+sapid = { path = "../../../sapid", default-features = false, optional = true }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "=0.2.129"
+web-sys = { version = "=0.3.106", features = ["Window", "Document", "Element", "HtmlElement", "Node"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+serde_json = { version = "=1.0.154", optional = true }
+
+[[bin]]
+name = "snapshot"
+required-features = ["gen-snapshot"]
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+debug = false
+strip = "debuginfo"

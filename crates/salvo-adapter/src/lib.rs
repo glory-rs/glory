@@ -1,40 +1,50 @@
-//! Salvo adapter for Glory SSR.
+//! Native Salvo HTTP integration. No HTTP types enter Glory's UI or SSR core.
+#![cfg(not(target_arch = "wasm32"))]
 
-use std::convert::Infallible;
+pub use glory_ssr as ssr;
+use glory_ui::{Scope, Widget};
+use salvo::Response;
+use salvo::http::{HeaderValue, StatusCode, header};
 
-use futures::StreamExt;
-pub use glory_core::web::holders::{HtmlChunk, SalvoHandler, ServerHolder};
-use salvo::prelude::{Response, StatusCode};
+#[cfg(feature = "stream")]
+mod streaming;
+#[cfg(feature = "stream")]
+pub use streaming::{StreamError, StreamPage, StreamRenderer};
 
-pub fn render_to_string(holder: &ServerHolder) -> String {
-    holder.render_string()
-}
-
-pub fn into_response(holder: ServerHolder) -> Response {
-    let mut response = Response::new();
-    response.status_code(StatusCode::OK);
-    let _ = response.add_header("content-type", "text/html", true);
-    let _ = response.write_body(holder.render_string());
+/// Wrap already-rendered HTML, including explicitly assembled resource snapshots.
+pub fn html_response(html: impl Into<String>) -> Response {
+    let mut response = html_headers();
+    response
+        .write_body(html.into())
+        .expect("fresh response body");
     response
 }
 
-/// Streams the holder's [`HtmlChunk`] sequence as a Salvo chunked stream body
-/// (via [`Response::stream`]) with a `text/html` content type. This mirrors the
-/// `Scribe for ServerHolder` impl in core under an `into_*` name aligned with
-/// the axum/actix adapters.
-///
-/// `ServerHolder` is `!Send`, but `render_stream()` materializes the whole
-/// [`HtmlChunk`] sequence eagerly (the `!Send` render work runs on this thread
-/// before the stream is constructed); the stream then only yields already-owned
-/// `String` chunks, so it is safe to hand to Salvo's stream body.
-///
-/// This wires up the streaming-body transport (the prerequisite pipeline for
-/// first-byte flush); true incremental parse-and-flush over the wire is bounded
-/// by the `!Send` runtime and is tracked separately as FS4.
-pub fn into_streaming_response(holder: ServerHolder) -> Response {
+/// Render a semantic widget on the calling thread. No runtime survives the call.
+pub fn render_response(widget: impl Widget) -> glory_ui::Result<Response> {
+    ssr::render(widget).map(html_response)
+}
+
+/// Construct reactive state under this request's Owner on the calling thread.
+pub fn render_response_with<W: Widget>(
+    factory: impl FnOnce(&Scope) -> W,
+) -> glory_ui::Result<Response> {
+    ssr::render_with(factory).map(html_response)
+}
+
+pub fn document_response(
+    widget: impl Widget,
+    document: &ssr::Document,
+) -> glory_ui::Result<Response> {
+    ssr::render_document(widget, document).map(html_response)
+}
+
+fn html_headers() -> Response {
     let mut response = Response::new();
     response.status_code(StatusCode::OK);
-    let _ = response.add_header("content-type", "text/html", true);
-    response.stream(holder.render_stream().map(|chunk| Result::<_, Infallible>::Ok(chunk.into_string())));
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("text/html; charset=utf-8"),
+    );
     response
 }

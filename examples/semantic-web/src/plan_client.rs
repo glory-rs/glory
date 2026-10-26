@@ -50,3 +50,108 @@ pub fn plan_edit(command: &str) -> Result {
         web.app().flush().map_err(js)
     })
 }
+
+/// Exercise partial retirement of a shared physical instance, then reuse the
+/// retired semantic slots while the rest of that instance remains live.
+#[wasm_bindgen]
+pub fn plan_parts_lifecycle() -> Result {
+    use glory::prelude::*;
+    use glory::render::{Change, Descriptor, Patch, Props, Query, QueryValue};
+    use std::{cell::Cell, rc::Rc};
+    clear();
+    let document = web_sys::window().unwrap().document().unwrap();
+    let root = document.get_element_by_id("app").unwrap();
+    let web = glory::web::launch(root.clone(), group()).map_err(js)?;
+    let app = web.app();
+    let owner = app.scope().child().map_err(js)?;
+    let declaration = plan(
+        view().class("split-plan").fill((
+            text().class("split-first").content("first").mark("first"),
+            button()
+                .class("split-second")
+                .label("second")
+                .mark("second"),
+        )),
+    )
+    .map_err(js)?;
+    let first = declaration.part("first").map_err(js)?;
+    let second = declaration.part("second").map_err(js)?;
+    let instance = owner.instantiate(&declaration).map_err(js)?;
+    let target_owner = app.scope().child().map_err(js)?;
+    let target = target_owner
+        .create(Descriptor::new(Props::View))
+        .map_err(js)?;
+    owner
+        .place(instance.node(&first).map_err(js)?, Some(target), None)
+        .map_err(js)?;
+    app.flush().map_err(js)?;
+    let removed = root.query_selector(".split-first")?.unwrap();
+    let survivor = root.query_selector(".split-second")?.unwrap();
+    target_owner.dispose();
+    app.flush().map_err(js)?;
+    assert!(!removed.is_connected());
+    assert!(instance.text(&first, "retired".to_owned()).is_err());
+    instance.label(&second, "survived".to_owned()).map_err(js)?;
+    let replacement = owner.instantiate(&declaration).map_err(js)?;
+    replacement.text(&first, "fresh".to_owned()).map_err(js)?;
+    instance
+        .class(&second, "split-second updated".to_owned())
+        .map_err(js)?;
+    app.flush().map_err(js)?;
+    assert_eq!(survivor.text_content().as_deref(), Some("survived"));
+    assert_eq!(removed.text_content().as_deref(), Some("first"));
+    assert!(
+        survivor.is_same_node(
+            root.query_selector(".updated")?
+                .as_ref()
+                .map(|e| e.as_ref())
+        )
+    );
+    instance
+        .patch(&second, Patch::Classes(Change::Clear))
+        .map_err(js)?;
+    app.flush().map_err(js)?;
+    assert!(!survivor.has_attribute("class"));
+    let replied = Rc::new(Cell::new(false));
+    let seen = replied.clone();
+    app.request(
+        Query::Bounds(instance.node(&second).map_err(js)?),
+        move |reply| {
+            assert!(matches!(reply, Ok(QueryValue::Bounds(rect)) if rect.width > 0.0));
+            seen.set(true);
+        },
+    )
+    .map_err(js)?;
+    app.pump().map_err(js)?;
+    assert!(replied.get());
+    let parked_plan = plan(text().content("parked").class("parked-plan")).map_err(js)?;
+    let parked = owner
+        .mount_with(|| {
+            widget(move |scope| {
+                scope.instantiate(&parked_plan)?;
+                Ok(())
+            })
+        })
+        .map_err(js)?;
+    app.flush().map_err(js)?;
+    let parked_node = root.query_selector(".parked-plan")?.unwrap();
+    parked.suspend().map_err(js)?;
+    app.flush().map_err(js)?;
+    assert!(!parked_node.is_connected());
+    parked.place_before(None).map_err(js)?;
+    app.flush().map_err(js)?;
+    assert!(
+        parked_node.is_same_node(
+            root.query_selector(".parked-plan")?
+                .as_ref()
+                .map(|e| e.as_ref())
+        )
+    );
+    owner.dispose();
+    app.flush().map_err(js)?;
+    assert!(root.query_selector(".split-plan")?.is_none());
+    assert_eq!(app.stats().queries, 0);
+    drop(web);
+    assert!(!root.has_child_nodes());
+    Ok(())
+}

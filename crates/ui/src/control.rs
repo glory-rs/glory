@@ -91,7 +91,10 @@ impl Widget for When {
     }
 }
 
-type RowFactory<T> = Box<dyn FnMut(Cage<T>, Cage<usize>) -> Box<dyn Widget>>;
+enum RowFactory<T: 'static> {
+    Reactive(Box<dyn FnMut(Cage<T>, Cage<usize>) -> Box<dyn Widget>>),
+    Seed(Box<dyn FnMut(T) -> Box<dyn Widget>>),
+}
 type KeyFn<T, K> = Box<dyn Fn(&T) -> K>;
 pub struct Each<T: Clone + 'static, K: Clone + Eq + Hash + 'static> {
     items: Option<Lotus<Vec<T>>>,
@@ -109,11 +112,35 @@ pub fn each<T: Clone + 'static, K: Clone + Eq + Hash + 'static, W: Widget>(
     Each {
         items: Some(items.into()),
         key: Some(Box::new(key)),
-        render: Some(Box::new(move |item, index| Box::new(render(item, index)))),
+        render: Some(RowFactory::Reactive(Box::new(move |item, index| {
+            Box::new(render(item, index))
+        }))),
+    }
+}
+/// Mount a complete keyed sequence whose factory consumes only the initial
+/// value of each key. Retained keys keep their widget and local state: later
+/// item replacements and index changes are deliberately not delivered to it.
+/// Change the key to recreate a row, or use `each` for reactive item/index data.
+/// The factory runs under the row Owner, without item/index Cages or a separate
+/// data Owner. Removed keys retire immediately; reinsertion gets a fresh seed.
+pub fn each_seed<T: Clone + 'static, K: Clone + Eq + Hash + 'static, W: Widget>(
+    items: impl Into<Lotus<Vec<T>>>,
+    key: impl Fn(&T) -> K + 'static,
+    mut render: impl FnMut(T) -> W + 'static,
+) -> Each<T, K> {
+    Each {
+        items: Some(items.into()),
+        key: Some(Box::new(key)),
+        render: Some(RowFactory::Seed(Box::new(move |item| {
+            Box::new(render(item))
+        }))),
     }
 }
 struct BoundRow<T: 'static> {
     mounted: Mounted,
+    data: Option<BoundData<T>>,
+}
+struct BoundData<T: 'static> {
     _data: Scope,
     item: Cage<T>,
     index: Cage<usize>,
@@ -133,18 +160,28 @@ impl<T: Clone + 'static, K: Clone + Eq + Hash> RowHost for Rows<T, K> {
     }
     fn mount(&mut self, index: usize, _: &K) -> Self::Row {
         let row = (|| {
-            let data = self.parent.upgrade().ok_or(Error::Gone)?.child()?;
+            let parent = self.parent.upgrade().ok_or(Error::Gone)?;
+            let RowFactory::Reactive(render) = &mut self.render else {
+                let RowFactory::Seed(render) = &mut self.render else {
+                    unreachable!()
+                };
+                let seed = self.items[index].clone();
+                return Ok(BoundRow {
+                    mounted: parent.mount_with(|| render(seed))?,
+                    data: None,
+                });
+            };
+            let data = parent.child()?;
             let item = data.cage(self.items[index].clone());
             let position = data.cage(index);
-            let mounted = data
-                .owner()
-                .enter(|| (self.render)(item, position))
-                .mount(&data)?;
+            let mounted = data.owner().enter(|| render(item, position)).mount(&data)?;
             Ok(BoundRow {
                 mounted,
-                _data: data,
-                item,
-                index: position,
+                data: Some(BoundData {
+                    _data: data,
+                    item,
+                    index: position,
+                }),
             })
         })();
         match row {
@@ -156,7 +193,7 @@ impl<T: Clone + 'static, K: Clone + Eq + Hash> RowHost for Rows<T, K> {
         }
     }
     fn update(&mut self, index: usize, _: &K, row: &mut Self::Row) {
-        if let Some(row) = row {
+        if let Some(row) = row.as_mut().and_then(|row| row.data.as_mut()) {
             row.item.revise(|value| *value = self.items[index].clone());
             if row.index.get_untracked() != index {
                 row.index.revise(|value| *value = index);

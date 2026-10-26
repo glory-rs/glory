@@ -12,7 +12,7 @@ pub use plan::{Plan, PlanInstance, PlanPart, plan};
 pub mod list;
 pub use app::{App, Error, Mounted, Result, Scope, Settle, UiStats, WeakScope, Widget};
 pub use builders::*;
-pub use control::{Each, When, each, when};
+pub use control::{Each, When, each, each_seed, when};
 pub use glory_render::{
     Current, DismissReason, Event, EventKind, FieldPart, FocusMode, FormAction, FormControl,
     GridCommand, InputAssist, InputAutofill, InputEdit, InputEditCapture, InputEditIntent,

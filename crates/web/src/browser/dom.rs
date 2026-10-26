@@ -1,5 +1,5 @@
 use std::cell::{Cell, RefCell};
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
 
 use glory_html::{Edit, EditKind, Kind, Op, Part, Property, Shape};
@@ -858,10 +858,12 @@ impl Dom {
             let mut entries = self.entries.borrow_mut();
             subtree.iter().filter_map(|id| entries.remove(id)).collect()
         };
-        let subtree: HashSet<_> = subtree.into_iter().collect();
+        // Membership is already represented by the generation-checked live
+        // table after removal; no per-disposal HashSet is necessary.
+        let entries = self.entries.borrow();
         self.rich_pending
             .borrow_mut()
-            .retain(|id| !subtree.contains(id));
+            .retain(|id| entries.contains_key(id));
         for id in &subtree {
             self.rich_live.borrow_mut().remove(id);
         }
@@ -869,7 +871,7 @@ impl Dom {
             .drag
             .borrow()
             .as_ref()
-            .is_some_and(|drag| subtree.contains(&drag.from))
+            .is_some_and(|drag| !entries.contains_key(&drag.from))
         {
             self.drag.borrow_mut().take();
         }
@@ -888,10 +890,11 @@ impl Dom {
         }
         self.layout
             .borrow_mut()
-            .retain(|(id, _)| !subtree.contains(id));
-        self.inputs
-            .borrow_mut()
-            .retain(|input| !matches!(input, Input::Event { node, .. } if subtree.contains(node)));
+            .retain(|(id, _)| entries.contains_key(id));
+        self.inputs.borrow_mut().retain(
+            |input| !matches!(input, Input::Event { node, .. } if !entries.contains_key(node)),
+        );
+        drop(entries);
         if let Some(observer) = self.observer.borrow().as_ref() {
             for entry in &removed {
                 if entry.interests.borrow().contains(&EventKind::Resize)
@@ -904,12 +907,17 @@ impl Dom {
                 }
             }
         }
-        for node in range(&entry)? {
+        let remove = |node: &Node| -> Result<(), Error> {
             if let Some(parent) = node.parent_node() {
-                parent.remove_child(&node).map_err(backend)?;
+                parent.remove_child(node).map_err(backend)?;
             }
+            Ok(())
+        };
+        if let Boundary::Part(_) = entry.boundary {
+            remove(entry.first())
+        } else {
+            range(&entry).and_then(|nodes| nodes.iter().try_for_each(remove))
         }
-        Ok(())
     }
     pub fn clear(&self) {
         self.rich_pending.borrow_mut().clear();
@@ -988,8 +996,12 @@ impl glory_html::Sink for Sink {
                 let mut parking = entry.fragment.borrow_mut();
                 let fragment =
                     parking.get_or_insert_with(|| self.0.document.create_document_fragment());
-                for node in range(&entry)? {
-                    fragment.append_child(&node).map_err(backend)?;
+                if let Boundary::Part(_) = entry.boundary {
+                    fragment.append_child(entry.first()).map_err(backend)?;
+                } else {
+                    for node in range(&entry)? {
+                        fragment.append_child(&node).map_err(backend)?;
+                    }
                 }
                 Ok(())
             }

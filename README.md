@@ -7,8 +7,9 @@ virtual DOM is required.
 This branch is an intentionally breaking implementation in progress. The
 [architecture report](docs/semantic-ui-rendering-architecture-report-2026-10-21.md)
 defines the target; the [implementation ledger](docs/semantic-ui-implementation.md)
-records what actually works. Old HTML examples and adapter sources have not yet
-been ported and are not supported entry points for the new core.
+records what actually works. The active Salvo integration is documented below;
+remaining old HTML examples and adapter sources are extraction references and
+are not supported entry points for the new core.
 
 The migrated [counter example](examples/counter) shares one semantic component,
 state, event handlers and typed styles between Web and Blitz desktop hosts.
@@ -52,6 +53,11 @@ Its README includes build/run commands and the current platform boundaries.
   versioned fragments can be adopted with the optional `hydrate` feature.
 - `glory-ssr/stream`: native pull-driven shell/edit/end frames with owned request
   cancellation and a CSP-compatible browser bootstrap before final hydration.
+- [`glory-salvo`](crates/salvo-adapter): native Salvo responses for synchronous
+  semantic SSR and optional genuine progressive HTML streaming. Its bounded
+  local workers preserve body-driven backpressure and cancellation on disconnect.
+  Run `cargo run -p glory-salvo --example ssr --features stream` for `/plain`,
+  `/stream` and the matching browser script. Legacy Axum/Actix adapters are removed.
 - `glory-blitz`: native headless document adapter using the same HTML edits,
   actual CSS/box/text layout, viewport/DPI, measurements and programmatic scrolling.
   Enable optional `blitz`; run `cargo run -p glory --example semantic_blitz --features blitz`.
@@ -358,3 +364,5 @@ adapters and their old test modules are not covered by these commands.
 Rust 1.94 or later is declared. Current verification uses Rust 1.98; foundation
 checks also cover wasm32-unknown-unknown, aarch64-linux-android and
 x86_64-unknown-linux-gnu. Actual platform UI validation is tracked separately.
+
+The [Glory/Sapid WASM size baseline](docs/wasm-size-baseline.md) measures minimal apps, unused features and actual widget use, with browser checks and a regression gate.

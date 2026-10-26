@@ -1,0 +1,2255 @@
+{
+  "schema": 1,
+  "label": "baseline",
+  "versions": {
+    "rustc": "rustc 1.98.0 (88d9e12ae 2026-08-18)\nbinary: rustc\ncommit-hash: 88d9e12ae178fab0fb5cc050a94da85685d449ea\ncommit-date: 2026-08-18\nhost: x86_64-pc-windows-msvc\nrelease: 1.98.0\nLLVM version: 22.1.8",
+    "cargo": "cargo 1.98.0 (797e8a9bc 2026-08-05)",
+    "bindgen": "wasm-bindgen 0.2.129",
+    "binaryen": "wasm-opt version 132 (version_132)",
+    "node": "v24.3.0"
+  },
+  "sourceDigest": "7460f8bb11c7334af3b0277a7aa8dbfe5d389a0a22a3fed3047709cae0400b65",
+  "verifiedTarget": "D:\\BuildCache\\sapid\\wasm-size\\target",
+  "profile": {
+    "optLevel": "z",
+    "lto": true,
+    "codegenUnits": 1,
+    "strip": "debuginfo"
+  },
+  "optimizer": "-Oz --enable-bulk-memory --enable-reference-types",
+  "compression": {
+    "brotliQuality": 11,
+    "gzipLevel": 9
+  },
+  "cases": [
+    {
+      "name": "empty",
+      "features": [],
+      "reference": null,
+      "bindgen": {
+        "bytes": 19135,
+        "brotli": 6769,
+        "gzip": 7913,
+        "sha256": "f95f5ed91acd46a20d2063e42986ec7d19ac6547d42664101a5f432f3e96a4b2"
+      },
+      "optimized": {
+        "bytes": 1379,
+        "brotli": 803,
+        "gzip": 904,
+        "sha256": "855d97d594ca262523c83db0c6070f21e8dc597a5384e1fef2f81bae6637fbe2"
+      },
+      "js": {
+        "bytes": 4175,
+        "brotli": 1069,
+        "gzip": 1241,
+        "sha256": "f45eff4a4354f07546be60fce5097278888afc1e87dc9b6ad8adb4294260f419",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 4175,
+            "brotli": 1069,
+            "gzip": 1241,
+            "sha256": "fe19bbf926f8bbbf387ef4405db4c5104e68f0ffdde510480a5dd43999f79540"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 13,
+        "2": 51,
+        "3": 4,
+        "4": 5,
+        "5": 3,
+        "6": 25,
+        "7": 141,
+        "10": 175,
+        "11": 653,
+        "12": 1
+      }
+    },
+    {
+      "name": "glory-minimal",
+      "features": [
+        "minimal"
+      ],
+      "reference": "empty",
+      "bindgen": {
+        "bytes": 2130296,
+        "brotli": 328023,
+        "gzip": 436965,
+        "sha256": "f6ba345a93911885c84200117fa052572d237caa4955fcc4f3f99abc31b4e9ea"
+      },
+      "optimized": {
+        "bytes": 899792,
+        "brotli": 283106,
+        "gzip": 356656,
+        "sha256": "43d4a39de95f1de388e95cf7ec58180eee75119f1b135cdec082f07eb7217c66"
+      },
+      "js": {
+        "bytes": 59232,
+        "brotli": 8816,
+        "gzip": 10347,
+        "sha256": "fb86774e57fa8afa28712aaa2fa3456db5a9cced756647438fdfd5a21bff884b",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57243,
+            "brotli": 8062,
+            "gzip": 9454,
+            "sha256": "d37f6ad76cb76a4aebc1e0f5638a93916d2bfeac4677fa7fc0ab8d1fb7547bb7"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 786,
+        "2": 11604,
+        "3": 2232,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 579,
+        "10": 804923,
+        "11": 78412,
+        "12": 1
+      }
+    },
+    {
+      "name": "glory-text",
+      "features": [
+        "base"
+      ],
+      "reference": "empty",
+      "bindgen": {
+        "bytes": 2217621,
+        "brotli": 334778,
+        "gzip": 447202,
+        "sha256": "dd75effaefd948d77c1476233867ba7d45ea9f7494bfb9640179e42af314eaee"
+      },
+      "optimized": {
+        "bytes": 920659,
+        "brotli": 288913,
+        "gzip": 364148,
+        "sha256": "e3c21e13e1d68e365fdaaff3c3a8bf84ebfa7b7c8ff4cd0caff7fda81fdea7b3"
+      },
+      "js": {
+        "bytes": 59232,
+        "brotli": 8816,
+        "gzip": 10347,
+        "sha256": "8c07519ba38a4a48c94d00f8a6d70671b1c774d9ef9327e15b977ddc4f4d5fe9",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57243,
+            "brotli": 8062,
+            "gzip": 9454,
+            "sha256": "81402048bb467b4e41db5ad3945b4e0b3c78957501769da2b388711fa2f88c31"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 817,
+        "2": 11604,
+        "3": 2305,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 605,
+        "10": 824898,
+        "11": 79174,
+        "12": 1
+      }
+    },
+    {
+      "name": "glory-button",
+      "features": [
+        "button"
+      ],
+      "reference": "glory-text",
+      "bindgen": {
+        "bytes": 2238290,
+        "brotli": 335793,
+        "gzip": 449518,
+        "sha256": "6866bdbb8118fb0afc152dc1c1be55e852146bea40d40b289191f80c86d6fa2d"
+      },
+      "optimized": {
+        "bytes": 924724,
+        "brotli": 290662,
+        "gzip": 366039,
+        "sha256": "d0fa53afb1880c008779dceb7057b85d5a1a8ca05c565239b14e0b81c35b811c"
+      },
+      "js": {
+        "bytes": 59232,
+        "brotli": 8797,
+        "gzip": 10347,
+        "sha256": "3b043b6932da8261a8e6ae701261da185747b03cf81cbea732e449c792e575bc",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57243,
+            "brotli": 8043,
+            "gzip": 9454,
+            "sha256": "60c2ff02a6dc8e74ca1aa341578c0e08da96abd03a1fad96ae26f9c7b554e82a"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 825,
+        "2": 11604,
+        "3": 2308,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 613,
+        "10": 828319,
+        "11": 79799,
+        "12": 1
+      }
+    },
+    {
+      "name": "glory-css-unused",
+      "features": [
+        "css"
+      ],
+      "reference": "glory-text",
+      "bindgen": {
+        "bytes": 2219268,
+        "brotli": 334680,
+        "gzip": 447537,
+        "sha256": "76c1816462af498dc318f665e8fbd19fec467d700bc7461ca6564ae96a846965"
+      },
+      "optimized": {
+        "bytes": 920308,
+        "brotli": 288714,
+        "gzip": 364024,
+        "sha256": "ab8413f1fcd8ec2dff1ea41346248f7c05ab399468425f2e3946c72207302165"
+      },
+      "js": {
+        "bytes": 59232,
+        "brotli": 8816,
+        "gzip": 10347,
+        "sha256": "8c07519ba38a4a48c94d00f8a6d70671b1c774d9ef9327e15b977ddc4f4d5fe9",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57243,
+            "brotli": 8062,
+            "gzip": 9454,
+            "sha256": "81402048bb467b4e41db5ad3945b4e0b3c78957501769da2b388711fa2f88c31"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 817,
+        "2": 11604,
+        "3": 2302,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 611,
+        "10": 824430,
+        "11": 79288,
+        "12": 1
+      }
+    },
+    {
+      "name": "glory-hydrate-unused",
+      "features": [
+        "hydrate"
+      ],
+      "reference": "glory-text",
+      "bindgen": {
+        "bytes": 2225973,
+        "brotli": 334534,
+        "gzip": 448079,
+        "sha256": "c9ce4a679bdd58ab543dbe6f3d4f2e29f87dee30bca1dd3531feacd6d6898cc7"
+      },
+      "optimized": {
+        "bytes": 921203,
+        "brotli": 289378,
+        "gzip": 364558,
+        "sha256": "16d44535919b30fd70dadc39c568f62b2b3b528c5152e6ff88b3dec684c15602"
+      },
+      "js": {
+        "bytes": 59232,
+        "brotli": 8816,
+        "gzip": 10347,
+        "sha256": "8c07519ba38a4a48c94d00f8a6d70671b1c774d9ef9327e15b977ddc4f4d5fe9",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57243,
+            "brotli": 8062,
+            "gzip": 9454,
+            "sha256": "81402048bb467b4e41db5ad3945b4e0b3c78957501769da2b388711fa2f88c31"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 817,
+        "2": 11604,
+        "3": 2300,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 605,
+        "10": 825455,
+        "11": 79166,
+        "12": 1
+      }
+    },
+    {
+      "name": "glory-resources-unused",
+      "features": [
+        "resources"
+      ],
+      "reference": "glory-text",
+      "bindgen": {
+        "bytes": 2220956,
+        "brotli": 334850,
+        "gzip": 447663,
+        "sha256": "08eb6b4b9c0151d0fd4cb8923ae9a90ca47472c11ce5ebd5e3922b0177be71ca"
+      },
+      "optimized": {
+        "bytes": 920855,
+        "brotli": 289087,
+        "gzip": 364189,
+        "sha256": "8eb2389ca7d2780c3767030b3c8b63d0a43cabd6d2e35d5e202ca0a89626157e"
+      },
+      "js": {
+        "bytes": 59232,
+        "brotli": 8816,
+        "gzip": 10348,
+        "sha256": "215740bb2d3e345ea3dd55d292a7751657b93a86a0cd73e1af9292b89b08d8cb",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57243,
+            "brotli": 8062,
+            "gzip": 9455,
+            "sha256": "4bad3d047fdc7225141740dcb02232d985afdb598da7d5f38624e403dd235a6f"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 817,
+        "2": 11604,
+        "3": 2310,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 613,
+        "10": 825065,
+        "11": 79190,
+        "12": 1
+      }
+    },
+    {
+      "name": "glory-i18n-unused",
+      "features": [
+        "i18n"
+      ],
+      "reference": "glory-text",
+      "bindgen": {
+        "bytes": 2220298,
+        "brotli": 334807,
+        "gzip": 447602,
+        "sha256": "d3db7fe44b4f18ebe455d24f39051af2c42a25ed9a220e574ee556a0fd677fc5"
+      },
+      "optimized": {
+        "bytes": 921349,
+        "brotli": 289133,
+        "gzip": 364312,
+        "sha256": "b15763fc81c09fb90927a785f3ea91689ec85821997c24eb01d62f2103395e96"
+      },
+      "js": {
+        "bytes": 59232,
+        "brotli": 8816,
+        "gzip": 10348,
+        "sha256": "215740bb2d3e345ea3dd55d292a7751657b93a86a0cd73e1af9292b89b08d8cb",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57243,
+            "brotli": 8062,
+            "gzip": 9455,
+            "sha256": "4bad3d047fdc7225141740dcb02232d985afdb598da7d5f38624e403dd235a6f"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 817,
+        "2": 11604,
+        "3": 2319,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 613,
+        "10": 825542,
+        "11": 79198,
+        "12": 1
+      }
+    },
+    {
+      "name": "glory-ssr-unused",
+      "features": [
+        "ssr"
+      ],
+      "reference": "glory-text",
+      "bindgen": {
+        "bytes": 2217621,
+        "brotli": 334629,
+        "gzip": 447301,
+        "sha256": "3f04c98b03d7d123f3f0ce9fa7e27899ec0105e10d16581417a148b28125f456"
+      },
+      "optimized": {
+        "bytes": 920659,
+        "brotli": 288745,
+        "gzip": 364132,
+        "sha256": "7e67d5cf0ad4234a0e83f472e5a61e950d041c95fcb8fd2f543efe231bcb7992"
+      },
+      "js": {
+        "bytes": 59232,
+        "brotli": 8804,
+        "gzip": 10348,
+        "sha256": "c854bf5d06c62390342e5ac612fc6d89b11a0ffe8aac21e232d62b4642860bbd",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57243,
+            "brotli": 8050,
+            "gzip": 9455,
+            "sha256": "bb321e3494afab15dfd1aacdfd86962f3fa85d28f42f644e6e7eeba32e57c4c5"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 817,
+        "2": 11604,
+        "3": 2305,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 605,
+        "10": 824898,
+        "11": 79174,
+        "12": 1
+      }
+    },
+    {
+      "name": "glory-stream-unused",
+      "features": [
+        "stream"
+      ],
+      "reference": "glory-text",
+      "bindgen": {
+        "bytes": 2229422,
+        "brotli": 334741,
+        "gzip": 448639,
+        "sha256": "552e2603868be60206f020941c78db76deca5b4d61d5e2648c9ebfe905d5d950"
+      },
+      "optimized": {
+        "bytes": 921415,
+        "brotli": 289245,
+        "gzip": 364671,
+        "sha256": "39b21141675bc43fc4a7d89fa94fbde2a0911577b84e015be9d43676de300b4e"
+      },
+      "js": {
+        "bytes": 59232,
+        "brotli": 8813,
+        "gzip": 10347,
+        "sha256": "a6ea695090792875b370873e32e269f47917e3804f173f2e79b2c392b6e9e9e6",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57243,
+            "brotli": 8059,
+            "gzip": 9454,
+            "sha256": "f22e2e821814ee4500a1e3d186126a99e1f14927d6aa00d6ade81a24269b4d20"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 817,
+        "2": 11604,
+        "3": 2305,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 613,
+        "10": 825622,
+        "11": 79198,
+        "12": 1
+      }
+    },
+    {
+      "name": "glory-all-unused",
+      "features": [
+        "all-glory"
+      ],
+      "reference": "glory-text",
+      "bindgen": {
+        "bytes": 2230868,
+        "brotli": 334946,
+        "gzip": 448740,
+        "sha256": "cd724e10e6c13ce8f1d0b2f2b5a313740624c63f6ad083c1488708c881253a1c"
+      },
+      "optimized": {
+        "bytes": 922545,
+        "brotli": 289315,
+        "gzip": 364827,
+        "sha256": "36226109a28ee2163d0db32566d8c6e4d72c611b5bff60af94af24a275aa3ab3"
+      },
+      "js": {
+        "bytes": 59232,
+        "brotli": 8813,
+        "gzip": 10347,
+        "sha256": "a6ea695090792875b370873e32e269f47917e3804f173f2e79b2c392b6e9e9e6",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57243,
+            "brotli": 8059,
+            "gzip": 9454,
+            "sha256": "f22e2e821814ee4500a1e3d186126a99e1f14927d6aa00d6ade81a24269b4d20"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 817,
+        "2": 11604,
+        "3": 2309,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 611,
+        "10": 826652,
+        "11": 79296,
+        "12": 1
+      }
+    },
+    {
+      "name": "glory-css-used",
+      "features": [
+        "use-css"
+      ],
+      "reference": "glory-css-unused",
+      "bindgen": {
+        "bytes": 2319365,
+        "brotli": 367155,
+        "gzip": 489017,
+        "sha256": "ce2e76c613c71ff32d65d61d3e951678dd31e34f08c954e9a9ccf5de4cb3a38d"
+      },
+      "optimized": {
+        "bytes": 992800,
+        "brotli": 319038,
+        "gzip": 399814,
+        "sha256": "471b3b740d1dfb5bf9db016c7cca60145b45204e4241159ed358061e53959f73"
+      },
+      "js": {
+        "bytes": 59232,
+        "brotli": 8816,
+        "gzip": 10347,
+        "sha256": "8c07519ba38a4a48c94d00f8a6d70671b1c774d9ef9327e15b977ddc4f4d5fe9",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57243,
+            "brotli": 8062,
+            "gzip": 9454,
+            "sha256": "81402048bb467b4e41db5ad3945b4e0b3c78957501769da2b388711fa2f88c31"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 834,
+        "2": 11604,
+        "3": 2401,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 631,
+        "10": 875507,
+        "11": 100567,
+        "12": 1
+      }
+    },
+    {
+      "name": "glory-hydrate-used",
+      "features": [
+        "use-hydrate"
+      ],
+      "reference": "glory-hydrate-unused",
+      "bindgen": {
+        "bytes": 2358906,
+        "brotli": 365150,
+        "gzip": 487050,
+        "sha256": "8bc3cbe0dc0d6eecc8aec21916d435ba45d292d23f43c75c8873ce3212f4e2fe"
+      },
+      "optimized": {
+        "bytes": 989046,
+        "brotli": 317127,
+        "gzip": 398731,
+        "sha256": "fa346562de0517220528d482705dc589df43467569ad4e8211cb2fa89b763c10"
+      },
+      "js": {
+        "bytes": 60758,
+        "brotli": 8900,
+        "gzip": 10476,
+        "sha256": "2835f0b770e2680abf63513c6d2588e6e1b686134ef920286029149dc3146001",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 58769,
+            "brotli": 8146,
+            "gzip": 9583,
+            "sha256": "83497f680d8c1ad2dfe22f3c0956e184b22adf78bfbf8c0e4d3f977f06e8cc94"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 836,
+        "2": 11873,
+        "3": 2421,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 625,
+        "10": 877787,
+        "11": 94248,
+        "12": 1
+      }
+    },
+    {
+      "name": "glory-resources-used",
+      "features": [
+        "use-resources"
+      ],
+      "reference": "glory-resources-unused",
+      "bindgen": {
+        "bytes": 2420400,
+        "brotli": 359037,
+        "gzip": 484517,
+        "sha256": "94b0be6b882029edfbbeeeedf6c7fa4a6c64cd44ac8df6867d6df4029130b5f7"
+      },
+      "optimized": {
+        "bytes": 988485,
+        "brotli": 310617,
+        "gzip": 392415,
+        "sha256": "2b0639b985cc2cdd94b526bacafbf78cc5e8475eeae073943748a038d83fb719"
+      },
+      "js": {
+        "bytes": 59232,
+        "brotli": 8798,
+        "gzip": 10347,
+        "sha256": "4761b37c5b9f855ba8857dd910ec769aa2b852e3590b3410638fcb923e4723fe",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57243,
+            "brotli": 8044,
+            "gzip": 9454,
+            "sha256": "e5a96de8f32d2d258c7d044f60f9247e8eba6a8ad9bf87e4a855ab111c9048ea"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 851,
+        "2": 11604,
+        "3": 2493,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 703,
+        "10": 884043,
+        "11": 87535,
+        "12": 1
+      }
+    },
+    {
+      "name": "glory-i18n-used",
+      "features": [
+        "use-i18n"
+      ],
+      "reference": "glory-i18n-unused",
+      "bindgen": {
+        "bytes": 2516508,
+        "brotli": 386245,
+        "gzip": 523092,
+        "sha256": "658bc3f2efae1136cb1e360ad505027d1c3cd1419d30b5321ac84ab99b8a6448"
+      },
+      "optimized": {
+        "bytes": 1044865,
+        "brotli": 334703,
+        "gzip": 423141,
+        "sha256": "13d6559522796d101003bb4a6affdf4b1cd7df7fd26229e2d4513ba04ed97345"
+      },
+      "js": {
+        "bytes": 59232,
+        "brotli": 8794,
+        "gzip": 10348,
+        "sha256": "a90d33c60fedd54d5c23ac822579508fec60e353d840c2e390dc63fe180d1ba0",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57243,
+            "brotli": 8040,
+            "gzip": 9455,
+            "sha256": "dd9bbb5412d7b21400c8841e3e64b649e2d324a0b775d36cb7b5c919f3d27132"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 832,
+        "2": 11604,
+        "3": 2683,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 957,
+        "10": 912100,
+        "11": 115432,
+        "12": 2
+      }
+    },
+    {
+      "name": "glory-ssr-used-in-browser",
+      "features": [
+        "use-ssr"
+      ],
+      "reference": "glory-ssr-unused",
+      "bindgen": {
+        "bytes": 2277839,
+        "brotli": 342355,
+        "gzip": 458807,
+        "sha256": "9478e1379f292cddbb66c9d27f97d272b73c99d00d20e594a58a1beb1fb090a1"
+      },
+      "optimized": {
+        "bytes": 948301,
+        "brotli": 295607,
+        "gzip": 375452,
+        "sha256": "cdabaa32c4550b8bcaa0dfa3922a29f770210d610a3503b405bd902459708441"
+      },
+      "js": {
+        "bytes": 59232,
+        "brotli": 8809,
+        "gzip": 10348,
+        "sha256": "6de7f34cf22f3049d9f331967e17045ccfd485e85d12a90cfd66b380e3127d64",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57243,
+            "brotli": 8055,
+            "gzip": 9455,
+            "sha256": "6071d7b23bdcd68a62c99a9a0be48ae243d0cd97bba06a45c59e470e2032435d"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 827,
+        "2": 11604,
+        "3": 2378,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 653,
+        "10": 850312,
+        "11": 81271,
+        "12": 1
+      }
+    },
+    {
+      "name": "glory-stream-handoff-used",
+      "features": [
+        "use-stream"
+      ],
+      "reference": "glory-stream-unused",
+      "bindgen": {
+        "bytes": 2562020,
+        "brotli": 395919,
+        "gzip": 532460,
+        "sha256": "88d39162d73bb04dc3051a26e30d83083b028a3c5784cc3b635298a564b3ba25"
+      },
+      "optimized": {
+        "bytes": 1066168,
+        "brotli": 342903,
+        "gzip": 433393,
+        "sha256": "b1ef86a3732787f1ecc06dc3c7571e2319831a40d5cc5286a05f7c9d6ced1c96"
+      },
+      "js": {
+        "bytes": 60852,
+        "brotli": 8918,
+        "gzip": 10497,
+        "sha256": "11d0022bc7794f51d574ba2d0a9d4ef61664bab734df7e0b2faf48d8ebe090d7",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 58863,
+            "brotli": 8164,
+            "gzip": 9604,
+            "sha256": "0dbc19b408d9f6f0aed572626c742d774beca150e37c02064e9e3fc73f97c256"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 837,
+        "2": 11921,
+        "3": 2646,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 715,
+        "10": 943533,
+        "11": 105260,
+        "12": 1
+      }
+    },
+    {
+      "name": "glory-stream-script-embedded",
+      "features": [
+        "embed-stream-script"
+      ],
+      "reference": "glory-stream-unused",
+      "bindgen": {
+        "bytes": 2276125,
+        "brotli": 345759,
+        "gzip": 461197,
+        "sha256": "e8de8fe27853962884e1dce4caaf16bc5ec1b23db8e55f0c8fb0e4fb5aed584d"
+      },
+      "optimized": {
+        "bytes": 968117,
+        "brotli": 300159,
+        "gzip": 377237,
+        "sha256": "1de50922c76ea2f92c62c6842602e9bbefb87d9dc328095529e34351348b24aa"
+      },
+      "js": {
+        "bytes": 59232,
+        "brotli": 8813,
+        "gzip": 10347,
+        "sha256": "a6ea695090792875b370873e32e269f47917e3804f173f2e79b2c392b6e9e9e6",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57243,
+            "brotli": 8059,
+            "gzip": 9454,
+            "sha256": "f22e2e821814ee4500a1e3d186126a99e1f14927d6aa00d6ade81a24269b4d20"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 817,
+        "2": 11604,
+        "3": 2305,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 613,
+        "10": 825699,
+        "11": 125823,
+        "12": 1
+      }
+    },
+    {
+      "name": "sapid-unused",
+      "features": [
+        "sapid"
+      ],
+      "reference": "glory-text",
+      "bindgen": {
+        "bytes": 2217621,
+        "brotli": 334643,
+        "gzip": 447217,
+        "sha256": "233d5f90ae02e3616fcf010f5c08c90dc69f454f0120b861e11a8aeb3701dace"
+      },
+      "optimized": {
+        "bytes": 920659,
+        "brotli": 288913,
+        "gzip": 364148,
+        "sha256": "e3c21e13e1d68e365fdaaff3c3a8bf84ebfa7b7c8ff4cd0caff7fda81fdea7b3"
+      },
+      "js": {
+        "bytes": 59232,
+        "brotli": 8816,
+        "gzip": 10347,
+        "sha256": "8c07519ba38a4a48c94d00f8a6d70671b1c774d9ef9327e15b977ddc4f4d5fe9",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57243,
+            "brotli": 8062,
+            "gzip": 9454,
+            "sha256": "81402048bb467b4e41db5ad3945b4e0b3c78957501769da2b388711fa2f88c31"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 817,
+        "2": 11604,
+        "3": 2305,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 605,
+        "10": 824898,
+        "11": 79174,
+        "12": 1
+      }
+    },
+    {
+      "name": "sapid-button",
+      "features": [
+        "sapid-button"
+      ],
+      "reference": "glory-button",
+      "bindgen": {
+        "bytes": 2507504,
+        "brotli": 370686,
+        "gzip": 501553,
+        "sha256": "b1c041b5cebd6561099cd2f53fbb94600f72556f982369be07afed24c19146a9"
+      },
+      "optimized": {
+        "bytes": 1029679,
+        "brotli": 319564,
+        "gzip": 408496,
+        "sha256": "39c3d4c0cb1f761be0824588759345def36258973dc59a1cff56a9cd8d1c452d"
+      },
+      "js": {
+        "bytes": 59236,
+        "brotli": 8801,
+        "gzip": 10348,
+        "sha256": "8344f463fe29f1ab619683df3a86f0813ff3aa74687db247ff3bbc7bcf717f02",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57247,
+            "brotli": 8047,
+            "gzip": 9455,
+            "sha256": "bc81832189e190569c5918070f871c3dc3393b13092efdc54d612d708803a13e"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 834,
+        "2": 11604,
+        "3": 2572,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 823,
+        "10": 927093,
+        "11": 85497,
+        "12": 1
+      }
+    },
+    {
+      "name": "sapid-charts-unused",
+      "features": [
+        "charts"
+      ],
+      "reference": "sapid-unused",
+      "bindgen": {
+        "bytes": 2217605,
+        "brotli": 334641,
+        "gzip": 447189,
+        "sha256": "501b4d2c6d6f3c34df94296f33b99f3c5576730ebc5f6009d633f1e7d9369b36"
+      },
+      "optimized": {
+        "bytes": 920659,
+        "brotli": 288913,
+        "gzip": 364148,
+        "sha256": "e3c21e13e1d68e365fdaaff3c3a8bf84ebfa7b7c8ff4cd0caff7fda81fdea7b3"
+      },
+      "js": {
+        "bytes": 59232,
+        "brotli": 8816,
+        "gzip": 10347,
+        "sha256": "8c07519ba38a4a48c94d00f8a6d70671b1c774d9ef9327e15b977ddc4f4d5fe9",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57243,
+            "brotli": 8062,
+            "gzip": 9454,
+            "sha256": "81402048bb467b4e41db5ad3945b4e0b3c78957501769da2b388711fa2f88c31"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 817,
+        "2": 11604,
+        "3": 2305,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 605,
+        "10": 824898,
+        "11": 79174,
+        "12": 1
+      }
+    },
+    {
+      "name": "sapid-chat-unused",
+      "features": [
+        "chat"
+      ],
+      "reference": "sapid-unused",
+      "bindgen": {
+        "bytes": 2217621,
+        "brotli": 334439,
+        "gzip": 447213,
+        "sha256": "1fecfdfc10872c05d93ff8530faca4502abeb1b2207921f7da912a736b8e34fc"
+      },
+      "optimized": {
+        "bytes": 920659,
+        "brotli": 288913,
+        "gzip": 364148,
+        "sha256": "e3c21e13e1d68e365fdaaff3c3a8bf84ebfa7b7c8ff4cd0caff7fda81fdea7b3"
+      },
+      "js": {
+        "bytes": 59232,
+        "brotli": 8816,
+        "gzip": 10347,
+        "sha256": "8c07519ba38a4a48c94d00f8a6d70671b1c774d9ef9327e15b977ddc4f4d5fe9",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57243,
+            "brotli": 8062,
+            "gzip": 9454,
+            "sha256": "81402048bb467b4e41db5ad3945b4e0b3c78957501769da2b388711fa2f88c31"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 817,
+        "2": 11604,
+        "3": 2305,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 605,
+        "10": 824898,
+        "11": 79174,
+        "12": 1
+      }
+    },
+    {
+      "name": "sapid-code-unused",
+      "features": [
+        "code"
+      ],
+      "reference": "sapid-unused",
+      "bindgen": {
+        "bytes": 2217621,
+        "brotli": 334724,
+        "gzip": 447211,
+        "sha256": "a4d52c65c318009d2c0658c0cdd81e239c6fe3f7635f6bb681c1a78fc8403213"
+      },
+      "optimized": {
+        "bytes": 920659,
+        "brotli": 288913,
+        "gzip": 364148,
+        "sha256": "e3c21e13e1d68e365fdaaff3c3a8bf84ebfa7b7c8ff4cd0caff7fda81fdea7b3"
+      },
+      "js": {
+        "bytes": 59232,
+        "brotli": 8816,
+        "gzip": 10347,
+        "sha256": "8c07519ba38a4a48c94d00f8a6d70671b1c774d9ef9327e15b977ddc4f4d5fe9",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57243,
+            "brotli": 8062,
+            "gzip": 9454,
+            "sha256": "81402048bb467b4e41db5ad3945b4e0b3c78957501769da2b388711fa2f88c31"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 817,
+        "2": 11604,
+        "3": 2305,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 605,
+        "10": 824898,
+        "11": 79174,
+        "12": 1
+      }
+    },
+    {
+      "name": "sapid-files-unused",
+      "features": [
+        "files"
+      ],
+      "reference": "sapid-unused",
+      "bindgen": {
+        "bytes": 2217621,
+        "brotli": 334638,
+        "gzip": 447209,
+        "sha256": "c909072be45f2bf8ee6488831189d27a1268384d00ce4e5afb880949ffbad3bd"
+      },
+      "optimized": {
+        "bytes": 920659,
+        "brotli": 288913,
+        "gzip": 364148,
+        "sha256": "e3c21e13e1d68e365fdaaff3c3a8bf84ebfa7b7c8ff4cd0caff7fda81fdea7b3"
+      },
+      "js": {
+        "bytes": 59232,
+        "brotli": 8816,
+        "gzip": 10347,
+        "sha256": "8c07519ba38a4a48c94d00f8a6d70671b1c774d9ef9327e15b977ddc4f4d5fe9",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57243,
+            "brotli": 8062,
+            "gzip": 9454,
+            "sha256": "81402048bb467b4e41db5ad3945b4e0b3c78957501769da2b388711fa2f88c31"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 817,
+        "2": 11604,
+        "3": 2305,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 605,
+        "10": 824898,
+        "11": 79174,
+        "12": 1
+      }
+    },
+    {
+      "name": "sapid-editor-unused",
+      "features": [
+        "editor"
+      ],
+      "reference": "sapid-unused",
+      "bindgen": {
+        "bytes": 2217621,
+        "brotli": 334710,
+        "gzip": 447216,
+        "sha256": "146f7a5572e255845e675e7eb9a149ed2020f0571550bf928911b64a47ea32fc"
+      },
+      "optimized": {
+        "bytes": 920659,
+        "brotli": 288913,
+        "gzip": 364148,
+        "sha256": "e3c21e13e1d68e365fdaaff3c3a8bf84ebfa7b7c8ff4cd0caff7fda81fdea7b3"
+      },
+      "js": {
+        "bytes": 59232,
+        "brotli": 8816,
+        "gzip": 10347,
+        "sha256": "8c07519ba38a4a48c94d00f8a6d70671b1c774d9ef9327e15b977ddc4f4d5fe9",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57243,
+            "brotli": 8062,
+            "gzip": 9454,
+            "sha256": "81402048bb467b4e41db5ad3945b4e0b3c78957501769da2b388711fa2f88c31"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 817,
+        "2": 11604,
+        "3": 2305,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 605,
+        "10": 824898,
+        "11": 79174,
+        "12": 1
+      }
+    },
+    {
+      "name": "sapid-json-unused",
+      "features": [
+        "json"
+      ],
+      "reference": "sapid-unused",
+      "bindgen": {
+        "bytes": 2217621,
+        "brotli": 334139,
+        "gzip": 447218,
+        "sha256": "14465c5d61cc8a8cf2c83bae57565e182b0046be3098e366b93cd6440cf63e2c"
+      },
+      "optimized": {
+        "bytes": 920659,
+        "brotli": 288913,
+        "gzip": 364148,
+        "sha256": "e3c21e13e1d68e365fdaaff3c3a8bf84ebfa7b7c8ff4cd0caff7fda81fdea7b3"
+      },
+      "js": {
+        "bytes": 59232,
+        "brotli": 8816,
+        "gzip": 10347,
+        "sha256": "8c07519ba38a4a48c94d00f8a6d70671b1c774d9ef9327e15b977ddc4f4d5fe9",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57243,
+            "brotli": 8062,
+            "gzip": 9454,
+            "sha256": "81402048bb467b4e41db5ad3945b4e0b3c78957501769da2b388711fa2f88c31"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 817,
+        "2": 11604,
+        "3": 2305,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 605,
+        "10": 824898,
+        "11": 79174,
+        "12": 1
+      }
+    },
+    {
+      "name": "sapid-dates-unused",
+      "features": [
+        "dates"
+      ],
+      "reference": "sapid-unused",
+      "bindgen": {
+        "bytes": 2217621,
+        "brotli": 334578,
+        "gzip": 447217,
+        "sha256": "4177634743477ad9c7446eb84f46232ba382ade04424bf7d209810612004c9b5"
+      },
+      "optimized": {
+        "bytes": 920659,
+        "brotli": 288913,
+        "gzip": 364148,
+        "sha256": "e3c21e13e1d68e365fdaaff3c3a8bf84ebfa7b7c8ff4cd0caff7fda81fdea7b3"
+      },
+      "js": {
+        "bytes": 59232,
+        "brotli": 8816,
+        "gzip": 10347,
+        "sha256": "8c07519ba38a4a48c94d00f8a6d70671b1c774d9ef9327e15b977ddc4f4d5fe9",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57243,
+            "brotli": 8062,
+            "gzip": 9454,
+            "sha256": "81402048bb467b4e41db5ad3945b4e0b3c78957501769da2b388711fa2f88c31"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 817,
+        "2": 11604,
+        "3": 2305,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 605,
+        "10": 824898,
+        "11": 79174,
+        "12": 1
+      }
+    },
+    {
+      "name": "sapid-all-unused",
+      "features": [
+        "all-sapid"
+      ],
+      "reference": "sapid-unused",
+      "bindgen": {
+        "bytes": 2217621,
+        "brotli": 334395,
+        "gzip": 447218,
+        "sha256": "d5e1a97ee2567822712de2364a99600d2d81f3aaaf4909d19ea3ccc411ca125e"
+      },
+      "optimized": {
+        "bytes": 920659,
+        "brotli": 288913,
+        "gzip": 364148,
+        "sha256": "e3c21e13e1d68e365fdaaff3c3a8bf84ebfa7b7c8ff4cd0caff7fda81fdea7b3"
+      },
+      "js": {
+        "bytes": 59232,
+        "brotli": 8816,
+        "gzip": 10347,
+        "sha256": "8c07519ba38a4a48c94d00f8a6d70671b1c774d9ef9327e15b977ddc4f4d5fe9",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57243,
+            "brotli": 8062,
+            "gzip": 9454,
+            "sha256": "81402048bb467b4e41db5ad3945b4e0b3c78957501769da2b388711fa2f88c31"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 817,
+        "2": 11604,
+        "3": 2305,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 605,
+        "10": 824898,
+        "11": 79174,
+        "12": 1
+      }
+    },
+    {
+      "name": "sapid-button-all-unused",
+      "features": [
+        "sapid-button",
+        "all-sapid"
+      ],
+      "reference": "sapid-button",
+      "bindgen": {
+        "bytes": 2509321,
+        "brotli": 370905,
+        "gzip": 501865,
+        "sha256": "7940536502236cd39494bf1e0e8812a41da084c04f3a85b810c6c19892a693b6"
+      },
+      "optimized": {
+        "bytes": 1029864,
+        "brotli": 319408,
+        "gzip": 408553,
+        "sha256": "fd0346e66760106650419a772ac8034360db01496889bf98c66c642fbb8c52d0"
+      },
+      "js": {
+        "bytes": 59236,
+        "brotli": 8801,
+        "gzip": 10348,
+        "sha256": "8344f463fe29f1ab619683df3a86f0813ff3aa74687db247ff3bbc7bcf717f02",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57247,
+            "brotli": 8047,
+            "gzip": 9455,
+            "sha256": "bc81832189e190569c5918070f871c3dc3393b13092efdc54d612d708803a13e"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 834,
+        "2": 11604,
+        "3": 2573,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 823,
+        "10": 927277,
+        "11": 85497,
+        "12": 1
+      }
+    },
+    {
+      "name": "sapid-charts-used",
+      "features": [
+        "use-charts"
+      ],
+      "reference": "sapid-charts-unused",
+      "bindgen": {
+        "bytes": 3136448,
+        "brotli": 427502,
+        "gzip": 590077,
+        "sha256": "8203a715ff9a4a4010eae7debf5a2de35be1fd0facd886da049191844ed43763"
+      },
+      "optimized": {
+        "bytes": 1251561,
+        "brotli": 371578,
+        "gzip": 487476,
+        "sha256": "a2f17ae08b2a1f74bd4022fc63120bbd360334935ce03b52bd1f6eeb8c2bba45"
+      },
+      "js": {
+        "bytes": 59236,
+        "brotli": 8799,
+        "gzip": 10348,
+        "sha256": "f28bff5ddcd58a1577900993c8d3bd31fac44f41c2f30a860a4601d509f0338f",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57247,
+            "brotli": 8045,
+            "gzip": 9455,
+            "sha256": "a74e4e179243b5a016860f73bb60836e212f9448c497c5ac3eb57090f1b3bb36"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 843,
+        "2": 11604,
+        "3": 3107,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 1283,
+        "10": 1140992,
+        "11": 92476,
+        "12": 1
+      }
+    },
+    {
+      "name": "sapid-chat-used",
+      "features": [
+        "use-chat"
+      ],
+      "reference": "sapid-chat-unused",
+      "bindgen": {
+        "bytes": 2521411,
+        "brotli": 372049,
+        "gzip": 503591,
+        "sha256": "bb00861bb3baa8d6aad7ff4a627a2c548d3543f16da3ea932eeba137f1a8f586"
+      },
+      "optimized": {
+        "bytes": 1031451,
+        "brotli": 321002,
+        "gzip": 409532,
+        "sha256": "6cd4b5b74e4e09b731af97ec4d6df62b654c725daafc3c6d9a47a67e120bd983"
+      },
+      "js": {
+        "bytes": 59236,
+        "brotli": 8812,
+        "gzip": 10348,
+        "sha256": "d7c398a469e02efb6b1de6f664048f43bd379069bd3590119f5b06ac2457d72c",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57247,
+            "brotli": 8058,
+            "gzip": 9455,
+            "sha256": "b62b52265daa57a2095132b0dd378d3ab10a3e41bca7fac3d2680cadeeb8a2f6"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 825,
+        "2": 11604,
+        "3": 2590,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 823,
+        "10": 929221,
+        "11": 85132,
+        "12": 1
+      }
+    },
+    {
+      "name": "sapid-code-used",
+      "features": [
+        "use-code"
+      ],
+      "reference": "sapid-code-unused",
+      "bindgen": {
+        "bytes": 2635944,
+        "brotli": 384868,
+        "gzip": 522899,
+        "sha256": "d5b03c31148a88147a291ef13b8596f6310caee7b832ee1a0a6c93dd470e3723"
+      },
+      "optimized": {
+        "bytes": 1083942,
+        "brotli": 334127,
+        "gzip": 430936,
+        "sha256": "5273b799d3633963843bbbab6cba23dc018c349d6c5ea9aaf97a03008e1e7e65"
+      },
+      "js": {
+        "bytes": 59236,
+        "brotli": 8791,
+        "gzip": 10347,
+        "sha256": "b919ee4b2572b74607c26d980aa2ce9c6b896aac0ea5a25256c4c6847f87f087",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57247,
+            "brotli": 8037,
+            "gzip": 9454,
+            "sha256": "f25f5c5cdecd19261f2d5085c438d1765d25373a6f78e18d7a1b8e4346c4ab37"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 825,
+        "2": 11604,
+        "3": 2682,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 931,
+        "10": 975839,
+        "11": 90805,
+        "12": 1
+      }
+    },
+    {
+      "name": "sapid-files-used",
+      "features": [
+        "use-files"
+      ],
+      "reference": "sapid-files-unused",
+      "bindgen": {
+        "bytes": 2419051,
+        "brotli": 359824,
+        "gzip": 484666,
+        "sha256": "94c77ab5cb2c7b875f423c4a780c7fc227624fe15bc9f5a7e963ed5cb7f9c34f"
+      },
+      "optimized": {
+        "bytes": 1008236,
+        "brotli": 311136,
+        "gzip": 397091,
+        "sha256": "66cf1481796588005e1d1652caaf6be84244836c10caea0ac0a385a3238a3937"
+      },
+      "js": {
+        "bytes": 59236,
+        "brotli": 8805,
+        "gzip": 10347,
+        "sha256": "fd359d8a61d88dd4adb3ba88d7b206915c1a7c444ffb3a2e11f7147988caaa8e",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57247,
+            "brotli": 8051,
+            "gzip": 9454,
+            "sha256": "02a51cf23947b42bba27ba595b91d6c6a0f6d66202c6201d6c6042becff8c45d"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 825,
+        "2": 11604,
+        "3": 2473,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 739,
+        "10": 907323,
+        "11": 84016,
+        "12": 1
+      }
+    },
+    {
+      "name": "sapid-editor-used",
+      "features": [
+        "use-editor"
+      ],
+      "reference": "sapid-editor-unused",
+      "bindgen": {
+        "bytes": 2684409,
+        "brotli": 390584,
+        "gzip": 530291,
+        "sha256": "767f45b83542ecb520bf7a96873db4f40bdbdfcc74fc6fd7bbdf9f1d24a6d0c8"
+      },
+      "optimized": {
+        "bytes": 1115270,
+        "brotli": 342004,
+        "gzip": 440545,
+        "sha256": "1d95d2b67bbaeceda26cc2bf3d9d37ada5b075c168bf09aa40ca65e9bb000d54"
+      },
+      "js": {
+        "bytes": 59236,
+        "brotli": 8805,
+        "gzip": 10347,
+        "sha256": "db270fc77304d1e4934bcfd4dd03981223731198ed1c22b75370227b2cf1dc6f",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57247,
+            "brotli": 8051,
+            "gzip": 9454,
+            "sha256": "be86052d606210ed00cee23875097fcdd00a6901884e668942c9d267835453e6"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 838,
+        "2": 11704,
+        "3": 2766,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 979,
+        "10": 1009628,
+        "11": 88099,
+        "12": 1
+      }
+    },
+    {
+      "name": "sapid-json-used",
+      "features": [
+        "use-json"
+      ],
+      "reference": "sapid-json-unused",
+      "bindgen": {
+        "bytes": 3508803,
+        "brotli": 472276,
+        "gzip": 658217,
+        "sha256": "ac942b062b858dc38ade6d45d699dc7a6933fc501955db3b0c9105c786e5200e"
+      },
+      "optimized": {
+        "bytes": 1438324,
+        "brotli": 417362,
+        "gzip": 558018,
+        "sha256": "49ea39b0ab4d8a2322929c45d08703d058d159eb8ac8d72257e364c1dc7533aa"
+      },
+      "js": {
+        "bytes": 59236,
+        "brotli": 8796,
+        "gzip": 10348,
+        "sha256": "549aa795ae4603ea808ee2caacdd6e1db63d0d1be3030032858e20e429e3ac14",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57247,
+            "brotli": 8042,
+            "gzip": 9455,
+            "sha256": "2fe8305037171ce5803ec61d179c1a22a1cc6855f428bd76217ed608fd7ab209"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 838,
+        "2": 11604,
+        "3": 3512,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 1585,
+        "10": 1311213,
+        "11": 108316,
+        "12": 1
+      }
+    },
+    {
+      "name": "sapid-dates-used",
+      "features": [
+        "use-dates"
+      ],
+      "reference": "sapid-dates-unused",
+      "bindgen": {
+        "bytes": 3086871,
+        "brotli": 431643,
+        "gzip": 593954,
+        "sha256": "3e6523291bcf8dff08e584b076cc0e4056b18c8eea1e224c2739a89b133bebc1"
+      },
+      "optimized": {
+        "bytes": 1297026,
+        "brotli": 380905,
+        "gzip": 502730,
+        "sha256": "c4a962c1b10e294428e0b340f2f3cf2b890e63e76ae657287582b3b8b0d28267"
+      },
+      "js": {
+        "bytes": 59236,
+        "brotli": 8809,
+        "gzip": 10349,
+        "sha256": "2cf1f4f41b618836e1623aa9fbf6057d7b89eef67a20038f78cf431eb2b4b957",
+        "files": [
+          {
+            "path": "fixture.js",
+            "bytes": 57247,
+            "brotli": 8055,
+            "gzip": 9456,
+            "sha256": "5c6b3fc9bb675afae76172e517140d32a8185f0f7d7a8ff2bdd8181a1d17fe2e"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+            "bytes": 1609,
+            "brotli": 598,
+            "gzip": 692,
+            "sha256": "6c1d5cecee7bf357fd622ae4cca362096cb29fbd4214e521307b2324d78f46e4"
+          },
+          {
+            "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+            "bytes": 380,
+            "brotli": 156,
+            "gzip": 201,
+            "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+          }
+        ]
+      },
+      "sections": {
+        "0": 272,
+        "1": 825,
+        "2": 11604,
+        "3": 3094,
+        "4": 11,
+        "5": 3,
+        "6": 25,
+        "7": 900,
+        "9": 1385,
+        "10": 1185559,
+        "11": 93303,
+        "12": 1
+      }
+    }
+  ],
+  "jsScope": "wasm-bindgen entry and transitively imported JS snippets; per-resource compression; excludes test loader",
+  "lockSha256": "0dddefecb2d0b30d1b6443048237fa31ba5eb0c990bd55ee307bb9d02e9517e8",
+  "recorded": "2026-10-26",
+  "inputSource": {
+    "gloryRevision": "81cf630427a6b6c96951c315402b8565954e3d94",
+    "sapidRevision": "fd64d78edf9f91f9dc63bfa2be6e59ec1f739a58",
+    "gloryStatus": " M .gitignore\n M AGENTS.md\n M Cargo.lock\n M Cargo.toml\n M README.md\n M benchmarks/glory/src/main.rs\n D crates/actix-adapter/Cargo.toml\n D crates/actix-adapter/src/lib.rs\n D crates/actix-adapter/tests/render.rs\n D crates/axum-adapter/Cargo.toml\n D crates/axum-adapter/src/lib.rs\n D crates/axum-adapter/tests/render.rs\n M crates/blitz/src/document.rs\n M crates/glory/src/lib.rs\n M crates/html/src/lib.rs\n M crates/html/src/semantics.rs\n M crates/render/src/input_assist.rs\n M crates/render/src/lib.rs\n M crates/render/src/semantics.rs\n M crates/salvo-adapter/Cargo.toml\n M crates/salvo-adapter/src/lib.rs\n M crates/salvo-adapter/tests/render.rs\n M crates/ssr/src/stream/choice_tests.rs\n M crates/ui/src/control.rs\n M crates/ui/src/lib.rs\n M crates/web/src/browser/dom.rs\n M docs/performance.md\n M docs/release-readiness.md\n M docs/semantic-ui-implementation.md\n M examples/semantic-web/plan-acceptance.js\n M examples/semantic-web/src/plan_client.rs\n?? benchmarks/wasm-size/\n?? crates/blitz/tests/placeholder.rs\n?? crates/html/src/placeholder_tests.rs\n?? crates/render/tests/placeholder.rs\n?? crates/salvo-adapter/README.md\n?? crates/salvo-adapter/examples/\n?? crates/salvo-adapter/src/streaming.rs\n?? crates/salvo-adapter/tests/stream.rs\n?? crates/ui/tests/each_seed.rs\n?? docs/input-placeholder.md\n",
+    "sapidStatus": " M Cargo.toml\n M README.md\n M docs/action-widgets.md\n M docs/autocomplete-multi-select.md\n M docs/button.md\n M docs/capability-matrix.json\n M docs/display-widgets.md\n M docs/showcase-site.md\n M docs/widget-capabilities.md\n M docs/widget-inventory.json\n M docs/widgets-roadmap.md\n M examples/web/gallery.html\n M examples/web/site.css\n M examples/web/src/bin/showcase_ssr.rs\n M examples/web/src/showcase.rs\n M examples/web/src/showcase_catalog.rs\n M examples/web/src/showcase_demos/core_button.rs\n M examples/web/src/showcase_demos/core_text_field.rs\n M examples/web/src/showcase_demos/mod.rs\n D examples/web/src/showcase_demos/tags.rs\n M examples/web/src/showcase_home.rs\n M examples/web/src/showcase_host/browser.rs\n M examples/web/src/showcase_host/mod.rs\n M scripts/check-showcase.ps1\n M scripts/showcase-catalog.py\n M scripts/theme-studio-browser.cjs\n M src/actions.rs\n M src/autocomplete.rs\n M src/button.rs\n M src/combobox.rs\n M src/combobox_advanced_tests.rs\n M src/display.rs\n M src/json_input.rs\n M src/lib.rs\n M src/multi_select.rs\n M src/pills_input.rs\n M src/tags_input.rs\n M src/text_field.rs\n M src/text_input.rs\n M styles/sapid.css\n M tests/actions.rs\n M tests/button_enhancements.rs\n?? docs/mantine-api-audit.json\n?? docs/mantine-api-comparison.md\n?? docs/mantine-api-decisions.json\n?? docs/mantine-api-surface.md\n?? docs/showcase-style-review.md\n?? examples/web/src/showcase_demos/core_icon_actions.rs\n?? examples/web/src/showcase_demos/core_multi_select.rs\n?? examples/web/src/showcase_demos/core_pills.rs\n?? examples/web/src/showcase_demos/core_tags.rs\n?? scripts/mantine-api-audit.py\n?? scripts/mantine-api-browser.cjs\n?? scripts/palette-order-browser.cjs\n?? scripts/showcase-style-browser.cjs\n?? src/tag.rs\n?? tests/placeholders.rs\n"
+  },
+  "browser": {
+    "version": "155.0.8059.84",
+    "passed": 36
+  }
+}

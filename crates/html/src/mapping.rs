@@ -267,7 +267,12 @@ pub fn preflight<'a>(
 }
 
 pub fn shape<'a>(descriptor: impl Into<glory_render::DescriptorView<'a>>) -> Result<Shape, Error> {
-    let descriptor = descriptor.into();
+    shape_view(descriptor.into())
+}
+
+// Keep the finite lowering shared by owned, live and declared descriptors.
+// The public conversion boundary must not monomorphize this complete mapper.
+fn shape_view(descriptor: glory_render::DescriptorView<'_>) -> Result<Shape, Error> {
     descriptor.validate()?;
     if matches!(descriptor.props, Props::Group) {
         return Ok(Shape::default());

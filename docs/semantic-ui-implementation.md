@@ -45,6 +45,13 @@ R8 的其他工具包按报告作为后续按需适配项，不用空 crate 或�
 
 ## 当前实施
 
+2026-10-25 新增 `each_seed` 明确同 key 只消费首次 T，省去 item/index Cage 和
+data Owner；普通 `each` 保持活更新语义。普通 Part 销毁/挂起省去单元素范围 Vec，
+退休队列直接查活 Entry 表，省去临时 HashSet。JS Part 数组/按需句柄实验虽然减少
+桥接调用，但交错计时未显示稳定收益，已撤回；新增部分退休/查询/恢复验收保留。
+两份 Memory、所有语义身份、受控输入和成功前缀保持；跨行批量创建/挂接及动态字段
+一次初始化仍未实现。计数、对照和验证范围见 [性能记录](performance.md#plan-physical-parts-and-seed-rows--2026-10-25)。
+
 2026-10-24 创建提交继续优化：固定 JS 参数合并浅克隆、class/style 与身份/live，
 其他属性与受控输入保持原路径。独立 1,080 样本中千行创建/替换/万行 Script 降低
 3.0%/3.8%/6.7%；属性打包及 Memory 间接存储实验均未保留。流式 fixture 增加生成
@@ -2231,3 +2238,36 @@ native ranges and classic Start/Create/End use that root, rather than assuming
 that semantic Main is the whole physical range. Native File construction remains
 explicitly unsupported until an actual system file driver exists. This shape
 checkpoint does not claim a completed Web file picker/read component.
+
+### Salvo HTTP SSR adapter（2026-10-26）
+
+`crates/salvo-adapter` 以 `glory-salvo` 重新加入活动 workspace，直接消费当前
+`glory-ssr` / `glory-ui`。旧 ServerHolder、GloryConfig、HTML widget API 和伪流式
+collect 路径全部移除；`crates/axum-adapter` 与 `crates/actix-adapter` 的旧包、源码、
+测试删除。其他未迁移应用示例继续作为提取参考，不计为当前支持。
+
+普通 `render_response` / `render_response_with` / `document_response` 返回带 UTF-8
+HTML content type 的 Salvo 响应；错误保留 typed Result。`html_response` 可包装显式
+拼装的 hydration/resource snapshot。Document::opening_html 复用同步文档的样式验证、
+转义、nonce 和 stylesheet 去重，避免流式宿主另写文档格式。
+
+可选 stream 的 StreamRenderer 跨路由共享有界 admission，每个活跃请求在一个本地
+线程/current-thread Tokio runtime 内构造独立 App/Resources 和 !Send future。
+网络端只接收 owned HTML/error。初始化只生成并序列化 Shell，不轮询 loader；HTTP
+body 每次需求通过单一 outstanding request/reply 拉取下一帧，无预生成 frame backlog。
+body drop 同时覆盖等待需求和 pending resource I/O；取消在本地清理 Owner/future 后
+归还 admission。同步业务代码的取消仍需其返回/yield，不声称抢占阻塞闭包。
+初始化错误在 HTTP commit 前返回；后续错误/worker panic 终止 body，不发送成功 End。
+HTTP 响应设置 no-store / X-Accel-Buffering:no，代理/压缩的实际 flush 仍由应用配置。
+
+示例 `cargo run -p glory-salvo --example ssr --features stream` 提供 `/plain`、`/stream`
+和匹配的 `/stream.js`，在 CSP 下先展示 shell，再分别更新 350ms/1200ms 的两个资源。
+使用当前 Bootstrap preload + Frame::to_html，End 携带 rekey/资源种子；示例不加载
+WASM，不将渐进 DOM 输出验收当作新增 WASM hydration 验收。
+
+验证：适配器 21 项测试通过（含普通 SSR、CSS、资源种子、独立 Owner、Shell 提前返回、
+逐次 demand、乱序完成、初始化取消、初始化/后续错误和 panic、准入回收，以及真实
+Salvo chunked TCP、pending I/O 断开取消、暂停 TCP 读取后的背压）。glory-ssr 的
+all-features 测试通过。真实 Chromium 执行 examples/ssr-acceptance.js，先读到两个
+pending，约 361ms 只更新 fast、约 1208ms 更新 slow 后 End，两个资源种子完整，
+controller active=0，无 CSP/页面错误。

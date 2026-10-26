@@ -83,8 +83,8 @@ targeted command here.
 - [ ] For each crate above, run `cargo publish -p <crate> --dry-run` before the
   real publish, then wait for the published version to appear in crates.io
   search before moving to the next downstream crate.
-- [ ] If the release includes platform crates, run package and dry-run checks
-  after `glory-core` is published for `glory-actix`, `glory-axum`,
-  `glory-salvo`, `glory-desktop`, `glory-native`, `glory-liveview`, and
-  `glory-tui`.
+- [ ] For the current semantic workspace, package/dry-run `glory-salvo` after
+  its UI/SSR dependencies are published. The old `glory-actix` and `glory-axum`
+  adapters were removed. Desktop/native/liveview/tui sources listed in this
+  historical checklist remain outside the active workspace until migrated.
 - [ ] Release notes mention breaking removals.

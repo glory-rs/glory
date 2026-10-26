@@ -9,6 +9,7 @@ debug.log
 !/examples/semantic-web/Cargo.lock
 !/examples/counter/Cargo.lock
 !/benchmarks/glory/Cargo.lock
+!/benchmarks/wasm-size/Cargo.lock
 !/benchmarks/leptos/Cargo.lock
 !/benchmarks/dioxus/Cargo.lock
 !/benchmarks/scenarios/glory/Cargo.lock

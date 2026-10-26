@@ -91,7 +91,9 @@ pub use slider::SliderValue;
 mod spinbutton;
 pub use spinbutton::SpinValue;
 mod input_assist;
-pub use input_assist::{InputAssist, InputAutofill, InputMode};
+pub use input_assist::{
+    InputAssist, InputAutofill, InputMode, MAX_INPUT_PLACEHOLDER_BYTES, validate_input_placeholder,
+};
 mod text_selection;
 pub use text_selection::{SelectionDirection, TextSelection};
 mod focus_scope;
@@ -1151,7 +1153,12 @@ impl Event {
         target: NodeId,
         node: impl Into<DescriptorView<'a>>,
     ) -> Result<(), Error> {
-        let node = node.into();
+        self.validate_payload_view(target, node.into())
+    }
+
+    // One implementation for live descriptors and borrowed construction values;
+    // conversion at the API boundary should not duplicate all event validation.
+    fn validate_payload_view(&self, target: NodeId, node: DescriptorView<'_>) -> Result<(), Error> {
         if let Self::RichRejected { revision } | Self::RichCommand { revision, .. } = self {
             let Props::RichEditor(editor) = node.props else {
                 return Err(Error::InvalidEvent("rich rejection requires its editor"));

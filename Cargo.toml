@@ -1,7 +1,7 @@
 [workspace]
 # Rebuild the semantic architecture without legacy feature aliases. Older
 # adapter/tool sources rejoin once migrated; see docs/semantic-ui-implementation.md.
-members = ["crates/style", "crates/render", "crates/core", "crates/resource", "crates/i18n", "crates/ui", "crates/html", "crates/web", "crates/ssr", "crates/blitz", "crates/glory"]
+members = ["crates/style", "crates/render", "crates/core", "crates/resource", "crates/i18n", "crates/ui", "crates/html", "crates/web", "crates/ssr", "crates/blitz", "crates/glory", "crates/salvo-adapter"]
 exclude = ["examples", "benchmarks"]
 resolver = "2"
 

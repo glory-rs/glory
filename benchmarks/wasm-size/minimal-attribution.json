@@ -1,0 +1,588 @@
+{
+  "schema": 1,
+  "final": {
+    "path": "D:/BuildCache/sapid/wasm-size/runs/optimized/glory-minimal/optimized.wasm",
+    "bytes": 894092,
+    "sha256": "4b4a3e3fdaec31c01c393173d47e9d25e6f53076c98313e2ded9fe3378c69c44"
+  },
+  "nonCustomSectionsIdentical": true,
+  "attribution": "Non-overlapping function bodies grouped by enclosing symbol; inlined callees are charged to the enclosing symbol. These are not exclusive crate sizes or removable-size estimates.",
+  "sections": [
+    {
+      "id": 1,
+      "payloadBytes": 777,
+      "encodedBytes": 780,
+      "sha256": "55785df52982f81076f30c699421cccdaeebc0457527df95400133e3da97ba35"
+    },
+    {
+      "id": 2,
+      "payloadBytes": 11604,
+      "encodedBytes": 11607,
+      "sha256": "83ae27df89f0bd81ea80ea49bd483f60f39e2142a3ec72cb4ad7d9f89fccd81a"
+    },
+    {
+      "id": 3,
+      "payloadBytes": 2223,
+      "encodedBytes": 2226,
+      "sha256": "d3400a7af122bef4d7df0680965f770067ad3575ce94304c667d85d1b8d1312d"
+    },
+    {
+      "id": 4,
+      "payloadBytes": 11,
+      "encodedBytes": 13,
+      "sha256": "4053861d01fd83486626c46334cc31fd0fcecab201e77c0ab77a1b247eba4dda"
+    },
+    {
+      "id": 5,
+      "payloadBytes": 3,
+      "encodedBytes": 5,
+      "sha256": "e3c4e8c4be74ea7897d60436685f5014a88654a4f415f7e08b959984bf15f5d0"
+    },
+    {
+      "id": 6,
+      "payloadBytes": 25,
+      "encodedBytes": 27,
+      "sha256": "a4ffcf7bf16d7e47006c18a3c4718a7ccba4ef0b0d6bd47669050e0c2e0a0d57"
+    },
+    {
+      "id": 7,
+      "payloadBytes": 900,
+      "encodedBytes": 903,
+      "sha256": "765ae54f826fdbde471174c4c5fecfbd4654d9de039aa54ff7cc1208e9d13431"
+    },
+    {
+      "id": 9,
+      "payloadBytes": 579,
+      "encodedBytes": 582,
+      "sha256": "0ee91c1b5d3d58c4a8cabfdc74fd8b576932518a90da53133cf03d153510b19d"
+    },
+    {
+      "id": 12,
+      "payloadBytes": 1,
+      "encodedBytes": 3,
+      "sha256": "36a9e7f1c95b82ffb99743e0c5c4ce95d83c9a430aac59f84ef3cbfab6145068"
+    },
+    {
+      "id": 10,
+      "payloadBytes": 799205,
+      "encodedBytes": 799209,
+      "sha256": "704b3825dd0ef08783e284a1c1f4c6ca8c3aeb25acc376332da5d9ce2a62a7ba"
+    },
+    {
+      "id": 11,
+      "payloadBytes": 78448,
+      "encodedBytes": 78452,
+      "sha256": "23c1f3f0b82d2a58086b0bf1c1fa2d5c12e197c44b45a6e940181582cb7572dc"
+    },
+    {
+      "id": 0,
+      "payloadBytes": 124,
+      "encodedBytes": 126,
+      "sha256": "5349359afa1778d0d8c567fa09601cda2ce1fbb4cc12a020275fcd608b9cbc81",
+      "name": "producers"
+    },
+    {
+      "id": 0,
+      "payloadBytes": 148,
+      "encodedBytes": 151,
+      "sha256": "436e14b8b97dd381f16be421a6f633e615c441207f9de33379f9604cb6c23723",
+      "name": "target_features"
+    }
+  ],
+  "functionBytes": 796143,
+  "functionCount": 2221,
+  "enclosingSymbols": [
+    {
+      "name": "glory_web",
+      "bytes": 283202,
+      "functions": 155
+    },
+    {
+      "name": "alloc",
+      "bytes": 156765,
+      "functions": 818
+    },
+    {
+      "name": "glory_render",
+      "bytes": 103125,
+      "functions": 199
+    },
+    {
+      "name": "core",
+      "bytes": 86776,
+      "functions": 503
+    },
+    {
+      "name": "glory_html",
+      "bytes": 68207,
+      "functions": 41
+    },
+    {
+      "name": "glory_ui",
+      "bytes": 21593,
+      "functions": 21
+    },
+    {
+      "name": "glory_core",
+      "bytes": 21163,
+      "functions": 47
+    },
+    {
+      "name": "hashbrown",
+      "bytes": 12302,
+      "functions": 99
+    },
+    {
+      "name": "generated",
+      "bytes": 10545,
+      "functions": 68
+    },
+    {
+      "name": "dlmalloc",
+      "bytes": 7275,
+      "functions": 6
+    },
+    {
+      "name": "std",
+      "bytes": 6851,
+      "functions": 39
+    },
+    {
+      "name": "web_sys",
+      "bytes": 4223,
+      "functions": 101
+    },
+    {
+      "name": "js_sys",
+      "bytes": 3764,
+      "functions": 45
+    },
+    {
+      "name": "compiler_builtins",
+      "bytes": 2579,
+      "functions": 2
+    },
+    {
+      "name": "glory_style",
+      "bytes": 2354,
+      "functions": 10
+    },
+    {
+      "name": "wasm_bindgen",
+      "bytes": 2189,
+      "functions": 49
+    },
+    {
+      "name": "__rustc",
+      "bytes": 992,
+      "functions": 3
+    },
+    {
+      "name": "once_cell",
+      "bytes": 580,
+      "functions": 2
+    },
+    {
+      "name": "futures_util",
+      "bytes": 373,
+      "functions": 3
+    },
+    {
+      "name": "trim_matches",
+      "bytes": 345,
+      "functions": 1
+    },
+    {
+      "name": "contains",
+      "bytes": 321,
+      "functions": 3
+    },
+    {
+      "name": "futures_core",
+      "bytes": 272,
+      "functions": 1
+    },
+    {
+      "name": "split_once",
+      "bytes": 112,
+      "functions": 1
+    },
+    {
+      "name": "to_vec_in",
+      "bytes": 96,
+      "functions": 1
+    },
+    {
+      "name": "then_some",
+      "bytes": 76,
+      "functions": 1
+    },
+    {
+      "name": "starts_with",
+      "bytes": 56,
+      "functions": 1
+    },
+    {
+      "name": "glory_wasm_size",
+      "bytes": 7,
+      "functions": 1
+    }
+  ],
+  "structuralBodies": [
+    {
+      "name": "remaining bodies",
+      "bytes": 577270,
+      "functions": 1198
+    },
+    {
+      "name": "BTree collection implementations",
+      "bytes": 135730,
+      "functions": 548
+    },
+    {
+      "name": "formatting / number conversion symbols",
+      "bytes": 29413,
+      "functions": 91
+    },
+    {
+      "name": "destruction glue",
+      "bytes": 24960,
+      "functions": 246
+    },
+    {
+      "name": "hash collection implementations",
+      "bytes": 12302,
+      "functions": 99
+    },
+    {
+      "name": "Clone implementations",
+      "bytes": 9193,
+      "functions": 33
+    },
+    {
+      "name": "dlmalloc implementation",
+      "bytes": 7275,
+      "functions": 6
+    }
+  ],
+  "webModules": [
+    {
+      "name": "browser entry / Renderer",
+      "bytes": 137102,
+      "functions": 16
+    },
+    {
+      "name": "events",
+      "bytes": 58779,
+      "functions": 19
+    },
+    {
+      "name": "dom",
+      "bytes": 29537,
+      "functions": 42
+    },
+    {
+      "name": "layers",
+      "bytes": 28840,
+      "functions": 29
+    },
+    {
+      "name": "rich",
+      "bytes": 11393,
+      "functions": 15
+    },
+    {
+      "name": "frame",
+      "bytes": 5935,
+      "functions": 9
+    },
+    {
+      "name": "sheet",
+      "bytes": 2841,
+      "functions": 2
+    },
+    {
+      "name": "input_edit",
+      "bytes": 2380,
+      "functions": 4
+    },
+    {
+      "name": "select",
+      "bytes": 1865,
+      "functions": 3
+    },
+    {
+      "name": "files",
+      "bytes": 1113,
+      "functions": 5
+    },
+    {
+      "name": "swipe",
+      "bytes": 1074,
+      "functions": 3
+    },
+    {
+      "name": "images",
+      "bytes": 948,
+      "functions": 1
+    },
+    {
+      "name": "translation",
+      "bytes": 512,
+      "functions": 2
+    },
+    {
+      "name": "file_document",
+      "bytes": 395,
+      "functions": 2
+    },
+    {
+      "name": "clipboard",
+      "bytes": 217,
+      "functions": 1
+    },
+    {
+      "name": "collapse",
+      "bytes": 185,
+      "functions": 1
+    },
+    {
+      "name": "scroll_into_view",
+      "bytes": 86,
+      "functions": 1
+    }
+  ],
+  "regularExpressionSymbols": [],
+  "data": {
+    "segments": 32,
+    "bytes": 78173,
+    "asciiRunBytes": 51223,
+    "longestAsciiRuns": [
+      {
+        "bytes": 4685,
+        "preview": "blockquoteolullidldtddcaptiontheadtbodytfoottrthtdformfieldsetlegendheaderfooterstyle[data-gly-base=\"v1\"]data-gly-basev1[data-gly-kind=graphic]>path:not([data-gly-path-transition]){transition:none}[data-gly-path-transition]{transition-property:d;transition-timing-function:linear}@media(prefers-reduced-motion:reduce){[data-gly-path-transition]{transition:none!important}}@keyframes gly-rotate{from{t"
+      },
+      {
+        "bytes": 1870,
+        "preview": "this node cannot have a naming relationnavigation requires a generic group or tab lista node cannot label itselfa control cannot control itselfhidden content requires a view or intrinsic optionhidden panels and navigation boundaries require a viewselected belongs to tabs; tabs cannot be disclosuresnavigation items require a button, link or radiocomposite trigger metadata requires a buttonpressed r"
+      },
+      {
+        "bytes": 1516,
+        "preview": "clipboard completion has a future revision or zero requestgrid navigation requires a real descendant Buttoninput edit capture is absentsheet command requires a sheetsheet command exceeds its accepted configurationsheet command origin must equal its targetdismiss requires a layerdisabled layer dismissalremove-last requires a multiple comboboxnavigation entry requires a disclosure triggernavigation "
+      },
+      {
+        "bytes": 1491,
+        "preview": "rich insertion exceeds block budgetrich insertion exceeds text budgetrich runs must be canonically mergedselected file sizes overflowselected file metadata size overflowselected file does not match a declared filterselected file tokens must be uniqueselected file total exceeds byte or metadata budgetselected file exceeds per-file byte budgetselected file count exceeds configurationfile filter stri"
+      },
+      {
+        "bytes": 1320,
+        "preview": "aria-valueminaria-valuemaxaria-valuenowaria-valuetextaria-busydata-gly-busypagesteplocationdatearia-currentaria-orientationdata-gly-spinbuttondata-gly-spin-increasedata-gly-spin-decreasedata-gly-sliderdata-gly-splitterdata-gly-scroll-keyboarddata-gly-grid-navigationdata-gly-link-request_blanktargetnoopener noreferrerrelnovalidatedata-gly-formsubmitresetdata-gly-form-actionnamedata-gly-control-name"
+      },
+      {
+        "bytes": 1280,
+        "preview": "heading level must be 1..=6codekbdmarkph1h2h3h4h5h6HTML text tag conflicts with semantic kindblockquoteolullidldtddtablecaptiontheadtbodytfoottrthtdformfieldsetlegendheaderfootersectionnavsliderspinbuttonprogressbarseparatorgroupbannercontentinforegionnavigationlistlistitemstatusalertgridcelltreeitemcolumnheadercellalertdialogtooltiptablisttabpanelradiogrouptoolbarmenubarheadingplaceholderltrrtldi"
+      },
+      {
+        "bytes": 1039,
+        "preview": "choice commands require a comboboxform request requires a formpassive separator has no interactionhost observation requires a semantic Viewpalette shortcut requires a non-editor physical scope or origingroup has no physical event targetevent does not belong to this controldismiss requires a viewimage status requires an imagescroll keyboard requires a viewport viewselection event requires a selectr"
+      },
+      {
+        "bytes": 797,
+        "preview": "tags paste splits a surrogate pairinvalid bounded tags paste or UTF-16 selectiontree item requires finite level and sibling coordinatesfile token requires a positive document-local serialcombobox requires a matching intrinsic trigger, listbox popup and controls/expanded metadatalistbox options require an unfocusable intrinsic button, selected state and distinct ownerlistbox requires a vertical unf"
+      },
+      {
+        "bytes": 662,
+        "preview": "pointer-eventsgrid-template-columnsgrid-template-rowsgrid-columngrid-rowfillcontaincoverscale-downobject-fitaspect-rationowrapwrapflex-wrapwidthheightmin-widthmin-heightmax-widthmax-heightstaticrelativeabsolutestickyfixedpositionblockflexinline-flexgriddisplayrowcolumnflex-directiongapfont-sizeline-heightborder-radiuspaddingmarginborder-widthflex-growflex-shrinkfont-weightopacitycolorbackground-co"
+      },
+      {
+        "bytes": 641,
+        "preview": "multiline input requires text purposesingle-line input cannot contain line breaksdecorative graphics cannot be named or focusableonly heading text accepts an accessible namedecorative image has no name or focus targetclasses must be individual nonempty tokensstructural roles require a viewgroup has no style box or accessibility rolegroup has no focus box or item positiontooltips cannot receive foc"
+      },
+      {
+        "bytes": 630,
+        "preview": "selected references require the same document, node and revisionfile metadata overflowfile sizes overflowselected file event exceeds its unique metadata/byte domainselected file event exceeds 32 filesfile read exceeds its live selected reference or sizefile reads require a finite range of at most 65536 bytesfile observation references a different picker nodefile drop was not enabledfile observatio"
+      },
+      {
+        "bytes": 562,
+        "preview": "grid tracks require finite nonnegative px/percent or positive frgrid placement requires start/span in 1..=64 and end <=65sizes must be finite and nonnegativeshadow offsets/spread must be finite and blur finite and nonnegativeopacity must be finite and in [0, 1]border widths and radius must be finite and nonnegativefont weight must be finite and in [1, 1000]font families must be nonempty and names "
+      }
+    ]
+  },
+  "largestFunctions": [
+    {
+      "index": 722,
+      "bytes": 51305,
+      "name": "<glory_web::browser::events::Listeners>::new::{closure#2}"
+    },
+    {
+      "index": 295,
+      "bytes": 42176,
+      "name": "glory_web::browser::launch_with::<glory_ui::builders::Group, glory_wasm_size::ui>"
+    },
+    {
+      "index": 217,
+      "bytes": 32898,
+      "name": "<glory_web::browser::Renderer as glory_render::Render>::apply"
+    },
+    {
+      "index": 234,
+      "bytes": 31331,
+      "name": "<glory_html::Mapper>::apply::<glory_web::browser::dom::Sink>"
+    },
+    {
+      "index": 216,
+      "bytes": 29631,
+      "name": "<glory_web::browser::Renderer as glory_render::Render>::drain"
+    },
+    {
+      "index": 221,
+      "bytes": 22515,
+      "name": "<glory_web::browser::Renderer as glory_render::Render>::action"
+    },
+    {
+      "index": 218,
+      "bytes": 16541,
+      "name": "<glory_render::props::view::DescriptorView>::validate_fields"
+    },
+    {
+      "index": 220,
+      "bytes": 12875,
+      "name": "<glory_web::browser::layers::document::DocumentLayers>::sync"
+    },
+    {
+      "index": 219,
+      "bytes": 10446,
+      "name": "glory_html::semantics::attributes"
+    },
+    {
+      "index": 236,
+      "bytes": 8446,
+      "name": "glory_web::browser::layers::positions"
+    },
+    {
+      "index": 222,
+      "bytes": 7780,
+      "name": "<glory_render::memory::Memory>::prepare_patch"
+    },
+    {
+      "index": 242,
+      "bytes": 7015,
+      "name": "<glory_web::browser::Renderer as glory_render::Render>::listen"
+    },
+    {
+      "index": 225,
+      "bytes": 7005,
+      "name": "glory_html::mapping::shape_view"
+    },
+    {
+      "index": 1666,
+      "bytes": 6627,
+      "name": "<glory_render::Event>::validate_payload::<&glory_render::props::live::LiveDescriptor>"
+    },
+    {
+      "index": 279,
+      "bytes": 6330,
+      "name": "core::fmt::float::float_to_decimal_common_exact::<f64>"
+    },
+    {
+      "index": 226,
+      "bytes": 6114,
+      "name": "<glory_render::memory::Memory>::event_in"
+    },
+    {
+      "index": 229,
+      "bytes": 6078,
+      "name": "glory_html::styles::style"
+    },
+    {
+      "index": 227,
+      "bytes": 5940,
+      "name": "<glory_ui::app::Session>::route"
+    },
+    {
+      "index": 230,
+      "bytes": 5732,
+      "name": "<glory_render::memory::Memory as glory_render::Render>::apply"
+    },
+    {
+      "index": 224,
+      "bytes": 5299,
+      "name": "core::num::imp::flt2dec::strategy::dragon::format_shortest"
+    },
+    {
+      "index": 228,
+      "bytes": 5192,
+      "name": "<glory_render::memory::Memory>::validate_child_inner"
+    },
+    {
+      "index": 912,
+      "bytes": 4919,
+      "name": "core::ptr::drop_glue::<glory_web::browser::Renderer>"
+    },
+    {
+      "index": 231,
+      "bytes": 4870,
+      "name": "<dlmalloc::dlmalloc::Dlmalloc<dlmalloc::sys::System>>::malloc"
+    },
+    {
+      "index": 233,
+      "bytes": 4819,
+      "name": "<glory_web::browser::dom::Dom>::create"
+    },
+    {
+      "index": 275,
+      "bytes": 4459,
+      "name": "<glory_web::browser::frame::Frame>::new::{closure#0}"
+    },
+    {
+      "index": 232,
+      "bytes": 4338,
+      "name": "<glory_ui::app::Session>::commit"
+    },
+    {
+      "index": 237,
+      "bytes": 4225,
+      "name": "<<glory_ui::app::Scope>::new::{closure#0} as core::ops::function::FnOnce<()>>::call_once::{shim:vtable#0}"
+    },
+    {
+      "index": 248,
+      "bytes": 3864,
+      "name": "<glory_core::runtime::State>::write_target"
+    },
+    {
+      "index": 235,
+      "bytes": 3687,
+      "name": "<glory_render::props::live::Storage>::swap_patch"
+    },
+    {
+      "index": 238,
+      "bytes": 3620,
+      "name": "<core::option::Option<alloc::boxed::Box<glory_render::semantics::Semantics>> as core::clone::Clone>::clone"
+    },
+    {
+      "index": 239,
+      "bytes": 3563,
+      "name": "<glory_web::browser::dom::Dom>::publish_files"
+    },
+    {
+      "index": 241,
+      "bytes": 3474,
+      "name": "glory_core::runtime::ensure"
+    },
+    {
+      "index": 240,
+      "bytes": 3321,
+      "name": "<glory_web::browser::dom::Dom>::make_entry"
+    },
+    {
+      "index": 245,
+      "bytes": 2974,
+      "name": "<glory_core::runtime::State>::remove_node"
+    },
+    {
+      "index": 246,
+      "bytes": 2805,
+      "name": "<glory_web::browser::dom::Dom>::update_files"
+    }
+  ]
+}

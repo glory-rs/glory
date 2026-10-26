@@ -75,8 +75,7 @@ mod browser {
             }
         }
     }
-    fn row(scope: &Scope, seed: Cage<Row>, model: Model, declaration: &RowPlan) -> Result {
-        let seed = seed.get_untracked();
+    fn row(scope: &Scope, seed: Row, model: Model, declaration: &RowPlan) -> Result {
         let id = seed.id;
         let label = scope.cage(seed.initial.to_string());
         model.labels.borrow_mut().insert(id, label);
@@ -171,13 +170,13 @@ mod browser {
             view()
                 .role(Role::Table)
                 .class("bench-table")
-                .fill(view().class("bench-body").fill(each(
+                .fill(view().class("bench-body").fill(each_seed(
                     rows,
                     |row| row.id,
-                    move |seed, _| {
+                    move |seed| {
                         let model = model.clone();
                         let declaration = declaration.clone();
-                        widget(move |scope| row(scope, seed, model.clone(), &declaration))
+                        widget(move |scope| row(scope, seed.clone(), model.clone(), &declaration))
                     },
                 ))),
         ))

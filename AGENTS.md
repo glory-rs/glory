@@ -8,7 +8,7 @@ report and `docs/semantic-ui-implementation.md`; do not preserve the former
 HTML API/feature/wire format through compatibility aliases.
 
 The active workspace currently contains style, render, core, resource, i18n, ui,
-html, web, ssr, blitz and glory. The opt-in i18n package was authorized after
+html, web, ssr, blitz, glory and salvo-adapter. The opt-in i18n package was authorized after
 the semantic rewrite; see `crates/i18n/README.md` for its boundaries.
 Old adapter/tool directories and unreferenced old core sources are extraction
 references, not supported workspace packages. Migrate useful behavior/tests,
@@ -100,6 +100,12 @@ reduced workspace check as proof that those adapters/platforms work.
   under the app's CSP. Bootstrap::head_script installs pre-edit capture;
   Frame::to_html emits complete inert data + parser-blocking external script.
 - `glory`: facade; outer hosts join by actual technology (web/ssr/blitz/etc.).
+- `glory-salvo`: native HTTP integration over semantic SSR. Ordinary responses
+  use glory-ssr; optional stream owns each !Send request on an admitted local
+  worker, transferring only owned HTML/errors to Salvo. Share bounded admission,
+  request one frame per body demand and cancel pending I/O on body drop. Never
+  eagerly collect the stream or move UI state across threads. Serve the matching
+  STREAM_SCRIPT under the app's CSP. Axum/Actix legacy adapters were removed.
 - `glory-blitz`: native-only document interpreter over html's typed edits.
   Pinned dom/traits/paint beta.4; system fonts and real CSS/box/text layout.
   STYLE_PROFILE is native-specific (blitz v4), not Profile::HTML: typed Sticky

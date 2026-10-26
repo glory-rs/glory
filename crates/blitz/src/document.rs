@@ -140,6 +140,11 @@ fn check_mode<'a>(
         Some(Patch::Role(Change::Clear)) => None,
         _ => node.role,
     };
+    // The pinned engine does not paint a placeholder editor projection yet.
+    // Reject the opt-in hint rather than accepting an invisible capability.
+    if semantics.is_some_and(|semantics| semantics.placeholder.is_some()) {
+        return Err(Error::Unsupported("native input placeholders"));
+    }
     if role == Some(glory_render::Role::Menubar) || semantics.is_some_and(|s| s.menubar_item) {
         return Err(Error::Unsupported("native menubar controls"));
     }

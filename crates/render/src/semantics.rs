@@ -254,6 +254,9 @@ pub struct Semantics {
     pub translation: Option<crate::TranslationMotion>,
     /// Finite single-line input hints; no automatic code or credential retrieval.
     pub input_assist: Option<crate::InputAssist>,
+    /// Optional bounded presentation hint on Input, never its accessible name,
+    /// stored value, default value or composition state.
+    pub placeholder: Option<String>,
     /// Optional intrinsic-height presentation with immediate logical hiding.
     pub collapse: Option<crate::CollapseConfig>,
     /// Immediate primary-pointer capture, in viewport CSS pixels.
@@ -338,6 +341,12 @@ pub struct Semantics {
 }
 impl Semantics {
     pub(crate) fn validate(&self, d: crate::DescriptorView<'_>) -> Result<(), Error> {
+        if let Some(placeholder) = &self.placeholder {
+            let Props::Input(input) = d.props else {
+                return Err(Error::InvalidProps("placeholder requires an Input"));
+            };
+            crate::validate_input_placeholder(placeholder, input.multiline)?;
+        }
         if let Some(environment) = &self.environment {
             if !matches!(d.props, Props::View) {
                 return Err(Error::InvalidProps("environment metadata belongs to View"));
