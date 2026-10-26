@@ -2,6 +2,8 @@
 
 日期：2026 年 10 月 26 日。
 
+实施状态：生命周期维护、纯 Entry 初始化和能力更新依赖已按复核结果完成，见[实现与验证报告](/D:/Works/glory-rs/glory/docs/render-pipeline-implementation-2026-10-26.md)。本文件保留实施前基点 `463272a` 的分析和决策；下文原流程按当时源码理解，代码链接指向冻结的实施前源码。
+
 **最终建议：保留现有分层，先统一 UI 的节点登记与退休流程，再整理浏览器节点的初始化和能力驱动依赖。完整宿主批提交暂缓。** 改进的首要依据是职责、数据归属和状态转换是否更清楚，性能、内存和 WASM 体积作为结果与约束评估。不能为了少几次过桥，把语义规则移到 JS，或者让传输协议反过来支配核心模型。
 
 本报告复核浏览器 CSR 的事件、响应式执行、语义暂存、HTML 映射、DOM 提交、查询和销毁链路；对照 benchmark 锁定的 Dioxus 0.7.10。共享层的调整还必须覆盖 SSR、stream 和 Blitz，但浏览器测量不证明这些宿主的性能或平台验收。
@@ -57,7 +59,7 @@ Structure、Binding、Effect 是调度优先级，**不是三次固定的 Render
 
 当前实现已经收集 `Vec<Mutation>`。批次到了 Mapper 后，仍按操作顺序校验、降低并执行 Sink。因此，当前差距不能概括成“Rust 没有批量”或“缺少一层命令队列”。
 
-源码入口：[App::pump](/D:/Works/glory-rs/glory/crates/ui/src/app.rs:1961)、[Session::flush](/D:/Works/glory-rs/glory/crates/ui/src/app.rs:1009)、[Session::commit](/D:/Works/glory-rs/glory/crates/ui/src/app.rs:473)、[Runtime::flush](/D:/Works/glory-rs/glory/crates/core/src/runtime.rs:871)、[Web apply](/D:/Works/glory-rs/glory/crates/web/src/browser.rs:143)。
+源码入口：[App::pump](/D:/BuildCache/glory-pipeline-implementation-20261026/inputs-before/crates/ui/src/app.rs:1961)、[Session::flush](/D:/BuildCache/glory-pipeline-implementation-20261026/inputs-before/crates/ui/src/app.rs:1009)、[Session::commit](/D:/BuildCache/glory-pipeline-implementation-20261026/inputs-before/crates/ui/src/app.rs:473)、[Runtime::flush](/D:/BuildCache/glory-pipeline-implementation-20261026/inputs-before/crates/core/src/runtime.rs:871)、[Web apply](/D:/BuildCache/glory-pipeline-implementation-20261026/inputs-before/crates/web/src/browser.rs:143)。
 
 ### 2.2 Plan 创建
 
@@ -77,7 +79,7 @@ Structure、Binding、Effect 是调度优先级，**不是三次固定的 Render
 
 静态声明、Shape、原型已经共享；Memory 和 DOM 活节点也已经使用校验完整身份的分页 NodeMap。再次提出“共享静态信息”或“改成直接节点索引”，不是新的架构改进。
 
-源码入口：[Scope::instantiate](/D:/Works/glory-rs/glory/crates/ui/src/app.rs:1098)、[Plan Binding](/D:/Works/glory-rs/glory/crates/ui/src/plan.rs:152)、[Memory CreatePlan](/D:/Works/glory-rs/glory/crates/render/src/memory.rs:1662)、[Web create_plan](/D:/Works/glory-rs/glory/crates/web/src/browser/plans.rs:414)。
+源码入口：[Scope::instantiate](/D:/BuildCache/glory-pipeline-implementation-20261026/inputs-before/crates/ui/src/app.rs:1098)、[Plan Binding](/D:/BuildCache/glory-pipeline-implementation-20261026/inputs-before/crates/ui/src/plan.rs:152)、[Memory CreatePlan](/D:/BuildCache/glory-pipeline-implementation-20261026/inputs-before/crates/render/src/memory.rs:1662)、[Web create_plan](/D:/BuildCache/glory-pipeline-implementation-20261026/inputs-before/crates/web/src/browser/plans.rs:414)。
 
 ### 2.3 查询和失败
 
@@ -89,7 +91,7 @@ Mapper 的模型修改在宿主调用前完成，成功 receipt 在宿主返回�
 
 因此，合批不能只增加一个“最后统一成功”的布尔返回值，也不能把宿主错误解释成可以恢复整个 UI 状态。
 
-源码入口：[请求屏障](/D:/Works/glory-rs/glory/crates/ui/src/app.rs:1028)、[Mapper 顺序提交](/D:/Works/glory-rs/glory/crates/html/src/lib.rs:423)。
+源码入口：[请求屏障](/D:/BuildCache/glory-pipeline-implementation-20261026/inputs-before/crates/ui/src/app.rs:1028)、[Mapper 顺序提交](/D:/BuildCache/glory-pipeline-implementation-20261026/inputs-before/crates/html/src/lib.rs:423)。
 
 ### 2.4 退休与清理
 
@@ -217,7 +219,7 @@ flowchart LR
 
 实现必须保持原来的退休根选择、disposal boundary、外部 Owner 节点移动、取消顺序和 Mutation 数量。清单覆盖挂起和离树后代。不要把 UI 清单直接当作 Mapper 的校验结论：后者仍须从自己的已接受树执行 Dispose。
 
-源码位置：[UI 重复枚举](/D:/Works/glory-rs/glory/crates/ui/src/app.rs:394)、[随后再次 Dispose](/D:/Works/glory-rs/glory/crates/ui/src/app.rs:460)、[已有退休清单接口](/D:/Works/glory-rs/glory/crates/render/src/memory.rs:1816)。
+源码位置：[UI 重复枚举](/D:/BuildCache/glory-pipeline-implementation-20261026/inputs-before/crates/ui/src/app.rs:394)、[随后再次 Dispose](/D:/BuildCache/glory-pipeline-implementation-20261026/inputs-before/crates/ui/src/app.rs:460)、[已有退休清单接口](/D:/BuildCache/glory-pipeline-implementation-20261026/inputs-before/crates/render/src/memory.rs:1816)。
 
 ### 6.2 统一登记规则，再决定存储布局
 
@@ -231,7 +233,7 @@ flowchart LR
 
 存储合并只在能明确减少重复维护、且稀疏状态布局合理时考虑。若只是换一个容器而规则没有更清楚，则不列为架构改进。
 
-源码位置：[Present 与 Owned](/D:/Works/glory-rs/glory/crates/ui/src/app.rs:50)、[监听器替换](/D:/Works/glory-rs/glory/crates/ui/src/app.rs:1682)、[查询移除](/D:/Works/glory-rs/glory/crates/ui/src/app.rs:94)。
+源码位置：[Present 与 Owned](/D:/BuildCache/glory-pipeline-implementation-20261026/inputs-before/crates/ui/src/app.rs:50)、[监听器替换](/D:/BuildCache/glory-pipeline-implementation-20261026/inputs-before/crates/ui/src/app.rs:1682)、[查询移除](/D:/BuildCache/glory-pipeline-implementation-20261026/inputs-before/crates/ui/src/app.rs:94)。
 
 ## 7 第二优先级是明确浏览器实例和能力驱动的职责
 
@@ -245,7 +247,7 @@ CSR 的新控件属性回放、Select 构造，以及 hydration 的组合态读�
 
 这项整理即使没有性能收益，也能减少默认状态分叉。暂不把所有 Entry 状态重新装进大型枚举或多层 Box；只有字段职责或生命周期确实不同，才调整结构。
 
-源码位置：[adopt 构造](/D:/Works/glory-rs/glory/crates/web/src/browser/dom.rs:389)、[make_entry 构造](/D:/Works/glory-rs/glory/crates/web/src/browser/dom.rs:735)。
+源码位置：[adopt 构造](/D:/BuildCache/glory-pipeline-implementation-20261026/inputs-before/crates/web/src/browser/dom.rs:389)、[make_entry 构造](/D:/BuildCache/glory-pipeline-implementation-20261026/inputs-before/crates/web/src/browser/dom.rs:735)。
 
 ### 7.2 能力驱动声明自己的更新依赖
 
@@ -259,7 +261,7 @@ Renderer 在 Mapper 后调用多个能力驱动。当前已经共用一次借用
 
 普通行 benchmark 不含 Rich 或文件选择，空驱动多为少量判断。这项工作的主要理由是让能力依赖和更新责任清楚，其性能验证必须增加实际使用这些能力的场景。
 
-源码位置：[统一语义变更摘要](/D:/Works/glory-rs/glory/crates/web/src/semantic_changes.rs:1)、[Rich 全活跃集合更新](/D:/Works/glory-rs/glory/crates/web/src/browser/rich.rs:421)、[文件选择更新](/D:/Works/glory-rs/glory/crates/web/src/browser/files.rs:566)、[Layers 更新](/D:/Works/glory-rs/glory/crates/web/src/browser/layers.rs:54)。
+源码位置：[统一语义变更摘要](/D:/BuildCache/glory-pipeline-implementation-20261026/inputs-before/crates/web/src/semantic_changes.rs:1)、[Rich 全活跃集合更新](/D:/BuildCache/glory-pipeline-implementation-20261026/inputs-before/crates/web/src/browser/rich.rs:421)、[文件选择更新](/D:/BuildCache/glory-pipeline-implementation-20261026/inputs-before/crates/web/src/browser/files.rs:566)、[Layers 更新](/D:/BuildCache/glory-pipeline-implementation-20261026/inputs-before/crates/web/src/browser/layers.rs:54)。
 
 ## 8 收益不足的复杂度与精简边界
 

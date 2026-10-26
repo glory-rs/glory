@@ -1,0 +1,4014 @@
+{
+  "schema": 1,
+  "date": "2026-10-26",
+  "criterion": "Architecture and responsibilities first; performance is a measured constraint, not justification to break boundaries.",
+  "source": {
+    "before": {
+      "path": "D:\\BuildCache\\glory-pipeline-implementation-20261026\\inputs-before\\inputs.json",
+      "sha256": "607ab8fec1030beee3565615fbd520c2c9c7633e555e58b2abd31d406510df7d"
+    },
+    "after": {
+      "path": "D:\\BuildCache\\glory-pipeline-implementation-20261026\\inputs-after\\inputs.json",
+      "sha256": "307b12ad08a7d63272c9f912e7bb39106456238d0b2819f1930fa95a807b69ad"
+    },
+    "inputCount": 468,
+    "onlyChanges": [
+      "crates/ui/src/app.rs",
+      "crates/ui/tests/query_barriers.rs",
+      "crates/web/src/browser.rs",
+      "crates/web/src/semantic_changes.rs",
+      "crates/web/src/browser/dom.rs",
+      "crates/web/src/browser/layers.rs",
+      "crates/web/src/browser/plans.rs",
+      "crates/web/src/browser/rich.rs"
+    ],
+    "ownedWorkingFilesMatch": true,
+    "compiledSourceMatchesFinalSnapshot": true,
+    "baselineGitHead": "463272a9ea90ae2f7a544a46fcd903e03e225002",
+    "currentGitHead": "a7058d2b33c46848d762216759b95125dc0c04b6",
+    "concurrentChanges": "Other chats committed workspace/platform changes during this task. Benchmark comparisons use the frozen before/after input sets, never a HEAD diff.",
+    "scenarioInputs": {
+      "path": "D:\\BuildCache\\glory-pipeline-implementation-20261026\\scenario-inputs.json",
+      "sha256": "5ad83236bae31c002dc908488ba63a604684d2b6bb99c4466112b5eac61159d8"
+    },
+    "controllerFixture": {
+      "path": "D:\\BuildCache\\glory-pipeline-implementation-20261026\\controller-fixture-inputs.json",
+      "sha256": "2cf154148f4d45da269dd12687f7428725365bfc44af5d97536249b6ba233749"
+    }
+  },
+  "artifacts": {
+    "before": "03f41d5db2d69718600ce1e048509e6b49ffe78e41ce19fd9d53d930967bef62",
+    "after": "ee3cd636b6472c00dae1ea6ad1fe665aaa8e0c9fd6e66d4404e61cff7ad42095"
+  },
+  "pairedInitial": {
+    "path": "D:\\BuildCache\\glory-pipeline-implementation-20261026\\pair-pinned\\evidence.json",
+    "sha256": "068506010aa8854794f0f0237f05b3e7d46262d4cc23c59df0d48cda8d61382c",
+    "samples": 864,
+    "operations": [
+      {
+        "key": "create_1k",
+        "before": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 21.372499999999988,
+            "p10": 16.85399999999998,
+            "p90": 36.17199999999998
+          },
+          "wallMs": {
+            "median": 53.5,
+            "p10": 41.90000009536743,
+            "p90": 90.69999992847443
+          },
+          "roundScriptMedians": [
+            27.080499999999994,
+            17.312500000000007,
+            36.11449999999999,
+            17.96199999999998
+          ]
+        },
+        "after": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 17.304500000000008,
+            "p10": 16.328999999999983,
+            "p90": 18.961999999999993
+          },
+          "wallMs": {
+            "median": 43.15000003576279,
+            "p10": 40.299999952316284,
+            "p90": 48.200000047683716
+          },
+          "roundScriptMedians": [
+            16.971999999999973,
+            16.646999999999995,
+            18.066500000000012,
+            17.517000000000003
+          ]
+        },
+        "scriptChangePercent": -19.033805123406168
+      },
+      {
+        "key": "replace_1k",
+        "before": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 27.2675,
+            "p10": 24.990999999999985,
+            "p90": 43.93799999999981
+          },
+          "wallMs": {
+            "median": 56.35000002384186,
+            "p10": 49.60000002384186,
+            "p90": 78.5
+          },
+          "roundScriptMedians": [
+            30.287999999999982,
+            25.1575,
+            37.984999999999935,
+            26.01150000000002
+          ]
+        },
+        "after": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 26.128500000000052,
+            "p10": 25.020000000000042,
+            "p90": 28.864
+          },
+          "wallMs": {
+            "median": 54.19999998807907,
+            "p10": 50.299999952316284,
+            "p90": 57.299999952316284
+          },
+          "roundScriptMedians": [
+            25.42749999999999,
+            26.128500000000052,
+            27.63199999999999,
+            27.017500000000027
+          ]
+        },
+        "scriptChangePercent": -4.177133950673683
+      },
+      {
+        "key": "update_10th",
+        "before": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 0.4939999999998834,
+            "p10": 0.44800000000000395,
+            "p90": 0.5429999999999602
+          },
+          "wallMs": {
+            "median": 11.549999952316284,
+            "p10": 7.899999976158142,
+            "p90": 14.200000047683716
+          },
+          "roundScriptMedians": [
+            0.49399999999999444,
+            0.4724999999999868,
+            0.5015000000001546,
+            0.49200000000004795
+          ]
+        },
+        "after": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 0.4904999999999493,
+            "p10": 0.4349999999999632,
+            "p90": 0.5650000000001487
+          },
+          "wallMs": {
+            "median": 10.850000023841858,
+            "p10": 8.299999952316284,
+            "p90": 13.399999976158142
+          },
+          "roundScriptMedians": [
+            0.4704999999999293,
+            0.4984999999999573,
+            0.5199999999999649,
+            0.47050000000004033
+          ]
+        },
+        "scriptChangePercent": -0.7085020242783235
+      },
+      {
+        "key": "select_row",
+        "before": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 0.6414999999999615,
+            "p10": 0.5749999999999922,
+            "p90": 0.7260000000000044
+          },
+          "wallMs": {
+            "median": 7.799999952316284,
+            "p10": 4.700000047683716,
+            "p90": 10.799999952316284
+          },
+          "roundScriptMedians": [
+            0.6404999999998218,
+            0.6280000000000729,
+            0.6610000000000227,
+            0.6299999999999084
+          ]
+        },
+        "after": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 0.6309999999999372,
+            "p10": 0.5790000000001072,
+            "p90": 0.6759999999998989
+          },
+          "wallMs": {
+            "median": 8.949999988079071,
+            "p10": 6.300000071525574,
+            "p90": 11.5
+          },
+          "roundScriptMedians": [
+            0.5999999999999339,
+            0.6524999999999448,
+            0.6365000000000398,
+            0.6144999999998513
+          ]
+        },
+        "scriptChangePercent": -1.636788776309428
+      },
+      {
+        "key": "swap_rows",
+        "before": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 0.3704999999998293,
+            "p10": 0.3429999999999822,
+            "p90": 0.4290000000000127
+          },
+          "wallMs": {
+            "median": 9.149999976158142,
+            "p10": 5.5,
+            "p90": 11.799999952316284
+          },
+          "roundScriptMedians": [
+            0.36999999999998145,
+            0.3620000000001955,
+            0.39600000000006297,
+            0.3704999999998293
+          ]
+        },
+        "after": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 0.34599999999995745,
+            "p10": 0.31900000000018025,
+            "p90": 0.39900000000026026
+          },
+          "wallMs": {
+            "median": 9.0,
+            "p10": 6.300000071525574,
+            "p90": 10.900000095367432
+          },
+          "roundScriptMedians": [
+            0.3420000000000645,
+            0.3409999999999247,
+            0.34599999999995745,
+            0.3500000000000725
+          ]
+        },
+        "scriptChangePercent": -6.6126855600224355
+      },
+      {
+        "key": "remove_row",
+        "before": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 0.34850000000008485,
+            "p10": 0.3229999999998512,
+            "p90": 0.39899999999981617
+          },
+          "wallMs": {
+            "median": 10.299999952316284,
+            "p10": 6.600000023841858,
+            "p90": 12.5
+          },
+          "roundScriptMedians": [
+            0.3474999999999451,
+            0.3395000000001591,
+            0.38549999999992757,
+            0.34000000000000696
+          ]
+        },
+        "after": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 0.3295000000000936,
+            "p10": 0.3100000000002545,
+            "p90": 0.3580000000003025
+          },
+          "wallMs": {
+            "median": 8.800000011920929,
+            "p10": 6.600000023841858,
+            "p90": 11.799999952316284
+          },
+          "roundScriptMedians": [
+            0.31750000000019263,
+            0.33649999999996183,
+            0.3269999999999662,
+            0.33799999999994945
+          ]
+        },
+        "scriptChangePercent": -5.451936872306062
+      },
+      {
+        "key": "append_1k",
+        "before": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 19.086500000000008,
+            "p10": 17.76700000000009,
+            "p90": 21.09799999999984
+          },
+          "wallMs": {
+            "median": 49.450000047683716,
+            "p10": 46.199999928474426,
+            "p90": 53.40000009536743
+          },
+          "roundScriptMedians": [
+            18.62149999999985,
+            18.086500000000115,
+            19.85400000000004,
+            18.860999999999795
+          ]
+        },
+        "after": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 18.702500000000065,
+            "p10": 17.678000000000083,
+            "p90": 19.95599999999964
+          },
+          "wallMs": {
+            "median": 49.19999998807907,
+            "p10": 45.300000071525574,
+            "p90": 54.700000047683716
+          },
+          "roundScriptMedians": [
+            18.243499999999855,
+            18.650000000000055,
+            19.79799999999976,
+            18.662999999999876
+          ]
+        },
+        "scriptChangePercent": -2.0118932229583386
+      },
+      {
+        "key": "create_10k",
+        "before": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 206.50100000000026,
+            "p10": 182.15299999999957,
+            "p90": 218.07599999999994
+          },
+          "wallMs": {
+            "median": 491.80000001192093,
+            "p10": 419.60000002384186,
+            "p90": 536.7000000476837
+          },
+          "roundScriptMedians": [
+            205.01850000000044,
+            204.0725000000001,
+            195.99900000000002,
+            210.78199999999958
+          ]
+        },
+        "after": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 203.98550000000037,
+            "p10": 185.5519999999995,
+            "p90": 216.13300000000012
+          },
+          "wallMs": {
+            "median": 467.0499999523163,
+            "p10": 420,
+            "p90": 536
+          },
+          "roundScriptMedians": [
+            195.28999999999996,
+            198.72250000000014,
+            206.87500000000014,
+            204.86850000000032
+          ]
+        },
+        "scriptChangePercent": -1.2181539072449454
+      },
+      {
+        "key": "clear_1k",
+        "before": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 13.194000000000372,
+            "p10": 12.585999999998876,
+            "p90": 13.710999999998918
+          },
+          "wallMs": {
+            "median": 15.199999988079071,
+            "p10": 13.699999928474426,
+            "p90": 17.299999952316284
+          },
+          "roundScriptMedians": [
+            13.280499999999584,
+            12.883000000000422,
+            13.22549999999989,
+            13.322500000000126
+          ]
+        },
+        "after": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 13.333499999999887,
+            "p10": 12.715999999999283,
+            "p90": 14.120000000000132
+          },
+          "wallMs": {
+            "median": 15.150000035762787,
+            "p10": 13.600000023841858,
+            "p90": 18.59999990463257
+          },
+          "roundScriptMedians": [
+            13.133499999999465,
+            13.404500000000041,
+            13.9440000000004,
+            13.175500000000007
+          ]
+        },
+        "scriptChangePercent": 1.0572987721654714
+      }
+    ],
+    "environment": [
+      {
+        "round": 0,
+        "variant": "before",
+        "before": {
+          "load": 46,
+          "builds": [
+            {
+              "Id": 115844,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 123020,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 592,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 14376,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 62496,
+              "ProcessName": "rustc"
+            }
+          ]
+        },
+        "after": {
+          "load": 33,
+          "builds": []
+        }
+      },
+      {
+        "round": 0,
+        "variant": "after",
+        "before": {
+          "load": 19,
+          "builds": []
+        },
+        "after": {
+          "load": 11,
+          "builds": []
+        }
+      },
+      {
+        "round": 1,
+        "variant": "after",
+        "before": {
+          "load": 14,
+          "builds": []
+        },
+        "after": {
+          "load": 14,
+          "builds": []
+        }
+      },
+      {
+        "round": 1,
+        "variant": "before",
+        "before": {
+          "load": 19,
+          "builds": []
+        },
+        "after": {
+          "load": 23,
+          "builds": [
+            {
+              "Id": 102272,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 110440,
+              "ProcessName": "cargo"
+            }
+          ]
+        }
+      },
+      {
+        "round": 2,
+        "variant": "before",
+        "before": {
+          "load": 88,
+          "builds": [
+            {
+              "Id": 31484,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 48796,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 74260,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 99812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 116924,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 572,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 15452,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 30436,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 31596,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 38464,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 54680,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 60920,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 62040,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 62832,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 68980,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 71496,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 75060,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 76284,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 78024,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 103436,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 108864,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 117044,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 120644,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 120740,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 123188,
+              "ProcessName": "rustc"
+            }
+          ]
+        },
+        "after": {
+          "load": 9,
+          "builds": [
+            {
+              "Id": 48796,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 74260,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 99812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 104064,
+              "ProcessName": "rustc"
+            }
+          ]
+        }
+      },
+      {
+        "round": 2,
+        "variant": "after",
+        "before": {
+          "load": 18,
+          "builds": [
+            {
+              "Id": 48796,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 74260,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 99812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 84268,
+              "ProcessName": "rustc"
+            }
+          ]
+        },
+        "after": {
+          "load": 21,
+          "builds": []
+        }
+      },
+      {
+        "round": 3,
+        "variant": "after",
+        "before": {
+          "load": 16,
+          "builds": []
+        },
+        "after": {
+          "load": 14,
+          "builds": []
+        }
+      },
+      {
+        "round": 3,
+        "variant": "before",
+        "before": {
+          "load": 18,
+          "builds": []
+        },
+        "after": {
+          "load": 17,
+          "builds": []
+        }
+      }
+    ]
+  },
+  "pairedConfirmation": {
+    "path": "D:\\BuildCache\\glory-pipeline-implementation-20261026\\pair-confirmation\\evidence.json",
+    "sha256": "1997a6f2a11401ed3be0148b25323e445a75016e5136ab8626574009334c340e",
+    "samples": 864,
+    "operations": [
+      {
+        "key": "create_1k",
+        "before": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 18.435499999999966,
+            "p10": 16.99299999999998,
+            "p90": 20.58600000000002
+          },
+          "wallMs": {
+            "median": 45.64999997615814,
+            "p10": 42.700000047683716,
+            "p90": 50.5
+          },
+          "roundScriptMedians": [
+            17.1655,
+            18.122499999999988,
+            20.466000000000026,
+            18.696999999999978
+          ]
+        },
+        "after": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 18.44399999999998,
+            "p10": 16.515999999999977,
+            "p90": 21.229000000000024
+          },
+          "wallMs": {
+            "median": 45.80000001192093,
+            "p10": 42.199999928474426,
+            "p90": 54.300000071525574
+          },
+          "roundScriptMedians": [
+            16.79399999999999,
+            17.982500000000027,
+            19.81800000000003,
+            19.434499999999993
+          ]
+        },
+        "scriptChangePercent": 0.046106696319681006
+      },
+      {
+        "key": "replace_1k",
+        "before": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 27.072499999999998,
+            "p10": 25.402000000000037,
+            "p90": 31.121999999999872
+          },
+          "wallMs": {
+            "median": 54.80000001192093,
+            "p10": 49.799999952316284,
+            "p90": 61.299999952316284
+          },
+          "roundScriptMedians": [
+            25.570500000000052,
+            26.062500000000043,
+            29.432000000000016,
+            28.685500000000033
+          ]
+        },
+        "after": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 27.762999999999984,
+            "p10": 25.016000000000037,
+            "p90": 32.97100000000008
+          },
+          "wallMs": {
+            "median": 56.40000003576279,
+            "p10": 50.300000071525574,
+            "p90": 65.60000002384186
+          },
+          "roundScriptMedians": [
+            25.60049999999997,
+            26.84350000000002,
+            28.680999999999955,
+            29.15799999999996
+          ]
+        },
+        "scriptChangePercent": 2.5505586850124162
+      },
+      {
+        "key": "update_10th",
+        "before": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 0.5155000000000021,
+            "p10": 0.45600000000001195,
+            "p90": 0.6039999999998269
+          },
+          "wallMs": {
+            "median": 11.350000083446503,
+            "p10": 8.299999952316284,
+            "p90": 15
+          },
+          "roundScriptMedians": [
+            0.4910000000001302,
+            0.5104999999998583,
+            0.5149999999999322,
+            0.5375000000000796
+          ]
+        },
+        "after": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 0.5134999999999446,
+            "p10": 0.45600000000001195,
+            "p90": 0.6019999999999914
+          },
+          "wallMs": {
+            "median": 11.800000011920929,
+            "p10": 7.400000095367432,
+            "p90": 14.800000071525574
+          },
+          "roundScriptMedians": [
+            0.4859999999998754,
+            0.5069999999999242,
+            0.5589999999999762,
+            0.5195000000000061
+          ]
+        },
+        "scriptChangePercent": -0.3879728419122208
+      },
+      {
+        "key": "select_row",
+        "before": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 0.6390000000000562,
+            "p10": 0.5910000000000082,
+            "p90": 0.7369999999999877
+          },
+          "wallMs": {
+            "median": 7.600000023841858,
+            "p10": 5.400000095367432,
+            "p90": 11
+          },
+          "roundScriptMedians": [
+            0.632000000000077,
+            0.6825000000001413,
+            0.6585000000000063,
+            0.6244999999998058
+          ]
+        },
+        "after": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 0.6570000000001297,
+            "p10": 0.5910000000000082,
+            "p90": 0.796000000000241
+          },
+          "wallMs": {
+            "median": 8.100000023841858,
+            "p10": 6.200000047683716,
+            "p90": 11.300000071525574
+          },
+          "roundScriptMedians": [
+            0.6690000000000307,
+            0.6324999999999248,
+            0.6725000000000758,
+            0.6864999999998123
+          ]
+        },
+        "scriptChangePercent": 2.816901408461958
+      },
+      {
+        "key": "swap_rows",
+        "before": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 0.384000000000162,
+            "p10": 0.35100000000021225,
+            "p90": 0.43799999999993844
+          },
+          "wallMs": {
+            "median": 9.149999976158142,
+            "p10": 5.799999952316284,
+            "p90": 11.100000023841858
+          },
+          "roundScriptMedians": [
+            0.3695000000001336,
+            0.3874999999999851,
+            0.3949999999999232,
+            0.38150000000025663
+          ]
+        },
+        "after": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 0.36800000000036803,
+            "p10": 0.3340000000000565,
+            "p90": 0.45800000000006946
+          },
+          "wallMs": {
+            "median": 9.5,
+            "p10": 6.199999928474426,
+            "p90": 11.5
+          },
+          "roundScriptMedians": [
+            0.35500000000010523,
+            0.35650000000009285,
+            0.3874999999999851,
+            0.4059999999996844
+          ]
+        },
+        "scriptChangePercent": -4.166666666611252
+      },
+      {
+        "key": "remove_row",
+        "before": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 0.3575000000000106,
+            "p10": 0.3340000000000565,
+            "p90": 0.38999999999989043
+          },
+          "wallMs": {
+            "median": 9.25,
+            "p10": 6,
+            "p90": 12.899999976158142
+          },
+          "roundScriptMedians": [
+            0.34150000000021663,
+            0.36500000000017074,
+            0.3610000000000557,
+            0.3609999999998337
+          ]
+        },
+        "after": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 0.3394999999999371,
+            "p10": 0.3049999999999997,
+            "p90": 0.4290000000000127
+          },
+          "wallMs": {
+            "median": 10.199999988079071,
+            "p10": 7,
+            "p90": 12.700000047683716
+          },
+          "roundScriptMedians": [
+            0.3334999999999866,
+            0.3180000000002625,
+            0.376000000000154,
+            0.3750000000000142
+          ]
+        },
+        "scriptChangePercent": -5.034965034985451
+      },
+      {
+        "key": "append_1k",
+        "before": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 20.028500000000005,
+            "p10": 18.064999999999998,
+            "p90": 22.977999999999277
+          },
+          "wallMs": {
+            "median": 51.84999996423721,
+            "p10": 46.10000002384186,
+            "p90": 58.299999952316284
+          },
+          "roundScriptMedians": [
+            18.24899999999996,
+            19.524500000000167,
+            21.04050000000024,
+            20.20899999999992
+          ]
+        },
+        "after": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 20.27200000000007,
+            "p10": 18.08399999999999,
+            "p90": 23.394000000000137
+          },
+          "wallMs": {
+            "median": 52.250000059604645,
+            "p10": 45.59999990463257,
+            "p90": 61.799999952316284
+          },
+          "roundScriptMedians": [
+            19.3620000000001,
+            18.59350000000015,
+            22.691500000000087,
+            20.838000000000136
+          ]
+        },
+        "scriptChangePercent": 1.2157675312682636
+      },
+      {
+        "key": "create_10k",
+        "before": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 217.4064999999996,
+            "p10": 196.45700000000056,
+            "p90": 243.055
+          },
+          "wallMs": {
+            "median": 501.1999999284744,
+            "p10": 443.2999999523163,
+            "p90": 593.5
+          },
+          "roundScriptMedians": [
+            201.5494999999996,
+            217.07450000000028,
+            234.29449999999986,
+            231.33150000000046
+          ]
+        },
+        "after": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 213.27350000000013,
+            "p10": 190.01599999999996,
+            "p90": 234.68999999999875
+          },
+          "wallMs": {
+            "median": 504.80000001192093,
+            "p10": 429.10000002384186,
+            "p90": 577.5
+          },
+          "roundScriptMedians": [
+            202.18849999999964,
+            201.94750000000016,
+            233.8315000000004,
+            219.78350000000057
+          ]
+        },
+        "scriptChangePercent": -1.9010471168062981
+      },
+      {
+        "key": "clear_1k",
+        "before": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 14.018499999999712,
+            "p10": 13.124999999998721,
+            "p90": 15.19400000000104
+          },
+          "wallMs": {
+            "median": 15.749999940395355,
+            "p10": 14.200000047683716,
+            "p90": 18.5
+          },
+          "roundScriptMedians": [
+            13.600499999999904,
+            14.207999999999998,
+            13.900499999999205,
+            14.325000000000365
+          ]
+        },
+        "after": {
+          "samples": 48,
+          "scriptMs": {
+            "median": 13.920499999999336,
+            "p10": 13.039000000000911,
+            "p90": 15.13699999999929
+          },
+          "wallMs": {
+            "median": 15.099999964237213,
+            "p10": 13.799999952316284,
+            "p90": 17.5
+          },
+          "roundScriptMedians": [
+            13.147000000000908,
+            13.59099999999902,
+            14.092499999999397,
+            14.532000000000878
+          ]
+        },
+        "scriptChangePercent": -0.6990762207110479
+      }
+    ],
+    "environment": [
+      {
+        "round": 0,
+        "variant": "before",
+        "before": {
+          "load": 22,
+          "builds": []
+        },
+        "after": {
+          "load": 7,
+          "builds": []
+        }
+      },
+      {
+        "round": 0,
+        "variant": "after",
+        "before": {
+          "load": 5,
+          "builds": []
+        },
+        "after": {
+          "load": 19,
+          "builds": []
+        }
+      },
+      {
+        "round": 1,
+        "variant": "after",
+        "before": {
+          "load": 12,
+          "builds": []
+        },
+        "after": {
+          "load": 25,
+          "builds": [
+            {
+              "Id": 104156,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 113792,
+              "ProcessName": "cargo"
+            }
+          ]
+        }
+      },
+      {
+        "round": 1,
+        "variant": "before",
+        "before": {
+          "load": 20,
+          "builds": [
+            {
+              "Id": 104156,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 113792,
+              "ProcessName": "cargo"
+            }
+          ]
+        },
+        "after": {
+          "load": 39,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 7048,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 16184,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 60132,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 116588,
+              "ProcessName": "rustc"
+            }
+          ]
+        }
+      },
+      {
+        "round": 2,
+        "variant": "before",
+        "before": {
+          "load": 32,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 7048,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 16184,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 29572,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 111480,
+              "ProcessName": "rustc"
+            }
+          ]
+        },
+        "after": {
+          "load": 28,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 54208,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 57704,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 122388,
+              "ProcessName": "rustc"
+            }
+          ]
+        }
+      },
+      {
+        "round": 2,
+        "variant": "after",
+        "before": {
+          "load": 39,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 32640,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 99708,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 122388,
+              "ProcessName": "rustc"
+            }
+          ]
+        },
+        "after": {
+          "load": 32,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 51352,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 87700,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 103044,
+              "ProcessName": "rustc"
+            }
+          ]
+        }
+      },
+      {
+        "round": 3,
+        "variant": "after",
+        "before": {
+          "load": 26,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 51352,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 87700,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 120760,
+              "ProcessName": "rustc"
+            }
+          ]
+        },
+        "after": {
+          "load": 29,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 45248,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 87700,
+              "ProcessName": "rustc"
+            }
+          ]
+        }
+      },
+      {
+        "round": 3,
+        "variant": "before",
+        "before": {
+          "load": 28,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 34964,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 45248,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 87700,
+              "ProcessName": "rustc"
+            }
+          ]
+        },
+        "after": {
+          "load": 30,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 64696,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 87700,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 104192,
+              "ProcessName": "rustc"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "frameworks": {
+    "path": "D:\\BuildCache\\glory-pipeline-implementation-20261026\\after\\primary\\evidence.json",
+    "sha256": "f4a6a19ca240e259b55141e43f4767389f3ad9a299bc011911475d1b7459e2d2",
+    "samples": 648,
+    "operations": [
+      {
+        "key": "create_1k",
+        "glory": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 17.41100000000001,
+            "p10": 16.172999999999995,
+            "p90": 18.606000000000012
+          }
+        },
+        "leptos": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 14.359000000000005,
+            "p10": 13.090999999999992,
+            "p90": 14.825000000000033
+          }
+        },
+        "dioxus": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 4.364999999999994,
+            "p10": 4.235000000000003,
+            "p90": 5.030000000000003
+          }
+        }
+      },
+      {
+        "key": "replace_1k",
+        "glory": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 26.864499999999957,
+            "p10": 25.541000000000036,
+            "p90": 28.59199999999995
+          }
+        },
+        "leptos": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 21.51799999999998,
+            "p10": 20.25499999999991,
+            "p90": 23.011000000000003
+          }
+        },
+        "dioxus": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 7.583499999999993,
+            "p10": 7.241999999999998,
+            "p90": 8.068999999999992
+          }
+        }
+      },
+      {
+        "key": "update_10th",
+        "glory": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.5025000000000723,
+            "p10": 0.4579999999998474,
+            "p90": 0.5589999999999762
+          }
+        },
+        "leptos": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.3454999999999986,
+            "p10": 0.3109999999999502,
+            "p90": 0.41100000000016124
+          }
+        },
+        "dioxus": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.8154999999999968,
+            "p10": 0.7949999999999902,
+            "p90": 0.9310000000000151
+          }
+        }
+      },
+      {
+        "key": "select_row",
+        "glory": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.6479999999999819,
+            "p10": 0.6129999999999747,
+            "p90": 0.6960000000000299
+          }
+        },
+        "leptos": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 179.84200000000007,
+            "p10": 162.71400000000025,
+            "p90": 190.11100000000036
+          }
+        },
+        "dioxus": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.7200000000000539,
+            "p10": 0.6979999999999764,
+            "p90": 0.7739999999999414
+          }
+        }
+      },
+      {
+        "key": "swap_rows",
+        "glory": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.3770000000000717,
+            "p10": 0.32900000000024576,
+            "p90": 0.4500000000002835
+          }
+        },
+        "leptos": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.18049999999991684,
+            "p10": 0.14599999999997948,
+            "p90": 0.21300000000046282
+          }
+        },
+        "dioxus": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.8624999999999883,
+            "p10": 0.8209999999999607,
+            "p90": 0.9249999999999536
+          }
+        }
+      },
+      {
+        "key": "remove_row",
+        "glory": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.3370000000000317,
+            "p10": 0.3229999999998512,
+            "p90": 0.38800000000005497
+          }
+        },
+        "leptos": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.3095000000001846,
+            "p10": 0.22799999999989495,
+            "p90": 0.41699999999966764
+          }
+        },
+        "dioxus": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.8025000000000393,
+            "p10": 0.7420000000000204,
+            "p90": 0.8399999999999519
+          }
+        }
+      },
+      {
+        "key": "append_1k",
+        "glory": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 19.709500000000048,
+            "p10": 18.487999999999616,
+            "p90": 20.531999999999773
+          }
+        },
+        "leptos": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 17.303500000000138,
+            "p10": 15.441000000000038,
+            "p90": 20.805000000000184
+          }
+        },
+        "dioxus": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 5.361499999999908,
+            "p10": 5.179000000000045,
+            "p90": 5.774000000000168
+          }
+        }
+      },
+      {
+        "key": "create_10k",
+        "glory": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 211.5005000000001,
+            "p10": 189.52099999999916,
+            "p90": 255.60800000000052
+          }
+        },
+        "leptos": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 177.70449999999994,
+            "p10": 163.1640000000001,
+            "p90": 189.84999999999985
+          }
+        },
+        "dioxus": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 49.63650000000008,
+            "p10": 43.60199999999992,
+            "p90": 53.98199999999997
+          }
+        }
+      },
+      {
+        "key": "clear_1k",
+        "glory": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 13.345999999999414,
+            "p10": 12.636000000000536,
+            "p90": 13.859000000000066
+          }
+        },
+        "leptos": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 15.763000000000638,
+            "p10": 14.847999999998862,
+            "p90": 17.258999999999247
+          }
+        },
+        "dioxus": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 2.6970000000001715,
+            "p10": 2.5369999999997894,
+            "p90": 3.043000000000351
+          }
+        }
+      }
+    ],
+    "selectionDiagnostic": {
+      "path": "D:\\BuildCache\\glory-pipeline-implementation-20261026\\after\\primary\\selection-diagnostic.json",
+      "sha256": "166c757ec144898a1fb0ffb5f7250c575036c60d2ab516b2c60081623229178b"
+    }
+  },
+  "portfolio": {
+    "path": "D:\\BuildCache\\glory-pipeline-implementation-20261026\\scenario-pair\\evidence.json",
+    "sha256": "c4057a24acb00760743407defce1f06df10386eec41d9774d0cf153ef01cd78f",
+    "samples": 768,
+    "operations": [
+      {
+        "rows": 1000,
+        "operation": "mount",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 15.206999999999997,
+            "p10": 14.425999999999995,
+            "p90": 15.809000000000003
+          }
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 15.014000000000006,
+            "p10": 14.328000000000007,
+            "p90": 15.701999999999995
+          }
+        },
+        "scriptChangePercent": -1.2691523640428137
+      },
+      {
+        "rows": 1000,
+        "operation": "one",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.1895000000000091,
+            "p10": 0.16700000000002824,
+            "p90": 0.23199999999995446
+          }
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.1664999999999861,
+            "p10": 0.15899999999996473,
+            "p90": 0.19000000000002348
+          }
+        },
+        "scriptChangePercent": -12.137203166238464
+      },
+      {
+        "rows": 1000,
+        "operation": "sparse",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.26249999999999885,
+            "p10": 0.24099999999999122,
+            "p90": 0.2949999999999897
+          }
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.2500000000000002,
+            "p10": 0.23600000000001398,
+            "p90": 0.3220000000000445
+          }
+        },
+        "scriptChangePercent": -4.7619047619042565
+      },
+      {
+        "rows": 1000,
+        "operation": "medium",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.7849999999999802,
+            "p10": 0.7350000000000412,
+            "p90": 0.9160000000000279
+          }
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.8144999999999958,
+            "p10": 0.7360000000000144,
+            "p90": 0.9490000000000332
+          }
+        },
+        "scriptChangePercent": 3.7579617834415657
+      },
+      {
+        "rows": 1000,
+        "operation": "dense",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 6.203000000000042,
+            "p10": 5.832999999999977,
+            "p90": 6.828000000000001
+          }
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 5.977999999999955,
+            "p10": 5.695000000000006,
+            "p90": 6.213999999999997
+          }
+        },
+        "scriptChangePercent": -3.627277123973649
+      },
+      {
+        "rows": 1000,
+        "operation": "burst",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.8269999999999667,
+            "p10": 0.7409999999999917,
+            "p90": 1.0050000000000336
+          }
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.759500000000024,
+            "p10": 0.7139999999999924,
+            "p90": 0.8369999999999767
+          }
+        },
+        "scriptChangePercent": -8.162031438929308
+      },
+      {
+        "rows": 1000,
+        "operation": "select",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.17600000000000948,
+            "p10": 0.16599999999999948,
+            "p90": 0.19999999999997797
+          }
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.16199999999999548,
+            "p10": 0.15300000000006975,
+            "p90": 0.17699999999998273
+          }
+        },
+        "scriptChangePercent": -7.954545454552986
+      },
+      {
+        "rows": 1000,
+        "operation": "clear",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 6.543000000000021,
+            "p10": 6.074999999999942,
+            "p90": 7.357999999999976
+          }
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 6.464000000000025,
+            "p10": 6.05,
+            "p90": 7.839999999999958
+          }
+        },
+        "scriptChangePercent": -1.2073972184012738
+      },
+      {
+        "rows": 5000,
+        "operation": "mount",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 79.32949999999994,
+            "p10": 76.04899999999992,
+            "p90": 83.15899999999998
+          }
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 77.08099999999996,
+            "p10": 74.72499999999994,
+            "p90": 90.33999999999997
+          }
+        },
+        "scriptChangePercent": -2.8343806528466464
+      },
+      {
+        "rows": 5000,
+        "operation": "one",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.18649999999997835,
+            "p10": 0.17599999999995397,
+            "p90": 0.20700000000006824
+          }
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.18650000000008937,
+            "p10": 0.17300000000020077,
+            "p90": 0.21599999999999397
+          }
+        },
+        "scriptChangePercent": 5.95301585804009e-11
+      },
+      {
+        "rows": 5000,
+        "operation": "sparse",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.5170000000001007,
+            "p10": 0.476000000000365,
+            "p90": 0.5530000000000257
+          }
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.5005000000001258,
+            "p10": 0.47499999999978115,
+            "p90": 0.5379999999999274
+          }
+        },
+        "scriptChangePercent": -3.191489361696642
+      },
+      {
+        "rows": 5000,
+        "operation": "medium",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 3.865500000000077,
+            "p10": 3.71100000000002,
+            "p90": 4.296999999999773
+          }
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 4.06099999999987,
+            "p10": 3.6439999999999806,
+            "p90": 4.350000000000076
+          }
+        },
+        "scriptChangePercent": 5.057560470826261
+      },
+      {
+        "rows": 5000,
+        "operation": "dense",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 36.295000000000186,
+            "p10": 33.64199999999995,
+            "p90": 38.920000000000066
+          }
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 36.49499999999994,
+            "p10": 33.12099999999995,
+            "p90": 42.23299999999996
+          }
+        },
+        "scriptChangePercent": 0.5510400881657329
+      },
+      {
+        "rows": 5000,
+        "operation": "burst",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 3.1129999999999214,
+            "p10": 2.9010000000000424,
+            "p90": 3.3090000000002284
+          }
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 2.8954999999997177,
+            "p10": 2.759000000000178,
+            "p90": 3.1120000000002257
+          }
+        },
+        "scriptChangePercent": -6.986829424998686
+      },
+      {
+        "rows": 5000,
+        "operation": "select",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.1854999999999496,
+            "p10": 0.17399999999989646,
+            "p90": 0.21799999999982944
+          }
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 0.19100000000005224,
+            "p10": 0.1669999999998062,
+            "p90": 0.22799999999989495
+          }
+        },
+        "scriptChangePercent": 2.9649595687892827
+      },
+      {
+        "rows": 5000,
+        "operation": "clear",
+        "before": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 38.86149999999988,
+            "p10": 35.690000000000666,
+            "p90": 45.228999999999964
+          }
+        },
+        "after": {
+          "samples": 24,
+          "scriptMs": {
+            "median": 39.695000000000036,
+            "p10": 35.02099999999997,
+            "p90": 44.86900000000027
+          }
+        },
+        "scriptChangePercent": 2.144796263654669
+      }
+    ],
+    "environment": [
+      {
+        "round": 0,
+        "rows": 1000,
+        "variant": "before",
+        "before": {
+          "load": 47,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87700,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 94792,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 102384,
+              "ProcessName": "rustc"
+            }
+          ]
+        },
+        "after": {
+          "load": 22,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87700,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 94792,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 106964,
+              "ProcessName": "rustc"
+            }
+          ]
+        }
+      },
+      {
+        "round": 0,
+        "rows": 1000,
+        "variant": "after",
+        "before": {
+          "load": 41,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87700,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 94792,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 106964,
+              "ProcessName": "rustc"
+            }
+          ]
+        },
+        "after": {
+          "load": 24,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87700,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 94792,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 106964,
+              "ProcessName": "rustc"
+            }
+          ]
+        }
+      },
+      {
+        "round": 0,
+        "rows": 5000,
+        "variant": "before",
+        "before": {
+          "load": 27,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87700,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 94792,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 106964,
+              "ProcessName": "rustc"
+            }
+          ]
+        },
+        "after": {
+          "load": 27,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87700,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 94792,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 106964,
+              "ProcessName": "rustc"
+            }
+          ]
+        }
+      },
+      {
+        "round": 0,
+        "rows": 5000,
+        "variant": "after",
+        "before": {
+          "load": 28,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87700,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 94792,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 106964,
+              "ProcessName": "rustc"
+            }
+          ]
+        },
+        "after": {
+          "load": 41,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87700,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 94792,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 106964,
+              "ProcessName": "rustc"
+            }
+          ]
+        }
+      },
+      {
+        "round": 1,
+        "rows": 1000,
+        "variant": "after",
+        "before": {
+          "load": 33,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87700,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 94792,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 106964,
+              "ProcessName": "rustc"
+            }
+          ]
+        },
+        "after": {
+          "load": 27,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87700,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 94792,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 106964,
+              "ProcessName": "rustc"
+            }
+          ]
+        }
+      },
+      {
+        "round": 1,
+        "rows": 1000,
+        "variant": "before",
+        "before": {
+          "load": 31,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87700,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 94792,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 106964,
+              "ProcessName": "rustc"
+            }
+          ]
+        },
+        "after": {
+          "load": 48,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87700,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 94792,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 106964,
+              "ProcessName": "rustc"
+            }
+          ]
+        }
+      },
+      {
+        "round": 1,
+        "rows": 5000,
+        "variant": "after",
+        "before": {
+          "load": 27,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87700,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 94792,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 106964,
+              "ProcessName": "rustc"
+            }
+          ]
+        },
+        "after": {
+          "load": 28,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 16196,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 87700,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 94792,
+              "ProcessName": "rustc"
+            }
+          ]
+        }
+      },
+      {
+        "round": 1,
+        "rows": 5000,
+        "variant": "before",
+        "before": {
+          "load": 27,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 16196,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 36860,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 87700,
+              "ProcessName": "rustc"
+            }
+          ]
+        },
+        "after": {
+          "load": 32,
+          "builds": [
+            {
+              "Id": 19988,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 43544,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 87812,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 94392,
+              "ProcessName": "cargo"
+            },
+            {
+              "Id": 44328,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 87700,
+              "ProcessName": "rustc"
+            },
+            {
+              "Id": 104636,
+              "ProcessName": "rustc"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "bridge": {
+    "path": "D:\\BuildCache\\glory-pipeline-implementation-20261026\\bridge-counts\\evidence.json",
+    "sha256": "4cdebf63e546ed177c19520511aa393755968f637f1fa377464932359e66faaa",
+    "results": [
+      {
+        "variant": "before",
+        "name": "create_1k",
+        "methods": {
+          "cloneNode": 1000,
+          "setAttribute": 9000,
+          "insertBefore": 1000,
+          "nodeValue": 2000
+        },
+        "attributes": {
+          "data-gly-node": 8000,
+          "class": 1000
+        },
+        "imports": 5034,
+        "importNames": {
+          "./app_bg.js.__wbg_instanceof_PointerEvent_7da84319295c0048": 2,
+          "./app_bg.js.__wbg_isPrimary_bb4c000cc7c51110": 2,
+          "./app_bg.js.__wbg_defaultPrevented_5af41e1dd07ed819": 1,
+          "./app_bg.js.__wbg_for_beb5dc4e908dd8b8": 1,
+          "./app_bg.js.__wbg_get_31af05bd4842a84f": 1,
+          "./app_bg.js.__wbg___wbindgen_jsval_eq_02babf21faa37971": 1,
+          "./app_bg.js.__wbg_set_145a351398b48c65": 1,
+          "./app_bg.js.__wbg_target_38ae9feb025b820c": 2,
+          "./app_bg.js.__wbg_instanceof_Node_177cfa58c50e2609": 2,
+          "./app_bg.js.__wbg_instanceof_Element_818e11074cdb63b5": 1,
+          "./app_bg.js.__wbg_closest_6abd1bf5d7559cda": 6,
+          "./app_bg.js.__wbg_is_4b278c0bd3caba97": 4,
+          "./app_bg.js.__wbg_getAttribute_061ad00c16e2f622": 2,
+          "./app_bg.js.__wbg_hasAttribute_b009da6c546736e9": 3,
+          "./app_bg.js.__wbg_parentElement_108b58de82cab63f": 1,
+          "./app_bg.js.__wbg_requestAnimationFrame_7b526ab7aa550c74": 1,
+          "./app_bg.js.__wbg_gloryClonePlan_963b099174fc5b33": 1000,
+          "./app_bg.js.__wbg_gloryPlaceDetachedPlan_02f19603e34cc9e6": 1000,
+          "./app_bg.js.__wbg_gloryPlanText_ccff6b8f9f42bf0f": 2000,
+          "./app_bg.js.__wbg_gloryPlanAttribute_c5b92c4e64d88836": 1000,
+          "./app_bg.js.__wbg_activeElement_69b55e3697f14d9b": 3
+        },
+        "exportNames": {
+          "wasm_bindgen_b295c735bc863485___convert__closures_____invoke___web_sys_cdb65ab54cf5dbfe___features__gen_Event__Event______true_": 1,
+          "__externref_table_alloc": 10,
+          "__wbindgen_malloc": 2,
+          "wasm_bindgen_b295c735bc863485___convert__closures_____invoke___f64______true_": 1
+        },
+        "decodeCalls": 5012,
+        "decodeBytes": 106056
+      },
+      {
+        "variant": "before",
+        "name": "replace_1k",
+        "methods": {
+          "removeChild": 1000,
+          "cloneNode": 1000,
+          "setAttribute": 9000,
+          "insertBefore": 1000,
+          "nodeValue": 2000
+        },
+        "attributes": {
+          "data-gly-node": 8000,
+          "class": 1000
+        },
+        "imports": 6034,
+        "importNames": {
+          "./app_bg.js.__wbg_instanceof_PointerEvent_7da84319295c0048": 2,
+          "./app_bg.js.__wbg_isPrimary_bb4c000cc7c51110": 2,
+          "./app_bg.js.__wbg_defaultPrevented_5af41e1dd07ed819": 1,
+          "./app_bg.js.__wbg_for_beb5dc4e908dd8b8": 1,
+          "./app_bg.js.__wbg_get_31af05bd4842a84f": 1,
+          "./app_bg.js.__wbg___wbindgen_jsval_eq_02babf21faa37971": 1,
+          "./app_bg.js.__wbg_set_145a351398b48c65": 1,
+          "./app_bg.js.__wbg_target_38ae9feb025b820c": 2,
+          "./app_bg.js.__wbg_instanceof_Node_177cfa58c50e2609": 2,
+          "./app_bg.js.__wbg_instanceof_Element_818e11074cdb63b5": 1,
+          "./app_bg.js.__wbg_closest_6abd1bf5d7559cda": 6,
+          "./app_bg.js.__wbg_is_4b278c0bd3caba97": 4,
+          "./app_bg.js.__wbg_getAttribute_061ad00c16e2f622": 2,
+          "./app_bg.js.__wbg_hasAttribute_b009da6c546736e9": 3,
+          "./app_bg.js.__wbg_parentElement_108b58de82cab63f": 1,
+          "./app_bg.js.__wbg_requestAnimationFrame_7b526ab7aa550c74": 1,
+          "./app_bg.js.__wbg_gloryRemovePlanPart_0978e6bfbbfb5816": 1000,
+          "./app_bg.js.__wbg_gloryClonePlan_963b099174fc5b33": 1000,
+          "./app_bg.js.__wbg_gloryPlaceDetachedPlan_02f19603e34cc9e6": 1000,
+          "./app_bg.js.__wbg_gloryPlanText_ccff6b8f9f42bf0f": 2000,
+          "./app_bg.js.__wbg_gloryPlanAttribute_c5b92c4e64d88836": 1000,
+          "./app_bg.js.__wbg_activeElement_69b55e3697f14d9b": 3
+        },
+        "exportNames": {
+          "wasm_bindgen_b295c735bc863485___convert__closures_____invoke___web_sys_cdb65ab54cf5dbfe___features__gen_Event__Event______true_": 1,
+          "__externref_table_alloc": 10,
+          "__wbindgen_malloc": 2,
+          "wasm_bindgen_b295c735bc863485___convert__closures_____invoke___f64______true_": 1
+        },
+        "decodeCalls": 5012,
+        "decodeBytes": 106118
+      },
+      {
+        "variant": "before",
+        "name": "clear_1k",
+        "methods": {
+          "removeChild": 1000
+        },
+        "attributes": {},
+        "imports": 1034,
+        "importNames": {
+          "./app_bg.js.__wbg_instanceof_PointerEvent_7da84319295c0048": 2,
+          "./app_bg.js.__wbg_isPrimary_bb4c000cc7c51110": 2,
+          "./app_bg.js.__wbg_defaultPrevented_5af41e1dd07ed819": 1,
+          "./app_bg.js.__wbg_for_beb5dc4e908dd8b8": 1,
+          "./app_bg.js.__wbg_get_31af05bd4842a84f": 1,
+          "./app_bg.js.__wbg___wbindgen_jsval_eq_02babf21faa37971": 1,
+          "./app_bg.js.__wbg_set_145a351398b48c65": 1,
+          "./app_bg.js.__wbg_target_38ae9feb025b820c": 2,
+          "./app_bg.js.__wbg_instanceof_Node_177cfa58c50e2609": 2,
+          "./app_bg.js.__wbg_instanceof_Element_818e11074cdb63b5": 1,
+          "./app_bg.js.__wbg_closest_6abd1bf5d7559cda": 6,
+          "./app_bg.js.__wbg_is_4b278c0bd3caba97": 4,
+          "./app_bg.js.__wbg_getAttribute_061ad00c16e2f622": 2,
+          "./app_bg.js.__wbg_hasAttribute_b009da6c546736e9": 3,
+          "./app_bg.js.__wbg_parentElement_108b58de82cab63f": 1,
+          "./app_bg.js.__wbg_requestAnimationFrame_7b526ab7aa550c74": 1,
+          "./app_bg.js.__wbg_gloryRemovePlanPart_0978e6bfbbfb5816": 1000,
+          "./app_bg.js.__wbg_activeElement_69b55e3697f14d9b": 3
+        },
+        "exportNames": {
+          "wasm_bindgen_b295c735bc863485___convert__closures_____invoke___web_sys_cdb65ab54cf5dbfe___features__gen_Event__Event______true_": 1,
+          "__externref_table_alloc": 10,
+          "__wbindgen_malloc": 2,
+          "wasm_bindgen_b295c735bc863485___convert__closures_____invoke___f64______true_": 1
+        },
+        "decodeCalls": 12,
+        "decodeBytes": 201
+      },
+      {
+        "variant": "before",
+        "name": "create_10k",
+        "methods": {
+          "cloneNode": 10000,
+          "setAttribute": 90000,
+          "insertBefore": 10000,
+          "nodeValue": 20000
+        },
+        "attributes": {
+          "data-gly-node": 80000,
+          "class": 10000
+        },
+        "imports": 50034,
+        "importNames": {
+          "./app_bg.js.__wbg_instanceof_PointerEvent_7da84319295c0048": 2,
+          "./app_bg.js.__wbg_isPrimary_bb4c000cc7c51110": 2,
+          "./app_bg.js.__wbg_defaultPrevented_5af41e1dd07ed819": 1,
+          "./app_bg.js.__wbg_for_beb5dc4e908dd8b8": 1,
+          "./app_bg.js.__wbg_get_31af05bd4842a84f": 1,
+          "./app_bg.js.__wbg___wbindgen_jsval_eq_02babf21faa37971": 1,
+          "./app_bg.js.__wbg_set_145a351398b48c65": 1,
+          "./app_bg.js.__wbg_target_38ae9feb025b820c": 2,
+          "./app_bg.js.__wbg_instanceof_Node_177cfa58c50e2609": 2,
+          "./app_bg.js.__wbg_instanceof_Element_818e11074cdb63b5": 1,
+          "./app_bg.js.__wbg_closest_6abd1bf5d7559cda": 6,
+          "./app_bg.js.__wbg_is_4b278c0bd3caba97": 4,
+          "./app_bg.js.__wbg_getAttribute_061ad00c16e2f622": 2,
+          "./app_bg.js.__wbg_hasAttribute_b009da6c546736e9": 3,
+          "./app_bg.js.__wbg_parentElement_108b58de82cab63f": 1,
+          "./app_bg.js.__wbg_requestAnimationFrame_7b526ab7aa550c74": 1,
+          "./app_bg.js.__wbg_gloryClonePlan_963b099174fc5b33": 10000,
+          "./app_bg.js.__wbg_gloryPlaceDetachedPlan_02f19603e34cc9e6": 10000,
+          "./app_bg.js.__wbg_gloryPlanText_ccff6b8f9f42bf0f": 20000,
+          "./app_bg.js.__wbg_gloryPlanAttribute_c5b92c4e64d88836": 10000,
+          "./app_bg.js.__wbg_activeElement_69b55e3697f14d9b": 3
+        },
+        "exportNames": {
+          "wasm_bindgen_b295c735bc863485___convert__closures_____invoke___web_sys_cdb65ab54cf5dbfe___features__gen_Event__Event______true_": 1,
+          "__externref_table_alloc": 10,
+          "__wbindgen_malloc": 2,
+          "wasm_bindgen_b295c735bc863485___convert__closures_____invoke___f64______true_": 1
+        },
+        "decodeCalls": 50012,
+        "decodeBytes": 1144018
+      },
+      {
+        "variant": "after",
+        "name": "create_1k",
+        "methods": {
+          "cloneNode": 1000,
+          "setAttribute": 9000,
+          "insertBefore": 1000,
+          "nodeValue": 2000
+        },
+        "attributes": {
+          "data-gly-node": 8000,
+          "class": 1000
+        },
+        "imports": 5034,
+        "importNames": {
+          "./app_bg.js.__wbg_instanceof_PointerEvent_7da84319295c0048": 2,
+          "./app_bg.js.__wbg_isPrimary_bb4c000cc7c51110": 2,
+          "./app_bg.js.__wbg_defaultPrevented_5af41e1dd07ed819": 1,
+          "./app_bg.js.__wbg_for_beb5dc4e908dd8b8": 1,
+          "./app_bg.js.__wbg_get_31af05bd4842a84f": 1,
+          "./app_bg.js.__wbg___wbindgen_jsval_eq_02babf21faa37971": 1,
+          "./app_bg.js.__wbg_set_145a351398b48c65": 1,
+          "./app_bg.js.__wbg_target_38ae9feb025b820c": 2,
+          "./app_bg.js.__wbg_instanceof_Node_177cfa58c50e2609": 2,
+          "./app_bg.js.__wbg_instanceof_Element_818e11074cdb63b5": 1,
+          "./app_bg.js.__wbg_closest_6abd1bf5d7559cda": 6,
+          "./app_bg.js.__wbg_is_4b278c0bd3caba97": 4,
+          "./app_bg.js.__wbg_getAttribute_061ad00c16e2f622": 2,
+          "./app_bg.js.__wbg_hasAttribute_b009da6c546736e9": 3,
+          "./app_bg.js.__wbg_parentElement_108b58de82cab63f": 1,
+          "./app_bg.js.__wbg_requestAnimationFrame_7b526ab7aa550c74": 1,
+          "./app_bg.js.__wbg_gloryClonePlan_963b099174fc5b33": 1000,
+          "./app_bg.js.__wbg_gloryPlaceDetachedPlan_02f19603e34cc9e6": 1000,
+          "./app_bg.js.__wbg_gloryPlanText_ccff6b8f9f42bf0f": 2000,
+          "./app_bg.js.__wbg_gloryPlanAttribute_c5b92c4e64d88836": 1000,
+          "./app_bg.js.__wbg_activeElement_69b55e3697f14d9b": 3
+        },
+        "exportNames": {
+          "wasm_bindgen_b295c735bc863485___convert__closures_____invoke___web_sys_cdb65ab54cf5dbfe___features__gen_Event__Event______true_": 1,
+          "__externref_table_alloc": 10,
+          "__wbindgen_malloc": 2,
+          "wasm_bindgen_b295c735bc863485___convert__closures_____invoke___f64______true_": 1
+        },
+        "decodeCalls": 5012,
+        "decodeBytes": 106056
+      },
+      {
+        "variant": "after",
+        "name": "replace_1k",
+        "methods": {
+          "removeChild": 1000,
+          "cloneNode": 1000,
+          "setAttribute": 9000,
+          "insertBefore": 1000,
+          "nodeValue": 2000
+        },
+        "attributes": {
+          "data-gly-node": 8000,
+          "class": 1000
+        },
+        "imports": 6034,
+        "importNames": {
+          "./app_bg.js.__wbg_instanceof_PointerEvent_7da84319295c0048": 2,
+          "./app_bg.js.__wbg_isPrimary_bb4c000cc7c51110": 2,
+          "./app_bg.js.__wbg_defaultPrevented_5af41e1dd07ed819": 1,
+          "./app_bg.js.__wbg_for_beb5dc4e908dd8b8": 1,
+          "./app_bg.js.__wbg_get_31af05bd4842a84f": 1,
+          "./app_bg.js.__wbg___wbindgen_jsval_eq_02babf21faa37971": 1,
+          "./app_bg.js.__wbg_set_145a351398b48c65": 1,
+          "./app_bg.js.__wbg_target_38ae9feb025b820c": 2,
+          "./app_bg.js.__wbg_instanceof_Node_177cfa58c50e2609": 2,
+          "./app_bg.js.__wbg_instanceof_Element_818e11074cdb63b5": 1,
+          "./app_bg.js.__wbg_closest_6abd1bf5d7559cda": 6,
+          "./app_bg.js.__wbg_is_4b278c0bd3caba97": 4,
+          "./app_bg.js.__wbg_getAttribute_061ad00c16e2f622": 2,
+          "./app_bg.js.__wbg_hasAttribute_b009da6c546736e9": 3,
+          "./app_bg.js.__wbg_parentElement_108b58de82cab63f": 1,
+          "./app_bg.js.__wbg_requestAnimationFrame_7b526ab7aa550c74": 1,
+          "./app_bg.js.__wbg_gloryRemovePlanPart_0978e6bfbbfb5816": 1000,
+          "./app_bg.js.__wbg_gloryClonePlan_963b099174fc5b33": 1000,
+          "./app_bg.js.__wbg_gloryPlaceDetachedPlan_02f19603e34cc9e6": 1000,
+          "./app_bg.js.__wbg_gloryPlanText_ccff6b8f9f42bf0f": 2000,
+          "./app_bg.js.__wbg_gloryPlanAttribute_c5b92c4e64d88836": 1000,
+          "./app_bg.js.__wbg_activeElement_69b55e3697f14d9b": 3
+        },
+        "exportNames": {
+          "wasm_bindgen_b295c735bc863485___convert__closures_____invoke___web_sys_cdb65ab54cf5dbfe___features__gen_Event__Event______true_": 1,
+          "__externref_table_alloc": 10,
+          "__wbindgen_malloc": 2,
+          "wasm_bindgen_b295c735bc863485___convert__closures_____invoke___f64______true_": 1
+        },
+        "decodeCalls": 5012,
+        "decodeBytes": 106118
+      },
+      {
+        "variant": "after",
+        "name": "clear_1k",
+        "methods": {
+          "removeChild": 1000
+        },
+        "attributes": {},
+        "imports": 1034,
+        "importNames": {
+          "./app_bg.js.__wbg_instanceof_PointerEvent_7da84319295c0048": 2,
+          "./app_bg.js.__wbg_isPrimary_bb4c000cc7c51110": 2,
+          "./app_bg.js.__wbg_defaultPrevented_5af41e1dd07ed819": 1,
+          "./app_bg.js.__wbg_for_beb5dc4e908dd8b8": 1,
+          "./app_bg.js.__wbg_get_31af05bd4842a84f": 1,
+          "./app_bg.js.__wbg___wbindgen_jsval_eq_02babf21faa37971": 1,
+          "./app_bg.js.__wbg_set_145a351398b48c65": 1,
+          "./app_bg.js.__wbg_target_38ae9feb025b820c": 2,
+          "./app_bg.js.__wbg_instanceof_Node_177cfa58c50e2609": 2,
+          "./app_bg.js.__wbg_instanceof_Element_818e11074cdb63b5": 1,
+          "./app_bg.js.__wbg_closest_6abd1bf5d7559cda": 6,
+          "./app_bg.js.__wbg_is_4b278c0bd3caba97": 4,
+          "./app_bg.js.__wbg_getAttribute_061ad00c16e2f622": 2,
+          "./app_bg.js.__wbg_hasAttribute_b009da6c546736e9": 3,
+          "./app_bg.js.__wbg_parentElement_108b58de82cab63f": 1,
+          "./app_bg.js.__wbg_requestAnimationFrame_7b526ab7aa550c74": 1,
+          "./app_bg.js.__wbg_gloryRemovePlanPart_0978e6bfbbfb5816": 1000,
+          "./app_bg.js.__wbg_activeElement_69b55e3697f14d9b": 3
+        },
+        "exportNames": {
+          "wasm_bindgen_b295c735bc863485___convert__closures_____invoke___web_sys_cdb65ab54cf5dbfe___features__gen_Event__Event______true_": 1,
+          "__externref_table_alloc": 10,
+          "__wbindgen_malloc": 2,
+          "wasm_bindgen_b295c735bc863485___convert__closures_____invoke___f64______true_": 1
+        },
+        "decodeCalls": 12,
+        "decodeBytes": 201
+      },
+      {
+        "variant": "after",
+        "name": "create_10k",
+        "methods": {
+          "cloneNode": 10000,
+          "setAttribute": 90000,
+          "insertBefore": 10000,
+          "nodeValue": 20000
+        },
+        "attributes": {
+          "data-gly-node": 80000,
+          "class": 10000
+        },
+        "imports": 50034,
+        "importNames": {
+          "./app_bg.js.__wbg_instanceof_PointerEvent_7da84319295c0048": 2,
+          "./app_bg.js.__wbg_isPrimary_bb4c000cc7c51110": 2,
+          "./app_bg.js.__wbg_defaultPrevented_5af41e1dd07ed819": 1,
+          "./app_bg.js.__wbg_for_beb5dc4e908dd8b8": 1,
+          "./app_bg.js.__wbg_get_31af05bd4842a84f": 1,
+          "./app_bg.js.__wbg___wbindgen_jsval_eq_02babf21faa37971": 1,
+          "./app_bg.js.__wbg_set_145a351398b48c65": 1,
+          "./app_bg.js.__wbg_target_38ae9feb025b820c": 2,
+          "./app_bg.js.__wbg_instanceof_Node_177cfa58c50e2609": 2,
+          "./app_bg.js.__wbg_instanceof_Element_818e11074cdb63b5": 1,
+          "./app_bg.js.__wbg_closest_6abd1bf5d7559cda": 6,
+          "./app_bg.js.__wbg_is_4b278c0bd3caba97": 4,
+          "./app_bg.js.__wbg_getAttribute_061ad00c16e2f622": 2,
+          "./app_bg.js.__wbg_hasAttribute_b009da6c546736e9": 3,
+          "./app_bg.js.__wbg_parentElement_108b58de82cab63f": 1,
+          "./app_bg.js.__wbg_requestAnimationFrame_7b526ab7aa550c74": 1,
+          "./app_bg.js.__wbg_gloryClonePlan_963b099174fc5b33": 10000,
+          "./app_bg.js.__wbg_gloryPlaceDetachedPlan_02f19603e34cc9e6": 10000,
+          "./app_bg.js.__wbg_gloryPlanText_ccff6b8f9f42bf0f": 20000,
+          "./app_bg.js.__wbg_gloryPlanAttribute_c5b92c4e64d88836": 10000,
+          "./app_bg.js.__wbg_activeElement_69b55e3697f14d9b": 3
+        },
+        "exportNames": {
+          "wasm_bindgen_b295c735bc863485___convert__closures_____invoke___web_sys_cdb65ab54cf5dbfe___features__gen_Event__Event______true_": 1,
+          "__externref_table_alloc": 10,
+          "__wbindgen_malloc": 2,
+          "wasm_bindgen_b295c735bc863485___convert__closures_____invoke___f64______true_": 1
+        },
+        "decodeCalls": 50012,
+        "decodeBytes": 1144018
+      }
+    ]
+  },
+  "sizes": {
+    "before": {
+      "path": "D:\\BuildCache\\glory-pipeline-implementation-20261026\\before\\bundle-size\\report.json",
+      "sha256": "0c1996eecf5e68d25d022b9247d3b5024e6b717d8ee07edd5e73aaf0b2fce702",
+      "cases": [
+        {
+          "name": "glory",
+          "version": "0.3.1",
+          "packageId": "path+file:///D:/BuildCache/glory-pipeline-implementation-20261026/source/crates/glory#0.3.1",
+          "lockSha256": "525dc12ee93e6251ea131f638e1b6a7a8dc637b5760d2766d927f365ba085fb8",
+          "rustc": {
+            "bytes": 2843982,
+            "brotli": 523405,
+            "gzip": 780703,
+            "sha256": "077a45c445c6d72dfab4ba45914c297deee7c1f085245190bd42c2733714c21b"
+          },
+          "bindgen": {
+            "bytes": 1850756,
+            "brotli": 401628,
+            "gzip": 556985,
+            "sha256": "03f41d5db2d69718600ce1e048509e6b49ffe78e41ce19fd9d53d930967bef62"
+          },
+          "stripped": {
+            "bytes": 1576538,
+            "brotli": 378066,
+            "gzip": 519720,
+            "sha256": "e03839212a4f1f84bead6f8acdd659f9103115ab00347b5f9d3ecd461af32123"
+          },
+          "optimized": {
+            "bytes": 1415046,
+            "brotli": 377119,
+            "gzip": 512759,
+            "sha256": "6907d3b1de7c0ec1ed3cd1baa69a27908ffbc7fca4b16708aa3d7baec9eee432"
+          },
+          "js": {
+            "bytes": 64891,
+            "brotli": 9699,
+            "gzip": 11426,
+            "sha256": "15179fb49e37d037cd002f1c2617dae516e1e8b500d52637d999f504228f1b9d",
+            "files": [
+              {
+                "path": "app.js",
+                "bytes": 60772,
+                "brotli": 8407,
+                "gzip": 9871,
+                "sha256": "4b5d460555acbe9b4f27a431192a548d2b785b309b507945106b2f89c352f350"
+              },
+              {
+                "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+                "bytes": 3739,
+                "brotli": 1136,
+                "gzip": 1354,
+                "sha256": "d305daa4a8c435119e4295b0452f064d4dc275f52cea595dc90038d27d6b0999"
+              },
+              {
+                "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+                "bytes": 380,
+                "brotli": 156,
+                "gzip": 201,
+                "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+              }
+            ]
+          },
+          "sections": {
+            "bindgen": [
+              {
+                "id": 1,
+                "payloadBytes": 811,
+                "encodedBytes": 814,
+                "sha256": "565e5d7fc2c629dc3c175090e89925730c6d161b0f0bb3c20e294a5b657edeb7"
+              },
+              {
+                "id": 2,
+                "payloadBytes": 11167,
+                "encodedBytes": 11170,
+                "sha256": "84e9a3c6f742512aa8cfbc0e0330dc3003086e8743aab5fd514fe643ff0c270a"
+              },
+              {
+                "id": 3,
+                "payloadBytes": 1557,
+                "encodedBytes": 1560,
+                "sha256": "e4392cc21ca9ff8955b307c59d4f32014f3b491f7e193726efc522a35de2624e"
+              },
+              {
+                "id": 4,
+                "payloadBytes": 11,
+                "encodedBytes": 13,
+                "sha256": "f3371588cc87ca06ec6360746f9015d5cef04d70400bb5c549cf856837e24a7e"
+              },
+              {
+                "id": 5,
+                "payloadBytes": 3,
+                "encodedBytes": 5,
+                "sha256": "e3c4e8c4be74ea7897d60436685f5014a88654a4f415f7e08b959984bf15f5d0"
+              },
+              {
+                "id": 6,
+                "payloadBytes": 25,
+                "encodedBytes": 27,
+                "sha256": "27e758637bd8da1284c307a3e0e81a2a085253afb624b63a25f1f6e58b7fca8e"
+              },
+              {
+                "id": 7,
+                "payloadBytes": 916,
+                "encodedBytes": 919,
+                "sha256": "c27b5846f86fd1226bc5aab17772d116680b6bea6f75e0b2db498ffc9154d83e"
+              },
+              {
+                "id": 9,
+                "payloadBytes": 519,
+                "encodedBytes": 522,
+                "sha256": "0584be79df4b1373a69ee9602881fd2ca1434046bb51a5a20624420292bbac01"
+              },
+              {
+                "id": 10,
+                "payloadBytes": 1483744,
+                "encodedBytes": 1483748,
+                "sha256": "878e9846ee0216bbeb940989b803f3833c425412f4f0171518f858465f2e4da8"
+              },
+              {
+                "id": 11,
+                "payloadBytes": 76835,
+                "encodedBytes": 76839,
+                "sha256": "f0c220f2b015efe34bcbb3949f4be86ea7bba4807435a3510cb45f71a72d4796"
+              },
+              {
+                "id": 0,
+                "name": "name",
+                "payloadBytes": 274850,
+                "encodedBytes": 274854,
+                "sha256": "134331ca05b9f9ef01a18dfd3a013270241adb35268804dc84a1d182666f1f98"
+              },
+              {
+                "id": 0,
+                "name": "producers",
+                "payloadBytes": 124,
+                "encodedBytes": 126,
+                "sha256": "5349359afa1778d0d8c567fa09601cda2ce1fbb4cc12a020275fcd608b9cbc81"
+              },
+              {
+                "id": 0,
+                "name": "target_features",
+                "payloadBytes": 148,
+                "encodedBytes": 151,
+                "sha256": "97ceea95e0687b14437e21c205ebb40eea27aa5ecaa971f7d87601e3aa213bfd"
+              }
+            ],
+            "optimized": [
+              {
+                "id": 1,
+                "payloadBytes": 687,
+                "encodedBytes": 690,
+                "sha256": "c32d0ee97ff68fa66c62fc3b4d8033239003600e8fa19ebf7ddbe5d1b1d7f95c"
+              },
+              {
+                "id": 2,
+                "payloadBytes": 11075,
+                "encodedBytes": 11078,
+                "sha256": "24afe96ac465a1172f5136cd0178ad34d2cd24bc9a0514fb0314edf0f000970b"
+              },
+              {
+                "id": 3,
+                "payloadBytes": 1107,
+                "encodedBytes": 1110,
+                "sha256": "0fc3a6ebfe5ab26d5cf0d2f3a0888553063ab22f465578102bbf0f52734eacdd"
+              },
+              {
+                "id": 4,
+                "payloadBytes": 11,
+                "encodedBytes": 13,
+                "sha256": "f3371588cc87ca06ec6360746f9015d5cef04d70400bb5c549cf856837e24a7e"
+              },
+              {
+                "id": 5,
+                "payloadBytes": 3,
+                "encodedBytes": 5,
+                "sha256": "e3c4e8c4be74ea7897d60436685f5014a88654a4f415f7e08b959984bf15f5d0"
+              },
+              {
+                "id": 6,
+                "payloadBytes": 25,
+                "encodedBytes": 27,
+                "sha256": "27e758637bd8da1284c307a3e0e81a2a085253afb624b63a25f1f6e58b7fca8e"
+              },
+              {
+                "id": 7,
+                "payloadBytes": 916,
+                "encodedBytes": 919,
+                "sha256": "ea3a7b49c9d2b137b582a354a32d4a00476302680619847b1f0abd2743d3b5ef"
+              },
+              {
+                "id": 9,
+                "payloadBytes": 519,
+                "encodedBytes": 522,
+                "sha256": "2dd2de3ee1709779863d6fff2cb6a394bac4c239db24952e6b556f50274e5909"
+              },
+              {
+                "id": 12,
+                "payloadBytes": 1,
+                "encodedBytes": 3,
+                "sha256": "83891d7fe85c33e52c8b4e5814c92fb6a3b9467299200538a6babaa8b452d879"
+              },
+              {
+                "id": 10,
+                "payloadBytes": 1323785,
+                "encodedBytes": 1323789,
+                "sha256": "2cd6c5bb7d3adf5c2e943ab70caf1167e432e5f0f1e62609af5642b91bd79b2a"
+              },
+              {
+                "id": 11,
+                "payloadBytes": 76601,
+                "encodedBytes": 76605,
+                "sha256": "ba3f79543b18ba11b1556557c5854195a9dbccb3146491d133417f437287e6eb"
+              },
+              {
+                "id": 0,
+                "name": "producers",
+                "payloadBytes": 124,
+                "encodedBytes": 126,
+                "sha256": "5349359afa1778d0d8c567fa09601cda2ce1fbb4cc12a020275fcd608b9cbc81"
+              },
+              {
+                "id": 0,
+                "name": "target_features",
+                "payloadBytes": 148,
+                "encodedBytes": 151,
+                "sha256": "436e14b8b97dd381f16be421a6f633e615c441207f9de33379f9604cb6c23723"
+              }
+            ]
+          },
+          "profile": {
+            "opt_level": "3",
+            "debuginfo": 0,
+            "debug_assertions": false,
+            "overflow_checks": false,
+            "test": false
+          }
+        }
+      ]
+    },
+    "after": {
+      "path": "D:\\BuildCache\\glory-pipeline-implementation-20261026\\after\\bundle-size\\report.json",
+      "sha256": "6db0f4e8bde718af6244a181ca200dd604fe864ad4010b36c1aba20dc605a83a",
+      "cases": [
+        {
+          "name": "glory",
+          "version": "0.3.1",
+          "packageId": "path+file:///D:/BuildCache/glory-pipeline-implementation-20261026/source/crates/glory#0.3.1",
+          "lockSha256": "525dc12ee93e6251ea131f638e1b6a7a8dc637b5760d2766d927f365ba085fb8",
+          "rustc": {
+            "bytes": 2836564,
+            "brotli": 523072,
+            "gzip": 778854,
+            "sha256": "ef4913b805170288141168801e98d524d7eb943bad23dceacdd1b506a6b2291a"
+          },
+          "bindgen": {
+            "bytes": 1844145,
+            "brotli": 401571,
+            "gzip": 557328,
+            "sha256": "ee3cd636b6472c00dae1ea6ad1fe665aaa8e0c9fd6e66d4404e61cff7ad42095"
+          },
+          "stripped": {
+            "bytes": 1570118,
+            "brotli": 378275,
+            "gzip": 519953,
+            "sha256": "6aa8668a25b34b4bd820f757562759636a5a6f0c0b094499cb1b9b8c5b3d4cd7"
+          },
+          "optimized": {
+            "bytes": 1409062,
+            "brotli": 376708,
+            "gzip": 512409,
+            "sha256": "f156907bf76f6bcff6eba60a1399c477e309cea98af3d769036a8de9fa2c39e9"
+          },
+          "js": {
+            "bytes": 64891,
+            "brotli": 9699,
+            "gzip": 11426,
+            "sha256": "2e313645a5d9f2dab9e2fad389b22ff381b4f10a1ff05fca85e72a40a1544893",
+            "files": [
+              {
+                "path": "app.js",
+                "bytes": 60772,
+                "brotli": 8407,
+                "gzip": 9871,
+                "sha256": "7e670411ec6320720506a444c0c8bb443145edd19a5ff40120d3980e5efe8db1"
+              },
+              {
+                "path": "snippets/glory-web-3dfc31990f887acc/inline0.js",
+                "bytes": 3739,
+                "brotli": 1136,
+                "gzip": 1354,
+                "sha256": "d305daa4a8c435119e4295b0452f064d4dc275f52cea595dc90038d27d6b0999"
+              },
+              {
+                "path": "snippets/glory-web-3dfc31990f887acc/inline1.js",
+                "bytes": 380,
+                "brotli": 156,
+                "gzip": 201,
+                "sha256": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280"
+              }
+            ]
+          },
+          "sections": {
+            "bindgen": [
+              {
+                "id": 1,
+                "payloadBytes": 818,
+                "encodedBytes": 821,
+                "sha256": "f6c0ac66f1dd71fd67713f2765c1da8c12f605a8b1e2d0dd2a945ce8c315b8fe"
+              },
+              {
+                "id": 2,
+                "payloadBytes": 11167,
+                "encodedBytes": 11170,
+                "sha256": "0104f25b174501b3d1b95bdc2d9bd95699e1026d18e8e4929d643589d15691fa"
+              },
+              {
+                "id": 3,
+                "payloadBytes": 1556,
+                "encodedBytes": 1559,
+                "sha256": "5decab2b6b61aa7a91c43c52be483a8678312b6c34d1094fe09b4b287cca4af0"
+              },
+              {
+                "id": 4,
+                "payloadBytes": 11,
+                "encodedBytes": 13,
+                "sha256": "e4c46e57f01978d99452ee107b4667ed10734a96d4ce2a405578a9f99358c519"
+              },
+              {
+                "id": 5,
+                "payloadBytes": 3,
+                "encodedBytes": 5,
+                "sha256": "e3c4e8c4be74ea7897d60436685f5014a88654a4f415f7e08b959984bf15f5d0"
+              },
+              {
+                "id": 6,
+                "payloadBytes": 25,
+                "encodedBytes": 27,
+                "sha256": "6e9abcbad2933534925219e203cae557f479516a0252935a58cb566421016c8b"
+              },
+              {
+                "id": 7,
+                "payloadBytes": 916,
+                "encodedBytes": 919,
+                "sha256": "80afb1448c61c5a4ea9c67df9d7c9fb8e1720629b6ef47f683bb541938c19462"
+              },
+              {
+                "id": 9,
+                "payloadBytes": 525,
+                "encodedBytes": 528,
+                "sha256": "0f8465d2a219af8253bd08412c13d51dda28ff93a21bae6d38866d6a6e1e3521"
+              },
+              {
+                "id": 10,
+                "payloadBytes": 1477341,
+                "encodedBytes": 1477345,
+                "sha256": "213a4eaf8343b11ca7f0ba3e652746d087545febf59eab373daf555796d71782"
+              },
+              {
+                "id": 11,
+                "payloadBytes": 76819,
+                "encodedBytes": 76823,
+                "sha256": "4240c2ce08df70b4476968e65c12df143ddac8803c606dc036a89dfc5a001ab0"
+              },
+              {
+                "id": 0,
+                "name": "name",
+                "payloadBytes": 274646,
+                "encodedBytes": 274650,
+                "sha256": "a2eed4ec7c5fef64c80ff4934ba472a24d2ac6a1062231e5663992be36edbc0a"
+              },
+              {
+                "id": 0,
+                "name": "producers",
+                "payloadBytes": 124,
+                "encodedBytes": 126,
+                "sha256": "5349359afa1778d0d8c567fa09601cda2ce1fbb4cc12a020275fcd608b9cbc81"
+              },
+              {
+                "id": 0,
+                "name": "target_features",
+                "payloadBytes": 148,
+                "encodedBytes": 151,
+                "sha256": "97ceea95e0687b14437e21c205ebb40eea27aa5ecaa971f7d87601e3aa213bfd"
+              }
+            ],
+            "optimized": [
+              {
+                "id": 1,
+                "payloadBytes": 703,
+                "encodedBytes": 706,
+                "sha256": "7abaf6ca6ee2544fa1133728e4d970eea465f9d88a77eda779a37ffa361f829e"
+              },
+              {
+                "id": 2,
+                "payloadBytes": 11075,
+                "encodedBytes": 11078,
+                "sha256": "5b9e8090e436e6b111d3aac3170e4bfe8337b587685c8d78a163636ee8e41e45"
+              },
+              {
+                "id": 3,
+                "payloadBytes": 1107,
+                "encodedBytes": 1110,
+                "sha256": "d26d3b61d9bc82ada4f15180d19e437d7353a6ac50374f5072017ca0af2b35f4"
+              },
+              {
+                "id": 4,
+                "payloadBytes": 11,
+                "encodedBytes": 13,
+                "sha256": "e4c46e57f01978d99452ee107b4667ed10734a96d4ce2a405578a9f99358c519"
+              },
+              {
+                "id": 5,
+                "payloadBytes": 3,
+                "encodedBytes": 5,
+                "sha256": "e3c4e8c4be74ea7897d60436685f5014a88654a4f415f7e08b959984bf15f5d0"
+              },
+              {
+                "id": 6,
+                "payloadBytes": 25,
+                "encodedBytes": 27,
+                "sha256": "6e9abcbad2933534925219e203cae557f479516a0252935a58cb566421016c8b"
+              },
+              {
+                "id": 7,
+                "payloadBytes": 916,
+                "encodedBytes": 919,
+                "sha256": "ae57bb840d6c5257c1d90f86236b88687e12f37ec5b6cead804958f93be45ae9"
+              },
+              {
+                "id": 9,
+                "payloadBytes": 525,
+                "encodedBytes": 528,
+                "sha256": "398c4be7fd80634625bc58221697a6ca0bc818d31100b4c8883a4c50817733fd"
+              },
+              {
+                "id": 12,
+                "payloadBytes": 1,
+                "encodedBytes": 3,
+                "sha256": "83891d7fe85c33e52c8b4e5814c92fb6a3b9467299200538a6babaa8b452d879"
+              },
+              {
+                "id": 10,
+                "payloadBytes": 1317795,
+                "encodedBytes": 1317799,
+                "sha256": "b20dae82a80d8c378d121ee940b7e0711ce7bbf230675fd2acb92fe5d26d7667"
+              },
+              {
+                "id": 11,
+                "payloadBytes": 76585,
+                "encodedBytes": 76589,
+                "sha256": "0ea8ee4b0f04910b6770677c6417e82d2531a8b0109ee4f39c1baa9affb52985"
+              },
+              {
+                "id": 0,
+                "name": "producers",
+                "payloadBytes": 124,
+                "encodedBytes": 126,
+                "sha256": "5349359afa1778d0d8c567fa09601cda2ce1fbb4cc12a020275fcd608b9cbc81"
+              },
+              {
+                "id": 0,
+                "name": "target_features",
+                "payloadBytes": 148,
+                "encodedBytes": 151,
+                "sha256": "436e14b8b97dd381f16be421a6f633e615c441207f9de33379f9604cb6c23723"
+              }
+            ]
+          },
+          "profile": {
+            "opt_level": "3",
+            "debuginfo": 0,
+            "debug_assertions": false,
+            "overflow_checks": false,
+            "test": false
+          }
+        },
+        {
+          "name": "dioxus",
+          "version": "0.7.10",
+          "packageId": "registry+https://github.com/rust-lang/crates.io-index#dioxus@0.7.10",
+          "lockSha256": "b945c32ec883d0ad02577827b12ed98dc30e6cf54d8f6cd02dca1d0ea9428986",
+          "rustc": {
+            "bytes": 1468947,
+            "brotli": 235035,
+            "gzip": 352442,
+            "sha256": "069b850aeb31e04bb45e75f18be4bbae68d884af9721a3abb8698c3a18c8fcd1"
+          },
+          "bindgen": {
+            "bytes": 457470,
+            "brotli": 112423,
+            "gzip": 144497,
+            "sha256": "d31826528c08edf9a0c95bc97893733d949f2a2c6afbe49b401c84938f29c36b"
+          },
+          "stripped": {
+            "bytes": 351644,
+            "brotli": 101182,
+            "gzip": 128850,
+            "sha256": "f78c50506d118c3645a09d87bcd05f43b2d84a0950ed67107d3f0abde1010544"
+          },
+          "optimized": {
+            "bytes": 317164,
+            "brotli": 99109,
+            "gzip": 125714,
+            "sha256": "bacb5f7352e32ad928569c8a3c24f62e27a35934f518ffe433c4d23f6a60a60c"
+          },
+          "js": {
+            "bytes": 49916,
+            "brotli": 9381,
+            "gzip": 10769,
+            "sha256": "b36182d580d44ffeffdb26dbb363b29b1a267cbd826039e9b317ae66639053a8",
+            "files": [
+              {
+                "path": "app.js",
+                "bytes": 27174,
+                "brotli": 4927,
+                "gzip": 5690,
+                "sha256": "01d35ed5682959853458eef7d5796f6456950291453829775522f70fcfa89abb"
+              },
+              {
+                "path": "snippets/dioxus-interpreter-js-20451f6aefec841d/inline0.js",
+                "bytes": 20855,
+                "brotli": 3897,
+                "gzip": 4400,
+                "sha256": "cd533b7b9f2192fa535f92f4f266d03d47c23105cf500498d0bc8d6cc90dc6cf"
+              },
+              {
+                "path": "snippets/dioxus-interpreter-js-20451f6aefec841d/src/js/set_attribute.js",
+                "bytes": 1887,
+                "brotli": 557,
+                "gzip": 679,
+                "sha256": "5b56995f71fe629934f4ab5eb292d5cfccd9d99037eb9a39ede5078c78db88df"
+              }
+            ]
+          },
+          "sections": {
+            "bindgen": [
+              {
+                "id": 1,
+                "payloadBytes": 389,
+                "encodedBytes": 392,
+                "sha256": "fd10a995ba553f9f1a06d2b497792e958beabbb5a77de3b262a2e224ec9b1d20"
+              },
+              {
+                "id": 2,
+                "payloadBytes": 3503,
+                "encodedBytes": 3506,
+                "sha256": "7f78e1e52b9d4cc5cc5b73d3fae67842740592f9996f13d0f41cb79bb51c87a8"
+              },
+              {
+                "id": 3,
+                "payloadBytes": 699,
+                "encodedBytes": 702,
+                "sha256": "9aafb50a89a82c66fc6aeae0ef8b32c5086f4e499e9a34dded7eedf9dbfd6cba"
+              },
+              {
+                "id": 4,
+                "payloadBytes": 11,
+                "encodedBytes": 13,
+                "sha256": "f622d1bcb2d8e9c48e0a53ce2ed80fd27a303030cd9a6632d5b7e1a375d4280a"
+              },
+              {
+                "id": 5,
+                "payloadBytes": 3,
+                "encodedBytes": 5,
+                "sha256": "f0b84402ff5181a6f998d07e5832d16de5bd3ea4e32e542da814690a734e0950"
+              },
+              {
+                "id": 6,
+                "payloadBytes": 31,
+                "encodedBytes": 33,
+                "sha256": "8c2aa69c260c19e3c12ff665d138c0d5dc3d2adb105ca74d298520efdd757d3e"
+              },
+              {
+                "id": 7,
+                "payloadBytes": 636,
+                "encodedBytes": 639,
+                "sha256": "943f91c57a41857cd2ede0016eca3e60aada52e5d4dfb32882c412ec921f7523"
+              },
+              {
+                "id": 9,
+                "payloadBytes": 561,
+                "encodedBytes": 564,
+                "sha256": "7f72f82efca2d14f982e14d08e3f921b567bd02f92b786dd38431312779a3d04"
+              },
+              {
+                "id": 10,
+                "payloadBytes": 311246,
+                "encodedBytes": 311250,
+                "sha256": "3bade984a0c7764866d5b0874df17b0f61bd7d570bc02f3e24e2e8b98e6bb350"
+              },
+              {
+                "id": 11,
+                "payloadBytes": 34087,
+                "encodedBytes": 34091,
+                "sha256": "14c0bd0497ec2dc5dad4e56d55633fbe9b75eaa233c1690050f18cd7a2f8bf7f"
+              },
+              {
+                "id": 0,
+                "name": "name",
+                "payloadBytes": 105986,
+                "encodedBytes": 105990,
+                "sha256": "b1fc406c6a7eee6fb7c65c02f4f39473f2b695aa4981474227fb57b99db6e229"
+              },
+              {
+                "id": 0,
+                "name": "producers",
+                "payloadBytes": 124,
+                "encodedBytes": 126,
+                "sha256": "5349359afa1778d0d8c567fa09601cda2ce1fbb4cc12a020275fcd608b9cbc81"
+              },
+              {
+                "id": 0,
+                "name": "target_features",
+                "payloadBytes": 148,
+                "encodedBytes": 151,
+                "sha256": "97ceea95e0687b14437e21c205ebb40eea27aa5ecaa971f7d87601e3aa213bfd"
+              }
+            ],
+            "optimized": [
+              {
+                "id": 1,
+                "payloadBytes": 361,
+                "encodedBytes": 364,
+                "sha256": "973d9f466491e55e244e52c6e90bea08f5f86602417b3b1dd566fb2712a74380"
+              },
+              {
+                "id": 2,
+                "payloadBytes": 3503,
+                "encodedBytes": 3506,
+                "sha256": "4c3e5769439dcce50c573311dcb4a8663706844851137a2ce8f14a293f2489ef"
+              },
+              {
+                "id": 3,
+                "payloadBytes": 518,
+                "encodedBytes": 521,
+                "sha256": "11660fa3af769d257a91dad12e9e978c5aabee3a5ff6dfa8c488219a8914315f"
+              },
+              {
+                "id": 4,
+                "payloadBytes": 11,
+                "encodedBytes": 13,
+                "sha256": "f622d1bcb2d8e9c48e0a53ce2ed80fd27a303030cd9a6632d5b7e1a375d4280a"
+              },
+              {
+                "id": 5,
+                "payloadBytes": 3,
+                "encodedBytes": 5,
+                "sha256": "f0b84402ff5181a6f998d07e5832d16de5bd3ea4e32e542da814690a734e0950"
+              },
+              {
+                "id": 6,
+                "payloadBytes": 31,
+                "encodedBytes": 33,
+                "sha256": "8c2aa69c260c19e3c12ff665d138c0d5dc3d2adb105ca74d298520efdd757d3e"
+              },
+              {
+                "id": 7,
+                "payloadBytes": 636,
+                "encodedBytes": 639,
+                "sha256": "c416420409969427dda1b14a00f5d047d53a3ab66dee894285d7fd660a07c4f4"
+              },
+              {
+                "id": 9,
+                "payloadBytes": 560,
+                "encodedBytes": 563,
+                "sha256": "b9b38d397797a43f2056d91a9ec49f8622024c3c5e7c20ce18c24f4b96516021"
+              },
+              {
+                "id": 12,
+                "payloadBytes": 1,
+                "encodedBytes": 3,
+                "sha256": "86be9a55762d316a3026c2836d044f5fc76e34da10e1b45feee5f18be7edb177"
+              },
+              {
+                "id": 10,
+                "payloadBytes": 277980,
+                "encodedBytes": 277984,
+                "sha256": "7a28f3a341889d4a5de6a527aaed00462bec6334e714b6e4b6419521bc433600"
+              },
+              {
+                "id": 11,
+                "payloadBytes": 33244,
+                "encodedBytes": 33248,
+                "sha256": "7266b3bb650463e2c731eb798638a24ae0d3f2c72057b03d35118944c89a3752"
+              },
+              {
+                "id": 0,
+                "name": "producers",
+                "payloadBytes": 124,
+                "encodedBytes": 126,
+                "sha256": "5349359afa1778d0d8c567fa09601cda2ce1fbb4cc12a020275fcd608b9cbc81"
+              },
+              {
+                "id": 0,
+                "name": "target_features",
+                "payloadBytes": 148,
+                "encodedBytes": 151,
+                "sha256": "436e14b8b97dd381f16be421a6f633e615c441207f9de33379f9604cb6c23723"
+              }
+            ]
+          },
+          "profile": {
+            "opt_level": "3",
+            "debuginfo": 0,
+            "debug_assertions": false,
+            "overflow_checks": false,
+            "test": false
+          }
+        },
+        {
+          "name": "leptos",
+          "version": "0.8.22",
+          "packageId": "registry+https://github.com/rust-lang/crates.io-index#leptos@0.8.22",
+          "lockSha256": "7ff3756dbcbf73040833db49fe40bc466bed5438a63cfb9c92974544515fd8eb",
+          "rustc": {
+            "bytes": 1553159,
+            "brotli": 205971,
+            "gzip": 334322,
+            "sha256": "70dc90d6fa06b130c75bfc725643e58ca0d3b8469d65b4e8af1ffe08a5913bf3"
+          },
+          "bindgen": {
+            "bytes": 279406,
+            "brotli": 52824,
+            "gzip": 68995,
+            "sha256": "4c65e88eb86279c80b5bd9267b0751d935b6eb2540f8c693726bd5a0f90f51ca"
+          },
+          "stripped": {
+            "bytes": 172868,
+            "brotli": 44468,
+            "gzip": 56544,
+            "sha256": "4dc210a5a69d5430ba3b876da672134de1e1fe7a15845d880eafa4750a66bdeb"
+          },
+          "optimized": {
+            "bytes": 155008,
+            "brotli": 43438,
+            "gzip": 54567,
+            "sha256": "a01c1f0f17d4d6ea819dab3485a29a5eb0d1532b0c002148420dd00ad84f76c8"
+          },
+          "js": {
+            "bytes": 30134,
+            "brotli": 5309,
+            "gzip": 6094,
+            "sha256": "e3251c2f31bb2edb9a3e40dd132327589030c547a2fdbbdb28cb4fd65b911741",
+            "files": [
+              {
+                "path": "app.js",
+                "bytes": 30134,
+                "brotli": 5309,
+                "gzip": 6094,
+                "sha256": "b8d1d71a35ba7c2032fb25f1dfd551449e6456db8d9c7e581bdd7b5c7e8e744c"
+              }
+            ]
+          },
+          "sections": {
+            "bindgen": [
+              {
+                "id": 1,
+                "payloadBytes": 325,
+                "encodedBytes": 328,
+                "sha256": "bdac0f0f179848e4ee4f07783a31cd8b25db39713e1ea0e9309f50767f3fee91"
+              },
+              {
+                "id": 2,
+                "payloadBytes": 3286,
+                "encodedBytes": 3289,
+                "sha256": "fd9353fb006cd0ba3496b6219037ab958768766d5bb2a547ca09ef9bfb534bd0"
+              },
+              {
+                "id": 3,
+                "payloadBytes": 456,
+                "encodedBytes": 459,
+                "sha256": "9dc15c89c96aa80f5bab5f75b564e19a4ffb692ecbb0f46279699d27be945709"
+              },
+              {
+                "id": 4,
+                "payloadBytes": 11,
+                "encodedBytes": 13,
+                "sha256": "85c6b5e6f676f005b1b537ee34f13cf718a05c076d8c426445efe06f5cb1869e"
+              },
+              {
+                "id": 5,
+                "payloadBytes": 3,
+                "encodedBytes": 5,
+                "sha256": "f0b84402ff5181a6f998d07e5832d16de5bd3ea4e32e542da814690a734e0950"
+              },
+              {
+                "id": 6,
+                "payloadBytes": 33,
+                "encodedBytes": 35,
+                "sha256": "4764c93d1d49017fc7292a433dfa8b3e1ccf9ae231178f7a1da4dfd1c837577e"
+              },
+              {
+                "id": 7,
+                "payloadBytes": 1513,
+                "encodedBytes": 1516,
+                "sha256": "ee4bead420a91e20454db405b2400bb56498f48e8e6cab3237ef16bd845ca6bf"
+              },
+              {
+                "id": 9,
+                "payloadBytes": 339,
+                "encodedBytes": 342,
+                "sha256": "b2405b8f9714cc8bb81430330c5af2731a8439a61f6059983611a764a6e8d190"
+              },
+              {
+                "id": 10,
+                "payloadBytes": 152772,
+                "encodedBytes": 152776,
+                "sha256": "7e864c6cef4bea89f7c9cfa58c7c4c793791595bc60436cd91170f1ac7670d67"
+              },
+              {
+                "id": 11,
+                "payloadBytes": 13706,
+                "encodedBytes": 13709,
+                "sha256": "285799b37ada090b010e3f8b80490dbf9ec05582413c12c719c173d38722cc04"
+              },
+              {
+                "id": 0,
+                "name": "name",
+                "payloadBytes": 106618,
+                "encodedBytes": 106622,
+                "sha256": "dd153f03b139aff0e06fa9d6feac7235644fbf72a726d21c9f480afdd46bf6f4"
+              },
+              {
+                "id": 0,
+                "name": "producers",
+                "payloadBytes": 124,
+                "encodedBytes": 126,
+                "sha256": "5349359afa1778d0d8c567fa09601cda2ce1fbb4cc12a020275fcd608b9cbc81"
+              },
+              {
+                "id": 0,
+                "name": "__wasm_split_unstable",
+                "payloadBytes": 25,
+                "encodedBytes": 27,
+                "sha256": "a416640601782cc68593cd2b5da1ea9868b5e050d5872dab34e72b937316ac10"
+              },
+              {
+                "id": 0,
+                "name": "target_features",
+                "payloadBytes": 148,
+                "encodedBytes": 151,
+                "sha256": "97ceea95e0687b14437e21c205ebb40eea27aa5ecaa971f7d87601e3aa213bfd"
+              }
+            ],
+            "optimized": [
+              {
+                "id": 1,
+                "payloadBytes": 309,
+                "encodedBytes": 312,
+                "sha256": "fe1175b5dea77c570c0816cbf00b76f1c3f18e5ff59a283bb18a44dad1301465"
+              },
+              {
+                "id": 2,
+                "payloadBytes": 3286,
+                "encodedBytes": 3289,
+                "sha256": "b460f8b6f5f85c0a9653e9a55ba1b58601cff2bbe91a7e30600e0656c6445389"
+              },
+              {
+                "id": 3,
+                "payloadBytes": 337,
+                "encodedBytes": 340,
+                "sha256": "55e4c091d3366b925ca9901eeddce1f5efcbeb791f86d63ae7cd7a6fd8555831"
+              },
+              {
+                "id": 4,
+                "payloadBytes": 11,
+                "encodedBytes": 13,
+                "sha256": "85c6b5e6f676f005b1b537ee34f13cf718a05c076d8c426445efe06f5cb1869e"
+              },
+              {
+                "id": 5,
+                "payloadBytes": 3,
+                "encodedBytes": 5,
+                "sha256": "f0b84402ff5181a6f998d07e5832d16de5bd3ea4e32e542da814690a734e0950"
+              },
+              {
+                "id": 6,
+                "payloadBytes": 33,
+                "encodedBytes": 35,
+                "sha256": "4764c93d1d49017fc7292a433dfa8b3e1ccf9ae231178f7a1da4dfd1c837577e"
+              },
+              {
+                "id": 7,
+                "payloadBytes": 1513,
+                "encodedBytes": 1516,
+                "sha256": "36b685124db5b1e21f00e8eb71088284b1085e723f0c004b82e570923ca44d64"
+              },
+              {
+                "id": 9,
+                "payloadBytes": 336,
+                "encodedBytes": 339,
+                "sha256": "2f9c470f30bee1cf5c4911055082bc30944b30bd6cfd04e608cbd4fbae128313"
+              },
+              {
+                "id": 12,
+                "payloadBytes": 1,
+                "encodedBytes": 3,
+                "sha256": "ca358758f6d27e6cf45272937977a748fd88391db679ceda7dc7bf1f005ee879"
+              },
+              {
+                "id": 10,
+                "payloadBytes": 135161,
+                "encodedBytes": 135165,
+                "sha256": "ed40e6a2995ddd7a5152b5e52695a972e3b30838c5fb13cd006432d9bd0c33c1"
+              },
+              {
+                "id": 11,
+                "payloadBytes": 13676,
+                "encodedBytes": 13679,
+                "sha256": "68eeb578e0066082770339db6ed8b05763e0a57c772a853444720b75379400f4"
+              },
+              {
+                "id": 0,
+                "name": "producers",
+                "payloadBytes": 124,
+                "encodedBytes": 126,
+                "sha256": "5349359afa1778d0d8c567fa09601cda2ce1fbb4cc12a020275fcd608b9cbc81"
+              },
+              {
+                "id": 0,
+                "name": "__wasm_split_unstable",
+                "payloadBytes": 25,
+                "encodedBytes": 27,
+                "sha256": "a416640601782cc68593cd2b5da1ea9868b5e050d5872dab34e72b937316ac10"
+              },
+              {
+                "id": 0,
+                "name": "target_features",
+                "payloadBytes": 148,
+                "encodedBytes": 151,
+                "sha256": "436e14b8b97dd381f16be421a6f633e615c441207f9de33379f9604cb6c23723"
+              }
+            ]
+          },
+          "profile": {
+            "opt_level": "3",
+            "debuginfo": 0,
+            "debug_assertions": false,
+            "overflow_checks": false,
+            "test": false
+          }
+        }
+      ]
+    }
+  },
+  "correctness": {
+    "browser": {
+      "path": "D:\\BuildCache\\glory-pipeline-implementation-20261026\\browser-full\\evidence.json",
+      "sha256": "2c75259b367ea7d2b7420dad2b772ac26aeeadf679feee057b3895519c339844"
+    },
+    "browserSuites": 29,
+    "controllerBefore": {
+      "path": "D:\\BuildCache\\glory-pipeline-implementation-20261026\\browser-controller-before\\controller-acceptance.js.json",
+      "sha256": "bc0b539f910c314414ba59615574ebfe6e3395cd1348d5a88528aa9556372e3e",
+      "result": {
+        "unrelatedReads": 8,
+        "inheritedChanges": true,
+        "stableIdentities": true,
+        "compositionEnds": 1,
+        "filesRead": 1,
+        "trustedDrop": true,
+        "revokedConfiguration": true
+      }
+    },
+    "controllerAfter": {
+      "unrelatedReads": 0,
+      "inheritedChanges": true,
+      "stableIdentities": true,
+      "compositionEnds": 1,
+      "filesRead": 1,
+      "trustedDrop": true,
+      "revokedConfiguration": true
+    },
+    "optimizedBundles": {
+      "path": "D:\\BuildCache\\glory-pipeline-implementation-20261026\\after\\bundle-size\\browser\\evidence.json",
+      "sha256": "7123efe24ac40f846dc242804bb50755dd0abaeaa993608fb1e14a891abf3afa"
+    },
+    "optimizedCases": 6,
+    "transport": {
+      "path": "D:\\BuildCache\\glory-pipeline-implementation-20261026\\transport.log",
+      "sha256": "e3642a1fcf5639a9e4fb52eba1659b508e17a89acea7f300d55953b79c61c9d3"
+    }
+  },
+  "tests": {
+    "logs": [
+      {
+        "path": "D:\\BuildCache\\glory-pipeline-implementation-20261026\\native-all.log",
+        "sha256": "9c72fd4e0643ede4dd98b621611a1d52b3f2316c7e0f83a64e2ca5885fff12a5"
+      },
+      {
+        "path": "D:\\BuildCache\\glory-pipeline-implementation-20261026\\native-ui-blitz.log",
+        "sha256": "cd20b1ed46d9b3ab4852692519bb94b047064cbb6897e6fafdec3a61530826c5"
+      },
+      {
+        "path": "D:\\BuildCache\\glory-pipeline-implementation-20261026\\salvo-tests.log",
+        "sha256": "5aa2de27dbba2595c2b2cec2382fdba9ef937dd1a453f6e079f994c40b987492"
+      },
+      {
+        "path": "D:\\BuildCache\\glory-pipeline-implementation-20261026\\native-clippy-final.log",
+        "sha256": "5571de837d8cc1147300aa5ccf81b717936d4e287732b316313cddf4e0ed10c6"
+      },
+      {
+        "path": "D:\\BuildCache\\glory-pipeline-implementation-20261026\\wasm-clippy.log",
+        "sha256": "f8019cf546b337b8aa19aecd534ace2900416636d462749cbdb0a6f071da13b4"
+      },
+      {
+        "path": "D:\\BuildCache\\glory-pipeline-implementation-20261026\\fixture-clippy.log",
+        "sha256": "ef20412fc90654a012a9eb673dba7438324966a75767586021db891acd5d1b5f"
+      }
+    ],
+    "sharedPackagesPassed": 707,
+    "blitzPassed": 231,
+    "blitzIgnored": 2,
+    "uiRerunPassed": 167,
+    "salvoPassed": 13,
+    "webUnitPassed": 18,
+    "ignoredAcceptance": [
+      "real_accesskit_windows_ui_automation",
+      "real_windows_present_scroll_resume_and_release_owned_tasks"
+    ]
+  },
+  "limits": [
+    "Both paired cohorts and portfolio timing contexts observed unrelated compilation activity. Initial create_1k -19% is not attributed to the change; cohorts are never pooled or filtered.",
+    "No stable overall performance improvement is established; regressions and per-round distributions are retained.",
+    "Two independent Memories, full generational identities, validation, successful-prefix semantics, all capabilities and release profiles remain.",
+    "Retirement inventory is temporary O(retired nodes) storage, not proof of fewer allocations or lower peak RSS.",
+    "Existing Leptos sequential selection anomaly is kept in primary results; 72 independent diagnostic samples are separate.",
+    "Real desktop/UIA ignored tests and mobile/OS IME acceptance are outside this change."
+  ]
+}

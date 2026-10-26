@@ -31,6 +31,9 @@ Start here when evaluating or extending Glory:
   lazy original-node handles, partial retirement and independent bridge/GC measurements.
 - [Typed Plan host goals](plan-host-goals-2026-10-26.md):
   finite field/placement/removal calls, controlled-input barriers and memory-growth recovery.
+- [Render pipeline architecture and implementation](render-pipeline-implementation-2026-10-26.md):
+  authoritative retirement inventories, shared Entry initialization, bounded control-change summaries,
+  full regression and paired measurements with explicit environmental limits.
 - [Cross-mutation field submission experiment](field-submit-plan-2026-10-26.md):
   reverted after paired measurements; journal/prefix validation and experimental results remain documented.
 - [Bulk creation and Dioxus design](bulk-create-dioxus-2026-10-24.md): fixed DOM creation bridge,

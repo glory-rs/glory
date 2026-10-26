@@ -1,5 +1,10 @@
 # Glory / Leptos / Dioxus: current semantic browser benchmark
 
+[2026-10-26 渲染流程架构改进](../docs/render-pipeline-implementation-2026-10-26.md)：
+统一 UI 退休清单和索引维护、共用纯 Entry 初始化，并明确控制器更新依赖。29 组浏览器、
+共享层/Blitz/Salvo 回归通过；保留两组 A/B 的环境干扰和回退，不声称整体提速。
+−Oz WASM 减少 5,984 B，JS 大小不变；三框架、看板及主配对共 3,144 个正式样本。
+
 [2026-10-26 跨 mutation 字段提交试验（已撤回）](../docs/field-submit-plan-2026-10-26.md)：
 过桥 **5,034 → 3,065**、解码调用 **5,012 → 2,027**，但第二版四轮 A/B 的创建只快
 约 1.5%，替换 / 选行 / 清空分别慢约 **4.4% / 23.6% / 13.9%**。保留两版实验、
