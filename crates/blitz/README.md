@@ -8,7 +8,7 @@ window host with CPU presentation; the headless default creates no window/GPU.
 The shell also exposes `Shell::android(AndroidApp)` and `Shell::from_event_loop`;
 its existing `Shell::new` supports the UIKit entry path. The
 [mobile example](../../examples/mobile/README.md) records Android emulator
-packaging/interaction checks and the unverified iOS path. Optional `package`
+packaging/interaction checks and Apple-host iOS simulator/pinyin IME evidence. Optional `package`
 provides the same bounded offline Loader on desktop and mobile; HTTP/file
 transport and AccessKit remain desktop integrations.
 
@@ -52,7 +52,7 @@ remains separate from this editor protocol and CPU/window evidence.
 | Resource loads | Explicit Config base URL/provider, bounded cache/pending/decode/font budgets, failure/cancel/close and host wake. Default installs no HTTP/file loader |
 | Drawing | Optional `paint`: complete AnyRender frames; optional `raster`: Vello CPU premultiplied sRGB RGBA8 |
 | Window/platform | Optional desktop shell: winit + Vello CPU/softbuffer; default creates no window |
-| Platform accessibility | Optional `accesskit` (facade `blitz-accesskit`): semantic roles/names/values, collection metadata and Focus/Click/SetValue; virtual-row ScrollIntoView uses the shared list controller, then native ancestors/viewport. Windows UIA client tested. Linux AT-SPI clients and screen-reader announcements remain pending |
+| Platform accessibility | Optional `accesskit` (facade `blitz-accesskit`): semantic roles/names/values, collection metadata and Focus/Click/SetValue; virtual-row ScrollIntoView uses the shared list controller, then native ancestors/viewport. Windows UIA and macOS AX clients tested. Linux AT-SPI clients and screen-reader announcements remain pending |
 
 `Renderer` is a cloneable handle to one document. `set_css` replaces a single
 author sheet; `set_viewport` uses physical dimensions plus DPI. `stats` records
@@ -329,7 +329,9 @@ The canonical script also checks the package-only production dependency graph.
 These budgets do not claim total process memory. Android AssetManager/network
 transport, deployment/CDN behavior, broader OS input/accessibility and performance
 timing remain pending. Desktop transports are target-gated away from Android/WASM;
-macOS/iOS have no compile/runtime evidence in this stage.
+macOS has actual window/AX evidence and iOS has simulator CSS/PNG, keyboard/pinyin,
+Home/resume and rotation evidence; signed devices and production Apple
+distribution remain separate.
 
 `tests/document.rs` runs real CSS/box/text layout on Windows and Ubuntu/WSL, including a
 100-million-row indexed source with fixed and measured variable heights, far
@@ -413,9 +415,16 @@ event. Geometry queries use the same monotonic animation clock as shell paint;
 headless hosts can drive `Renderer::advance_time` explicitly. Static clock
 changes do not dirty frames. Once attached, let the shell own that clock.
 
-The shell is target-gated to Windows/Linux/macOS; macOS has no runtime acceptance
-yet. Android remains a separate Activity/Surface integration and is not enabled
-by desktop shell. See the implementation ledger for actual tested displays.
+Desktop shells target Windows/Linux/macOS. Mobile shells use explicit AndroidApp
+and app-owned UIKit scene entry paths, documented in the mobile example.
+`tests/macos_window.rs` is a separate AppKit main-thread process; opt in with
+`GLORY_MACOS_WINDOW=1`. It checks presented frames, native resizing and Owner
+cleanup. `Shell::window_stats` reads live surface/frame counters without invalidation;
+`take_event_loop` lets an application-owned handler delegate to Shell.
+The pinned UIKit UITextInput bridge synchronizes only a bounded current-editor
+context and keeps password context empty. Real pinyin composition is accepted;
+arbitrary UIKit selection gestures/rectangles, VoiceOver and signed devices
+remain separate. See the implementation ledger for actual tested displays.
 The explicitly ignored `real_windows_present_scroll_resume_and_release_owned_tasks`
 test requires a real display, and exercises two independently owned windows,
 queued synthetic pointer activation, fixed/measured lists, 20 far seeks,

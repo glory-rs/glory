@@ -19,6 +19,14 @@ pub(super) fn focus(app: &mut WindowApp, id: NodeId) {
     settle(app);
 }
 pub(super) fn key(app: &mut WindowApp, value: Key, modifiers: Modifiers) {
+    // AppKit delivers deletion through its standard text binding callback.
+    // A bare Backspace KeyDown deliberately does not edit plain Mac inputs.
+    #[cfg(target_os = "macos")]
+    if value == Key::Named(NamedKey::Backspace) && modifiers.is_empty() {
+        app.handle_ui_event(UiEvent::AppleStandardKeybinding("deleteBackward:".into()));
+        settle(app);
+        return;
+    }
     let text = match &value {
         Key::Character(value) => Some(value.as_str().into()),
         _ => None,

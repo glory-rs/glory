@@ -281,25 +281,44 @@ finally {
 pub const SHELL: &str = r#"#!/bin/sh
 set -eu
 project=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-identity=$(printf '%s' "$project/Cargo.toml" | sha256sum | cut -c1-16)
-build=${GLORY_BUILD_ROOT:-/mnt/d/BuildCache/glory-projects/$identity}
-build=$(realpath -m "$build")
-case "$build" in /mnt/d/BuildCache/*) ;; *) echo 'GLORY_BUILD_ROOT must be under /mnt/d/BuildCache' >&2; exit 1;; esac
-case "$build" in */../*) echo 'Invalid build root' >&2; exit 1;; esac
-mount_source=$(findmnt -n -T /mnt/d -o SOURCE | tr '\\' '/' | tr '[:upper:]' '[:lower:]')
-case "$mount_source" in d:|d:/*|//localhost/d\$) ;; *) echo '/mnt/d is not the Windows D: mount' >&2; exit 1;; esac
-export GLORY_BUILD_ROOT="$build"
-case "${CARGO_HOME:-}" in /mnt/d/BuildCache/*) ;; *) export CARGO_HOME="$build/cargo";; esac
-export CARGO_HOME=$(realpath -m "$CARGO_HOME")
-case "$CARGO_HOME" in /mnt/d/BuildCache/*) ;; *) echo 'Cargo home escaped the D: build root' >&2; exit 1;; esac
-export CARGO_TARGET_DIR="$build/tools-target" TMPDIR="$build/tmp" TEMP="$build/tmp" TMP="$build/tmp"
-mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR" "$TMPDIR"
+identity=$(python3 -c 'import hashlib,sys; print(hashlib.sha256(sys.argv[1].encode()).hexdigest()[:16])' "$project/Cargo.toml")
+case "$(uname -s)" in
+    Darwin) cache_base=/Volumes/Data/Caches/glory/projects ;;
+    *) cache_base=/mnt/d/BuildCache/glory-projects
+        mount_source=$(findmnt -n -T /mnt/d -o SOURCE | tr '\\' '/' | tr '[:upper:]' '[:lower:]')
+        case "$mount_source" in d:|d:/*|//localhost/d\$) ;; *) echo '/mnt/d is not the Windows D: mount' >&2; exit 1;; esac ;;
+esac
+export GLORY_BUILD_ROOT=${GLORY_BUILD_ROOT:-$cache_base/$identity}
+export GLORY_CACHE_BASE="$cache_base"
+GLORY_BUILD_ROOT=$(python3 - <<'PYROOT'
+import os,pathlib
+p=pathlib.Path(os.environ['GLORY_BUILD_ROOT'])
+base=pathlib.Path(os.environ['GLORY_CACHE_BASE']).parent
+if not p.is_absolute() or '..' in p.parts or not p.resolve().is_relative_to(base) or p.resolve() == base:
+    raise SystemExit('Build root escaped the approved cache directory')
+print(p.resolve())
+PYROOT
+)
+export GLORY_BUILD_ROOT
+# All launcher outputs are isolated before Cargo is invoked.
+export CARGO_HOME="$GLORY_BUILD_ROOT/cargo" CARGO_TARGET_DIR="$GLORY_BUILD_ROOT/tools-target"
+export TMPDIR="$GLORY_BUILD_ROOT/tmp" TEMP="$GLORY_BUILD_ROOT/tmp" TMP="$GLORY_BUILD_ROOT/tmp"
+export PYTHONPYCACHEPREFIX="$GLORY_BUILD_ROOT/pycache"
+python3 - <<'PYCACHE'
+import os,pathlib
+base=pathlib.Path(os.environ['GLORY_CACHE_BASE']).parent
+for key in ('CARGO_HOME','CARGO_TARGET_DIR','TMPDIR','PYTHONPYCACHEPREFIX'):
+    p=pathlib.Path(os.environ[key]).resolve()
+    if not p.is_relative_to(base):
+        raise SystemExit(f'{key} escaped the approved cache directory')
+    p.mkdir(parents=True,exist_ok=True)
+PYCACHE
 cd "$project"
 offline=
 for argument in "$@"; do if [ "$argument" = --offline ]; then offline=--offline; fi; done
-cargo metadata $offline --no-deps --format-version 1 --manifest-path tools/glory/Cargo.toml > "$build/tool-metadata.json"
+cargo metadata $offline --no-deps --format-version 1 --manifest-path tools/glory/Cargo.toml > "$GLORY_BUILD_ROOT/tool-metadata.json"
 # Ask Cargo to verify the real target before compiling the launcher.
-actual=$(sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p' "$build/tool-metadata.json")
+actual=$(sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p' "$GLORY_BUILD_ROOT/tool-metadata.json")
 [ "$actual" = "$CARGO_TARGET_DIR" ] || { echo 'Unexpected Cargo target' >&2; exit 1; }
 native=$(rustc -vV | sed -n 's/^host: //p')
 [ -n "$native" ] || { echo 'Cannot determine the Rust host' >&2; exit 1; }

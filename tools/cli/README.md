@@ -17,7 +17,7 @@ The root workspace still contains the same twelve runtime/adapter packages.
 | Version ownership | CLI library pinned by the project | One `glory-cli` library; exact release or full Git revision, shared application Cargo.lock |
 | Startup during application errors | A separate private workspace executable | `tools/glory` has no application dependency; `doctor` still works with broken application source |
 | Convenient invocation | Project Cargo alias | `cargo glory` plus generated `bin/glory.ps1` and `bin/glory` |
-| Host and cache isolation | Cargo controls tool compilation | Bin launchers select the native Rust target and D: caches before compiling the private runner |
+| Host and cache isolation | Cargo controls tool compilation | Bin launchers select the native Rust target and approved Windows/WSL/macOS data-volume caches before compiling the private runner |
 | Configuration | Application-owned setup | Infer ordinary entries/features/assets; put only overrides in `package.metadata.glory` |
 | Auxiliary tools | Project command owns its tools | Resolve wasm-bindgen from Cargo.lock and install that exact version under the project build root |
 
@@ -37,18 +37,35 @@ this implementation does not add an RSX compiler or a binary hot-patching system
 - `print`: JSON build plan, selected package/host/features and resolved paths.
 - `build`: Web WASM + matching wasm-bindgen + HTML/assets, or a native binary.
 - `run`: run a desktop/server binary, or serve Web without watching.
-- `serve`: loopback Web server, filesystem watch, debounced rebuild and browser
-  refresh. A failed rebuild keeps the previous output and reports the error.
+- `serve`: loopback Web server with refresh, or desktop/server watch with process
+  restart. Rebuilds are debounced; failed native builds keep the old process.
+  Each native generation runs a separate executable copy so Windows can link
+  the next build. Ctrl+C stops/reaps the owned process. Restarts reset app state.
 - `check`: Cargo check plus strict Clippy for the selected application/host.
 - `fmt [--check]`: the application's ordinary rustfmt.
 - `bundle`: release Web directory or desktop/server executable/assets plus a
   target-specific hash manifest. Native directory bundles are portable file
-  layouts; installers, signing and mobile packages require separate tooling.
+  layouts. macOS desktop output is an ad-hoc-signed `.app` with assets in
+  `Contents/Resources` and hashes of the final signature. Other installers and
+  mobile packages require separate tooling.
 - `init`: create a private tool package, project Cargo alias and bin launchers.
 
 Use `--help` for options. Rust hot-patching, RSX, a second UI lifecycle, automatic
 global updates, remote deployment and application state preservation on reload
 are outside this implementation.
+
+Release Web builds stream compressible HTML/JS/WASM/CSS/JSON/SVG/text into gzip
+sidecars when smaller than the original (files below 256 bytes are skipped).
+Headers contain no source filename or timestamp, so equal inputs produce equal
+compressed bytes with the pinned compressor. Sidecars enter `glory-build.json`;
+an application asset with the same `.gz` name is a build error, never overwritten.
+Original URLs and bytes remain available. The local server negotiates gzip and
+identity using `Accept-Encoding`, emits `Vary` and the encoded length for HEAD,
+and returns 406 when neither is acceptable. Watch/reload always uses identity
+bytes so the development script can be inserted. A production server must
+configure equivalent content negotiation; simply copying sidecars does not
+configure a CDN. Brotli, asset fingerprinting, image conversion and WASM code
+splitting remain separate work.
 
 ## First use in this repository
 
@@ -149,7 +166,10 @@ a verified D:-backed `/mnt/d/BuildCache` mount. `GLORY_BUILD_ROOT` selects anoth
 project root there; `--build-root` changes the application's output root.
 An existing D: Cargo home may be shared as an immutable package download cache;
 versions come from the project lock, not its contents. No C: cache fallback is
-used. Other native Unix cache layouts have not been implemented or accepted.
+used. macOS uses `/Volumes/Data/Caches/glory/projects/<project-path-hash>`;
+`GLORY_BUILD_ROOT` can select a project directory under that approved data-volume
+cache root. Paths and existing symlink parents are checked before creating files.
+Other native Unix cache layouts have not been implemented or accepted.
 
 The matching wasm-bindgen CLI is installed into a version/host-specific project
 directory on the first Web build. `--offline` prohibits installation; `--bindgen`
@@ -215,3 +235,30 @@ rejection, bundles a release executable with assets, checks every hash, relocate
 and runs it from a path containing spaces, and checks lockfile and other-target
 output preservation. It exercises native tooling and asset lookup; the console
 fixture does not assert window/input or mobile device behavior.
+
+## Native Apple hosts
+
+The shell launcher works on macOS without GNU sha256sum/realpath/findmnt.
+It isolates Cargo/tool/app/temp/Python caches under `/Volumes/Data/Caches/glory`;
+Windows D: and verified WSL mount behavior remain supported. Canonical path
+checks reject `..` and symlink escapes before creating output directories.
+
+`package.metadata.glory.desktop.bundle-identifier` sets the macOS reverse-DNS
+identifier; the default is `rs.glory.<package-name>`. `bundle --platform desktop`
+creates `<package>.app/Contents/{MacOS,Resources,Info.plist}` on a macOS host,
+verifies its ad-hoc signature, then hashes and atomically publishes the package.
+Application assets are explicit; locate them relative to the bundle's Resources
+folder rather than relying on Finder's working directory.
+
+For Developer ID distribution, `scripts/sign-macos.sh APP IDENTITY NOTARY_PROFILE`
+uses an explicitly supplied identity and an existing notarytool keychain profile.
+It enables hardened runtime/timestamping, submits the ZIP, requires Accepted,
+staples and verifies the ticket, runs Gatekeeper assessment and refreshes the
+CLI integrity manifest. No credentials are discovered or embedded. The current
+session verified ad-hoc installation; Developer ID/notarization requires the
+application owner's credentials and remains unexecuted.
+
+`tools/cli/tests/native-watch.py` exercises the real Cargo/notify/process flow:
+a syntax error preserves the first live PID, a corrected source launches a new
+PID, and Ctrl+C reaps it. It accepts a built bootstrap runner and keeps fixture
+sources/logs/results in an explicit Apple cache directory.

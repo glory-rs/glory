@@ -1,7 +1,10 @@
 //! Project-owned Glory tooling. Link this library from a small private workspace
 //! package; CLI dependencies never belong to the application's runtime graph.
+mod apple;
 mod args;
 mod build;
+mod compression;
+mod native_dev;
 mod process;
 mod project;
 mod scaffold;

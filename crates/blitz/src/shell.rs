@@ -178,7 +178,20 @@ impl Document for WindowApp {
         editing::sanitize_ime(&self.renderer.0.borrow(), &mut event);
         self.renderer.invalidate();
         let collector = Events(self.renderer.clone());
-        EventDriver::new(self, collector).handle_ui_event(event);
+        // The pinned engine's UiEvent Apple path runs the default directly,
+        // bypassing EventHandler (and therefore readonly/inert/disabled guards).
+        // Route that command through the same DOM dispatch as other text input.
+        if let UiEvent::AppleStandardKeybinding(command) = event {
+            let target = self.renderer.0.borrow().dom.doc.get_focussed_node_id();
+            if let Some(target) = target {
+                EventDriver::new(self, collector).handle_dom_event(DomEvent::new(
+                    target,
+                    DomEventData::AppleStandardKeybinding(command),
+                ));
+            }
+        } else {
+            EventDriver::new(self, collector).handle_ui_event(event);
+        }
         let mut state = self.renderer.0.borrow_mut();
         layers::lock_viewport(&mut state);
         state.sync_focus();
@@ -268,10 +281,27 @@ impl EventHandler for Events {
                     event.data,
                     DomEventData::KeyDown(_)
                         | DomEventData::KeyUp(_)
+                        | DomEventData::AppleStandardKeybinding(_)
                         | DomEventData::Ime(_)
                         | DomEventData::Input(_)
                         | DomEventData::Click(_)
                 )
+            {
+                event_state.prevent_default();
+                return;
+            }
+            if let DomEventData::AppleStandardKeybinding(command) = &event.data
+                && state
+                    .mapper
+                    .tree()
+                    .node(node)
+                    .is_ok_and(|n| n.descriptor.view().readonly())
+                && (command.starts_with("delete")
+                    || command.starts_with("insert")
+                    || matches!(
+                        command.as_str(),
+                        "cut:" | "paste:" | "insertNewline:" | "insertTab:"
+                    ))
             {
                 event_state.prevent_default();
                 return;
@@ -1420,6 +1450,14 @@ impl WindowRenderer for CpuRenderer {
     }
 }
 
+/// Current native surface diagnostics; counters do not trigger layout or redraw.
+#[derive(Clone, Copy, Debug)]
+pub struct WindowStats {
+    pub surface_size: winit::dpi::PhysicalSize<u32>,
+    pub scale_factor: f64,
+    pub presented_frames: u64,
+}
+
 /// One native event-loop owner; supports multiple independently owned Apps.
 pub struct Shell {
     // Platform subclasses must be removed before their window handles die.
@@ -1428,6 +1466,10 @@ pub struct Shell {
         not(any(target_os = "android", target_os = "ios"))
     ))]
     accessibility: std::collections::HashMap<WindowId, accesskit_platform::Platform>,
+    #[cfg(target_os = "ios")]
+    uikit_active: bool,
+    #[cfg(target_os = "ios")]
+    uikit_error_reported: bool,
     inner: BlitzApplication<CpuRenderer>,
     event_loop: Option<EventLoop>,
     error: Rc<RefCell<Option<ShellError>>>,
@@ -1480,6 +1522,10 @@ impl Shell {
                 not(any(target_os = "android", target_os = "ios"))
             ))]
             accessibility: Default::default(),
+            #[cfg(target_os = "ios")]
+            uikit_active: false,
+            #[cfg(target_os = "ios")]
+            uikit_error_reported: false,
             inner: BlitzApplication::new(proxy, queue),
             event_loop: Some(event_loop),
             error: Rc::default(),
@@ -1513,6 +1559,14 @@ impl Shell {
             attributes,
         ));
     }
+    /// Inspect one live window without invalidating its document.
+    pub fn window_stats(&self, id: WindowId) -> Option<WindowStats> {
+        self.inner.windows.get(&id).map(|view| WindowStats {
+            surface_size: view.window.surface_size(),
+            scale_factor: view.window.scale_factor(),
+            presented_frames: view.renderer.frames(),
+        })
+    }
     /// Some platforms resize synchronously and emit no SurfaceResized event.
     /// Apply that returned size immediately; None waits for the native event.
     pub fn request_size(
@@ -1534,11 +1588,20 @@ impl Shell {
         }
         Ok(applied)
     }
+    /// Transfer the loop to an application-owned ApplicationHandler that delegates
+    /// native callbacks to this Shell. Must run on the platform's required thread.
+    /// After transfer, Shell::run returns an error; it cannot create another loop.
+    pub fn take_event_loop(&mut self) -> Option<EventLoop> {
+        self.event_loop.take()
+    }
     pub fn run(mut self) -> Result<(), ShellError> {
         if self.inner.pending_windows.is_empty() {
             return Err(ShellError::Window("no windows configured".into()));
         }
-        let event_loop = self.event_loop.take().expect("event loop owned");
+        let event_loop = self
+            .event_loop
+            .take()
+            .ok_or_else(|| ShellError::Window("event loop already transferred".into()))?;
         let error = self.error.clone();
         event_loop
             .run_app(self)
@@ -1571,6 +1634,16 @@ impl Shell {
             }
         }
         if self.error.borrow().is_some() {
+            // UIKit's application loop cannot return the Shell::run error.
+            #[cfg(target_os = "ios")]
+            {
+                if std::mem::replace(&mut self.uikit_error_reported, true) {
+                    return;
+                }
+                if let Some(error) = self.error.borrow().as_ref() {
+                    eprintln!("Glory UIKit shell: {error}");
+                }
+            }
             #[cfg(all(
                 feature = "accesskit",
                 not(any(target_os = "android", target_os = "ios"))
@@ -1582,6 +1655,26 @@ impl Shell {
     }
 }
 impl ApplicationHandler for Shell {
+    #[cfg(target_os = "ios")]
+    fn can_create_surfaces(&mut self, _event_loop: &dyn ActiveEventLoop) {
+        // UIApplication finishes launching before UIScene connects. Creating a
+        // legacy UIWindow here leaves it invisible under the iOS 27 SDK.
+        // The app-owned scene bridge delivers activation after connection.
+    }
+    #[cfg(target_os = "ios")]
+    fn resumed(&mut self, event_loop: &dyn ActiveEventLoop) {
+        if !std::mem::replace(&mut self.uikit_active, true) {
+            self.inner.can_create_surfaces(event_loop);
+            self.check(event_loop);
+        }
+    }
+    #[cfg(target_os = "ios")]
+    fn suspended(&mut self, event_loop: &dyn ActiveEventLoop) {
+        if std::mem::replace(&mut self.uikit_active, false) {
+            self.inner.destroy_surfaces(event_loop);
+        }
+    }
+    #[cfg(not(target_os = "ios"))]
     fn can_create_surfaces(&mut self, event_loop: &dyn ActiveEventLoop) {
         for view in self.inner.windows.values_mut() {
             view.downcast_doc_mut::<WindowApp>().renderer.invalidate();

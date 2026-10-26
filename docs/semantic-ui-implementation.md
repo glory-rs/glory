@@ -2405,3 +2405,28 @@ Android 16 x86_64 实际运行验证 CSS/PNG 像素、Gboard/触摸/编辑、后
 
 这不包含 Android AssetManager/动态资产或联网权限；CJK、TalkBack、arm64 真机
 和 iOS Apple SDK 构建/运行仍待验收。SSR 集成继续只提供 Salvo。
+
+## 2026-10-26 Apple 主机与桌面开发补齐
+
+本次环境已换为 Apple Silicon/Xcode 27.1；前节“iOS 没有 Apple-host 证据”为前轮边界。
+macOS 真窗口/调整尺寸/关闭清理、Counter release `.app`、外部 AX 客户端读取与
+Click/SetValue/真实键盘已验收。iOS 27 模拟器实际通过 CPU/CSS/PNG、触摸、软件键、
+pinyin marked text/候选/中文提交、中文与 emoji 缓冲区退格、组合取消/Clear、
+同进程恢复及旋转后继续输入；arm64 设备目标已实际链接，未签名安装。
+
+场景和 UIKit IME 改动在真实 glory-rs Winit/Blitz fork 内固定完整 SHA。新增 unsafe
+仅限用户明确授权的 Winit UIKit Objective-C UITextInput 协议桥接，Glory 运行时
+无新增 unsafe。上下文是焦点编辑器的有限 UTF-8 片段，密码为空，preedit 不被确认
+回写覆盖；其他平台不隐式导出文本。完整文本选择手势/selection rects、VoiceOver、
+彩色 emoji 绘制、键盘避让、scene 重连及生产签名/公证仍独立待验收。
+
+CLI 支持 Mac 数据盘缓存和 `.app` 结构/签名/完整哈希；生产签名脚本显式要求凭据，
+校验完毕后整体替换包。桌面/server serve 支持 watch/restart，真实 Cargo/notify
+验收确认失败构建保留旧进程、修复后新 PID、Ctrl+C 回收。它不保持应用状态。
+详见 [差距报告的 Apple/IME 后续记录](dioxus-feature-gap-analysis-2026-10-26.md) 与
+[移动工程说明](../examples/mobile/README.md)；未把整体差距标为关闭。
+
+随后补齐 Web release 可复现 gzip 和预览内容协商，压缩文件进入完整清单。
+真实 Counter WASM 从 2,107,005 压到 570,130 字节，解压及全部清单哈希一致，
+浏览器启动/按钮交互通过；CLI 25 项测试与严格 Clippy 通过。指纹、图片转换、
+Brotli 和 WASM 分包仍独立待办。

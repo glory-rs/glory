@@ -94,6 +94,9 @@ pub fn build(project: &Project, args: &Args) -> Result<Built> {
                 .ok_or("WASM artifact has no UTF-8 name")?;
             fs::write(stage.join("index.html"), format!("<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"></head><body><main id=\"app\"></main><script type=\"module\">import init from './{stem}.js';init();</script></body></html>")).map_err(|e| e.to_string())?;
         }
+        if args.release {
+            crate::compression::compress(&stage)?;
+        }
         write_manifest(project, &stage, args)?;
         publish(&stage, &output_root, &project.paths.root)
     })();
@@ -249,6 +252,9 @@ pub fn bundle(project: &Project, args: &Args) -> Result<()> {
 }
 
 fn native_bundle(project: &Project, executable: &Path, stage: &Path, args: &Args) -> Result<()> {
+    if project.platform == Platform::Desktop && project.target().ends_with("-apple-darwin") {
+        return crate::apple::bundle(project, executable, stage, args);
+    }
     // Assets are copied first so neither the executable nor its integrity
     // manifest can be silently replaced by an application asset.
     for asset in &project.host.assets {
@@ -339,7 +345,7 @@ fn checked_asset(root: &Path, relative: &Path) -> Result<PathBuf> {
     Ok(path)
 }
 
-fn copy_asset(root: &Path, relative: &Path, destination: &Path) -> Result<()> {
+pub(crate) fn copy_asset(root: &Path, relative: &Path, destination: &Path) -> Result<()> {
     let source = checked_asset(root, relative)?;
     let target = destination.join(relative);
     if source.is_dir() {
@@ -373,7 +379,7 @@ pub fn copy_contents(source: &Path, destination: &Path) -> Result<()> {
     Ok(())
 }
 
-fn write_manifest(project: &Project, directory: &Path, args: &Args) -> Result<()> {
+pub(crate) fn write_manifest(project: &Project, directory: &Path, args: &Args) -> Result<()> {
     let mut files = Vec::new();
     hash_files(directory, directory, &mut files)?;
     files.sort_by(|left, right| left["path"].as_str().cmp(&right["path"].as_str()));

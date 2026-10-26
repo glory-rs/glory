@@ -7,6 +7,9 @@ use glory::blitz::{
 use glory::prelude::{group, image};
 use std::{collections::BTreeMap, sync::Arc};
 
+#[cfg(feature = "ime-probe")]
+mod ime_probe;
+
 /// One package worker per document, including every recreated Android Activity.
 pub fn counter_window() -> std::result::Result<(WindowApp, Arc<Loader>), Box<dyn std::error::Error>>
 {
@@ -29,9 +32,13 @@ pub fn counter_window() -> std::result::Result<(WindowApp, Arc<Loader>), Box<dyn
         ..Default::default()
     });
     window.renderer().set_css("@import url('theme.css');");
+    #[cfg(not(feature = "ime-probe"))]
+    let content = counter::Counter;
+    #[cfg(feature = "ime-probe")]
+    let content = ime_probe::fixture();
     window.mount(
         group().fill((
-            counter::Counter,
+            content,
             image()
                 .class("package-badge")
                 .source("badge.png")

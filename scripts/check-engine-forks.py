@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tomllib
 
 
@@ -21,7 +22,7 @@ def build_environment():
     for name in ("CARGO_HOME", "CARGO_TARGET_DIR"):
         value = Path(os.environ[name]).resolve()
         portable = value.as_posix().lower()
-        assert portable.startswith(("d:/buildcache/", "/mnt/d/buildcache/")), (name, value)
+        assert portable.startswith(("d:/buildcache/", "/mnt/d/buildcache/")) or (sys.platform == "darwin" and value.is_relative_to("/Volumes/Data/Caches/glory")), (name, value)
         paths[name] = value
     return paths
 
@@ -48,6 +49,9 @@ def test_fork(fork, directory, target):
         executable = target / f"{fork['name']}-standalone-{index}{'.exe' if os.name == 'nt' else ''}"
         run("rustc", "--edition", "2024", "--test", str(directory / source), "-o", str(executable))
         run(str(executable))
+    if sys.platform == "darwin":
+        for arguments in fork.get("apple_checks", []):
+            run("cargo", "check", "--locked", "--manifest-path", manifest, *arguments)
     assert not output("git", "-C", str(directory), "status", "--porcelain"), directory
 
 

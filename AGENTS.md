@@ -16,7 +16,7 @@ desktop/native/liveview/tui adapters and examples have been removed. Only the
 new `tools/cli` is a separate library-only host tooling workspace, explicitly
 authorized after the cleanup. It must not depend on runtime crates or enter
 the facade/default/HTML/SSR/WASM runtime graphs. Applications own a tiny private
-workspace executable and shared Cargo.lock; bin launchers set D: caches and the
+workspace executable and shared Cargo.lock; bin launchers set approved per-host caches and the
 native tool target before Cargo. The canonical check script also verifies CLI
 metadata, fmt, tests and Clippy independently of the runtime workspace. Historical
 design and measurement reports may refer to removed sources through Git history;
@@ -148,8 +148,17 @@ retired feature aliases or count compilation as proof of platform acceptance.
   Optional shell also has explicit AndroidApp and UIKit entry paths; see
   examples/mobile. Android emulator evidence stays separate from real-device,
   CJK composition, AssetManager/network transport and accessibility acceptance.
-  Android embedded CSS/PNG has actual emulator pixel/lifecycle evidence. iOS has no
-  Apple-host compilation or runtime evidence yet.
+  Android embedded CSS/PNG has actual emulator pixel/lifecycle evidence. iOS now has
+  simulator/device linking and actual iOS 27 simulator pixel, touch, software-key,
+  Home/restore and rotation evidence. The app-owned Swift scene bridge forwards
+  actual UIKit lifecycle events; the Winit fork attaches windows to UIWindowScene.
+  UIKit now has a narrowly authorized UITextInput bridge, bounded surrounding
+  context and real pinyin preedit/candidate/commit/cancel/restore evidence.
+  Arbitrary native selection gestures, VoiceOver and signed device installation
+  remain open. Passwords export empty context; never overwrite live marked text
+  with acknowledgements or native purpose changes.
+  macOS has actual CPU window/resize/cleanup and external AX client evidence;
+  Developer ID/notarization and VoiceOver speech remain separate acceptance.
 
 ## Design rules
 
@@ -408,7 +417,7 @@ retired feature aliases or count compilation as proof of platform acceptance.
   revisions recorded in docs/engine-forks.json. They stay outside the twelve-package
   workspace. Run python scripts/check-engine-forks.py --test to verify Cargo's
   resolved sources/lock and run fork-owned tests in separate clean Git checkouts
-  under the D: build root. Do not edit Cargo's managed Git checkouts. Update the
+  under the approved per-host build root. Do not edit Cargo's managed Git checkouts. Update the
   dependency rev, lockfiles and provenance record together after a fork change.
   The additional twelve dpi/Winit platform packages share the immutable
   glory-rs/winit revision in that record; Blitz's fork pins the same revision.
@@ -616,7 +625,12 @@ retired feature aliases or count compilation as proof of platform acceptance.
 - Virtual lists disable native scroll anchoring; preserve actual fractional
   scrollTop deltas without scaling them by the logical total. Pixel reads may
   have native zoom/DPR quantization; distinguish it from framework drift.
-- No new unsafe code; workspace denies it.
+- No new unsafe code in Glory; workspace denies it.
+  User-authorized exception (2026-10-26, Apple follow-up): the genuine
+  glory-rs/winit UIKit fork may add the minimum Objective-C UITextInput
+  protocol bridge declarations/FFI required for native IME. Keep safety comments,
+  main-thread ownership and native/model tests. This does not authorize unsafe
+  in Glory runtime crates or unrelated fork/platform code.
   User-authorized exception (2026-10-26): only the Android application entry
   in examples/mobile may use #[unsafe(no_mangle)] with a local lint allowance
   to export android_main. No unsafe blocks or runtime-crate exceptions.
@@ -726,7 +740,12 @@ offscreen CPU: cargo run -p glory-blitz --example profile --features raster --re
 Both separate setup/cold/warm work and expose aggregate inclusive phases; their
 logical update count need not equal the number of actual draws.
 
-All build artifacts, Cargo home and temporary compiler files must be on D:.
+On Windows, all build artifacts, Cargo home and temporary compiler files must be on D:.
+For the macOS support work requested on 2026-10-26, use the local data volume
+`/Volumes/Data/Caches/glory` for artifacts, Cargo home and compiler temporary
+files. Resolve paths before use and reject symlink escapes. Apple SDK tools may
+read the existing Xcode installation; select it per process with DEVELOPER_DIR.
+Do not require an unavailable Windows SMB share on a native Apple host.
 Use D:/BuildCache/glory-semantic-ui and verify target_directory with
 `cargo metadata --no-deps --format-version 1` before new build configurations.
 Never introduce a C: target/cache/temp directory. Docker storage must likewise

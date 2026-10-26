@@ -2,6 +2,21 @@
 
 Glory 的主要缺口集中在移动平台交付、桌面分发、应用级导航与文档服务、开发调试工具。响应式内核、浏览器渲染、SSR、水合、流式资源传递和常用交互组件已经有实现；不能把旧架构删除的能力、README 未列出的能力和真实缺口混为一谈。本轮按现有语义架构补齐，SSR 的 HTTP 框架集成只支持 Salvo。
 
+## 当前进度（Apple 主机补齐后）
+
+下方“起始状态”和 Windows 会话记录保留为比较基线；当前主机已是 Apple Silicon
+Mac，最新证据见文末 Apple/IME 记录，不能继续把“没有 Mac”当作当前状态。
+
+| 项目 | 当前结果 | 未关闭边界 |
+|---|---|---|
+| macOS | CPU 真窗口/缩放/清理、实际 AX 读取和编辑、可重定位签名 `.app` | VoiceOver 朗读、Developer ID/公证的凭据验收、外部机器安装 |
+| iOS | 模拟器/设备链接、UIScene、CPU 窗口、包资产、触摸和真实拼音 IME、同进程恢复/旋转 | 真机签名安装、VoiceOver、任意选择手势/rects、Unicode 程序选区、键盘避让与完整场景重连 |
+| 桌面开发 | native watch、错误保留旧进程、成功重启与退出回收 | 状态保持、真正 Rust 热补丁、检查器 |
+| Web 发布 | 可复现 gzip、哈希清单、预览协商/HEAD/身份回退 | 指纹命名、Brotli/图片转换、WASM 分包 |
+
+整体差距仍未关闭。签名身份/设备等外部条件和仍需实现的软件功能分别保留，
+没有用模拟器或编译结果替代完整平台交付。
+
 ## 对比范围
 
 源码基线为 2026 年 10 月 26 日的两个本地工作树：
@@ -46,7 +61,9 @@ Glory 的主要缺口集中在移动平台交付、桌面分发、应用级导�
 
 桌面安装器还要验证资源定位、可执行权限、系统依赖、图标、启动入口、更新/卸载、macOS 签名和公证。可执行文件加 assets 的目录交付可以解决手工部署，但不代表这些工作完成。
 
-当前会话为 Windows，已建立隔离在 D: 的 Android 16 x86_64 模拟器。用户确认暂时没有可用 Mac，iOS 保留明确待验收项；Android 模拟器也不能替代 arm64 真机。其他目标分别记录编译或运行证据，不能因为依赖支持这些 OS 就标为 Glory 已验收。
+起始 Windows 会话曾建立隔离在 D: 的 Android 16 x86_64 模拟器，当时没有可用 Mac。
+后续 Apple 主机的结果见当前进度与文末记录。Android/iOS 模拟器均不能替代 arm64
+真机；其他目标分别记录编译或运行证据，不能因为依赖支持这些 OS 就标为 Glory 已验收。
 
 ## 补齐顺序和边界
 
@@ -113,3 +130,162 @@ Android 16 x86_64 实际 APK 通过完整交互、Gboard 数字键、后台恢�
 本轮工作区共 964 项测试通过（含文档测试）；Android aarch64 适配器严格 Clippy（--no-deps）通过，x86_64/arm64 两个 APK 都重新链接、打包并验证签名。指定 -AndroidSerial 的规范 gate 现在会先安装本次 x86_64 APK，再运行像素/交互验收，避免测试残留旧安装包。
 
 这是嵌入式离线资产链路的补齐。Android AssetManager/动态资产、联网及权限、CJK/TalkBack 和 arm64 真机仍待验收；iOS 共用源码但仍没有 Apple SDK 构建/运行结果。SSR 继续仅集成 Salvo。
+
+## Apple 主机后续补齐（2026-10-26）
+
+本节接续上面的 Windows 记录。当前主机为 Apple Silicon Mac，完整 Xcode 27.1
+及 iOS 27.0 模拟器运行时均已存在；前文“没有 Mac/Apple SDK”的限制属于前轮，
+不再代表当前环境。保留此前证据与尚未完成项，不把模拟器验收合并为真机验收。
+
+### macOS 构建、应用包与系统交互
+
+CLI 与生成的 shell launcher 支持 `/Volumes/Data/Caches/glory` 数据盘缓存隔离，
+不再在 Mac 上要求 Windows D$ 挂载或 GNU 工具。路径在 mkdir 前解析并拒绝越界
+符号链接；Windows/WSL 原有路径规则保留。Apple 工具通过进程级 DEVELOPER_DIR
+选择完整 Xcode，没有修改全局 xcode-select。
+
+`bundle --platform desktop` 在 macOS 目标生成真正 `.app`：可执行文件进入
+Contents/MacOS，显式资产进入 Contents/Resources，生成 Info.plist 和可配置
+reverse-DNS 包标识。ad-hoc 签名校验后生成包含签名文件的完整哈希清单，再原子发布。
+新增测试将签名应用移到含空格目录后执行并重新核对签名、资源和所有清单哈希。
+实际 Counter release `.app` 已构建并启动。
+
+AppKit 主线程独立进程验收实际呈现、640×480 尺寸变化、多帧及关闭时 Owner 清理。
+外部 macOS AX 客户端实际读取 Heading、Counter value 文本框、Clear/-1/+1 按钮，
+执行 +1 得到 1、SetValue 得到 42，真实键盘全选/退格/输入后得到 17。
+这建立 macOS AX 树和动作链路证据，不能替代 VoiceOver 朗读或完整文本选择验收。
+
+实际测试还发现 AppKit 文本命令绕过引擎 EventHandler 的缺口。现在 Glory 将
+AppleStandardKeybinding 送入同一 DOM 事件分发，补齐 inert/disabled/readonly
+默认动作前的保护，以及编辑捕获的删除意图和 UTF-16 选区。真实引擎回归确认
+只读控件不能被退格或插入引号修改；测试按 Mac 的真实文本命令协议产生退格。
+
+`scripts/sign-macos.sh` 提供显式 Developer ID 身份与 notarytool keychain profile
+的发布步骤：hardened runtime、时间戳、公证 Accepted 校验、staple、Gatekeeper
+评估及刷新哈希清单。当前没有应用所有者签名凭据，故只实现并静态检查该链路，
+没有声称已完成 Developer ID 签名、公证或外部机器安装。
+
+### iOS 27 场景、CPU 窗口与移动资产
+
+iOS 模拟器和 arm64 真机目标均已实际编译链接。模拟器 `.app` 经签名校验后安装，
+初次启动在 UIKit 的 UIScene 强制检查处中止；仅添加场景 manifest 又得到黑屏。
+保留失败截图和崩溃记录，未降低 SDK 版本或把链接成功计作运行成功。
+
+应用工程增加 Swift SceneDelegate 和可追踪源变更的 build.rs。场景真实激活/
+失活事件转到既有 Winit 生命周期；Shell 在场景连接后创建 Surface，失活释放
+CPU Surface，重新激活恢复同一语义 App。WindowApp/Loader 的所有权继续保留。
+
+真正的 [Winit fork 固定提交](https://github.com/glory-rs/winit/commit/eff22893b58d35f31bc65928b365e9863ce1c5ce)
+通过安全 UIKit API 在显示窗口前关联已连接 UIWindowScene；传统无场景路径保留。
+[Blitz 固定提交](https://github.com/glory-rs/blitz/commit/01e237f5e33b272ecb524cf3a4b1f39ac77f6a03)
+同步固定同一 Winit 身份。manifest、全部活动锁文件、来源记录与检查脚本一起更新；
+没有修改 Cargo checkout、vendor、全局 patch 或增加 unsafe Rust。
+
+实际 iPhone 17/iOS 27 模拟器通过：Counter/包内 CSS/PNG 显示，触摸 +1，真正的
+系统软件键 7 将 1 改为 17，Home/同进程恢复、横屏旋转及后续保留值。
+原始截图验证绿色 PNG 是 32×32 point、距安全区边缘 24 point，横屏左右安全区
+均为 62 point；恢复与横屏后的标签像素哈希与软件键输入后完全相同。
+`capture-ios.py` 保留原始帧、图片位置/尺寸与标签哈希，不伪造触摸或 IME 结论。
+CoreSimulator 服务拒绝数据盘写入，因此设备使用其 OS 管理目录；仅截图先在该
+自有设备 tmp 中生成，再转存数据盘。编译/Cargo/Swift/temp 缓存全部在数据盘。
+
+设备打包脚本要求显式身份和 provisioning profile，验证有效期/应用标识、派生
+entitlements、嵌入 profile，并提供签名 `.app`/Payload IPA/哈希清单。
+当前只有 arm64 设备可执行文件链接证据，没有证书签名或真机安装结果。
+
+### 其他缺口：桌面开发 watch/restart
+
+CLI `serve --platform desktop|server` 增加本地依赖文件监控、200ms 去抖、成功构建
+后重启。每一代运行独立的可执行文件副本，避免 Windows 正在运行的 EXE 阻塞下轮
+链接；构建失败保留原进程，启动失败尝试恢复上一代。Ctrl+C 取消构建并回收自有
+进程，关闭后移除临时副本。它是进程重启，不是 Rust 热补丁或状态保持。
+
+真实 Cargo/notify/子进程验收通过：故意写入语法错误后原 PID 仍存活，修复后新
+一代产生不同 PID，Ctrl+C 后新 PID 已回收。完整源码和失败/恢复日志保留。
+
+### 本次验证与仍未关闭项
+
+- macOS 全工作区 all-features 单元/集成/文档测试合计 964 项通过；全目标严格 Clippy 通过。
+- CLI Apple/watch 阶段 22 项测试通过，后续 Web 压缩补齐后为 25 项；包含签名包重定位、哈希验证和真实 TCP 协商，严格 Clippy 通过；桌面 watch 另有实际端到端结果。
+- macOS 真窗口主线程测试和 Counter release 应用包实际运行通过。
+- iOS 模拟器应用链接、签名验证、安装、原生交互和资产像素通过；arm64 设备目标实际链接。
+- 三个固定引擎 fork 的独立 checkout 测试及 UIKit 模拟器/设备编译检查单独记录。
+- 证据总表：`/Volumes/Data/Caches/glory/apple-acceptance-result.json`；原始 iOS 帧与
+  JSON 在 `ios-acceptance/`，编译/测试/fork/CLI/watch 日志也在同一数据盘缓存根下。
+
+初次中文拼音触摸未产生组合文本/候选，失败帧 `pinyin-no-composition.png` 保留。
+用户随后明确授权仅在 Winit UIKit fork 增加完整 UITextInput 所需的最小 unsafe
+协议桥接；Glory 运行时继续禁止新增 unsafe。补齐结果见下节。
+
+### UIKit 中文 IME 后续补齐（用户授权后）
+
+[Winit 最终固定提交](https://github.com/glory-rs/winit/commit/edfaacd7c88feed241d12f7b2bb6b61271e513c4)
+实现 UITextInput 所需的 Objective-C selectors，复用一个不进入显示树的 UIKit
+文本存储来管理 opaque position/range/tokenizer。新增 unsafe 仅位于该 UIKit
+协议 ABI 声明和必要的同类型转发，有主线程、对象生命周期、返回值所有权和弱
+delegate 的安全说明；没有裸指针转换或 Glory 运行时 unsafe 例外。
+
+[Blitz 最终固定提交](https://github.com/glory-rs/blitz/commit/54e070d591ec387be40b2a25500376aa796f15ef)
+为显式 opt-in 的 UIKit shell 同步当前焦点输入的周边文本：最多 3999 UTF-8 字节，
+不截断码点或选区，超过预算的选择改用空上下文，密码始终为空。非 UIKit host
+默认不导出上下文。更新按字段合并，离开输入时清理；不扫描其他输入、列表或业务源。
+原生 marked text 活跃时不接收旧值确认覆盖；原生 purpose/secure traits 的改变
+延后到组合终止，避免 UIKit 销毁正在输入的文本。Native UTF-16 选区转换为经验证
+的 UTF-8 preedit 范围，开启/关闭/组合/提交继续进入已有有限 IME 协议。
+
+真实系统拼音键盘通过：`nihao` marked text 与“你好”候选、单次提交得到 `0你好`、
+中文提交后退格得到 `0你`、连续候选提交、emoji 的缓冲区插入及整字删除、删除
+预编辑恢复原提交值、组合期间点 Clear 后保持 `0`、重新聚焦后上下文无旧值、
+中文值的 Home/同进程恢复，以及横竖屏后继续组合并提交为 `0你好`。AX 值和可见
+输入框同时核对，原始 PNG/包资产像素记录位于 `ios-ime-acceptance/`。Emoji 缓冲区
+与偏移正确不代表彩色 emoji 已正确绘制；此次该 glyph 的绘制未通过。
+
+纯 Rust UTF-16/UTF-8 测试覆盖中文、emoji 代理对、组合附加符、越界/溢出与非法
+半代理对。引擎测试验证周边文本限额、选择范围、密码不导出以及 preedit 不被覆盖。
+Winit UIKit 严格 Clippy（--no-deps）通过。完整原生选择手势、selection rects 和
+超出当前选择的系统自动更正仍不宣称支持；没有用这次 IME 补齐替代完整文本选择
+或 VoiceOver 验收。
+
+新增仅应用测试使用的 `ime-probe` 可选视图，沿用当前 ASCII 程序选区契约选择
+`ABCDZ` 的 `BCD`。实际系统键盘将其预编辑为 `AniZ`，删除预编辑后恢复
+`ABCDZ`、原选区和 Idle；不重新选择即可再次输入并提交为 `A你好Z`。
+原值恢复后的标签像素与起始截图相同，原生 AX 文本上下文也回到 `ABCDZ`。
+这覆盖了“最终值相等但原生 backing store 已变化”的取消路径：原生 IME
+通知现在使上下文确认缓存失效，下一次提交恢复完整文本与选区。记录在
+`ios-ime-probe-acceptance/`。任意 Unicode 程序选区没有被偷偷放宽；初次用
+Unicode 选区触发的 Unsupported 日志保留，UIKit 的不可返回主循环现在只打印
+一次致命错误以便诊断。
+
+普通 Counter 的最终安装包未启用 `ime-probe`；再次实际输入 `0你好` 后，Home/
+恢复前后均为 PID 14280，横屏后值继续保留，包资产像素与标签哈希检查通过。
+最终截图与报告在 `ios-final-acceptance/`；`ime-probe` 模式另有当前依赖的严格
+Clippy 检查。当前钥匙串未发现可用发布签名身份，也没有连接真实 iOS 设备，
+这两项仍保留为外部验收条件，没有使用 ad-hoc 模拟器签名代替。
+
+### 继续补齐：Web release gzip 与内容协商
+
+独立 CLI 在 Web release staging 内流式生成 gzip sidecar，跳过 256 字节以下及
+已压缩媒体，只有小于原文件时才保留。固定 gzip 时间戳为零、不嵌入文件名，
+相同输入与固定压缩器得到相同字节；显式应用 `.gz` 资产冲突会拒绝构建并保留
+上一次发布结果。原 URL 和原文件不改名，压缩产物在原子发布前进入完整哈希清单。
+压缩依赖仅进入独立 CLI/项目私有工具，没有进入十二包运行时图。
+
+本地预览根据 `Accept-Encoding` 的质量值、显式禁用和 wildcard 选择 gzip/identity，
+发送原 MIME、Content-Encoding、Vary 和对应 Content-Length；HEAD 不发送内容。
+两种表示均不可接受时返回 406。watch/reload 使用 identity 后插入开发脚本，
+避免把脚本插进压缩字节。生产服务/CDN 仍需应用配置同等协商，不能仅凭 sidecar
+存在就宣称线上压缩已开启。
+
+真实 Counter release 产物：WASM 2,107,005 → 570,130 字节，JS 59,230 → 9,808 字节。
+全部清单哈希和 gzip 解压字节逐一核对；压缩版浏览器页面实际启动并点击 +1
+得到 Value: 1。25 项 CLI 测试与严格 Clippy 通过，含真实 TCP gzip/HEAD、禁用
+编码、identity 回退、406 和 reload 断言。记录：
+`/Volumes/Data/Caches/glory/web-compression-result.json`、`web-compression-build.log`、
+`web-compression-browser.png`。指纹命名、Brotli、图片转换和 WASM 分包尚未实现。
+
+
+还未关闭：iOS VoiceOver、视口底部键盘避让、scene disconnect/reconnect、真机权限/
+网络/签名安装/App Store 资产；macOS VoiceOver/生产公证及其他系统安装器；应用级
+history/嵌套路由/返回恢复、动态文档头、Salvo 类型化调用、发布资产优化、WASM 分包、
+GPU 和真正热补丁等。整体差距保持开放，不以本次 Apple 纵向链路或桌面 watch
+替代这些实现和验收。

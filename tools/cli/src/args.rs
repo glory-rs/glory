@@ -10,7 +10,7 @@ Commands:
   print    Print the resolved build plan as JSON
   build    Build Web, desktop or server artifacts
   run      Build and run (Web starts the static server without watching)
-  serve    Build, watch and reload a Web app
+  serve    Build/watch Web reload or native process restart
   check    Cargo check and strict Clippy for the selected application
   fmt      Run rustfmt (--check is supported)
   bundle   Build a release Web, desktop or server directory
@@ -22,7 +22,7 @@ Options:
   --package NAME                 Select an application in a workspace
   --manifest-path PATH           Select the application manifest
   --cli-path PATH                Local glory-cli source for init (unpublished development)
-  --build-root PATH              D:/BuildCache/<project> (or verified /mnt/d/...)
+  --build-root PATH              D:/BuildCache/<project> (macOS: /Volumes/Data/Caches/glory/...)
   --bindgen PATH                 Explicit wasm-bindgen executable, version checked
   --port PORT                    Development server port (0 selects a free port)
   --no-watch                     Disable development file watching

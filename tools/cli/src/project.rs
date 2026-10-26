@@ -34,6 +34,7 @@ pub struct Host {
     pub index: Option<PathBuf>,
     pub assets: Vec<PathBuf>,
     pub port: Option<u16>,
+    pub bundle_identifier: Option<String>,
 }
 
 #[derive(Clone)]
@@ -52,6 +53,8 @@ impl Paths {
         );
         let default = if cfg!(windows) {
             PathBuf::from("D:/BuildCache/glory-projects")
+        } else if cfg!(target_os = "macos") {
+            PathBuf::from("/Volumes/Data/Caches/glory/projects")
         } else {
             PathBuf::from("/mnt/d/BuildCache/glory-projects")
         }
@@ -123,6 +126,22 @@ pub fn validate_build_root(path: &Path) -> Result<()> {
         if portable.starts_with("d:/buildcache/") {
             return Ok(());
         }
+    } else if cfg!(target_os = "macos") {
+        if path.starts_with("/Volumes/Data/Caches/glory")
+            && path != Path::new("/Volumes/Data/Caches/glory")
+        {
+            // Validate existing ancestors too, before creating any directories.
+            let ancestor = path
+                .ancestors()
+                .find(|path| path.exists())
+                .ok_or("build path has no existing ancestor")?;
+            let resolved = ancestor.canonicalize().map_err(|e| e.to_string())?;
+            if resolved.starts_with("/Volumes/Data/Caches/glory")
+                || Path::new("/Volumes/Data/Caches/glory").starts_with(&resolved)
+            {
+                return Ok(());
+            }
+        }
     } else if portable.starts_with("/mnt/d/buildcache/") {
         let mount = capture(Command::new("findmnt").args(["-n", "-T", "/mnt/d", "-o", "SOURCE"]))?;
         if is_d_mount(&String::from_utf8_lossy(&mount.stdout)) {
@@ -131,7 +150,7 @@ pub fn validate_build_root(path: &Path) -> Result<()> {
         return Err("/mnt/d is not verified as the Windows D: mount".into());
     }
     Err(format!(
-        "build/cache paths must be under D:/BuildCache (WSL: verified /mnt/d/BuildCache): {}",
+        "build/cache paths must be under D:/BuildCache, verified /mnt/d/BuildCache, or macOS /Volumes/Data/Caches/glory: {}",
         path.display()
     ))
 }
@@ -790,6 +809,22 @@ mod tests {
         ] {
             assert!(validate_build_root(Path::new(path)).is_err(), "{path}");
         }
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn apple_cache_symlinks_cannot_escape_before_directory_creation() {
+        let scratch = crate::test_support::Scratch::new();
+        let escaped = scratch.0.join("escaped");
+        std::os::unix::fs::symlink("/tmp", &escaped).unwrap();
+        assert!(validate_build_root(&escaped.join("uncreated-child")).is_err());
+        assert!(
+            Paths::new(
+                &scratch.0.join("Cargo.toml"),
+                Some(&escaped.join("uncreated-child"))
+            )
+            .is_err()
+        );
     }
 
     #[test]

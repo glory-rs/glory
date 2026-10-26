@@ -24,8 +24,10 @@ Its README includes build/run commands and the current platform boundaries.
 
 The [mobile counter](examples/mobile/README.md) adds explicit Android NativeActivity
 and iOS UIKit entries for that same component. Android has an isolated D: emulator
-and APK/interaction lifecycle checks; iOS still requires Apple-host compilation
-and simulator/device acceptance. See the [Dioxus feature comparison](docs/dioxus-feature-gap-analysis-2026-10-26.md)
+and APK/interaction lifecycle checks. Apple Silicon macOS has native window, AX
+client and signed `.app` evidence; iOS 27 has simulator pixels, software keyboard,
+pinyin IME, resume and rotation evidence. Signed device installation and Apple
+production distribution remain pending. See the [Dioxus feature comparison](docs/dioxus-feature-gap-analysis-2026-10-26.md)
 for the remaining platform and application gaps. SSR framework integration stays
 limited to Salvo.
 
@@ -93,10 +95,10 @@ limited to Salvo.
   Optional `blitz-accesskit` connects the live semantic tree and Focus/Click/SetValue
   actions to desktop AccessKit. Virtual-row ScrollIntoView uses the shared list
   controller, then native ancestors/viewport, preserving the editor and its focus.
-  Windows UI Automation has real client evidence;
+  Windows UI Automation and macOS AX have real client evidence;
   password values stay out of the tree, and list exports remain windowed.
-  Linux AT-SPI clients, screen-reader announcements, OS IME and Android integration
-  still need their own acceptance; see the [current boundary](crates/blitz/README.md).
+  Linux AT-SPI clients, screen-reader announcements, remaining platform IME and
+  Android system integrations still need their own acceptance; see the [current boundary](crates/blitz/README.md).
 
 External resource loading policies, platform accessibility acceptance, complete
 Blitz OS input acceptance and Android host integration remain in progress. DOM

@@ -165,7 +165,35 @@ fn capture_selection(
     })
 }
 pub(super) fn capture_before(state: &mut State, event: &UiEvent) {
-    let UiEvent::KeyDown(key) = event else { return };
+    let intent = match event {
+        UiEvent::KeyDown(key) => match key.key {
+            Key::Named(NamedKey::Backspace) => glory_render::InputEditIntent::DeleteBackward,
+            Key::Named(NamedKey::Delete) => glory_render::InputEditIntent::DeleteForward,
+            Key::Character(_)
+                if !key
+                    .modifiers
+                    .intersects(Modifiers::CONTROL | Modifiers::META) =>
+            {
+                glory_render::InputEditIntent::Insert
+            }
+            _ => glory_render::InputEditIntent::Replace,
+        },
+        UiEvent::AppleStandardKeybinding(command) => match command.as_str() {
+            "deleteBackward:"
+            | "deleteWordBackward:"
+            | "deleteToBeginningOfLine:"
+            | "deleteToBeginningOfParagraph:"
+            | "deleteBackwardByDecomposingPreviousCharacter:" => {
+                glory_render::InputEditIntent::DeleteBackward
+            }
+            "deleteForward:"
+            | "deleteWordForward:"
+            | "deleteToEndOfLine:"
+            | "deleteToEndOfParagraph:" => glory_render::InputEditIntent::DeleteForward,
+            _ => glory_render::InputEditIntent::Replace,
+        },
+        _ => return,
+    };
     let Some(node) = state
         .dom
         .doc
@@ -184,18 +212,6 @@ pub(super) fn capture_before(state: &mut State, event: &UiEvent) {
         return;
     };
     let before = capture_selection(state, node, capture.max_bytes);
-    let intent = match key.key {
-        Key::Named(NamedKey::Backspace) => glory_render::InputEditIntent::DeleteBackward,
-        Key::Named(NamedKey::Delete) => glory_render::InputEditIntent::DeleteForward,
-        Key::Character(_)
-            if !key
-                .modifiers
-                .intersects(Modifiers::CONTROL | Modifiers::META) =>
-        {
-            glory_render::InputEditIntent::Insert
-        }
-        _ => glory_render::InputEditIntent::Replace,
-    };
     if let Some(range) = state.dom.ranges.get_mut(&node) {
         range.editing.input_before = before.map(|s| (range.editing.revision, s, intent));
     }

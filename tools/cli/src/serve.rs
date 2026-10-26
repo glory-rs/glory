@@ -17,7 +17,7 @@ const RELOAD: &str = "let revision=Number(new URL(import.meta.url).searchParams.
 
 pub fn serve(mut project: Project, mut args: Args) -> Result<()> {
     if project.platform != Platform::Web {
-        return Err("serve currently supports Web; use run for desktop/server".into());
+        return crate::native_dev::serve(project, args);
     }
     let stop = Arc::new(AtomicBool::new(false));
     let signal = stop.clone();
@@ -92,7 +92,10 @@ pub fn serve(mut project: Project, mut args: Args) -> Result<()> {
     Ok(())
 }
 
-fn watch(project: &Project, changed: Arc<AtomicBool>) -> Result<notify::RecommendedWatcher> {
+pub(crate) fn watch(
+    project: &Project,
+    changed: Arc<AtomicBool>,
+) -> Result<notify::RecommendedWatcher> {
     let build_root = project.paths.root.clone();
     let mut watcher =
         notify::recommended_watcher(move |result: notify::Result<notify::Event>| match result {
@@ -209,16 +212,44 @@ fn respond(
             );
         }
     };
+    let canonical_root = root.canonicalize().map_err(|e| e.to_string())?;
     let file = match root.join(&relative).canonicalize() {
-        Ok(file)
-            if file.starts_with(root.canonicalize().map_err(|e| e.to_string())?)
-                && file.is_file() =>
-        {
-            file
-        }
+        Ok(file) if file.starts_with(&canonical_root) && file.is_file() => file,
         _ => return reply(stream, "404 Not Found", "text/plain", b"not found", head),
     };
-    let mut body = std::fs::read(&file).map_err(|e| e.to_string())?;
+    let accept_encoding = request
+        .lines()
+        .skip(1)
+        .take_while(|line| !line.is_empty())
+        .filter_map(|line| line.split_once(':'))
+        .filter(|(name, _)| name.eq_ignore_ascii_case("accept-encoding"))
+        .map(|(_, value)| value.trim())
+        .collect::<Vec<_>>()
+        .join(",");
+    let mut compressed_name = file.as_os_str().to_owned();
+    compressed_name.push(".gz");
+    let compressed = Path::new(&compressed_name)
+        .canonicalize()
+        .ok()
+        .filter(|path| !reload && path.starts_with(&canonical_root) && path.is_file());
+    let gzip = match crate::compression::negotiate(&accept_encoding, compressed.is_some()) {
+        Ok(gzip) => gzip,
+        Err(_) => {
+            return reply(
+                stream,
+                "406 Not Acceptable",
+                "text/plain",
+                b"no acceptable content encoding",
+                head,
+            );
+        }
+    };
+    let selected = if gzip {
+        compressed.as_ref().unwrap()
+    } else {
+        &file
+    };
+    let mut body = std::fs::read(selected).map_err(|e| e.to_string())?;
     let kind = match file
         .extension()
         .and_then(|extension| extension.to_str())
@@ -249,11 +280,27 @@ fn respond(
         let position = html.rfind("</body>").unwrap_or(html.len());
         body = format!("{}{script}{}", &html[..position], &html[position..]).into_bytes();
     }
-    reply(stream, "200 OK", kind, &body, head)
+    reply_encoded(stream, "200 OK", kind, &body, head, gzip)
 }
 
 fn reply(stream: &mut TcpStream, status: &str, kind: &str, body: &[u8], head: bool) -> Result<()> {
-    write!(stream, "HTTP/1.1 {status}\r\nContent-Type: {kind}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\n\r\n", body.len()).map_err(|e| e.to_string())?;
+    reply_encoded(stream, status, kind, body, head, false)
+}
+
+fn reply_encoded(
+    stream: &mut TcpStream,
+    status: &str,
+    kind: &str,
+    body: &[u8],
+    head: bool,
+    gzip: bool,
+) -> Result<()> {
+    let encoding = if gzip {
+        "Content-Encoding: gzip\r\n"
+    } else {
+        ""
+    };
+    write!(stream, "HTTP/1.1 {status}\r\nContent-Type: {kind}\r\nContent-Length: {}\r\n{encoding}Vary: Accept-Encoding\r\nCache-Control: no-store\r\nConnection: close\r\nX-Content-Type-Options: nosniff\r\n\r\n", body.len()).map_err(|e| e.to_string())?;
     if !head {
         stream.write_all(body).map_err(|e| e.to_string())?;
     }
@@ -373,5 +420,63 @@ mod tests {
             serde_json::from_str(response.split("\r\n\r\n").nth(1).unwrap()).unwrap();
         assert_eq!(json["revision"], 7);
         assert_eq!(json["error"], "<compiler error>");
+    }
+
+    #[test]
+    fn real_http_negotiates_release_gzip_and_head_but_keeps_reload_editable() {
+        let root = crate::test_support::Scratch::new();
+        let source = format!("<html><body>{}</body></html>", "中文 app ".repeat(100));
+        root.write("index.html", &source);
+        root.write("app.wasm", &"wasm-bytes".repeat(200));
+        crate::compression::compress(&root.0).unwrap();
+        let compressed = std::fs::read(root.0.join("index.html.gz")).unwrap();
+        let response = request(
+            &root.0,
+            b"GET / HTTP/1.1\r\nAccept-Encoding: br, gzip\r\n\r\n",
+            false,
+        );
+        let split = response.windows(4).position(|p| p == b"\r\n\r\n").unwrap() + 4;
+        let headers = std::str::from_utf8(&response[..split]).unwrap();
+        assert!(headers.contains("Content-Encoding: gzip\r\n"));
+        assert!(headers.contains("Vary: Accept-Encoding\r\n"));
+        assert!(headers.contains(&format!("Content-Length: {}\r\n", compressed.len())));
+        assert_eq!(&response[split..], compressed);
+        let response = request(
+            &root.0,
+            b"HEAD / HTTP/1.1\r\nAccept-Encoding: gzip\r\n\r\n",
+            false,
+        );
+        let response = String::from_utf8(response).unwrap();
+        assert!(response.contains("Content-Encoding: gzip\r\n"));
+        assert!(response.contains(&format!("Content-Length: {}\r\n", compressed.len())));
+        assert!(response.ends_with("\r\n\r\n"));
+        for (headers, reload) in [
+            ("", false),
+            ("Accept-Encoding: gzip;q=0\r\n", false),
+            ("Accept-Encoding: gzip\r\n", true),
+        ] {
+            let response = request(
+                &root.0,
+                format!("GET / HTTP/1.1\r\n{headers}\r\n").as_bytes(),
+                reload,
+            );
+            let response = String::from_utf8(response).unwrap();
+            assert!(!response.contains("Content-Encoding:"));
+            let body = response.split_once("\r\n\r\n").unwrap().1;
+            if reload {
+                let script =
+                    "<script type=\"module\" src=\"/__glory_dev/reload.js?revision=7\"></script>";
+                assert_eq!(body.replace(script, ""), source);
+            } else {
+                assert_eq!(body, source);
+            }
+            assert_eq!(response.contains("/__glory_dev/reload.js"), reload);
+        }
+        let response = request(
+            &root.0,
+            b"GET /app.wasm HTTP/1.1\r\nAccept-Encoding: *;q=0\r\n\r\n",
+            false,
+        );
+        assert!(response.starts_with(b"HTTP/1.1 406 Not Acceptable\r\n"));
     }
 }

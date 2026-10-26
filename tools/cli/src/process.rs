@@ -83,6 +83,46 @@ fn wait(child: &mut Child, cancel: &AtomicBool) -> Result<std::process::ExitStat
     }
 }
 
+/// One owned native development process. Explicit stop and Drop reap it.
+pub struct Running(Option<Child>);
+impl Running {
+    pub fn spawn(command: &mut Command) -> Result<Self> {
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            command.process_group(0);
+        }
+        command
+            .spawn()
+            .map(|child| Self(Some(child)))
+            .map_err(|e| format!("{command:?}: {e}"))
+    }
+    pub fn exited(&mut self) -> Result<bool> {
+        self.0
+            .as_mut()
+            .map(|child| {
+                child
+                    .try_wait()
+                    .map(|status| status.is_some())
+                    .map_err(|e| e.to_string())
+            })
+            .unwrap_or(Ok(true))
+    }
+    pub fn stop(&mut self) {
+        if let Some(mut child) = self.0.take() {
+            if matches!(child.try_wait(), Ok(None)) {
+                kill_tree(&mut child);
+            }
+            let _ = child.wait();
+        }
+    }
+}
+impl Drop for Running {
+    fn drop(&mut self) {
+        self.stop();
+    }
+}
+
 fn kill_tree(child: &mut Child) {
     #[cfg(windows)]
     {

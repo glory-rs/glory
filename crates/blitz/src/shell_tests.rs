@@ -5,8 +5,10 @@ use blitz_traits::events::{
 };
 use glory_core::{Cage, Host};
 use glory_ui::{Widget, button, events::activate, input, list, text, view, widget};
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::task::{Poll, Waker};
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 use std::time::{Duration, Instant};
 #[path = "shell_inert_tests.rs"]
 mod inert;
@@ -90,6 +92,7 @@ pub(super) fn bounds_now(app: &WindowApp, node: NodeId) -> Rect {
     };
     rect
 }
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 fn visible_focus(app: &WindowApp) {
     let root = app.app.tree().roots()[1];
     let outer = bounds_now(app, root);
@@ -245,11 +248,14 @@ impl Drop for Live {
     }
 }
 struct Data {
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
     runtime: RuntimeId,
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
     count: Cage<usize>,
     position: Cage<f64>,
     reads: Rc<Cell<usize>>,
     live: Rc<Cell<usize>>,
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
     async_ready: Rc<Cell<bool>>,
     logical: Rc<Cell<f64>>,
 }
@@ -326,15 +332,19 @@ fn fixture(adaptive: bool) -> (WindowApp, Data) {
         widget.row_height(24.0)
     })
     .unwrap();
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
     let runtime = app.app.runtime().id();
     (
         app,
         Data {
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
             runtime,
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
             count,
             position,
             reads,
             live,
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
             async_ready: Rc::default(),
             logical,
         },
@@ -393,6 +403,7 @@ fn native_wheel_bursts_observe_the_final_offset_without_scaling_or_scanning_the_
         assert_eq!(data.live.get(), 0);
     }
 }
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 struct Driver {
     shell: Shell,
     data: Vec<Data>,
@@ -403,6 +414,7 @@ struct Driver {
     frames_before: Vec<u64>,
     pinned: Vec<(RuntimeId, NodeId, EngineId, String, (usize, usize))>,
 }
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 impl ApplicationHandler for Driver {
     fn can_create_surfaces(&mut self, el: &dyn ActiveEventLoop) {
         self.shell.can_create_surfaces(el);
@@ -805,6 +817,7 @@ impl ApplicationHandler for Driver {
     }
 }
 
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 fn start_timer(app: &WindowApp, count: Cage<usize>, ready: Rc<Cell<bool>>) {
     let done = Arc::new(AtomicBool::new(false));
     let mut started = false;

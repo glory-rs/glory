@@ -1617,3 +1617,76 @@ fn native_tree_commands_are_queued_cross_groups_and_leave_nested_editors_and_cho
     host.app.clear().unwrap();
     assert!(item.get().is_none());
 }
+
+#[test]
+fn apple_text_commands_capture_deletion_and_respect_readonly_before_engine_mutation() {
+    use super::focus_tests::{focus, settle};
+    use glory_render::{InputEditCapture, InputEditIntent, TextSelection};
+    for readonly in [false, true] {
+        let mut app = WindowApp::new();
+        let reference = app.app.scope().cage(None);
+        let edits = Rc::new(RefCell::new(Vec::new()));
+        let output = edits.clone();
+        app.mount(
+            input()
+                .value("1234")
+                .node_ref(reference)
+                .semantics(Some(Box::new(glory_render::Semantics {
+                    input_edit: Some(InputEditCapture { max_bytes: 32 }),
+                    readonly,
+                    ..Default::default()
+                })))
+                .on(EventKind::InputEdit, move |event| {
+                    output.borrow_mut().push(event)
+                }),
+        )
+        .unwrap();
+        let id = reference.get().unwrap();
+        focus(&mut app, id);
+        app.app
+            .scope()
+            .set_input_selection(
+                id,
+                TextSelection {
+                    start: 2,
+                    end: 2,
+                    ..Default::default()
+                },
+            )
+            .unwrap();
+        app.app.flush().unwrap();
+        settle(&mut app);
+        app.handle_ui_event(UiEvent::AppleStandardKeybinding("deleteBackward:".into()));
+        settle(&mut app);
+        if readonly {
+            app.handle_ui_event(UiEvent::AppleStandardKeybinding(
+                "insertSingleQuoteIgnoringSubstitution:".into(),
+            ));
+            settle(&mut app);
+            assert!(edits.borrow().is_empty());
+            {
+                let state = app.renderer.0.borrow();
+                let doc = &state.dom.doc;
+                let control = app.renderer.engine_id(id, Part::Main).unwrap();
+                assert_eq!(
+                    doc.get_node(control)
+                        .unwrap()
+                        .element_data()
+                        .unwrap()
+                        .text_input_data()
+                        .unwrap()
+                        .editor
+                        .raw_text(),
+                    "1234"
+                );
+            }
+        } else {
+            assert!(
+                matches!(&edits.borrow()[0], Event::InputEdit(glory_render::InputEdit::Value {
+                value, intent: InputEditIntent::DeleteBackward, before: Some(TextSelection { start: 2, end: 2, .. }),
+                selection: TextSelection { start: 1, end: 1, .. }, ..
+            }) if value == "134")
+            );
+        }
+    }
+}

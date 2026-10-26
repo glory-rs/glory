@@ -18,6 +18,7 @@ toml_edit = "0.25"
 sha2 = "0.10.9"
 notify = "8.2.1"
 ctrlc = "3.5"
+flate2 = { version = "1.1", default-features = false, features = ["rust_backend"] }
 
 [lints.rust]
 unsafe_code = "forbid"

@@ -17,7 +17,7 @@ positions and sizes the PNG badge; neither is supplied by a synchronous decode
 shortcut. Queue/deadline/encoded-byte budgets and engine decode admission apply.
 Package-only builds reject HTTP origins and file mounts and exclude desktop
 HTTP/TLS/filesystem dependencies. Android AssetManager, networking and AccessKit
-are still separate gaps. iOS uses the same source path but remains unverified.
+are still separate gaps. iOS has Apple-host build and simulator evidence; see the iOS boundaries below.
 
 ## Android
 
@@ -84,24 +84,97 @@ loop; overlapping loops remain rejected. Versions and fork-owned tests are in
 
 ## iOS
 
-`src/ios.rs` and `ios/Info.plist` define the application entry and bundle.
-On a Mac with Xcode and the simulator Rust target:
+`src/ios.rs`, `ios/Info.plist` and `ios/SceneDelegate.swift` define the UIKit
+application. With Xcode 27, UIScene adoption is mandatory: the app-owned Swift
+delegate forwards actual scene lifecycle callbacks to Winit, and Shell creates
+its surface after scene activation. The pinned Winit fork associates its existing
+window with the connected UIWindowScene before making it visible. Inactivation
+releases the CPU surface; activation resumes the same semantic document and Loader.
+No additional reactive runtime or unsafe code is introduced in Glory. The Winit
+UIKit protocol bridge has the narrowly authorized exception recorded in AGENTS.md.
+
+On a Mac with full Xcode and the simulator Rust standard library:
 
 ```sh
-export GLORY_BUILD_ROOT=/Volumes/D/BuildCache/glory-mobile
+export GLORY_BUILD_ROOT=/Volumes/Data/Caches/glory/mobile
+export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 sh examples/mobile/build-ios.sh
-xcrun simctl install booted "$GLORY_BUILD_ROOT/ios-aarch64-apple-ios-sim/GloryCounter.app"
-xcrun simctl launch booted rs.glory.counter
+xcrun simctl install <owned-device-udid> "$GLORY_BUILD_ROOT/ios-aarch64-apple-ios-sim-debug/GloryCounter.app"
+xcrun simctl launch <owned-device-udid> rs.glory.counter
 ```
 
-The build root must be inside BuildCache on a verified Windows administrative
-`D$` SMB mount, following this repository's storage policy. The script rejects
-other storage and non-macOS hosts, checks Cargo metadata, uses the simulator SDK
-and creates an ad-hoc-signed simulator `.app`. Intel Macs can set
-`GLORY_IOS_TARGET=x86_64-apple-ios`. The current Windows session has no Apple SDK;
-the iOS path remains uncompiled and unaccepted. Device provisioning, signed IPA,
-UIKit lifecycle/input/safe areas, VoiceOver and simulator/device runtime checks
-remain required before claiming iOS support.
+All compiler output, Cargo home, Swift module caches and temporary files stay
+under `/Volumes/Data/Caches/glory`; canonical paths reject symlink escapes.
+`DEVELOPER_DIR` selects Xcode per process without changing xcode-select. The
+application build script compiles its Swift bridge and tracks the source for
+relinking. Intel simulators use `GLORY_IOS_TARGET=x86_64-apple-ios`.
+`GLORY_IOS_PROFILE=release` selects release output. Packages have a fresh
+Info.plist, verified signature and `build.json` hashes of the final signed files.
+
+Device packaging uses `GLORY_IOS_TARGET=aarch64-apple-ios` and requires explicit
+`GLORY_SIGN_IDENTITY` and `GLORY_PROVISION_PROFILE`. It validates profile expiry
+and application identity, derives entitlements, embeds the profile, verifies the
+signature and writes `GloryCounter.ipa` with its Payload directory. This path
+has not been signed or installed on a device in this session. The arm64 device
+executable has actually linked; that alone does not establish device acceptance.
+
+Apple Silicon/Xcode 27.1/iOS 27 simulator evidence covers actual Counter pixels,
+CPU rendering, touch increment, a real software-key `7` changing `1` to `17`,
+same-process Home/restore, landscape rotation and retained value/embedded assets.
+The 32-point PNG and its safe-area-relative CSS position are checked from raw
+screenshots. `capture-ios.py` (Python with Pillow) records a named UI phase and
+can require the same label pixels as a previous phase. It does not synthesize
+UI input or claim that a screenshot proves accessibility/IME support.
+
+```sh
+python3 examples/mobile/capture-ios.py --device <owned-device-udid> \
+  --out /Volumes/Data/Caches/glory/ios-acceptance --phase resumed \
+  --same-label /Volumes/Data/Caches/glory/ios-acceptance/before.json
+```
+
+For the iPhone 17 landscape fixture, add `--safe-left 62 --safe-right 62`.
+CoreSimulator uses its OS-managed device directory: this host's CoreSimulator
+service rejects writes to the data volume. The helper captures into that owned
+device's tmp directory and moves only the resulting evidence to the data volume.
+Xcode 27's simulator UI is Device Hub (`Xcode.app/Contents/Applications/DeviceHub.app`).
+
+The UIKit fork now implements the required UITextInput selectors using one
+non-displayed UIKit text store per native view. UIKit owns its opaque positions,
+ranges and tokenizer; Glory/Blitz still own the visible editor and semantic state.
+Committed surrounding text is a UTF-8-boundary-safe excerpt under 4000 bytes,
+exported only by the focused editor. Password context is empty. Acknowledgements
+and purpose changes preserve active marked text; UTF-16 native selection offsets
+become validated UTF-8 preedit offsets. Disable/Clear cancels the old composition.
+
+Real system pinyin key taps now produce marked `nihao`, a `你好` candidate and
+exactly one committed `0你好`. Tests also cover Chinese backspace, emoji buffer
+insertion/grapheme deletion, deleting preedit back to the committed value, Clear
+during composition, refocusing with a fresh context, same-process Home/resume and
+continued Chinese input after rotation. Old failing screenshots remain separately
+in the evidence directory. Emoji buffer/offset acceptance does not establish
+color-emoji painting.
+
+An additional opt-in view makes nonempty replacement/cancellation reproducible:
+
+```sh
+GLORY_IOS_FEATURES=ime-probe sh examples/mobile/build-ios.sh
+```
+
+It starts with `ABCDZ`. Tap **Select middle** (the existing exact-program-selection
+contract is ASCII), type `ni`, then delete both preedit letters: both the visible
+value and native text context must return to `ABCDZ` with `BCD` selected. Type
+`nihao` and choose `你好`: the result must be `A你好Z` with status Idle. **Restore**
+returns to the original fixture; **Reset** tests a differing program value.
+The ordinary counter build excludes this view. Its feature selection is recorded
+in `build.json`. Native IME callbacks invalidate the context acknowledgement
+cache so equal-value cancellation can restore the native store and selection.
+
+**Open gaps:** arbitrary native selection gestures, selection rectangles and
+unrequested autocorrection outside the application's current selection are not
+advertised by this IME bridge. VoiceOver, keyboard avoidance for controls
+near the bottom of the viewport, reconnecting a disconnected scene, signed
+device installation, App Store icons/distribution and real-device networking/
+permissions remain separate work. A simulator pass does not close those items.
 
 The Windows canonical gate accepts `-Android` to check the adapter and build both
 APKs. Add `-AndroidSerial emulator-5582` to install the newly built x86_64 APK on
