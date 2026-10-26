@@ -143,14 +143,17 @@ retired feature aliases or count compilation as proof of platform acceptance.
   actual client acceptance. Optional android-assets (facade blitz-android-assets)
   binds an explicit application AssetManager/prefix under asset://android/;
   bounded APK streaming and ARM64 emulator CSS/PNG/Unicode evidence exist.
-  Mobile network transport, Unix AT-SPI clients and
+  Optional network (facade blitz-network) supplies the same bounded native HTTP(S)
+  worker on desktop/Android/iOS. Actual mobile simulator HTTP/TLS/socket cancellation
+  evidence exists; Android requires explicit Application-based AndroidTls setup.
+  Runtime permissions, real-device networks, Unix AT-SPI clients and
   screen-reader/text-selection acceptance remain pending. Facade
   `blitz` is optional and must not enter default/HTML/SSR dependency graphs.
   Linux Fontique uses fontconfig-dlopen; cross-checks do not prove runtime font
   availability or display-server acceptance.
   Optional shell also has explicit AndroidApp and UIKit entry paths; see
-  examples/mobile. Android emulator evidence stays separate from real-device,
-  AssetManager/network transport and accessibility acceptance. GameActivity has
+  examples/mobile. Android emulator evidence stays separate from real-device
+  network/permission, accessibility and store acceptance. GameActivity has
   ARM64 emulator system-pinyin preedit/commit/cancel evidence; NativeActivity's
   baseline keyboard evidence does not imply the same CJK support.
   Android embedded CSS/PNG has actual emulator pixel/lifecycle evidence. iOS now has
@@ -459,7 +462,8 @@ retired feature aliases or count compilation as proof of platform acceptance.
   bound encoded bodies, jobs, queues, deadlines and URL/redirect policy; the
   injected test provider is not a production transport.
 - Native `glory-blitz/package` (facade blitz-package) owns one Loader per document.
-  Desktop assets (facade blitz-assets) includes package and adds HTTP/file transport.
+  Native network (facade blitz-network) includes package and adds HTTP(S) on
+  Windows/Linux/macOS/Android/iOS. Desktop assets includes network and file mounts.
   Package-only builds reject nonempty origins/mounts and exclude desktop transport
   dependencies. Do not bypass NetHandler::prepare when serving immutable bytes;
   queue, deadline, cancellation and decode/result budgets still apply on mobile.
@@ -473,6 +477,14 @@ retired feature aliases or count compilation as proof of platform acceptance.
   JoinSet entries and never poll an idle loader timer. Keep user handlers and
   destructors outside state locks; cancellation revokes future acceptance, not a
   handler that has already begun. No UI state crosses onto the transport runtime.
+- HTTP transport is shared across native hosts; mounted files remain desktop-only.
+  On Android, nonempty origins require an explicit AndroidTls capability made
+  through safe JNI with an Application context, never an Activity/raw pointer.
+  Its matching verifier AAR follows Cargo metadata and committed Gradle hashes;
+  ordinary non-network APKs must not gain INTERNET or the verifier component.
+  No global AndroidApp or crypto provider installation. iOS uses Security.framework.
+  Explicit HTTP origins grant cleartext; HTTPS still verifies chains/hostnames.
+  Keep protocol/HTTP tests runnable under network alone, without cap-std/assets.
 - Optional android-assets includes package and binds an explicit application
   AssetManager plus validated APK prefix under asset://android/. Never discover
   a global AndroidApp, use raw JNI pointers or fall back to the embedded package.

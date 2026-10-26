@@ -19,6 +19,8 @@ mod loader;
 pub mod assets {
     #[cfg(all(feature = "android-assets", target_os = "android"))]
     pub use crate::loader::AndroidAssets;
+    #[cfg(all(feature = "network", target_os = "android"))]
+    pub use crate::loader::AndroidTls;
     #[cfg(all(feature = "package", not(target_arch = "wasm32")))]
     pub use crate::loader::{LoadConfig, LoadLimits, LoadStats, Loader};
     pub use blitz_dom::{ResourceLimits, ResourceStats};

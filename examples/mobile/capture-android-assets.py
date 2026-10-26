@@ -1,7 +1,7 @@
-"""Verify the installed APK and capture actual AssetManager-rendered pixels.
+"""Verify the installed APK and actual AssetManager or HTTP asset pixels.
 
 Read-only ADB calls; no input injection. Uses Pillow. Run after launching an
-owned Glory emulator APK built with android-assets-probe.
+owned Glory emulator APK built with android-assets-probe or network-probe.
 """
 import argparse
 import hashlib
@@ -21,6 +21,7 @@ parser.add_argument('--serial', required=True)
 parser.add_argument('--package', type=Path, required=True, help='directory containing build.json and glory-counter.apk')
 parser.add_argument('--out', type=Path, required=True)
 parser.add_argument('--phase', default='probe')
+parser.add_argument('--network', action='store_true', help='check network-probe instead of APK AssetManager')
 parser.add_argument('--scale', type=float, default=2.625)
 args = parser.parse_args()
 root = args.out.resolve()
@@ -40,7 +41,7 @@ def adb(*parts):
 avd = adb('emu', 'avd', 'name').decode().splitlines()[0].strip()
 assert avd.startswith('Glory_'), f'not an owned Glory AVD: {avd}'
 manifest = json.loads((args.package / 'build.json').read_text())
-assert 'android-assets-probe' in manifest['features']
+assert ('network-probe' if args.network else 'android-assets-probe') in manifest['features']
 apk = args.package / 'glory-counter.apk'
 assert hashlib.sha256(apk.read_bytes()).hexdigest() == manifest['sha256']
 installed = adb('shell', 'pm', 'path', 'rs.glory.counter').decode().strip()
@@ -54,14 +55,20 @@ with zipfile.ZipFile(apk) as archive:
         name = entry.filename if entry.flag_bits & 0x800 else entry.filename.encode('cp437').decode('utf-8')
         if name.startswith('assets/glory/'):
             compression[name] = entry.compress_type
-assert compression['assets/glory/theme.css'] == zipfile.ZIP_DEFLATED
-assert compression['assets/glory/中文/组合.txt'] == zipfile.ZIP_DEFLATED
+if not args.network:
+    assert compression['assets/glory/theme.css'] == zipfile.ZIP_DEFLATED
+    assert compression['assets/glory/中文/组合.txt'] == zipfile.ZIP_DEFLATED
 pid = adb('shell', 'pidof', 'rs.glory.counter').decode().strip()
 assert re.fullmatch(r'[0-9]+', pid)
 log = adb('logcat', '-d', '--pid=' + pid, '-s', 'RustStdoutStderr').decode()
 (root / f'{args.phase}-logcat.txt').write_text(log)
-assert 'Glory APK assets probe: CSS/PNG/Unicode, misses/policy, body limit, prepare and close passed' in log
-assert 'APK AssetManager prefix=glory, embedded entries=0' in log
+if args.network:
+    assert 'Glory network probe: HTTP/redirect/origin/body and trusted/untrusted platform TLS passed' in log
+    assert 'Glory network probe: cancel/close/deadline closed actual sockets; no late prepare/publication; passed' in log
+    assert 'HTTP assets origin=' in log and 'embedded entries=0' in log
+else:
+    assert 'Glory APK assets probe: CSS/PNG/Unicode, misses/policy, body limit, prepare and close passed' in log
+    assert 'APK AssetManager prefix=glory, embedded entries=0' in log
 pixels = adb('exec-out', 'screencap', '-p')
 (root / f'{args.phase}.png').write_bytes(pixels)
 image = Image.open(io.BytesIO(pixels)).convert('RGB')
@@ -82,6 +89,7 @@ result = dict(format=1, serial=args.serial, avd=avd, pid=int(pid), phase=args.ph
               apk_sha256=manifest['sha256'], features=manifest['features'], compression=compression,
               png_sha256=hashlib.sha256(pixels).hexdigest(), dimensions=image.size,
               scale=scale, badge=badge, embedded_entries=0, asset_probe_passed=True, package_pixels=True,
-              limits=['emulator only', 'no network or permissions', 'no input injection or interaction acceptance'])
+              transport='network' if args.network else 'AssetManager',
+              limits=['emulator only', 'no runtime permission or device acceptance', 'no input injection or interaction acceptance'])
 (root / f'{args.phase}.json').write_text(json.dumps(result, indent=2, ensure_ascii=False) + '\n')
 print(json.dumps(result, ensure_ascii=False))

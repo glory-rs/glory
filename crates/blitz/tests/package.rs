@@ -165,22 +165,41 @@ fn package_paths_and_each_encoded_budget_are_checked_at_construction() {
     any(target_os = "windows", target_os = "linux", target_os = "macos")
 )))]
 #[test]
-fn package_only_build_rejects_http_and_mounted_file_configuration() {
-    for config in [
-        LoadConfig {
-            origins: vec![Url::parse("https://example.com/").unwrap()],
-            ..config()
-        },
-        LoadConfig {
+fn builds_without_desktop_assets_reject_mounted_file_configuration() {
+    assert_eq!(
+        Loader::new(LoadConfig {
             mounts: BTreeMap::from([("media".into(), std::path::PathBuf::from("/explicit/root"))]),
             ..config()
-        },
-    ] {
-        assert_eq!(
-            Loader::new(config).err().unwrap().kind(),
-            std::io::ErrorKind::Unsupported
-        );
-    }
+        })
+        .err()
+        .unwrap()
+        .kind(),
+        std::io::ErrorKind::Unsupported
+    );
+}
+
+#[cfg(not(all(
+    feature = "network",
+    any(
+        target_os = "windows",
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "android",
+        target_os = "ios"
+    )
+)))]
+#[test]
+fn builds_without_network_reject_http_configuration() {
+    assert_eq!(
+        Loader::new(LoadConfig {
+            origins: vec![Url::parse("https://example.com/").unwrap()],
+            ..config()
+        })
+        .err()
+        .unwrap()
+        .kind(),
+        std::io::ErrorKind::Unsupported
+    );
 }
 
 struct Gated {

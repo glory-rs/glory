@@ -3,7 +3,9 @@ plugins { id 'com.android.application' version '9.0.0' }
 def output = System.getenv('GLORY_ANDROID_GRADLE_OUTPUT')
 def nativeLibraries = System.getenv('GLORY_ANDROID_LIBS')
 def debugKey = System.getenv('GLORY_ANDROID_DEBUG_KEY')
-if (!output || !nativeLibraries || !debugKey) {
+def generatedManifest = System.getenv('GLORY_ANDROID_MANIFEST')
+def tlsVersion = System.getenv('GLORY_ANDROID_TLS_VERSION')
+if (!output || !nativeLibraries || !debugKey || !generatedManifest) {
     throw new GradleException('Use build-android-game.sh with explicit data-volume outputs')
 }
 layout.buildDirectory = file(output)
@@ -41,6 +43,7 @@ android {
     }
     sourceSets.main.jniLibs.srcDirs = [nativeLibraries]
     sourceSets.main.assets.srcDirs = [layout.buildDirectory.dir('glory-assets')]
+    sourceSets.main.manifest.srcFile generatedManifest
     // android-activity compiles its matching 4.4.0 C++ glue; do not link the AAR's.
     buildFeatures { prefab false }
     packaging { jniLibs { useLegacyPackaging true } }
@@ -53,5 +56,11 @@ tasks.named('preBuild').configure { dependsOn prepareGloryAssets }
 dependencies {
     implementation 'androidx.games:games-activity:4.4.0'
     implementation 'androidx.appcompat:appcompat:1.7.1'
+    if (tlsVersion) {
+        implementation "org.rustls:rustls-platform-verifier:${tlsVersion}"
+    }
 }
-dependencyLocking { lockAllConfigurations() }
+dependencyLocking {
+    lockAllConfigurations()
+    lockFile = file(tlsVersion ? 'gradle-network.lockfile' : 'gradle.lockfile')
+}

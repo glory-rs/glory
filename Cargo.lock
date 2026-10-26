@@ -1579,6 +1579,7 @@ dependencies = [
  "glory-render",
  "glory-ui",
  "image",
+ "jni",
  "keyboard-types",
  "kurbo",
  "ndk",

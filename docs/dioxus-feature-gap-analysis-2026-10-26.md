@@ -10,8 +10,8 @@ Mac，最新证据见文末 Apple/移动输入记录，不能继续把“没有 
 | 项目 | 当前结果 | 未关闭边界 |
 |---|---|---|
 | macOS | CPU 真窗口/缩放/清理、实际 AX 读取和编辑、可重定位签名 `.app` | VoiceOver 朗读、Developer ID/公证的凭据验收、外部机器安装 |
-| iOS | 模拟器/设备链接、UIScene、CPU 窗口、包资产、真实拼音 IME、Unicode 程序选区、底部键盘避让、同进程恢复/旋转、单窗口场景断开重连 | 真机签名安装、VoiceOver、任意选择手势/rects、多 Glory 场景及进程终止后的状态持久化 |
-| Android | NativeActivity 基线；明确选择的 GameActivity、ARM64 模拟器真实拼音预编辑/提交/取消、Unicode 选区、汉字/emoji 删除、APK AssetManager 读取 | 真机/16 KiB 内核运行、TalkBack、移动网络与权限、生产分发 |
+| iOS | 模拟器/设备链接、UIScene、CPU 窗口、包资产、真实拼音 IME、Unicode 程序选区、底部键盘避让、同进程恢复/旋转、单窗口场景断开重连、HTTP(S)/原生证书校验与真实连接取消 | 真机网络/权限及签名安装、VoiceOver、任意选择手势/rects、多 Glory 场景及进程终止后的状态持久化 |
+| Android | NativeActivity 基线；明确选择的 GameActivity、ARM64 模拟器真实拼音预编辑/提交/取消、Unicode 选区、汉字/emoji 删除、APK AssetManager 读取、HTTP(S)/系统证书校验与真实连接取消 | 真机/16 KiB 内核运行、TalkBack、运行时权限及真机网络、生产分发 |
 | 桌面开发 | native watch、错误保留旧进程、成功重启与退出回收 | 状态保持、真正 Rust 热补丁、检查器 |
 | Web 发布 | 可复现 gzip、哈希清单、预览协商/HEAD/身份回退 | 指纹命名、Brotli/图片转换、WASM 分包 |
 
@@ -425,3 +425,40 @@ probe-logcat.txt 和保留的 probe.apk。小数 DPI 的 logical edge rounding �
 实际 ARM64 APK 链接/签名通过。新增通用回归覆盖增长文件的实际字节限制、提前
 拒绝、分块取消和 APK 路径；原 200 个取消等待者不扩张 blocking worker 的回归
 继续通过。网络/权限、真机/16 KiB runtime、TalkBack 和生产签名分发仍未关闭。
+
+## 2026-10-27：移动 HTTP(S) 资产与平台 TLS
+
+新增可选 `glory-blitz/network`（facade `blitz-network`），将原桌面 HTTP worker
+提取为 Windows/Linux/macOS/Android/iOS 共用传输。桌面 assets 包含 network 后再
+加入 mounted files；网络单独启用不引入 cap-std，包专用图仍不含 HTTP/TLS。
+原始及每跳 redirect origin、HTTPS 降级拒绝、body/queue/deadline、prepare 和取消
+契约保持。空 origins 不创建 HTTP client；未显式允许的 origin 不产生网络请求。
+原生 reqwest/Rustls socket 不使用环境代理或自动 retry/redirect/decompression；
+明文 HTTP 需应用显式允许 origin，HTTPS 证书链及 hostname 交平台校验。
+
+Android 新增 AndroidTls 能力，构造时只接受显式 Application JNI 对象，拒绝 null/
+非 Application 和缺少 Java verifier class 的配置。版本匹配由应用构建校验。Loader 的非空 origins 必须携带
+该能力，不能依赖别的 Loader 已初始化的全局状态。示例从 android-activity 已准备
+的安全 JVM/class-loader API 获取应用桥接对象；Java 仅保存 Application，未保存
+Activity。没有新 unsafe、原始指针转换或全局 AndroidApp。iOS 使用 Security.framework。
+
+GameActivity 构建从 Cargo metadata 取得 verifier-android 版本，匹配 AAR/POM
+SHA-256 及独立 gradle-network.lockfile；Maven archive 固定 upstream Git SHA。
+原始 raw GitHub 下载失败后使用同一固定提交的干净本地 archive 镜像，未替换依赖
+或跳过校验。生成的 manifest 仅为网络构建添加普通 INTERNET 权限；运行时权限
+弹窗服务仍未实现，不能把 manifest 权限当作该缺口完成。
+
+Android ARM64 与 iOS 27 模拟器的实际原生请求均通过：可信公开 HTTPS、自签证书
+拒绝、同源跳转、跨 origin/循环拒绝、声明长度及 chunked body 限额、编码拒绝；
+Counter 清空内存包后通过 HTTP 取得 CSS/PNG 并核对实际像素。独立后台探针等待
+loopback server 确认 slow request 后再取消/关闭，服务端均观察到连接 EOF/reset；
+deadline 同样关闭实际 socket，未发生迟到 prepare/publication。证据位于
+`/Volumes/Data/Caches/glory/mobile-network/`：两端日志、截图/JSON、server.jsonl 和
+result.json。初次 Android 250ms 在连接建立前已过期，观察失败记录保留；使用
+三秒预算后重新通过实际连接的到期关闭检查，没有用“无回调”冒充 TCP 取消。
+
+全工作区含文档测试仍为 970 项，native/WASM 严格 Clippy 通过；network-only 的
+HTTP 测试单独运行，package-only 和 desktop assets 回归通过。iOS 模拟器包与 arm64
+device 可执行文件实际链接，Android 网络 APK 链接/签名及锁定依赖构建通过。
+这关闭的是移动资产 Loader 的 HTTP(S)/平台 TLS/取消实现缺口；运行时权限、
+真机网络/离线及无线环境、TalkBack/VoiceOver、原生控件和正式分发继续保留。

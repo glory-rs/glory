@@ -2,11 +2,17 @@ use super::{Bytes, LoadConfig, Url};
 use std::{io, time::Instant};
 
 #[cfg(all(
-    feature = "assets",
-    any(target_os = "windows", target_os = "linux", target_os = "macos")
+    feature = "network",
+    any(
+        target_os = "windows",
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "android",
+        target_os = "ios"
+    )
 ))]
-#[path = "desktop.rs"]
-mod desktop;
+#[path = "http.rs"]
+mod http;
 
 pub(super) struct Transport {
     #[cfg(all(feature = "android-assets", target_os = "android"))]
@@ -15,39 +21,88 @@ pub(super) struct Transport {
         feature = "assets",
         any(target_os = "windows", target_os = "linux", target_os = "macos")
     ))]
-    desktop: desktop::Desktop,
+    files: super::files::Files,
+    #[cfg(all(
+        feature = "network",
+        any(
+            target_os = "windows",
+            target_os = "linux",
+            target_os = "macos",
+            target_os = "android",
+            target_os = "ios"
+        )
+    ))]
+    http: Option<http::Http>,
 }
 impl Transport {
     pub fn new(config: &LoadConfig, runtime: &tokio::runtime::Runtime) -> io::Result<Self> {
-        #[cfg(all(
-            feature = "assets",
-            any(target_os = "windows", target_os = "linux", target_os = "macos")
-        ))]
+        let _ = runtime;
+        if !config.mounts.is_empty()
+            && !cfg!(all(
+                feature = "assets",
+                any(
+                    target_os = "windows",
+                    target_os = "linux",
+                    target_os = "macos"
+                )
+            ))
         {
-            Ok(Self {
-                desktop: desktop::Desktop::new(config, runtime)?,
-            })
+            return Err(io::Error::new(
+                io::ErrorKind::Unsupported,
+                "file mounts require desktop assets",
+            ));
         }
-        #[cfg(not(all(
-            feature = "assets",
-            any(target_os = "windows", target_os = "linux", target_os = "macos")
-        )))]
+        if !config.origins.is_empty()
+            && !cfg!(all(
+                feature = "network",
+                any(
+                    target_os = "windows",
+                    target_os = "linux",
+                    target_os = "macos",
+                    target_os = "android",
+                    target_os = "ios"
+                )
+            ))
         {
-            let _ = runtime;
-            if !config.origins.is_empty() || !config.mounts.is_empty() {
-                return Err(io::Error::new(
-                    io::ErrorKind::Unsupported,
-                    "HTTP and file mounts require desktop assets; this target supports package assets only",
-                ));
-            }
-            Ok(Self {
-                #[cfg(all(feature = "android-assets", target_os = "android"))]
-                android: config
-                    .android
-                    .clone()
-                    .map(|assets| super::android::Android::new(assets, config.limits.workers)),
-            })
+            return Err(io::Error::new(
+                io::ErrorKind::Unsupported,
+                "HTTP(S) requires native network transport",
+            ));
         }
+        #[cfg(all(feature = "network", target_os = "android"))]
+        if !config.origins.is_empty() && config.android_tls.is_none() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Android HTTP(S) requires explicit AndroidTls initialization",
+            ));
+        }
+        Ok(Self {
+            #[cfg(all(feature = "android-assets", target_os = "android"))]
+            android: config
+                .android
+                .clone()
+                .map(|assets| super::android::Android::new(assets, config.limits.workers)),
+            #[cfg(all(
+                feature = "assets",
+                any(target_os = "windows", target_os = "linux", target_os = "macos")
+            ))]
+            files: super::files::Files::new(&config.mounts, config.limits.workers)?,
+            #[cfg(all(
+                feature = "network",
+                any(
+                    target_os = "windows",
+                    target_os = "linux",
+                    target_os = "macos",
+                    target_os = "android",
+                    target_os = "ios"
+                )
+            ))]
+            http: if config.origins.is_empty() {
+                None
+            } else {
+                Some(http::Http::new(config, runtime)?)
+            },
+        })
     }
     pub fn file_counts(&self) -> (usize, usize) {
         #[cfg(all(feature = "android-assets", target_os = "android"))]
@@ -59,7 +114,7 @@ impl Transport {
             any(target_os = "windows", target_os = "linux", target_os = "macos")
         ))]
         {
-            self.desktop.file_counts()
+            (self.files.active(), self.files.peak())
         }
         #[cfg(not(all(
             feature = "assets",
@@ -78,7 +133,7 @@ impl Transport {
             feature = "assets",
             any(target_os = "windows", target_os = "linux", target_os = "macos")
         ))]
-        self.desktop.close();
+        self.files.close();
     }
     pub async fn load(
         &self,
@@ -87,6 +142,7 @@ impl Transport {
         deadline: Instant,
     ) -> Result<(String, Bytes), String> {
         config.check(&url)?;
+        let _ = deadline;
         if url.scheme() == "asset" && url.host_str() == Some("app") {
             return config
                 .package
@@ -110,16 +166,31 @@ impl Transport {
             feature = "assets",
             any(target_os = "windows", target_os = "linux", target_os = "macos")
         ))]
-        {
-            self.desktop.load(config, url, deadline).await
+        if url.scheme() == "asset" {
+            let bytes = self
+                .files
+                .read(&url, config.limits.body_bytes, deadline)
+                .await?;
+            return Ok((url.to_string(), bytes));
         }
-        #[cfg(not(all(
-            feature = "assets",
-            any(target_os = "windows", target_os = "linux", target_os = "macos")
-        )))]
-        {
-            let _ = deadline;
-            Err("transport unavailable for package-only loader".into())
+        #[cfg(all(
+            feature = "network",
+            any(
+                target_os = "windows",
+                target_os = "linux",
+                target_os = "macos",
+                target_os = "android",
+                target_os = "ios"
+            )
+        ))]
+        if matches!(url.scheme(), "http" | "https") {
+            return self
+                .http
+                .as_ref()
+                .ok_or("HTTP(S) not configured")?
+                .load(config, url)
+                .await;
         }
+        Err("transport unavailable for this URL".into())
     }
 }

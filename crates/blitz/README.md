@@ -10,8 +10,9 @@ its existing `Shell::new` supports the UIKit entry path. The
 [mobile example](../../examples/mobile/README.md) records Android emulator
 packaging/interaction checks and Apple-host iOS simulator/pinyin IME evidence. Optional `package`
 provides the same bounded offline Loader on desktop and mobile. Optional
-`android-assets` adds explicit APK AssetManager reads; HTTP/file
-transport and AccessKit remain desktop integrations.
+`android-assets` adds explicit APK AssetManager reads. Optional `network` shares
+HTTP(S) on desktop, Android and iOS; file mounts and AccessKit remain desktop
+integrations.
 
 ```rust
 use glory::{App, prelude::*};
@@ -278,8 +279,9 @@ builds reject HTTP origins and file mounts at construction, and do not compile
 the HTTP/TLS/filesystem transport dependencies. No Android AssetManager or UIKit
 bundle discovery is installed. The mobile example embeds CSS and PNG bytes.
 
-Desktop `assets` (facade: `blitz-assets`) includes `package` and adds explicit
-HTTP(S) origins and mounted-file transport. Run the packaged CSS/window/list example with
+Native `network` (facade: `blitz-network`) includes `package` and adds explicit
+HTTP(S) origins on Windows/Linux/macOS/Android/iOS. Desktop `assets` (facade:
+`blitz-assets`) includes `network` and adds mounted-file transport. Run the packaged CSS/window/list example with
 `cargo run --locked -p glory-blitz --example assets --features assets,shell`.
 
 Android `android-assets` (facade: `blitz-android-assets`) includes `package` and
@@ -297,8 +299,8 @@ validated components. URL components decode UTF-8 once and refuse separators,
 controls and empty/dot components; URL normalization cannot escape the separately
 joined prefix. Unicode names are supported. The in-memory `asset://app/` map is
 independent and provides no fallback. No ambient filesystem, permission lookup,
-global AndroidApp or new unsafe bridge is introduced. HTTP and file mounts remain
-unsupported on Android. The safe NDK streaming API opens/closes each Asset on one
+global AndroidApp or new unsafe bridge is introduced. HTTP requires `network`;
+file mounts remain unsupported on Android. The safe NDK streaming API opens/closes each Asset on one
 bounded blocking worker, checks declared length before allocation and enforces
 actual encoded bytes, cancellation and deadline between chunks. Cancelling an
 async waiter does not return admission until its actual blocking operation exits;
@@ -311,6 +313,33 @@ through the real ARM64 emulator AssetManager, then mounts Counter with no embedd
 entries. Its read-only capture script verifies the installed APK hash, success
 log and actual CSS/PNG pixels. These are emulator asset checks, not networking,
 permission, interaction or real-device acceptance; see the mobile README.
+
+### Mobile HTTP(S)
+
+The same bounded HTTP worker validates every original/redirect origin, denies
+HTTPS downgrade, enforces queue/body/deadline budgets and awaits decode admission.
+An empty origin list creates no HTTP client and grants no networking. File/APK
+and HTTP are separate capabilities. Network-only builds do not acquire cap-std.
+Requests use native reqwest/Rustls sockets, with no environment proxy, automatic
+redirect/retry or decompression. Explicit HTTP origins grant cleartext access;
+HTTPS chain and hostname checks use the platform certificate verifier.
+
+iOS uses Security.framework without a separate initialization token. Android
+requires `LoadConfig::android_tls: Some(AndroidTls::new(env, application)?)` before
+constructing a Loader with origins. Pass an application-owned JNI Application,
+not an Activity; null/wrong contexts are rejected. Include the matching
+`org.rustls:rustls-platform-verifier` AAR selected by Cargo's
+rustls-platform-verifier-android version. The constructor checks that its class
+is available and initializes the verifier via safe JNI APIs. The capability
+contains no Activity or UI state; the verifier library retains the process's
+Application. The mobile example obtains the already-initialized JVM/class loader
+through safe APIs and adds INTERNET only for builds using this component.
+
+The simulator `network-probe` checks trusted public HTTPS, refusal of a local
+self-signed certificate, redirects, origin/body policy and actual socket closure
+on cancel/close/deadline. Its Counter fetches HTTP CSS/PNG with no embedded fallback.
+These are native mobile transport checks. Runtime permission prompts, real-device
+networks and signed distribution remain separate work.
 
 HTTP(S) requires explicit exact origins in `LoadConfig::origins`. An origin
 includes scheme/host/effective port and has path `/`. Every redirect is checked;

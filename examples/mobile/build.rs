@@ -21,6 +21,9 @@ fn main() {
     println!("cargo:rerun-if-changed=ios/SceneDelegate.swift");
     println!("cargo:rerun-if-env-changed=DEVELOPER_DIR");
     println!("cargo:rerun-if-env-changed=GLORY_IOS_SCENE_MULTI");
+    println!("cargo:rerun-if-env-changed=GLORY_MOBILE_NETWORK_ORIGIN");
+    println!("cargo:rerun-if-env-changed=GLORY_MOBILE_TLS_ORIGIN");
+    println!("cargo:rerun-if-env-changed=GLORY_MOBILE_REJECT_TLS_ORIGIN");
     if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("ios") {
         return;
     }

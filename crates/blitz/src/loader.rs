@@ -30,6 +30,10 @@ mod blocking;
 mod files;
 #[cfg(all(feature = "android-assets", target_os = "android"))]
 pub use android::AndroidAssets;
+#[cfg(all(feature = "network", target_os = "android"))]
+mod android_tls;
+#[cfg(all(feature = "network", target_os = "android"))]
+pub use android_tls::AndroidTls;
 mod transport;
 use transport::Transport;
 
@@ -64,7 +68,7 @@ impl Default for LoadLimits {
 pub struct LoadConfig {
     /// Exact HTTP(S) origins, including effective port. Entries must be origin
     /// URLs with path `/`, no credentials, query or fragment. Empty denies HTTP.
-    /// Nonempty origins require the desktop `assets` feature and target.
+    /// Nonempty origins require `network` on a supported native target.
     pub origins: Vec<Url>,
     /// Encoded paths such as `/theme.css` served under `asset://app/`.
     /// Immutable owned bytes, not a history cache or filesystem mount.
@@ -78,6 +82,10 @@ pub struct LoadConfig {
     /// `asset://android/`. No ambient files, Activity lookup or JNI is used.
     #[cfg(all(feature = "android-assets", target_os = "android"))]
     pub android: Option<AndroidAssets>,
+    /// Proof of explicit Android platform certificate verifier initialization.
+    /// Required for nonempty origins on Android, including HTTP-only origins.
+    #[cfg(all(feature = "network", target_os = "android"))]
+    pub android_tls: Option<AndroidTls>,
     pub limits: LoadLimits,
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]

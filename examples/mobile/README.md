@@ -18,7 +18,8 @@ positions and sizes the PNG badge; neither is supplied by a synchronous decode
 shortcut. Queue/deadline/encoded-byte budgets and engine decode admission apply.
 Package-only builds reject HTTP origins and file mounts and exclude desktop
 HTTP/TLS/filesystem dependencies. Optional Android AssetManager support is described
-below; networking, permissions and mobile accessibility remain separate gaps.
+below; opt-in native HTTP(S) is also available. Runtime permissions, real-device
+networks and mobile accessibility remain separate gaps.
 iOS has Apple-host build and simulator evidence; see the iOS boundaries below.
 
 ## Android
@@ -151,6 +152,64 @@ The read-only capture verifies the installed APK against its manifest and checks
 actual badge pixels, CSS dimensions/position and PID-specific success logs.
 It does not inject input or establish network/permission/device acceptance.
 ARM64 Android 16 emulator evidence is under the output directory above.
+
+### Native HTTP(S) and platform certificates
+
+`network` selects facade `blitz-network`; it does not grant HTTP until an
+application configures exact `LoadConfig::origins`. The worker is shared with
+desktop and uses native reqwest/Rustls sockets. Chain/hostname verification uses
+Android's certificate verifier or iOS Security.framework. Cleartext HTTP needs
+an explicitly allowed origin. All request/queue/body/deadline/redirect/cancel and
+decode-admission budgets continue to apply; file mounts remain desktop-only.
+
+On Android this example requires an explicitly selected GameActivity for its
+Application context bridge. Java stores only the Application, never an Activity.
+Rust uses the JVM and application class loader initialized by android-activity,
+loads the bridge through safe JNI, and obtains `AndroidTls`. A nonempty Android
+origin list without that capability is rejected even if another Loader already
+initialized the verifier. Null and non-Application contexts are rejected.
+No new unsafe export, JNI raw-pointer conversion or runtime exception is added.
+
+The build script derives the Java verifier version from Cargo metadata, verifies
+its AAR/POM hashes, and uses a separate `gradle-network.lockfile`. The Maven archive
+URL is pinned to an upstream Git commit; `GLORY_ANDROID_TLS_REPOSITORY` may select
+an on-disk mirror of that archive while retaining hash verification. The generated
+manifest adds normal INTERNET permission only for these builds. This is not a
+runtime permission prompt service. iOS needs no JNI setup.
+
+### Reproduce network acceptance
+
+Run `network-fixture.py` on the host with a generated self-signed certificate and
+key under the data-volume cache. It binds loopback ports 8791 (HTTP) and 8792
+(untrusted HTTPS), serves the actual CSS/PNG, and records request/connection-close
+events in `server.jsonl`. It never installs a trust root or relaxes verification.
+The probe also requests the explicitly allowed public `https://example.com/` to
+exercise the system trust store.
+
+```sh
+GLORY_MOBILE_NETWORK_ORIGIN=http://10.0.2.2:8791/ \
+GLORY_MOBILE_REJECT_TLS_ORIGIN=https://10.0.2.2:8792/ \
+GLORY_ANDROID_FEATURES=network-probe sh examples/mobile/build-android-game.sh
+
+GLORY_MOBILE_NETWORK_ORIGIN=http://127.0.0.1:8791/ \
+GLORY_MOBILE_REJECT_TLS_ORIGIN=https://127.0.0.1:8792/ \
+GLORY_IOS_FEATURES=network-probe sh examples/mobile/build-ios.sh
+```
+
+The background probe leaves the UI loop free. It checks original/redirect URL
+policy, declared/chunked body limits, Content-Encoding refusal, platform TLS,
+then waits for the server to observe each pending request before cancel/close.
+The server must see EOF/reset and the handler must receive no late prepare or
+publication. A separate three-second deadline exercises actual connection closure.
+The initial 250ms Android observation expired before TCP establishment and was
+retained as a failed probe, then rerun with enough time to observe the connection.
+
+Use `capture-android-assets.py --network` with the same package/output arguments
+above; it checks installed APK hash, PID-specific success logs and actual HTTP
+CSS/PNG pixels. Use `capture-ios.py` for iOS pixels, plus the probe's console and
+server socket events; pass actual safe-area offsets for a rotated/notched device.
+Evidence is under `/Volumes/Data/Caches/glory/mobile-network/`. This does not
+establish runtime permission prompts, device radios/offline behavior or stores.
 
 ## iOS
 

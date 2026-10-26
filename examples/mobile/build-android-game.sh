@@ -22,6 +22,16 @@ export AR_aarch64_linux_android="$compiler/llvm-ar"
 features=android-game-activity
 if [ -n "${GLORY_ANDROID_FEATURES:-}" ]; then features="$features,$GLORY_ANDROID_FEATURES"; fi
 cd "$repo"
+cargo metadata --locked --manifest-path examples/mobile/Cargo.toml --format-version 1 --filter-platform aarch64-linux-android --no-default-features --features "$features" > "$GLORY_BUILD_ROOT/game-metadata.json"
+tls_version=$(python3 - "$GLORY_BUILD_ROOT/game-metadata.json" <<'PY'
+import json,sys
+metadata=json.load(open(sys.argv[1])); active={n['id'] for n in metadata['resolve']['nodes']}
+versions=[p['version'] for p in metadata['packages'] if p['id'] in active and p['name']=='rustls-platform-verifier-android']
+assert len(versions)<=1, 'One matching verifier Android artifact is required'
+print(versions[0] if versions else '')
+PY
+)
+export GLORY_ANDROID_TLS_VERSION="$tls_version"
 cargo rustc --locked --manifest-path examples/mobile/Cargo.toml --lib --target aarch64-linux-android --no-default-features --features "$features" -- -C link-arg=-Wl,-z,max-page-size=16384
 library="$CARGO_TARGET_DIR/aarch64-linux-android/debug/libglory_mobile_counter.so"
 "$compiler/llvm-readelf" -h "$library" | grep -q 'AArch64'
@@ -46,6 +56,15 @@ mkdir -p "$stage/lib/arm64-v8a"
 cp "$library" "$stage/lib/arm64-v8a/"
 "$compiler/llvm-strip" --strip-unneeded "$stage/lib/arm64-v8a/libglory_mobile_counter.so"
 export GLORY_ANDROID_LIBS="$stage/lib" GLORY_ANDROID_GRADLE_OUTPUT="$GLORY_BUILD_ROOT/gradle-build"
+export GLORY_ANDROID_MANIFEST="$stage/AndroidManifest.xml"
+python3 - "$repo/examples/mobile/android-game/src/main/AndroidManifest.xml" "$GLORY_ANDROID_MANIFEST" <<'PY'
+import os,sys,xml.etree.ElementTree as ET
+ET.register_namespace('android','http://schemas.android.com/apk/res/android')
+tree=ET.parse(sys.argv[1]); root=tree.getroot()
+if os.environ.get('GLORY_ANDROID_TLS_VERSION'):
+    root.insert(0,ET.Element('uses-permission',{'{http://schemas.android.com/apk/res/android}name':'android.permission.INTERNET'}))
+tree.write(sys.argv[2],encoding='utf-8',xml_declaration=True)
+PY
 set -- assembleDebug
 if [ "${GLORY_UPDATE_GRADLE_LOCKS:-0}" = 1 ]; then set -- "$@" --write-locks --write-verification-metadata sha256; fi
 "$gradle" --no-daemon --project-dir examples/mobile/android-game --project-cache-dir "$GLORY_BUILD_ROOT/gradle-project" "$@"
@@ -59,6 +78,7 @@ root=pathlib.Path(sys.argv[1]); apk=root/'glory-counter.apk'
     sha256=hashlib.sha256(apk.read_bytes()).hexdigest()),indent=2)+'\n')
 PY
 rm -rf "$stage/lib"
+rm "$stage/AndroidManifest.xml"
 destination="$GLORY_BUILD_ROOT/package-game-aarch64-debug"
 if [ -e "$destination" ]; then mv "$destination" "$stage/previous"; fi
 if ! mv "$stage" "$destination"; then

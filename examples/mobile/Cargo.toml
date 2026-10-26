@@ -20,12 +20,17 @@ android-native-activity = ["glory/blitz-android-native-activity"]
 android-game-activity = ["glory/blitz-android-game-activity"]
 android-assets = ["glory/blitz-android-assets"]
 android-assets-probe = ["android-assets"]
+network = ["glory/blitz-network", "dep:jni"]
+network-probe = ["network"]
 ime-probe = []
 keyboard-probe = []
 
 [dependencies]
 counter = { path = "../counter" }
 glory = { path = "../../crates/glory", features = ["blitz-shell", "blitz-package"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = { version = "=0.22.4", default-features = false, optional = true }
 
 [lints.rust]
 unsafe_code = "deny"

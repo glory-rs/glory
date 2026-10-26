@@ -1,5 +1,5 @@
 #![cfg(all(
-    feature = "assets",
+    feature = "network",
     any(target_os = "windows", target_os = "linux", target_os = "macos")
 ))]
 

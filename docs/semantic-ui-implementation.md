@@ -2474,3 +2474,19 @@ ARM64 模拟器中实际 APK probe 通过压缩 CSS、中文路径、PNG、缺�
 prepare 和 close；Counter 内存包为空时仍显示正确样式/图片。capture 脚本核对
 已安装 APK 哈希、PID 日志与实际像素，证据和边界见缺口报告。全工作区 970 项
 通过，独立 blocking 取消许可回归仍有效；真机、TalkBack 和移动网络继续推进。
+
+## 2026-10-27：共用原生 HTTP(S) 与移动平台证书
+
+`network`/facade `blitz-network` 将旧 desktop HTTP worker 供 Android/iOS 共用；
+desktop assets 在 network 上再开放文件挂载，package-only 不增加 HTTP/TLS。
+空 origins 不创建客户端；origin/redirect、body/deadline/cancel 和 prepare 契约
+保留。Android 的非空 origins 需要显式 AndroidTls，由安全 JNI Application 对象
+初始化匹配的系统 verifier AAR，拒绝 null、非 Application 或缺少能力；无 raw JNI
+或新 unsafe。Java 只保留 Application。iOS 复用 Security.framework。
+
+两端模拟器实际通过可信/自签 TLS、redirect/origin/body 编码规则、HTTP CSS/PNG
+像素及 cancel/close/deadline 的真实服务端 socket 断开，未迟到 prepare/publication。
+Android 初次 250ms 建连前超时的观察失败保留，三秒后复验实际连接到期关闭通过。
+Cargo/Gradle 版本、哈希和可选 INTERNET manifest 由构建脚本关联；普通包独立。
+全工作区 970 项、native/WASM 严格 Clippy 及独立 network/package/assets gates
+通过。证据及未关闭的权限/真机/读屏/分发边界见 gap report 和移动 README。

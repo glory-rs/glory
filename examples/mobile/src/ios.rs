@@ -3,7 +3,10 @@
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use glory::blitz::shell::{Shell, WindowAttributes};
     let mut shell = Shell::new()?;
+    #[cfg(not(feature = "network-probe"))]
     let (window, _loader) = glory_mobile_counter::counter_window()?;
+    #[cfg(feature = "network-probe")]
+    let (window, _loader) = glory_mobile_counter::network_window()?;
     shell.add_window(
         window,
         WindowAttributes::default().with_title("Glory Counter"),

@@ -1,6 +1,12 @@
 pluginManagement { repositories { google(); mavenCentral(); gradlePluginPortal() } }
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-    repositories { google(); mavenCentral() }
+    repositories {
+        google(); mavenCentral()
+        maven {
+            url = uri(System.getenv('GLORY_ANDROID_TLS_REPOSITORY') ?: 'https://raw.githubusercontent.com/rustls/rustls-platform-verifier/1aa691352a5e0c215210dfc9a3c2f2078639dc91/android-release-support/maven/')
+            content { includeGroup 'org.rustls' }
+        }
+    }
 }
 rootProject.name = 'GloryGameActivity'

@@ -1,21 +1,18 @@
-//! Desktop HTTP and mounted-file transport; package workers do not compile this module.
-use super::super::{Bytes, LoadConfig, Url, files};
+//! Bounded native HTTP(S), shared by desktop, Android and UIKit hosts.
+use super::super::{Bytes, LoadConfig, Url};
 use std::{
     collections::BTreeMap,
     io,
     net::SocketAddr,
     sync::{Arc, Mutex},
-    time::Instant,
 };
 use tokio::sync::Notify;
 
-pub(super) struct Desktop {
-    files: files::Files,
+pub(super) struct Http {
     client: reqwest::Client,
 }
-impl Desktop {
+impl Http {
     pub fn new(config: &LoadConfig, runtime: &tokio::runtime::Runtime) -> io::Result<Self> {
-        let files = files::Files::new(&config.mounts, config.limits.workers)?;
         // An explicit provider avoids changing Rustls's process-global default.
         let provider = Arc::new(rustls::crypto::ring::default_provider());
         let verifier =
@@ -47,28 +44,13 @@ impl Desktop {
                 .build()
                 .map_err(io::Error::other)?
         };
-        Ok(Self { files, client })
+        Ok(Self { client })
     }
-    pub fn file_counts(&self) -> (usize, usize) {
-        (self.files.active(), self.files.peak())
-    }
-    pub fn close(&self) {
-        self.files.close();
-    }
-    pub async fn load(
-        &self,
-        config: &LoadConfig,
-        mut url: Url,
-        deadline: Instant,
-    ) -> Result<(String, Bytes), String> {
+    pub async fn load(&self, config: &LoadConfig, mut url: Url) -> Result<(String, Bytes), String> {
         for hop in 0..=config.limits.redirects {
             config.check(&url)?;
-            if url.scheme() == "asset" {
-                let bytes = self
-                    .files
-                    .read(&url, config.limits.body_bytes, deadline)
-                    .await?;
-                return Ok((url.to_string(), bytes));
+            if !matches!(url.scheme(), "http" | "https") {
+                return Err("asset HTTP scheme".into());
             }
             let mut response = self
                 .client
