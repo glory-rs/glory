@@ -13,10 +13,11 @@ Commands:
   serve    Build, watch and reload a Web app
   check    Cargo check and strict Clippy for the selected application
   fmt      Run rustfmt (--check is supported)
-  bundle   Build a release Web directory or server executable
+  bundle   Build a release Web, desktop or server directory
   init     Add a private CLI package, Cargo alias and bin launchers
 Options:
   --platform web|desktop|server   Select a configured host
+  --target TRIPLE                 Rust target (native host by default; Web uses wasm32)
   --release                      Use Cargo's release profile
   --package NAME                 Select an application in a workspace
   --manifest-path PATH           Select the application manifest
@@ -52,6 +53,7 @@ pub struct Args {
     pub cancel: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
     pub command: Command,
     pub platform: Option<String>,
+    pub target: Option<String>,
     pub package: Option<String>,
     pub manifest: Option<PathBuf>,
     pub cli_path: Option<PathBuf>,
@@ -86,6 +88,7 @@ impl Args {
             cancel: None,
             command,
             platform: None,
+            target: None,
             package: None,
             manifest: None,
             cli_path: None,
@@ -102,6 +105,7 @@ impl Args {
             let option = option.to_str().ok_or("option names must be UTF-8")?;
             match option {
                 "--platform" => args.platform = Some(next_text(&mut input, option)?),
+                "--target" => args.target = Some(next_text(&mut input, option)?),
                 "--package" | "-p" => args.package = Some(next_text(&mut input, option)?),
                 "--manifest-path" => {
                     args.manifest = Some(PathBuf::from(

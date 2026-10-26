@@ -19,7 +19,7 @@
     {
       "name": "blitz",
       "git": "https://github.com/glory-rs/blitz",
-      "rev": "c850a2aee1a8cb49eee1386120807751d7480559",
+      "rev": "80938ef8369257e82080ebd7d477b254487accec",
       "upstream": "https://github.com/DioxusLabs/blitz",
       "upstream_rev": "92b11f1bd8ab7975411328b0406a95a09445b4e7",
       "packages": [
@@ -104,6 +104,42 @@
           "--lib",
           "layout_move_tests"
         ]
+      ]
+    },
+    {
+      "extra_tests": [
+        [
+          "-p",
+          "winit-common",
+          "--lib"
+        ]
+      ],
+      "name": "winit",
+      "git": "https://github.com/glory-rs/winit",
+      "packages": [
+        "dpi",
+        "winit",
+        "winit-android",
+        "winit-appkit",
+        "winit-common",
+        "winit-core",
+        "winit-orbital",
+        "winit-uikit",
+        "winit-wayland",
+        "winit-web",
+        "winit-win32",
+        "winit-x11"
+      ],
+      "rev": "07fe20dec93211df240050f76dada687c0d705ee",
+      "upstream": "https://github.com/rust-windowing/winit",
+      "upstream_rev": "d597ced770f3263f66ab901cc27bf7984e314465",
+      "rustc_tests": [
+        "winit-android/src/event_loop_lifetime.rs"
+      ],
+      "tests": [
+        "-p",
+        "winit-core",
+        "--lib"
       ]
     }
   ]

@@ -66,7 +66,10 @@ impl Layers {
     }
     /// Accessibility keeps transparent ancestors of the current modal while
     /// omitting unrelated branches. No business source participates.
-    #[cfg(feature = "accesskit")]
+    #[cfg(all(
+        feature = "accesskit",
+        not(any(target_os = "android", target_os = "ios"))
+    ))]
     pub fn ax_branch(&self, tree: &glory_render::memory::Memory, id: NodeId) -> bool {
         self.modal().is_none_or(|modal| {
             self.allowed(tree, id)

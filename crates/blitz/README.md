@@ -5,6 +5,12 @@ applies the shared `glory-html` mapper's typed edits directly to Blitz nodes;
 updates do not serialize and reparse the document. Optional shell adds a desktop
 window host with CPU presentation; the headless default creates no window/GPU.
 
+The shell also exposes `Shell::android(AndroidApp)` and `Shell::from_event_loop`;
+its existing `Shell::new` supports the UIKit entry path. The
+[mobile example](../../examples/mobile/README.md) records Android emulator
+packaging/interaction checks and the unverified iOS path. Desktop Loader and
+AccessKit flags do not provide mobile implementations.
+
 ```rust
 use glory::{App, prelude::*};
 

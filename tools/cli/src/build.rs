@@ -201,6 +201,7 @@ fn bindgen(project: &Project, args: &Args) -> Result<PathBuf> {
 }
 
 pub fn run(project: &Project, args: &Args) -> Result<()> {
+    project.ensure_runnable()?;
     if project.platform == Platform::Web {
         let mut args = args.clone();
         args.watch = false;
@@ -214,11 +215,6 @@ pub fn run(project: &Project, args: &Args) -> Result<()> {
 }
 
 pub fn bundle(project: &Project, args: &Args) -> Result<()> {
-    if project.platform == Platform::Desktop {
-        return Err(
-            "desktop installers are not implemented; use build/run --platform desktop".into(),
-        );
-    }
     let mut args = args.clone();
     args.release = true;
     let built = build(project, &args)?;
@@ -228,27 +224,20 @@ pub fn bundle(project: &Project, args: &Args) -> Result<()> {
             copy_contents(&directory, &stage)?;
         }
         if let Some(executable) = built.executable {
-            fs::copy(
-                &executable,
-                stage.join(executable.file_name().ok_or("executable has no name")?),
-            )
-            .map_err(|e| e.to_string())?;
-            for asset in &project.host.assets {
-                copy_asset(&project.root, asset, &stage)?;
-            }
-            write_manifest(project, &stage, &args)?;
+            native_bundle(project, &executable, &stage, &args)?;
         }
-        let platform = if project.platform == Platform::Web {
-            "web"
-        } else {
-            "server"
+        let platform = match project.platform {
+            Platform::Web => "web",
+            Platform::Desktop => "desktop",
+            Platform::Server => "server",
         };
         let destination = project
             .paths
             .root
             .join("bundle")
             .join(project.name())
-            .join(platform);
+            .join(platform)
+            .join(project.target());
         publish(&stage, &destination, &project.paths.root)?;
         println!("Bundle: {}", destination.display());
         Ok(())
@@ -257,6 +246,20 @@ pub fn bundle(project: &Project, args: &Args) -> Result<()> {
         let _ = remove_owned(&stage, &project.paths.root);
     }
     result
+}
+
+fn native_bundle(project: &Project, executable: &Path, stage: &Path, args: &Args) -> Result<()> {
+    // Assets are copied first so neither the executable nor its integrity
+    // manifest can be silently replaced by an application asset.
+    for asset in &project.host.assets {
+        copy_asset(&project.root, asset, stage)?;
+    }
+    let destination = stage.join(executable.file_name().ok_or("executable has no name")?);
+    if destination.exists() || stage.join("glory-build.json").exists() {
+        return Err("assets collide with the executable or reserved glory-build.json".into());
+    }
+    fs::copy(executable, destination).map_err(|e| e.to_string())?;
+    write_manifest(project, stage, args)
 }
 
 pub fn staging(root: &Path) -> Result<PathBuf> {
@@ -374,7 +377,7 @@ fn write_manifest(project: &Project, directory: &Path, args: &Args) -> Result<()
     let mut files = Vec::new();
     hash_files(directory, directory, &mut files)?;
     files.sort_by(|left, right| left["path"].as_str().cmp(&right["path"].as_str()));
-    let manifest = json!({ "format": 1, "cli_version": env!("CARGO_PKG_VERSION"), "package": project.name(), "platform": project.platform, "release": args.release, "wasm_bindgen": project.bindgen_version, "files": files });
+    let manifest = json!({ "format": 1, "cli_version": env!("CARGO_PKG_VERSION"), "package": project.name(), "platform": project.platform, "target": project.target(), "rust_host": project.rust_host, "release": args.release, "wasm_bindgen": project.bindgen_version, "files": files });
     fs::write(
         directory.join("glory-build.json"),
         serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?,
@@ -404,6 +407,76 @@ fn hash_files(root: &Path, directory: &Path, files: &mut Vec<Value>) -> Result<(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn desktop_bundle_contains_binary_assets_and_target_specific_hashes() {
+        let scratch = crate::test_support::Scratch::new();
+        scratch.write("compiled/fixture.exe", "executable bytes");
+        scratch.write("assets/nested/config.txt", "asset bytes");
+        let mut project = scratch.project(Platform::Desktop);
+        project.host.assets.push("assets".into());
+        let mut args = Args::parse(["bundle".into()]).unwrap();
+        args.release = true;
+        let stage = staging(&scratch.0).unwrap();
+        native_bundle(
+            &project,
+            &scratch.0.join("compiled/fixture.exe"),
+            &stage,
+            &args,
+        )
+        .unwrap();
+        let manifest: Value =
+            serde_json::from_slice(&fs::read(stage.join("glory-build.json")).unwrap()).unwrap();
+        assert_eq!(manifest["platform"], "desktop");
+        assert_eq!(manifest["target"], project.target());
+        assert_eq!(manifest["release"], true);
+        let files = manifest["files"].as_array().unwrap();
+        assert_eq!(files.len(), 2);
+        assert_eq!(files[0]["path"], "assets/nested/config.txt");
+        for file in files {
+            let bytes = fs::read(stage.join(file["path"].as_str().unwrap())).unwrap();
+            assert_eq!(file["bytes"], bytes.len());
+            assert_eq!(file["sha256"], format!("{:x}", Sha256::digest(bytes)));
+        }
+        let foreign = scratch
+            .0
+            .join("bundle/fixture/desktop/aarch64-apple-darwin");
+        fs::create_dir_all(&foreign).unwrap();
+        fs::write(foreign.join("keep"), "previous architecture").unwrap();
+        let destination = scratch
+            .0
+            .join("bundle/fixture/desktop")
+            .join(project.target());
+        publish(&stage, &destination, &scratch.0).unwrap();
+        assert!(destination.join("fixture.exe").exists());
+        assert_eq!(
+            fs::read_to_string(foreign.join("keep")).unwrap(),
+            "previous architecture"
+        );
+    }
+
+    #[test]
+    fn native_bundle_rejects_assets_that_replace_its_binary_or_manifest() {
+        for name in ["fixture.exe", "glory-build.json"] {
+            let scratch = crate::test_support::Scratch::new();
+            scratch.write("compiled/fixture.exe", "binary");
+            scratch.write(name, "conflicting asset");
+            let mut project = scratch.project(Platform::Desktop);
+            project.host.assets.push(name.into());
+            let args = Args::parse(["bundle".into()]).unwrap();
+            let stage = staging(&scratch.0).unwrap();
+            assert!(
+                native_bundle(
+                    &project,
+                    &scratch.0.join("compiled/fixture.exe"),
+                    &stage,
+                    &args
+                )
+                .unwrap_err()
+                .contains("collide")
+            );
+        }
+    }
     #[test]
     fn chooses_reported_artifacts_not_guessed_target_filenames() {
         let input = br#"{"reason":"compiler-artifact","package_id":"app","filenames":["D:/odd/output.wasm"]}

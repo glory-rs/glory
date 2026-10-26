@@ -22,6 +22,13 @@ The migrated [counter example](examples/counter) shares one semantic component,
 state, event handlers and typed styles between Web and Blitz desktop hosts.
 Its README includes build/run commands and the current platform boundaries.
 
+The [mobile counter](examples/mobile/README.md) adds explicit Android NativeActivity
+and iOS UIKit entries for that same component. Android has an isolated D: emulator
+and APK/interaction lifecycle checks; iOS still requires Apple-host compilation
+and simulator/device acceptance. See the [Dioxus feature comparison](docs/dioxus-feature-gap-analysis-2026-10-26.md)
+for the remaining platform and application gaps. SSR framework integration stays
+limited to Salvo.
+
 ## Available now
 
 - `glory-style`: explicit portable style values, separate from CSS engines.

@@ -41,8 +41,9 @@ this implementation does not add an RSX compiler or a binary hot-patching system
   refresh. A failed rebuild keeps the previous output and reports the error.
 - `check`: Cargo check plus strict Clippy for the selected application/host.
 - `fmt [--check]`: the application's ordinary rustfmt.
-- `bundle`: release Web directory or server executable/assets plus a hash
-  manifest. Desktop installers and mobile hosts are not implemented.
+- `bundle`: release Web directory or desktop/server executable/assets plus a
+  target-specific hash manifest. Native directory bundles are portable file
+  layouts; installers, signing and mobile packages require separate tooling.
 - `init`: create a private tool package, project Cargo alias and bin launchers.
 
 Use `--help` for options. Rust hot-patching, RSX, a second UI lifecycle, automatic
@@ -99,6 +100,8 @@ directory, so the enclosing `cargo run` cannot hold their build lock.
 ./bin/glory.ps1 serve --platform web
 ./bin/glory.ps1 run --platform desktop
 ./bin/glory.ps1 build --platform web --release
+./bin/glory.ps1 bundle --platform desktop
+./bin/glory.ps1 print --platform desktop --target aarch64-apple-darwin
 ```
 
 `cargo glory ...` is also available after configuring Cargo's D: environment;
@@ -121,6 +124,8 @@ default-platform = "web"
 [package.metadata.glory.desktop]
 bin = "my-desktop-app"
 features = ["desktop"]
+# Optional built-in Rust triple. --target overrides this setting.
+# target = "x86_64-pc-windows-msvc"
 
 [package.metadata.glory.web]
 port = 8080
@@ -157,10 +162,23 @@ no development script. SSR applications retain responsibility for their server,
 HTTP/CSP configuration and streaming bootstrap; this static Web server does not
 replace Salvo or add an SSR rewrite protocol.
 
-Bundles are published to `<build-root>/bundle/<package>/web` or `.../server`;
-each contains `glory-build.json` with release settings and file SHA-256 hashes.
+Bundles are published to `<build-root>/bundle/<package>/<platform>/<target>`;
+each contains `glory-build.json` with the Rust host/target, release settings and
+file SHA-256 hashes. The target suffix prevents different architectures from
+replacing each other's output. Native assets preserve their configured relative
+paths; resolve them against `current_exe()` for relocation. Asset names cannot
+replace the executable or reserved `glory-build.json`.
 Failed Web builds do not replace the last accepted output. The development server
 waits for each build synchronously, so requests may pause while Cargo is running.
+
+`--target` accepts built-in Windows/Linux/macOS targets for desktop/server and
+only `wasm32-unknown-unknown` for Web. The configured platform still selects
+application features and entry points; a triple does not install a mobile host.
+`doctor` checks the selected target's standard library. Cross-compilation needs
+an appropriate Cargo linker and SDK; `run` rejects a target different from the
+Rust host before building or launching it. Native Unix tool launchers still
+require the verified D: mount described above. Selecting an Apple target from
+Windows does not establish macOS/iOS build or device acceptance.
 
 ## Verification
 
@@ -171,6 +189,8 @@ Then run:
 cargo fmt --manifest-path tools/cli/Cargo.toml -- --check
 cargo test --locked --manifest-path tools/cli/Cargo.toml
 cargo clippy --locked --manifest-path tools/cli/Cargo.toml --all-targets -- -D warnings
+cargo build --locked --manifest-path tools/cli/Cargo.toml --example bootstrap
+./tools/cli/tests/native-acceptance.ps1 -Driver D:/BuildCache/glory-semantic-ui/target/debug/examples/bootstrap.exe
 ```
 
 Windows acceptance on 2026-10-26 used a disposable D: counter copy and real Chrome:
@@ -183,8 +203,15 @@ select the disposable project, running serve log, evidence output, private runne
 and installed Playwright module. Set Cargo home and temporary paths on D: before
 running it. Results are under `D:/BuildCache/glory-project-cli/browser-acceptance-final`.
 
-The CLI's fifteen tests cover configuration isolation, version/source mismatch,
+The CLI tests cover configuration isolation, version/source mismatch,
 artifact selection, output rollback, initialization without app compilation,
 real TCP request handling and cancellation of owned child processes. Web release
 bundling and a native SSR server's run/release bundle were also exercised. WSL
 launcher syntax checks do not establish a Linux build or desktop window acceptance.
+
+`tests/native-acceptance.ps1` creates a disposable application using the real
+Glory facade, verifies target overrides and foreign/mobile/unknown-target
+rejection, bundles a release executable with assets, checks every hash, relocates
+and runs it from a path containing spaces, and checks lockfile and other-target
+output preservation. It exercises native tooling and asset lookup; the console
+fixture does not assert window/input or mobile device behavior.

@@ -144,6 +144,10 @@ retired feature aliases or count compilation as proof of platform acceptance.
   `blitz` is optional and must not enter default/HTML/SSR dependency graphs.
   Linux Fontique uses fontconfig-dlopen; cross-checks do not prove runtime font
   availability or display-server acceptance.
+  Optional shell also has explicit AndroidApp and UIKit entry paths; see
+  examples/mobile. Android emulator evidence stays separate from real-device,
+  CJK composition, mobile assets and accessibility acceptance. iOS has no
+  Apple-host compilation or runtime evidence yet.
 
 ## Design rules
 
@@ -404,6 +408,9 @@ retired feature aliases or count compilation as proof of platform acceptance.
   resolved sources/lock and run fork-owned tests in separate clean Git checkouts
   under the D: build root. Do not edit Cargo's managed Git checkouts. Update the
   dependency rev, lockfiles and provenance record together after a fork change.
+  The additional twelve dpi/Winit platform packages share the immutable
+  glory-rs/winit revision in that record; Blitz's fork pins the same revision.
+  Its Android Activity lifetime tests run from the clean fork with --test.
   Existing upstream unsafe is unchanged; local resource additions use safe Rust.
   Do not reformat unrelated third-party files with the workspace line length.
   Initial free space already includes gaps;
@@ -604,6 +611,9 @@ retired feature aliases or count compilation as proof of platform acceptance.
   scrollTop deltas without scaling them by the logical total. Pixel reads may
   have native zoom/DPR quantization; distinguish it from framework drift.
 - No new unsafe code; workspace denies it.
+  User-authorized exception (2026-10-26): only the Android application entry
+  in examples/mobile may use #[unsafe(no_mangle)] with a local lint allowance
+  to export android_main. No unsafe blocks or runtime-crate exceptions.
 - Optional `render::profile::Profile` is local and fixed at 31 aggregate phase
   samples, not an event/row/frame trace. App::set_profile shares it with runtime
   and supported adapters; None performs no profiling clock reads. Clock callbacks

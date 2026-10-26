@@ -20,13 +20,13 @@ glory-html = { path = "../html", version = "0.3.1" }
 glory-render = { path = "../render", version = "0.3.1" }
 glory-core = { path = "../core", version = "0.3.1", optional = true }
 glory-ui = { path = "../ui", version = "0.3.1", optional = true }
-blitz-dom = { git = "https://github.com/glory-rs/blitz", rev = "c850a2aee1a8cb49eee1386120807751d7480559", version = "=0.3.0-beta.4", default-features = false, features = ["system-fonts", "complex-scripts"] }
-blitz-traits = { git = "https://github.com/glory-rs/blitz", rev = "c850a2aee1a8cb49eee1386120807751d7480559", version = "=0.3.0-beta.4", default-features = false }
+blitz-dom = { git = "https://github.com/glory-rs/blitz", rev = "80938ef8369257e82080ebd7d477b254487accec", version = "=0.3.0-beta.4", default-features = false, features = ["system-fonts", "complex-scripts"] }
+blitz-traits = { git = "https://github.com/glory-rs/blitz", rev = "80938ef8369257e82080ebd7d477b254487accec", version = "=0.3.0-beta.4", default-features = false }
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
 # Typed visibility returned by Blitz's public computed-style API. Keep this
 # engine detail inside the adapter; glory-style remains the portable value crate.
 style = { package = "stylo", version = "=0.22.0", default-features = false }
-blitz-paint = { git = "https://github.com/glory-rs/blitz", rev = "c850a2aee1a8cb49eee1386120807751d7480559", version = "=0.3.0-beta.4", default-features = false, optional = true }
+blitz-paint = { git = "https://github.com/glory-rs/blitz", rev = "80938ef8369257e82080ebd7d477b254487accec", version = "=0.3.0-beta.4", default-features = false, optional = true }
 anyrender = { version = "=0.14.0", optional = true }
 kurbo = { version = "=0.13.1", optional = true }
 peniko = { version = "=0.6.1", optional = true }
@@ -42,10 +42,15 @@ cap-std = { version = "=4.0.3", optional = true }
 cap-fs-ext = { version = "=4.0.3", optional = true }
 percent-encoding = { version = "2.3.2", optional = true }
 tokio = { version = "1.54.1", default-features = false, features = ["rt", "net", "sync", "time", "macros"], optional = true }
-blitz-shell = { git = "https://github.com/glory-rs/blitz", rev = "c850a2aee1a8cb49eee1386120807751d7480559", version = "=0.3.0-beta.4", default-features = false, optional = true }
-winit = { version = "=0.31.0-beta.4", optional = true }
+
+[target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos", target_os = "android", target_os = "ios"))'.dependencies]
+blitz-shell = { git = "https://github.com/glory-rs/blitz", rev = "80938ef8369257e82080ebd7d477b254487accec", version = "=0.3.0-beta.4", default-features = false, optional = true }
+winit = { git = "https://github.com/glory-rs/winit", rev = "07fe20dec93211df240050f76dada687c0d705ee", version = "=0.31.0-beta.4", optional = true }
 keyboard-types = { version = "0.8.3", optional = true }
 softbuffer_window_renderer = { version = "=0.9.0", optional = true }
+
+[target.'cfg(target_os = "android")'.dependencies]
+winit = { git = "https://github.com/glory-rs/winit", rev = "07fe20dec93211df240050f76dada687c0d705ee", version = "=0.31.0-beta.4", features = ["android-native-activity"], optional = true }
 
 [target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
 # Resolve system fonts through runtime-loaded Fontconfig. Cross-checking from

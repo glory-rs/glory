@@ -1,6 +1,7 @@
-param([switch]$Bench, [switch]$Web, [switch]$Window)
+param([switch]$Bench, [switch]$Web, [switch]$Window, [switch]$Android, [string]$AndroidSerial)
 
 $ErrorActionPreference = 'Stop'
+if ($AndroidSerial -and -not $Android) { throw '-AndroidSerial requires -Android' }
 $taskBuildRoot = 'D:/BuildCache/glory-semantic-ui'
 $taskWorkspace = Split-Path -Parent $PSScriptRoot
 $savedEnvironment = @{}
@@ -32,6 +33,12 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'project CLI tests failed' }
     cargo clippy --locked --manifest-path tools/cli/Cargo.toml --all-targets -- -D warnings
     if ($LASTEXITCODE -ne 0) { throw 'project CLI clippy failed' }
+    $toolArtifacts = cargo build --locked --manifest-path tools/cli/Cargo.toml --example bootstrap --message-format=json-render-diagnostics | ForEach-Object { $_ | ConvertFrom-Json }
+    if ($LASTEXITCODE -ne 0) { throw 'project CLI acceptance driver build failed' }
+    $toolDriver = $toolArtifacts | Where-Object { $_.reason -eq 'compiler-artifact' -and $_.target.name -eq 'bootstrap' -and $_.executable } | Select-Object -Last 1 -ExpandProperty executable
+    if (-not $toolDriver) { throw 'Cargo did not report the CLI acceptance driver' }
+    & "$taskWorkspace/tools/cli/tests/native-acceptance.ps1" -Driver $toolDriver
+    if ($LASTEXITCODE -ne 0) { throw 'project CLI native acceptance failed' }
     python scripts/check-engine-forks.py --test
     if ($LASTEXITCODE -ne 0) { throw 'pinned engine fork verification/tests failed' }
 
@@ -65,6 +72,23 @@ try {
         $env:CARGO_PROFILE_BENCH_OPT_LEVEL = '3'
         cargo bench -p glory-ui --bench virtual_list | Tee-Object -FilePath "$taskBuildRoot/list-benchmark.txt"
         if ($LASTEXITCODE -ne 0) { throw 'list benchmark failed' }
+    }
+
+    if ($Android) {
+        $mobileMetadata = cargo metadata --locked --manifest-path examples/mobile/Cargo.toml --no-deps --format-version 1 | ConvertFrom-Json
+        if ($LASTEXITCODE -ne 0 -or [IO.Path]::GetFullPath($mobileMetadata.target_directory) -ne $expectedTarget) { throw 'Unexpected mobile target directory' }
+        cargo fmt --manifest-path examples/mobile/Cargo.toml -- --check
+        if ($LASTEXITCODE -ne 0) { throw 'Mobile formatting failed' }
+        cargo clippy --locked -p glory-blitz --all-features --target aarch64-linux-android --no-deps -- -D warnings
+        if ($LASTEXITCODE -ne 0) { throw 'Android adapter Clippy failed' }
+        & "$taskWorkspace/examples/mobile/build-android.ps1" -Target x86_64-linux-android
+        & "$taskWorkspace/examples/mobile/build-android.ps1" -Target aarch64-linux-android
+        if ($AndroidSerial) {
+            python examples/mobile/accept-android.py --serial $AndroidSerial --out "$taskBuildRoot/android-acceptance"
+            if ($LASTEXITCODE -ne 0) { throw 'Android emulator acceptance failed' }
+        } else {
+            Write-Output 'Android APK builds passed; no runtime acceptance requested (use -AndroidSerial with an owned emulator).'
+        }
     }
 }
 finally {

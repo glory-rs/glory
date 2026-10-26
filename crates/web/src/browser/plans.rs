@@ -20,9 +20,6 @@ use addresses::{Layout, Retirement};
 #[path = "plan_fields.rs"]
 mod fields;
 
-// Private experiment boundary: the generic build changes only this constant.
-const DEEP_CLONE: bool = true;
-
 #[wasm_bindgen(inline_js = "
 export function gloryPlan(root, parts, owners, virtualParts, fields) {
     const positions = new Map(parts.map((part, index) => [part, index]));
@@ -275,7 +272,7 @@ impl Plans {
         plan: &Plan,
         shape: &PlanShape,
     ) -> Result<Option<Rc<Prototype>>, Error> {
-        if !DEEP_CLONE || shape.shapes.iter().any(|node| node.pieces.is_empty()) {
+        if shape.shapes.iter().any(|node| node.pieces.is_empty()) {
             return Ok(None);
         }
         let key = plan.identity();

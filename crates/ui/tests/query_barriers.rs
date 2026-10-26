@@ -423,6 +423,116 @@ impl Drop for Dropped {
 }
 
 #[test]
+fn retired_subtree_cleans_parked_targets_and_foreign_interests_without_retiring_their_owners() {
+    use glory_ui::{Scope, button};
+
+    struct Capture(std::rc::Weak<App>, Rc<Cell<usize>>);
+    impl Drop for Capture {
+        fn drop(&mut self) {
+            let app = self.0.upgrade().unwrap();
+            app.stats();
+            app.runtime_stats();
+            self.1.set(self.1.get() + 1);
+        }
+    }
+
+    let (app, outside, wire) = fixture();
+    let app = Rc::new(app);
+    let parent = app.scope().child().unwrap();
+    let root = parent.create(Descriptor::new(Props::View)).unwrap();
+    let inside = parent.child_in(root).unwrap();
+    let parked = button().label("parked").mount(&inside).unwrap();
+    let target = parked.roots()[0];
+    parked.suspend().unwrap();
+    let foreign = app.scope().child().unwrap();
+    let drops = Rc::new(Cell::new(0));
+    let calls = Rc::new(RefCell::new(Vec::new()));
+    let capture = || Capture(Rc::downgrade(&app), drops.clone());
+    // The node creator, listener Owner and query requester are distinct.
+    for (owner, node) in [(&foreign, target), (&parent, outside)] {
+        let held = capture();
+        owner
+            .on(node, EventKind::Activate, move |_| {
+                std::hint::black_box(&held);
+                panic!("retired listener");
+            })
+            .unwrap();
+    }
+    let request = |owner: &Scope, node, index| {
+        let held = capture();
+        let calls = calls.clone();
+        owner
+            .request(Query::Bounds(node), move |result| {
+                std::hint::black_box(&held);
+                calls.borrow_mut().push((index, result));
+            })
+            .unwrap()
+    };
+    let gone = request(&foreign, target, 1);
+    let cancelled = request(&parent, outside, 2);
+    let live = request(&foreign, outside, 3);
+    let accepted = wire.borrow().applied;
+
+    parent.dispose();
+    // Captures can reenter App from Drop, and the parent's external query is
+    // released before any host response or another flush.
+    assert_eq!(drops.get(), 3);
+    assert!(foreign.is_alive());
+    assert_eq!(app.tree().roots(), [outside]);
+    assert!(app.tree().node(target).is_err());
+    app.flush().unwrap();
+    assert_eq!(wire.borrow().applied, accepted + 1, "one semantic Dispose");
+    assert_eq!(*calls.borrow(), [(1, Err(Error::NodeGone(target)))]);
+    assert_eq!(drops.get(), 4);
+    assert_eq!(
+        (
+            app.stats().queries,
+            app.stats().query_owners,
+            app.stats().query_targets
+        ),
+        (1, 1, 1)
+    );
+    assert_eq!(app.stats().handlers, 0);
+
+    let next = app
+        .scope()
+        .create(Descriptor::new(Props::Button(Default::default())))
+        .unwrap();
+    let previous = [root, target]
+        .into_iter()
+        .find(|old| old.slot() == next.slot())
+        .unwrap();
+    assert!(next.generation() > previous.generation());
+    assert!(!app.dispatch(next, Event::Activate).unwrap());
+    for token in [gone, cancelled, live] {
+        reply(
+            &wire,
+            token,
+            accepted,
+            Ok(QueryValue::Bounds(Rect::default())),
+        );
+    }
+    app.pump().unwrap();
+    assert_eq!(calls.borrow().len(), 2);
+    assert_eq!(
+        calls.borrow()[1],
+        (3, Ok(QueryValue::Bounds(Rect::default())))
+    );
+    assert_eq!(drops.get(), 5);
+    assert_eq!(
+        (
+            app.stats().queries,
+            app.stats().query_owners,
+            app.stats().query_targets
+        ),
+        (0, 0, 0)
+    );
+    foreign.dispose();
+    drop(parked);
+    app.clear().unwrap();
+}
+
+#[test]
 fn scoped_reply_resources_retire_with_the_requester_including_error_replies() {
     for result in [
         Ok(QueryValue::Bounds(Rect::default())),

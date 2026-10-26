@@ -2363,3 +2363,27 @@ None 项，重复更新按最终已提交值合并，退休世代不进入视图
 名称、FocusScope、世代水位、事件清理和 receipt 语义不变；两份 Memory 和全部
 节点身份仍保留。实现、约束及前后测量见
 [批量路径质量优化报告](bulk-lifecycle-quality-2026-10-26.md)。
+
+## 2026-10-26 跨平台功能差距和移动宿主
+
+按用户指定与本地 Dioxus 工作树比较功能，并优先补跨平台交付；完整矩阵见
+[功能差距及补齐报告](dioxus-feature-gap-analysis-2026-10-26.md)。SSR 框架集成
+仍只支持 Salvo。项目内 CLI 新增显式 target、诊断与跨目标运行拒绝，以及含
+资产/哈希清单的桌面目录包；真实 Counter release 与复制后的资产定位均验证。
+
+Blitz shell 新增显式 AndroidApp 和外部事件循环入口，并开放 UIKit 编译路径。
+独立 mobile 示例复用 Counter，提供两种 Android ABI 的实际链接/签名 APK。
+Android 16 x86_64 的全新 D: AVD 已验证绘制、触摸、Gboard 数字键、后台恢复、
+旋转和同进程 Activity 重建。Winit Destroy/循环独占许可修复维护于真正组织
+fork，和 Blitz/锁文件/来源记录一起固定；没有 vendor 或新运行时 unsafe。
+唯一导出属性例外经用户明确授权，限制在示例 android_main。
+
+工作区全特性测试和 native 严格 Clippy、三个 fork 的独立测试、CLI 19 项测试和
+复制后运行、Windows 普通/AccessKit 真窗口及独立 UIA 客户端均通过。
+Android 适配器严格 Clippy 为 --no-deps，已有 core const thread-local 的 Android
+全图诊断另行保留，不宣称全图严格检查通过。脚本新增 -Android 和可选的
+-AndroidSerial gate，构建与运行分别报告。
+
+用户确认暂无 Mac。iOS 入口、plist 与模拟器包脚本仅通过语法/元数据检查，未在
+Apple SDK 编译或运行。Android arm64 真机、CJK 组合输入、移动资产/无障碍、
+iOS 签名/生命周期/输入及桌面安装器仍待补齐；不据此关闭完整平台目标。

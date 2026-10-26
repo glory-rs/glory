@@ -418,7 +418,16 @@ pub(super) fn mark(dom: &Dom, id: NodeId) {
 }
 /// Current declarations only. Retiring/blocking an editor ends the one draft
 /// and pending desired value; a late native composition event cannot restore it.
-pub(super) fn update(dom: &Dom, tree: &glory_render::memory::Memory) -> Result<(), Error> {
+pub(super) fn update(
+    dom: &Dom,
+    tree: &glory_render::memory::Memory,
+    changes: &crate::semantic_changes::StateChanges,
+) -> Result<(), Error> {
+    // Only semantic eligibility, focus policy, document revision and topology
+    // affect this reconciliation. Native editing is observed separately.
+    if !(changes.inherited() || changes.focus || changes.rich_document) {
+        return Ok(());
+    }
     let live: Vec<_> = dom.rich_live.borrow().iter().copied().collect();
     for id in live {
         let model = tree.node(id)?;

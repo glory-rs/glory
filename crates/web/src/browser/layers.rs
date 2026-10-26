@@ -55,22 +55,27 @@ impl Layers {
         &mut self,
         tree: &glory_render::memory::Memory,
         changes: &crate::semantic_changes::Changes<'_>,
+        state: &crate::semantic_changes::StateChanges,
     ) {
-        self.scope_declarations.clear();
-        for id in tree.focus_scope_roots() {
-            if tree.active(id)
-                && !tree.inert(id)
-                && tree.enabled(id)
-                && let Some(config) = tree.node(id).ok().and_then(|node| {
-                    node.descriptor
-                        .view()
-                        .semantics
-                        .as_ref()?
-                        .focus_scope
-                        .as_ref()
-                })
-            {
-                self.scope_declarations.insert(id, config.clone());
+        // Scope membership/configuration and inherited eligibility are stable
+        // across local text/style/value patches. Physical layer sync still runs.
+        if state.inherited() {
+            self.scope_declarations.clear();
+            for id in tree.focus_scope_roots() {
+                if tree.active(id)
+                    && !tree.inert(id)
+                    && tree.enabled(id)
+                    && let Some(config) = tree.node(id).ok().and_then(|node| {
+                        node.descriptor
+                            .view()
+                            .semantics
+                            .as_ref()?
+                            .focus_scope
+                            .as_ref()
+                    })
+                {
+                    self.scope_declarations.insert(id, config.clone());
+                }
             }
         }
         for (&id, semantics) in changes {

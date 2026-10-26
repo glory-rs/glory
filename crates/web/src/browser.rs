@@ -172,24 +172,27 @@ impl Render for Renderer {
             })()
         };
         self.receipt = mapper.receipt();
-        let metadata = crate::semantic_changes::collect(mapper.tree(), mutations);
+        let changes = crate::semantic_changes::collect(mapper.tree(), mutations);
+        let metadata = &changes.metadata;
         swipe::update(&self.dom, mapper.tree());
         self.dom
             .sheets
             .borrow_mut()
-            .update(mapper.tree(), mutations, &metadata);
+            .update(mapper.tree(), mutations, metadata);
         if self.dom.sheets.borrow().needs_frame() {
             self.dom.frame.input();
         }
         self.dom
             .layers
             .borrow_mut()
-            .update(mapper.tree(), &metadata);
-        self.dom.update_collapses(mapper.tree(), &metadata);
-        self.dom.update_translations(mapper.tree(), &metadata);
+            .update(mapper.tree(), metadata, &changes.state);
+        self.dom.update_collapses(mapper.tree(), metadata);
+        self.dom.update_translations(mapper.tree(), metadata);
         self.dom.update_clipboard(mapper.tree());
-        self.dom.update_files(mapper.tree());
-        rich::update(&self.dom, mapper.tree())?;
+        if changes.state.structure || changes.state.file_configuration {
+            self.dom.update_files(mapper.tree());
+        }
+        rich::update(&self.dom, mapper.tree(), &changes.state)?;
         drop(mapper);
         if !self.dom.staging.get() && self.dom.live.get() {
             sheet::sync_accepted(&self.dom)?;

@@ -44,6 +44,10 @@ def test_fork(fork, directory, target):
     assert Path(metadata["target_directory"]).resolve() == target
     for arguments in [fork["tests"], *fork.get("extra_tests", [])]:
         run("cargo", "test", "--locked", "--manifest-path", manifest, *arguments)
+    for index, source in enumerate(fork.get("rustc_tests", [])):
+        executable = target / f"{fork['name']}-standalone-{index}{'.exe' if os.name == 'nt' else ''}"
+        run("rustc", "--edition", "2024", "--test", str(directory / source), "-o", str(executable))
+        run(str(executable))
     assert not output("git", "-C", str(directory), "status", "--porcelain"), directory
 
 
@@ -81,6 +85,7 @@ def main():
         root / "Cargo.lock",
         root / "examples/semantic-web/Cargo.lock",
         root / "examples/counter/Cargo.lock",
+        root / "examples/mobile/Cargo.lock",
     ):
         packages = tomllib.loads(lockfile.read_text(encoding="utf-8"))["package"]
         assert not retired.intersection(package["name"] for package in packages), lockfile
@@ -90,7 +95,7 @@ def main():
                 if package["name"] in fork["packages"]:
                     assert package.get("source") == expected, (lockfile, package)
     assert not (root / "vendor").exists(), "Engine sources belong in the organization forks"
-    print(f"Verified two immutable glory-rs Git forks, six engine/layout packages, one shared type identity per package; {len(member_names)} Glory workspace crates.")
+    print(f"Verified {len(record['forks'])} immutable glory-rs Git forks, {sum(len(fork['packages']) for fork in record['forks'])} engine/platform packages, one shared type identity per package; {len(member_names)} Glory workspace crates.")
 
 
 if __name__ == "__main__":

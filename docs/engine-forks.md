@@ -9,8 +9,9 @@ vendor、副本补丁树或子模块；应用无需添加全局 Cargo patch。
 
 | Fork | 上游基线 | Glory 固定提交 | 维护范围 |
 |---|---|---|---|
-| [glory-rs/blitz](https://github.com/glory-rs/blitz) | `92b11f1b` / beta.4 | [c850a2ae](https://github.com/glory-rs/blitz/commit/c850a2aee1a8cb49eee1386120807751d7480559) | 资源生命周期、增量失效、焦点、密码显示、IME、阶段计时、inline 样式差分失效、隐藏子树销毁与移动缓存回收及真正的文档顶层 |
+| [glory-rs/blitz](https://github.com/glory-rs/blitz) | `92b11f1b` / beta.4 | [80938ef8](https://github.com/glory-rs/blitz/commit/80938ef8369257e82080ebd7d477b254487accec) | 资源生命周期、增量失效、焦点、密码显示、IME、阶段计时、inline 样式差分失效、隐藏子树销毁与移动缓存回收、真正的文档顶层和固定 Winit Activity 生命周期修复 |
 | [glory-rs/taffy](https://github.com/glory-rs/taffy) | `eb645069` / 0.15.0 | [dd7914fb](https://github.com/glory-rs/taffy/commit/dd7914fba2e6e0b5d8a2c8854d764a2ade817efd) | 小数 flex 因子的 gap 计算与回归测试 |
+| [glory-rs/winit](https://github.com/glory-rs/winit) | `d597ced7` / 0.31.0-beta.4 | [07fe20de](https://github.com/glory-rs/winit/commit/07fe20dec93211df240050f76dada687c0d705ee) | Android Destroy 退出当前事件循环，释放 Activity 循环独占许可后允许同进程重建；保留上游包和锁定的测试依赖 |
 
 恢复上游包名 blitz-dom/traits/paint/shell、stylo_taffy、taffy；Glory 自己的
 适配 crate 继续叫 glory-blitz。Blitz fork 的 workspace 统一固定同一个 Taffy

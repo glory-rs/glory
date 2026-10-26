@@ -3,6 +3,8 @@
 #[cfg(target_arch = "wasm32")]
 mod adaptive;
 #[cfg(target_arch = "wasm32")]
+mod controller_client;
+#[cfg(target_arch = "wasm32")]
 mod css_client;
 pub mod css_form;
 #[cfg(target_arch = "wasm32")]
@@ -205,6 +207,7 @@ mod browser {
     }
     #[wasm_bindgen]
     pub fn unmount() {
+        crate::controller_client::clear();
         crate::css_client::clear();
         crate::entries_client::clear();
         crate::fields_client::clear();

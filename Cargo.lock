@@ -484,7 +484,7 @@ checksum = "3ded4057c258ba199e2d26386d3af3780957ecaee6c4ef4041c6b4b8b97c0b06"
 [[package]]
 name = "blitz-dom"
 version = "0.3.0-beta.4"
-source = "git+https://github.com/glory-rs/blitz?rev=c850a2aee1a8cb49eee1386120807751d7480559#c850a2aee1a8cb49eee1386120807751d7480559"
+source = "git+https://github.com/glory-rs/blitz?rev=80938ef8369257e82080ebd7d477b254487accec#80938ef8369257e82080ebd7d477b254487accec"
 dependencies = [
  "accesskit",
  "anyrender",
@@ -495,7 +495,7 @@ dependencies = [
  "color",
  "cssparser",
  "cursor-icon",
- "debug_timer 0.1.3 (git+https://github.com/glory-rs/blitz?rev=c850a2aee1a8cb49eee1386120807751d7480559)",
+ "debug_timer 0.1.3 (git+https://github.com/glory-rs/blitz?rev=80938ef8369257e82080ebd7d477b254487accec)",
  "euclid",
  "html-escape",
  "icu_locale_core",
@@ -529,7 +529,7 @@ dependencies = [
 [[package]]
 name = "blitz-paint"
 version = "0.3.0-beta.4"
-source = "git+https://github.com/glory-rs/blitz?rev=c850a2aee1a8cb49eee1386120807751d7480559#c850a2aee1a8cb49eee1386120807751d7480559"
+source = "git+https://github.com/glory-rs/blitz?rev=80938ef8369257e82080ebd7d477b254487accec#80938ef8369257e82080ebd7d477b254487accec"
 dependencies = [
  "anyrender",
  "blitz-dom",
@@ -549,7 +549,7 @@ dependencies = [
 [[package]]
 name = "blitz-shell"
 version = "0.3.0-beta.4"
-source = "git+https://github.com/glory-rs/blitz?rev=c850a2aee1a8cb49eee1386120807751d7480559#c850a2aee1a8cb49eee1386120807751d7480559"
+source = "git+https://github.com/glory-rs/blitz?rev=80938ef8369257e82080ebd7d477b254487accec#80938ef8369257e82080ebd7d477b254487accec"
 dependencies = [
  "android-activity",
  "anyrender",
@@ -568,7 +568,7 @@ dependencies = [
 [[package]]
 name = "blitz-traits"
 version = "0.3.0-beta.4"
-source = "git+https://github.com/glory-rs/blitz?rev=c850a2aee1a8cb49eee1386120807751d7480559#c850a2aee1a8cb49eee1386120807751d7480559"
+source = "git+https://github.com/glory-rs/blitz?rev=80938ef8369257e82080ebd7d477b254487accec#80938ef8369257e82080ebd7d477b254487accec"
 dependencies = [
  "atomic_refcell",
  "bitflags",
@@ -729,7 +729,7 @@ dependencies = [
  "cap-primitives",
  "cap-std",
  "io-lifetimes 3.0.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -746,7 +746,7 @@ dependencies = [
  "maybe-owned",
  "rustix 1.1.5",
  "rustix-linux-procfs",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
  "winx",
 ]
 
@@ -1026,7 +1026,7 @@ checksum = "da220af51a1a335e9a930beaaef53d261e41ea9eecfb3d973a3ddae1a7284b9c"
 [[package]]
 name = "debug_timer"
 version = "0.1.3"
-source = "git+https://github.com/glory-rs/blitz?rev=c850a2aee1a8cb49eee1386120807751d7480559#c850a2aee1a8cb49eee1386120807751d7480559"
+source = "git+https://github.com/glory-rs/blitz?rev=80938ef8369257e82080ebd7d477b254487accec#80938ef8369257e82080ebd7d477b254487accec"
 
 [[package]]
 name = "der-parser"
@@ -1118,8 +1118,7 @@ checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 [[package]]
 name = "dpi"
 version = "0.1.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8b14ccef22fc6f5a8f4d7d768562a182c04ce9a3b3157b91390b52ddfdf1a76"
+source = "git+https://github.com/glory-rs/winit?rev=07fe20dec93211df240050f76dada687c0d705ee#07fe20dec93211df240050f76dada687c0d705ee"
 
 [[package]]
 name = "drm"
@@ -1242,7 +1241,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3410,7 +3409,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3476,7 +3475,7 @@ dependencies = [
  "security-framework",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3917,7 +3916,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d1e2c7f27f8d4cb10542a02c49005dbd6e93095799d6f3be745fae9f8fedd4"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -4147,7 +4146,7 @@ dependencies = [
 [[package]]
 name = "stylo_taffy"
 version = "0.3.0-beta.4"
-source = "git+https://github.com/glory-rs/blitz?rev=c850a2aee1a8cb49eee1386120807751d7480559#c850a2aee1a8cb49eee1386120807751d7480559"
+source = "git+https://github.com/glory-rs/blitz?rev=80938ef8369257e82080ebd7d477b254487accec#80938ef8369257e82080ebd7d477b254487accec"
 dependencies = [
  "bitflags",
  "stylo",
@@ -4256,7 +4255,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.5",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4641,7 +4640,7 @@ checksum = "f2f6fb2847f6742cd76af783a2a2c49e9375d0a111c7bef6f71cd9e738c72d6e"
 dependencies = [
  "memoffset",
  "tempfile",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -5028,7 +5027,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -5309,8 +5308,7 @@ checksum = "d6bbff5f0aada427a1e5a6da5f1f98158182f26556f345ac9e04d36d0ebed650"
 [[package]]
 name = "winit"
 version = "0.31.0-beta.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "453408a9f608e14c92c6c1b5ef0193e1699aee3bfb17b48cc5423c6ec2ae1806"
+source = "git+https://github.com/glory-rs/winit?rev=07fe20dec93211df240050f76dada687c0d705ee#07fe20dec93211df240050f76dada687c0d705ee"
 dependencies = [
  "bitflags",
  "cfg_aliases",
@@ -5336,8 +5334,7 @@ dependencies = [
 [[package]]
 name = "winit-android"
 version = "0.31.0-beta.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d356e863a4adda4a0309e34a0cafbb9dd57be61cca7c7ae3de95a285938959cd"
+source = "git+https://github.com/glory-rs/winit?rev=07fe20dec93211df240050f76dada687c0d705ee#07fe20dec93211df240050f76dada687c0d705ee"
 dependencies = [
  "android-activity",
  "bitflags",
@@ -5352,8 +5349,7 @@ dependencies = [
 [[package]]
 name = "winit-appkit"
 version = "0.31.0-beta.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd77d5b64db1abaf4ba11d08c1da69695f9c4fdc3ee19a543479872ef79e05c0"
+source = "git+https://github.com/glory-rs/winit?rev=07fe20dec93211df240050f76dada687c0d705ee#07fe20dec93211df240050f76dada687c0d705ee"
 dependencies = [
  "bitflags",
  "block2 0.6.2",
@@ -5375,8 +5371,7 @@ dependencies = [
 [[package]]
 name = "winit-common"
 version = "0.31.0-beta.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93ef82b1146fc93e6f60755e851152d708ede1f845eb73e8fdefc3192458ccf5"
+source = "git+https://github.com/glory-rs/winit?rev=07fe20dec93211df240050f76dada687c0d705ee#07fe20dec93211df240050f76dada687c0d705ee"
 dependencies = [
  "block2 0.6.2",
  "dpi",
@@ -5394,8 +5389,7 @@ dependencies = [
 [[package]]
 name = "winit-core"
 version = "0.31.0-beta.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "74158ad0526ab0f1e850b89f63a4513f4fee9178ef72b408bfb37f30a429d62e"
+source = "git+https://github.com/glory-rs/winit?rev=07fe20dec93211df240050f76dada687c0d705ee#07fe20dec93211df240050f76dada687c0d705ee"
 dependencies = [
  "bitflags",
  "cursor-icon",
@@ -5409,8 +5403,7 @@ dependencies = [
 [[package]]
 name = "winit-orbital"
 version = "0.31.0-beta.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "321adbc811d8b15f34f6d6ec49afaff4cbc06c3e807e56de8eda6ec9d3466151"
+source = "git+https://github.com/glory-rs/winit?rev=07fe20dec93211df240050f76dada687c0d705ee#07fe20dec93211df240050f76dada687c0d705ee"
 dependencies = [
  "bitflags",
  "dpi",
@@ -5426,8 +5419,7 @@ dependencies = [
 [[package]]
 name = "winit-uikit"
 version = "0.31.0-beta.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed4addb22374bc174e41143c22608ed125590962157bdcb02415377b41ef1b5a"
+source = "git+https://github.com/glory-rs/winit?rev=07fe20dec93211df240050f76dada687c0d705ee#07fe20dec93211df240050f76dada687c0d705ee"
 dependencies = [
  "bitflags",
  "block2 0.6.2",
@@ -5447,8 +5439,7 @@ dependencies = [
 [[package]]
 name = "winit-wayland"
 version = "0.31.0-beta.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8352b11bc0d223a37bbbdb55d2250949917c313f3ee07a34da7d614d74fce69e"
+source = "git+https://github.com/glory-rs/winit?rev=07fe20dec93211df240050f76dada687c0d705ee#07fe20dec93211df240050f76dada687c0d705ee"
 dependencies = [
  "bitflags",
  "calloop",
@@ -5475,8 +5466,7 @@ dependencies = [
 [[package]]
 name = "winit-web"
 version = "0.31.0-beta.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1c38d83a15b854abe625a3db8144ad9a5094899d9a0bc976b4edc4c233197563"
+source = "git+https://github.com/glory-rs/winit?rev=07fe20dec93211df240050f76dada687c0d705ee#07fe20dec93211df240050f76dada687c0d705ee"
 dependencies = [
  "atomic-waker",
  "bitflags",
@@ -5498,8 +5488,7 @@ dependencies = [
 [[package]]
 name = "winit-win32"
 version = "0.31.0-beta.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf3b2326760dad4a8fe721a8c8a40fd4f7efb338ef468f340794ea1efcd5261e"
+source = "git+https://github.com/glory-rs/winit?rev=07fe20dec93211df240050f76dada687c0d705ee#07fe20dec93211df240050f76dada687c0d705ee"
 dependencies = [
  "bitflags",
  "cursor-icon",
@@ -5517,8 +5506,7 @@ dependencies = [
 [[package]]
 name = "winit-x11"
 version = "0.31.0-beta.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eee2be0a6dce77b889b6f9040a349e8c2cea6c0c4257f0b61591d7e0d9a6dfaf"
+source = "git+https://github.com/glory-rs/winit?rev=07fe20dec93211df240050f76dada687c0d705ee#07fe20dec93211df240050f76dada687c0d705ee"
 dependencies = [
  "bitflags",
  "bytemuck",

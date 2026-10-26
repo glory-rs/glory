@@ -5,10 +5,16 @@ use super::*;
 #[path = "editing.rs"]
 mod editing;
 use editing::ime_event;
-#[cfg(feature = "accesskit")]
+#[cfg(all(
+    feature = "accesskit",
+    not(any(target_os = "android", target_os = "ios"))
+))]
 #[path = "accessibility.rs"]
 mod accessibility;
-#[cfg(feature = "accesskit")]
+#[cfg(all(
+    feature = "accesskit",
+    not(any(target_os = "android", target_os = "ios"))
+))]
 #[path = "accesskit_platform.rs"]
 mod accesskit_platform;
 use std::cell::{Cell, Ref, RefMut};
@@ -30,6 +36,8 @@ use keyboard_types::{Key, Modifiers, NamedKey};
 use winit::application::ApplicationHandler;
 use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, EventLoop};
+#[cfg(target_os = "android")]
+pub use winit::platform::android::activity::AndroidApp;
 pub use winit::window::WindowAttributes;
 use winit::window::WindowId;
 
@@ -63,9 +71,15 @@ pub struct WindowApp {
     executor: Rc<Executor>,
     revision: Cell<u64>,
     error: Option<glory_ui::Error>,
-    #[cfg(feature = "accesskit")]
+    #[cfg(all(
+        feature = "accesskit",
+        not(any(target_os = "android", target_os = "ios"))
+    ))]
     accessibility: RefCell<accessibility::Tree>,
-    #[cfg(feature = "accesskit")]
+    #[cfg(all(
+        feature = "accesskit",
+        not(any(target_os = "android", target_os = "ios"))
+    ))]
     requested_visible: bool,
 }
 impl Default for WindowApp {
@@ -97,9 +111,15 @@ impl WindowApp {
             executor,
             revision: Cell::new(0),
             error: None,
-            #[cfg(feature = "accesskit")]
+            #[cfg(all(
+                feature = "accesskit",
+                not(any(target_os = "android", target_os = "ios"))
+            ))]
             accessibility: RefCell::default(),
-            #[cfg(feature = "accesskit")]
+            #[cfg(all(
+                feature = "accesskit",
+                not(any(target_os = "android", target_os = "ios"))
+            ))]
             requested_visible: true,
         }
     }
@@ -1403,7 +1423,10 @@ impl WindowRenderer for CpuRenderer {
 /// One native event-loop owner; supports multiple independently owned Apps.
 pub struct Shell {
     // Platform subclasses must be removed before their window handles die.
-    #[cfg(feature = "accesskit")]
+    #[cfg(all(
+        feature = "accesskit",
+        not(any(target_os = "android", target_os = "ios"))
+    ))]
     accessibility: std::collections::HashMap<WindowId, accesskit_platform::Platform>,
     inner: BlitzApplication<CpuRenderer>,
     event_loop: Option<EventLoop>,
@@ -1439,21 +1462,46 @@ fn queue_color_scheme(state: &mut State, dark: bool) {
     }
 }
 impl Shell {
+    #[cfg(not(target_os = "android"))]
     pub fn new() -> Result<Self, ShellError> {
         let event_loop = EventLoop::builder()
             .build()
             .map_err(|error| ShellError::Window(error.to_string()))?;
+        Ok(Self::from_event_loop(event_loop))
+    }
+
+    /// Use an application-configured event loop. The caller follows winit's
+    /// platform thread/one-loop rules; UI state stays on that same thread.
+    pub fn from_event_loop(event_loop: EventLoop) -> Self {
         let (proxy, queue) = BlitzShellProxy::new(event_loop.create_proxy());
-        Ok(Self {
-            #[cfg(feature = "accesskit")]
+        Self {
+            #[cfg(all(
+                feature = "accesskit",
+                not(any(target_os = "android", target_os = "ios"))
+            ))]
             accessibility: Default::default(),
             inner: BlitzApplication::new(proxy, queue),
             event_loop: Some(event_loop),
             error: Rc::default(),
-        })
+        }
+    }
+
+    /// Build the native-activity event loop from this invocation's AndroidApp.
+    /// Never discover or store a process-global Activity.
+    #[cfg(target_os = "android")]
+    pub fn android(app: AndroidApp) -> Result<Self, ShellError> {
+        use winit::platform::android::EventLoopBuilderExtAndroid;
+        let event_loop = EventLoop::builder()
+            .with_android_app(app)
+            .build()
+            .map_err(|error| ShellError::Window(error.to_string()))?;
+        Ok(Self::from_event_loop(event_loop))
     }
     pub fn add_window(&mut self, app: WindowApp, attributes: WindowAttributes) {
-        #[cfg(feature = "accesskit")]
+        #[cfg(all(
+            feature = "accesskit",
+            not(any(target_os = "android", target_os = "ios"))
+        ))]
         let (app, attributes) = {
             let mut app = app;
             app.requested_visible = attributes.visible;
@@ -1498,7 +1546,10 @@ impl Shell {
         error.borrow_mut().take().map_or(Ok(()), Err)
     }
     fn check(&mut self, event_loop: &dyn ActiveEventLoop) {
-        #[cfg(feature = "accesskit")]
+        #[cfg(all(
+            feature = "accesskit",
+            not(any(target_os = "android", target_os = "ios"))
+        ))]
         for (id, view) in &mut self.inner.windows {
             let platform = self
                 .accessibility
@@ -1520,7 +1571,10 @@ impl Shell {
             }
         }
         if self.error.borrow().is_some() {
-            #[cfg(feature = "accesskit")]
+            #[cfg(all(
+                feature = "accesskit",
+                not(any(target_os = "android", target_os = "ios"))
+            ))]
             self.accessibility.clear();
             self.inner.windows.clear();
             event_loop.exit();
@@ -1539,7 +1593,10 @@ impl ApplicationHandler for Shell {
         self.inner.destroy_surfaces(event_loop);
     }
     fn window_event(&mut self, event_loop: &dyn ActiveEventLoop, id: WindowId, event: WindowEvent) {
-        #[cfg(feature = "accesskit")]
+        #[cfg(all(
+            feature = "accesskit",
+            not(any(target_os = "android", target_os = "ios"))
+        ))]
         if let Some(platform) = self.accessibility.get_mut(&id) {
             if matches!(event, WindowEvent::CloseRequested | WindowEvent::Destroyed) {
                 self.accessibility.remove(&id);
@@ -1607,11 +1664,17 @@ impl ApplicationHandler for Shell {
                     view.downcast_doc_mut::<WindowApp>().renderer.invalidate();
                 }
             }
-            #[cfg(feature = "accesskit")]
+            #[cfg(all(
+                feature = "accesskit",
+                not(any(target_os = "android", target_os = "ios"))
+            ))]
             if let BlitzShellEvent::CloseWindow { window_id } = &event {
                 self.accessibility.remove(window_id);
             }
-            #[cfg(feature = "accesskit")]
+            #[cfg(all(
+                feature = "accesskit",
+                not(any(target_os = "android", target_os = "ios"))
+            ))]
             let accessibility = if let BlitzShellEvent::Embedder(value) = &event
                 && let Some(message) = value.downcast_ref::<accesskit_platform::Message>()
             {
@@ -1625,7 +1688,10 @@ impl ApplicationHandler for Shell {
             } else {
                 false
             };
-            #[cfg(not(feature = "accesskit"))]
+            #[cfg(not(all(
+                feature = "accesskit",
+                not(any(target_os = "android", target_os = "ios"))
+            )))]
             let accessibility = false;
             if !accessibility {
                 self.inner.handle_blitz_shell_event(event_loop, event);
@@ -1645,24 +1711,24 @@ impl ApplicationHandler for Shell {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(any(target_os = "android", target_os = "ios"))))]
 #[path = "command_tests.rs"]
 mod command_tests;
-#[cfg(test)]
+#[cfg(all(test, not(any(target_os = "android", target_os = "ios"))))]
 #[path = "editing_tests.rs"]
 mod editing_tests;
-#[cfg(test)]
+#[cfg(all(test, not(any(target_os = "android", target_os = "ios"))))]
 #[path = "environment_tests.rs"]
 mod environment_tests;
-#[cfg(test)]
+#[cfg(all(test, not(any(target_os = "android", target_os = "ios"))))]
 #[path = "focus_scope_tests.rs"]
 mod focus_scope_tests;
-#[cfg(test)]
+#[cfg(all(test, not(any(target_os = "android", target_os = "ios"))))]
 #[path = "focus_tests.rs"]
 mod focus_tests;
-#[cfg(test)]
+#[cfg(all(test, not(any(target_os = "android", target_os = "ios"))))]
 #[path = "layer_tests.rs"]
 mod layer_tests;
-#[cfg(test)]
+#[cfg(all(test, not(any(target_os = "android", target_os = "ios"))))]
 #[path = "shell_tests.rs"]
 mod tests;

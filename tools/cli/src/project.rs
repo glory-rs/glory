@@ -28,6 +28,7 @@ pub struct Config {
 #[serde(default, deny_unknown_fields, rename_all = "kebab-case")]
 pub struct Host {
     pub bin: Option<String>,
+    pub target: Option<String>,
     pub features: Vec<String>,
     pub no_default_features: bool,
     pub index: Option<PathBuf>,
@@ -63,6 +64,11 @@ impl Paths {
         std::fs::create_dir_all(&root).map_err(|e| format!("create {}: {e}", root.display()))?;
         let root = root.canonicalize().map_err(|e| e.to_string())?;
         validate_build_root(&root)?;
+        // Python build generators (including Stylo) join OUT_DIR with `..`.
+        // Windows verbatim paths disable that normalization and reject the
+        // result. Validate the real destination first, then pass Cargo a normal
+        // absolute drive path so downstream generators can traverse parents.
+        let root = compiler_path(root);
         let cargo_home = std::env::var_os("CARGO_HOME")
             .map(PathBuf::from)
             .filter(|path| validate_build_root(path).is_ok())
@@ -86,8 +92,19 @@ impl Paths {
             .env("CARGO_TARGET_DIR", &self.target)
             .env("TEMP", &self.temp)
             .env("TMP", &self.temp)
-            .env("TMPDIR", &self.temp);
+            .env("TMPDIR", &self.temp)
+            .env("PYTHONPYCACHEPREFIX", self.root.join("pycache"));
     }
+}
+
+fn compiler_path(path: PathBuf) -> PathBuf {
+    #[cfg(windows)]
+    if let Some(normal) = path.to_str().and_then(|path| path.strip_prefix(r"\\?\"))
+        && normal.as_bytes().get(1) == Some(&b':')
+    {
+        return PathBuf::from(normal);
+    }
+    path
 }
 
 pub fn validate_build_root(path: &Path) -> Result<()> {
@@ -134,6 +151,7 @@ pub struct Project {
     pub platform: Platform,
     pub paths: Paths,
     pub rust_host: String,
+    pub build_target: String,
     pub bindgen_version: Option<String>,
     pub watch_roots: Vec<PathBuf>,
 }
@@ -278,6 +296,20 @@ impl Project {
             .find_map(|line| line.strip_prefix("host: "))
             .ok_or("rustc did not report its host")?
             .to_owned();
+        let build_target = resolve_target(
+            platform,
+            args.target.as_deref().or(host.target.as_deref()),
+            &rust_host,
+        )?;
+        let targets = capture(Command::new("rustc").args(["--print", "target-list"]))?;
+        if !String::from_utf8_lossy(&targets.stdout)
+            .lines()
+            .any(|target| target == build_target)
+        {
+            return Err(format!(
+                "unknown built-in Rust target {build_target:?}; use rustc --print target-list"
+            ));
+        }
         let mut project = Self {
             cancel: args.cancel.clone(),
             root,
@@ -287,11 +319,19 @@ impl Project {
             platform,
             paths,
             rust_host,
+            build_target,
             bindgen_version: None,
             watch_roots: Vec::new(),
         };
         let mut command = project.cargo();
-        command.args(["metadata", "--locked", "--format-version", "1"]);
+        command.args([
+            "metadata",
+            "--locked",
+            "--format-version",
+            "1",
+            "--filter-platform",
+            project.target(),
+        ]);
         project.selection(&mut command, false, args);
         let metadata: Value = serde_json::from_slice(
             &capture_with_cancel(&mut command, args.cancel.as_deref())?.stdout,
@@ -347,16 +387,23 @@ impl Project {
         self.package["name"].as_str().unwrap_or("app")
     }
     pub fn target(&self) -> &str {
-        if self.platform == Platform::Web {
-            "wasm32-unknown-unknown"
-        } else {
-            &self.rust_host
+        &self.build_target
+    }
+
+    pub fn ensure_runnable(&self) -> Result<()> {
+        if self.platform != Platform::Web && self.target() != self.rust_host {
+            return Err(format!(
+                "cannot run target {} on host {}; use build or bundle and run on the target system",
+                self.target(),
+                self.rust_host
+            ));
         }
+        Ok(())
     }
 
     pub fn plan(&self, args: &Args) -> Value {
         json!({ "cli_version": env!("CARGO_PKG_VERSION"), "manifest": self.manifest,
-            "package": self.name(), "platform": self.platform, "features": self.host.features,
+            "package": self.name(), "platform": self.platform, "features": self.host.features, "rust_host": self.rust_host,
             "bin": self.host.bin, "target": self.target(), "release": args.release,
             "build_root": self.paths.root, "cargo_home": self.paths.cargo_home,
             "target_directory": self.paths.target, "temporary_directory": self.paths.temp,
@@ -390,6 +437,35 @@ impl Project {
             self.paths.target.display(),
             self.paths.cargo_home.display()
         );
+        let mut command = Command::new("rustc");
+        command.args(["--print", "target-libdir", "--target", self.target()]);
+        self.paths.apply(&mut command);
+        let output = self.capture(&mut command)?;
+        let library = PathBuf::from(String::from_utf8_lossy(&output.stdout).trim());
+        let installed = std::fs::read_dir(&library).is_ok_and(|entries| {
+            entries.filter_map(std::result::Result::ok).any(|entry| {
+                let name = entry.file_name();
+                let name = name.to_string_lossy();
+                name.starts_with("libstd-") && name.ends_with(".rlib")
+            })
+        });
+        println!(
+            "Build target: {}\nTarget libraries: {}",
+            self.target(),
+            library.display()
+        );
+        if !installed {
+            return Err(format!(
+                "Rust standard library for {} is missing; install it with rustup target add {}",
+                self.target(),
+                self.target()
+            ));
+        }
+        if self.platform != Platform::Web && self.target() != self.rust_host {
+            println!(
+                "Cross-compilation selected: configure the target linker/SDK using Cargo; run is disabled. Linker and runtime availability require a real build and target-system acceptance."
+            );
+        }
         if let Some(version) = &self.bindgen_version {
             println!(
                 "Required wasm-bindgen: {version} (project-local installation on first Web build)"
@@ -429,6 +505,36 @@ impl Project {
         }
         self.status(&mut command)
     }
+}
+
+fn resolve_target(platform: Platform, requested: Option<&str>, rust_host: &str) -> Result<String> {
+    let target = requested.unwrap_or(if platform == Platform::Web {
+        "wasm32-unknown-unknown"
+    } else {
+        rust_host
+    });
+    if target.is_empty()
+        || !target
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+    {
+        return Err(
+            "--target must be a built-in Rust target triple, not a path or command option".into(),
+        );
+    }
+    if platform == Platform::Web {
+        if target != "wasm32-unknown-unknown" {
+            return Err("Web requires --target wasm32-unknown-unknown".into());
+        }
+    } else if !(target.contains("-windows-")
+        || (target.contains("-linux-") && !target.contains("android"))
+        || target.ends_with("-apple-darwin"))
+    {
+        return Err(format!(
+            "{target:?} has no configured desktop/server host; Android and iOS need dedicated application hosts and packaging"
+        ));
+    }
+    Ok(target.to_owned())
 }
 
 fn cargo(root: &Path, paths: &Paths) -> Command {
@@ -595,6 +701,70 @@ fn verify_source(package: &Value) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn native_targets_are_explicit_and_mobile_is_not_misreported_as_desktop() {
+        let host = "x86_64-pc-windows-msvc";
+        assert_eq!(resolve_target(Platform::Desktop, None, host).unwrap(), host);
+        assert_eq!(
+            resolve_target(Platform::Web, None, host).unwrap(),
+            "wasm32-unknown-unknown"
+        );
+        for target in [
+            "aarch64-apple-darwin",
+            "x86_64-unknown-linux-gnu",
+            "aarch64-unknown-linux-musl",
+            host,
+        ] {
+            assert_eq!(
+                resolve_target(Platform::Desktop, Some(target), host).unwrap(),
+                target
+            );
+            assert_eq!(
+                resolve_target(Platform::Server, Some(target), host).unwrap(),
+                target
+            );
+            assert!(resolve_target(Platform::Web, Some(target), host).is_err());
+        }
+        for target in [
+            "aarch64-linux-android",
+            "aarch64-apple-ios",
+            "aarch64-apple-ios-sim",
+            "wasm32-unknown-unknown",
+            "../target.json",
+            "--help",
+            "",
+            "x86_64\nlinux",
+        ] {
+            assert!(
+                resolve_target(Platform::Desktop, Some(target), host).is_err(),
+                "{target}"
+            );
+        }
+    }
+
+    #[test]
+    fn cross_target_can_be_planned_but_cannot_run_on_the_host() {
+        let scratch = crate::test_support::Scratch::new();
+        let mut project = scratch.project(Platform::Desktop);
+        let args = Args::parse(["print".into()]).unwrap();
+        assert!(project.ensure_runnable().is_ok());
+        project.build_target = "aarch64-apple-darwin".into();
+        assert_eq!(project.plan(&args)["target"], "aarch64-apple-darwin");
+        assert_eq!(project.plan(&args)["rust_host"], "x86_64-pc-windows-msvc");
+        assert!(
+            project
+                .ensure_runnable()
+                .unwrap_err()
+                .contains("cannot run target")
+        );
+        // Rejection precedes Cargo or executable creation, even for a broken app.
+        assert!(
+            crate::build::run(&project, &args)
+                .unwrap_err()
+                .contains("cannot run target")
+        );
+    }
     #[test]
     fn recognizes_both_wsl_drive_mount_formats_without_accepting_other_drives() {
         for source in ["D:\\\n", "D:", "//localhost/D$\n"] {

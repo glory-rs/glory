@@ -24,6 +24,28 @@ impl Scratch {
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(path, text).unwrap();
     }
+
+    pub fn project(&self, platform: crate::project::Platform) -> crate::project::Project {
+        let root = self.0.canonicalize().unwrap();
+        crate::project::Project {
+            cancel: None,
+            manifest: root.join("Cargo.toml"),
+            root: root.clone(),
+            package: serde_json::json!({"id":"fixture", "name":"fixture"}),
+            host: Default::default(),
+            platform,
+            paths: crate::project::Paths {
+                cargo_home: root.join("cargo"),
+                target: root.join("target"),
+                temp: root.join("tmp"),
+                root,
+            },
+            rust_host: "x86_64-pc-windows-msvc".into(),
+            build_target: "x86_64-pc-windows-msvc".into(),
+            bindgen_version: None,
+            watch_roots: Vec::new(),
+        }
+    }
 }
 
 impl Drop for Scratch {

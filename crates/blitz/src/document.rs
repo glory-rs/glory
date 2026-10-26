@@ -214,7 +214,13 @@ mod paint;
 pub use paint::*;
 #[cfg(all(
     feature = "shell",
-    any(target_os = "windows", target_os = "linux", target_os = "macos")
+    any(
+        target_os = "windows",
+        target_os = "linux",
+        target_os = "macos",
+        target_os = "android",
+        target_os = "ios"
+    )
 ))]
 #[path = "shell.rs"]
 pub mod shell;

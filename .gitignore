@@ -9,6 +9,7 @@ debug.log
 !/tools/cli/Cargo.lock
 !/examples/semantic-web/Cargo.lock
 !/examples/counter/Cargo.lock
+!/examples/mobile/Cargo.lock
 !/benchmarks/glory/Cargo.lock
 !/benchmarks/wasm-size/Cargo.lock
 !/benchmarks/role-patches/Cargo.lock

@@ -91,6 +91,80 @@ struct Present {
 }
 
 impl Present {
+    fn register_nodes(&mut self, owner: InstanceId, nodes: &[NodeId]) {
+        for &node in nodes {
+            self.node_owners.insert(node, owner);
+        }
+        let owned = self.owners.entry(owner).or_default();
+        let first = owned.nodes.is_empty();
+        owned.nodes.extend(nodes.iter().copied());
+        self.node_owner_count += usize::from(first && !owned.nodes.is_empty());
+    }
+
+    fn take_owner(&mut self, owner: InstanceId) -> Option<Owned> {
+        let owned = self.owners.remove(&owner)?;
+        self.node_owner_count -= usize::from(!owned.nodes.is_empty());
+        self.query_owner_count -= usize::from(!owned.queries.is_empty());
+        Some(owned)
+    }
+
+    fn unlink_subscription(&mut self, owner: InstanceId, node: NodeId, kind: EventKind) {
+        if let Some(owned) = self.owners.get_mut(&owner) {
+            owned.subscriptions.remove(&(node, kind));
+            if owned.is_empty() {
+                self.owners.remove(&owner);
+            }
+        }
+    }
+
+    /// Return the old capture so its destructor runs outside the Present borrow.
+    fn register_subscription(
+        &mut self,
+        node: NodeId,
+        kind: EventKind,
+        subscription: Subscription,
+    ) -> Option<Subscription> {
+        let owner = subscription.owner;
+        let previous = self
+            .handlers
+            .entry(node)
+            .or_default()
+            .insert(kind, subscription);
+        if let Some(previous) = &previous {
+            self.unlink_subscription(previous.owner, node, kind);
+        } else {
+            self.listeners.push((node, kind, true));
+        }
+        self.owners
+            .entry(owner)
+            .or_default()
+            .subscriptions
+            .insert((node, kind));
+        previous
+    }
+
+    fn remove_subscription(&mut self, node: NodeId, kind: EventKind) -> Option<Subscription> {
+        let subscription = self.handlers.get_mut(&node)?.remove(&kind)?;
+        if self.handlers.get(&node).is_some_and(BTreeMap::is_empty) {
+            self.handlers.remove(&node);
+        }
+        self.unlink_subscription(subscription.owner, node, kind);
+        self.listeners.push((node, kind, false));
+        Some(subscription)
+    }
+
+    fn register_query(&mut self, token: QueryToken, pending: PendingQuery) {
+        self.node_queries
+            .entry(pending.node)
+            .or_default()
+            .insert(token);
+        let owned = self.owners.entry(pending.owner).or_default();
+        let first = owned.queries.is_empty();
+        owned.queries.insert(token);
+        self.query_owner_count += usize::from(first);
+        self.queries.insert(token, pending);
+    }
+
     fn remove_query(&mut self, token: QueryToken) -> Option<PendingQuery> {
         let pending = self.queries.remove(&token)?;
         if let Some(tokens) = self.node_queries.get_mut(&pending.node) {
@@ -109,6 +183,61 @@ impl Present {
             }
         }
         Some(pending)
+    }
+
+    /// Memory supplies the actual retired identities. This only unlinks their
+    /// presentation interests; it never walks the tree or drops user captures.
+    fn retire_node(
+        &mut self,
+        node: NodeId,
+        retiring_owner: InstanceId,
+        discarded: &mut Vec<Handler>,
+        cancelled: &mut Vec<QueryToken>,
+    ) {
+        self.ids.release(node);
+        if !self.disposal_boundaries.is_empty() {
+            self.disposal_boundaries.remove(&node);
+        }
+        let node_owner = self.node_owners.remove(&node);
+        let handlers = self.handlers.remove(&node);
+        // The retiring Owner's record may already be extracted. Occupied entry
+        // avoids reserving insertion capacity when no record remains.
+        if let Some(node_owner) = node_owner
+            && node_owner != retiring_owner
+            && let std::collections::hash_map::Entry::Occupied(mut entry) =
+                self.owners.entry(node_owner)
+        {
+            let owned = entry.get_mut();
+            owned.nodes.remove(&node);
+            let empty_nodes = owned.nodes.is_empty();
+            if let Some(handlers) = &handlers {
+                for (kind, subscription) in handlers {
+                    if subscription.owner == node_owner {
+                        owned.subscriptions.remove(&(node, *kind));
+                    }
+                }
+            }
+            if owned.is_empty() {
+                entry.remove();
+            }
+            self.node_owner_count -= usize::from(empty_nodes);
+        }
+        if let Some(handlers) = handlers {
+            for (kind, subscription) in handlers {
+                if Some(subscription.owner) != node_owner {
+                    self.unlink_subscription(subscription.owner, node, kind);
+                }
+                discarded.push(subscription.callback);
+            }
+        }
+        if let Some(tokens) = self.node_queries.remove(&node) {
+            for token in tokens {
+                if let Some(query) = self.queries.get_mut(&token) {
+                    query.cancelled = true;
+                    cancelled.push(token);
+                }
+            }
+        }
     }
 }
 
@@ -336,11 +465,9 @@ impl Session {
             // One record covers all presentation interests of this Owner.
             // Ancestor cleanup may already have removed its nodes/listeners;
             // an empty Scope needs no further hash lookups or tree work.
-            let Some(owned) = present.owners.remove(&owner) else {
+            let Some(owned) = present.take_owner(owner) else {
                 return;
             };
-            present.node_owner_count -= usize::from(!owned.nodes.is_empty());
-            present.query_owner_count -= usize::from(!owned.queries.is_empty());
             {
                 for token in owned.queries {
                     if let Some(query) = present.remove_query(token) {
@@ -350,16 +477,8 @@ impl Session {
             }
             {
                 for (node, kind) in owned.subscriptions {
-                    if let Some(subscription) = present
-                        .handlers
-                        .get_mut(&node)
-                        .and_then(|handlers| handlers.remove(&kind))
-                    {
+                    if let Some(subscription) = present.remove_subscription(node, kind) {
                         discarded.push(subscription.callback);
-                        present.listeners.push((node, kind, false));
-                    }
-                    if present.handlers.get(&node).is_some_and(BTreeMap::is_empty) {
-                        present.handlers.remove(&node);
                     }
                 }
             }
@@ -391,78 +510,11 @@ impl Session {
                     }
                     id = parent;
                 }
-                let mut pending = vec![id];
-                while let Some(child) = pending.pop() {
-                    pending.extend(
-                        present
-                            .tree
-                            .node(child)
-                            .expect("owned subtree")
-                            .children
-                            .iter()
-                            .copied(),
-                    );
-                    present.ids.release(child);
-                    if !present.disposal_boundaries.is_empty() {
-                        present.disposal_boundaries.remove(&child);
-                    }
-                    let node_owner = present.node_owners.remove(&child);
-                    let handlers = present.handlers.remove(&child);
-                    // This callback already extracted its entire Owned record.
-                    // Avoid entry() on that missing key: a vacant std entry
-                    // reserves insertion capacity even though cleanup won't insert.
-                    if let Some(node_owner) = node_owner
-                        && node_owner != owner
-                        && let std::collections::hash_map::Entry::Occupied(mut entry) =
-                            present.owners.entry(node_owner)
-                    {
-                        let owned = entry.get_mut();
-                        owned.nodes.remove(&child);
-                        let empty_nodes = owned.nodes.is_empty();
-                        // Node-local listeners usually have the same Owner.
-                        // Remove their interests with the node in one lookup.
-                        if let Some(handlers) = &handlers {
-                            for (kind, subscription) in handlers {
-                                if subscription.owner == node_owner {
-                                    owned.subscriptions.remove(&(child, *kind));
-                                }
-                            }
-                        }
-                        if owned.is_empty() {
-                            entry.remove();
-                        }
-                        present.node_owner_count -= usize::from(empty_nodes);
-                    }
-                    if let Some(handlers) = handlers {
-                        for (kind, subscription) in handlers {
-                            if Some(subscription.owner) != node_owner
-                                && let std::collections::hash_map::Entry::Occupied(mut entry) =
-                                    present.owners.entry(subscription.owner)
-                            {
-                                let owned = entry.get_mut();
-                                owned.subscriptions.remove(&(child, kind));
-                                if owned.is_empty() {
-                                    entry.remove();
-                                }
-                            }
-                            discarded.push(subscription.callback);
-                        }
-                    }
-                    if let Some(tokens) = present.node_queries.remove(&child) {
-                        for token in tokens {
-                            if let Some(query) = present.queries.get_mut(&token) {
-                                query.cancelled = true;
-                                cancelled.push(token);
-                            }
-                        }
-                    }
+                let (_, retired) = present.tree.dispose(id).expect("owned semantic subtree");
+                for child in retired {
+                    present.retire_node(child, owner, &mut discarded, &mut cancelled);
                 }
-                let mutation = Mutation::Dispose { id };
-                present
-                    .tree
-                    .apply(std::slice::from_ref(&mutation))
-                    .expect("owned semantic subtree");
-                present.commands.push(mutation);
+                present.commands.push(Mutation::Dispose { id });
             }
         }
         self.cancelled_queries.borrow_mut().extend(cancelled);
@@ -1042,16 +1094,7 @@ impl Session {
         self.renderer.borrow_mut().request(query, token)?;
         {
             let mut present = self.present.borrow_mut();
-            present
-                .node_queries
-                .entry(query.node())
-                .or_default()
-                .insert(token);
-            let owned = present.owners.entry(owner).or_default();
-            let first_query = owned.queries.is_empty();
-            owned.queries.insert(token);
-            present.query_owner_count += usize::from(first_query);
-            present.queries.insert(
+            present.register_query(
                 token,
                 PendingQuery {
                     owner,
@@ -1132,13 +1175,7 @@ impl Scope {
                 return Err(error.into());
             }
             let owner = self.id();
-            for id in &ids {
-                present.node_owners.insert(*id, owner);
-            }
-            let owned = present.owners.entry(owner).or_default();
-            let first = owned.nodes.is_empty();
-            owned.nodes.extend(ids.iter().copied());
-            present.node_owner_count += usize::from(first);
+            present.register_nodes(owner, &ids);
             present.commands.push(mutation);
             ids
         };
@@ -1310,11 +1347,7 @@ impl Scope {
                 present.ids.release(id);
                 return Err(error.into());
             }
-            present.node_owners.insert(id, self.id());
-            let owned = present.owners.entry(self.id()).or_default();
-            let first_node = owned.nodes.is_empty();
-            owned.nodes.insert(id);
-            present.node_owner_count += usize::from(first_node);
+            present.register_nodes(self.id(), &[id]);
             present.commands.push(mutation);
             id
         };
@@ -1689,31 +1722,14 @@ impl Scope {
         let previous = {
             let mut present = session.present.borrow_mut();
             kind.validate_target(&present.tree.node(node)?.descriptor)?;
-            let previous = present.handlers.entry(node).or_default().insert(
+            present.register_subscription(
+                node,
                 kind,
                 Subscription {
                     owner: self.id(),
                     callback: Rc::new(RefCell::new(Box::new(handler))),
                 },
-            );
-            if let Some(previous) = &previous
-                && let Some(owned) = present.owners.get_mut(&previous.owner)
-            {
-                owned.subscriptions.remove(&(node, kind));
-                if owned.is_empty() {
-                    present.owners.remove(&previous.owner);
-                }
-            }
-            present
-                .owners
-                .entry(self.id())
-                .or_default()
-                .subscriptions
-                .insert((node, kind));
-            if previous.is_none() {
-                present.listeners.push((node, kind, true));
-            }
-            previous
+            )
         };
         drop(previous);
         Ok(())

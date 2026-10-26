@@ -138,6 +138,41 @@ pub(super) struct Entry {
     pub prevent_default: bool,
 }
 impl Entry {
+    /// Shared Rust state only. Creation replays new-control properties later;
+    /// adoption supplies observed composition without rewriting the live input.
+    fn new(
+        shape: &Shape,
+        parts: Parts,
+        boundary: Boundary,
+        parent: Option<NodeId>,
+        fragment: Option<DocumentFragment>,
+        composing: bool,
+    ) -> Rc<Self> {
+        Rc::new(Self {
+            rich: RefCell::new(None),
+            collapse: RefCell::new(None),
+            image: RefCell::new(None),
+            parent: Cell::new(parent),
+            #[cfg(feature = "hydrate")]
+            is_virtual: virtual_shape(shape),
+            parts,
+            boundary,
+            fragment: RefCell::new(fragment),
+            children: shape.children,
+            control: shape.control,
+            edit: shape.edit,
+            editing: RefCell::new(Editing {
+                composing,
+                revision: shape.revision,
+                requested: shape.revision,
+                ..Editing::default()
+            }),
+            interests: RefCell::new(BTreeSet::new()),
+            scroll_request: Cell::new(None),
+            prevent_default: shape.prevent_activate_default,
+        })
+    }
+
     pub(super) fn first(&self) -> &Node {
         match &self.boundary {
             Boundary::Part(part) => self.parts.get(part).expect("physical root part"),
@@ -386,33 +421,12 @@ impl Dom {
                 );
             }
         }
-        let entry = Rc::new(Entry {
-            rich: RefCell::new(None),
-            collapse: RefCell::new(None),
-            image: RefCell::new(None),
-            parent: Cell::new(parent),
-            #[cfg(feature = "hydrate")]
-            is_virtual: virtual_shape(shape),
-            parts: parts.into(),
-            boundary: if shape.pieces.is_empty() {
-                Boundary::Range(first, last)
-            } else {
-                Boundary::Part(shape.root_part()?)
-            },
-            fragment: RefCell::new(None),
-            children: shape.children,
-            control: shape.control,
-            edit: shape.edit,
-            editing: RefCell::new(Editing {
-                composing,
-                revision: shape.revision,
-                requested: shape.revision,
-                ..Editing::default()
-            }),
-            interests: RefCell::new(BTreeSet::new()),
-            scroll_request: Cell::new(None),
-            prevent_default: shape.prevent_activate_default,
-        });
+        let boundary = if shape.pieces.is_empty() {
+            Boundary::Range(first, last)
+        } else {
+            Boundary::Part(shape.root_part()?)
+        };
+        let entry = Entry::new(shape, parts.into(), boundary, parent, None, composing);
         if entry.edit == EditKind::Text {
             entry.value()?;
         }
@@ -715,8 +729,6 @@ impl Dom {
         parts: Parts,
         fragment: Option<DocumentFragment>,
     ) -> Result<Rc<Entry>, Error> {
-        #[cfg(feature = "hydrate")]
-        let is_virtual = virtual_shape(shape);
         let boundary = if shape.pieces.is_empty() {
             let range = fragment.as_ref().ok_or(Error::Unsupported("Group range"))?;
             Boundary::Range(
@@ -732,28 +744,7 @@ impl Dom {
             }
             Boundary::Part(root)
         };
-        let entry = Rc::new(Entry {
-            rich: RefCell::new(None),
-            collapse: RefCell::new(None),
-            image: RefCell::new(None),
-            parent: Cell::new(None),
-            #[cfg(feature = "hydrate")]
-            is_virtual,
-            boundary,
-            fragment: RefCell::new(fragment),
-            parts,
-            children: shape.children,
-            control: shape.control,
-            edit: shape.edit,
-            editing: RefCell::new(Editing {
-                revision: shape.revision,
-                requested: shape.revision,
-                ..Editing::default()
-            }),
-            interests: RefCell::new(BTreeSet::new()),
-            scroll_request: Cell::new(None),
-            prevent_default: shape.prevent_activate_default,
-        });
+        let entry = Entry::new(shape, parts, boundary, None, fragment, false);
         if let Some(options) = &shape.select_options {
             let control = entry.control()?;
             let keys = shape

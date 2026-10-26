@@ -2,6 +2,10 @@
 
 Start here when evaluating or extending Glory:
 
+- [Glory and Dioxus feature gaps](dioxus-feature-gap-analysis-2026-10-26.md):
+  current source comparison, platform delivery boundaries and implementation priorities;
+  SSR framework integration remains Salvo-only.
+
 - [Semantic UI architecture report](semantic-ui-rendering-architecture-report-2026-10-21.md):
   breaking rewrite decisions, short component names, crate boundaries, CSS/Blitz/Taffy,
   toolkit tradeoffs, concrete platform/crate organization and implementation priorities.
