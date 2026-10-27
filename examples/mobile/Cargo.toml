@@ -28,6 +28,7 @@ permissions-host-probe = ["permissions"]
 ime-probe = []
 keyboard-probe = []
 controls-probe = []
+radio-probe = []
 
 [dependencies]
 counter = { path = "../counter" }

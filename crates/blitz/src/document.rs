@@ -128,7 +128,7 @@ fn check_mode<'a>(
     patch: Option<&glory_render::Patch>,
 ) -> Result<(), Error> {
     let node = node.into();
-    use glory_render::{Change, CheckMode, Patch, Props};
+    use glory_render::{Change, Patch, Props};
     let semantics = match patch {
         Some(Patch::Semantics(Change::Set(semantics))) => semantics.as_ref(),
         Some(Patch::Semantics(Change::Clear)) => None,
@@ -168,17 +168,6 @@ fn check_mode<'a>(
     }
     if matches!(node.props, Props::Select(_)) {
         return Err(Error::Unsupported("native select controls"));
-    }
-    let Props::Check(check) = &node.props else {
-        return Ok(());
-    };
-    let mode = match patch {
-        Some(Patch::CheckMode(Change::Set(mode))) => *mode,
-        Some(Patch::CheckMode(Change::Clear)) => CheckMode::default(),
-        _ => check.mode,
-    };
-    if mode == CheckMode::Radio {
-        return Err(Error::Unsupported("native radio groups"));
     }
     Ok(())
 }
@@ -592,16 +581,28 @@ impl Dom {
                 }
                 m.set_attribute(node, attr("value"), value);
             }
-            // Blitz beta.4 parses the controlled checked attribute as bool.
-            // Empty HTML boolean attributes only initialize it on attachment.
+            // Live properties stay independent from default HTML attributes.
             ("indeterminate", Property::Bool(value)) => {
+                // Radio has no mixed presentation. The shared shape resets the
+                // property to false when switching out of checkbox modes.
+                if !*value
+                    && m.doc.get_node(node).is_some_and(|n| {
+                        n.attr(blitz_dom::LocalName::from("type")) == Some("radio")
+                    })
+                {
+                    return Ok(());
+                }
                 if !m.set_input_indeterminate(node, *value) {
                     return Err(invariant("indeterminate requires a native checkbox"));
                 }
             }
-            ("checked", Property::Bool(true)) => m.set_attribute(node, attr(name), "true"),
+            ("checked", Property::Bool(value)) => {
+                if !m.set_input_checked(node, *value) {
+                    return Err(invariant("checked requires a native check control"));
+                }
+            }
             ("disabled", Property::Bool(true)) => m.set_attribute(node, attr(name), ""),
-            ("disabled" | "checked", Property::Bool(false)) => m.clear_attribute(node, attr(name)),
+            ("disabled", Property::Bool(false)) => m.clear_attribute(node, attr(name)),
             _ => return Err(Error::Unsupported("Blitz form property")),
         }
         Ok(())

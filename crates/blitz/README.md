@@ -466,8 +466,24 @@ protocol implementation, not successful OS IME or assistive-technology acceptanc
 The CPU renderer draws a dash; program checked updates preserve mixed, while
 click/Space/AccessKit activation clears it and emits one boolean change. Mode
 changes and Clear preserve control identity. The AX tree reads the current native
-mixed state, including after activation. Radio groups remain unsupported. These
+mixed state, including after activation. These
 engine/adapter checks do not establish screen-reader speech or device acceptance.
+
+Radio controls select in one direction: Click/Space/AccessKit emits one true
+change on a newly selected target, and silently withdraws checked peers with the
+same nonempty name, tree and form owner. Empty names are independent. Program
+checked properties preserve defaults and can reassert an accepted value after a
+rejected native proposal. Name/type/form changes and reparenting follow current
+membership; no retired-member/group history is retained. Group discovery traverses
+only the live physical host tree, never a business or virtual data source.
+
+Without an explicit Navigate listener, native radio arrows wrap through editable
+members, Home/End select endpoints and Auto focus exposes one eligible Tab stop.
+Disabled/hidden/inert/modal-excluded targets cannot receive that selection.
+Explicit navigation/tab policies remain with the application's controller.
+`radio-probe` in the mobile example has actual simulator initial-rendering evidence;
+framework-injected keys/clicks and AccessKit tree/action tests remain separate from physical
+input and screen-reader speech. Typeahead and native menus are separate gaps.
 
 Surface suspension preserves App/document; zero dimensions release CPU/surface
 buffers and later resize restores them. Closing a window drops App and cancels

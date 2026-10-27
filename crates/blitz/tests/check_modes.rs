@@ -229,40 +229,22 @@ fn direct_mixed_create_patch_and_clear_keep_the_accepted_query_watermark() {
 }
 
 #[test]
-fn native_radio_rejection_checks_descriptors_and_direct_prefixes() {
+fn native_radio_creation_mode_changes_and_query_watermarks_preserve_the_control() {
     let runtime = RuntimeId::new();
     let mut renderer = Renderer::new(runtime);
     let mut ids = NodeIds::new(runtime);
     let id = ids.allocate();
     let radio = Descriptor::new(Props::Check(CheckProps {
         mode: CheckMode::Radio,
+        checked: true,
         ..Default::default()
     }));
-    assert_eq!(
-        renderer.preflight((radio).view(), None),
-        Err(Error::Unsupported("native radio groups"))
-    );
-    let checkbox = Descriptor::new(Props::Check(CheckProps::default()));
-    assert_eq!(
-        renderer.preflight(
-            (checkbox).view(),
-            Some(&Patch::CheckMode(Change::Set(CheckMode::Radio)))
-        ),
-        Err(Error::Unsupported("native radio groups"))
-    );
-    assert_eq!(
-        renderer.apply(&[Mutation::Create {
-            id,
-            node: Box::new(radio)
-        }]),
-        Err(Error::Unsupported("native radio groups"))
-    );
-    assert_eq!(renderer.stats().applied, 0);
+    assert_eq!(renderer.preflight(radio.view(), None), Ok(()));
     renderer
         .apply(&[
             Mutation::Create {
                 id,
-                node: Box::new(checkbox),
+                node: Box::new(radio),
             },
             Mutation::Place {
                 id,
@@ -271,22 +253,42 @@ fn native_radio_rejection_checks_descriptors_and_direct_prefixes() {
             },
         ])
         .unwrap();
-    assert_eq!(
-        renderer.apply(&[Mutation::Patch {
-            id,
-            patch: Patch::CheckMode(Change::Set(CheckMode::Radio))
-        }]),
-        Err(Error::Unsupported("native radio groups"))
-    );
-    renderer.request(Query::Bounds(id), QueryToken(9)).unwrap();
-    let mut inputs = Vec::new();
-    renderer.drain(&mut inputs);
-    assert!(matches!(
-        inputs.as_slice(),
-        [Input::Response {
-            applied: 2,
-            token: QueryToken(9),
-            result: Ok(QueryValue::Bounds(_))
-        }]
-    ));
+    let physical = renderer.engine_id(id, Part::Control).unwrap();
+    for (index, mode) in [
+        CheckMode::Checkbox,
+        CheckMode::Radio,
+        CheckMode::Mixed,
+        CheckMode::Switch,
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        renderer
+            .apply(&[Mutation::Patch {
+                id,
+                patch: Patch::CheckMode(Change::Set(mode)),
+            }])
+            .unwrap();
+        renderer
+            .request(Query::Bounds(id), QueryToken(index as u64))
+            .unwrap();
+        let mut inputs = Vec::new();
+        renderer.drain(&mut inputs);
+        assert!(
+            matches!(inputs.as_slice(),[Input::Response{applied,result:Ok(QueryValue::Bounds(_)),..}] if *applied==3+index as u64)
+        );
+        assert_eq!(renderer.engine_id(id, Part::Control).unwrap(), physical);
+        renderer.inspect(|doc| {
+            let element = doc.get_node(physical).unwrap().element_data().unwrap();
+            assert_eq!(element.checkbox_input_checked(), Some(true));
+            assert_eq!(
+                element.attr(blitz_dom::LocalName::from("type")),
+                Some(if mode == CheckMode::Radio {
+                    "radio"
+                } else {
+                    "checkbox"
+                })
+            );
+        });
+    }
 }

@@ -17,6 +17,11 @@ mod accessibility;
 ))]
 #[path = "accesskit_platform.rs"]
 mod accesskit_platform;
+#[path = "radio.rs"]
+mod radio;
+#[cfg(test)]
+#[path = "radio_tests.rs"]
+mod radio_tests;
 use std::cell::{Cell, Ref, RefMut};
 use std::sync::Arc;
 use std::task::Context;
@@ -450,6 +455,12 @@ impl EventHandler for Events {
                         && matches!(n.descriptor.view().props, glory_render::Props::Check(_))
                 }) {
                     event_state.prevent_default();
+                    return;
+                }
+                if radio::is_radio(&state, node) {
+                    event_state.prevent_default();
+                    let _ = state.focus(node);
+                    activate_control(&mut state, node);
                     return;
                 }
                 if let Some(button) = button
@@ -1225,7 +1236,11 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
             let pivot = current.map_or(0, |index| index + 1);
             Box::new((pivot..nodes.len()).chain(0..pivot))
         };
-        if let Some(id) = indices.map(|index| nodes[index]).find(|id| eligible(*id)) {
+        let mut radio_stops = std::collections::HashMap::new();
+        if let Some(id) = indices
+            .map(|index| nodes[index])
+            .find(|id| eligible(*id) && radio::tab_stop(state, *id, &eligible, &mut radio_stops))
+        {
             if state.dom.doc.set_focus_to(id) {
                 state.dom.invalidate();
             }
@@ -1240,9 +1255,6 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
     if !key.modifiers.is_empty() {
         return false;
     }
-    let Ok(node) = state.mapper.tree().node(origin) else {
-        return false;
-    };
     if state.dom.control(origin).ok() == Some(target)
         && let Some((root, axis)) = state.mapper.tree().navigation(origin)
         && state.subscriptions.contains(&(root, EventKind::Navigate))
@@ -1270,6 +1282,12 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
         });
         return true;
     }
+    if radio::key(state, origin, target, key) {
+        return true;
+    }
+    let Ok(node) = state.mapper.tree().node(origin) else {
+        return false;
+    };
     if !matches!(
         node.descriptor
             .view()
@@ -1324,6 +1342,18 @@ fn activate_control(state: &mut State, id: NodeId) {
         node: id,
         event: Event::Activate,
     });
+    if radio::is_radio(state, id) {
+        if let Ok(control) = state.dom.control(id)
+            && state.dom.doc.activate_radio(control) == Some(true)
+        {
+            state.inputs.push(Input::Event {
+                node: id,
+                event: Event::CheckedChanged(true),
+            });
+        }
+        state.dom.invalidate();
+        return;
+    }
     if let Ok(control) = state.dom.control(id)
         && let Some(checked) = state
             .dom
@@ -1334,11 +1364,7 @@ fn activate_control(state: &mut State, id: NodeId) {
     {
         let mut mutation = state.dom.doc.mutate();
         mutation.set_input_indeterminate(control, false);
-        if checked {
-            mutation.clear_attribute(control, attr("checked"));
-        } else {
-            mutation.set_attribute(control, attr("checked"), "true");
-        }
+        mutation.set_input_checked(control, !checked);
         drop(mutation);
         state.inputs.push(Input::Event {
             node: id,

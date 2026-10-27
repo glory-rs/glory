@@ -102,6 +102,15 @@ the status once. **Restore mixed** restores its dash without replacing the node.
 Select this view separately from the IME, keyboard and permission views. Ordinary
 Counter builds exclude it; no permission service or sensitive declaration is enabled.
 
+`GLORY_ANDROID_FEATURES=radio-probe` or `GLORY_IOS_FEATURES=radio-probe` selects
+the native radio fixture instead. A starts selected, B is disabled and C can be
+selected by touch/Space; intrinsic arrows skip B and wrap, and Tab leaves the
+group. The controlled value and **Restore A** exercise programmatic updates.
+Select this separately from the other acceptance views. Native CPU initial
+rendering screenshots and the installed APK hash are recorded in
+`/Volumes/Data/Caches/glory/native-checks/radio/`; these are not physical-input
+or screen-reader acceptance. Ordinary Counter packages exclude the fixture.
+
 This explicitly disables default features and selects `android-game-activity`.
 Never enable it together with `android-native-activity`. The matching Java AAR
 and Rust android-activity glue both use GameActivity 4.4.0. The small Java subclass

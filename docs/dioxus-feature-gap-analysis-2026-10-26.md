@@ -15,7 +15,7 @@ Mac，最新证据见文末 Apple/移动输入记录，不能继续把“没有 
 | 桌面开发 | native watch、错误保留旧进程、成功重启与退出回收 | 状态保持、真正 Rust 热补丁、检查器 |
 | Web 发布 | 可复现 gzip、哈希清单、预览协商/HEAD/身份回退 | 指纹命名、Brotli/图片转换、WASM 分包 |
 | 运行时权限 | 有界 Owner future/driver API；Android 安全 JNI；iOS Swift 宿主；SDK 控制的授权状态查询 | iOS Rust 应用连接待最小 FFI 声明授权；真实系统弹窗选择、真机及其他权限类别 |
-| 原生控件 | Checkbox/Switch 及 Mixed 三态绘制、受控更新、点击/Space/AX 激活；Android/iOS 模拟器三态初始显示 | radio、select、combobox、placeholder、菜单、富文本、文件/语义剪贴板等仍开放；实际读屏单独验收 |
+| 原生控件 | Checkbox/Switch/Mixed 和 Radio 的绘制、受控更新、点击/Space/AX 动作；Radio 分组与键盘导航；两端模拟器初始显示 | select、combobox、placeholder、typeahead、菜单、富文本、文件/语义剪贴板等仍开放；实际读屏单独验收 |
 
 整体差距仍未关闭。签名身份/设备等外部条件和仍需实现的软件功能分别保留，
 没有用模拟器或编译结果替代完整平台交付。
@@ -528,3 +528,38 @@ Clippy 仍有原有 needless_return/result_large_err 诊断；仅命令行排除
 实际链接；这些分别是模拟器初始显示和设备链接证据，不替代真实触摸/读屏/签名设备。
 UI 自动化尚未从上次锁屏中断恢复；未用 SDK 注入点击代替。radio、select、placeholder、
 菜单、文件/剪贴板、富文本及应用服务等其他缺口继续保留。
+
+## 2026-10-27：原生 radio 与活跃分组
+
+真正的 [Blitz fork eb375a02](https://github.com/glory-rs/blitz/commit/eb375a029330b6179d5276a41dda5643b6077a25)
+提供独立的 checked property 和当前 radio group 查询；Glory 的 Radio preflight/direct
+apply 不再拒绝。相同非空 name、同一物理 tree/form owner 的 radio 互斥，空名独立；
+同名 checkbox、其他表单及断开的树不被误改。关联只从当前宿主树解析，没有存活组
+以外的历史表，也不遍历业务/虚拟数据源。checked 程序写入不再依赖 HTML 默认属性。
+
+Click、标签、Space、AccessKit 激活只向新选中的目标发布一次 true；旧项隐式取消
+不发布 false，重复选中不产生值变化。受控组件可以通过相等 true property 屏障恢复
+被拒绝的提案。name/type/form 变化、重排、挂起/重连按当前关联重新协调；批量插入
+保留最后一个初始 checked 项，退休的引擎代次不能选中后继控件。分组依据见
+[HTML radio 定义](https://html.spec.whatwg.org/multipage/input.html#radio-button-state-(type=radio))。
+
+无显式 Navigate listener 时，原生方向键在可编辑项中循环，Home/End 到端点；隐藏、
+禁用、只读和不在当前焦点/模态范围的目标不被选择。Auto focus 只有一个可用 Tab stop，
+从只读项仍能导航到可编辑项。显式 Navigate 和显式 tab-stop 策略继续由组件控制，
+没有另建组件状态机。键盘模式参考 [APG Radio Group](https://www.w3.org/WAI/ARIA/apg/patterns/radio/)。
+
+新增七项 Glory 回归覆盖单向变化、受控恢复、动态关联、原生键盘/Tab、显式导航、
+Owner/节点挂起退休、实际 CPU 像素及 AccessKit 两个 peer 的当前状态和稳定身份。
+全工作区含文档测试 988 项通过，最终 radio 聚焦七项和 native/WASM 严格 Clippy
+通过；普通 Tab 保持惰性，只在遇到 radio 时解析该组，并仅在本次 Tab 搜索期间
+暂存数字身份，未新增持久组缓存或全量控件 eligibility 扫描。
+Blitz 默认/并行库各 121 项通过，三个固定 fork 的干净检出和来源 gate 通过；fork
+Clippy 仍只在命令行排除前节记录的两类既有诊断，不新增代码例外。普通移动包和
+radio-probe 两种构建均通过；两端模拟器初始选中圆点/未选中圆环的实际截图和 APK
+安装哈希证据保留在 `/Volumes/Data/Caches/glory/native-checks/radio/`。
+最终记录同时核对已安装 iOS 可执行文件与本次包的哈希，保存运行时代码文件摘要；
+arm64 iOS device 也按部署目标 15.0 链接，仍不代表签名设备运行。
+
+这是有限原生 radio 协议的实现与模拟器初始显示；原生输入回归通过框架事件驱动，
+不冒充真实触摸/物理键盘或读屏。移动无障碍桥、typeahead、select、placeholder、菜单、
+文件/剪贴板、富文本和应用服务仍待补齐。整体缺口继续开放。

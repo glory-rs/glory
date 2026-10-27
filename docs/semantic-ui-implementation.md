@@ -2516,3 +2516,16 @@ fork 干净检出测试通过。Android/iOS `controls-probe` 实际显示三态�
 `/Volumes/Data/Caches/glory/native-checks/`；真实输入/读屏和签名设备另验收。
 radio、select、placeholder、菜单、富文本、文件/剪贴板及应用导航等仍开放；整体
 目标没有因一个控件补齐而关闭。详细证据和 fork Clippy 边界见缺口报告。
+
+## 2026-10-27：原生 Radio 与当前 tree/form 分组
+
+固定 Blitz fork eb375a029330b6179d5276a41dda5643b6077a25，Radio 通过实际 checked
+property 和当前非空 name/tree/form owner 互斥；同名 checkbox/其他表单/断开树保持
+独立。Click/标签/Space/AX 只给新目标一次 true，旧 peer 无 false，重复选中无值变化；
+受控 true 重申可恢复被拒绝的提案。批量插入、name/type/form、移动/挂起/重连和代次
+退休有真实引擎回归，不存历史组或扫描业务源。Auto Tab stop 和默认方向/Home/End
+复用当前宿主树；显式 Navigate/tab 策略仍由组件控制，readonly 不陷住焦点。
+全工作区 988 项、最终七项新适配器回归、native/WASM 严格 Clippy、Blitz 默认/并行
+各 121 项及固定来源 gate 通过；Android/iOS 普通包
+和 radio-probe 构建通过，实际初始显示截图/JSON 在 `native-checks/radio/` 数据盘目录。
+框架事件和 AX 树/动作不代替真实物理输入或读屏；typeahead/select/菜单等继续开放。

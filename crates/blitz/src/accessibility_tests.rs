@@ -133,6 +133,96 @@ fn mixed_checks_publish_native_mixed_then_boolean_state_after_assistive_activati
 }
 
 #[test]
+fn radio_accesskit_click_replaces_the_peer_state_without_duplicate_changes_or_identity_changes() {
+    use glory_render::{CheckMode, Event, Orientation, SemanticId, Semantics};
+    let app = WindowApp::new();
+    let calls = Rc::new(Cell::new(0));
+    let output = calls.clone();
+    let member = Some(Box::new(Semantics {
+        check_group: Some(SemanticId::new("ax-radio").unwrap()),
+        navigation_item: true,
+        ..Default::default()
+    }));
+    app.mount(
+        view()
+            .name("Delivery")
+            .role(glory_render::Role::RadioGroup)
+            .semantics(Some(Box::new(Semantics {
+                navigation: Some(Orientation::Vertical),
+                ..Default::default()
+            })))
+            .fill((
+                check()
+                    .label("A")
+                    .mode(CheckMode::Radio)
+                    .checked(true)
+                    .semantics(member.clone()),
+                check()
+                    .label("B")
+                    .mode(CheckMode::Radio)
+                    .semantics(member)
+                    .on(glory_ui::events::checked_changed, move |event| {
+                        assert_eq!(event, Event::CheckedChanged(true));
+                        output.set(output.get() + 1);
+                    }),
+            )),
+    )
+    .unwrap();
+    let root = app.app.tree().roots()[0];
+    let children = app.app.tree().node(root).unwrap().children.clone();
+    let mut tree = Consumer::new(build(&app, true), true);
+    let a = id(&app, children[0]);
+    let b = id(&app, children[1]);
+    assert_eq!(
+        tree.state()
+            .node_by_tree_local_id(a, TreeId::ROOT)
+            .unwrap()
+            .role(),
+        AxRole::RadioButton
+    );
+    assert_eq!(
+        tree.state()
+            .node_by_tree_local_id(a, TreeId::ROOT)
+            .unwrap()
+            .data()
+            .toggled(),
+        Some(Toggled::True)
+    );
+    assert_eq!(
+        tree.state()
+            .node_by_tree_local_id(b, TreeId::ROOT)
+            .unwrap()
+            .data()
+            .toggled(),
+        Some(Toggled::False)
+    );
+    assert!(action(&app, &request(b, AxAction::Click, None)).unwrap());
+    tree.update_and_process_changes(build(&app, false), &mut Changes);
+    assert_eq!(
+        tree.state()
+            .node_by_tree_local_id(a, TreeId::ROOT)
+            .unwrap()
+            .data()
+            .toggled(),
+        Some(Toggled::False)
+    );
+    assert_eq!(
+        tree.state()
+            .node_by_tree_local_id(b, TreeId::ROOT)
+            .unwrap()
+            .data()
+            .toggled(),
+        Some(Toggled::True)
+    );
+    assert_eq!(calls.get(), 1);
+    assert!(action(&app, &request(b, AxAction::Click, None)).unwrap());
+    tree.update_and_process_changes(build(&app, false), &mut Changes);
+    assert_eq!(calls.get(), 1);
+    assert_eq!(id(&app, children[0]), a);
+    assert_eq!(id(&app, children[1]), b);
+}
+
+#[test]
 fn composite_roles_states_and_live_named_relations_reach_accesskit() {
     use glory_render::{Change, Orientation, Patch, SemanticId, Semantics};
     let app = WindowApp::new();
