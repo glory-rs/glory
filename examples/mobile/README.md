@@ -418,3 +418,18 @@ an explicitly selected, already running owned emulator and run acceptance;
 APK builds alone are reported separately from runtime
 acceptance. The native adapter check uses `--no-deps` because the current Android
 Clippy diagnoses already-const thread locals in core.
+
+### Native placeholder probe
+
+Build the shared opt-in view with:
+
+```sh
+GLORY_ANDROID_FEATURES=placeholder-probe sh examples/mobile/build-android-game.sh
+GLORY_BUILD_ROOT=/Volumes/Data/Caches/glory/apple GLORY_IOS_FEATURES=placeholder-probe sh examples/mobile/build-ios.sh
+```
+
+The view shows empty text,
+password and multiline hints plus a filled reference, with controlled edits and
+buttons to update hints/clear values. Select only one acceptance view. Ordinary
+builds retain Counter. Simulator screenshots prove initial rendering only;
+real input, IME and screen-reader acceptance require their own evidence.

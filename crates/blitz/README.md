@@ -38,6 +38,13 @@ display projection: one bullet per grapheme, with display geometry for paint,
 pointer/keyboard navigation, selection, caret and scrolling. Values and UTF-16
 query offsets stay in the original text. Copy/cut are blocked and paste works.
 Switching Purpose preserves the control, selection and active composition.
+Native Input placeholders use an independent bounded, lazily shaped hint layout,
+including multiline and empty password Inputs. Dynamic hint updates preserve
+editable values, selection, composition and control identity. Hints are neutral
+gray, clipped to the content box, and never enter IME/clipboard/pointer geometry.
+`:placeholder-shown` follows live editor state; AccessKit exports a separate
+placeholder property, preserving names and protected values. See
+[the contract](../../docs/input-placeholder.md) for the finite styling policy.
 IME preedit is masked and underlined; cursor-area/purpose requests reach the
 host, which coalesces unchanged updates. OS IME/assistive-technology acceptance
 remains separate from this editor protocol and CPU/window evidence.

@@ -139,6 +139,13 @@ retired feature aliases or count compilation as proof of platform acceptance.
   skipping unavailable/readonly selection targets. Explicit Navigate handlers
   and explicit tab stops remain component-owned. Detached trees are independent;
   reattachment and name/type/form changes re-evaluate current association.
+  Input placeholder is a bounded, independent presentation layout, lazily shaped
+  only while empty/non-composing and released when hidden/cleared. Hint-only
+  changes preserve editor identity, raw generation, selection, IME and value
+  property barriers. Use its layout for hint paint only, clipped to the content
+  box; all editing/geometry/context stay on the real editor/password projection.
+  Keep :placeholder-shown snapshots local and preserve selector invalidation.
+  AccessKit placeholder metadata never supplies a label or password value.
   Password uses the pinned local engine's grapheme-to-bullet display projection.
   Raw editor bytes remain for values/IME/UTF-16 selection; use display_editor for
   layout, pointer navigation, selection paint, caret and scrolling. Never paint

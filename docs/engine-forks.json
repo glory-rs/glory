@@ -19,7 +19,7 @@
     {
       "name": "blitz",
       "git": "https://github.com/glory-rs/blitz",
-      "rev": "eb375a029330b6179d5276a41dda5643b6077a25",
+      "rev": "0811cfd9e7ca3ddcc126ad7ef42f453dfba5be8d",
       "upstream": "https://github.com/DioxusLabs/blitz",
       "upstream_rev": "92b11f1bd8ab7975411328b0406a95a09445b4e7",
       "packages": [
@@ -110,6 +110,13 @@
           "system-fonts,complex-scripts,parallel-construct",
           "--lib",
           "layout_move_tests"
+        ],
+        [
+          "-p",
+          "blitz-paint",
+          "--no-default-features",
+          "--test",
+          "placeholders"
         ]
       ],
       "android_checks": [

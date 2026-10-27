@@ -399,6 +399,9 @@ impl Tree {
                     }
                 }
                 Props::Input(p) => {
+                    if let Some(hint) = d.semantics.as_ref().and_then(|s| s.placeholder.as_ref()) {
+                        node.set_placeholder(hint.clone());
+                    }
                     // Do not even copy raw password bytes into the accessibility cache.
                     if p.purpose != Purpose::Password
                         && !d.semantics.as_ref().is_some_and(|s| {

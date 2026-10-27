@@ -15,7 +15,7 @@ Mac，最新证据见文末 Apple/移动输入记录，不能继续把“没有 
 | 桌面开发 | native watch、错误保留旧进程、成功重启与退出回收 | 状态保持、真正 Rust 热补丁、检查器 |
 | Web 发布 | 可复现 gzip、哈希清单、预览协商/HEAD/身份回退 | 指纹命名、Brotli/图片转换、WASM 分包 |
 | 运行时权限 | 有界 Owner future/driver API；Android 安全 JNI；iOS Swift 宿主；SDK 控制的授权状态查询 | iOS Rust 应用连接待最小 FFI 声明授权；真实系统弹窗选择、真机及其他权限类别 |
-| 原生控件 | Checkbox/Switch/Mixed 和 Radio 的绘制、受控更新、点击/Space/AX 动作；Radio 分组与键盘导航；两端模拟器初始显示 | select、combobox、placeholder、typeahead、菜单、富文本、文件/语义剪贴板等仍开放；实际读屏单独验收 |
+| 原生控件 | Checkbox/Switch/Mixed 和 Radio 的绘制、受控更新、点击/Space/AX 动作；Radio 分组与键盘导航；placeholder 独立提示布局与绘制；两端模拟器初始显示 | select、combobox、typeahead、菜单、富文本、文件/语义剪贴板等仍开放；实际读屏单独验收 |
 
 整体差距仍未关闭。签名身份/设备等外部条件和仍需实现的软件功能分别保留，
 没有用模拟器或编译结果替代完整平台交付。
@@ -563,3 +563,40 @@ arm64 iOS device 也按部署目标 15.0 链接，仍不代表签名设备运行
 这是有限原生 radio 协议的实现与模拟器初始显示；原生输入回归通过框架事件驱动，
 不冒充真实触摸/物理键盘或读屏。移动无障碍桥、typeahead、select、placeholder、菜单、
 文件/剪贴板、富文本和应用服务仍待补齐。整体缺口继续开放。
+
+
+## 2026-10-27：原生 input placeholder
+
+真正的 [Blitz fork 0811cfd9](https://github.com/glory-rs/blitz/commit/0811cfd9e7ca3ddcc126ad7ef42f453dfba5be8d)
+为单行、多行及空密码输入框提供独立提示布局，沿用 4096 UTF-8 字节的有限协议。
+提示仅在空值且没有预编辑时塑形；填值/组合时释放提示布局，清除属性释放提示。
+动态 Set/Keep/Clear 不改真实值、revision、选区、编辑器身份或 IME；密码提示可见
+不意味着密码正文可见。默认灰色提示继承字体/方向/对齐，单行不换行、多行保留
+换行并按内容宽度折行，绘制及下划线均裁剪到内容框，不沿用长值的旧滚动偏移。
+
+`:placeholder-shown` 使用当前编辑器状态及属性存在性，含显式空提示；样式 snapshot
+能刷新关联 sibling 选择器。属性选择器改变字体时仍走 Stylo 正常差异失效；纯提示
+更新不强制重建真实编辑器。仅本地节点同步，无全量输入/业务源扫描或新 unsafe。
+AccessKit 提供独立 placeholder metadata，不替代名称或值，密码原值仍不导出。
+语义边界参考 [HTML placeholder](https://html.spec.whatwg.org/multipage/input.html#attr-input-placeholder)；
+任意 `::placeholder` CSS 伪元素样式不在当前有限提示策略内。
+
+全工作区含文档测试 991 项通过，native/WASM 全工作区严格 Clippy 通过。
+新增适配器回归验证 admission/direct apply 的接受前缀和查询水位、Set/Keep/Clear
+不改值 property、当前编辑器选区/预编辑保持、真实 CPU 绘制/受控清空以及 AX 独立
+提示与密码保护。固定 fork 的干净检出与来源检查通过：Blitz 精简配置 125 项、
+并行/writing-mode 126 项；新增提示 CPU 测试与既有三态/顶层绘制分别通过。
+Fork 本身 Clippy 仍仅在命令行排除既有 result_large_err/needless_return 后通过，
+没有新增源码 lint 例外，也不把它写成全 fork 无例外严格通过。
+
+Android ARM64 APK 与 iOS 模拟器 `placeholder-probe` 包均实际安装启动；两端原始帧
+可见单行、空密码和双行提示，填值参考框隐藏提示。SDK 启动/截图没有注入触摸或
+按键。安装 APK/iOS 可执行文件与本次 probe 产物 SHA-256 相同，probe 包和源码摘要
+留存在 `/Volumes/Data/Caches/glory/native-input-placeholders/result.json` 及同目录。
+Android 首帧是系统启动画面，保留为 android-initial.png；后续实际绘制帧为
+android-rendered.png，没有把首帧计为成功。iOS arm64 device 按部署目标 15.0 链接；
+普通 Counter 两端包另行构建，移动 probe 的 iOS target Clippy（--no-deps）通过。
+
+这是有限原生 placeholder 实现及模拟器初始显示；真实触摸、软件键盘/读屏与签名
+设备验收仍分别保留。select、combobox、typeahead、菜单、文件/剪贴板、富文本、
+移动无障碍及应用服务等缺口继续开放。

@@ -9,7 +9,7 @@ vendor、副本补丁树或子模块；应用无需添加全局 Cargo patch。
 
 | Fork | 上游基线 | Glory 固定提交 | 维护范围 |
 |---|---|---|---|
-| [glory-rs/blitz](https://github.com/glory-rs/blitz) | `92b11f1b` / beta.4 | [eb375a02](https://github.com/glory-rs/blitz/commit/eb375a029330b6179d5276a41dda5643b6077a25) | 资源生命周期、增量失效、焦点、密码显示、IME、阶段计时、inline 样式差分失效、隐藏子树销毁与移动缓存回收、真正的文档顶层、UIKit 键盘视口触摸保护、三态 checkbox、按 tree/form/name 分组的 radio checked property 和固定 Winit Activity 生命周期修复 |
+| [glory-rs/blitz](https://github.com/glory-rs/blitz) | `92b11f1b` / beta.4 | [0811cfd9](https://github.com/glory-rs/blitz/commit/0811cfd9e7ca3ddcc126ad7ef42f453dfba5be8d) | 资源生命周期、增量失效、焦点、密码显示、IME、阶段计时、inline 样式差分失效、隐藏子树销毁与移动缓存回收、真正的文档顶层、UIKit 键盘视口触摸保护、三态 checkbox、按 tree/form/name 分组的 radio checked property、独立 placeholder 布局/绘制 和固定 Winit Activity 生命周期修复 |
 | [glory-rs/taffy](https://github.com/glory-rs/taffy) | `eb645069` / 0.15.0 | [dd7914fb](https://github.com/glory-rs/taffy/commit/dd7914fba2e6e0b5d8a2c8854d764a2ade817efd) | 小数 flex 因子的 gap 计算与回归测试 |
 | [glory-rs/winit](https://github.com/glory-rs/winit) | `d597ced7` / 0.31.0-beta.4 | [3b6f5a09](https://github.com/glory-rs/winit/commit/3b6f5a09697acb936567af64e53c915b0b1a2af9) | Android Destroy 退出当前事件循环，释放 Activity 循环独占许可后允许同进程重建；UIKit UITextInput、Android GameTextInput；保留上游包和锁定的测试依赖 |
 
@@ -34,7 +34,7 @@ Blitz fork 的 Linux/FreeBSD 测试依赖启用 Fontique 的 fontconfig-dlopen�
 stylesheet；16种连续样式变化与强制完整重建对照，属性选择器仍重算关联节点。
 inline style 保留 snapshot、selector/inherited restyle 与祖先标记，只去掉
 无条件 ALL_DAMAGE，交给 computed-style difference 分类；CustomWidget 继续
-保守完整失效。其余属性修改仍保持原路径。
+保守完整失效。placeholder 修改同样由样式差异决定编辑器损伤；提示文字单独更新布局，不重写值或预编辑。其余属性修改仍保持原路径。
 默认不安装 collector；开启后使用引擎自身的单调时钟，Glory 在 resolve 返回
 后导入其固定快照，不跨线程传递 Glory 的本地响应式对象。
 

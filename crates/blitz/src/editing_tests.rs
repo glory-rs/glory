@@ -1014,3 +1014,95 @@ fn mixed_check_pointer_label_and_space_clear_only_the_live_mixed_state_once() {
         assert_eq!(seen.borrow().len(), 3);
     }
 }
+
+#[test]
+fn placeholder_updates_leave_selection_preedit_and_empty_pointer_geometry_unchanged() {
+    use glory_render::{Purpose, Semantics};
+    for purpose in [Purpose::Text, Purpose::Password] {
+        let mut app = WindowApp::new();
+        app.mount(
+            input()
+                .purpose(purpose)
+                .value("A中Z")
+                .semantics(Some(Box::new(Semantics {
+                    placeholder: Some("First hint".into()),
+                    ..Default::default()
+                }))),
+        )
+        .unwrap();
+        let id = app.app.tree().roots()[0];
+        let physical = app.renderer.engine_id(id, Part::Main).unwrap();
+        focus(&mut app, id);
+        ime(&mut app, BlitzImeEvent::Preedit("拼".into(), Some((3, 3))));
+        let before = (selection(&mut app, id), value(&app, id));
+        let writes = app.renderer.stats().property_writes;
+        for change in [
+            Change::Set(Some(Box::new(Semantics {
+                placeholder: Some("Next hint".into()),
+                ..Default::default()
+            }))),
+            Change::Keep,
+            Change::Clear,
+        ] {
+            let generation = app.renderer.inspect(|doc| {
+                doc.get_node(physical)
+                    .unwrap()
+                    .element_data()
+                    .unwrap()
+                    .text_input_data()
+                    .unwrap()
+                    .editor
+                    .generation()
+            });
+            app.app.scope().patch(id, Patch::Semantics(change)).unwrap();
+            app.app.flush().unwrap();
+            settle(&mut app);
+            assert_eq!((selection(&mut app, id), value(&app, id)), before);
+            assert_eq!(app.renderer.stats().property_writes, writes);
+            app.renderer.inspect(|doc| {
+                let data = doc
+                    .get_node(physical)
+                    .unwrap()
+                    .element_data()
+                    .unwrap()
+                    .text_input_data()
+                    .unwrap();
+                assert_eq!(data.editor.generation(), generation);
+                assert!(data.editor.is_composing());
+                assert!(data.placeholder_layout().is_none());
+            });
+        }
+        ime(&mut app, BlitzImeEvent::Preedit("".into(), None));
+        app.app
+            .scope()
+            .patch(
+                id,
+                Patch::Value {
+                    value: Change::Clear,
+                    revision: 20,
+                },
+            )
+            .unwrap();
+        app.app
+            .scope()
+            .patch(
+                id,
+                Patch::Semantics(Change::Set(Some(Box::new(Semantics {
+                    placeholder: Some("Long empty hint".into()),
+                    ..Default::default()
+                })))),
+            )
+            .unwrap();
+        app.app.flush().unwrap();
+        settle(&mut app);
+        app.renderer
+            .0
+            .borrow_mut()
+            .dom
+            .doc
+            .with_text_input(physical, |mut d| d.move_to_point(80., 8.));
+        assert_eq!(selection(&mut app, id).0, 0);
+        assert_eq!(selection(&mut app, id).1, 0);
+        assert_eq!(app.renderer.engine_id(id, Part::Main).unwrap(), physical);
+    }
+}

@@ -2529,3 +2529,20 @@ property 和当前非空 name/tree/form owner 互斥；同名 checkbox/其他表
 各 121 项及固定来源 gate 通过；Android/iOS 普通包
 和 radio-probe 构建通过，实际初始显示截图/JSON 在 `native-checks/radio/` 数据盘目录。
 框架事件和 AX 树/动作不代替真实物理输入或读屏；typeahead/select/菜单等继续开放。
+
+
+## 2026-10-27：原生 placeholder 的独立布局
+
+Glory 解除有限 Input placeholder 的原生拒绝；真正 Blitz fork 0811cfd9 提供懒惰
+提示布局和内容框裁剪，覆盖单行、多行及空密码输入。Set/Keep/Clear 保留真实值、
+property 屏障、编辑器身份、选区和预编辑；提示不进入密码、IME 或点击选区几何。
+`:placeholder-shown` 跟随当前值/组合状态，正常 selector snapshot 仍可刷新字体和
+关联节点。AccessKit placeholder 与标签/值分开，密码原值继续受保护。
+
+全工作区 991 项测试、native/WASM 严格 Clippy、固定 fork 独立来源/测试检查通过。
+两端 opt-in probe 均已安装启动，初始提示像素和已安装包哈希见
+`/Volumes/Data/Caches/glory/native-input-placeholders/result.json`。普通移动包及 iOS
+设备目标链接另行通过；没有以截图代替实际触摸或读屏。详细范围见
+[dioxus 缺口报告](dioxus-feature-gap-analysis-2026-10-26.md)
+及 [placeholder 契约](input-placeholder.md)。select、菜单、移动无障碍和应用服务等
+其他缺口仍开放。

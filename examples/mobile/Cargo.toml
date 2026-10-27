@@ -29,6 +29,7 @@ ime-probe = []
 keyboard-probe = []
 controls-probe = []
 radio-probe = []
+placeholder-probe = []
 
 [dependencies]
 counter = { path = "../counter" }
