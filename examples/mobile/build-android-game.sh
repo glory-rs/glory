@@ -17,6 +17,7 @@ compiler="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin"
 }
 sh "$repo/examples/mobile/check-android-permissions.sh"
 sh "$repo/examples/mobile/check-android-clipboard.sh"
+sh "$repo/examples/mobile/check-android-files.sh"
 export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$compiler/aarch64-linux-android28-clang"
 export CC_aarch64_linux_android="$compiler/aarch64-linux-android28-clang"
 export CXX_aarch64_linux_android="$compiler/aarch64-linux-android28-clang++"
@@ -48,6 +49,13 @@ print('1' if any(n['id'] in ids and 'clipboard' in n['features'] for n in m['res
 PY
 )
 export GLORY_ANDROID_CLIPBOARD_HOST="$clipboard_host"
+files_host=$(python3 - "$GLORY_BUILD_ROOT/game-metadata.json" <<'PYFILES'
+import json,sys
+m=json.load(open(sys.argv[1])); ids={p['id'] for p in m['packages'] if p['name']=='glory-blitz'}
+print('1' if any(n['id'] in ids and 'files' in n['features'] for n in m['resolve']['nodes']) else '0')
+PYFILES
+)
+export GLORY_ANDROID_FILES_HOST="$files_host"
 cargo rustc --locked --manifest-path examples/mobile/Cargo.toml --lib --target aarch64-linux-android --no-default-features --features "$features" -- -C link-arg=-Wl,-z,max-page-size=16384
 library="$CARGO_TARGET_DIR/aarch64-linux-android/debug/libglory_mobile_counter.so"
 "$compiler/llvm-readelf" -h "$library" | grep -q 'AArch64'
@@ -87,6 +95,11 @@ if os.environ.get('GLORY_ANDROID_PERMISSION_HOST')=='1':
         root.insert(0,ET.Element('uses-permission',attrs))
     for name in ['camera','microphone']:
         root.insert(0,ET.Element('uses-feature',{android+'name':'android.hardware.'+name,android+'required':'false'}))
+if 'files-probe' in os.environ.get('GLORY_ANDROID_FEATURES','').replace(',',' ').split():
+    android='{http://schemas.android.com/apk/res/android}'
+    app=root.find('application')
+    ET.SubElement(app,'activity',{android+'name':'.GloryFilesSelectionProbe',android+'exported':'false'})
+    ET.SubElement(app,'provider',{android+'name':'.GloryFilesProbeProvider',android+'authorities':'rs.glory.counter.files-probe',android+'exported':'false',android+'grantUriPermissions':'true'})
 tree.write(sys.argv[2],encoding='utf-8',xml_declaration=True)
 PY
 set -- assembleDebug

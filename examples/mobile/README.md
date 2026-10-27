@@ -507,3 +507,41 @@ cancelled delivery cannot refund an unsettled native operation. Input's ordinary
 copy/cut/paste and Tags reuse Glory's shared asynchronous path. Actual keyboard,
 clipboard menu, TalkBack, real-device and iOS service acceptance remain separate.
 See [the clipboard contract](../../docs/native-clipboard.md).
+
+### Android document picker and reads
+
+`GLORY_ANDROID_FEATURES=files` installs `AndroidFiles` explicitly in Counter's
+Config, backed by the app-owned safe-JNI Host. Applications expose semantic File
+controls and call the existing pick/read/preview API; this feature grants no
+storage permission. The production host launches Android `ACTION_OPEN_DOCUMENT`,
+retains the selected seekable regular-file descriptor, and never reopens a display
+name or persists a URI grant. Non-seekable or unknown-size providers are currently
+refused. iOS still requires a platform driver.
+
+The separate `files-probe` view uses an owned selector Activity and private
+ContentProvider, never user documents:
+
+```sh
+GLORY_BUILD_ROOT=/Volumes/Data/Caches/glory/android \
+GLORY_ANDROID_FEATURES=files-probe sh examples/mobile/build-android-game.sh
+python3 examples/mobile/check-android-files-sdk.py \
+  --adb /Volumes/Data/Caches/glory/android/adb36/platform-tools/adb \
+  --apk /Volumes/Data/Caches/glory/android/package-game-aarch64-debug/glory-counter.apk \
+  --serial emulator-5580 --output /Volumes/Data/Caches/glory/android-files/reproduced
+```
+
+Every GameActivity build first runs strict Java compilation and the actual
+ledger's JVM tests, including cancellation retaining physical permits, global
+read/result/handle/metadata/size limits, Activity replacement, stale IDs, invalid
+UTF-8 metadata, unadopted cleanup and exhaustion. SDK acceptance checks real
+activity results, ContentResolver/PFD reads, multi-selection, semantic read/private
+preview decode and actual descriptor/cache/token cleanup. Retaining an already
+completed Future must not retain native reply admission. Installed APK hashes
+must match the tested build. The owned source proves this service chain; actual
+system DocumentsUI selection/cancellation, cloud pipes, TalkBack and real devices
+remain separate acceptance.
+
+Archive a probe APK before the next build overwrites its output. Ordinary builds
+exclude the fixture Activity/provider from their manifest and DEX; default builds
+also keep `GLORY_FILES=false` and initialize no file service. Native drop remains
+desktop-only. See [the file contract](../../docs/native-files.md).

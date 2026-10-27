@@ -6,6 +6,30 @@ use glory::blitz::{
 };
 use glory::prelude::{group, image};
 use std::{collections::BTreeMap, sync::Arc};
+#[cfg(all(feature = "files-probe", target_os = "android"))]
+mod files_probe;
+#[cfg(all(feature = "files-probe", not(target_os = "android")))]
+compile_error!("files-probe currently requires the Android system host");
+#[cfg(all(
+    feature = "files-probe",
+    any(
+        feature = "clipboard-probe",
+        feature = "network-probe",
+        feature = "permissions-probe",
+        feature = "permissions-host-probe",
+        feature = "android-assets-probe",
+        feature = "ime-probe",
+        feature = "keyboard-probe",
+        feature = "controls-probe",
+        feature = "radio-probe",
+        feature = "placeholder-probe",
+        feature = "choice-probe",
+        feature = "select-probe",
+        feature = "menu-probe",
+        feature = "tags-probe"
+    )
+))]
+compile_error!("select one mobile acceptance view");
 #[cfg(all(feature = "clipboard-probe", target_os = "android"))]
 mod clipboard_probe;
 #[cfg(all(feature = "clipboard-probe", not(target_os = "android")))]
@@ -147,7 +171,12 @@ compile_error!("permissions-host-probe runs the Swift iOS host; Android uses per
 compile_error!("select one mobile acceptance view");
 #[cfg(all(
     target_os = "android",
-    any(feature = "network", feature = "permissions", feature = "clipboard"),
+    any(
+        feature = "network",
+        feature = "permissions",
+        feature = "clipboard",
+        feature = "files"
+    ),
     not(feature = "android-game-activity")
 ))]
 compile_error!(
@@ -188,9 +217,15 @@ fn asset_window(
     let loader = Arc::new(Loader::new(config)?);
     #[cfg(all(feature = "clipboard", target_os = "android"))]
     let clipboard = android_clipboard()?;
+    #[cfg(all(feature = "files", target_os = "android"))]
+    let file_driver = android_files()?;
+    #[cfg(all(feature = "files", target_os = "android"))]
+    let files = glory::blitz::files::Files::new(file_driver.clone());
     let window = WindowApp::with_config(Config {
         #[cfg(all(feature = "clipboard", target_os = "android"))]
         clipboard: Some(glory::blitz::clipboard::Clipboard::new(clipboard.clone())),
+        #[cfg(all(feature = "files", target_os = "android"))]
+        files: Some(files.clone()),
         base_url: Url::parse(base)?,
         provider: Some(loader.clone()),
         ..Default::default()
@@ -219,7 +254,8 @@ fn asset_window(
         feature = "select-probe",
         feature = "menu-probe",
         feature = "tags-probe",
-        feature = "clipboard-probe"
+        feature = "clipboard-probe",
+        feature = "files-probe"
     )))]
     let content = counter::Counter;
     #[cfg(feature = "ime-probe")]
@@ -244,6 +280,8 @@ fn asset_window(
     let content = tags_probe::fixture();
     #[cfg(all(feature = "clipboard-probe", target_os = "android"))]
     let content = clipboard_probe::fixture(clipboard);
+    #[cfg(all(feature = "files-probe", target_os = "android"))]
+    let content = files_probe::fixture(file_driver, files, window.renderer().clone());
     window.mount(
         group().fill((
             content,
@@ -388,6 +426,25 @@ fn android_clipboard()
         Ok(Arc::new(glory::blitz::clipboard::AndroidClipboard::new(
             env, host,
         )?))
+    })
+}
+
+#[cfg(all(feature = "files", target_os = "android"))]
+fn android_files() -> Result<Arc<glory::blitz::files::AndroidFiles>, Box<dyn std::error::Error>> {
+    use jni::{JavaVM, jni_sig, jni_str};
+    JavaVM::singleton()?.attach_current_thread(|env| -> Result<_, Box<dyn std::error::Error>> {
+        let class = env.load_class(jni_str!("rs.glory.counter.GloryGameActivity"))?;
+        let host = env
+            .call_static_method(
+                class,
+                jni_str!("gloryFileHost"),
+                jni_sig!(() -> JObject),
+                &[],
+            )?
+            .l()?;
+        let driver = glory::blitz::files::AndroidFiles::new(env, host)
+            .map_err(|error| std::io::Error::other(format!("Android file host: {error:?}")))?;
+        Ok(Arc::new(driver))
     })
 }
 

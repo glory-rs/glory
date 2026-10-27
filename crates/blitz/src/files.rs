@@ -6,6 +6,13 @@ use std::{
     sync::{Arc, Mutex},
     time::Duration,
 };
+#[cfg(target_os = "android")]
+mod android;
+#[cfg(any(target_os = "android", test))]
+mod android_protocol;
+#[cfg(target_os = "android")]
+pub use android::{AndroidFileStats, AndroidFiles};
+
 pub type Reply<T> = Pin<Box<dyn Future<Output = Result<T, FileRejection>> + Send + 'static>>;
 
 /// Constructors must return promptly. OS work starts only when polled; foreign

@@ -106,6 +106,57 @@ expiry withdraws delivery while an uncancellable raw transfer/opener retains its
 slot until receipt/settlement or document teardown. Already-started blocking
 opener permits remain owned by the driver through the actual OS operation.
 
+## Android picker and provider reads
+
+The same `files` feature exports `AndroidFiles` on Android. Create it with safe
+JNI from the application-owned protocol-v1 Java Host in
+[GloryFiles.java](../examples/mobile/android-game/src/main/java/rs/glory/counter/GloryFiles.java), wrap it in `Arc`, and install
+`Files::new(driver.clone())` in the document's explicit Config. Clone one driver
+to share its request sequence. Each Host can be claimed only once. JNI request
+submission serializes ID allocation and native arrival, including concurrent
+readers; there is no completed-ID set. Native replies are bounded binary metadata
+or exact byte arrays, checked before Rust copies them. A completed failed or
+cancelled Future releases its reply record even if its caller retains the Future.
+Only a currently pending Future has an 8 ms polling timer.
+
+The app launches `ACTION_OPEN_DOCUMENT` from a resumed, focused Activity and
+accepts only the matching result with an explicit read grant and bounded content
+URI list. MIME/extension hints do not replace returned metadata/filter checks.
+No display name becomes a path, no storage permission is added, and no persistent
+URI grant or bookmark is saved. ContentResolver query/open calls run on the
+bounded worker pool. The current implementation accepts finite, seekable regular
+file descriptors only; unknown sizes, pipes and non-seekable cloud streams are
+refused. Reads use the originally opened PFD/FileChannel, not the URI or display
+name again. This is a live handle grant, not an immutable content snapshot.
+Provider/OS Cursor, String and ClipData allocations precede the bounded transfer;
+the metadata/URI limits do not bound those foreign allocations.
+
+One process-lifetime native admission ledger spans Activity coordinators. It
+holds at most one actual picker/opening operation, four reads (including ready,
+undrained replies), 32 weak clients, 160 charged handles, 160 KiB display metadata
+and 2 GiB declared sizes. These independent native limits allow the shared Rust
+service's 128-reference/1-GiB limit and a transactional replacement. Five bounded
+workers also close retired sources; idle workers expire. Closing an Activity or
+dropping a reply revokes delivery, while an already-running open/read/close keeps
+its physical charge until the call settles. Retired sources close after their
+last actual read returns. Neither operation cancellation nor these counters
+claim total RSS or interruption of foreign provider calls.
+
+Native callbacks update current records only. A monotonically increasing Android
+request-code watermark is saved through instance recreation, with no URI or
+authorization state; exhaustion fails rather than wrapping. A destroyed session's
+late callback cannot issue reads or publish to a successor. The Activity is weak,
+and foreign launch/query/read/close work runs outside ledger/document locks.
+
+`files-probe` is a separate APK feature. It uses an application-owned selector
+Activity and a non-exported fixture ContentProvider, both omitted from ordinary
+APK manifests and DEX classes. The ARM64 SDK probe verifies actual activity-result
+delivery, cancellation/count/type/grant/filter/size refusals, PFD reads, semantic
+multi-selection/read, private PNG decode, token/cache revocation and the provider's
+actual descriptor-close callbacks. It uses no injected UI input. This evidence
+does not establish system DocumentsUI gestures, real devices or reader speech.
+Commands are in the [mobile example](../examples/mobile/README.md).
+
 ## Image previews
 
 Enable `FileConfig::preview` explicitly. PNG/JPEG requests first read at most
@@ -162,10 +213,15 @@ cargo test --locked --manifest-path ../sapid/examples/native/Cargo.toml --featur
 
 Actual desktop dialog selection/cancellation has not been accepted through OS
 input. macOS sandbox security-scoped URLs/bookmarks, Windows/Linux dialog runtime,
-Android/iOS platform pickers, actual OS drag-source/destination interaction and
+iOS platform pickers, Android system DocumentsUI input and non-seekable providers,
+actual OS drag-source/destination interaction and
 assistive-technology acceptance remain open. Native drop protocol/engine tests
 use application-owned native event sources and do not prove a system drag gesture. Injected-driver, CPU and compile evidence
 do not establish those flows or complete the full file-service/platform gap.
+
+Android's separate owned-source SDK evidence and APK hashes are recorded under
+`/Volumes/Data/Caches/glory/android-files/`; JVM lifecycle/admission tests are run
+by `examples/mobile/check-android-files.sh` on every GameActivity build.
 
 
 The drop follow-up is recorded in `native-file-drop-*.log` and

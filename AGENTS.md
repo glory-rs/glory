@@ -230,6 +230,20 @@ retired feature aliases or count compilation as proof of platform acceptance.
   preserve the chooser. Poll/drop opener futures and native URI callbacks outside
   document borrows. Custom hosts forward native file/availability events once;
   mobile and actual OS drag/dialog/reader acceptance remain separate. See docs/native-files.md.
+  Android files uses an explicit protocol-v1 safe-JNI Host and ACTION_OPEN_DOCUMENT;
+  retain original finite seekable regular PFDs, never reopen names or persist URI
+  grants. One process-lifetime native admission ledger spans Activity sessions:
+  one picker, four reads including undrained replies, 32 weak clients and bounded
+  charged handles/metadata/declared sizes. Serialize numeric request allocation
+  with JNI submission across concurrent readers. Terminal Futures release reply
+  records even if callers retain them. Cancellation/Activity close revokes delivery
+  without refunding actual opens/reads/closes; sources close after final real reads.
+  Keep foreign provider work outside ledger/document locks and callbacks out of
+  Rust UI state. Save only
+  the non-wrapping native request-code watermark, no URI/authorization history.
+  files-probe's owned selector/provider and their DEX classes belong only to the
+  probe APK. SDK result/PFD/private-decode evidence does not prove DocumentsUI
+  input, non-seekable provider, real-device, TalkBack or iOS file acceptance.
   Input placeholder is a bounded, independent presentation layout, lazily shaped
   only while empty/non-composing and released when hidden/cleared. Hint-only
   changes preserve editor identity, raw generation, selection, IME and value

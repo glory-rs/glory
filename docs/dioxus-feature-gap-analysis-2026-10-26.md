@@ -16,7 +16,7 @@ Mac，最新证据见文末 Apple/移动输入记录，不能继续把“没有 
 | Web 发布 | 可复现 gzip、哈希清单、预览协商/HEAD/身份回退 | 指纹命名、Brotli/图片转换、WASM 分包 |
 | 运行时权限 | 有界 Owner future/driver API；Android 安全 JNI；iOS Swift 宿主；SDK 控制的授权状态查询 | iOS Rust 应用连接待最小 FFI 声明授权；真实系统弹窗选择、真机及其他权限类别 |
 | 原生剪贴板 | 显式可选桌面 worker 与 Android 安全 JNI；CopyText 与原生编辑器复制/剪切/粘贴；实际 Sapid 四主题消费端、macOS 系统往返和 Android ARM64 前台系统读写/ClipData 恢复 | iOS 系统 driver、Windows/Linux 实际 OS 往返、移动系统菜单及真实键盘/读屏 |
-| 原生文件服务 | 显式可选 driver、桌面系统选择器、Winit 文件拖放通道、稳定句柄分块读取及私有 PNG/JPEG 预览；真实文件替换/截断、解码及撤权回归、Sapid 四主题消费端通过 | 实际 OS 选择器/拖动输入验收、Android/iOS driver、macOS sandbox security scope 与平台读屏 |
+| 原生文件服务 | 显式可选 driver、桌面系统选择器、Winit 文件拖放通道、Android 安全 JNI/ContentResolver/PFD、稳定句柄分块读取及私有 PNG/JPEG 预览；桌面实际文件/消费端与 Android 自有源 SDK 链路通过 | 实际 OS 选择器/拖动输入验收、iOS driver、Android 非 seekable provider、macOS sandbox security scope 与平台读屏 |
 | 原生控件 | Checkbox/Switch/Mixed 和 Radio 的绘制、受控更新、点击/Space/AX 动作；Radio 分组与键盘导航；placeholder 独立提示布局与绘制；combobox/typeahead 协议及 listbox/tree 弹层；原生 Select 单选/多选/分组、选择属性与 AX；五项实际选择控件消费端通过；菜单/菜单栏/右键菜单/Palette 协议、八项实际消费端与浏览器回归通过；TagsInput/PillsInput 的原生输入与 provider 粘贴协议、五项实际消费端通过；两端模拟器初始显示 | 富文本、系统文件服务、iOS 剪贴板/移动系统菜单、其他弹层及系统菜单服务仍开放；实际输入/读屏单独验收 |
 
 整体差距仍未关闭。签名身份/设备等外部条件和仍需实现的软件功能分别保留，
@@ -897,3 +897,40 @@ Android/iOS 适配器严格 Clippy（--no-deps）及固定 fork 来源核对通�
 引擎固定 SHA 不变，无新 unsafe。详细边界见 [native-files.md](native-files.md)，
 本批证据为 `/Volumes/Data/Caches/glory/native-file-drop/result.json`。移动 picker/driver、
 OS 选择器/拖动、sandbox security scope、真机/读屏以及报告其他缺口继续推进。
+
+## 2026-10-27：Android 文件选择与 ContentResolver 读取
+
+显式 `AndroidFiles` 用安全 JNI 连接应用自有 Java protocol-v1 Host；移动示例的
+`files` 功能将其接入 `Config::files`。普通宿主从 resumed/focused Activity 发起
+`ACTION_OPEN_DOCUMENT`，只接收当前 request code、read grant 和有界 content URI。
+过滤提示不代替回执校验，不增加存储权限、不持久化 URI 授权，也不将显示名当路径。
+ContentResolver 在有界 worker 查询元数据并打开 PFD；目前只接受大小已知、可 seek 的
+常规文件。读取保留原句柄，不接受未知大小、pipe 或非 seekable 云端流。
+
+一个进程期原生额度账本跨越 Activity 重建，限制一个实际选择/打开、四个读取（包含
+已完成未取走的正文）、32 个弱 client、160 个 charged handle、160 KiB 显示元数据及
+2 GiB 声明大小；共享 Rust 文件服务的 128 引用/1 GiB 限额另行保持。五个有界 worker
+执行打开、读取和回收，空闲线程退出。取消/销毁先撤销交付，实际工作结束前不归还额度；
+最后一个实际读取返回后才关闭退休句柄。没有把这些预算描述为总 RSS 或强制中断 OS 调用。
+
+Rust 对并发请求的数字 ID 分配与 JNI 提交排序；Java 只保留当前记录与不回绕水位。
+Activity 保存的只有 request-code 水位，没有 URI、授权或完成历史。终态 Future 即使
+被调用者继续持有，也立即释放取消/失败回执；迟到旧 Activity 结果不能打开文件或投递
+到后继文档。回调不进入 Rust UI，foreign provider 工作不持有 ledger/document 锁。
+
+严格 Java 编译及真实 ledger 的 JVM 回归覆盖实际调用未结束的额度、跨 session 阻塞、
+四个未取走结果、160 句柄/元数据/声明大小上限、无效 opener、UTF-8、未 adopt 清理、
+主线程投递失败、ID/request-code 耗尽。两个 Rust 协议测试覆盖精确报文、截断、重复 ID、
+非法 UTF-8 域和预算。无新 unsafe，引擎固定 SHA 未改。
+
+`files-probe` 专用 APK 实际 ARM64 SDK 安装/启动通过：自有 selector Activity 交付真实
+Activity result，私有 ContentProvider 返回真实 PFD；验证单选/多选、取消、数量/type/
+grant/filter/大小拒绝、保留原句柄、语义读取中文/emoji、私有 PNG 解码、令牌/cache
+撤权、原生额度及 provider descriptor close callback 归零。没有注入触摸或按键。
+该来源不等于系统 DocumentsUI 的用户操作；普通 APK 的 manifest/DEX 排除两个验收组件。
+
+全工作区含文档测试 **1086 项、222 个结果报告**通过；既有系统剪贴板 opt-in 测试一项
+仍忽略。native/WASM 严格 Clippy、Android 适配器/probe、CLI 25 项及固定 fork 检查通过。
+证据与 APK 哈希在 `/Volumes/Data/Caches/glory/android-files/`；接口和复验命令见
+[native-files.md](native-files.md) 与移动示例。系统选择器真实操作、非 seekable provider、
+iOS driver、sandbox security scope、真机/读屏和其他报告缺口继续开放。

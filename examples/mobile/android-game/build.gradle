@@ -5,6 +5,7 @@ def nativeLibraries = System.getenv('GLORY_ANDROID_LIBS')
 def debugKey = System.getenv('GLORY_ANDROID_DEBUG_KEY')
 def generatedManifest = System.getenv('GLORY_ANDROID_MANIFEST')
 def tlsVersion = System.getenv('GLORY_ANDROID_TLS_VERSION')
+def filesProbe = (System.getenv('GLORY_ANDROID_FEATURES') ?: '').tokenize(', ').contains('files-probe')
 if (!output || !nativeLibraries || !debugKey || !generatedManifest) {
     throw new GradleException('Use build-android-game.sh with explicit data-volume outputs')
 }
@@ -34,6 +35,8 @@ android {
         ndk { abiFilters 'arm64-v8a' }
         buildConfigField 'boolean', 'GLORY_PERMISSIONS', System.getenv('GLORY_ANDROID_PERMISSION_HOST') == '1' ? 'true' : 'false'
         buildConfigField 'boolean', 'GLORY_CLIPBOARD', System.getenv('GLORY_ANDROID_CLIPBOARD_HOST') == '1' ? 'true' : 'false'
+        buildConfigField 'boolean', 'GLORY_FILES', System.getenv('GLORY_ANDROID_FILES_HOST') == '1' ? 'true' : 'false'
+        buildConfigField 'boolean', 'GLORY_FILES_PROBE', (System.getenv('GLORY_ANDROID_FEATURES') ?: '').tokenize(', ').contains('files-probe') ? 'true' : 'false'
         buildConfigField 'boolean', 'GLORY_CLIPBOARD_PROBE', (System.getenv('GLORY_ANDROID_FEATURES') ?: '').tokenize(', ').contains('clipboard-probe') ? 'true' : 'false'
     }
     signingConfigs {
@@ -47,6 +50,7 @@ android {
     sourceSets.main.jniLibs.srcDirs = [nativeLibraries]
     sourceSets.main.assets.srcDirs = [layout.buildDirectory.dir('glory-assets')]
     sourceSets.main.manifest.srcFile generatedManifest
+    if (!filesProbe) sourceSets.main.java.exclude('**/GloryFilesSelectionProbe.java', '**/GloryFilesProbeProvider.java')
     // android-activity compiles its matching 4.4.0 C++ glue; do not link the AAR's.
     buildFeatures { prefab false; buildConfig true }
     packaging { jniLibs { useLegacyPackaging true } }
