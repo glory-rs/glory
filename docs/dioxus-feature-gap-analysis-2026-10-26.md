@@ -15,7 +15,7 @@ Mac，最新证据见文末 Apple/移动输入记录，不能继续把“没有 
 | 桌面开发 | native watch、错误保留旧进程、成功重启与退出回收 | 状态保持、真正 Rust 热补丁、检查器 |
 | Web 发布 | 可复现 gzip、哈希清单、预览协商/HEAD/身份回退 | 指纹命名、Brotli/图片转换、WASM 分包 |
 | 运行时权限 | 有界 Owner future/driver API；Android 安全 JNI；iOS Swift 宿主；SDK 控制的授权状态查询 | iOS Rust 应用连接待最小 FFI 声明授权；真实系统弹窗选择、真机及其他权限类别 |
-| 原生控件 | Checkbox/Switch/Mixed 和 Radio 的绘制、受控更新、点击/Space/AX 动作；Radio 分组与键盘导航；placeholder 独立提示布局与绘制；combobox/typeahead 协议及 listbox/tree 弹层；原生 Select 单选/多选/分组、选择属性与 AX；五项实际选择控件消费端通过；菜单/菜单栏/右键菜单/Palette 协议、八项实际消费端与浏览器回归通过；两端模拟器初始显示 | TagsInput、富文本、文件/语义剪贴板、其他弹层及系统菜单服务仍开放；实际读屏单独验收 |
+| 原生控件 | Checkbox/Switch/Mixed 和 Radio 的绘制、受控更新、点击/Space/AX 动作；Radio 分组与键盘导航；placeholder 独立提示布局与绘制；combobox/typeahead 协议及 listbox/tree 弹层；原生 Select 单选/多选/分组、选择属性与 AX；五项实际选择控件消费端通过；菜单/菜单栏/右键菜单/Palette 协议、八项实际消费端与浏览器回归通过；TagsInput/PillsInput 的原生输入与 provider 粘贴协议、五项实际消费端通过；两端模拟器初始显示 | 富文本、系统文件/剪贴板服务、其他弹层及系统菜单服务仍开放；实际输入/读屏单独验收 |
 
 整体差距仍未关闭。签名身份/设备等外部条件和仍需实现的软件功能分别保留，
 没有用模拟器或编译结果替代完整平台交付。
@@ -712,3 +712,46 @@ Clippy 仍显式排除既有 result_large_err/needless_return，未伪称全 for
 这里完成自绘语义菜单与 Palette 连接。平台系统菜单栏/托盘、TagsInput、富文本、
 文件/语义剪贴板、Tooltip/navigation Group/Sheet 等弹层、移动权限 Rust 后续连接、
 读屏/真机/分发、应用服务和发布工具仍按本报告继续补齐，整体差距不标为关闭。
+
+
+## 2026-10-27：原生 TagsInput / PillsInput 输入连接
+
+Blitz 解除 tags facet 的拒绝，接通共享 revisioned TagsCommand。输入仍是普通
+单行 Input，Sapid 保留原有原子 state、分隔/重复/数量规则、移除项和成功值代理，
+不增加宿主标签控制器、业务列表扫描或访问历史。策略补丁保留编辑器身份、选区
+和值；正常光标、Space/Tab、未配置分隔符及空 Enter 的表单语义继续工作。
+
+AppKit 使用一个当前 NodeId/命令种类配对空退格及粘贴与原始按键，尊重实际修饰键，
+删除最后字符不会顺带删除标签。粘贴已经处理后，即使回调撤销 tags 策略，随后
+原始按键也不能再次粘贴。回归在修复前实际得到 3 次读取而非 2 次；保留
+`/Volumes/Data/Caches/glory/tags-pair-retirement-before.log`，最终完整测试通过。
+其他输入、焦点变化及退休清除标记，标记不保存文本/剪贴板正文。
+
+未组合的软件 IME 单个分隔标点使用同一提交协议；软件 Return 复用 Enter 路径，
+包括空 Enter 的表单提交。组合中或空 Preedit 后的最终候选文本不会被分隔，随后
+普通 Enter 可提交候选。消耗软件标点后使 native IME context 失效，保证受控拒绝
+也能回写接受值。这是原生输入协议验证，不替代实际软键盘/中文 IME 的该控件验收。
+
+粘贴只读取一次 document ShellProvider 快照，返回后在规范化/复制进事件或修改
+编辑器前执行 16 KiB UTF-8 检查，再检查规范化结果；4096 字节当前草稿/普通粘贴
+结果也受限。Provider 的原始 OS 读取/分配发生在返回 String 之前，不把其内存
+算作已受 UI payload 限额保护。分隔/换行粘贴产生一个含 UTF-16 选区的原子提议，
+保留物理编辑器直到组件接受。普通粘贴走同一编辑器/文本事件；超限只发送无正文
+拒绝，保留选区并允许后续恢复。百万字节和 UTF-16 emoji 选区已有实际消费端证据。
+
+新增七项输入回归及一项 AX 回归。AccessKit 保留 TextInput/value/SetValue，没有
+虚构 ComboBox/ListBox；AT 赋值不会分隔，退休动作失效。五项实际 Sapid 消费端的
+四主题验证自由值、重复/上限、受控拒绝和光标、已选中的成功值代理、原子粘贴/Pills
+重复项、IME/空 Return、同批输入提交、256 标签下少于 1100 节点及清理，并输出
+CPU 控件/文字像素。Sapid 运行时没有本批改动；既有菜单八项和选择控件五项回归仍通过。
+
+最终 Glory 全工作区含文档测试 **1032 项**、native/WASM 全工作区严格 Clippy、
+headless 无默认 feature 以及 CLI 25 项/严格 Clippy 通过。引擎固定 SHA 没有变化，
+当前来源检查通过。两端 tags-probe 构建、安装、SDK 启动和初始中文输入框画面及
+已安装二进制哈希单独核对；iOS device 以 15.0 部署目标链接，普通两端包另行构建。
+详情与摘要见 [native-tags.md](native-tags.md) 和
+`/Volumes/Data/Caches/glory/native-tags/result.json`。
+
+这批完成原生输入和注入 provider 的 Tags 协议连接。普通 Glory shell 尚未暴露
+系统 clipboard provider，因此实际系统剪贴板/语义 CopyText、移动粘贴服务、真实
+设备输入/读屏、文件选择与富文本、其余平台和应用服务缺口仍开放，继续逐项补齐。

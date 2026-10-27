@@ -109,5 +109,7 @@ SDK installation/launch, package hashes and initial pixels are evidence only for
 those operations; no injected input or OS-reader acceptance is claimed.
 
 Menus/context menus/palette are connected in the subsequent
-[native menu implementation](native-menus.md). TagsInput policy, rich editing,
-file pickers, semantic clipboard and the other report items remain open.
+[native menu implementation](native-menus.md). The TagsInput host protocol is
+connected in [native tags](native-tags.md), with platform clipboard services
+tracked separately. Rich editing, file pickers, semantic clipboard and the other
+report items remain open.

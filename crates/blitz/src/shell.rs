@@ -33,6 +33,11 @@ mod radio;
 #[cfg(test)]
 #[path = "radio_tests.rs"]
 mod radio_tests;
+#[path = "tags.rs"]
+mod tags;
+#[cfg(test)]
+#[path = "tags_tests.rs"]
+mod tags_tests;
 use std::cell::{Cell, Ref, RefMut};
 use std::sync::Arc;
 use std::task::Context;
@@ -56,6 +61,12 @@ use winit::event_loop::{ActiveEventLoop, EventLoop};
 pub use winit::platform::android::activity::AndroidApp;
 pub use winit::window::WindowAttributes;
 use winit::window::WindowId;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum AppleInput {
+    EmptyDelete,
+    TagsPaste,
+}
 
 #[derive(Debug)]
 pub enum ShellError {
@@ -190,9 +201,24 @@ impl Document for WindowApp {
         }))
     }
     fn handle_ui_event(&mut self, mut event: UiEvent) {
+        if matches!(&event, UiEvent::Ime(BlitzImeEvent::Commit(text)) if text == "\n")
+            && tags::software_enter(&self.renderer.0.borrow())
+        {
+            event = UiEvent::KeyDown(BlitzKeyEvent {
+                key: Key::Named(NamedKey::Enter),
+                code: keyboard_types::Code::Enter,
+                modifiers: Modifiers::empty(),
+                location: keyboard_types::Location::Standard,
+                is_auto_repeating: false,
+                is_composing: false,
+                state: blitz_traits::events::KeyState::Pressed,
+                text: Some("\n".into()),
+            });
+        }
         let apple_command = matches!(&event, UiEvent::AppleStandardKeybinding(_));
-        if !matches!(&event,UiEvent::KeyDown(key) if key.key==Key::Named(NamedKey::Backspace)) {
-            self.renderer.0.borrow_mut().apple_empty_delete = None;
+        if !matches!(&event,UiEvent::KeyDown(key) if key.key==Key::Named(NamedKey::Backspace) || matches!(&key.key,Key::Character(c) if c.eq_ignore_ascii_case("v")))
+        {
+            self.renderer.0.borrow_mut().apple_input = None;
         }
         editing::capture_before(&mut self.renderer.0.borrow_mut(), &event);
         editing::sanitize_ime(&self.renderer.0.borrow(), &mut event);
@@ -214,7 +240,7 @@ impl Document for WindowApp {
         }
         let mut state = self.renderer.0.borrow_mut();
         if !apple_command {
-            state.apple_empty_delete = None;
+            state.apple_input = None;
         }
         layers::lock_viewport(&mut state);
         state.sync_focus();
@@ -340,7 +366,8 @@ impl EventHandler for Events {
                 return;
             }
             if let DomEventData::AppleStandardKeybinding(command) = &event.data
-                && choice::apple(&mut state, node, event.target, command)
+                && (tags::apple(&mut state, node, event.target, command)
+                    || choice::apple(&mut state, node, event.target, command))
             {
                 event_state.prevent_default();
                 return;
@@ -357,6 +384,12 @@ impl EventHandler for Events {
                         command.as_str(),
                         "cut:" | "paste:" | "insertNewline:" | "insertTab:"
                     ))
+            {
+                event_state.prevent_default();
+                return;
+            }
+            if let DomEventData::Ime(ime) = &event.data
+                && tags::ime(&mut state, node, event.target, ime)
             {
                 event_state.prevent_default();
                 return;
@@ -794,6 +827,9 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
             )
         });
         let key_name = key.key.to_string();
+        if tags::key(state, origin, target, key, &key_name) {
+            return true;
+        }
         if menu::key(state, origin, target, key, &key_name) {
             return true;
         }

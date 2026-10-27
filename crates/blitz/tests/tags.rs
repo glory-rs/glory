@@ -2,7 +2,7 @@
 use glory_blitz::Renderer;
 use glory_render::*;
 #[test]
-fn native_tags_policy_explicitly_rejects_without_rejecting_plain_inputs_or_losing_prefix() {
+fn native_tags_policy_admits_plain_and_refined_inputs_and_preserves_later_rejection_prefix() {
     let runtime = RuntimeId::new();
     let mut ids = NodeIds::new(runtime);
     let input = ids.allocate();
@@ -16,14 +16,8 @@ fn native_tags_policy_explicitly_rejects_without_rejecting_plain_inputs_or_losin
     let patch = Patch::Semantics(Change::Set(tags.semantics.clone()));
     let mut renderer = Renderer::new(runtime);
     renderer.preflight(plain.view(), None).unwrap();
-    assert_eq!(
-        renderer.preflight(tags.view(), None),
-        Err(Error::Unsupported("native tags input policy"))
-    );
-    assert_eq!(
-        renderer.preflight(plain.view(), Some(&patch)),
-        Err(Error::Unsupported("native tags input policy"))
-    );
+    renderer.preflight(tags.view(), None).unwrap();
+    renderer.preflight(plain.view(), Some(&patch)).unwrap();
     assert_eq!(
         renderer.apply(&[
             Mutation::Create {
@@ -35,23 +29,21 @@ fn native_tags_policy_explicitly_rejects_without_rejecting_plain_inputs_or_losin
                 parent: None,
                 before: None
             },
+            Mutation::Patch { id: input, patch },
             Mutation::Create {
                 id: rejected,
-                node: Box::new(tags)
+                node: Box::new(Descriptor::new(Props::File(Default::default())))
             }
         ]),
-        Err(Error::Unsupported("native tags input policy"))
+        Err(Error::Unsupported("native file picker controls"))
     );
+    renderer.listen(input, EventKind::Tags, true).unwrap();
     assert_eq!(renderer.stats().nodes, 1);
-    assert_eq!(renderer.stats().applied, 2);
+    assert_eq!(renderer.stats().applied, 3);
     assert!(
         renderer
             .engine_id(rejected, glory_html::Part::Main)
             .is_err()
-    );
-    assert_eq!(
-        renderer.apply(&[Mutation::Patch { id: input, patch }]),
-        Err(Error::Unsupported("native tags input policy"))
     );
     renderer
         .request(Query::Bounds(input), QueryToken(5051))
@@ -62,7 +54,7 @@ fn native_tags_policy_explicitly_rejects_without_rejecting_plain_inputs_or_losin
         inputs.as_slice(),
         [Input::Response {
             token: QueryToken(5051),
-            applied: 2,
+            applied: 3,
             result: Ok(QueryValue::Bounds(_))
         }]
     ));

@@ -11,6 +11,23 @@ use std::{collections::BTreeMap, sync::Arc};
 mod android_assets_probe;
 #[cfg(feature = "choice-probe")]
 mod choice_probe;
+#[cfg(feature = "tags-probe")]
+mod tags_probe;
+#[cfg(all(
+    feature = "tags-probe",
+    any(
+        feature = "menu-probe",
+        feature = "select-probe",
+        feature = "choice-probe",
+        feature = "placeholder-probe",
+        feature = "radio-probe",
+        feature = "controls-probe",
+        feature = "ime-probe",
+        feature = "keyboard-probe",
+        feature = "permissions-probe"
+    )
+))]
+compile_error!("select one mobile acceptance view");
 #[cfg(feature = "menu-probe")]
 mod menu_probe;
 #[cfg(feature = "select-probe")]
@@ -160,6 +177,10 @@ fn asset_window(
     window
         .renderer()
         .set_css(&format!("@import url('theme.css');{}", menu_probe::CSS));
+    #[cfg(feature = "tags-probe")]
+    window
+        .renderer()
+        .set_css(&format!("@import url('theme.css');{}", tags_probe::CSS));
     #[cfg(not(any(
         feature = "ime-probe",
         feature = "keyboard-probe",
@@ -169,7 +190,8 @@ fn asset_window(
         feature = "placeholder-probe",
         feature = "choice-probe",
         feature = "select-probe",
-        feature = "menu-probe"
+        feature = "menu-probe",
+        feature = "tags-probe"
     )))]
     let content = counter::Counter;
     #[cfg(feature = "ime-probe")]
@@ -190,6 +212,8 @@ fn asset_window(
     let content = select_probe::fixture();
     #[cfg(feature = "menu-probe")]
     let content = menu_probe::fixture();
+    #[cfg(feature = "tags-probe")]
+    let content = tags_probe::fixture();
     window.mount(
         group().fill((
             content,

@@ -148,7 +148,7 @@ retired feature aliases or count compilation as proof of platform acceptance.
   Mouse/pen Pointer uses one dispatch's previous hover identity; App derives
   logical PointerWithin boundaries. Touch never becomes hover/typeahead input.
   AppKit empty Multiple Backspace cancels the command's no-op deletion and keeps
-  one pending current NodeId until the following physical key supplies modifiers.
+  one pending current NodeId/command kind until the following physical key supplies modifiers.
   Clear it on other input/focus retirement; do not remove a token after deleting
   the final text character or repeat password deletion on the raw Mac key.
   AccessKit resolves active descendants from current semantic ownership and live
@@ -176,6 +176,18 @@ retired feature aliases or count compilation as proof of platform acceptance.
   scroll. Explicit programmatic scrolling cancels old touch inertia in the fork.
   Protocol/CPU/AX models and SDK initial display do not prove OS input/reader
   acceptance or platform system-menu services. See docs/native-menus.md.
+  TagsInput retains an ordinary Input and shared revisioned Tags commands; Sapid
+  owns accepted values, tokenization, duplicates and atomic proposals. Preserve
+  caret/native input, composition and terminal candidates. Uncomposed software
+  punctuation/Return may use the shared commit/form path. One current AppKit
+  (NodeId, command kind) pairs empty deletion/paste with the physical key; other
+  input/focus retirement clears it. Never retain clipboard bodies or tag history.
+  Read one provider clipboard snapshot, bound its returned UTF-8 before copying
+  or editing, and retain UTF-16 selection on body-free budget rejection. Provider
+  OS allocation is outside that payload budget. Ordinary paste uses the same
+  editor; delimited paste remains an atomic component proposal. Stock platform
+  clipboard services and real mobile input/readers stay separate from injected
+  provider/CPU/AX evidence. See docs/native-tags.md.
   Input placeholder is a bounded, independent presentation layout, lazily shaped
   only while empty/non-composing and released when hidden/cleared. Hint-only
   changes preserve editor identity, raw generation, selection, IME and value

@@ -865,11 +865,11 @@ fn appkit_command_then_raw_key_deletes_once_and_empty_multiple_keeps_physical_mo
     f.host
         .handle_ui_event(UiEvent::AppleStandardKeybinding("deleteBackward:".into()));
     assert_eq!(
-        f.host.renderer.0.borrow().apple_empty_delete,
-        Some(f.trigger)
+        f.host.renderer.0.borrow().apple_input,
+        Some((f.trigger, super::AppleInput::EmptyDelete))
     );
     f.host.app.clear().unwrap();
-    assert!(f.host.renderer.0.borrow().apple_empty_delete.is_none());
+    assert!(f.host.renderer.0.borrow().apple_input.is_none());
     let mut host = WindowApp::new();
     let value = host.app.scope().cage("abc".to_owned());
     host.mount(

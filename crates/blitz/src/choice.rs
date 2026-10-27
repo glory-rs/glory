@@ -85,14 +85,15 @@ pub(super) fn key(
                     .is_some_and(|i| i.editor.raw_text().is_empty());
             let remove_last = input.choice_remove_last(kind, empty);
             #[cfg(target_os = "macos")]
-            let remove_last =
-                if input.key == "Backspace" && state.apple_empty_delete.take() != Some(origin) {
-                    // The preceding AppKit command may have deleted the final
-                    // character. Only an originally empty editor removes a token.
-                    None
-                } else {
-                    remove_last
-                };
+            let remove_last = if input.key == "Backspace"
+                && state.apple_input.take() != Some((origin, super::shell::AppleInput::EmptyDelete))
+            {
+                // The preceding AppKit command may have deleted the final
+                // character. Only an originally empty editor removes a token.
+                None
+            } else {
+                remove_last
+            };
             if let Some(command) =
                 remove_last.or_else(|| input.choice(kind, s.expanded == Some(true)))
             {
@@ -178,7 +179,7 @@ pub(super) fn apple(state: &mut State, origin: NodeId, target: EngineId, command
     }
     // Winit delivers doCommandBySelector before KeyboardInput. Cancel the
     // no-op deletion now, then let that physical key carry real modifiers.
-    state.apple_empty_delete = Some(origin);
+    state.apple_input = Some((origin, super::shell::AppleInput::EmptyDelete));
     true
 }
 

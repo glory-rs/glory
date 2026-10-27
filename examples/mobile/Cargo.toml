@@ -33,6 +33,7 @@ placeholder-probe = []
 choice-probe = []
 select-probe = []
 menu-probe = []
+tags-probe = []
 
 [dependencies]
 counter = { path = "../counter" }

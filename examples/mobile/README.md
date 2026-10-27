@@ -462,3 +462,16 @@ installed-binary hashes and initial menu pixels are recorded under
 `/Volumes/Data/Caches/glory/native-menus`. Real OS input, VoiceOver/TalkBack,
 permission dialogs and signed device installation remain separate acceptance.
 See [native menu boundaries](../../docs/native-menus.md).
+
+
+### Native free-tag protocol probe
+
+Select `GLORY_ANDROID_FEATURES=tags-probe` or `GLORY_IOS_FEATURES=tags-probe` with
+the corresponding build script. The shared fixture displays three ordinary Input
+separator policies and bounded command feedback. Enter/comma/semicolon commit,
+empty Backspace removal, software IME punctuation/Return and composition use the
+native protocol; actual duplicate/token/proxy policy is tested with Sapid consumers.
+Select only one acceptance view. Stock platform clipboard services remain separate;
+paste requires an explicit document clipboard provider. SDK screenshots and
+installed-binary hashes prove initial display, not real input/readers or signed
+devices. See [native tags](../../docs/native-tags.md).

@@ -2579,3 +2579,17 @@ Glory 1024、Sapid 1153、实际菜单消费端 8、既有选择控件消费端 
 headless、fork 来源/测试、普通移动包及设备链接通过。两端探针仅声明 SDK 安装、
 初始画面与安装哈希，不替代 OS 输入/读屏或签名真机。完整实现、失败保留与证据
 见 [native-menus.md](native-menus.md) 和 [功能差距报告](dioxus-feature-gap-analysis-2026-10-26.md)。
+
+
+## 2026-10-27：原生自由标签输入协议
+
+Blitz 原生 TagsInput 连接共享键盘、revisioned Tags 命令、UTF-16 原子粘贴和无正文
+预算拒绝。Sapid 原子 state/控制器未变，实际五项四主题消费者含 256 tags、成功值
+代理、受控拒绝/光标与 IME/表单 Return 已通过。AppKit 一次当前命令配对避免最后
+字符删除后移除标签，以及策略撤销后重复粘贴；软件标点和 Return 保留组合候选。
+AccessKit 仍是 TextInput，退休动作拒绝，无新角色/依赖/fork/unsafe。
+
+Glory 1032 项、native/WASM 严格 Clippy、headless、CLI 25 项/严格 Clippy通过；
+菜单八项、选择控件五项消费者继续通过。两端探针的 SDK 初始显示/安装哈希与
+设备链接单独记录。系统剪贴板服务、真实控件 OS 输入/读屏和其他报告缺口未关闭；
+见 [native-tags.md](native-tags.md) 的 provider/预算和验收边界。

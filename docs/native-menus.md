@@ -77,6 +77,7 @@ belong to its `result.json`. Browser checks of the shared Sapid focus change use
 the existing Menu/Menubar/ContextMenu/Command acceptance scripts.
 
 Tooltip/navigation Group layers, Sheet gestures, layer Translation, intrinsic
-collapse motion, TagsInput, rich editing, file pickers and semantic clipboard
-remain separate native gaps. Multi-scene/device/distribution and other application
+collapse motion, rich editing, file pickers and semantic clipboard remain separate
+native gaps. The subsequent [TagsInput protocol](native-tags.md) retains its own
+platform clipboard/input acceptance boundaries. Multi-scene/device/distribution and other application
 services remain tracked by the [feature-gap report](dioxus-feature-gap-analysis-2026-10-26.md).

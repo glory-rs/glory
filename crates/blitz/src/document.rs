@@ -136,18 +136,10 @@ fn check_layer<'a>(
 /// Keep native control admission in sync with actual engine and input support.
 fn check_mode<'a>(
     node: impl Into<glory_render::DescriptorView<'a>>,
-    patch: Option<&glory_render::Patch>,
+    _patch: Option<&glory_render::Patch>,
 ) -> Result<(), Error> {
     let node = node.into();
-    use glory_render::{Change, Patch, Props};
-    let semantics = match patch {
-        Some(Patch::Semantics(Change::Set(semantics))) => semantics.as_ref(),
-        Some(Patch::Semantics(Change::Clear)) => None,
-        _ => node.semantics.as_ref(),
-    };
-    if semantics.is_some_and(|semantics| semantics.tags_input.is_some()) {
-        return Err(Error::Unsupported("native tags input policy"));
-    }
+    use glory_render::Props;
     if matches!(node.props, Props::RichEditor(_)) {
         return Err(Error::Unsupported("native rich editing"));
     }
@@ -1050,7 +1042,7 @@ struct State {
     keyboard_clock: std::time::Instant,
     // One AppKit command awaiting its immediately following physical key.
     #[cfg(feature = "shell")]
-    apple_empty_delete: Option<NodeId>,
+    apple_input: Option<(NodeId, shell::AppleInput)>,
     layers: layers::Layers,
     focus_scopes: focus_scope::Scopes,
     color_scheme: Option<bool>,
@@ -1213,7 +1205,7 @@ impl State {
         }
         #[cfg(feature = "shell")]
         {
-            self.apple_empty_delete = None;
+            self.apple_input = None;
         }
         if let Some(node) = self.focused.take() {
             if let Err(error) = self.end_editing(node) {
@@ -1321,7 +1313,7 @@ impl Renderer {
             #[cfg(feature = "shell")]
             keyboard_clock: std::time::Instant::now(),
             #[cfg(feature = "shell")]
-            apple_empty_delete: None,
+            apple_input: None,
             layers: layers::Layers::default(),
             focus_scopes: focus_scope::Scopes::default(),
             #[cfg(feature = "paint")]

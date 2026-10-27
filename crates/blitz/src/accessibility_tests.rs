@@ -25,6 +25,8 @@ mod select;
 mod separator;
 #[path = "accessibility_table_tests.rs"]
 mod tables;
+#[path = "accessibility_tags_tests.rs"]
+mod tags;
 #[path = "accessibility_translation_tests.rs"]
 mod translation;
 #[cfg(target_os = "windows")]
