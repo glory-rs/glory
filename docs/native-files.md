@@ -213,7 +213,7 @@ cargo test --locked --manifest-path ../sapid/examples/native/Cargo.toml --featur
 
 Actual desktop dialog selection/cancellation has not been accepted through OS
 input. macOS sandbox security-scoped URLs/bookmarks, Windows/Linux dialog runtime,
-iOS platform pickers, Android system DocumentsUI input and non-seekable providers,
+iOS third-party/cloud provider flows, Android system DocumentsUI input and non-seekable providers,
 actual OS drag-source/destination interaction and
 assistive-technology acceptance remain open. Native drop protocol/engine tests
 use application-owned native event sources and do not prove a system drag gesture. Injected-driver, CPU and compile evidence
@@ -296,3 +296,38 @@ remain platform acceptance work. Device SDK linking is recorded separately.
 
 The integer ABI and reproducible host checks are specified in
 [ios-mobile-io.md](ios-mobile-io.md).
+
+## Actual iOS picker and external-container acceptance
+
+`ios-files-ui-probe` now exercises the production `UIDocumentPickerViewController`
+through actual Device Hub touch input. A separate `rs.glory.files.fixture` app
+exposes only its owned Documents using UIFileSharingEnabled and
+LSSupportsOpeningDocumentsInPlace. Apple's **Local Storage File Provider** supplies
+those documents to the consumer; there is no shared app group, URL injection,
+consumer-container fixture copy or cloud/account access. The application label
+“Glory Provider” identifies that document fixture, not a custom extension.
+
+On the owned iPhone 17 and iPad Air M4 / iOS 27 simulators, real Browse/Open
+produces the UIKit delegate callback and container-external URLs with successful
+security-scope starts. Text and PNG bytes match exactly; private PNG previews
+actually paint. A nonmatching BIN is disabled by the system picker. Cancel keeps
+prior selected grants usable; iPad outside-tap dismissal also settles as Cancel.
+Retiring a requesting Owner while the actual sheet is visible dismisses it,
+releases the picker slot after native completion and delivers no late callback.
+Clear pairs every successful scope start with a stop and every open with a close,
+then drains native/shared references, bytes, reads and private preview/cache state.
+
+The dedicated probe fixes two harness omissions: File activation explicitly
+calls Scope::pick_files, and clearing without a preview does not expect the
+unrelated package-image cache to be empty. Temporary query child scopes are
+retired after each response rather than accumulating completed response storage.
+No production IO or grant imbalance was found by these flows; production runtime
+crates, the integer ABI declaration and immutable engine pins are unchanged.
+Test-only opcode 101 supplies body/path-free counters and is absent from normal
+builds. Raw UI screenshots/logs, hashes and result checks are under
+`/Volumes/Data/Caches/glory/ios-system-files/`.
+
+This closes actual system-picker input/callback and external Local Storage
+provider scope/read/close acceptance on these simulators. It does not establish
+third-party provider extensions, remote hydration/error recovery, real-device
+sandbox enforcement, store distribution or assistive-reader behavior.

@@ -276,6 +276,13 @@ retired feature aliases or count compilation as proof of platform acceptance.
   guard are absent from normal builds. iPhone/iPad simulator owned-source service
   and semantic evidence does not prove system picker input, external File Provider
   security-scope grants, cross-app paste alerts, real devices or readers.
+  Separate ios-files-ui-probe has actual Device Hub picker/cancel/multi-select,
+  external Local Storage provider scope/read/close, private preview and Owner
+  retirement evidence on owned iPhone/iPad simulators. Its independent Documents
+  fixture is a different app, not a custom provider extension or shared container.
+  Test-only opcode 101/counters and fixture binaries stay out of normal bundles;
+  never inject selected URLs into this acceptance. Third-party/cloud providers,
+  hydration/error recovery, real-device sandbox and readers remain separate.
   Input placeholder is a bounded, independent presentation layout, lazily shaped
   only while empty/non-composing and released when hidden/cleared. Hint-only
   changes preserve editor identity, raw generation, selection, IME and value

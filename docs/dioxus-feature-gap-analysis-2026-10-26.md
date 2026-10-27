@@ -1059,3 +1059,35 @@ Owner。剪贴板限制原始/规范化 UTF-8 均不超过 64 KiB、一个物理
 授权、iCloud hydration、场景切换下的系统选择器行为、跨应用粘贴弹窗或真机/读屏
 完成；这些仍是独立平台验收项。详见 [native-files.md](native-files.md) 和
 [native-clipboard.md](native-clipboard.md)。
+
+## 2026-10-27：真实 iOS 系统选择器与容器外 Local Storage Provider 验收
+
+确认 Mac 已解锁后，在两个自有模拟器通过 Device Hub 实际点击系统 Files 界面，
+使用生产 `UIDocumentPickerViewController` 和真实 delegate 回调。新增 file-only
+`ios-files-ui-probe`；独立 `rs.glory.files.fixture` 文档应用仅生成自有 TXT/PNG/BIN，
+通过苹果系统 Local Storage File Provider 暴露 Documents。没有共享 app group、
+选择 URL 注入、把文件拷入消费端容器或接入个人云盘。“Glory Provider” 是夹具
+应用的显示名，不是自定义 File Provider extension。
+
+iPhone 17 与 iPad Air M4 / iOS 27 模拟器实际通过：
+
+- Browse/On My iPhone或iPad/Glory Provider/Open 的真实单选、多选和 UIKit 回调；
+  `.bin` 因声明过滤器在系统 UI 中置灰。
+- 返回 URL 位于消费端容器外，security-scope start 实际返回 true；保留原描述符
+  完成精确文本/PNG 读取、私有预览解析、解码与真实绘制。
+- 系统 Cancel 保留旧选择及可读能力；iPad 点击 sheet 外部也正确回收 picker。
+- 实际 sheet 显示后退休请求 Owner，原生 dismiss 完成后释放名额，无迟到回调。
+- Clear 后成功 scope start/stop 和 open/close 配对，原生/共用额度及私有预览归零。
+
+本轮发现并修正的是验收视图问题：显式为 File 激活连接 pick_files、无预览时不
+错误要求独立包图片缓存为空，以及每次查询完成后销毁临时子 Scope，避免积累旧
+响应。本轮真实来源流程未发现生产读写/授权失衡；运行时 crates、现有整数 FFI
+声明与引擎 pin 未改。诊断仅限此 probe 的 opcode 101 和无路径/正文计数器，普通
+服务包与默认 Counter 不包含它；独立夹具也不进入产品包。
+
+8 项应用回归、12 项共用文件回归、Swift 台账、模拟器/device 构建及严格 Clippy
+结果和实际安装二进制
+散列记录于 `/Volumes/Data/Caches/glory/ios-system-files/result.json`，保留真实
+选择界面、外部 PNG 预览和原始日志。该证据关闭上述模拟器的系统选择器输入/
+回调和外部 Local Storage provider 授权/读取/关闭验收；第三方 replicated provider、
+iCloud hydration/失败恢复、真机 sandbox、发布签名和 VoiceOver 仍分别开放。

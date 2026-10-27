@@ -25,6 +25,7 @@ fn main() {
         "MobileIOFiles.swift",
         "MobileIOUIKit.swift",
         "MobileIOProbe.swift",
+        "SystemFilesTrace.swift",
     ] {
         println!("cargo:rerun-if-changed=ios/{source}");
     }
@@ -89,6 +90,13 @@ fn main() {
         }
         if env::var_os("CARGO_FEATURE_FILES").is_some() {
             compiler_command.args(["-D", "GLORY_FILES_HOST"]);
+        }
+        if env::var_os("CARGO_FEATURE_IOS_FILES_UI_PROBE").is_some() {
+            compiler_command.args([
+                "-D",
+                "GLORY_SYSTEM_FILES_PROBE",
+                "ios/SystemFilesTrace.swift",
+            ]);
         }
         if env::var_os("CARGO_FEATURE_IOS_IO_PROBE").is_some() {
             compiler_command.args(["-D", "GLORY_IO_PROBE", "ios/MobileIOProbe.swift"]);

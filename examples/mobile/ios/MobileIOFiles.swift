@@ -17,6 +17,10 @@ private func gloryCloseSource(_ file: FileHandle, _ url: URL, _ scoped: Bool, _ 
     do {
         try file.close()
         if scoped { url.stopAccessingSecurityScopedResource() }
+        #if GLORY_SYSTEM_FILES_PROBE
+        GlorySystemFilesTrace.shared.record(6)
+        if scoped { GlorySystemFilesTrace.shared.record(4) }
+        #endif
         withExtendedLifetime(lease) {}
     } catch { GloryIOCloseFailures.shared.retain(file, url, scoped, lease) }
 }
@@ -31,13 +35,21 @@ final class GloryIOSource {
         guard url.isFileURL else { throw GloryIOError(GloryIO.type) }
         let scoped = url.startAccessingSecurityScopedResource()
         let home = URL(fileURLWithPath: NSHomeDirectory()).resolvingSymlinksInPath().path + "/"
-        guard scoped || url.resolvingSymlinksInPath().path.hasPrefix(home) else { throw GloryIOError(GloryIO.denied) }
+        let external = !url.resolvingSymlinksInPath().path.hasPrefix(home)
+        #if GLORY_SYSTEM_FILES_PROBE
+        if scoped { GlorySystemFilesTrace.shared.record(3) }
+        if !scoped && external { GlorySystemFilesTrace.shared.record(8) }
+        #endif
+        guard scoped || !external else { throw GloryIOError(GloryIO.denied) }
         var opened: FileHandle?
         do {
             var error: NSError?, failure: Error?, details: (String, String, UInt64)?
             NSFileCoordinator().coordinate(readingItemAt: url, options: [], error: &error) { selected in
                 do {
                     let file = try FileHandle(forReadingFrom: selected); opened = file
+                    #if GLORY_SYSTEM_FILES_PROBE
+                    GlorySystemFilesTrace.shared.opened(scoped, external)
+                    #endif
                     var info = stat()
                     guard fstat(file.fileDescriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG, info.st_size >= 0 else { throw GloryIOError(GloryIO.type) }
                     let name = selected.lastPathComponent
@@ -57,7 +69,12 @@ final class GloryIOSource {
             self.name = details.0; self.mime = details.1; self.size = details.2
         } catch {
             if let file = opened { gloryCloseSource(file, url, scoped, lease) }
-            else if scoped { url.stopAccessingSecurityScopedResource() }
+            else if scoped {
+                url.stopAccessingSecurityScopedResource()
+                #if GLORY_SYSTEM_FILES_PROBE
+                GlorySystemFilesTrace.shared.record(4)
+                #endif
+            }
             throw error
         }
     }

@@ -223,6 +223,30 @@ compile_error!("ios-io-probe requires the UIKit application host");
 ))]
 compile_error!("select one mobile acceptance view");
 
+#[cfg(all(feature = "ios-files-ui-probe", not(target_os = "ios")))]
+compile_error!("ios-files-ui-probe requires UIKit");
+#[cfg(all(
+    feature = "ios-files-ui-probe",
+    any(
+        feature = "ios-io-probe",
+        feature = "files-probe",
+        feature = "clipboard-probe",
+        feature = "permissions-probe",
+        feature = "permissions-host-probe",
+        feature = "network-probe",
+        feature = "ime-probe",
+        feature = "keyboard-probe",
+        feature = "controls-probe",
+        feature = "choice-probe",
+        feature = "radio-probe",
+        feature = "placeholder-probe",
+        feature = "select-probe",
+        feature = "menu-probe",
+        feature = "tags-probe",
+        feature = "android-assets-probe"
+    )
+))]
+compile_error!("select one mobile acceptance view");
 /// One package worker per document, including every recreated Android Activity.
 pub fn counter_window() -> std::result::Result<(WindowApp, Arc<Loader>), Box<dyn std::error::Error>>
 {
@@ -295,7 +319,8 @@ fn asset_window(
         feature = "tags-probe",
         feature = "clipboard-probe",
         feature = "files-probe",
-        feature = "ios-io-probe"
+        feature = "ios-io-probe",
+        feature = "ios-files-ui-probe"
     )))]
     let content = counter::Counter;
     #[cfg(feature = "ime-probe")]
@@ -326,6 +351,9 @@ fn asset_window(
     let content = files_probe::fixture(file_driver, files, window.renderer().clone());
     #[cfg(all(feature = "ios-io-probe", target_os = "ios"))]
     let content = ios_io::probe::fixture(clipboard, file_driver, files, window.renderer().clone());
+    #[cfg(all(feature = "ios-files-ui-probe", target_os = "ios"))]
+    let content =
+        ios_io::system_files_probe::fixture(file_driver, files, window.renderer().clone());
     window.mount(
         group().fill((
             content,

@@ -17,6 +17,8 @@ mod clipboard;
 mod files;
 #[cfg(all(target_os = "ios", feature = "ios-io-probe"))]
 pub(crate) mod probe;
+#[cfg(all(target_os = "ios", feature = "ios-files-ui-probe"))]
+pub(crate) mod system_files_probe;
 #[cfg(feature = "clipboard")]
 pub use clipboard::IosClipboard;
 #[cfg(feature = "files")]

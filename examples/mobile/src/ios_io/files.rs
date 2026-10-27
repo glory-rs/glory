@@ -17,6 +17,11 @@ fn error(code: i64) -> FileRejection {
     }
 }
 impl IosFiles {
+    #[cfg(feature = "ios-files-ui-probe")]
+    pub(super) fn trace(&self) -> Vec<i64> {
+        (0..10).map(|index| self.0.call(101, 0, index, 0)).collect()
+    }
+
     #[cfg(feature = "ios-io-probe")]
     pub(super) fn probe(&self, action: i64) -> Result<(), FileRejection> {
         accepted((self.0.host)(2, self.0.id, 100, 0, action, 0)).map_err(error)

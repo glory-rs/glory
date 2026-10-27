@@ -92,3 +92,11 @@ xcrun swiftc examples/mobile/ios/MobileIO.swift \
 
 See [native files](native-files.md), [native clipboard](native-clipboard.md) and
 the [mobile host](../examples/mobile/README.md) for SDK acceptance and boundaries.
+
+The separate `ios-files-ui-probe` compiles test-only operation 101 for ten
+body/path-free counters: presented pickers, selection callbacks, user Cancel,
+scope starts/stops, opens/closes, scoped external opens, denied unscoped external
+URLs and completed native cancellation dismissals. It uses the same authorized
+function declaration and never accepts an arbitrary path or selected-URL packet.
+It is mutually exclusive with `ios-io-probe`. See the actual-system acceptance
+section in [native-files.md](native-files.md).

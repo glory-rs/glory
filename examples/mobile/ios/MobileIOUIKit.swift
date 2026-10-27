@@ -32,6 +32,9 @@ func gloryMobileIO(_ service: Int64, _ client: Int64, _ op: Int64, _ request: In
     #if GLORY_IO_PROBE
     if op == 100 { return GloryIOProbe.shared.command(service, a) }
     #endif
+    #if GLORY_SYSTEM_FILES_PROBE
+    if op == 101 && service == 2 { return GlorySystemFilesTrace.shared.value(a) }
+    #endif
     return gloryApplicationIO.call(service, client, op, request, a, b)
 }
 @MainActor
@@ -102,7 +105,13 @@ private final class GloryIOUI {
             controller.allowsMultipleSelection = options.multiple
             let delegate = GloryIOPicker(ledger, record, options, window.windowScene, self)
             controller.delegate = delegate; delegate.controller = controller; picker = delegate
-            presenter.present(controller, animated: true) { controller.presentationController?.delegate = delegate }
+            presenter.present(controller, animated: true) {
+                controller.presentationController?.delegate = delegate
+                #if GLORY_SYSTEM_FILES_PROBE
+                GlorySystemFilesTrace.shared.record(0)
+                FileHandle.standardError.write(Data("Glory system picker presented\n".utf8))
+                #endif
+            }
         } catch { ledger.finish(record, gloryIOFailure(error)) }
         #else
         ledger.finish(record, GloryIO.unavailable)
@@ -120,19 +129,35 @@ private final class GloryIOPicker: NSObject, UIDocumentPickerDelegate, UIAdaptiv
     }
     func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
         guard !ended else { return }; ended = true
+        #if GLORY_SYSTEM_FILES_PROBE
+        GlorySystemFilesTrace.shared.record(1)
+        FileHandle.standardError.write(Data("Glory system picker selected count=\(urls.count)\n".utf8))
+        #endif
         controller.dismiss(animated: true) {
             self.host?.picker = nil
             gloryOpenSelection(self.ledger, self.record, urls, self.options)
         }
     }
-    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) { cancel() }
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        #if GLORY_SYSTEM_FILES_PROBE
+        GlorySystemFilesTrace.shared.record(2)
+        FileHandle.standardError.write(Data("Glory system picker user cancelled\n".utf8))
+        #endif
+        cancel()
+    }
     func presentationControllerDidDismiss(_ presentationController: UIPresentationController) {
         guard !ended else { return }; ended = true; host?.picker = nil; ledger.finish(record, 1)
     }
     func cancel() {
         guard !ended else { return }; ended = true
         guard let controller = controller else { host?.picker = nil; ledger.finish(record, 1); return }
-        controller.dismiss(animated: true) { self.host?.picker = nil; self.ledger.finish(self.record, 1) }
+        controller.dismiss(animated: true) {
+            self.host?.picker = nil
+            #if GLORY_SYSTEM_FILES_PROBE
+            GlorySystemFilesTrace.shared.record(9)
+            #endif
+            self.ledger.finish(self.record, 1)
+        }
     }
 }
 func gloryIOSceneDisconnected(_ scene: UIScene) {

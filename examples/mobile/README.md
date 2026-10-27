@@ -596,3 +596,49 @@ external provider scope grants, cross-app paste alerts, real devices and readers
 remain separate. See [native files](../../docs/native-files.md) and
 [native clipboard](../../docs/native-clipboard.md). Evidence lives at
 `/Volumes/Data/Caches/glory/ios-io/result.json`.
+
+### Actual iOS system picker / external Local Storage provider
+
+`ios-files-ui-probe` is a separate file-only view. It uses the production UIKit
+picker and genuine delegate callbacks; it has no selected-URL injection, read
+gate or clipboard guard. `SystemFilesTrace.swift` adds counters only in this
+probe. Neither it nor the independent fixture app belongs to a normal bundle.
+
+```sh
+export GLORY_BUILD_ROOT=/Volumes/Data/Caches/glory/apple
+. scripts/apple-env.sh
+sh examples/mobile/build-ios-files-fixture.sh
+xcrun simctl install OWNED_DEVICE "$GLORY_BUILD_ROOT/ios-files-fixture/GloryProvider.app"
+xcrun simctl launch OWNED_DEVICE rs.glory.files.fixture
+GLORY_IOS_FEATURES=ios-files-ui-probe sh examples/mobile/build-ios.sh
+xcrun simctl install OWNED_DEVICE "$GLORY_BUILD_ROOT/ios-aarch64-apple-ios-sim-debug/GloryCounter.app"
+xcrun simctl launch --console OWNED_DEVICE rs.glory.counter
+```
+
+In the actual picker, browse **On My iPhone/iPad → Glory Provider**. This folder
+belongs to `rs.glory.files.fixture`, an independent Documents application exposed
+by Apple's Local Storage File Provider, not a custom provider extension. No app
+group or file copy into the consumer is used. Choose the owned text and/or PNG;
+`rejected.bin` must remain disabled. Confirm Open and wait for exact-read/private
+preview success. Reopen and Cancel to verify existing grants still read. **Clear
+and verify release** checks actual close/scope-stop pairing and zero native/shared
+quotas. **Open then retire requester** presents a real sheet, then disposes its
+requesting Owner after five seconds; do not select a file in that case. It must
+dismiss the sheet and deliver no late application result.
+
+The probe reads only known fixture names with exact expected sizes/content.
+Per-query child scopes dispose response storage after delivery. Counters prove
+that selected URLs were outside the consumer container, that scope start returned
+true and that stop/close pairs balanced. iPhone/iPad real UI, filtered selections,
+Cancel, iPad outside-tap dismissal and Owner retirement passed in iOS 27 simulator
+runs. This establishes the built-in Local Storage provider's external-container
+flow. Third-party replicated providers, iCloud hydration/failures, real devices
+and VoiceOver remain separate. Evidence is
+`/Volumes/Data/Caches/glory/ios-system-files/result.json`.
+
+`check-ios-system-files.py` validates these logs, counters and actual installed
+binary hashes without sending UI events. Pass `--iphone-device`, `--ipad-device`,
+`--consumer-app`, `--fixture-app`, `--iphone-log`, `--ipad-log` and a data-volume
+`--output` JSON path before uninstalling fixtures. It requires the owned simulator
+names “Glory owned acceptance” and “Glory iPad scene acceptance”. After recording
+results, restore the default Counter and uninstall `rs.glory.files.fixture`.
