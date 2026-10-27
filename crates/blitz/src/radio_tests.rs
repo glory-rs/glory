@@ -28,7 +28,7 @@ fn click(app: &mut WindowApp, id: NodeId, part: Part) {
             .synthetic_click_event_data(Modifiers::empty())
     });
     let renderer = app.renderer.clone();
-    EventDriver::new(app, Events(renderer))
+    EventDriver::new(app, Events::new(renderer))
         .handle_dom_event(DomEvent::new(control, DomEventData::Click(event)));
     settle(app);
 }

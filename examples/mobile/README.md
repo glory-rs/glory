@@ -433,3 +433,14 @@ password and multiline hints plus a filled reference, with controlled edits and
 buttons to update hints/clear values. Select only one acceptance view. Ordinary
 builds retain Counter. Simulator screenshots prove initial rendering only;
 real input, IME and screen-reader acceptance require their own evidence.
+
+
+### Native choice protocol probe
+
+Select `GLORY_ANDROID_FEATURES=choice-probe` for `build-android-game.sh`, or
+`GLORY_IOS_FEATURES=choice-probe` for `build-ios.sh`. This opt-in view uses the
+shared combobox/option protocol and an initially open native CPU listbox with
+ASCII/Chinese options, a disabled member and an IME reference. It is independent
+of intrinsic `Props::Select`, which remains a separate gap. Ordinary builds
+keep Counter. SDK screenshots establish initial display only; framework input
+regressions and actual OS touch/keyboard/reader acceptance are separate evidence.

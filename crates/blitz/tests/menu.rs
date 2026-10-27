@@ -58,13 +58,13 @@ fn native_menu_layer_rejection_preserves_initial_model_direct_prefix_and_query_w
         Err(Error::Unsupported("native top layers"))
     );
     assert_eq!(renderer.stats().applied, 2);
-    for kind in [EventKind::Menu, EventKind::Pointer] {
-        assert_eq!(
-            renderer.listen(first, kind, true),
-            Err(Error::Unsupported("native menu input"))
-        );
-        renderer.listen(first, kind, false).unwrap();
-    }
+    assert_eq!(
+        renderer.listen(first, EventKind::Menu, true),
+        Err(Error::Unsupported("native menu input"))
+    );
+    renderer.listen(first, EventKind::Menu, false).unwrap();
+    renderer.listen(first, EventKind::Pointer, true).unwrap();
+    renderer.listen(first, EventKind::Pointer, false).unwrap();
     renderer
         .request(Query::Bounds(first), QueryToken(9))
         .unwrap();

@@ -2546,3 +2546,20 @@ property 屏障、编辑器身份、选区和预编辑；提示不进入密码�
 [dioxus 缺口报告](dioxus-feature-gap-analysis-2026-10-26.md)
 及 [placeholder 契约](input-placeholder.md)。select、菜单、移动无障碍和应用服务等
 其他缺口仍开放。
+
+
+## 2026-10-27：原生组合框与 typeahead 连接，Select 继续开放
+
+Blitz 适配器接通四种 combobox refinement、共享 Choice/scalar Typeahead、mouse/pen
+Pointer 与 App 派生 PointerWithin。Listbox 顶层保留触发器/输入焦点，Tree 顶层管理
+并恢复实际焦点；选项滚动只作用于匹配 listbox。组件继续拥有匹配与受控选择，
+没有全量业务源扫描、访问历史或新 unsafe。修复按钮选项点击/语义文本子节点点击
+丢失焦点，以及 macOS AppKit/原始 Backspace 配对：只在原本为空时移除选中项，尊重实际修饰键，密码不重复删除。AccessKit 的当前
+active-descendant/multiple 状态与 PasswordInput 保护有独立回归。
+
+全工作区 1002 项测试、native/WASM 严格 Clippy及 headless feature 构建通过。
+两端 choice-probe 初始显示和安装哈希见 `native-choices/result.json` 数据盘记录；
+模拟器显示不替代 OS 触摸/键盘/读屏。独立真实 Sapid 消费端中 Autocomplete、
+TreeSelect/Cascader 的四主题命令/CPU 绘制通过，Select/Combobox/MultiSelect 的
+三项仍因隐藏表单代理依赖 Props::Select 而失败。保留失败并继续完整原生 Select，
+不增加 hidden 特判；见 [当前范围与后续要求](native-choice.md)。整体差距继续开放。

@@ -30,6 +30,7 @@ keyboard-probe = []
 controls-probe = []
 radio-probe = []
 placeholder-probe = []
+choice-probe = []
 
 [dependencies]
 counter = { path = "../counter" }

@@ -14,6 +14,16 @@ pub(super) fn reveal(state: &mut State, id: NodeId) -> Result<(), Error> {
         .boundary(tree, id)
         .map(|id| state.dom.main(id))
         .transpose()?;
+    reveal_within(state, id, boundary)
+}
+
+/// Reveal only through this live physical ancestor. It must never scroll an
+/// enclosing document/layer when an option belongs to a local listbox.
+pub(super) fn reveal_within(
+    state: &mut State,
+    id: NodeId,
+    boundary: Option<EngineId>,
+) -> Result<(), Error> {
     state.dom.resolve();
     let target = state.dom.main(id)?;
     if boundary == Some(target) {
@@ -82,7 +92,7 @@ pub(super) fn reveal(state: &mut State, id: NodeId) -> Result<(), Error> {
             break;
         }
     }
-    if !inside_layer {
+    if !inside_layer && boundary.is_none() {
         state.dom.doc.scroll_into_view(
             target,
             ScrollBehavior::Instant,

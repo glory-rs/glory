@@ -15,7 +15,7 @@ Mac，最新证据见文末 Apple/移动输入记录，不能继续把“没有 
 | 桌面开发 | native watch、错误保留旧进程、成功重启与退出回收 | 状态保持、真正 Rust 热补丁、检查器 |
 | Web 发布 | 可复现 gzip、哈希清单、预览协商/HEAD/身份回退 | 指纹命名、Brotli/图片转换、WASM 分包 |
 | 运行时权限 | 有界 Owner future/driver API；Android 安全 JNI；iOS Swift 宿主；SDK 控制的授权状态查询 | iOS Rust 应用连接待最小 FFI 声明授权；真实系统弹窗选择、真机及其他权限类别 |
-| 原生控件 | Checkbox/Switch/Mixed 和 Radio 的绘制、受控更新、点击/Space/AX 动作；Radio 分组与键盘导航；placeholder 独立提示布局与绘制；两端模拟器初始显示 | select、combobox、typeahead、菜单、富文本、文件/语义剪贴板等仍开放；实际读屏单独验收 |
+| 原生控件 | Checkbox/Switch/Mixed 和 Radio 的绘制、受控更新、点击/Space/AX 动作；Radio 分组与键盘导航；placeholder 独立提示布局与绘制；combobox/typeahead 协议及 listbox/tree 弹层；两端模拟器初始显示 | 原生 Select 及组合组件表单代理、菜单、富文本、文件/语义剪贴板等仍开放；实际读屏单独验收 |
 
 整体差距仍未关闭。签名身份/设备等外部条件和仍需实现的软件功能分别保留，
 没有用模拟器或编译结果替代完整平台交付。
@@ -600,3 +600,37 @@ android-rendered.png，没有把首帧计为成功。iOS arm64 device 按部署�
 这是有限原生 placeholder 实现及模拟器初始显示；真实触摸、软件键盘/读屏与签名
 设备验收仍分别保留。select、combobox、typeahead、菜单、文件/剪贴板、富文本、
 移动无障碍及应用服务等缺口继续开放。
+
+
+## 2026-10-27：组合框、typeahead 与选择弹层连接（仍有 Select 依赖）
+
+原生适配器已连接共享四种 ComboboxKind、Choice 命令、Unicode scalar typeahead 和
+mouse/pen Pointer/PointerWithin。组件继续拥有匹配、活动游标与受控选择；宿主不另建
+搜索/选择控制器。仅当前焦点控件或明确 navigation item/boundary 参与；编辑器、
+预编辑、修饰键与最近的独立边界保留原输入。多个按键在 metadata 刷新前排队时，
+Select 类型仍交同一个 Next/Previous/Commit 命令，由组件读取当前源处理。
+
+Listbox 顶层保留输入焦点，鼠标/笔移动不选择值，点击选项不会把焦点送到随后关闭的
+按钮。Tab 跳过选项，Escape 交组件关闭。Tree 顶层采用已有管理焦点和返回策略，实际
+TreeItem 获焦、Escape 返回触发器。RevealOption 仅滚动最近匹配的活跃 listbox，不
+滚动外部文档。macOS 空 Multiple 输入的 deleteBackward: 只保留一个待配对节点，由随后的
+真实按键按修饰键决定 RemoveLast；删除最后字符不会顺带删除选中项，密码 Backspace
+也不会在原始按键中重复删除。其他输入/焦点退休清除待配对节点。所有这些复用现有引擎，无新 fork 或 unsafe。
+
+AccessKit 区分 ComboBox/EditableComboBox、multiple listbox 和当前 active descendant。
+隐藏、禁用及退休的活动选项关系被撤销；密码组合框仍使用受保护 PasswordInput 角色，
+原值不进入 AX 缓存。完整读屏及移动无障碍桥继续独立验收。
+
+全工作区含文档测试 1002 项通过，新增九项原生事件/CPU 绘制回归及两项 AX 回归；
+native/WASM 全工作区严格 Clippy 通过，headless 无默认 feature 构建通过。
+Android ARM64 与 iOS 模拟器 choice-probe 包均构建、安装启动；初始画面可见真实
+顶层 listbox、禁用项和中文选项。安装 APK/iOS 可执行文件哈希及原始帧位于
+`/Volumes/Data/Caches/glory/native-choices/result.json`；这些是 SDK 启动/显示证据，
+没有用注入触摸/按键替代真实输入。普通两端包另行构建；iOS device 目标按 15.0
+部署版本实际链接，移动 probe 的 iOS Clippy（--no-deps）通过。
+
+实际 Sapid 消费端发现仍须完成原生
+Props::Select：Select、Combobox、MultiSelect 的隐藏表单代理会被当前有限拒绝挡住。
+保留失败记录 `/Volumes/Data/Caches/glory/choice-consumer-tests.log`；没有仅对 hidden
+代理放行。Autocomplete 和 TreeSelect/Cascader 的四主题挂载、命令及 CPU 绘制通过，
+不把这两项通过写成五类消费端全部通过。完整后续要求见 [native-choice.md](native-choice.md)。

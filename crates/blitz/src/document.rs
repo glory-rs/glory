@@ -18,6 +18,8 @@ mod image_observation;
 #[path = "resource_wake.rs"]
 mod resource_wake;
 use image_observation::ImageObserver;
+#[path = "choice.rs"]
+mod choice;
 #[path = "focus_scope.rs"]
 mod focus_scope;
 #[path = "graphic.rs"]
@@ -100,7 +102,12 @@ fn check_layer<'a>(
         };
         if !matches!(
             role,
-            Some(glory_render::Role::Dialog | glory_render::Role::AlertDialog)
+            Some(
+                glory_render::Role::Dialog
+                    | glory_render::Role::AlertDialog
+                    | glory_render::Role::Listbox
+                    | glory_render::Role::Tree
+            )
         ) || layer.sheet.is_some()
             || !matches!(
                 layer.placement,
@@ -147,13 +154,6 @@ fn check_mode<'a>(
     }
     if semantics.is_some_and(|semantics| semantics.context_menu.is_some()) {
         return Err(Error::Unsupported("native context menu input"));
-    }
-    if semantics.is_some_and(|semantics| semantics.combobox.is_some() || semantics.option.is_some())
-    {
-        return Err(Error::Unsupported("native combobox controls"));
-    }
-    if semantics.is_some_and(|semantics| semantics.typeahead) {
-        return Err(Error::Unsupported("native typeahead input"));
     }
     if matches!(node.props, Props::RichEditor(_)) {
         return Err(Error::Unsupported("native rich editing"));
@@ -1040,6 +1040,9 @@ struct DragSession {
 struct State {
     #[cfg(feature = "shell")]
     keyboard_clock: std::time::Instant,
+    // One AppKit command awaiting its immediately following physical key.
+    #[cfg(feature = "shell")]
+    apple_empty_delete: Option<NodeId>,
     layers: layers::Layers,
     focus_scopes: focus_scope::Scopes,
     color_scheme: Option<bool>,
@@ -1197,6 +1200,10 @@ impl State {
             return;
         }
         self.space = None;
+        #[cfg(feature = "shell")]
+        {
+            self.apple_empty_delete = None;
+        }
         if let Some(node) = self.focused.take() {
             if let Err(error) = self.end_editing(node) {
                 self.input_error = Some(error);
@@ -1302,6 +1309,8 @@ impl Renderer {
         Self(Rc::new(RefCell::new(State {
             #[cfg(feature = "shell")]
             keyboard_clock: std::time::Instant::now(),
+            #[cfg(feature = "shell")]
+            apple_empty_delete: None,
             layers: layers::Layers::default(),
             focus_scopes: focus_scope::Scopes::default(),
             #[cfg(feature = "paint")]
@@ -1659,17 +1668,8 @@ impl Render for Renderer {
         let descriptor = state.mapper.tree().node(node)?.descriptor.view();
         if enabled {
             kind.validate_target(descriptor)?;
-            if matches!(
-                kind,
-                EventKind::Menu
-                    | EventKind::Pointer
-                    | EventKind::PointerWithin
-                    | EventKind::ContextMenu
-            ) {
+            if matches!(kind, EventKind::Menu | EventKind::ContextMenu) {
                 return Err(Error::Unsupported("native menu input"));
-            }
-            if kind == EventKind::Typeahead {
-                return Err(Error::Unsupported("native typeahead input"));
             }
             if kind == EventKind::Palette {
                 return Err(Error::Unsupported("native palette shortcut input"));
@@ -1811,9 +1811,7 @@ impl Render for Renderer {
                 state.observation_pending = true;
                 Ok(())
             }
-            glory_render::Action::RevealOption { .. } => {
-                Err(Error::Unsupported("native combobox controls"))
-            }
+            glory_render::Action::RevealOption { node } => choice::reveal(&mut state, node),
             glory_render::Action::ExitMenu { .. } => {
                 Err(Error::Unsupported("native menu focus navigation"))
             }

@@ -160,7 +160,7 @@ fn native_opt_in_edit_captures_current_selection_intent_and_ime_without_the_lega
     assert_eq!(legacy.get(), 0);
     let physical = app.renderer.engine_id(id, Part::Main).unwrap();
     let renderer = app.renderer.clone();
-    EventDriver::new(&mut app, Events(renderer)).handle_dom_event(DomEvent::new(
+    EventDriver::new(&mut app, Events::new(renderer)).handle_dom_event(DomEvent::new(
         physical,
         DomEventData::Input(blitz_traits::events::BlitzInputEvent {
             value: "0".repeat(1_000_000),
@@ -438,7 +438,7 @@ fn native_ch_input_assist_preserves_real_pointer_caret_keyboard_editing_and_whol
             });
         let raw = app.renderer.0.borrow().dom.text_value(id).unwrap();
         let renderer = app.renderer.clone();
-        EventDriver::new(&mut app, Events(renderer)).handle_dom_event(DomEvent::new(
+        EventDriver::new(&mut app, Events::new(renderer)).handle_dom_event(DomEvent::new(
             physical,
             DomEventData::Input(blitz_traits::events::BlitzInputEvent { value: raw }),
         ));

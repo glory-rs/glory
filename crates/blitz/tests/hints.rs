@@ -3,7 +3,8 @@ use glory_blitz::Renderer;
 use glory_render::*;
 
 #[test]
-fn native_hint_layers_and_pointer_within_are_explicitly_rejected_with_prefix_watermark() {
+fn native_hint_layers_keep_explicit_rejection_while_pointer_within_admission_preserves_prefix_watermark()
+ {
     let runtime = RuntimeId::new();
     let mut ids = NodeIds::new(runtime);
     let mut renderer = Renderer::new(runtime);
@@ -60,10 +61,9 @@ fn native_hint_layers_and_pointer_within_are_explicitly_rejected_with_prefix_wat
         renderer.apply(&[Mutation::Patch { id: first, patch }]),
         Err(Error::Unsupported("native top layers"))
     );
-    assert_eq!(
-        renderer.listen(first, EventKind::PointerWithin, true),
-        Err(Error::Unsupported("native menu input"))
-    );
+    renderer
+        .listen(first, EventKind::PointerWithin, true)
+        .unwrap();
     renderer
         .listen(first, EventKind::PointerWithin, false)
         .unwrap();

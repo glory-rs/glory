@@ -598,3 +598,14 @@ one application-only integer FFI declaration; runtime crates contain no new unsa
 The Swift host alone does not establish end-to-end Rust iOS permissions. Actual
 dialog choices, restricted/provisional/ephemeral cases and real devices remain
 separate acceptance, as do other platform-specific permission categories.
+
+
+Native combobox refinements (`Select`, `Editable`, `Autocomplete`, `Multiple`)
+connect shared Choice commands, scalar Typeahead, mouse/pen pointer observations,
+listbox/tree top layers and local option reveal. Matching and controlled selection
+remain component-owned. Listbox options keep editor focus; Tree popups manage
+and restore it. AccessKit exports current active descendants and multiple-state
+metadata, preserving password protection. See [native choices](../../docs/native-choice.md).
+Intrinsic `Props::Select` is still rejected, including the hidden form proxies
+used by some higher-level choice widgets; this connection does not close that
+separate implementation or establish OS reader/gesture acceptance.

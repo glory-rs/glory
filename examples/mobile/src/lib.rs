@@ -9,8 +9,22 @@ use std::{collections::BTreeMap, sync::Arc};
 
 #[cfg(all(feature = "android-assets-probe", target_os = "android"))]
 mod android_assets_probe;
+#[cfg(feature = "choice-probe")]
+mod choice_probe;
 #[cfg(feature = "controls-probe")]
 mod controls_probe;
+#[cfg(all(
+    feature = "choice-probe",
+    any(
+        feature = "placeholder-probe",
+        feature = "radio-probe",
+        feature = "controls-probe",
+        feature = "ime-probe",
+        feature = "keyboard-probe",
+        feature = "permissions-probe"
+    )
+))]
+compile_error!("select one mobile acceptance view");
 #[cfg(feature = "placeholder-probe")]
 mod placeholder_probe;
 #[cfg(feature = "radio-probe")]
@@ -113,7 +127,8 @@ fn asset_window(
         feature = "permissions-probe",
         feature = "controls-probe",
         feature = "radio-probe",
-        feature = "placeholder-probe"
+        feature = "placeholder-probe",
+        feature = "choice-probe"
     )))]
     let content = counter::Counter;
     #[cfg(feature = "ime-probe")]
@@ -128,6 +143,8 @@ fn asset_window(
     let content = radio_probe::fixture();
     #[cfg(feature = "placeholder-probe")]
     let content = placeholder_probe::fixture();
+    #[cfg(feature = "choice-probe")]
+    let content = choice_probe::fixture();
     window.mount(
         group().fill((
             content,

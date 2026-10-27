@@ -1,7 +1,7 @@
 # Native viewport top layers
 
 The genuine `glory-rs/blitz` fork is pinned to
-`c127fd9699a89ff8ecba0c8d8c9eccb3330627af`. The provenance record and Cargo
+`0811cfd9e7ca3ddcc126ad7ef42f453dfba5be8d`. The provenance record and Cargo
 lockfiles resolve all four Blitz packages to that full commit. No vendored code,
 managed Cargo checkout edits, global patches or DOM portals are involved.
 
@@ -52,8 +52,12 @@ ModalsManager consumer test cover this later adapter correction. Their logs are
 the matching `modals-native-*-clippy.log` under `D:/BuildCache/sapid`. The original
 consumer focus failure is retained in `modals-native-current-tests.log`.
 
-Menu, Tooltip, Listbox and navigation Group layers, sheet, ContextPoint and a
-Layer's own Translation remain explicit native rejections. Descriptor preflight,
+Listbox layers now use Preserve focus and current combobox active-descendant
+relations; option pointer activation keeps the editor/trigger focused. Tree layers
+use Manage focus with actual TreeItem focus and return to the current trigger.
+Their current regressions and remaining intrinsic Select dependency are recorded
+in [native choices](native-choice.md). Menu, Tooltip and navigation Group layers,
+sheet, ContextPoint and a Layer's own Translation remain explicit native rejections. Descriptor preflight,
 placement preflight and direct apply retain their accepted-prefix and query
 watermark contract. Supporting Dialog does not imply those facets or OS screen
 reader acceptance.

@@ -19,6 +19,7 @@ enum Key {
 struct Relations {
     owner: AxId,
     controls: Option<AxId>,
+    active_descendant: Option<AxId>,
     label: Option<AxId>,
     description: Option<AxId>,
     error: Option<AxId>,
@@ -310,6 +311,9 @@ impl Tree {
                         }
                         ancestor = parent_node.parent;
                     }
+                }
+                if s.listbox_multiple {
+                    node.set_multiselectable();
                 }
                 if s.required {
                     node.set_required();
@@ -639,6 +643,12 @@ impl Tree {
                     .filter(|target| nodes.contains_key(target))
             };
             let controls = s.controls.as_ref().and_then(resolve);
+            let active_descendant = state
+                .mapper
+                .tree()
+                .resolve_active_descendant(*id)?
+                .and_then(|option| self.ids.get(&Key::Main(option)).copied())
+                .filter(|target| nodes.contains_key(target));
             let label = s.labelled_by.as_ref().and_then(resolve).or_else(|| {
                 if d.name.is_some() || d.document_part() != Some(glory_render::DocumentPart::Table)
                 {
@@ -712,6 +722,7 @@ impl Tree {
             relations.push(Relations {
                 owner: *ax_id,
                 controls,
+                active_descendant,
                 label,
                 description,
                 error,
@@ -726,6 +737,9 @@ impl Tree {
             if let Some(node) = nodes.get_mut(&relation.owner) {
                 if let Some(target) = relation.controls {
                     node.set_controls(vec![target]);
+                }
+                if let Some(target) = relation.active_descendant {
+                    node.set_active_descendant(target);
                 }
                 if let Some(target) = relation.label {
                     node.set_labelled_by(vec![target]);
@@ -980,8 +994,16 @@ fn role(d: glory_render::DescriptorView<'_>) -> AxRole {
     if d.semantics.as_ref().is_some_and(|s| s.tab) {
         return AxRole::Tab;
     }
-    if d.semantics.as_ref().is_some_and(|s| s.combobox.is_some()) {
-        return AxRole::ComboBox;
+    // AccessKit's protected-text role must survive an input refinement.
+    if matches!(d.props, Props::Input(p) if p.purpose == Purpose::Password) {
+        return AxRole::PasswordInput;
+    }
+    if let Some(kind) = d.semantics.as_ref().and_then(|s| s.combobox) {
+        return if kind == glory_render::ComboboxKind::Select {
+            AxRole::ComboBox
+        } else {
+            AxRole::EditableComboBox
+        };
     }
     if d.semantics.as_ref().is_some_and(|s| s.option.is_some()) {
         return AxRole::ListBoxOption;

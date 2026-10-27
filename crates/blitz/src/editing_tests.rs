@@ -175,7 +175,7 @@ fn native_text_echo_preserves_caret_and_enter_commits_without_reentry() {
     // it. Its stale payload must not overwrite the newer controlled value.
     let renderer = app.renderer.clone();
     let physical = renderer.engine_id(node, Part::Main).unwrap();
-    EventDriver::new(&mut app, Events(renderer)).handle_dom_event(DomEvent::new(
+    EventDriver::new(&mut app, Events::new(renderer)).handle_dom_event(DomEvent::new(
         physical,
         DomEventData::Input(blitz_traits::events::BlitzInputEvent {
             value: "obsolete".into(),
@@ -496,7 +496,7 @@ fn native_paste_and_ime_normalize_line_endings_without_invalid_single_line_value
         });
     let raw = value(&app, node);
     let renderer = app.renderer.clone();
-    EventDriver::new(&mut app, Events(renderer)).handle_dom_event(DomEvent::new(
+    EventDriver::new(&mut app, Events::new(renderer)).handle_dom_event(DomEvent::new(
         physical,
         DomEventData::Input(blitz_traits::events::BlitzInputEvent { value: raw }),
     ));
@@ -845,7 +845,7 @@ fn checkbox_label_and_control_report_one_typed_change_and_program_updates_work()
                 .synthetic_click_event_data(Modifiers::empty())
         });
         let renderer = app.renderer.clone();
-        EventDriver::new(&mut app, Events(renderer))
+        EventDriver::new(&mut app, Events::new(renderer))
             .handle_dom_event(DomEvent::new(target, DomEventData::Click(event)));
         settle(&mut app);
     }
@@ -865,7 +865,7 @@ fn checkbox_label_and_control_report_one_typed_change_and_program_updates_work()
             .unwrap()
             .synthetic_click_event_data(Modifiers::empty())
     });
-    EventDriver::new(&mut app, Events(renderer))
+    EventDriver::new(&mut app, Events::new(renderer))
         .handle_dom_event(DomEvent::new(physical, DomEventData::Click(event)));
     settle(&mut app);
     assert_eq!(changed.borrow().len(), 2);
@@ -929,7 +929,7 @@ fn mixed_check_pointer_label_and_space_clear_only_the_live_mixed_state_once() {
                         .synthetic_click_event_data(Modifiers::empty())
                 });
                 let renderer = app.renderer.clone();
-                EventDriver::new(&mut app, Events(renderer))
+                EventDriver::new(&mut app, Events::new(renderer))
                     .handle_dom_event(DomEvent::new(target, DomEventData::Click(event)));
             } else {
                 focus(&mut app, node);
@@ -978,7 +978,7 @@ fn mixed_check_pointer_label_and_space_clear_only_the_live_mixed_state_once() {
                 .synthetic_click_event_data(Modifiers::empty())
         });
         let renderer = app.renderer.clone();
-        EventDriver::new(&mut app, Events(renderer))
+        EventDriver::new(&mut app, Events::new(renderer))
             .handle_dom_event(DomEvent::new(control, DomEventData::Click(event)));
         settle(&mut app);
         assert!(mixed(&app));
@@ -1004,7 +1004,7 @@ fn mixed_check_pointer_label_and_space_clear_only_the_live_mixed_state_once() {
                 .synthetic_click_event_data(Modifiers::empty())
         });
         let renderer = app.renderer.clone();
-        EventDriver::new(&mut app, Events(renderer))
+        EventDriver::new(&mut app, Events::new(renderer))
             .handle_dom_event(DomEvent::new(control, DomEventData::Click(event)));
         settle(&mut app);
         assert!(

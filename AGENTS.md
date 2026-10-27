@@ -139,6 +139,23 @@ retired feature aliases or count compilation as proof of platform acceptance.
   skipping unavailable/readonly selection targets. Explicit Navigate handlers
   and explicit tab stops remain component-owned. Detached trees are independent;
   reattachment and name/type/form changes re-evaluate current association.
+  Combobox/option refinements route shared Choice and scalar Typeahead through
+  the current focused control. Components own matching/selection; no host query,
+  visited-option registry or competing controller. Listbox layers Preserve focus;
+  option pointerdown/click must not focus the intrinsic Button, including after
+  the popup closes. Tree layers Manage focus and restore the current trigger.
+  RevealOption scrolls only its nearest matching live listbox, never the viewport.
+  Mouse/pen Pointer uses one dispatch's previous hover identity; App derives
+  logical PointerWithin boundaries. Touch never becomes hover/typeahead input.
+  AppKit empty Multiple Backspace cancels the command's no-op deletion and keeps
+  one pending current NodeId until the following physical key supplies modifiers.
+  Clear it on other input/focus retirement; do not remove a token after deleting
+  the final text character or repeat password deletion on the raw Mac key.
+  AccessKit resolves active descendants from current semantic ownership and live
+  exported nodes. Preserve PasswordInput's protected role and omit its value.
+  Props::Select remains explicitly unsupported, including hidden form proxies,
+  until real single/multiple selection layout, properties, events and AX exist.
+  See docs/native-choice.md for current consumer failures and next requirements.
   Input placeholder is a bounded, independent presentation layout, lazily shaped
   only while empty/non-composing and released when hidden/cleared. Hint-only
   changes preserve editor identity, raw generation, selection, IME and value

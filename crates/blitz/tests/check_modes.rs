@@ -57,55 +57,47 @@ fn semantic_mixed_properties_reach_cpu_pixels_at_both_dpi_scales() {
 }
 
 #[test]
-fn native_typeahead_rejection_matches_preflight_direct_apply_listen_and_query_prefix() {
+fn native_typeahead_admission_keeps_prefix_watermarks_and_does_not_install_an_input_driver_in_headless_mode()
+ {
     let runtime = RuntimeId::new();
-    let mut renderer = Renderer::new(runtime);
     let mut ids = NodeIds::new(runtime);
     let id = ids.allocate();
+    let rejected = ids.allocate();
+    let mut renderer = Renderer::new(runtime);
     let mut descriptor = Descriptor::new(Props::View);
     descriptor.semantics = Some(Box::new(Semantics {
         navigation: Some(Orientation::Horizontal),
         typeahead: true,
         ..Default::default()
     }));
-    assert_eq!(
-        renderer.preflight((descriptor).view(), None),
-        Err(Error::Unsupported("native typeahead input"))
-    );
-    let patch = Patch::Semantics(Change::Set(descriptor.semantics.clone()));
-    assert_eq!(
-        renderer.preflight((Descriptor::new(Props::View)).view(), Some(&patch)),
-        Err(Error::Unsupported("native typeahead input"))
-    );
-    assert_eq!(
-        renderer.apply(&[Mutation::Create {
-            id,
-            node: Box::new(descriptor)
-        }]),
-        Err(Error::Unsupported("native typeahead input"))
-    );
-    assert_eq!(renderer.stats().nodes, 0);
+    renderer.preflight(descriptor.view(), None).unwrap();
+    renderer
+        .preflight(
+            Descriptor::new(Props::View).view(),
+            Some(&Patch::Semantics(Change::Set(descriptor.semantics.clone()))),
+        )
+        .unwrap();
     assert_eq!(
         renderer.apply(&[
             Mutation::Create {
                 id,
-                node: Box::new(Descriptor::new(Props::View))
+                node: Box::new(descriptor)
             },
             Mutation::Place {
                 id,
                 parent: None,
                 before: None
             },
-            Mutation::Patch { id, patch },
+            Mutation::Create {
+                id: rejected,
+                node: Box::new(Descriptor::new(Props::Select(Default::default())))
+            }
         ]),
-        Err(Error::Unsupported("native typeahead input"))
+        Err(Error::Unsupported("native select controls"))
     );
-    assert_eq!(renderer.stats().applied, 2);
-    assert_eq!(
-        renderer.listen(id, EventKind::Typeahead, true),
-        Err(Error::Unsupported("native typeahead input"))
-    );
-    renderer.listen(id, EventKind::Typeahead, false).unwrap();
+    renderer.listen(id, EventKind::Typeahead, true).unwrap();
+    assert!(!renderer.capabilities().input);
+    assert_eq!(renderer.stats().nodes, 1);
     renderer.request(Query::Bounds(id), QueryToken(42)).unwrap();
     let mut inputs = Vec::new();
     renderer.drain(&mut inputs);
@@ -117,6 +109,7 @@ fn native_typeahead_rejection_matches_preflight_direct_apply_listen_and_query_pr
             result: Ok(QueryValue::Bounds(_))
         }]
     ));
+    renderer.listen(id, EventKind::Typeahead, false).unwrap();
 }
 
 #[test]

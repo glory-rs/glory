@@ -17,6 +17,9 @@ mod accessibility;
 ))]
 #[path = "accesskit_platform.rs"]
 mod accesskit_platform;
+#[cfg(test)]
+#[path = "choice_tests.rs"]
+mod choice_tests;
 #[path = "radio.rs"]
 mod radio;
 #[cfg(test)]
@@ -179,10 +182,14 @@ impl Document for WindowApp {
         }))
     }
     fn handle_ui_event(&mut self, mut event: UiEvent) {
+        let apple_command = matches!(&event, UiEvent::AppleStandardKeybinding(_));
+        if !matches!(&event,UiEvent::KeyDown(key) if key.key==Key::Named(NamedKey::Backspace)) {
+            self.renderer.0.borrow_mut().apple_empty_delete = None;
+        }
         editing::capture_before(&mut self.renderer.0.borrow_mut(), &event);
         editing::sanitize_ime(&self.renderer.0.borrow(), &mut event);
         self.renderer.invalidate();
-        let collector = Events(self.renderer.clone());
+        let collector = Events::new(self.renderer.clone());
         // The pinned engine's UiEvent Apple path runs the default directly,
         // bypassing EventHandler (and therefore readonly/inert/disabled guards).
         // Route that command through the same DOM dispatch as other text input.
@@ -198,6 +205,9 @@ impl Document for WindowApp {
             EventDriver::new(self, collector).handle_ui_event(event);
         }
         let mut state = self.renderer.0.borrow_mut();
+        if !apple_command {
+            state.apple_empty_delete = None;
+        }
         layers::lock_viewport(&mut state);
         state.sync_focus();
         if let Some(error) = state.input_error.take() {
@@ -218,7 +228,20 @@ impl Document for WindowApp {
         }
     }
 }
-struct Events(Renderer);
+struct Events {
+    renderer: Renderer,
+    // This input dispatch only: the former hover target, never visited history.
+    previous_hover: Option<EngineId>,
+}
+impl Events {
+    fn new(renderer: Renderer) -> Self {
+        let previous_hover = renderer.0.borrow().dom.doc.get_hover_node_id();
+        Self {
+            renderer,
+            previous_hover,
+        }
+    }
+}
 impl EventHandler for Events {
     fn handle_event(
         &mut self,
@@ -227,7 +250,7 @@ impl EventHandler for Events {
         _doc: &mut dyn Document,
         event_state: &mut EventState,
     ) {
-        let mut state = self.0.0.borrow_mut();
+        let mut state = self.renderer.0.borrow_mut();
         if matches!(event.data, DomEventData::Click(_)) && std::mem::take(&mut state.suppress_click)
         {
             event_state.prevent_default();
@@ -256,6 +279,10 @@ impl EventHandler for Events {
             })
             .or_else(|| state.dom.owner(event.target));
         if let Some(node) = node {
+            if choice::prevent_pointer_focus(&state, node, &event.data) {
+                event_state.prevent_default();
+            }
+            choice::pointer(&mut state, node, self.previous_hover, &event.data);
             // Engine defaults run after this callback. Inert content must not
             // acquire a caret/selection or a context action before UI routing.
             // Scroll/wheel and terminal loss retain their independent behavior.
@@ -291,6 +318,12 @@ impl EventHandler for Events {
                         | DomEventData::Input(_)
                         | DomEventData::Click(_)
                 )
+            {
+                event_state.prevent_default();
+                return;
+            }
+            if let DomEventData::AppleStandardKeybinding(command) = &event.data
+                && choice::apple(&mut state, node, event.target, command)
             {
                 event_state.prevent_default();
                 return;
@@ -471,7 +504,15 @@ impl EventHandler for Events {
                     // and clears focus. Keep the actual intrinsic control as
                     // the pointer focus/return target, including visual slots.
                     event_state.prevent_default();
-                    let _ = state.focus(button);
+                    if !state.mapper.tree().node(button).is_ok_and(|node| {
+                        node.descriptor
+                            .view()
+                            .semantics
+                            .as_ref()
+                            .is_some_and(|s| s.option.is_some())
+                    }) {
+                        let _ = state.focus(button);
+                    }
                 }
                 state.inputs.push(Input::Event {
                     node,
@@ -735,6 +776,16 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
             matches!(node.descriptor.view().props, glory_render::Props::Input(_))
         });
         let key_name = key.key.to_string();
+        if choice::key(state, origin, target, key, &key_name) {
+            return true;
+        }
+        // AppKit already delivered the deletion command before this raw key.
+        // In particular, passwords must not delete a second grapheme here.
+        #[cfg(target_os = "macos")]
+        if editable && key.key == Key::Named(NamedKey::Backspace) {
+            return true;
+        }
+
         if state.focused == Some(origin)
             && !editable
             && state.dom.control(origin).ok() == Some(target)

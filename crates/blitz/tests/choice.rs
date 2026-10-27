@@ -3,121 +3,127 @@ use glory_blitz::Renderer;
 use glory_render::*;
 
 #[test]
-fn native_combobox_option_refinements_reject_before_facets_with_prefix_watermarks() {
-    let runtime = RuntimeId::new();
-    let mut ids = NodeIds::new(runtime);
-    let first = ids.allocate();
-    let second = ids.allocate();
-    let mut renderer = Renderer::new(runtime);
-    let plain = Descriptor::new(Props::Button(ButtonProps::default()));
-    let mut combo = plain.clone();
-    combo.semantics = Some(Box::new(Semantics {
-        id: Some(SemanticId::new("combo").unwrap()),
-        combobox: Some(ComboboxKind::Select),
-        controls: Some(SemanticId::new("box").unwrap()),
-        popup: Some(PopupKind::Listbox),
-        expanded: Some(false),
-        ..Default::default()
-    }));
-    let patch = Patch::Semantics(Change::Set(combo.semantics.clone()));
-    let mut editable = Descriptor::new(Props::Input(InputProps::default()));
-    editable.semantics = combo.semantics.clone();
-    editable.semantics.as_mut().unwrap().combobox = Some(ComboboxKind::Editable);
-    assert_eq!(
-        renderer.preflight(editable.view(), None),
-        Err(Error::Unsupported("native combobox controls"))
-    );
-    assert_eq!(
-        renderer.preflight(combo.view(), None),
-        Err(Error::Unsupported("native combobox controls"))
-    );
-    assert_eq!(
-        renderer.preflight(plain.view(), Some(&patch)),
-        Err(Error::Unsupported("native combobox controls"))
-    );
-    assert_eq!(
-        renderer.apply(&[
-            Mutation::Create {
-                id: first,
-                node: Box::new(plain)
-            },
-            Mutation::Place {
-                id: first,
-                parent: None,
-                before: None
-            },
-            Mutation::Create {
-                id: second,
-                node: Box::new(combo)
-            }
-        ]),
-        Err(Error::Unsupported("native combobox controls"))
-    );
-    assert_eq!(renderer.stats().nodes, 1);
-    assert_eq!(renderer.stats().applied, 2);
-    assert!(renderer.engine_id(second, glory_html::Part::Main).is_err());
-    for kind in [ComboboxKind::Autocomplete, ComboboxKind::Multiple] {
-        let mut refined = Descriptor::new(Props::Input(InputProps::default()));
-        refined.semantics = Some(Box::new(Semantics {
-            id: Some(SemanticId::new("extra-editor").unwrap()),
+fn combobox_kinds_and_options_admit_through_preflight_and_direct_apply_with_shared_owner_validation()
+ {
+    for kind in [
+        ComboboxKind::Select,
+        ComboboxKind::Editable,
+        ComboboxKind::Autocomplete,
+        ComboboxKind::Multiple,
+    ] {
+        let runtime = RuntimeId::new();
+        let mut ids = NodeIds::new(runtime);
+        let trigger = ids.allocate();
+        let panel = ids.allocate();
+        let option = ids.allocate();
+        let mut renderer = Renderer::new(runtime);
+        let mut d = Descriptor::new(if kind == ComboboxKind::Select {
+            Props::Button(Default::default())
+        } else {
+            Props::Input(Default::default())
+        });
+        d.semantics = Some(Box::new(Semantics {
+            id: Some(SemanticId::new("trigger").unwrap()),
             combobox: Some(kind),
-            controls: Some(SemanticId::new("later-listbox").unwrap()),
+            controls: Some(SemanticId::new("panel").unwrap()),
             popup: Some(PopupKind::Listbox),
             expanded: Some(false),
             ..Default::default()
         }));
+        renderer.preflight(d.view(), None).unwrap();
+        renderer
+            .preflight(
+                d.view(),
+                Some(&Patch::Semantics(Change::Set(d.semantics.clone()))),
+            )
+            .unwrap();
+        let mut box_node = Descriptor::new(Props::View);
+        box_node.role = Some(Role::Listbox);
+        box_node.semantics = Some(Box::new(Semantics {
+            id: Some(SemanticId::new("panel").unwrap()),
+            navigation: Some(Orientation::Vertical),
+            listbox_multiple: kind == ComboboxKind::Multiple,
+            ..Default::default()
+        }));
+        let mut item = Descriptor::new(Props::Button(Default::default()));
+        item.focus = FocusMode::Programmatic;
+        item.semantics = Some(Box::new(Semantics {
+            id: Some(SemanticId::new("option").unwrap()),
+            option: Some(OptionSemantics {
+                owner: SemanticId::new("panel").unwrap(),
+            }),
+            selected: Some(false),
+            ..Default::default()
+        }));
+        renderer.preflight(item.view(), None).unwrap();
+        renderer
+            .apply(&[
+                Mutation::Create {
+                    id: trigger,
+                    node: Box::new(d),
+                },
+                Mutation::Place {
+                    id: trigger,
+                    parent: None,
+                    before: None,
+                },
+                Mutation::Create {
+                    id: panel,
+                    node: Box::new(box_node),
+                },
+                Mutation::Place {
+                    id: panel,
+                    parent: None,
+                    before: None,
+                },
+                Mutation::Create {
+                    id: option,
+                    node: Box::new(item),
+                },
+                Mutation::Place {
+                    id: option,
+                    parent: Some(panel),
+                    before: None,
+                },
+            ])
+            .unwrap();
+        renderer.listen(trigger, EventKind::Choice, true).unwrap();
+        renderer.listen(option, EventKind::Pointer, true).unwrap();
+        let physical = renderer.engine_id(trigger, glory_html::Part::Main).unwrap();
+        let writes = renderer.stats().property_writes;
+        let mut inputs = Vec::new();
+        renderer
+            .request(Query::Bounds(option), QueryToken(1))
+            .unwrap();
+        renderer.drain(&mut inputs);
+        assert!(matches!(
+            inputs.as_slice(),
+            [Input::Response {
+                applied: 6,
+                result: Ok(QueryValue::Bounds(_)),
+                ..
+            }]
+        ));
+        renderer
+            .action(Action::RevealOption { node: option })
+            .unwrap();
         assert_eq!(
-            renderer.preflight(refined.view(), None),
-            Err(Error::Unsupported("native combobox controls"))
+            renderer.engine_id(trigger, glory_html::Part::Main).unwrap(),
+            physical
         );
-        let input = ids.allocate();
-        assert_eq!(
-            renderer.apply(&[Mutation::Create {
-                id: input,
-                node: Box::new(refined)
-            }]),
-            Err(Error::Unsupported("native combobox controls"))
+        assert_eq!(renderer.stats().property_writes, writes);
+        assert!(!renderer.capabilities().input);
+        assert!(renderer.action(Action::Focus(option)).is_err());
+        // Ownership remains a shared tree invariant after native admission.
+        assert!(
+            renderer
+                .apply(&[Mutation::Place {
+                    id: option,
+                    parent: None,
+                    before: None
+                }])
+                .is_err()
         );
-        assert!(renderer.engine_id(input, glory_html::Part::Main).is_err());
-        assert_eq!(renderer.stats().applied, 2);
+        assert_eq!(renderer.stats().applied, 6);
     }
-    assert_eq!(
-        renderer.apply(&[Mutation::Create {
-            id: second,
-            node: Box::new(editable)
-        }]),
-        Err(Error::Unsupported("native combobox controls"))
-    );
-    assert!(renderer.engine_id(second, glory_html::Part::Main).is_err());
-    assert_eq!(
-        renderer.apply(&[Mutation::Patch { id: first, patch }]),
-        Err(Error::Unsupported("native combobox controls"))
-    );
-    let mut option = Descriptor::new(Props::Button(ButtonProps::default()));
-    option.focus = FocusMode::Programmatic;
-    option.semantics = Some(Box::new(Semantics {
-        id: Some(SemanticId::new("option").unwrap()),
-        option: Some(OptionSemantics {
-            owner: SemanticId::new("box").unwrap(),
-        }),
-        selected: Some(false),
-        ..Default::default()
-    }));
-    assert_eq!(
-        renderer.preflight(option.view(), None),
-        Err(Error::Unsupported("native combobox controls"))
-    );
-    renderer
-        .request(Query::Bounds(first), QueryToken(921))
-        .unwrap();
-    let mut inputs = Vec::new();
-    renderer.drain(&mut inputs);
-    assert!(matches!(
-        inputs.as_slice(),
-        [Input::Response {
-            token: QueryToken(921),
-            applied: 2,
-            result: Ok(QueryValue::Bounds(_))
-        }]
-    ));
 }
