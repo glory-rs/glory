@@ -25,6 +25,8 @@ network-probe = ["network"]
 permissions = ["glory/blitz-permissions", "dep:jni"]
 permissions-probe = ["permissions"]
 permissions-host-probe = ["permissions"]
+clipboard = ["glory/blitz-clipboard", "dep:jni"]
+clipboard-probe = ["clipboard", "dep:futures-timer"]
 ime-probe = []
 keyboard-probe = []
 controls-probe = []
@@ -41,6 +43,7 @@ glory = { path = "../../crates/glory", features = ["blitz-shell", "blitz-package
 
 [target.'cfg(target_os = "android")'.dependencies]
 jni = { version = "=0.22.4", default-features = false, optional = true }
+futures-timer = { version = "=3.0.3", optional = true }
 
 [lints.rust]
 unsafe_code = "deny"

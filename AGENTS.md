@@ -198,6 +198,16 @@ retired feature aliases or count compilation as proof of platform acceptance.
   Payload limits apply after OS allocation. macOS system round trips preserve
   all pasteboard representations in RAM; mobile drivers and other OS acceptance
   remain separate. See docs/native-clipboard.md.
+  Android's explicit AndroidClipboard uses safe JNI to the app-owned main-thread
+  host. Keep one physical operation and at most 32 weak clients per coordinator,
+  one current result per client, non-reused IDs and no completion history. Clone
+  a driver/service to share its ID sequence; do not wrap one Host twice. Bound
+  returned byte arrays before Rust copying, and raw/canonical UTF-8 in Java;
+  OS ClipData allocation stays outside that transfer budget. Never coerce URIs,
+  install listeners or keep an Activity strong. Pending-only timer polling and
+  native permits survive receipt cancellation; ordinary APKs initialize nothing.
+  The owned SDK probe preserves original ClipData only in RAM. Its service-call
+  evidence does not establish native menus, keyboard, TalkBack or real devices.
   Input placeholder is a bounded, independent presentation layout, lazily shaped
   only while empty/non-composing and released when hidden/cleared. Hint-only
   changes preserve editor identity, raw generation, selection, IME and value

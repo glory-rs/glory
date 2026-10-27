@@ -1,6 +1,11 @@
 //! Explicit native text clipboard I/O, separate from semantic request ownership.
 use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
 
+#[cfg(target_os = "android")]
+mod android;
+#[cfg(target_os = "android")]
+pub use android::AndroidClipboard;
+
 pub type Reply<T> = Pin<Box<dyn Future<Output = Result<T, ClipboardError>> + Send + 'static>>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

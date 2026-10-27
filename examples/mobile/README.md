@@ -471,7 +471,39 @@ the corresponding build script. The shared fixture displays three ordinary Input
 separator policies and bounded command feedback. Enter/comma/semicolon commit,
 empty Backspace removal, software IME punctuation/Return and composition use the
 native protocol; actual duplicate/token/proxy policy is tested with Sapid consumers.
-Select only one acceptance view. Stock platform clipboard services remain separate;
-paste requires an explicit document clipboard provider. SDK screenshots and
+Select only one acceptance view. Paste requires an explicit document clipboard
+provider/service; on Android `tags-probe,clipboard` supplies the new system driver.
+iOS system clipboard remains separate. SDK screenshots and
 installed-binary hashes prove initial display, not real input/readers or signed
 devices. See [native tags](../../docs/native-tags.md).
+
+
+### Android system clipboard
+
+`GLORY_ANDROID_FEATURES=clipboard` enables the explicit Android clipboard driver
+in Counter's Config. `clipboard-probe` selects the separate acceptance view:
+
+```sh
+GLORY_BUILD_ROOT=/Volumes/Data/Caches/glory/android \
+GLORY_ANDROID_FEATURES=clipboard-probe sh examples/mobile/build-android-game.sh
+python3 examples/mobile/check-android-clipboard-sdk.py \
+  --adb /Volumes/Data/Caches/glory/android/adb36/platform-tools/adb \
+  --apk /Volumes/Data/Caches/glory/android/package-game-aarch64-debug/glory-counter.apk \
+  --serial emulator-5580 --output /Volumes/Data/Caches/glory/android-clipboard/reproduced
+```
+
+The build runs pure JVM tests against the same request ledger. The SDK test
+requires the owned Glory_Input AVD, uses no injected UI input, validates installed
+APK bytes and performs foreground ClipboardManager calls. A guard retains the
+original ClipData in RAM and restores it only while the current text still has
+the owned test token; no URI is opened and no clipboard body or screenshot is
+saved. A failed/interrupted process does not promise automatic restoration.
+Archive the probe APK before building the ordinary package, which overwrites
+that build output. Ordinary builds leave both clipboard flags false.
+
+The driver uses safe JNI and current bounded records, not callbacks into Rust
+business state. Activity is weak and closes the coordinator on destruction;
+cancelled delivery cannot refund an unsettled native operation. Input's ordinary
+copy/cut/paste and Tags reuse Glory's shared asynchronous path. Actual keyboard,
+clipboard menu, TalkBack, real-device and iOS service acceptance remain separate.
+See [the clipboard contract](../../docs/native-clipboard.md).

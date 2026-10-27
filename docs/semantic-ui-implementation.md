@@ -2609,3 +2609,16 @@ CLI 25 项/严格 Clippy、来源及依赖图隔离通过。macOS 系统往返�
 其他 OS 往返、设备输入/读屏、文件服务和其余缺口仍开放。
 见 [native-clipboard.md](native-clipboard.md) 和
 `/Volumes/Data/Caches/glory/native-clipboard/result.json`。
+
+
+## 2026-10-27：Android 剪贴板系统 driver
+
+新增 AndroidClipboard 安全 JNI 与应用主线程宿主，一次 Host 认领、共享非回绕 ID、
+32 弱 client/一个物理操作、取消不提前返还许可，无 native callback/unsafe。
+前台 resumed/window-focus 与生命周期边界、Java/Rust 双侧 UTF-8 byte array
+预算和 OS 分配边界均明确。JVM 真 ledger 测试和 ARM64 SDK 系统读写/预算/语义
+CopyText/原 ClipData 恢复通过，普通 APK 另验三个服务/guard flag 为 false。
+1052 项、native/WASM 严格 Clippy、Android 新驱动/probe Clippy、headless、iOS
+feature 编译及来源核对通过。系统菜单/键盘/读屏/真机与 iOS driver 仍独立开放；
+复验边界见 [native clipboard](native-clipboard.md) 和
+`/Volumes/Data/Caches/glory/android-clipboard/final/sdk-result.json`。

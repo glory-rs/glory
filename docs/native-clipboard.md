@@ -92,6 +92,53 @@ run is `/Volumes/Data/Caches/glory/clipboard-macos-system.log`.
 Sapid's tracked `examples/native` clipboard feature tests actual CopyButton,
 CodeHighlight, both JsonViewer modes and TagsInput in four themes, including CPU
 pixels and feedback. Evidence is `/Volumes/Data/Caches/glory/clipboard-sapid-tests.log`.
-Windows/Linux OS round trips, Android/iOS system drivers, mobile clipboard menus,
+Windows/Linux OS round trips, the iOS system driver, mobile clipboard menus,
 actual keyboard/selection gestures and assistive-reader acceptance remain open.
 Injected drivers and CPU tests do not establish those platform results.
+
+## Android application host
+
+Android adds `AndroidClipboard::new(env, host)`, implementing the same Send
+`ClipboardDriver`. Supply an explicit protocol-v1 Java host, then put
+`Clipboard::new(Arc::new(driver))` in Config. JNI uses checked references and
+bounded byte arrays; no raw JNI pointers, native callback exports or new unsafe
+are required. The mobile example owns `GloryClipboard`/`ClipboardLedger`.
+
+The Java main-thread coordinator holds Activity weakly and closes on destruction.
+There are at most 32 current clients and one queued/running OS operation across
+them. Each client holds at most one request/result; numeric IDs never repeat.
+Cancellation removes a receipt but keeps actual admission until the queued or
+running job settles. Posted work and OS calls run outside the ledger lock.
+There is no clipboard listener, completed-ID table or saved clipboard history.
+
+`ClipboardManager` is accessed only with a live foreground window. Reads use the
+first item's text; URI coercion, HTML conversion, files and image decoding are
+not requested. Java bounds UTF-16 work, raw UTF-8 and canonical UTF-8 before a
+body crosses JNI, normalizing CRLF/CR, NUL and unpaired surrogates. Rust checks
+byte-array length before copying and validates UTF-8 again. OS-created ClipData
+and CharSequence allocation precede these transfer limits. Security exceptions
+map to Denied; no text/background access maps to Unavailable.
+
+JNI only submits/polls bounded records. An 8 ms timer exists while that one
+future is pending; idle/retired documents do not poll. `stats` reports current
+receipt count and actual coordinator admission separately. The application
+clones the existing driver/service to share its request-ID sequence; constructing
+a second driver around the same Host is refused by its one-time claim.
+
+Enable the mobile example's `clipboard` feature for the normal Counter plus
+explicit Android service, or `clipboard-probe` for the isolated acceptance view.
+The ordinary build creates neither clipboard coordinator nor probe guard, and
+adds no permission. `check-android-clipboard.sh` runs the real ledger's JVM
+budget/cancellation/lifecycle tests. `check-android-clipboard-sdk.py` installs the
+probe only on the owned Glory_Input AVD and verifies the installed APK hash.
+
+Actual Android 36 ARM64 emulator runs (final claim/lifecycle build PID 8619)
+passed foreground Chinese/emoji/CRLF/NUL write/read, read/write budget refusal,
+semantic CopyText and restoration of the prior ClipData from RAM. The guard
+passes the complete original items/types back to Android and checks restored
+item/type counts; it does not claim a byte snapshot of URI targets or OS data.
+No clipboard body is logged/persisted, and no screenshot captures a possible
+system preview of restored original data. Evidence is
+`/Volumes/Data/Caches/glory/android-clipboard/final/sdk-result.json`.
+These are real OS service calls and SDK launches, separately from actual menu,
+keyboard, selection gestures, TalkBack and real-device acceptance.

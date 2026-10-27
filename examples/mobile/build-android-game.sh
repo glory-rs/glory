@@ -16,6 +16,7 @@ compiler="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/darwin-x86_64/bin"
     echo 'Set GLORY_GRADLE, ANDROID_NDK_HOME and JAVA_HOME to installed tools' >&2; exit 1;
 }
 sh "$repo/examples/mobile/check-android-permissions.sh"
+sh "$repo/examples/mobile/check-android-clipboard.sh"
 export CARGO_TARGET_AARCH64_LINUX_ANDROID_LINKER="$compiler/aarch64-linux-android28-clang"
 export CC_aarch64_linux_android="$compiler/aarch64-linux-android28-clang"
 export CXX_aarch64_linux_android="$compiler/aarch64-linux-android28-clang++"
@@ -40,6 +41,13 @@ print('1' if any(n['id'] in ids and 'permissions' in n['features'] for n in m['r
 PY
 )
 export GLORY_ANDROID_PERMISSION_HOST="$permission_host"
+clipboard_host=$(python3 - "$GLORY_BUILD_ROOT/game-metadata.json" <<'PY'
+import json,sys
+m=json.load(open(sys.argv[1])); ids={p['id'] for p in m['packages'] if p['name']=='glory-blitz'}
+print('1' if any(n['id'] in ids and 'clipboard' in n['features'] for n in m['resolve']['nodes']) else '0')
+PY
+)
+export GLORY_ANDROID_CLIPBOARD_HOST="$clipboard_host"
 cargo rustc --locked --manifest-path examples/mobile/Cargo.toml --lib --target aarch64-linux-android --no-default-features --features "$features" -- -C link-arg=-Wl,-z,max-page-size=16384
 library="$CARGO_TARGET_DIR/aarch64-linux-android/debug/libglory_mobile_counter.so"
 "$compiler/llvm-readelf" -h "$library" | grep -q 'AArch64'

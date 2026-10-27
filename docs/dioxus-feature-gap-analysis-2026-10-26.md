@@ -15,8 +15,8 @@ Mac，最新证据见文末 Apple/移动输入记录，不能继续把“没有 
 | 桌面开发 | native watch、错误保留旧进程、成功重启与退出回收 | 状态保持、真正 Rust 热补丁、检查器 |
 | Web 发布 | 可复现 gzip、哈希清单、预览协商/HEAD/身份回退 | 指纹命名、Brotli/图片转换、WASM 分包 |
 | 运行时权限 | 有界 Owner future/driver API；Android 安全 JNI；iOS Swift 宿主；SDK 控制的授权状态查询 | iOS Rust 应用连接待最小 FFI 声明授权；真实系统弹窗选择、真机及其他权限类别 |
-| 原生剪贴板 | 显式可选桌面 worker；CopyText 与原生编辑器复制/剪切/粘贴；实际 Sapid 四主题消费端及 macOS 系统往返、原剪贴板完整恢复 | Android/iOS 系统 driver、Windows/Linux 实际 OS 往返、移动系统菜单及真实键盘/读屏 |
-| 原生控件 | Checkbox/Switch/Mixed 和 Radio 的绘制、受控更新、点击/Space/AX 动作；Radio 分组与键盘导航；placeholder 独立提示布局与绘制；combobox/typeahead 协议及 listbox/tree 弹层；原生 Select 单选/多选/分组、选择属性与 AX；五项实际选择控件消费端通过；菜单/菜单栏/右键菜单/Palette 协议、八项实际消费端与浏览器回归通过；TagsInput/PillsInput 的原生输入与 provider 粘贴协议、五项实际消费端通过；两端模拟器初始显示 | 富文本、系统文件服务、移动剪贴板、其他弹层及系统菜单服务仍开放；实际输入/读屏单独验收 |
+| 原生剪贴板 | 显式可选桌面 worker 与 Android 安全 JNI；CopyText 与原生编辑器复制/剪切/粘贴；实际 Sapid 四主题消费端、macOS 系统往返和 Android ARM64 前台系统读写/ClipData 恢复 | iOS 系统 driver、Windows/Linux 实际 OS 往返、移动系统菜单及真实键盘/读屏 |
+| 原生控件 | Checkbox/Switch/Mixed 和 Radio 的绘制、受控更新、点击/Space/AX 动作；Radio 分组与键盘导航；placeholder 独立提示布局与绘制；combobox/typeahead 协议及 listbox/tree 弹层；原生 Select 单选/多选/分组、选择属性与 AX；五项实际选择控件消费端通过；菜单/菜单栏/右键菜单/Palette 协议、八项实际消费端与浏览器回归通过；TagsInput/PillsInput 的原生输入与 provider 粘贴协议、五项实际消费端通过；两端模拟器初始显示 | 富文本、系统文件服务、iOS 剪贴板/移动系统菜单、其他弹层及系统菜单服务仍开放；实际输入/读屏单独验收 |
 
 整体差距仍未关闭。签名身份/设备等外部条件和仍需实现的软件功能分别保留，
 没有用模拟器或编译结果替代完整平台交付。
@@ -797,3 +797,37 @@ Clippy 和依赖图隔离检查通过。iOS 模拟器及 Android GameActivity �
 
 桌面系统服务与共享异步输入连接在此完成；Android/iOS 剪贴板 driver、其他桌面
 OS 往返、文件服务、富文本、权限后续连接、平台交付和应用服务继续开放。
+
+
+## 2026-10-27：Android 前台系统剪贴板
+
+AndroidClipboard 以安全 JNI 接入应用自有 GloryClipboard/ClipboardLedger，无新
+native 导出或 unsafe。构造只验证协议并认领一个 Host，不访问系统剪贴板；克隆
+共享 ID 序列，重复包装同一个 Host 明确拒绝。请求首 poll 才提交，Java 主线程在
+Activity resumed 且窗口获焦时调用 ClipboardManager，系统 API 不在 ledger 锁内。
+Activity 仅弱引用，销毁关闭 coordinator，迟到回执不能进入后继 Activity。
+
+每 coordinator 最多 32 个当前弱 client、一个排队/执行中的真实操作，每 client
+一个请求/结果；取消清除回执，但排队任务实际跳过或系统调用返回前不归还执行
+许可。当前 ID 不复用，无完成历史或 clipboard listener。只取第一项 plain text，
+不对 URI/HTML 做 coercion。Java 分别限制 UTF-16 工作量、原始和规范化 UTF-8，
+Rust 在复制 byte array 前再限长/验证 UTF-8；OS ClipData/CharSequence 分配仍在
+传输预算之外。8 ms timer 只属于当前等待 future，空闲没有定时轮询。
+
+纯 JVM 测试使用真正的 ledger，覆盖取消前/执行中许可、200 次 busy 拒绝、源字节
+快照、一次性结果、client/Activity 关闭、ID 耗尽和中文/emoji/CRLF/NUL/孤立代理
+字符预算。GameActivity 专用 clipboard-probe 实际 ARM64 SDK 安装/前台启动通过，
+含真实系统读写、超限读取/写入拒绝、语义 CopyText 和原 ClipData 恢复；安装包与
+构建产物哈希相同。Guard 仅在 RAM 中持有原对象的全部 item/type，并核对恢复后的
+数量/类型计数，不声称 URI 目标字节快照。不保存用户正文或可能含原剪贴板系统
+预览的截图，没有注入触摸/按键。最新可重复记录见
+`/Volumes/Data/Caches/glory/android-clipboard/final/sdk-result.json`。
+
+普通 GameActivity APK 另行构建并核对 clipboard/guard/permissions 三个 BuildConfig
+flag 均为 false，未初始化服务/guard；功能由应用显式选择，不增加权限声明。
+Glory 1052 项测试、native/WASM 严格 Clippy、Android 驱动与 probe 应用 Clippy
+（--no-deps）、headless、iOS 新 feature 编译检查及引擎来源核对通过，固定引擎 SHA
+未变。详细接口和复验命令见 [native-clipboard.md](native-clipboard.md) 与移动示例。
+
+这里完成 Android 前台系统服务，尚不等于实际移动键盘/剪贴板菜单、选择手势、
+TalkBack 或真机验收。iOS 系统 driver、原生文件服务和报告其他缺口继续推进。

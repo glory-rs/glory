@@ -6,6 +6,29 @@ use glory::blitz::{
 };
 use glory::prelude::{group, image};
 use std::{collections::BTreeMap, sync::Arc};
+#[cfg(all(feature = "clipboard-probe", target_os = "android"))]
+mod clipboard_probe;
+#[cfg(all(feature = "clipboard-probe", not(target_os = "android")))]
+compile_error!("clipboard-probe currently requires the Android system host");
+#[cfg(all(
+    feature = "clipboard-probe",
+    any(
+        feature = "network-probe",
+        feature = "permissions-probe",
+        feature = "permissions-host-probe",
+        feature = "android-assets-probe",
+        feature = "ime-probe",
+        feature = "keyboard-probe",
+        feature = "controls-probe",
+        feature = "radio-probe",
+        feature = "placeholder-probe",
+        feature = "choice-probe",
+        feature = "select-probe",
+        feature = "menu-probe",
+        feature = "tags-probe"
+    )
+))]
+compile_error!("select one mobile acceptance view");
 
 #[cfg(all(feature = "android-assets-probe", target_os = "android"))]
 mod android_assets_probe;
@@ -124,7 +147,7 @@ compile_error!("permissions-host-probe runs the Swift iOS host; Android uses per
 compile_error!("select one mobile acceptance view");
 #[cfg(all(
     target_os = "android",
-    any(feature = "network", feature = "permissions"),
+    any(feature = "network", feature = "permissions", feature = "clipboard"),
     not(feature = "android-game-activity")
 ))]
 compile_error!(
@@ -163,7 +186,11 @@ fn asset_window(
     base: &str,
 ) -> std::result::Result<(WindowApp, Arc<Loader>), Box<dyn std::error::Error>> {
     let loader = Arc::new(Loader::new(config)?);
+    #[cfg(all(feature = "clipboard", target_os = "android"))]
+    let clipboard = android_clipboard()?;
     let window = WindowApp::with_config(Config {
+        #[cfg(all(feature = "clipboard", target_os = "android"))]
+        clipboard: Some(glory::blitz::clipboard::Clipboard::new(clipboard.clone())),
         base_url: Url::parse(base)?,
         provider: Some(loader.clone()),
         ..Default::default()
@@ -191,7 +218,8 @@ fn asset_window(
         feature = "choice-probe",
         feature = "select-probe",
         feature = "menu-probe",
-        feature = "tags-probe"
+        feature = "tags-probe",
+        feature = "clipboard-probe"
     )))]
     let content = counter::Counter;
     #[cfg(feature = "ime-probe")]
@@ -214,6 +242,8 @@ fn asset_window(
     let content = menu_probe::fixture();
     #[cfg(feature = "tags-probe")]
     let content = tags_probe::fixture();
+    #[cfg(all(feature = "clipboard-probe", target_os = "android"))]
+    let content = clipboard_probe::fixture(clipboard);
     window.mount(
         group().fill((
             content,
@@ -338,6 +368,26 @@ fn android_permissions()
             AndroidPermissions::new(env, host)?,
             PermissionLimits::default(),
         )?)
+    })
+}
+
+#[cfg(all(feature = "clipboard", target_os = "android"))]
+fn android_clipboard()
+-> Result<Arc<glory::blitz::clipboard::AndroidClipboard>, Box<dyn std::error::Error>> {
+    use jni::{JavaVM, jni_sig, jni_str};
+    JavaVM::singleton()?.attach_current_thread(|env| -> Result<_, Box<dyn std::error::Error>> {
+        let class = env.load_class(jni_str!("rs.glory.counter.GloryGameActivity"))?;
+        let host = env
+            .call_static_method(
+                class,
+                jni_str!("gloryClipboardHost"),
+                jni_sig!(() -> JObject),
+                &[],
+            )?
+            .l()?;
+        Ok(Arc::new(glory::blitz::clipboard::AndroidClipboard::new(
+            env, host,
+        )?))
     })
 }
 
