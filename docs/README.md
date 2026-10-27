@@ -57,6 +57,8 @@ Start here when evaluating or extending Glory:
   application lockfile, bin launchers, build/preview and version diagnostics.
 - [Renderer author guide](renderer-author-guide.md): semantic mutations,
   preflight, query watermarks and adapter conformance.
+- [Native clipboard](native-clipboard.md): explicit desktop service, editor
+  commands, bounded admission and platform acceptance boundaries.
 - [Release readiness](release-readiness.md): current workspace and platform checks.
 
 Dated architecture assessments and performance reports are historical evidence,

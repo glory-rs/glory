@@ -188,6 +188,16 @@ retired feature aliases or count compilation as proof of platform acceptance.
   editor; delimited paste remains an atomic component proposal. Stock platform
   clipboard services and real mobile input/readers stay separate from injected
   provider/CPU/AX evidence. See docs/native-tags.md.
+  Optional clipboard (facade blitz-clipboard) requires an explicit Config service.
+  Semantic writes and shell editor copy/cut/paste share one current operation;
+  cancellation/deadline cannot refund an unsettled native permit. Foreign future
+  construction/poll/drop run outside document borrows. Revalidate current focus,
+  input revision/selection and policy before asynchronous editing; presentation
+  layout generations are not edit identities. Never export password copy/cut.
+  Desktop uses one lazy Arboard worker/permit; default graphs gain no clipboard.
+  Payload limits apply after OS allocation. macOS system round trips preserve
+  all pasteboard representations in RAM; mobile drivers and other OS acceptance
+  remain separate. See docs/native-clipboard.md.
   Input placeholder is a bounded, independent presentation layout, lazily shaped
   only while empty/non-composing and released when hidden/cleared. Hint-only
   changes preserve editor identity, raw generation, selection, IME and value

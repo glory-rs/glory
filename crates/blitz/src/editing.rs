@@ -45,6 +45,8 @@ pub(super) fn sanitize_ime(state: &State, event: &mut UiEvent) {
 }
 
 pub(super) fn text_event(state: &mut State, node: NodeId, text: &str) -> Result<Event, Error> {
+    #[cfg(feature = "clipboard")]
+    clipboard_io::editor::cancel(state);
     let capture = state
         .mapper
         .tree()
@@ -216,7 +218,7 @@ pub(super) fn capture_before(state: &mut State, event: &UiEvent) {
         range.editing.input_before = before.map(|s| (range.editing.revision, s, intent));
     }
 }
-pub(super) fn current_event(state: &mut State, node: NodeId) -> Result<Event, Error> {
+pub(in crate::document) fn current_event(state: &mut State, node: NodeId) -> Result<Event, Error> {
     if let Some(max) = state
         .mapper
         .tree()
@@ -246,6 +248,31 @@ pub(super) fn current_event(state: &mut State, node: NodeId) -> Result<Event, Er
     }
     let value = state.dom.text_value(node)?;
     text_event(state, node, &value)
+}
+#[cfg(feature = "clipboard")]
+pub(in crate::document) fn capture_clipboard(state: &mut State, node: NodeId) {
+    let before = state
+        .mapper
+        .tree()
+        .node(node)
+        .ok()
+        .and_then(|n| {
+            n.descriptor
+                .view()
+                .semantics
+                .as_ref()
+                .and_then(|s| s.input_edit)
+        })
+        .and_then(|capture| capture_selection(state, node, capture.max_bytes));
+    if let Some(range) = state.dom.ranges.get_mut(&node) {
+        range.editing.input_before = before.map(|selection| {
+            (
+                range.editing.revision,
+                selection,
+                glory_render::InputEditIntent::Replace,
+            )
+        });
+    }
 }
 pub(super) fn queue_commit(state: &mut State, node: NodeId, sync_value: bool) -> Result<(), Error> {
     let revision = state.dom.range(node)?.editing.revision;

@@ -13,6 +13,9 @@ use glory_render::{
 };
 use std::borrow::Cow;
 use std::sync::Arc;
+#[cfg(feature = "clipboard")]
+#[path = "clipboard_io.rs"]
+mod clipboard_io;
 #[path = "image_observation.rs"]
 mod image_observation;
 #[path = "resource_wake.rs"]
@@ -153,6 +156,8 @@ fn check_mode<'a>(
 /// default. A provider must queue work and honor cancel/close without UI reentry.
 #[derive(Clone)]
 pub struct Config {
+    #[cfg(feature = "clipboard")]
+    pub clipboard: Option<crate::clipboard::Clipboard>,
     pub motion: glory_render::MotionPreference,
     pub base_url: blitz_traits::net::Url,
     pub resources: blitz_dom::ResourceLimits,
@@ -161,6 +166,8 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            #[cfg(feature = "clipboard")]
+            clipboard: None,
             motion: glory_render::MotionPreference::Reduce,
             base_url: blitz_traits::net::Url::parse("glory://app/").expect("built-in base URL"),
             resources: blitz_dom::ResourceLimits::default(),
@@ -1038,6 +1045,8 @@ struct DragSession {
     captured: bool,
 }
 struct State {
+    #[cfg(feature = "clipboard")]
+    clipboard: clipboard_io::Io,
     #[cfg(feature = "shell")]
     keyboard_clock: std::time::Instant,
     // One AppKit command awaiting its immediately following physical key.
@@ -1067,6 +1076,11 @@ struct State {
     subscriptions: BTreeSet<(NodeId, EventKind)>,
     input_error: Option<Error>,
     space: Option<NodeId>,
+}
+impl Drop for State {
+    fn drop(&mut self) {
+        self.dom.resource_wake.close();
+    }
 }
 impl State {
     #[cfg(feature = "shell")]
@@ -1200,6 +1214,8 @@ impl State {
             return;
         }
         self.space = None;
+        #[cfg(all(feature = "clipboard", feature = "shell"))]
+        clipboard_io::editor::cancel(self);
         if self.dom.open_select != next {
             native_select::close(&mut self.dom);
         }
@@ -1310,6 +1326,8 @@ impl Renderer {
     }
     fn configured_with(runtime: RuntimeId, interactive: bool, config: Config) -> Self {
         Self(Rc::new(RefCell::new(State {
+            #[cfg(feature = "clipboard")]
+            clipboard: clipboard_io::Io::new(config.clipboard.clone()),
             #[cfg(feature = "shell")]
             keyboard_clock: std::time::Instant::now(),
             #[cfg(feature = "shell")]
@@ -1489,6 +1507,7 @@ impl Render for Renderer {
             || state.observed_revision != state.dom.revision
             || !state.inputs.is_empty()
             || state.dom.doc.resource_stats().completions != 0
+            || state.dom.resource_wake.is_pending()
     }
     fn set_profile(&mut self, profile: Option<Profile>) -> Option<Profile> {
         let engine = profile
@@ -1503,7 +1522,16 @@ impl Render for Renderer {
     }
     fn capabilities(&self) -> Capabilities {
         Capabilities {
-            clipboard_write: false,
+            clipboard_write: {
+                #[cfg(feature = "clipboard")]
+                {
+                    self.0.borrow().clipboard.configured()
+                }
+                #[cfg(not(feature = "clipboard"))]
+                {
+                    false
+                }
+            },
             files: None,
             measure: true,
             scroll: true,
@@ -1735,8 +1763,20 @@ impl Render for Renderer {
             | glory_render::Action::SelectRich { .. }
             | glory_render::Action::ClearFiles { .. }
             | glory_render::Action::RemoveFile(_) => Err(Error::Unsupported("native file access")),
-            glory_render::Action::CopyText { .. } => {
-                return Err(Error::Unsupported("native text clipboard write"));
+            glory_render::Action::CopyText {
+                node,
+                revision,
+                request,
+            } => {
+                #[cfg(feature = "clipboard")]
+                {
+                    clipboard_io::copy(&mut state, node, revision, request)
+                }
+                #[cfg(not(feature = "clipboard"))]
+                {
+                    let _ = (node, revision, request);
+                    Err(Error::Unsupported("native text clipboard write"))
+                }
             }
             glory_render::Action::RaiseLayer(id) => layers::raise(&mut state, id),
             glory_render::Action::SelectText {
@@ -1810,6 +1850,8 @@ impl Render for Renderer {
                 state.dom.doc.with_text_input(control, |mut driver| {
                     driver.select_byte_range(anchor, focus)
                 });
+                #[cfg(all(feature = "clipboard", feature = "shell"))]
+                clipboard_io::editor::cancel(&mut state);
                 state.dom.invalidate_pixels();
                 state.observation_pending = true;
                 Ok(())
@@ -1965,6 +2007,9 @@ impl Render for Renderer {
         Ok(())
     }
     fn drain(&mut self, inputs: &mut Vec<Input>) {
+        self.0.borrow().dom.resource_wake.acknowledge();
+        #[cfg(feature = "clipboard")]
+        clipboard_io::poll(self);
         let mut state = self.0.borrow_mut();
         if let Err(error) = layers::sync(&mut state, &[]) {
             state.input_error = Some(error);

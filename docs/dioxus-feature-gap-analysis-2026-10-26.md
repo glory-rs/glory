@@ -15,7 +15,8 @@ Mac，最新证据见文末 Apple/移动输入记录，不能继续把“没有 
 | 桌面开发 | native watch、错误保留旧进程、成功重启与退出回收 | 状态保持、真正 Rust 热补丁、检查器 |
 | Web 发布 | 可复现 gzip、哈希清单、预览协商/HEAD/身份回退 | 指纹命名、Brotli/图片转换、WASM 分包 |
 | 运行时权限 | 有界 Owner future/driver API；Android 安全 JNI；iOS Swift 宿主；SDK 控制的授权状态查询 | iOS Rust 应用连接待最小 FFI 声明授权；真实系统弹窗选择、真机及其他权限类别 |
-| 原生控件 | Checkbox/Switch/Mixed 和 Radio 的绘制、受控更新、点击/Space/AX 动作；Radio 分组与键盘导航；placeholder 独立提示布局与绘制；combobox/typeahead 协议及 listbox/tree 弹层；原生 Select 单选/多选/分组、选择属性与 AX；五项实际选择控件消费端通过；菜单/菜单栏/右键菜单/Palette 协议、八项实际消费端与浏览器回归通过；TagsInput/PillsInput 的原生输入与 provider 粘贴协议、五项实际消费端通过；两端模拟器初始显示 | 富文本、系统文件/剪贴板服务、其他弹层及系统菜单服务仍开放；实际输入/读屏单独验收 |
+| 原生剪贴板 | 显式可选桌面 worker；CopyText 与原生编辑器复制/剪切/粘贴；实际 Sapid 四主题消费端及 macOS 系统往返、原剪贴板完整恢复 | Android/iOS 系统 driver、Windows/Linux 实际 OS 往返、移动系统菜单及真实键盘/读屏 |
+| 原生控件 | Checkbox/Switch/Mixed 和 Radio 的绘制、受控更新、点击/Space/AX 动作；Radio 分组与键盘导航；placeholder 独立提示布局与绘制；combobox/typeahead 协议及 listbox/tree 弹层；原生 Select 单选/多选/分组、选择属性与 AX；五项实际选择控件消费端通过；菜单/菜单栏/右键菜单/Palette 协议、八项实际消费端与浏览器回归通过；TagsInput/PillsInput 的原生输入与 provider 粘贴协议、五项实际消费端通过；两端模拟器初始显示 | 富文本、系统文件服务、移动剪贴板、其他弹层及系统菜单服务仍开放；实际输入/读屏单独验收 |
 
 整体差距仍未关闭。签名身份/设备等外部条件和仍需实现的软件功能分别保留，
 没有用模拟器或编译结果替代完整平台交付。
@@ -755,3 +756,44 @@ headless 无默认 feature 以及 CLI 25 项/严格 Clippy 通过。引擎固定
 这批完成原生输入和注入 provider 的 Tags 协议连接。普通 Glory shell 尚未暴露
 系统 clipboard provider，因此实际系统剪贴板/语义 CopyText、移动粘贴服务、真实
 设备输入/读屏、文件选择与富文本、其余平台和应用服务缺口仍开放，继续逐项补齐。
+
+
+## 2026-10-27：显式原生剪贴板与桌面系统连接
+
+新增可选 `glory-blitz/clipboard`（facade `blitz-clipboard`），由应用在 Config 中
+显式提供 Clipboard。默认不开启 OS 服务，也不增加默认/SSR/WASM 生产图依赖。
+桌面使用固定 Arboard 3.6.1 的一个 worker，首次 poll 才打开系统剪贴板；同一服务
+保留一个真实执行许可和当前结果，不保存访问历史。无图片剪贴板或额外 unsafe。
+
+CopyText 复用既有 node/source revision/request 协议。源替换/节点退休撤销结果；
+首 poll 前失效不执行 OS 写入。每文档只允许一个当前操作，忙碌请求发 Failed，
+默认 30 秒、可配置至 120 秒 deadline。已开始的 OS 调用不能被撤销，超时或取消
+不能提前归还许可，迟到结果不覆盖新来源。驱动 future 的构造、poll、drop 均在
+文档借用外，完成只排回受校验的语义事件；稳定等待 I/O 不触发无休止 observe。
+
+WindowApp 的复制、剪切、粘贴及 AppKit 配对键使用同一条通道。密码不导出复制/
+剪切，readonly 仅允许复制，IME 保持自己的输入。剪切在写入成功且 receipt 仍
+有效后删除；粘贴核对实际/语义焦点、输入 revision、选区和当前策略，编辑、焦点
+或程序选区 ABA 会撤销旧结果。仅名称/布局更新不会因 Parley layout generation
+改变误撤销有效操作。普通粘贴保持 InputEdit 的 before-selection，并在编辑前
+检查结果大小；Tags 使用已有 16 KiB/4 KiB、UTF-16 原子提议与无正文预算拒绝。
+65,536 字节普通剪贴板预算不包括 OS/provider 返回 String 前的分配。
+
+macOS 实际 worker 写读、超限读取及语义 CopyText 往返通过。Swift guard 在 RAM 中
+保留原剪贴板全部条目与类型，检查当前测试 token 后恢复并逐项核对字节；不记录
+或落盘用户剪贴板正文。当前记录为 `clipboard-macos-system.log`。Sapid 三项新
+消费端测试在四主题覆盖 CopyButton 全部结果/源撤销、CodeHighlight 精确源、两种
+JsonViewer 源复制、TagsInput 异步原子粘贴和超限恢复；默认不可用测试仍通过。
+这些是驱动/CPU 消费端证据，OS 键盘、菜单和读屏仍分别验收。
+
+最终 Glory 全工作区含文档测试 **1052 项、221 个结果报告**通过；普通 gate 中
+一项会修改系统剪贴板的测试显式忽略，再由 guard 单独运行通过。native/WASM
+全工作区严格 Clippy、headless、无 shell 的 clipboard 协议测试、CLI 25 项/严格
+Clippy 和依赖图隔离检查通过。iOS 模拟器及 Android GameActivity 的新 feature
+适配器 Clippy（--no-deps）通过，仅证明可编译，并无移动 OS clipboard driver。
+固定引擎 SHA 不变，来源核对通过。实现及复验命令见
+[native-clipboard.md](native-clipboard.md)；日志/源摘要见
+`/Volumes/Data/Caches/glory/native-clipboard/result.json`。
+
+桌面系统服务与共享异步输入连接在此完成；Android/iOS 剪贴板 driver、其他桌面
+OS 往返、文件服务、富文本、权限后续连接、平台交付和应用服务继续开放。

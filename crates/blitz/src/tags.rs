@@ -78,6 +78,16 @@ fn paste(state: &mut State, id: NodeId, target: EngineId, separators: TagSeparat
     let Ok(raw) = state.dom.doc.shell_provider.get_clipboard_text() else {
         return;
     };
+    paste_text(state, id, target, separators, &raw);
+}
+
+pub(in crate::document) fn paste_text(
+    state: &mut State,
+    id: NodeId,
+    target: EngineId,
+    separators: TagSeparators,
+    raw: &str,
+) {
     if raw.len() > MAX_TAG_PASTE_BYTES {
         queue(
             state,
@@ -86,7 +96,7 @@ fn paste(state: &mut State, id: NodeId, target: EngineId, separators: TagSeparat
         );
         return;
     }
-    let text = normalize_text(&raw, true);
+    let text = normalize_text(raw, true);
     if text.len() > MAX_TAG_PASTE_BYTES {
         queue(
             state,
@@ -175,7 +185,7 @@ pub(super) fn key(
         || name == "Insert" && key.modifiers == Modifiers::SHIFT;
     // The native action already ran. Its raw key remains consumed even if a
     // component callback removed the tag policy before this key arrived.
-    if paste_key && state.apple_input == Some((id, AppleInput::TagsPaste)) {
+    if paste_key && state.apple_input == Some((id, AppleInput::Paste)) {
         state.apple_input = None;
         return true;
     }
@@ -237,7 +247,7 @@ pub(super) fn apple(state: &mut State, id: NodeId, target: EngineId, command: &s
         "insertNewline:" | "insertNewlineIgnoringFieldEditor:" => {}
         "paste:" => {
             paste(state, id, target, separators);
-            state.apple_input = Some((id, AppleInput::TagsPaste));
+            state.apple_input = Some((id, AppleInput::Paste));
         }
         _ => return false,
     }

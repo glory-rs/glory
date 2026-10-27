@@ -2593,3 +2593,19 @@ Glory 1032 项、native/WASM 严格 Clippy、headless、CLI 25 项/严格 Clippy
 菜单八项、选择控件五项消费者继续通过。两端探针的 SDK 初始显示/安装哈希与
 设备链接单独记录。系统剪贴板服务、真实控件 OS 输入/读屏和其他报告缺口未关闭；
 见 [native-tags.md](native-tags.md) 的 provider/预算和验收边界。
+
+
+## 2026-10-27：显式原生剪贴板与异步编辑器操作
+
+新增可选 clipboard/Config 服务，连接 CopyText 与 shell 复制/剪切/粘贴。桌面
+单 worker 延迟打开 Arboard，源退休/超时撤销结果但不提前归还真实 OS 许可。
+驱动 future 构造/poll/drop 均在文档借用外；编辑器结果验证焦点、revision、选区
+和策略，保留密码/readonly/IME、InputEdit 和 Tags 原子预算规则。
+
+Glory 1052 项、native/WASM 严格 Clippy、headless、无 shell 的 clipboard 协议、
+CLI 25 项/严格 Clippy、来源及依赖图隔离通过。macOS 系统往返独立通过，原剪贴板
+所有条目/类型在 RAM 中保留并恢复核对。Sapid 三项新四主题消费端及默认不可用
+回归通过。iOS/Android 新 feature 适配器 Clippy 仅为编译检查，移动 OS driver、
+其他 OS 往返、设备输入/读屏、文件服务和其余缺口仍开放。
+见 [native-clipboard.md](native-clipboard.md) 和
+`/Volumes/Data/Caches/glory/native-clipboard/result.json`。

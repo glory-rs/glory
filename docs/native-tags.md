@@ -46,11 +46,12 @@ same editor, then emits the existing text event; no second clipboard read occurs
 Oversized clipboard/current/result text produces a body-free rejection, retaining
 accepted text and selection. Provider read failure preserves the selection too.
 
-The stock Glory shell has not yet exposed its optional platform clipboard service.
-Current paste evidence uses an explicit injected provider, including a million-byte
-refusal and subsequent recovery. Wiring OS clipboard services on desktop/mobile,
-semantic CopyText and actual OS clipboard acceptance remain distinct report gaps.
-This input connection does not claim those services are complete.
+An explicit `Config::clipboard` now routes paste through the asynchronous
+[native clipboard service](native-clipboard.md) and reuses this same bounded
+parser/proposal path. Without it, an injected ShellProvider retains the prior
+synchronous path, including its million-byte rejection/recovery evidence.
+Desktop semantic CopyText and macOS system round trips are separately verified;
+mobile system services and actual device input/reader acceptance remain open.
 
 ## Evidence
 

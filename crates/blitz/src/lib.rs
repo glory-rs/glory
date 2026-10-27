@@ -18,6 +18,10 @@ mod loader;
 #[cfg(all(feature = "permissions", not(target_arch = "wasm32")))]
 pub mod permissions;
 
+/// Explicit native clipboard drivers; no clipboard is opened by default.
+#[cfg(all(feature = "clipboard", not(target_arch = "wasm32")))]
+pub mod clipboard;
+
 /// Transport hooks stay in this adapter; core/UI do not depend on engine types.
 #[cfg(not(target_arch = "wasm32"))]
 pub mod assets {

@@ -3,7 +3,7 @@
 //! and accessibility acceptance remain distinct from the protocol tests.
 use super::*;
 #[path = "editing.rs"]
-mod editing;
+pub(super) mod editing;
 use editing::ime_event;
 #[cfg(all(
     feature = "accesskit",
@@ -20,6 +20,9 @@ mod accesskit_platform;
 #[cfg(test)]
 #[path = "choice_tests.rs"]
 mod choice_tests;
+#[cfg(all(test, feature = "clipboard"))]
+#[path = "clipboard_editor_tests.rs"]
+mod clipboard_editor_tests;
 #[path = "menu.rs"]
 pub(super) mod menu;
 #[cfg(test)]
@@ -34,7 +37,7 @@ mod radio;
 #[path = "radio_tests.rs"]
 mod radio_tests;
 #[path = "tags.rs"]
-mod tags;
+pub(super) mod tags;
 #[cfg(test)]
 #[path = "tags_tests.rs"]
 mod tags_tests;
@@ -65,7 +68,23 @@ use winit::window::WindowId;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum AppleInput {
     EmptyDelete,
-    TagsPaste,
+    Paste,
+    #[cfg(feature = "clipboard")]
+    Copy,
+    #[cfg(feature = "clipboard")]
+    Cut,
+}
+impl AppleInput {
+    fn matches(self, key: &Key) -> bool {
+        match self {
+            Self::EmptyDelete => *key == Key::Named(NamedKey::Backspace),
+            Self::Paste => matches!(key, Key::Character(c) if c.eq_ignore_ascii_case("v")),
+            #[cfg(feature = "clipboard")]
+            Self::Copy => matches!(key, Key::Character(c) if c.eq_ignore_ascii_case("c")),
+            #[cfg(feature = "clipboard")]
+            Self::Cut => matches!(key, Key::Character(c) if c.eq_ignore_ascii_case("x")),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -216,10 +235,12 @@ impl Document for WindowApp {
             });
         }
         let apple_command = matches!(&event, UiEvent::AppleStandardKeybinding(_));
-        if !matches!(&event,UiEvent::KeyDown(key) if key.key==Key::Named(NamedKey::Backspace) || matches!(&key.key,Key::Character(c) if c.eq_ignore_ascii_case("v")))
+        if !matches!(&event,UiEvent::KeyDown(key) if self.renderer.0.borrow().apple_input.is_some_and(|(_,kind)|kind.matches(&key.key)))
         {
             self.renderer.0.borrow_mut().apple_input = None;
         }
+        #[cfg(feature = "clipboard")]
+        clipboard_io::editor::before_input(&mut self.renderer.0.borrow_mut(), &event);
         editing::capture_before(&mut self.renderer.0.borrow_mut(), &event);
         editing::sanitize_ime(&self.renderer.0.borrow(), &mut event);
         self.renderer.invalidate();
@@ -266,6 +287,17 @@ struct Events {
     renderer: Renderer,
     // This input dispatch only: the former hover target, never visited history.
     previous_hover: Option<EngineId>,
+}
+fn clipboard_apple(state: &mut State, node: NodeId, target: EngineId, command: &str) -> bool {
+    #[cfg(feature = "clipboard")]
+    {
+        clipboard_io::editor::apple(state, node, target, command)
+    }
+    #[cfg(not(feature = "clipboard"))]
+    {
+        let _ = (state, node, target, command);
+        false
+    }
 }
 impl Events {
     fn new(renderer: Renderer) -> Self {
@@ -361,6 +393,12 @@ impl EventHandler for Events {
                         | DomEventData::Input(_)
                         | DomEventData::Click(_)
                 )
+            {
+                event_state.prevent_default();
+                return;
+            }
+            if let DomEventData::AppleStandardKeybinding(command) = &event.data
+                && clipboard_apple(&mut state, node, event.target, command)
             {
                 event_state.prevent_default();
                 return;
@@ -827,6 +865,10 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
             )
         });
         let key_name = key.key.to_string();
+        #[cfg(feature = "clipboard")]
+        if clipboard_io::editor::key(state, origin, target, key, &key_name) {
+            return true;
+        }
         if tags::key(state, origin, target, key, &key_name) {
             return true;
         }

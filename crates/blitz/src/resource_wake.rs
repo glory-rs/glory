@@ -15,6 +15,12 @@ pub(super) struct ResourceWake {
     waker: Mutex<Option<Waker>>,
 }
 impl ResourceWake {
+    pub(super) fn is_pending(&self) -> bool {
+        self.pending.load(Ordering::Acquire)
+    }
+    pub(super) fn acknowledge(&self) {
+        self.pending.store(false, Ordering::Release);
+    }
     pub fn observe(&self, waker: &Waker) {
         let previous = {
             let mut current = self.waker.lock().expect("resource waker");
@@ -39,10 +45,18 @@ impl ResourceWake {
             waker.wake();
         }
     }
-    fn close(&self) {
+    pub(super) fn close(&self) {
         self.closed.store(true, Ordering::Release);
         let previous = self.waker.lock().expect("resource waker").take();
         drop(previous);
+    }
+}
+impl std::task::Wake for ResourceWake {
+    fn wake(self: Arc<Self>) {
+        self.as_ref().wake();
+    }
+    fn wake_by_ref(self: &Arc<Self>) {
+        self.as_ref().wake();
     }
 }
 pub(super) struct Provider {

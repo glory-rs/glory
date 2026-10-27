@@ -738,6 +738,7 @@ fn huge_fixed_and_measured_lists_bound_real_http_jobs_and_image_history() {
                         pending_images: 32,
                         ..Default::default()
                     },
+                    ..Default::default()
                 },
             );
             renderer = Some(host.clone());
@@ -886,6 +887,7 @@ fn pressure_app(
                 base_url,
                 provider: Some(loader),
                 resources: limits,
+                ..Default::default()
             },
         );
         renderer = Some(host.clone());
