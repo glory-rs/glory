@@ -642,3 +642,47 @@ binary hashes without sending UI events. Pass `--iphone-device`, `--ipad-device`
 `--output` JSON path before uninstalling fixtures. It requires the owned simulator
 names “Glory owned acceptance” and “Glory iPad scene acceptance”. After recording
 results, restore the default Counter and uninstall `rs.glory.files.fixture`.
+
+### Independent File Provider extension and delayed hydration
+
+Build the separate **Glory Downloads** enumerating provider fixture:
+
+```sh
+export GLORY_BUILD_ROOT=/Volumes/Data/Caches/glory/apple
+. scripts/apple-env.sh
+sh examples/mobile/build-ios-provider-fixture.sh
+xcrun simctl install OWNED_DEVICE "$GLORY_BUILD_ROOT/ios-provider-fixture/enumerating/GloryHydration.app"
+xcrun simctl launch OWNED_DEVICE rs.glory.hydration.enumerating
+```
+
+Use the same `ios-files-ui-probe` consumer and real Device Hub input. In Browse,
+enable **Glory Downloads** and select `glory-provider-image.png` and
+`glory-provider-retry.txt`. Enumeration only returns metadata; system content
+callbacks delay three seconds. The retry file fails its first download and
+succeeds on the next system request (which may be automatic thumbnail work or
+caused by Open). Confirm exact-read/private-preview success, reopen/Cancel,
+Clear and Owner retirement as above. Only owned fixture data is generated; no
+cloud account or real network is involved. Never count a prepopulated local file
+as a cold download. For a fresh run, uninstall/reinstall only the owned fixture
+and capture its group counters before browsing. Keep each consumer picker flow
+within its 120-second service deadline.
+
+Before uninstalling, run `check-ios-system-files.py` with the preceding arguments,
+`--provider-kind enumerating`, this fixture's app path, and additionally
+`--iphone-provider-log` / `--ipad-provider-log`. Capture raw provider events with
+`simctl spawn OWNED_DEVICE log show --last 10m --style compact --predicate
+'process == "GloryHydrationProvider" AND eventMessage CONTAINS "Glory hydration"'`.
+The checker reads actual fixed provider counters from its own group, checks the
+three-second delay and failure/retry, compares complete installed fixture trees,
+and verifies that the consumer has no group entitlement. It sends no UI events.
+Save logs/screenshots and JSON under the approved data-volume cache before
+restoring default Counter and uninstalling `rs.glory.hydration.enumerating`.
+
+`GLORY_PROVIDER_MODE=replicated sh examples/mobile/build-ios-provider-fixture.sh`
+builds the separate **Glory Hydration** variant under `ios-provider-fixture/replicated`.
+It registers only domain `glory-owned-hydration-v1`. On these iOS 27 simulators,
+registration/enumeration worked but dataless materialization repeatedly failed
+in fileproviderd with POSIX EPERM / cannotSetMetadata. This variant has no passing
+hydration acceptance. Do not substitute enumerating results for replicated/cloud
+or real-device proof; uninstall its owned `rs.glory.hydration` host after recording
+failures. See `docs/native-files.md` for the remaining boundaries.

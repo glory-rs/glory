@@ -331,3 +331,43 @@ This closes actual system-picker input/callback and external Local Storage
 provider scope/read/close acceptance on these simulators. It does not establish
 third-party provider extensions, remote hydration/error recovery, real-device
 sandbox enforcement, store distribution or assistive-reader behavior.
+
+### Independent iOS extension and delayed content acceptance (2026-10-27)
+
+`examples/mobile/build-ios-provider-fixture.sh` now builds a separate host and
+`com.apple.fileprovider-nonui` extension. The default enumerating variant appears
+as **Glory Downloads** (`rs.glory.hydration.enumerating`). This is a real
+`NSFileProviderExtension`, not the earlier Documents folder exposed by Local
+Storage. Only its own host/extension share `group.rs.glory.hydration.enumerating`;
+the Glory consumer has no provider-group entitlement and receives URLs only
+through the actual system picker.
+
+The fixed four-item model enumerates metadata without writing file bodies.
+Actual system `startProvidingItem` callbacks provide the owned 36-byte Unicode
+text and 70-byte PNG after three seconds. A separate retry TXT fails once with
+`NSFileProviderError.serverUnreachable`, then supplies the same expected text.
+Files may request contents for thumbnails while browsing, before Open; this
+acceptance does not claim that hydration starts exclusively at Open. The provider
+writes only its owned storage and never recursively coordinates inside the
+system-coordinated callback. Fixed counters/timestamps contain no user paths or
+bodies. The test server is in-process static data, not a real network server.
+
+Actual iPhone/iPad iOS 27 simulator runs selected retry TXT + PNG in the system
+picker, recovered from the provider error, read exact bytes through external
+security-scoped URLs, and painted private previews. Cancel preserved both grants;
+iPad outside-tap cancellation, Owner retirement, successful close/scope-stop
+pairing and zero native/shared/private-preview quotas passed. No production IO
+change or new FFI declaration was needed. `check-ios-system-files.py
+--provider-kind enumerating` checks installed host/extension tree hashes, consumer
+entitlements, authoritative provider counters and raw consumer/provider logs.
+Evidence: `/Volumes/Data/Caches/glory/ios-hydration/result.json`.
+
+`GLORY_PROVIDER_MODE=replicated` builds a separate
+`NSFileProviderReplicatedExtension` variant (`rs.glory.hydration`, **Glory
+Hydration**) with an explicit owned domain. It compiled, registered and enumerated
+on both simulators, but their `fileproviderd` repeatedly failed dataless item
+materialization with POSIX EPERM / `cannotSetMetadata`; contents could not be
+selected. That path is **not accepted**. Its failure logs are retained separately.
+No private entitlement or sandbox bypass is used. Replicated-provider hydration,
+commercial/cloud providers, actual network/offline/cancellation recovery,
+real-device sandbox/distribution and VoiceOver remain open.

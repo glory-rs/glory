@@ -100,3 +100,10 @@ URLs and completed native cancellation dismissals. It uses the same authorized
 function declaration and never accepts an arbitrary path or selected-URL packet.
 It is mutually exclusive with `ios-io-probe`. See the actual-system acceptance
 section in [native-files.md](native-files.md).
+
+The separate provider fixture now also tests actual enumerating-extension
+`startProvidingItem` callbacks, delayed hydration and one server-unreachable
+failure followed by retry. Its App Group is shared only by the independent host
+and extension; the Glory consumer has no such entitlement. No new ABI operation,
+FFI declaration or production IO code was needed. See [native files](native-files.md)
+for the accepted enumerating path and separately unaccepted replicated path.

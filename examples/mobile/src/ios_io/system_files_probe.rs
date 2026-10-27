@@ -31,7 +31,9 @@ async fn take<T: Clone + 'static>(value: Cage<Option<T>>) -> ProbeResult<T> {
 }
 async fn read(weak: &WeakScope, file: &FileInfo) -> ProbeResult {
     let expected: &[u8] = match file.name.as_str() {
-        "glory-provider-text.txt" => "Glory external provider: 中文😀\n".as_bytes(),
+        "glory-provider-text.txt" | "glory-provider-retry.txt" => {
+            "Glory external provider: 中文😀\n".as_bytes()
+        }
         "glory-provider-image.png" => include_bytes!("../../assets/badge.png"),
         _ => return Err("only owned provider fixture files are accepted".into()),
     };

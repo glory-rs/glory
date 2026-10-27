@@ -281,8 +281,15 @@ retired feature aliases or count compilation as proof of platform acceptance.
   retirement evidence on owned iPhone/iPad simulators. Its independent Documents
   fixture is a different app, not a custom provider extension or shared container.
   Test-only opcode 101/counters and fixture binaries stay out of normal bundles;
-  never inject selected URLs into this acceptance. Third-party/cloud providers,
-  hydration/error recovery, real-device sandbox and readers remain separate.
+  never inject selected URLs into this acceptance. The independent enumerating
+  File Provider extension fixture also has actual delayed content callbacks,
+  fail-once recovery, scoped exact reads/preview/cancel/close on both simulators.
+  Only its host/extension share an App Group; the consumer has no group entitlement.
+  Files may hydrate thumbnails before Open. Fixed counters contain no bodies or
+  user paths; no real network/cloud account is involved. Replicated dataless
+  materialization returned POSIX EPERM in these simulators and is not accepted.
+  Commercial/cloud providers, replicated hydration, actual network/offline/download
+  cancellation, real-device sandbox and readers remain separate.
   Input placeholder is a bounded, independent presentation layout, lazily shaped
   only while empty/non-composing and released when hidden/cleared. Hint-only
   changes preserve editor identity, raw generation, selection, IME and value

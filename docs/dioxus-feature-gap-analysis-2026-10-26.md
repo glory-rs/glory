@@ -1091,3 +1091,32 @@ iPhone 17 与 iPad Air M4 / iOS 27 模拟器实际通过：
 选择界面、外部 PNG 预览和原始日志。该证据关闭上述模拟器的系统选择器输入/
 回调和外部 Local Storage provider 授权/读取/关闭验收；第三方 replicated provider、
 iCloud hydration/失败恢复、真机 sandbox、发布签名和 VoiceOver 仍分别开放。
+
+### 2026-10-27：独立 File Provider 扩展、延迟提供内容与一次失败恢复
+
+新增独立宿主及 `com.apple.fileprovider-nonui` 扩展夹具，默认使用 iOS enumerating
+`NSFileProviderExtension`，在 Files Locations 中显示为 **Glory Downloads**。
+它与此前 Documents/Local Storage 文件夹不同，是真正的 provider 扩展。共享组仅在
+夹具宿主与扩展之间；Glory 消费端没有该组 entitlement，没有 URL 注入或文件复制。
+
+元数据枚举不写正文；系统实际调用 `startProvidingItem` 后延迟约三秒提供已知
+TXT/PNG。独立 retry TXT 首次返回 serverUnreachable，后续系统请求恢复。Files
+可能为缩略图在浏览阶段发起 hydration，不能把本轮证据说成“仅点击 Open 才下载”。
+自有 iPhone/iPad / iOS 27 模拟器实际通过 retry TXT + PNG 的真实选择、多选回调、
+安全作用域精确读取、私有预览绘制、取消保留旧授权、Owner 退役关闭 sheet 和
+Clear 后 scope/句柄/原生及共用额度归零。8 项应用回归、Swift 台账、严格 Clippy
+及 iOS device 链接检查通过（链接不计作真机验收）。默认 Counter 已确认不含桥接/
+probe/扩展，两台模拟器恢复默认应用并卸载自有 provider 夹具。证据校验同时核对安装宿主/扩展树散列、消费端无共享组、实际下载计数与
+时间、失败后重试和原始日志，结果在
+`/Volumes/Data/Caches/glory/ios-hydration/result.json`。
+
+本轮修正了验收夹具的 UIScene 生命周期、模拟器 entitlement 嵌入与扩展启动入口；
+消费端 probe 仅增加 retry TXT 的已知内容白名单，生产运行时、授权边界与整数
+FFI 声明不变。夹具及相关记录均不进入普通 Counter 包。
+
+另提供 opt-in replicated 扩展夹具（**Glory Hydration**）。两个模拟器可注册 domain
+和枚举元数据，但 fileproviderd 创建 dataless 文件反复返回 POSIX EPERM /
+cannotSetMetadata，未能完成内容选择；保留失败日志，**未关闭这一缺口**。
+本轮关闭独立 enumerating provider 协议夹具的延迟 hydration/一次失败恢复验收；
+第三方商业云盘、replicated hydration、真实网络/离线/下载取消、真机 sandbox、
+发布签名和 VoiceOver 仍分别开放。没有使用私有 entitlement 或绕过系统保护。
