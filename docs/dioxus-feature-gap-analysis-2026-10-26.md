@@ -1005,3 +1005,57 @@ iOS probe/仅 permissions 配置、macOS 应用测试和 Android GameActivity pr
 这一批关闭 Rust iOS 权限连接实现和 SDK 查询链路缺口。真实授权弹窗选择、
 相机/通知的系统授权变化、后台/场景重连时的弹窗、真机/读屏，以及 iOS 文件/
 剪贴板等其余平台和应用能力仍待补齐；不能把这些 SDK 查询计作弹窗输入验收。
+
+## 2026-10-27：iOS 文件与剪贴板原生服务（实现及自有来源 SDK 验收完成）
+
+移动宿主新增 `ios_io::files()` / `ios_io::clipboard()`，显式安装到既有 Config，
+复用 FilePicker/FileReader、ClipboardDriver、语义文件/复制和私有预览协议。
+iOS 文件选择使用 UIKit `UIDocumentPickerViewController`，剪贴板使用 `UIPasteboard`。
+普通服务构造不读取文件或剪贴板，不呈现选择器。`clipboard`、`files` 可单独启用。
+
+用户另行批准应用级最小连接后，仅在 `examples/mobile/src/ios_io/mod.rs` 加入一处
+`unsafe extern "C"` 声明块，只有一个参数/返回值均为 i64 的 `safe fn`。
+经校验的整数命令及八字节包字传输有界数据，不跨 ABI 传指针、对象或回调，
+没有 unsafe 调用块。Glory 运行时没有改动或新增 unsafe，引擎 pin 也没有变化。
+
+Swift 应用宿主在主线程处理 UIKit/剪贴板，在 worker 中协调文件打开、读取和关闭，
+OS 操作均不持有台账/文档锁。选择结果保留原始 regular FileHandle 和 security scope，
+精确读取有界区间并重查原描述符大小；不重新打开显示名，不持久化 bookmark。
+过滤器即使因 UTType 无映射而放宽 UI，仍按原配置再次校验真实选择元数据。
+惰性读取 future 也保留所选能力；先丢弃 Reader 不会撤销尚未首次 poll 的读取，
+而终态主动释放原生回执/能力，不依赖调用方再丢弃已完成 future。
+
+原生跨 client 台账限制 32 个 client、一个 picker、四个读取（包含未排空结果），
+以及 160 个保留句柄、160 KiB 元数据、2 GiB 声明字节额度。打开中保留配置
+总字节及 32 KiB 元数据，打开完成后按实际元数据/大小结算，最后一次实际读取/
+关闭后释放组额度；六个小选择组的回归防止重复最坏情况预算过早拒绝。关闭失败继续计为未结算
+资源，不提前返还额度。取消/Owner 退休只撤销结果投递；弱 client 回调不能写入旧
+Owner。剪贴板限制原始/规范化 UTF-8 均不超过 64 KiB、一个物理操作和每 client
+一个当前回执，无监听器、URI 强制转换或历史结果表。
+
+`ios-io-probe` 仅在显式环境开关下启用自有选择结果、worker 读取屏障及剪贴板 guard。
+原剪贴板可读 item 表示只保留在 RAM，检测到外部 changeCount 变化时保留外部修改并使验收
+失败；Owner cleanup 也会在物理工作结束且窗口活跃后请求恢复。它不承诺恢复公共 API
+无法读取的 expiration 等策略元数据，也不能保证进程突然退出后的恢复。普通包排除
+所有 probe/guard；默认 Counter 连 IO 宿主与桥符号都不包含。
+
+最终 iPhone 17、iPad Air M4 / iOS 27 模拟器均实际运行 Rust→整数 ABI→Swift→OS：
+
+- Unicode 多选元数据、协调区间读取、取消、count/type 拒绝和 prior capability 保持。
+- 四个真实 worker 任务被屏障保留时，第五个读取被拒绝；丢弃回执和退休 Owner 均
+  不归还未结束操作，最后实际读完/关闭后额度归零，无迟到 Owner 投递。
+- 共用语义 File 控件完成读取、私有 PNG 解析/解码、Clear、旧 token 拒绝与缓存撤销。
+- Chinese/emoji/CRLF/NUL 剪贴板往返、读写限额、语义 CopyText 和条件恢复。
+
+8 项应用回归（含既有 2 项权限桥测试）、21 项共用文件/剪贴板回归、Swift 台账/包/
+规范化/额度测试通过。iOS 单独/组合服务、probe、macOS 应用测试及 Android 三种
+服务 probe 的严格 Clippy 通过；arm64 iOS device SDK 实际链接通过，未做设备签名/
+真机安装。普通服务包核对桥存在且无 probe，默认 Counter 已在两台自有模拟器恢复
+并比对安装二进制 SHA。证据、源码/产物散列及保留的迭代日志在
+`/Volumes/Data/Caches/glory/ios-io/result.json`。
+
+本批完成两项 iOS 服务实现及自有来源的 SDK/语义链路验收。选择 fixture 的 URL 在
+应用容器内，不能据此宣称真实系统选择器输入、外部 File Provider security-scope
+授权、iCloud hydration、场景切换下的系统选择器行为、跨应用粘贴弹窗或真机/读屏
+完成；这些仍是独立平台验收项。详见 [native-files.md](native-files.md) 和
+[native-clipboard.md](native-clipboard.md)。

@@ -145,6 +145,11 @@ compile_error!("select one mobile acceptance view");
     )
 ))]
 compile_error!("select one mobile acceptance view");
+#[cfg(all(
+    any(feature = "clipboard", feature = "files"),
+    any(target_os = "ios", test)
+))]
+pub mod ios_io;
 #[cfg(all(feature = "permissions", any(target_os = "ios", test)))]
 pub mod ios_permissions;
 #[cfg(feature = "network-probe")]
@@ -194,6 +199,30 @@ mod keyboard_probe;
 #[cfg(all(feature = "ime-probe", feature = "keyboard-probe"))]
 compile_error!("select one mobile acceptance view");
 
+#[cfg(all(feature = "ios-io-probe", not(target_os = "ios")))]
+compile_error!("ios-io-probe requires the UIKit application host");
+#[cfg(all(
+    feature = "ios-io-probe",
+    any(
+        feature = "files-probe",
+        feature = "clipboard-probe",
+        feature = "network-probe",
+        feature = "permissions-probe",
+        feature = "permissions-host-probe",
+        feature = "android-assets-probe",
+        feature = "ime-probe",
+        feature = "keyboard-probe",
+        feature = "controls-probe",
+        feature = "radio-probe",
+        feature = "placeholder-probe",
+        feature = "choice-probe",
+        feature = "select-probe",
+        feature = "menu-probe",
+        feature = "tags-probe"
+    )
+))]
+compile_error!("select one mobile acceptance view");
+
 /// One package worker per document, including every recreated Android Activity.
 pub fn counter_window() -> std::result::Result<(WindowApp, Arc<Loader>), Box<dyn std::error::Error>>
 {
@@ -224,12 +253,17 @@ fn asset_window(
     let clipboard = android_clipboard()?;
     #[cfg(all(feature = "files", target_os = "android"))]
     let file_driver = android_files()?;
-    #[cfg(all(feature = "files", target_os = "android"))]
+    #[cfg(all(feature = "clipboard", target_os = "ios"))]
+    let clipboard = ios_io::clipboard()?;
+    #[cfg(all(feature = "files", target_os = "ios"))]
+    let file_driver = ios_io::files()
+        .map_err(|error| std::io::Error::other(format!("iOS file host: {error:?}")))?;
+    #[cfg(all(feature = "files", any(target_os = "android", target_os = "ios")))]
     let files = glory::blitz::files::Files::new(file_driver.clone());
     let window = WindowApp::with_config(Config {
-        #[cfg(all(feature = "clipboard", target_os = "android"))]
+        #[cfg(all(feature = "clipboard", any(target_os = "android", target_os = "ios")))]
         clipboard: Some(glory::blitz::clipboard::Clipboard::new(clipboard.clone())),
-        #[cfg(all(feature = "files", target_os = "android"))]
+        #[cfg(all(feature = "files", any(target_os = "android", target_os = "ios")))]
         files: Some(files.clone()),
         base_url: Url::parse(base)?,
         provider: Some(loader.clone()),
@@ -260,7 +294,8 @@ fn asset_window(
         feature = "menu-probe",
         feature = "tags-probe",
         feature = "clipboard-probe",
-        feature = "files-probe"
+        feature = "files-probe",
+        feature = "ios-io-probe"
     )))]
     let content = counter::Counter;
     #[cfg(feature = "ime-probe")]
@@ -289,6 +324,8 @@ fn asset_window(
     let content = clipboard_probe::fixture(clipboard);
     #[cfg(all(feature = "files-probe", target_os = "android"))]
     let content = files_probe::fixture(file_driver, files, window.renderer().clone());
+    #[cfg(all(feature = "ios-io-probe", target_os = "ios"))]
+    let content = ios_io::probe::fixture(clipboard, file_driver, files, window.renderer().clone());
     window.mount(
         group().fill((
             content,

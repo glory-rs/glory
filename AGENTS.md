@@ -259,6 +259,23 @@ retired feature aliases or count compilation as proof of platform acceptance.
   files-probe's owned selector/provider and their DEX classes belong only to the
   probe APK. SDK result/PFD/private-decode evidence does not prove DocumentsUI
   input, non-seekable provider, real-device, TalkBack or iOS file acceptance.
+  iOS's application-owned ios_io drivers use the separately authorized single
+  integer ABI. UIKit/pasteboard work runs on main, coordinated regular-handle
+  opens/reads/closes on workers, all outside ledger/document locks. Clients and
+  request watermarks are bounded; callbacks retain records with weak clients.
+  Cancellation revokes delivery and preserves actual native admission. Selected
+  URLs retain their security scope through the last actual read and close; never
+  reopen a display name or persist a bookmark. Opening groups reserve configured
+  declared bytes and 32 KiB metadata; after opening they settle to actual metadata
+  and sizes. Group charges remain until every original handle has actually closed.
+  Global maxima: 160 handles/160 KiB/2 GiB, one picker
+  and four reads including undrained receipts. A failed native close stays charged.
+  Clipboard raw/canonical UTF-8 is at most 64 KiB; one physical operation and one
+  receipt/client, at most 32 clients. Ordinary construction reads no clipboard or
+  file and presents no UI. ios-io-probe and its owned selector/read gate/clipboard
+  guard are absent from normal builds. iPhone/iPad simulator owned-source service
+  and semantic evidence does not prove system picker input, external File Provider
+  security-scope grants, cross-app paste alerts, real devices or readers.
   Input placeholder is a bounded, independent presentation layout, lazily shaped
   only while empty/non-composing and released when hidden/cleared. Hint-only
   changes preserve editor identity, raw generation, selection, IME and value
@@ -838,6 +855,12 @@ retired feature aliases or count compilation as proof of platform acceptance.
   only i64 arguments/results (or unit). Swift validates every integer and owns
   native objects/main-thread dispatch. No pointers, unsafe call blocks, broader
   application exceptions or runtime-crate unsafe are authorized.
+  User-authorized exception (2026-10-27, iOS files/clipboard): only
+  examples/mobile/src/ios_io/mod.rs may add one locally allowed unsafe extern "C"
+  block declaring safe fn glory_mobile_io(i64,i64,i64,i64,i64,i64)->i64. Swift
+  validates all integers and owns native objects, scopes, threads and admission.
+  No pointers, callbacks, unsafe call blocks, other declarations or runtime-crate
+  unsafe are authorized by this exception.
 - Optional `render::profile::Profile` is local and fixed at 31 aggregate phase
   samples, not an event/row/frame trace. App::set_profile shares it with runtime
   and supported adapters; None performs no profiling clock reads. Clock callbacks

@@ -92,7 +92,7 @@ run is `/Volumes/Data/Caches/glory/clipboard-macos-system.log`.
 Sapid's tracked `examples/native` clipboard feature tests actual CopyButton,
 CodeHighlight, both JsonViewer modes and TagsInput in four themes, including CPU
 pixels and feedback. Evidence is `/Volumes/Data/Caches/glory/clipboard-sapid-tests.log`.
-Windows/Linux OS round trips, the iOS system driver, mobile clipboard menus,
+Windows/Linux OS round trips, mobile clipboard menus,
 actual keyboard/selection gestures and assistive-reader acceptance remain open.
 Injected drivers and CPU tests do not establish those platform results.
 
@@ -142,3 +142,50 @@ system preview of restored original data. Evidence is
 `/Volumes/Data/Caches/glory/android-clipboard/final/sdk-result.json`.
 These are real OS service calls and SDK launches, separately from actual menu,
 keyboard, selection gestures, TalkBack and real-device acceptance.
+
+## iOS application host
+
+The mobile example's `ios_io::clipboard()` constructs an explicit `IosClipboard`
+for `Clipboard::new` in Config. Enable its `clipboard` feature; construction
+opens only a bounded native client, without reading the pasteboard. The adapter
+implements the existing Send/Sync driver trait and shares non-wrapping IDs across
+clones. Futures are lazy; only waiting futures own an 8 ms polling timer.
+
+The application-owned Swift host accesses `UIPasteboard.general` on main with an
+active Winit window. It never installs a listener or coerces URIs. Explicit reads
+inspect `hasStrings` and read one string snapshot, bound its returned UTF-8, then
+canonicalize CRLF/CR and NUL within the same 65,536-byte limit. OS NSString/board
+allocation is outside that transfer limit. Writes bound raw and canonical bytes
+before transfer. There is one physical operation, at most 32 clients and one
+current receipt per client. Cancellation/close removes delivery without refunding
+queued/running work. Current-body receipt storage has no completion history.
+Apple documents the distinction between content-presence checks and content
+reads in [UIPasteboard.hasStrings](https://developer.apple.com/documentation/uikit/uipasteboard/hasstrings).
+
+A single separately user-authorized application-only `safe fn` declaration in an
+`unsafe extern "C"` block connects both iOS services. Six i64 arguments and one
+i64 result carry validated commands and bounded eight-byte packet words; no
+pointer, native object or callback crosses the ABI. Runtime crates gain no unsafe.
+Length is checked before copying reply words; native records remain immutable
+until consumption and Rust rechecks concurrent close before delivery.
+
+`ios-io-probe` is a separate, explicitly enabled acceptance bundle. Only with
+`GLORY_IOS_IO_PROBE=1` does its guard retain original pasteboard representations
+in RAM, write a unique owned value and permit automated service tests. Restoration
+requires the last owned change count; an observed external change is preserved and fails
+the test. Owner cleanup requests restoration too, after physical work settles
+and an app window is active. It logs/persists no original clipboard body and takes
+no clipboard screenshots. The public API does not expose all pasteboard policy
+metadata, such as an original expiration option; the guard proves restoration of
+readable item representations, not every OS/provider property. Abrupt process
+death cannot guarantee restoration.
+
+Actual iPhone 17 and iPad Air M4 / iOS 27 simulator runs pass Chinese/emoji,
+CRLF/NUL normalization, read/write budgets, semantic CopyText through Config and
+conditional restoration. Native records/admission finish at zero. Evidence is
+`/Volumes/Data/Caches/glory/ios-io/result.json`. Cross-app paste alerts, actual
+copy/cut/paste menus, keyboard/selection gestures, VoiceOver and real devices
+remain separate acceptance; owned same-app values do not establish those flows.
+
+The integer ABI and reproducible host checks are specified in
+[ios-mobile-io.md](ios-mobile-io.md).

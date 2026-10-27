@@ -172,6 +172,9 @@ final class GlorySceneDelegate: NSObject, UIWindowSceneDelegate {
         if GlorySceneHost.anchorScene === scene { GlorySceneHost.anchorScene = nil }
         #endif
         guard GlorySceneHost.lifecycle.owns(ObjectIdentifier(scene)) else { return }
+        #if GLORY_MOBILE_IO_HOST
+        gloryIOSceneDisconnected(scene)
+        #endif
         if let scene = scene as? UIWindowScene {
             GlorySceneHost.capture(scene, rememberResponder: GlorySceneHost.lifecycle.active)
         }
@@ -211,6 +214,9 @@ final class GlorySceneDelegate: NSObject, UIWindowSceneDelegate {
             #endif
         }
         FileHandle.standardError.write(Data("Glory UIKit scene active\n".utf8))
+        #if GLORY_IO_PROBE
+        gloryIOProbeSceneActive()
+        #endif
         #if GLORY_PERMISSION_HOST_PROBE
         gloryPermissionsHostProbe()
         #endif

@@ -20,6 +20,14 @@ fn xcrun(args: &[&str]) -> String {
 fn main() {
     println!("cargo:rerun-if-changed=ios/SceneDelegate.swift");
     println!("cargo:rerun-if-changed=ios/Permissions.swift");
+    for source in [
+        "MobileIO.swift",
+        "MobileIOFiles.swift",
+        "MobileIOUIKit.swift",
+        "MobileIOProbe.swift",
+    ] {
+        println!("cargo:rerun-if-changed=ios/{source}");
+    }
     println!("cargo:rerun-if-env-changed=DEVELOPER_DIR");
     println!("cargo:rerun-if-env-changed=GLORY_IOS_SCENE_MULTI");
     println!("cargo:rerun-if-env-changed=GLORY_MOBILE_NETWORK_ORIGIN");
@@ -64,6 +72,28 @@ fn main() {
         .arg("ios/SceneDelegate.swift")
         .arg("-o")
         .arg(&object);
+    if env::var_os("CARGO_FEATURE_CLIPBOARD").is_some()
+        || env::var_os("CARGO_FEATURE_FILES").is_some()
+    {
+        compiler_command.args([
+            "-whole-module-optimization",
+            "-D",
+            "GLORY_MOBILE_IO_HOST",
+            "ios/MobileIO.swift",
+            "ios/MobileIOFiles.swift",
+            "ios/MobileIOUIKit.swift",
+        ]);
+        println!("cargo:rustc-link-lib=framework=UniformTypeIdentifiers");
+        if env::var_os("CARGO_FEATURE_CLIPBOARD").is_some() {
+            compiler_command.args(["-D", "GLORY_CLIPBOARD_HOST"]);
+        }
+        if env::var_os("CARGO_FEATURE_FILES").is_some() {
+            compiler_command.args(["-D", "GLORY_FILES_HOST"]);
+        }
+        if env::var_os("CARGO_FEATURE_IOS_IO_PROBE").is_some() {
+            compiler_command.args(["-D", "GLORY_IO_PROBE", "ios/MobileIOProbe.swift"]);
+        }
+    }
     if env::var_os("CARGO_FEATURE_PERMISSIONS").is_some() {
         compiler_command.args([
             "-whole-module-optimization",

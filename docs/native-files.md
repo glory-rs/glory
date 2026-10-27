@@ -235,3 +235,64 @@ desktop opener: selected files are renamed and their original paths replaced,
 yet chunk reads and PNG previews still decode the original opened data. All four
 themes cover rejection preserving selection, Remove and cleanup. Actual OS
 pointer/drag and reader acceptance remain separate from this evidence.
+
+## iOS application host
+
+Enable the mobile example's `files` feature and construct `ios_io::files()` for
+an explicit `Files::new` in Config. The safe Rust application driver implements
+the existing picker/reader traits. Construction opens a client only; the first
+poll presents `UIDocumentPickerViewController(forOpeningContentTypes:asCopy:)`
+with `asCopy: false` on the active application window. The example owns a single
+Winit window; independent multiple-window/scene routing is not implied. Ordinary
+mobile drop remains unsupported.
+
+UTType mapping supplies picker filters; unknown mappings can broaden its UI,
+so the original finite extension/MIME, count, size and metadata rules are checked
+again after selection and before Rust adoption. Files open once under
+`NSFileCoordinator`, keep the original regular `FileHandle`, and read exact
+bounded chunks under coordination and a per-source lock. Each read rechecks the
+original descriptor's declared size. Display names never become reopen paths;
+no bookmark or URI grant is persisted. Selected external URLs must successfully
+start security-scoped access; already accessible own-container URLs are allowed.
+Scope stop follows actual close after the last in-flight read. This follows
+[Apple's document picker coordination guidance](https://developer.apple.com/documentation/uikit/uidocumentpickerviewcontroller).
+
+One process-lifetime ledger spans native clients. Maxima are 32 clients, one
+picker, four admitted reads including undrained replies, 160 reserved handles,
+160 KiB reserved metadata and 2 GiB reserved declared bytes. Opening selections
+reserve their configured total-byte budget and 32 KiB metadata. Once all original
+handles open, metadata and declared-byte charges settle to actual sizes; completed
+small groups do not consume repeated worst-case reservations. Group charges release
+when the last actual handle close settles. Close failures retain that
+handle/scope/quota as unsettled work. These are admission/transfer bounds, not
+total process RSS or OS-provider allocation limits. Uploads, replies and IDs are
+bounded; no completed-ID history is retained.
+
+Cancellation removes receipts, not native operations. Picker cancellation
+requests dismissal of only the owned controller and retains admission through
+dismissal/open completion; scene disconnect does the same. Cancelled reads keep
+source/admission until actual settlement, and dropping readers schedules close
+outside ledger/document locks. Native callbacks only update weak-client records;
+Rust adopts opaque handles after validating the entire metadata packet. Rust
+terminal futures release receipts even if callers retain completed futures.
+The one authorized application-only integer ABI is shared with clipboard; it
+adds no unsafe to runtime crates, pointer transfer or arbitrary path capability.
+
+The opt-in `ios-io-probe` supplies app-owned post-selection URLs and a worker read
+gate, excluded from ordinary bundles. Actual iPhone/iPad simulator runs verify
+multi-selection, Unicode metadata, coordinated reads, count/type refusal and
+cancellation, four held worker jobs/fifth refusal, dropped receipts, Owner
+retirement without late delivery, and last-read/close quota release. The ordinary
+semantic File widget also performs read, private PNG decode, Clear, token refusal
+and preview/cache eviction. Native and shared grants finish at zero. Evidence,
+installed executable hashes and body-free logs are in
+`/Volumes/Data/Caches/glory/ios-io/result.json`.
+
+These owned URLs are inside the application container. They do not establish
+an actual system picker gesture/callback, an external File Provider's security
+scope grant or iCloud hydration. Those flows, UIKit cancellation/scene behavior
+under real OS input, provider mutation/failure cases, real devices and VoiceOver
+remain platform acceptance work. Device SDK linking is recorded separately.
+
+The integer ABI and reproducible host checks are specified in
+[ios-mobile-io.md](ios-mobile-io.md).

@@ -484,7 +484,8 @@ empty Backspace removal, software IME punctuation/Return and composition use the
 native protocol; actual duplicate/token/proxy policy is tested with Sapid consumers.
 Select only one acceptance view. Paste requires an explicit document clipboard
 provider/service; on Android `tags-probe,clipboard` supplies the new system driver.
-iOS system clipboard remains separate. SDK screenshots and
+On iOS, `tags-probe,clipboard` now supplies the explicit UIKit service. Actual
+clipboard menu/gesture acceptance remains separate. SDK screenshots and
 installed-binary hashes prove initial display, not real input/readers or signed
 devices. See [native tags](../../docs/native-tags.md).
 
@@ -516,7 +517,8 @@ The driver uses safe JNI and current bounded records, not callbacks into Rust
 business state. Activity is weak and closes the coordinator on destruction;
 cancelled delivery cannot refund an unsettled native operation. Input's ordinary
 copy/cut/paste and Tags reuse Glory's shared asynchronous path. Actual keyboard,
-clipboard menu, TalkBack, real-device and iOS service acceptance remain separate.
+clipboard menu, TalkBack and real-device acceptance remain separate. iOS service
+evidence is described below.
 See [the clipboard contract](../../docs/native-clipboard.md).
 
 ### Android document picker and reads
@@ -527,7 +529,7 @@ controls and call the existing pick/read/preview API; this feature grants no
 storage permission. The production host launches Android `ACTION_OPEN_DOCUMENT`,
 retains the selected seekable regular-file descriptor, and never reopens a display
 name or persists a URI grant. Non-seekable or unknown-size providers are currently
-refused. iOS still requires a platform driver.
+refused. The separate iOS host below uses coordinated security-scoped URLs.
 
 The separate `files-probe` view uses an owned selector Activity and private
 ContentProvider, never user documents:
@@ -556,3 +558,41 @@ Archive a probe APK before the next build overwrites its output. Ordinary builds
 exclude the fixture Activity/provider from their manifest and DEX; default builds
 also keep `GLORY_FILES=false` and initialize no file service. Native drop remains
 desktop-only. See [the file contract](../../docs/native-files.md).
+
+### iOS native files and clipboard
+
+`GLORY_IOS_FEATURES=clipboard,files sh examples/mobile/build-ios.sh` installs
+explicit app-owned services in Counter's Config. Individual `clipboard` and
+`files` features also work; ordinary service construction reads neither files nor
+clipboard and presents no picker. App hosts can reuse `ios_io::clipboard()` and
+`ios_io::files()` with Glory's existing Clipboard/Files and semantic controls.
+
+The UIKit host uses `UIPasteboard` for explicit text operations and
+`UIDocumentPickerViewController` for file selection. Retained regular handles
+are opened/read under `NSFileCoordinator`, with security scopes balanced after
+actual reads/close; display names are never reopened. These services use the
+separately authorized single integer FFI declaration in the application. No
+unsafe blocks, native pointers or runtime-crate unsafe were added.
+
+The combined owned-source acceptance view is separate:
+
+```sh
+GLORY_IOS_FEATURES=ios-io-probe sh examples/mobile/build-ios.sh
+SIMCTL_CHILD_GLORY_IOS_IO_PROBE=1 xcrun simctl launch --console OWNED_DEVICE rs.glory.counter
+```
+
+Install that bundle on your owned simulator before launching. Select one probe
+view. `GLORY_IOS_IO_PROBE=1` explicitly enables its in-memory clipboard guard,
+owned selector fixtures and worker read gate; no fixture or guard is compiled
+into ordinary builds. The guard restores readable original item representations
+only if no external board change occurred, never logs original bodies, and
+cannot guarantee recovery after abrupt process death.
+
+iPhone 17 and iPad Air M4 / iOS 27 SDK runs pass real service calls and the
+semantic selection/read/private-preview/revocation path, bounded cancelled work
+and Owner retirement, with all native/shared grants drained. Tests use owned
+post-selection URLs and same-app clipboard values; system picker/paste gestures,
+external provider scope grants, cross-app paste alerts, real devices and readers
+remain separate. See [native files](../../docs/native-files.md) and
+[native clipboard](../../docs/native-clipboard.md). Evidence lives at
+`/Volumes/Data/Caches/glory/ios-io/result.json`.
