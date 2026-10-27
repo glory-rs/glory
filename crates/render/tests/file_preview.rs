@@ -22,3 +22,47 @@ fn jpeg_preview_requires_first_scan_and_rejects_second_frame_before_it() {
     let image = inspect_file_preview(&bytes, 1024, "image/jpeg", Default::default()).unwrap();
     assert_eq!((image.width, image.height), (20, 30));
 }
+
+#[test]
+fn native_preview_addresses_bind_every_token_field_and_never_accept_paths_or_foreign_uris() {
+    let file = FileToken {
+        document: FileDocumentId::new().unwrap(),
+        node: NodeIds::new(RuntimeId::new()).allocate(),
+        revision: 3,
+        serial: 8,
+    };
+    let mut preview = FilePreview {
+        file,
+        image: FileImageInfo {
+            format: FileImageFormat::Png,
+            width: 32,
+            height: 24,
+        },
+        source: FilePreview::native_source(file),
+    };
+    preview.validate().unwrap();
+    for source in [
+        "file:///tmp/image.png".to_owned(),
+        "https://example.com/image.png".to_owned(),
+        format!("{}?extra=1", preview.source),
+        format!("{}#extra", preview.source),
+        FilePreview::native_source(FileToken { serial: 9, ..file }),
+        FilePreview::native_source(FileToken {
+            document: FileDocumentId::new().unwrap(),
+            ..file
+        }),
+        FilePreview::native_source(FileToken {
+            revision: 4,
+            ..file
+        }),
+        FilePreview::native_source(FileToken {
+            node: NodeIds::new(RuntimeId::new()).allocate(),
+            ..file
+        }),
+    ] {
+        preview.source = source;
+        assert!(preview.validate().is_err());
+    }
+    preview.source = "blob:https://example.com/document-owned".into();
+    preview.validate().unwrap();
+}

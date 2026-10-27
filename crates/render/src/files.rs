@@ -445,17 +445,30 @@ pub struct FilePreview {
     pub source: String,
 }
 impl FilePreview {
+    /// Exact document-local resource address used by native file services.
+    /// The address grants no ambient path or filesystem access.
+    pub fn native_source(file: FileToken) -> String {
+        format!(
+            "file-preview://document-{}/{}/{}/{}/{}/{}",
+            file.document.value(),
+            file.node.runtime().value(),
+            file.node.slot(),
+            file.node.generation(),
+            file.revision,
+            file.serial
+        )
+    }
     pub fn validate(&self) -> Result<(), Error> {
         self.file.validate()?;
         self.image
             .validate(FilePreviewLimits::default())
             .map_err(|_| Error::InvalidProps("file preview image exceeds pixel domain"))?;
         if self.source.len() > 2048
-            || !self.source.starts_with("blob:")
+            || !(self.source.starts_with("blob:") || self.source == Self::native_source(self.file))
             || self.source.contains(['\r', '\n', '\0'])
         {
             Err(Error::InvalidProps(
-                "file preview requires a bounded document-owned blob URI",
+                "file preview requires a bounded document-owned resource URI",
             ))
         } else {
             Ok(())

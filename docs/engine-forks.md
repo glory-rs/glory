@@ -9,7 +9,7 @@ vendor、副本补丁树或子模块；应用无需添加全局 Cargo patch。
 
 | Fork | 上游基线 | Glory 固定提交 | 维护范围 |
 |---|---|---|---|
-| [glory-rs/blitz](https://github.com/glory-rs/blitz) | `92b11f1b` / beta.4 | [f7178424](https://github.com/glory-rs/blitz/commit/f717842413c46125d0d9bd425890fbe62777a559) | 资源生命周期、增量失效、焦点、密码显示、IME、阶段计时、inline 样式差分失效、隐藏子树销毁与移动缓存回收、真正的文档顶层、UIKit 键盘视口触摸保护、三态 checkbox、按 tree/form/name 分组的 radio checked property、独立 placeholder 布局/绘制、显式程序滚动取消旧触摸惯性 和固定 Winit Activity 生命周期修复 |
+| [glory-rs/blitz](https://github.com/glory-rs/blitz) | `92b11f1b` / beta.4 | [6a9ca05b](https://github.com/glory-rs/blitz/commit/6a9ca05b246ecec6a7844e18dc6d264eb8f076cf) | 资源生命周期、增量失效、焦点、密码显示、IME、阶段计时、inline 样式差分失效、隐藏子树销毁与移动缓存回收、真正的文档顶层、UIKit 键盘视口触摸保护、三态 checkbox、按 tree/form/name 分组的 radio checked property、独立 placeholder 布局/绘制、显式程序滚动取消旧触摸惯性、按地址撤销图片复用缓存/迟到结果和固定 Winit Activity 生命周期修复 |
 | [glory-rs/taffy](https://github.com/glory-rs/taffy) | `eb645069` / 0.15.0 | [dd7914fb](https://github.com/glory-rs/taffy/commit/dd7914fba2e6e0b5d8a2c8854d764a2ade817efd) | 小数 flex 因子的 gap 计算与回归测试 |
 | [glory-rs/winit](https://github.com/glory-rs/winit) | `d597ced7` / 0.31.0-beta.4 | [3b6f5a09](https://github.com/glory-rs/winit/commit/3b6f5a09697acb936567af64e53c915b0b1a2af9) | Android Destroy 退出当前事件循环，释放 Activity 循环独占许可后允许同进程重建；UIKit UITextInput、Android GameTextInput；保留上游包和锁定的测试依赖 |
 

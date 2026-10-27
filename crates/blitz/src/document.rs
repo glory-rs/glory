@@ -16,6 +16,9 @@ use std::sync::Arc;
 #[cfg(feature = "clipboard")]
 #[path = "clipboard_io.rs"]
 mod clipboard_io;
+#[cfg(feature = "files")]
+#[path = "files_io.rs"]
+mod files_io;
 #[path = "image_observation.rs"]
 mod image_observation;
 #[path = "resource_wake.rs"]
@@ -139,15 +142,22 @@ fn check_layer<'a>(
 /// Keep native control admission in sync with actual engine and input support.
 fn check_mode<'a>(
     node: impl Into<glory_render::DescriptorView<'a>>,
-    _patch: Option<&glory_render::Patch>,
+    patch: Option<&glory_render::Patch>,
+    files_enabled: bool,
 ) -> Result<(), Error> {
     let node = node.into();
     use glory_render::Props;
     if matches!(node.props, Props::RichEditor(_)) {
         return Err(Error::Unsupported("native rich editing"));
     }
-    if matches!(node.props, Props::File(_)) {
-        return Err(Error::Unsupported("native file picker controls"));
+    #[cfg(feature = "files")]
+    files_io::check(node, patch, files_enabled)?;
+    #[cfg(not(feature = "files"))]
+    {
+        let _ = (patch, files_enabled);
+        if matches!(node.props, Props::File(_)) {
+            return Err(Error::Unsupported("native file picker controls"));
+        }
     }
     Ok(())
 }
@@ -156,6 +166,8 @@ fn check_mode<'a>(
 /// default. A provider must queue work and honor cancel/close without UI reentry.
 #[derive(Clone)]
 pub struct Config {
+    #[cfg(feature = "files")]
+    pub files: Option<crate::files::Files>,
     #[cfg(feature = "clipboard")]
     pub clipboard: Option<crate::clipboard::Clipboard>,
     pub motion: glory_render::MotionPreference,
@@ -166,6 +178,8 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            #[cfg(feature = "files")]
+            files: None,
             #[cfg(feature = "clipboard")]
             clipboard: None,
             motion: glory_render::MotionPreference::Reduce,
@@ -1045,6 +1059,8 @@ struct DragSession {
     captured: bool,
 }
 struct State {
+    #[cfg(feature = "files")]
+    files: files_io::Io,
     #[cfg(feature = "clipboard")]
     clipboard: clipboard_io::Io,
     #[cfg(feature = "shell")]
@@ -1079,6 +1095,8 @@ struct State {
 }
 impl Drop for State {
     fn drop(&mut self) {
+        #[cfg(feature = "files")]
+        self.files.close();
         self.dom.resource_wake.close();
     }
 }
@@ -1325,7 +1343,16 @@ impl Renderer {
         Self::configured_with(runtime, interactive, Config::default())
     }
     fn configured_with(runtime: RuntimeId, interactive: bool, config: Config) -> Self {
+        #[cfg(feature = "files")]
+        let (config, files) = {
+            let mut config = config;
+            let files = files_io::Io::new(config.files.clone());
+            files.install_provider(&mut config);
+            (config, files)
+        };
         Self(Rc::new(RefCell::new(State {
+            #[cfg(feature = "files")]
+            files,
             #[cfg(feature = "clipboard")]
             clipboard: clipboard_io::Io::new(config.clipboard.clone()),
             #[cfg(feature = "shell")]
@@ -1481,7 +1508,8 @@ impl Render for Renderer {
         patch: Option<&glory_render::Patch>,
     ) -> Result<(), Error> {
         check_layer(node, patch)?;
-        check_mode(node, patch)?;
+        let files_enabled = self.capabilities().files.is_some();
+        check_mode(node, patch, files_enabled)?;
         graphic::check(node, patch)?;
         match patch {
             None => check_style(node.style)?,
@@ -1532,7 +1560,16 @@ impl Render for Renderer {
                     false
                 }
             },
-            files: None,
+            files: {
+                #[cfg(feature = "files")]
+                {
+                    self.0.borrow().files.capabilities()
+                }
+                #[cfg(not(feature = "files"))]
+                {
+                    None
+                }
+            },
             measure: true,
             scroll: true,
             focus: self.0.borrow().interactive,
@@ -1542,6 +1579,10 @@ impl Render for Renderer {
     }
     fn apply(&mut self, mutations: &[Mutation]) -> Result<Receipt, Error> {
         let mut state = self.0.borrow_mut();
+        #[cfg(feature = "files")]
+        let files_enabled = state.files.capabilities().is_some();
+        #[cfg(not(feature = "files"))]
+        let files_enabled = false;
         let State { mapper, dom, .. } = &mut *state;
         // Check at each operation, not ahead of the entire batch: direct users
         // must retain an accepted prefix and its query watermark on rejection.
@@ -1553,20 +1594,20 @@ impl Render for Renderer {
                     Mutation::CreatePlan { plan, .. } => {
                         for node in plan.nodes() {
                             check_layer(&node.descriptor, None)?;
-                            check_mode(&node.descriptor, None)?;
+                            check_mode(&node.descriptor, None, files_enabled)?;
                             graphic::check(node.descriptor.view(), None)?;
                             check_style(node.descriptor.view().style)?;
                         }
                     }
                     Mutation::Create { node, .. } => {
                         check_layer(node, None)?;
-                        check_mode(node, None)?;
+                        check_mode(node, None, files_enabled)?;
                         graphic::check(node.view(), None)?;
                     }
                     Mutation::Patch { id, patch } => {
                         let descriptor = mapper.tree().node(*id)?.descriptor.view();
                         check_layer(descriptor, Some(patch))?;
-                        check_mode(descriptor, Some(patch))?;
+                        check_mode(descriptor, Some(patch), files_enabled)?;
                         graphic::check(descriptor, Some(patch))?;
                     }
                     _ => {}
@@ -1693,6 +1734,14 @@ impl Render for Renderer {
         subscriptions.retain(|(id, _)| mapper.tree().node(*id).is_ok());
         state.sync_focus();
         native_select::sync(&mut state);
+        #[cfg(feature = "files")]
+        let retired = {
+            files_io::sync(&mut state);
+            files_io::take_retired(&mut state)
+        };
+        drop(state);
+        #[cfg(feature = "files")]
+        drop(retired);
         result
     }
     fn listen(&mut self, node: NodeId, kind: EventKind, enabled: bool) -> Result<(), Error> {
@@ -1756,6 +1805,19 @@ impl Render for Renderer {
             && !matches!(action, glory_render::Action::ExitMenu { .. })
         {
             return Err(Error::Unsupported("action on disconnected Blitz range"));
+        }
+        #[cfg(feature = "files")]
+        if matches!(
+            action,
+            glory_render::Action::PickFiles { .. }
+                | glory_render::Action::ClearFiles { .. }
+                | glory_render::Action::RemoveFile(_)
+        ) {
+            let result = files_io::action(&mut state, action);
+            let retired = files_io::take_retired(&mut state);
+            drop(state);
+            drop(retired);
+            return result;
         }
         match action {
             glory_render::Action::ScrollIntoView(id) => scroll_into_view::reveal(&mut state, id),
@@ -1917,6 +1979,20 @@ impl Render for Renderer {
     fn request(&mut self, query: Query, token: QueryToken) -> Result<(), Error> {
         let mut state = self.0.borrow_mut();
         state.mapper.tree().node(query.node())?;
+        #[cfg(feature = "files")]
+        if matches!(query, Query::FileRead(_) | Query::FilePreview(_)) {
+            let result = layers::sync(&mut state, &[])
+                .and_then(|()| files_io::request(&mut state, query, token));
+            if let Err(error) = result {
+                let applied = state.receipt.applied;
+                state.inputs.push(Input::Response {
+                    token,
+                    applied,
+                    result: Err(error),
+                });
+            }
+            return Ok(());
+        }
         let result = (|| {
             layers::sync(&mut state, &[])?;
             query.validate_target(&state.mapper.tree().node(query.node())?.descriptor)?;
@@ -2010,6 +2086,8 @@ impl Render for Renderer {
         self.0.borrow().dom.resource_wake.acknowledge();
         #[cfg(feature = "clipboard")]
         clipboard_io::poll(self);
+        #[cfg(feature = "files")]
+        files_io::poll(self);
         let mut state = self.0.borrow_mut();
         if let Err(error) = layers::sync(&mut state, &[]) {
             state.input_error = Some(error);

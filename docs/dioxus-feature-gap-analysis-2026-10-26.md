@@ -16,6 +16,7 @@ Mac，最新证据见文末 Apple/移动输入记录，不能继续把“没有 
 | Web 发布 | 可复现 gzip、哈希清单、预览协商/HEAD/身份回退 | 指纹命名、Brotli/图片转换、WASM 分包 |
 | 运行时权限 | 有界 Owner future/driver API；Android 安全 JNI；iOS Swift 宿主；SDK 控制的授权状态查询 | iOS Rust 应用连接待最小 FFI 声明授权；真实系统弹窗选择、真机及其他权限类别 |
 | 原生剪贴板 | 显式可选桌面 worker 与 Android 安全 JNI；CopyText 与原生编辑器复制/剪切/粘贴；实际 Sapid 四主题消费端、macOS 系统往返和 Android ARM64 前台系统读写/ClipData 恢复 | iOS 系统 driver、Windows/Linux 实际 OS 往返、移动系统菜单及真实键盘/读屏 |
+| 原生文件服务 | 显式可选 driver、桌面系统选择器实现、稳定句柄分块读取、文档私有 PNG/JPEG 预览；真实文件替换/截断、解码及撤权回归、Sapid 四主题消费端通过 | 实际 OS 选择器输入验收、原生拖放、Android/iOS driver、macOS sandbox security scope 与平台读屏 |
 | 原生控件 | Checkbox/Switch/Mixed 和 Radio 的绘制、受控更新、点击/Space/AX 动作；Radio 分组与键盘导航；placeholder 独立提示布局与绘制；combobox/typeahead 协议及 listbox/tree 弹层；原生 Select 单选/多选/分组、选择属性与 AX；五项实际选择控件消费端通过；菜单/菜单栏/右键菜单/Palette 协议、八项实际消费端与浏览器回归通过；TagsInput/PillsInput 的原生输入与 provider 粘贴协议、五项实际消费端通过；两端模拟器初始显示 | 富文本、系统文件服务、iOS 剪贴板/移动系统菜单、其他弹层及系统菜单服务仍开放；实际输入/读屏单独验收 |
 
 整体差距仍未关闭。签名身份/设备等外部条件和仍需实现的软件功能分别保留，
@@ -831,3 +832,36 @@ Glory 1052 项测试、native/WASM 严格 Clippy、Android 驱动与 probe 应�
 
 这里完成 Android 前台系统服务，尚不等于实际移动键盘/剪贴板菜单、选择手势、
 TalkBack 或真机验收。iOS 系统 driver、原生文件服务和报告其他缺口继续推进。
+
+
+## 2026-10-27：原生文件选择、读取与私有预览（仍待平台验收）
+
+新增显式 `glory-blitz/files` / facade `blitz-files`，默认构建不安装任何文件服务。
+桌面 Rfd 选择器与应用注入的安全 driver 共用不透明令牌；最多一个选择器、四个读取，
+克隆服务共用 128 个引用、128 KiB 元数据、1 GiB 声明大小预算。替换失败保留前次选择，
+文件名仅作显示，分块读取始终使用最初打开的常规文件句柄，EOF 不返回部分正文。
+真实文件测试验证路径替换不改读取身份，以及丢弃回执不提前归还实际 OS 读取额度。
+
+PNG/JPEG 预览先检查共享的 64 KiB 头部、8 MiB 编码和像素/尺寸限制，再有界读取正文。
+待完成、已发布及取消后仍被 decoder 持有的编码体共用 32 MiB 服务预算；文档私有地址
+精确绑定整个令牌，无路径/外部 transport 回退。删除/清除/配置退休会撤销源与后续读取。
+实际测试还发现引擎图片复用缓存可能绕过源撤销，已在真正的
+[Blitz fork 6a9ca05b](https://github.com/glory-rs/blitz/commit/6a9ca05b246ecec6a7844e18dc6d264eb8f076cf)
+增加按地址撤销缓存和迟到结果的接口与独立回归，全部活动 manifest/锁及来源记录同步。
+已经交付到存活元素的像素不承诺安全擦除，编码/解码/绘制预算也不代表总 RSS。
+
+另一项先失败后修复的共享 UI 回归证明：同一批已 drain 的输入里，前一个事件清除文件后，
+后面的成功读取/预览回执也必须重新校验当前令牌。foreign driver 的构造、poll、drop 和
+退休句柄析构均在文档借用外，取消/超时不虚称中断不可取消的 OS 操作。Sapid 实际
+FileInput/FileAttachment/FileButton 四主题消费端覆盖读取、显式预览、移除、取消/拒绝
+保留原选择及清理，未新增宿主业务控制器或 unsafe。实现与复验见 [native-files.md](native-files.md)。
+
+最终全工作区含文档测试 **1071 项、222 个结果报告**通过；一项会修改系统剪贴板的
+既有 opt-in 测试在普通 gate 中仍显式忽略，没有重做该系统操作。native/WASM 全工作区
+严格 Clippy、headless 及默认依赖图隔离通过；Android/iOS 新 feature 编译检查、CLI 25 项
+及严格 Clippy、三个 fork 的固定来源和独立测试检查通过。Sapid 原有文件模型 6 项、新增
+原生四主题消费端 2 项、默认不可用回归 1 项及消费端严格 Clippy 通过。
+证据摘要为 `/Volumes/Data/Caches/glory/native-files/result.json`；这些检查与 OS 输入验收分开。
+
+这批仍不关闭完整文件服务缺口：系统选择器真实输入验收、macOS sandbox security scope、
+原生拖放、移动 driver、读屏和真机流程继续保留。没有将协议/CPU 或编译结果当作这些验收。

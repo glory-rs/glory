@@ -2012,6 +2012,15 @@ impl App {
                         } else {
                             result.and_then(|value| {
                                 pending.query.validate_response(&value)?;
+                                // An earlier event in this already-drained tick
+                                // may have cleared/replaced a selected grant.
+                                // File bodies and preview addresses require the
+                                // current token even after host completion.
+                                if let Query::FileRead(glory_render::FileRead { file, .. })
+                                | Query::FilePreview(file) = pending.query
+                                {
+                                    self.session.present.borrow().tree.selected_file(file)?;
+                                }
                                 Ok(value)
                             })
                         };

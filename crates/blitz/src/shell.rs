@@ -23,6 +23,9 @@ mod choice_tests;
 #[cfg(all(test, feature = "clipboard"))]
 #[path = "clipboard_editor_tests.rs"]
 mod clipboard_editor_tests;
+#[cfg(all(test, feature = "files"))]
+#[path = "file_control_tests.rs"]
+mod file_control_tests;
 #[path = "menu.rs"]
 pub(super) mod menu;
 #[cfg(test)]
@@ -535,7 +538,7 @@ impl EventHandler for Events {
                     if button.is_none()
                         && (matches!(
                             current.descriptor.view().props,
-                            glory_render::Props::Button(_)
+                            glory_render::Props::Button(_) | glory_render::Props::File(_)
                         ) || current.descriptor.view().role
                             == Some(glory_render::Role::TreeItem))
                     {
@@ -669,6 +672,7 @@ fn drag_input(state: &mut State, target: EngineId, event: &DomEventData) -> bool
             if matches!(
                 node.descriptor.view().props,
                 glory_render::Props::Input(_)
+                    | glory_render::Props::File(_)
                     | glory_render::Props::Button(_)
                     | glory_render::Props::Link(_)
                     | glory_render::Props::Check(_)
@@ -1318,7 +1322,9 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
         if space
             && matches!(
                 node.descriptor.view().props,
-                glory_render::Props::Button(_) | glory_render::Props::Check(_)
+                glory_render::Props::Button(_)
+                    | glory_render::Props::File(_)
+                    | glory_render::Props::Check(_)
             )
         {
             state.space = Some(id);
@@ -1327,7 +1333,9 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
         if key.key == Key::Named(NamedKey::Enter)
             && matches!(
                 node.descriptor.view().props,
-                glory_render::Props::Button(_) | glory_render::Props::Link(_)
+                glory_render::Props::Button(_)
+                    | glory_render::Props::File(_)
+                    | glory_render::Props::Link(_)
             )
         {
             activate_control(state, id);

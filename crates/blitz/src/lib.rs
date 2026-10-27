@@ -22,6 +22,10 @@ pub mod permissions;
 #[cfg(all(feature = "clipboard", not(target_arch = "wasm32")))]
 pub mod clipboard;
 
+/// Explicit native file grants and asynchronous picker/read drivers.
+#[cfg(all(feature = "files", not(target_arch = "wasm32")))]
+pub mod files;
+
 /// Transport hooks stay in this adapter; core/UI do not depend on engine types.
 #[cfg(not(target_arch = "wasm32"))]
 pub mod assets {

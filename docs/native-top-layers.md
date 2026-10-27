@@ -1,12 +1,14 @@
 # Native viewport top layers
 
 The genuine `glory-rs/blitz` fork is pinned to
-`f717842413c46125d0d9bd425890fbe62777a559`. The provenance record and Cargo
+`6a9ca05b246ecec6a7844e18dc6d264eb8f076cf`. The provenance record and Cargo
 lockfiles resolve all five Blitz/Stylo packages to that full commit. No vendored code,
 managed Cargo checkout edits, global patches or DOM portals are involved.
 
-Current-pin provenance and native regressions pass in
-`/Volumes/Data/Caches/glory/menu-provenance.log` and `menu-workspace-tests.log`.
+Current-pin provenance and native regressions are recorded in
+`/Volumes/Data/Caches/glory/native-files-fork-provenance.log` and
+`native-files-workspace-tests.log`. The earlier menu milestone used
+`menu-provenance.log` and `menu-workspace-tests.log`.
 The earlier baseline remains in `D:/BuildCache/sapid/final-engine-forks.log`
 and `final-native-acceptance.log`.
 The two pre-existing interactive desktop/UIA tests remain ignored in this run;

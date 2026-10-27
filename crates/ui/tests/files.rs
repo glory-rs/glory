@@ -259,3 +259,130 @@ fn unavailable_files_reject_before_request_watermark_queue_or_capability_io() {
     ));
     assert_eq!(app.tree().next_file_request(id).unwrap(), 1);
 }
+
+#[test]
+fn clearing_a_file_in_an_earlier_event_revokes_its_already_drained_read_or_preview_reply() {
+    struct ReadHost {
+        tree: Memory,
+        wire: Rc<Wire>,
+    }
+    impl Render for ReadHost {
+        fn capabilities(&self) -> Capabilities {
+            Capabilities {
+                files: Some(FileCapabilities {
+                    document: self.wire.document,
+                    picker: true,
+                    drop: false,
+                    read: true,
+                    preview: true,
+                }),
+                ..Default::default()
+            }
+        }
+        fn apply(&mut self, mutations: &[Mutation]) -> Result<Receipt, Error> {
+            self.tree.apply(mutations)
+        }
+        fn action(&mut self, action: Action) -> Result<(), Error> {
+            self.tree.admit_file_action(action).map(|_| ())
+        }
+        fn request(&mut self, query: Query, token: QueryToken) -> Result<(), Error> {
+            let result = match query {
+                Query::FileRead(read) => QueryValue::FileBytes(Box::new(FileChunk {
+                    file: read.file,
+                    offset: read.offset,
+                    bytes: vec![7; read.length as usize],
+                })),
+                Query::FilePreview(file) => QueryValue::FilePreview(Some(Box::new(FilePreview {
+                    file,
+                    image: FileImageInfo {
+                        format: FileImageFormat::Png,
+                        width: 1,
+                        height: 1,
+                    },
+                    source: FilePreview::native_source(file),
+                }))),
+                _ => unreachable!(),
+            };
+            self.wire.events.borrow_mut().push(Input::Response {
+                token,
+                applied: self.tree.receipt().applied,
+                result: Ok(result),
+            });
+            Ok(())
+        }
+        fn drain(&mut self, into: &mut Vec<Input>) {
+            into.extend(self.wire.events.borrow_mut().drain(..));
+        }
+    }
+    for preview in [false, true] {
+        let wire = Wire::new();
+        let host_wire = wire.clone();
+        let app = App::new(move |runtime| ReadHost {
+            tree: Memory::new(runtime),
+            wire: host_wire,
+        });
+        let scope = app.scope();
+        let file = scope
+            .create(Descriptor::new(Props::File(FileProps {
+                configuration: FileConfig {
+                    preview: Some(Default::default()),
+                    ..Default::default()
+                },
+                ..Default::default()
+            })))
+            .unwrap();
+        let button = scope
+            .create(Descriptor::new(Props::Button(ButtonProps {
+                label: "Revoke".into(),
+                ..Default::default()
+            })))
+            .unwrap();
+        scope.on(file, EventKind::Files, |_| {}).unwrap();
+        let clear = scope.downgrade();
+        scope
+            .on(button, EventKind::Activate, move |_| {
+                clear.upgrade().unwrap().clear_files(file).unwrap();
+            })
+            .unwrap();
+        app.flush().unwrap();
+        let request = scope.pick_files(file).unwrap();
+        app.flush().unwrap();
+        wire.events.borrow_mut().push(Input::Event {
+            node: file,
+            event: selected(file, wire.document, request, 1, 0),
+        });
+        app.pump().unwrap();
+        let reference = FileToken {
+            document: wire.document,
+            node: file,
+            revision: 0,
+            serial: 1,
+        };
+        let result = Rc::new(RefCell::new(None));
+        let output = result.clone();
+        let query = if preview {
+            Query::FilePreview(reference)
+        } else {
+            Query::FileRead(FileRead {
+                file: reference,
+                offset: 0,
+                length: 5,
+            })
+        };
+        app.request(query, move |reply| *output.borrow_mut() = Some(reply))
+            .unwrap();
+        wire.events.borrow_mut().insert(
+            0,
+            Input::Event {
+                node: button,
+                event: Event::Activate,
+            },
+        );
+        app.pump().unwrap();
+        assert!(app.tree().selected_file(reference).is_err());
+        assert!(
+            matches!(result.borrow().as_ref(), Some(Err(_))),
+            "a revoked grant must not deliver an already drained body"
+        );
+    }
+}

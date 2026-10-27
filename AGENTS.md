@@ -208,6 +208,20 @@ retired feature aliases or count compilation as proof of platform acceptance.
   native permits survive receipt cancellation; ordinary APKs initialize nothing.
   The owned SDK probe preserves original ClipData only in RAM. Its service-call
   evidence does not establish native menus, keyboard, TalkBack or real devices.
+  Optional files (facade blitz-files) requires explicit Config::files. Keep
+  one picker/four reads and shared live reference/metadata/declared-byte budgets;
+  native driver permits survive cancelled receipts until actual OS completion.
+  Open selected regular files once; display names never become paths. Read exact
+  bounded chunks, retaining the request watermark and current-token validation.
+  Poll/construct/drop foreign futures and retired readers outside document borrows.
+  PNG/JPEG previews use shared header limits before bounded encoded reads. Charge
+  pending/registered/cancelled decoder bodies to one 32 MiB service budget; await
+  NetHandler::prepare and revoke current private addresses without fallback.
+  Clear/remove/revision retirement also evicts that URL's engine reuse cache and
+  pending delivery. Already delivered pixels are separate from revocable grants.
+  Shared UI rechecks file rights after earlier events in an already drained tick.
+  No drop capability until the platform input path exists; mobile and actual OS
+  dialog/reader acceptance remain separate. See docs/native-files.md.
   Input placeholder is a bounded, independent presentation layout, lazily shaped
   only while empty/non-composing and released when hidden/cleared. Hint-only
   changes preserve editor identity, raw generation, selection, IME and value
