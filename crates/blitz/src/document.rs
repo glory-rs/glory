@@ -29,6 +29,8 @@ mod graphic;
 mod graphic_motion;
 #[path = "layers.rs"]
 mod layers;
+#[path = "native_select.rs"]
+mod native_select;
 #[path = "scroll_into_view.rs"]
 mod scroll_into_view;
 #[cfg(feature = "shell")]
@@ -161,9 +163,6 @@ fn check_mode<'a>(
     if matches!(node.props, Props::File(_)) {
         return Err(Error::Unsupported("native file picker controls"));
     }
-    if matches!(node.props, Props::Select(_)) {
-        return Err(Error::Unsupported("native select controls"));
-    }
     Ok(())
 }
 
@@ -224,6 +223,7 @@ fn invariant(message: &'static str) -> Error {
 }
 
 struct Range {
+    select: Option<native_select::Control>,
     image: Option<ImageObserver>,
     first: EngineId,
     last: EngineId,
@@ -265,6 +265,7 @@ impl Range {
     }
 }
 struct Dom {
+    open_select: Option<NodeId>,
     translations: translation::Translations,
     #[cfg(feature = "paint")]
     motion: graphic_motion::Motion,
@@ -352,7 +353,7 @@ impl Dom {
             let base = m.create_element(tag("style"), Vec::new());
             let baseline = m.create_text_node(&format!(
                 "html,body{{margin:0;padding:0}}{}[data-gly-layer=center]{{left:var(--gly-layer-x,0px);top:var(--gly-layer-y,0px);transform:none}}[data-gly-rotate]{{animation:none!important;transform:none!important}}[data-gly-path-transition]{{transition:none!important}}",
-                glory_html::BASE_CSS
+                format_args!("{}{}", glory_html::BASE_CSS, native_select::CSS)
             ));
             let sheet = m.create_element(tag("style"), Vec::new());
             let css = m.create_text_node("");
@@ -370,6 +371,7 @@ impl Dom {
             translations: translation::Translations::new(translation_sheet, config.motion),
             #[cfg(feature = "paint")]
             motion: graphic_motion::Motion::new(config.motion),
+            open_select: None,
             doc,
             body,
             css,
@@ -489,6 +491,9 @@ impl Dom {
             (root, root, None)
         };
         drop(m);
+        let select = shape
+            .select_options
+            .map(|options| native_select::Control::create(&mut self.doc, first, options));
         if let Some(main) = parts.get(&Part::Main) {
             self.owners.insert(*main, id);
         }
@@ -499,6 +504,7 @@ impl Dom {
         self.ranges.insert(
             id,
             Range {
+                select,
                 image,
                 first,
                 last,
@@ -528,6 +534,9 @@ impl Dom {
         value: &Property,
     ) -> Result<(), Error> {
         let node = self.range(id)?.part(part)?;
+        if let ("selectedKeys", Property::SelectedKeys(keys)) = (name, value) {
+            return native_select::reflect(self, id, keys);
+        }
         let value_seed = self.range(id)?.value_seed;
         let normalized = if name == "value"
             && let Property::Text(text) = value
@@ -813,28 +822,36 @@ impl Dom {
             self.invalidate();
         }
         if self.dirty {
-            let _span = self
-                .profile
-                .as_ref()
-                .map(|profile| profile.span(Phase::Layout));
-            let _engine = self.profile.as_ref().map(|profile| {
-                let mut engine = self.doc.profile().expect("attached engine collector");
-                if !engine.reset() {
-                    // An exhausted interval never aliases an old span's epoch.
-                    engine = blitz_dom::profile::Profile::default();
-                    self.doc.set_profile(Some(engine.clone()));
-                }
-                EngineRecording {
-                    engine,
-                    recording: profile.recording(),
-                }
-            });
-            self.doc.resolve(self.time);
-            self.dirty = false;
-            self.layouts += 1;
+            self.layout();
+        }
+        if native_select::position(self) {
+            self.layout();
         }
         #[cfg(feature = "paint")]
         self.refresh_graphic_motion();
+    }
+    // Each actual engine pass owns the same phase collectors, including a
+    // second pass needed to position the current intrinsic Select popup.
+    fn layout(&mut self) {
+        let _span = self
+            .profile
+            .as_ref()
+            .map(|profile| profile.span(Phase::Layout));
+        let _engine = self.profile.as_ref().map(|profile| {
+            let mut engine = self.doc.profile().expect("attached engine collector");
+            if !engine.reset() {
+                // An exhausted interval never aliases an old span's epoch.
+                engine = blitz_dom::profile::Profile::default();
+                self.doc.set_profile(Some(engine.clone()));
+            }
+            EngineRecording {
+                engine,
+                recording: profile.recording(),
+            }
+        });
+        self.doc.resolve(self.time);
+        self.dirty = false;
+        self.layouts += 1;
     }
     fn resources(&mut self) -> bool {
         let _span = self
@@ -1200,6 +1217,9 @@ impl State {
             return;
         }
         self.space = None;
+        if self.dom.open_select != next {
+            native_select::close(&mut self.dom);
+        }
         #[cfg(feature = "shell")]
         {
             self.apple_empty_delete = None;
@@ -1661,6 +1681,7 @@ impl Render for Renderer {
         interests.retain(|(id, _), _| mapper.tree().node(*id).is_ok());
         subscriptions.retain(|(id, _)| mapper.tree().node(*id).is_ok());
         state.sync_focus();
+        native_select::sync(&mut state);
         result
     }
     fn listen(&mut self, node: NodeId, kind: EventKind, enabled: bool) -> Result<(), Error> {

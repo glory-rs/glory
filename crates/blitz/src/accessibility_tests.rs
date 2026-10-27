@@ -19,6 +19,8 @@ mod layers;
 mod menu;
 #[path = "accessibility_progress_tests.rs"]
 mod progress;
+#[path = "accessibility_select_tests.rs"]
+mod select;
 #[path = "accessibility_separator_tests.rs"]
 mod separator;
 #[path = "accessibility_table_tests.rs"]

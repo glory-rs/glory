@@ -20,6 +20,9 @@ mod accesskit_platform;
 #[cfg(test)]
 #[path = "choice_tests.rs"]
 mod choice_tests;
+#[cfg(test)]
+#[path = "native_select_tests.rs"]
+mod native_select_tests;
 #[path = "radio.rs"]
 mod radio;
 #[cfg(test)]
@@ -256,11 +259,16 @@ impl EventHandler for Events {
             event_state.prevent_default();
             return;
         }
+        let select_popup = native_select::popup_target(&state, event.target);
+        if native_select::receive(&mut state, event.target, &event.data) {
+            event_state.prevent_default();
+            return;
+        }
         if focus_scope::prevent_pointer_focus(&state, event.target, &event.data) {
             event_state.prevent_default();
         }
         if focus_scope::receive(&mut state, event.target, &event.data)
-            || layers::receive(&mut state, event.target, &event.data)
+            || !select_popup && layers::receive(&mut state, event.target, &event.data)
         {
             event_state.prevent_default();
             return;
@@ -387,11 +395,9 @@ impl EventHandler for Events {
                         state.input_error = Some(Error::Unsupported("native rich editing"));
                         None
                     }
-                    EditKind::Select => {
-                        state.input_error =
-                            Some(glory_render::Error::Unsupported("native select controls"));
-                        None
-                    }
+                    // Intrinsic Select captures keys from its private rows;
+                    // arbitrary engine string input is never a selection.
+                    EditKind::Select => None,
                     EditKind::Text => match editing::text_event(&mut state, node, &input.value) {
                         Ok(event) => Some(event),
                         Err(error) => {

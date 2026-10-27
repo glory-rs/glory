@@ -15,7 +15,7 @@ Mac，最新证据见文末 Apple/移动输入记录，不能继续把“没有 
 | 桌面开发 | native watch、错误保留旧进程、成功重启与退出回收 | 状态保持、真正 Rust 热补丁、检查器 |
 | Web 发布 | 可复现 gzip、哈希清单、预览协商/HEAD/身份回退 | 指纹命名、Brotli/图片转换、WASM 分包 |
 | 运行时权限 | 有界 Owner future/driver API；Android 安全 JNI；iOS Swift 宿主；SDK 控制的授权状态查询 | iOS Rust 应用连接待最小 FFI 声明授权；真实系统弹窗选择、真机及其他权限类别 |
-| 原生控件 | Checkbox/Switch/Mixed 和 Radio 的绘制、受控更新、点击/Space/AX 动作；Radio 分组与键盘导航；placeholder 独立提示布局与绘制；combobox/typeahead 协议及 listbox/tree 弹层；两端模拟器初始显示 | 原生 Select 及组合组件表单代理、菜单、富文本、文件/语义剪贴板等仍开放；实际读屏单独验收 |
+| 原生控件 | Checkbox/Switch/Mixed 和 Radio 的绘制、受控更新、点击/Space/AX 动作；Radio 分组与键盘导航；placeholder 独立提示布局与绘制；combobox/typeahead 协议及 listbox/tree 弹层；原生 Select 单选/多选/分组、选择属性与 AX；五项实际消费端通过；两端模拟器初始显示 | 菜单、富文本、文件/语义剪贴板等仍开放；实际读屏单独验收 |
 
 整体差距仍未关闭。签名身份/设备等外部条件和仍需实现的软件功能分别保留，
 没有用模拟器或编译结果替代完整平台交付。
@@ -634,3 +634,39 @@ Props::Select：Select、Combobox、MultiSelect 的隐藏表单代理会被当�
 保留失败记录 `/Volumes/Data/Caches/glory/choice-consumer-tests.log`；没有仅对 hidden
 代理放行。Autocomplete 和 TreeSelect/Cascader 的四主题挂载、命令及 CPU 绘制通过，
 不把这两项通过写成五类消费端全部通过。完整后续要求见 [native-choice.md](native-choice.md)。
+
+
+## 2026-10-27：原生 Select 与实际消费端解阻
+
+原生适配器现已支持 `Props::Select` 的可见单选折叠显示/弹层、多选及 rows 列表框，
+包括中文标签、placeholder、分组、禁用选项/分组、真实 CPU 布局/字体/滚动和命中。
+复用共享的 1024 选项、32 分组、128 KiB 声明上限；选中键独立于业务表单值。
+私有物理选项只属于当前控件，不建立语义别名、全局选项注册表或业务源扫描。
+选择补丁保留声明 Rc 和物理身份；等值显式回写能拒绝原生提议，Keep 不写属性。
+程序修改不发用户事件，用户修改携带当前 revision 和声明顺序的唯一键。
+
+键盘支持方向/Home/End/Page、Enter/Space、Unicode typeahead、多选切换/范围/
+Control 或 Meta 游标移动及全选。共享契约仍明确拒绝 readonly Select。单选弹层
+游标在提交前不改变值，Escape 关闭后继续交父对话框处理后续 Escape。Tab、外部
+指针/失焦、禁用、挂起和销毁回收当前弹层；恢复保留选项身份。复用引擎触摸拖动、
+滚轮和边界滚动，拖动后的抬起不误选。弹层跨出父模态物理矩形时仍遵守原语义边界，
+只对当前弹层刷新视口位置。AccessKit 导出分组/选项、选中、多选、禁用、当前活动项
+和经存活/可用性校验的动作；其值使用标签，不泄露业务表单值。
+
+原先失败的 Sapid Select、Combobox、MultiSelect 已全部通过，完整五项消费者的
+四主题挂载、选择命令及 CPU 绘制均通过；保留旧失败日志，不改成只允许隐藏代理。
+新增原生事件、生命周期、触摸/滚轮、模态边界、1x/2x CPU、AX、Plan 和前缀回归。
+两端 `select-probe` 展示单选、rows 单选和多选，已按 SDK 安装启动并核对已安装
+APK/iOS 二进制哈希及初始画面。证据集中在
+`/Volumes/Data/Caches/glory/native-select`，消费端当前日志为
+`/Volumes/Data/Caches/glory/select-consumer-tests.log`。
+
+最终全工作区含文档测试 **1015 项**通过，native/WASM 全工作区严格 Clippy 通过，
+headless 无默认 feature 检查通过。普通 Android/iOS 包另行构建；iOS device 目标
+按 15.0 部署版本实际链接，iOS probe 应用 Clippy（--no-deps）通过。引擎 fork
+及依赖固定 SHA 未改变，当前 provenance 检查通过。源文件、测试、日志和帧摘要
+记录在 `/Volumes/Data/Caches/glory/native-select/result.json`。
+
+这些是原生协议/CPU 与 SDK 初始显示证据；完整系统输入、VoiceOver/TalkBack 和
+签名真机安装另行验收。菜单、TagsInput、富文本、文件/剪贴板、移动权限后续连接、
+应用服务和报告其他缺口继续开放。实现边界见 [native-choice.md](native-choice.md)。

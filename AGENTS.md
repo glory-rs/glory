@@ -153,9 +153,18 @@ retired feature aliases or count compilation as proof of platform acceptance.
   the final text character or repeat password deletion on the raw Mac key.
   AccessKit resolves active descendants from current semantic ownership and live
   exported nodes. Preserve PasswordInput's protected role and omit its value.
-  Props::Select remains explicitly unsupported, including hidden form proxies,
-  until real single/multiple selection layout, properties, events and AX exist.
-  See docs/native-choice.md for current consumer failures and next requirements.
+  Intrinsic Select uses bounded immutable declarations and private physical rows,
+  independent of combobox refinements. Single popup and multiple/rows listboxes
+  have live selected-key properties, revision barriers, disabled/group behavior,
+  keyboard/typeahead, pointer and engine-owned touch pan. Keep one current popup;
+  preserve option identities across patches/moves, retire its lease on suspension,
+  disposal, disabling and focus loss. Popup input must not dismiss its enclosing
+  modal. Escape falls through after the popup closes; Tab uses normal traversal.
+  Shared Select rejects readonly. Do not clone declarations/labels/business values
+  on selection patches or retain a visited-option registry. AccessKit exports
+  current groups/options, selected state and validated actions, never form values.
+  Actual Sapid Select/Combobox/MultiSelect consumers now pass; retain prior failed
+  evidence. OS input/reader acceptance stays separate. See docs/native-choice.md.
   Input placeholder is a bounded, independent presentation layout, lazily shaped
   only while empty/non-composing and released when hidden/cleared. Hint-only
   changes preserve editor identity, raw generation, selection, IME and value

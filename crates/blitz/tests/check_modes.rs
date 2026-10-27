@@ -90,10 +90,10 @@ fn native_typeahead_admission_keeps_prefix_watermarks_and_does_not_install_an_in
             },
             Mutation::Create {
                 id: rejected,
-                node: Box::new(Descriptor::new(Props::Select(Default::default())))
+                node: Box::new(Descriptor::new(Props::File(Default::default())))
             }
         ]),
-        Err(Error::Unsupported("native select controls"))
+        Err(Error::Unsupported("native file picker controls"))
     );
     renderer.listen(id, EventKind::Typeahead, true).unwrap();
     assert!(!renderer.capabilities().input);

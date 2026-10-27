@@ -14,6 +14,9 @@ enum Key {
     Main(NodeId),
     Label(NodeId),
     TreeChildren(NodeId),
+    SelectList(NodeId),
+    SelectGroup(NodeId, usize),
+    SelectOption(NodeId, usize),
 }
 
 struct Relations {
@@ -515,6 +518,126 @@ impl Tree {
                     node.add_action(AxAction::ScrollIntoView);
                 }
             }
+            if let Some(select) = state.dom.range(id)?.select.as_ref() {
+                if select.inline {
+                    node.set_role(AxRole::ListBox);
+                    if select.multiple {
+                        node.set_multiselectable();
+                    }
+                } else {
+                    node.set_has_popup(accesskit::HasPopup::Listbox);
+                    node.set_expanded(state.dom.open_select == Some(id));
+                    let label = select
+                        .rows
+                        .iter()
+                        .position(|r| r.selected)
+                        .map(|i| select.option(i).0.label.as_str())
+                        .unwrap_or("");
+                    node.set_value(label.to_owned());
+                    node.set_placeholder(
+                        select
+                            .options
+                            .placeholder
+                            .as_deref()
+                            .unwrap_or("")
+                            .to_owned(),
+                    );
+                    if state.mapper.tree().enabled(id)
+                        && !d.readonly()
+                        && focus_scope::allowed(state, id)
+                    {
+                        node.add_action(AxAction::Click);
+                        node.add_action(if state.dom.open_select == Some(id) {
+                            AxAction::Collapse
+                        } else {
+                            AxAction::Expand
+                        });
+                    }
+                }
+                if select.inline || state.dom.open_select == Some(id) {
+                    let list = if select.inline {
+                        ax_id
+                    } else {
+                        let key = Key::SelectList(id);
+                        let list = self.id(key)?;
+                        alive.insert(key);
+                        node.push_child(list);
+                        let mut list_node = Node::new(AxRole::ListBox);
+                        list_node.set_labelled_by(vec![ax_id]);
+                        nodes.insert(list, list_node);
+                        node.set_controls(vec![list]);
+                        list
+                    };
+                    let mut group_index = 0;
+                    let mut index = 0;
+                    for entry in select.options.entries.iter() {
+                        let (count, group_parent) = match entry {
+                            glory_render::SelectEntry::Option(_) => (1, None),
+                            glory_render::SelectEntry::Group(group) => {
+                                let key = Key::SelectGroup(id, group_index);
+                                group_index += 1;
+                                let ax = self.id(key)?;
+                                alive.insert(key);
+                                let mut group_node = Node::new(AxRole::Group);
+                                group_node.set_label(group.label.clone());
+                                if group.disabled {
+                                    group_node.set_disabled();
+                                }
+                                if list == ax_id {
+                                    node.push_child(ax);
+                                } else {
+                                    nodes.get_mut(&list).expect("select list").push_child(ax);
+                                }
+                                nodes.insert(ax, group_node);
+                                (group.options.len(), Some(ax))
+                            }
+                        };
+                        for _ in 0..count {
+                            let key = Key::SelectOption(id, index);
+                            let ax = self.id(key)?;
+                            alive.insert(key);
+                            let (option, disabled) = select.option(index);
+                            let mut option_node = Node::new(AxRole::ListBoxOption);
+                            option_node.set_label(option.label.clone());
+                            option_node.set_selected(select.rows[index].selected);
+                            option_node.set_position_in_set(index);
+                            option_node.set_size_of_set(select.rows.len());
+                            if disabled || !state.mapper.tree().enabled(id) {
+                                option_node.set_disabled();
+                            } else if !d.readonly() && focus_scope::allowed(state, id) {
+                                option_node.add_action(AxAction::Click);
+                                option_node.add_action(AxAction::ScrollIntoView);
+                            }
+                            if let Some(rect) = state
+                                .dom
+                                .doc
+                                .get_client_bounding_rect(select.rows[index].physical)
+                            {
+                                option_node.set_bounds(accesskit::Rect::new(
+                                    rect.x,
+                                    rect.y,
+                                    rect.x + rect.width,
+                                    rect.y + rect.height,
+                                ));
+                            }
+                            let parent = group_parent.unwrap_or(list);
+                            if parent == ax_id {
+                                node.push_child(ax);
+                            } else {
+                                nodes
+                                    .get_mut(&parent)
+                                    .expect("select option parent")
+                                    .push_child(ax);
+                            }
+                            nodes.insert(ax, option_node);
+                            if select.cursor == Some(index) {
+                                node.set_active_descendant(ax);
+                            }
+                            index += 1;
+                        }
+                    }
+                }
+            }
             // Keep label text as a real child so names composed from label +
             // logical children use the platform's ordinary accessible-name rules.
             let label = match &d.props {
@@ -795,7 +918,38 @@ impl Tree {
         if request.target_tree != TreeId::ROOT {
             return Ok(false);
         }
-        let Some(Key::Main(id)) = self.reverse.get(&request.target_node).copied() else {
+        let key = self.reverse.get(&request.target_node).copied();
+        if let Some(Key::SelectOption(id, index)) = key {
+            let Some(select) = state.dom.ranges.get(&id).and_then(|r| r.select.as_ref()) else {
+                return Ok(false);
+            };
+            if (!select.inline && state.dom.open_select != Some(id))
+                || index >= select.rows.len()
+                || select.option(index).1
+                || !native_select::available(state, id)
+                || !state.dom.focus_visible(state.dom.control(id)?)
+            {
+                return Ok(false);
+            }
+            let inline = select.inline;
+            match request.action {
+                AxAction::Click if request.data.is_none() => {
+                    state.focus(id)?;
+                    native_select::choose(state, id, index, true, false)?;
+                    if !inline {
+                        native_select::close(&mut state.dom);
+                    }
+                }
+                AxAction::ScrollIntoView
+                    if matches!(request.data, None | Some(ActionData::ScrollHint(_))) =>
+                {
+                    native_select::reveal_row(state, id, index);
+                }
+                _ => return Ok(false),
+            }
+            return Ok(true);
+        }
+        let Some(Key::Main(id)) = key else {
             return Ok(false);
         };
         if !state.mapper.tree().active(id) {
@@ -812,6 +966,35 @@ impl Tree {
         let control = state.dom.control(id)?;
         if !state.dom.focus_visible(control) {
             return Ok(false);
+        }
+        if matches!(d.props, Props::Select(_)) && request.data.is_none() {
+            if d.readonly() {
+                return Ok(false);
+            }
+            if state.dom.range(id)?.select.as_ref().expect("select").inline
+                && matches!(
+                    request.action,
+                    AxAction::Expand | AxAction::Collapse | AxAction::Click
+                )
+            {
+                return Ok(false);
+            }
+            match request.action {
+                AxAction::Expand | AxAction::Click => {
+                    state.focus(id)?;
+                    if request.action == AxAction::Click && state.dom.open_select == Some(id) {
+                        native_select::close(&mut state.dom);
+                    } else {
+                        native_select::open(state, id)?;
+                    }
+                    return Ok(true);
+                }
+                AxAction::Collapse => {
+                    native_select::close(&mut state.dom);
+                    return Ok(true);
+                }
+                _ => {}
+            }
         }
         match (&request.action, &request.data) {
             (AxAction::Increment, None)

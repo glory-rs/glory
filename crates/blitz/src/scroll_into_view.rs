@@ -107,7 +107,7 @@ pub(super) fn reveal_within(
     Ok(())
 }
 
-fn nearest(start: f64, size: f64, viewport: f64) -> f64 {
+pub(super) fn nearest(start: f64, size: f64, viewport: f64) -> f64 {
     let end = start + size;
     if (start >= 0.0 && end <= viewport) || (start <= 0.0 && end >= viewport) {
         0.0

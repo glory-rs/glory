@@ -39,10 +39,10 @@ fn native_hint_admission_and_mutations_preserve_identity_property_barriers_and_q
             },
             Mutation::Create {
                 id: second,
-                node: Box::new(Descriptor::new(Props::Select(Default::default())))
+                node: Box::new(Descriptor::new(Props::File(Default::default())))
             },
         ]),
-        Err(Error::Unsupported("native select controls"))
+        Err(Error::Unsupported("native file picker controls"))
     );
     assert_eq!(renderer.stats().nodes, 1);
     assert_eq!(renderer.stats().applied, 2);
