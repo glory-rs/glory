@@ -19,7 +19,7 @@
     {
       "name": "blitz",
       "git": "https://github.com/glory-rs/blitz",
-      "rev": "6a9ca05b246ecec6a7844e18dc6d264eb8f076cf",
+      "rev": "ee125981e0e5a217e758be5c470df23cdd9e2fc3",
       "upstream": "https://github.com/DioxusLabs/blitz",
       "upstream_rev": "92b11f1bd8ab7975411328b0406a95a09445b4e7",
       "packages": [

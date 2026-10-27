@@ -212,6 +212,7 @@ impl Renderer {
             state.dom.motion.preference = preference;
             state.dom.translations.preference = preference;
             let State { mapper, dom, .. } = &mut *state;
+            dom.sync_collapses(mapper.tree(), &[]);
             if let Err(error) = dom.sync_translations(mapper.tree(), &[]) {
                 state.input_error.get_or_insert(error);
             }
@@ -219,6 +220,7 @@ impl Renderer {
             if state.dom.motion.candidates.is_empty()
                 && state.dom.motion.transitions.is_empty()
                 && state.dom.translations.is_empty()
+                && state.dom.collapses.is_empty()
             {
                 None
             } else {

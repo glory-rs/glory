@@ -26,6 +26,8 @@ mod resource_wake;
 use image_observation::ImageObserver;
 #[path = "choice.rs"]
 mod choice;
+#[path = "collapse.rs"]
+mod collapse;
 #[path = "focus_scope.rs"]
 mod focus_scope;
 #[path = "graphic.rs"]
@@ -91,11 +93,6 @@ fn check_layer<'a>(
     };
     if value.is_some_and(|s| s.sheet_grip) {
         return Err(Error::Unsupported("native sheet gestures"));
-    }
-    if value.is_some_and(|s| s.collapse.is_some()) {
-        return Err(Error::Unsupported(
-            "native intrinsic-height collapse motion",
-        ));
     }
     if let Some(layer) = value.and_then(|s| s.layer.as_ref()) {
         let role = match patch {
@@ -271,6 +268,7 @@ impl Range {
 struct Dom {
     open_select: Option<NodeId>,
     translations: translation::Translations,
+    collapses: collapse::Collapses,
     #[cfg(feature = "paint")]
     motion: graphic_motion::Motion,
     doc: BaseDocument,
@@ -373,6 +371,7 @@ impl Dom {
         };
         Self {
             translations: translation::Translations::new(translation_sheet, config.motion),
+            collapses: collapse::Collapses::default(),
             #[cfg(feature = "paint")]
             motion: graphic_motion::Motion::new(config.motion),
             open_select: None,
@@ -823,8 +822,10 @@ impl Dom {
     }
     fn resolve(&mut self) {
         if self.resources() {
+            self.collapses.natural_dirty = true;
             self.invalidate();
         }
+        collapse::resolve(self);
         if self.dirty {
             self.layout();
         }
@@ -1402,6 +1403,8 @@ impl Renderer {
             state.dom.doc.set_viewport(viewport);
             state.dom.invalidate();
             let State { mapper, dom, .. } = &mut *state;
+            dom.collapses.natural_dirty = true;
+            dom.sync_collapses(mapper.tree(), &[]);
             dom.sync_translations(mapper.tree(), &[])?;
         }
         Ok(())
@@ -1420,6 +1423,7 @@ impl Renderer {
             return;
         }
         state.dom.doc.mutate().set_node_text(node, css);
+        state.dom.collapses.natural_dirty = true;
         state.dom.invalidate();
     }
     #[cfg(feature = "css")]
@@ -1483,7 +1487,7 @@ impl Renderer {
             return Err(Error::InvalidProps("invalid Blitz animation time"));
         }
         if seconds > state.dom.time {
-            let was_animating = state.dom.doc.is_animating();
+            let was_animating = state.dom.doc.is_animating() || state.dom.collapses.running();
             state.dom.time = seconds;
             #[cfg(feature = "paint")]
             state.dom.motion.clock.set(seconds);
@@ -1536,6 +1540,7 @@ impl Render for Renderer {
             || !state.inputs.is_empty()
             || state.dom.doc.resource_stats().completions != 0
             || state.dom.resource_wake.is_pending()
+            || state.dom.collapses.ready(&state.subscriptions)
     }
     fn set_profile(&mut self, profile: Option<Profile>) -> Option<Profile> {
         let engine = profile
@@ -1574,7 +1579,7 @@ impl Render for Renderer {
             scroll: true,
             focus: self.0.borrow().interactive,
             input: self.0.borrow().interactive,
-            collapse_completion: false,
+            collapse_completion: true,
         }
     }
     fn apply(&mut self, mutations: &[Mutation]) -> Result<Receipt, Error> {
@@ -1702,6 +1707,7 @@ impl Render for Renderer {
         swipe::update(&mut state);
         let translated = {
             let State { mapper, dom, .. } = &mut *state;
+            dom.sync_collapses(mapper.tree(), mutations);
             dom.sync_translations(mapper.tree(), mutations)
         };
         if result.is_ok() {
@@ -1757,6 +1763,9 @@ impl Render for Renderer {
             state.subscriptions.insert((node, kind));
             if kind == EventKind::ImageStatus {
                 state.dom.queue_image_result(node);
+                state.observation_pending = true;
+            }
+            if kind == EventKind::CollapseComplete {
                 state.observation_pending = true;
             }
             if kind == EventKind::ColorSchemeChanged
@@ -2093,6 +2102,7 @@ impl Render for Renderer {
             state.input_error = Some(error);
         }
         state.dom.resolve();
+        collapse::collect(&mut state);
         state.collect_image_inputs();
         state.sync_focus();
         let State {

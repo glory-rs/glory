@@ -17,7 +17,7 @@ Mac，最新证据见文末 Apple/移动输入记录，不能继续把“没有 
 | 运行时权限 | 有界 Owner future/driver API；Android 安全 JNI；iOS Swift 宿主；SDK 控制的授权状态查询 | iOS Rust 应用连接待最小 FFI 声明授权；真实系统弹窗选择、真机及其他权限类别 |
 | 原生剪贴板 | 显式可选桌面 worker 与 Android 安全 JNI；CopyText 与原生编辑器复制/剪切/粘贴；实际 Sapid 四主题消费端、macOS 系统往返和 Android ARM64 前台系统读写/ClipData 恢复 | iOS 系统 driver、Windows/Linux 实际 OS 往返、移动系统菜单及真实键盘/读屏 |
 | 原生文件服务 | 显式可选 driver、桌面系统选择器、Winit 文件拖放通道、Android 安全 JNI/ContentResolver/PFD、稳定句柄分块读取及私有 PNG/JPEG 预览；桌面实际文件/消费端与 Android 自有源 SDK 链路通过 | 实际 OS 选择器/拖动输入验收、iOS driver、Android 非 seekable provider、macOS sandbox security scope 与平台读屏 |
-| 原生控件 | Checkbox/Switch/Mixed 和 Radio 的绘制、受控更新、点击/Space/AX 动作；Radio 分组与键盘导航；placeholder 独立提示布局与绘制；combobox/typeahead 协议及 listbox/tree 弹层；原生 Select 单选/多选/分组、选择属性与 AX；五项实际选择控件消费端通过；菜单/菜单栏/右键菜单/Palette 协议、八项实际消费端与浏览器回归通过；TagsInput/PillsInput 的原生输入与 provider 粘贴协议、五项实际消费端通过；两端模拟器初始显示 | 富文本、系统文件服务、iOS 剪贴板/移动系统菜单、其他弹层及系统菜单服务仍开放；实际输入/读屏单独验收 |
+| 原生控件 | Checkbox/Switch/Mixed 和 Radio 绘制与输入、placeholder、选择控件、菜单/Palette、TagsInput/PillsInput 的协议和实际消费端；现补齐 Collapsible 的原生 intrinsic-height 过渡、匹配完成回执、四主题双内容策略与编辑器身份/Owner 清理；两端模拟器已有控件初始显示 | 富文本、系统文件服务、iOS 剪贴板/移动系统菜单、Sheet 及其他弹层/系统菜单仍开放；实际输入/读屏单独验收 |
 
 整体差距仍未关闭。签名身份/设备等外部条件和仍需实现的软件功能分别保留，
 没有用模拟器或编译结果替代完整平台交付。
@@ -934,3 +934,38 @@ grant/filter/大小拒绝、保留原句柄、语义读取中文/emoji、私有 
 证据与 APK 哈希在 `/Volumes/Data/Caches/glory/android-files/`；接口和复验命令见
 [native-files.md](native-files.md) 与移动示例。系统选择器真实操作、非 seekable provider、
 iOS driver、sandbox security scope、真机/读屏和其他报告缺口继续开放。
+
+## 2026-10-27：原生 intrinsic-height 收合与终态回执
+
+Blitz 现接受现有 `CollapseConfig` 并声明 completion capability。宿主测量真实原生
+intrinsic height，由 Stylo 在文档时钟上插值临时 min/max-height，Taffy 同时更新后续
+内容位置与裁剪，CPU 像素验证真实中间态。时长继续限制 0..=500ms，原生 motion 默认
+Reduce，应用显式选择 NoPreference；没有每帧 Cage 或第二套组件业务控制器。
+
+反向从当前高度继续，内容增长/宽度与 viewport 改变用剩余时间重定向，不延长原终点。
+完成释放约束，恢复普通文字重排和内容自然增长。关闭立即逻辑 hidden/inert，保留的
+裁剪像素完成退出；组件只在匹配 revision 的完成回执后释放 Unmount 内容。初始、
+零时长、Reduce、不可用祖先、作者 CSS 隐藏、零 viewport 和 Suspend 单次完成；
+Resume 不重放，Dispose 退休当前 phase。关闭静态高度为零，不能读取隐藏祖先留下的
+过期物理盒作为下一次进入起点。只保存当前声明与祖先路径，不保存访问/完成历史。
+
+实际测试暴露两个引擎问题，均在真正的
+[Blitz fork ee125981](https://github.com/glory-rs/blitz/commit/ee125981e0e5a217e758be5c470df23cdd9e2fc3)
+修复：display:none 祖先会跳过子节点 restyle，必须在本轮 style 完成后退休其仍运行的
+动画/transition，并保持其他存活动画；重新显示时从新时间启动，visibility:hidden 和
+display:contents 不误取消。另一个 block→contents 旧布局 roster/anonymous box
+残留会使孩子有两个竞争 layout parent；现在退休旧缓存，32 轮往返保留编辑器且节点
+分配有界。原始失败日志保留，无 Cargo 管理源码编辑、vendor 或新 unsafe。
+
+五项 native conformance/几何/CPU 回归通过，覆盖 accepted-prefix/query 水位、
+Suspend/Resume/Dispose、真实开合/流布局/像素、反向、嵌套、内容增长、2x 文字重排、
+动态 Reduce、作者 CSS 隐藏、viewport 与单次终态；既有四项 translation 回归通过。
+真实 Sapid Collapsible 在四主题 × Unmount/KeepMounted 下验证原生中间高度、程序焦点
+返回、旧回执拒绝、重开编辑器身份、零时长与整树 Owner 清理。Accordion/Spoiler 的
+现有独立协议没有被冒称为此次高度 facet 的新消费者。
+
+完整工作区含文档测试 **1089 项、222 个结果报告**通过，既有系统剪贴板 opt-in 一项
+仍忽略；native/WASM、headless、Android/iOS 及实际消费端严格 Clippy 和固定来源检查
+通过。fork 默认配置独立 130 项通过，其他 canonical 配置单独复验。当前实现与命令见
+[native-collapse.md](native-collapse.md)，证据位于 `/Volumes/Data/Caches/glory/native-collapse/`。
+这些结果不替代 OS 输入、读屏、真机呈现、Sheet、富文本或应用服务等其余缺口。

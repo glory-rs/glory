@@ -176,6 +176,21 @@ retired feature aliases or count compilation as proof of platform acceptance.
   scroll. Explicit programmatic scrolling cancels old touch inertia in the fork.
   Protocol/CPU/AX models and SDK initial display do not prove OS input/reader
   acceptance or platform system-menu services. See docs/native-menus.md.
+  Intrinsic-height CollapseConfig now has native presentation and revisioned
+  completion. Keep the current phase per live declaration only; no per-frame
+  Cage, Owner capture or revision history. Stylo interpolates temporary numeric
+  min/max-height constraints, while native layout measures actual intrinsic
+  targets. Retarget content/viewport changes over the remaining interval; release
+  constraints at completion. Close is logically hidden/inert immediately, with
+  retained clipped pixels until its matching terminal event. Initial/zero/Reduce,
+  unavailable ancestors, CSS hiding, suspension and zero viewport settle once;
+  Resume cannot replay completion and Dispose retires transitions. A settled
+  closed extent is zero even when a hidden ancestor left a stale physical box.
+  The fork retires display-none descendant animations after style and drops
+  obsolete boxed-container rosters/anonymous boxes on display:contents. Keep
+  current-pin tests/provenance and actual Sapid policy consumers in agreement.
+  CPU/component/target checks do not prove OS input, readers or mobile devices.
+  See docs/native-collapse.md.
   TagsInput retains an ordinary Input and shared revisioned Tags commands; Sapid
   owns accepted values, tokenization, duplicates and atomic proposals. Preserve
   caret/native input, composition and terminal candidates. Uncomposed software

@@ -185,7 +185,7 @@ erasure. Engine decoded-image, live-element and paint-backend allocations retain
 their own limits. These budgets do not measure total decoder/process RSS.
 
 The engine is pinned to
-[`6a9ca05b246ecec6a7844e18dc6d264eb8f076cf`](https://github.com/glory-rs/blitz/commit/6a9ca05b246ecec6a7844e18dc6d264eb8f076cf).
+[`ee125981e0e5a217e758be5c470df23cdd9e2fc3`](https://github.com/glory-rs/blitz/commit/ee125981e0e5a217e758be5c470df23cdd9e2fc3).
 The fork-owned regression proves precise cache eviction, pending failure and late
 result rejection while unrelated cache entries remain usable. Winit/Taffy pins
 are unchanged. No new unsafe code, vendor tree or managed Cargo source edits.
