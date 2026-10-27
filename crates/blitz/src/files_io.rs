@@ -13,6 +13,12 @@ use std::{
     task::{Context, Poll, Waker},
     time::Instant,
 };
+#[cfg(all(
+    feature = "shell",
+    any(target_os = "windows", target_os = "linux", target_os = "macos")
+))]
+#[path = "file_drop.rs"]
+pub(super) mod file_drop;
 struct Stored {
     info: FileInfo,
     reader: Arc<dyn crate::files::FileReader>,
@@ -53,6 +59,12 @@ struct ReadJob {
 }
 pub(super) struct Io {
     config: Option<Files>,
+    drop_enabled: bool,
+    #[cfg(all(
+        feature = "shell",
+        any(target_os = "windows", target_os = "linux", target_os = "macos")
+    ))]
+    drop: file_drop::DropState,
     document: Option<FileDocumentId>,
     serial: u64,
     batch: u64,
@@ -74,10 +86,26 @@ impl Io {
     pub fn close(&self) {
         self.previews.shutdown();
     }
-    pub fn new(config: Option<Files>) -> Self {
+    pub fn new(config: Option<Files>, interactive: bool) -> Self {
         let document = config.as_ref().and_then(|_| FileDocumentId::new().ok());
+        let drop_enabled = interactive
+            && cfg!(all(
+                feature = "shell",
+                any(
+                    target_os = "windows",
+                    target_os = "linux",
+                    target_os = "macos"
+                )
+            ))
+            && config.as_ref().is_some_and(|files| files.dropper.is_some());
         Self {
             config,
+            drop_enabled,
+            #[cfg(all(
+                feature = "shell",
+                any(target_os = "windows", target_os = "linux", target_os = "macos")
+            ))]
+            drop: file_drop::DropState::default(),
             document,
             serial: 0,
             batch: 0,
@@ -92,7 +120,7 @@ impl Io {
         self.document.map(|document| FileCapabilities {
             document,
             picker: true,
-            drop: false,
+            drop: self.drop_enabled,
             read: true,
             preview: true,
         })
@@ -101,10 +129,10 @@ impl Io {
 pub(super) fn check(
     node: glory_render::DescriptorView<'_>,
     patch: Option<&glory_render::Patch>,
-    enabled: bool,
+    capability: Option<FileCapabilities>,
 ) -> Result<(), Error> {
     if let Props::File(props) = node.props {
-        if !enabled {
+        if capability.is_none() {
             return Err(Error::Unsupported("native file picker controls"));
         }
         let default = glory_render::FileConfig::default();
@@ -119,7 +147,7 @@ pub(super) fn check(
             }) => &default,
             _ => &props.configuration,
         };
-        if config.drop {
+        if config.drop && !capability.is_some_and(|c| c.drop) {
             return Err(Error::Unsupported("native file drop"));
         }
     }
@@ -181,6 +209,13 @@ pub(super) fn action(state: &mut State, action: Action) -> Result<(), Error> {
         return Err(Error::Unsupported("file control outside modal scope"));
     }
     state.mapper.admit_file_action(action)?;
+    #[cfg(all(
+        feature = "shell",
+        any(target_os = "windows", target_os = "linux", target_os = "macos")
+    ))]
+    if matches!(action, Action::ClearFiles { .. } | Action::RemoveFile(_)) {
+        file_drop::retire(state, action.node());
+    }
     if let Action::PickFiles {
         node,
         revision,
@@ -224,6 +259,11 @@ pub(super) fn action(state: &mut State, action: Action) -> Result<(), Error> {
     Ok(())
 }
 pub(super) fn sync(state: &mut State) {
+    #[cfg(all(
+        feature = "shell",
+        any(target_os = "windows", target_os = "linux", target_os = "macos")
+    ))]
+    file_drop::sync(state);
     let nodes = state.files.selections.keys().copied().collect::<Vec<_>>();
     for id in nodes {
         if state.files.selections.get(&id).is_some_and(|s| {
@@ -500,6 +540,53 @@ fn prepare(
     }
     Ok((files, next))
 }
+fn select(
+    state: &mut State,
+    node: NodeId,
+    files: Vec<Stored>,
+    next: u64,
+) -> Result<FileOutcome, (FileRejection, Vec<Stored>)> {
+    if state.files.batch == u64::MAX {
+        return Err((FileRejection::Failed, files));
+    }
+    let cost = Cost {
+        references: files.len(),
+        metadata: files
+            .iter()
+            .map(|s| s.info.name.len() + s.info.media_type.len())
+            .sum(),
+        bytes: files.iter().map(|s| s.info.size).sum(),
+    };
+    let shared = state
+        .files
+        .config
+        .as_ref()
+        .expect("files service")
+        .shared
+        .clone();
+    let lease = match shared.select(
+        state.files.selections.get_mut(&node).map(|s| &mut s.lease),
+        cost,
+    ) {
+        Ok(lease) => lease,
+        Err(error) => return Err((error, files)),
+    };
+    let infos = files.iter().map(|f| f.info.clone()).collect();
+    if let Some(previous) = state
+        .files
+        .selections
+        .insert(node, Selection { files, lease })
+    {
+        state.files.retired.push(previous);
+    }
+    state.files.serial = next;
+    #[cfg(all(
+        feature = "shell",
+        any(target_os = "windows", target_os = "linux", target_os = "macos")
+    ))]
+    file_drop::retire(state, node);
+    Ok(FileOutcome::Selected(infos))
+}
 pub(super) fn poll(renderer: &Renderer) {
     let (picker, reads, wake) = {
         let mut state = renderer.0.borrow_mut();
@@ -583,50 +670,12 @@ pub(super) fn poll(renderer: &Renderer) {
                         match prepared {
                             Err(error) => FileOutcome::Rejected(error),
                             Ok(None) => FileOutcome::Cancelled,
-                            Ok(Some((files, next))) if state.files.batch == u64::MAX => {
-                                unused = Some((files, next));
-                                FileOutcome::Rejected(FileRejection::Failed)
-                            }
                             Ok(Some((files, next))) => {
-                                let cost = Cost {
-                                    references: files.len(),
-                                    metadata: files
-                                        .iter()
-                                        .map(|s| s.info.name.len() + s.info.media_type.len())
-                                        .sum(),
-                                    bytes: files.iter().map(|s| s.info.size).sum(),
-                                };
-                                let shared = state
-                                    .files
-                                    .config
-                                    .as_ref()
-                                    .expect("files service")
-                                    .shared
-                                    .clone();
-                                let lease = shared.select(
-                                    state
-                                        .files
-                                        .selections
-                                        .get_mut(&pick.node)
-                                        .map(|s| &mut s.lease),
-                                    cost,
-                                );
-                                match lease {
-                                    Err(error) => {
+                                match select(&mut state, pick.node, files, next) {
+                                    Ok(outcome) => outcome,
+                                    Err((error, files)) => {
                                         unused = Some((files, next));
                                         FileOutcome::Rejected(error)
-                                    }
-                                    Ok(lease) => {
-                                        let infos = files.iter().map(|f| f.info.clone()).collect();
-                                        if let Some(previous) = state
-                                            .files
-                                            .selections
-                                            .insert(pick.node, Selection { files, lease })
-                                        {
-                                            state.files.retired.push(previous);
-                                        }
-                                        state.files.serial = next;
-                                        FileOutcome::Selected(infos)
                                     }
                                 }
                             }
@@ -649,6 +698,11 @@ pub(super) fn poll(renderer: &Renderer) {
         }
     }
     poll_reads(renderer, reads, &mut cx);
+    #[cfg(all(
+        feature = "shell",
+        any(target_os = "windows", target_os = "linux", target_os = "macos")
+    ))]
+    file_drop::poll(renderer, &mut cx);
 }
 fn poll_reads(renderer: &Renderer, mut reads: Vec<ReadJob>, cx: &mut Context<'_>) {
     let mut pending_reads = Vec::new();

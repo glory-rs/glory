@@ -20,12 +20,19 @@ pub struct SelectedFile {
     pub size: u64,
     pub reader: Arc<dyn FileReader>,
 }
+/// Opens only paths delivered by an accepted native file drop. Hosts validate
+/// the finite URI/path list before invoking this driver, outside UI borrows.
+/// As with readers, dropping the receipt must not refund an active OS permit.
+pub trait FileDrop: Send + Sync + 'static {
+    fn open(&self, paths: Vec<std::path::PathBuf>) -> Reply<Vec<SelectedFile>>;
+}
 pub trait FilePicker: Send + Sync + 'static {
     fn pick(&self, configuration: FileConfig) -> Reply<Option<Vec<SelectedFile>>>;
 }
 #[derive(Clone)]
 pub struct Files {
     pub(crate) driver: Arc<dyn FilePicker>,
+    pub(crate) dropper: Option<Arc<dyn FileDrop>>,
     pub(crate) shared: Arc<Shared>,
     pub(crate) timeout: Duration,
 }
@@ -33,6 +40,7 @@ impl Files {
     pub fn new(driver: Arc<dyn FilePicker>) -> Self {
         Self {
             driver,
+            dropper: None,
             shared: Arc::new(Shared::default()),
             timeout: Duration::from_secs(120),
         }
@@ -48,17 +56,26 @@ impl Files {
         files.timeout = timeout;
         Ok(files)
     }
+    /// Explicitly connect native drop grants to the application's opener.
+    pub fn with_drop_driver(mut self, driver: Arc<dyn FileDrop>) -> Self {
+        self.dropper = Some(driver);
+        self
+    }
     pub fn stats(&self) -> FileStats {
         self.shared.0.lock().expect("file budget").stats
     }
     #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
     pub fn desktop() -> Result<Self, FileRejection> {
-        Ok(Self::new(Arc::new(desktop::Desktop::new()?)))
+        let driver = Arc::new(desktop::Desktop::new()?);
+        Ok(Self::new(driver.clone()).with_drop_driver(driver))
     }
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct FileStats {
     pub picker: bool,
+    /// Current host-owned native drop receipt/opener slot. Raw platform
+    /// allocation and the driver's actual OS permits are separate budgets.
+    pub dropping: bool,
     pub reads: usize,
     pub references: usize,
     pub metadata_bytes: usize,
@@ -76,7 +93,16 @@ struct Budget {
 }
 pub(crate) struct Permit {
     shared: Arc<Shared>,
-    picker: bool,
+    kind: Operation,
+}
+enum Operation {
+    Picker,
+    Read,
+    #[cfg(all(
+        feature = "shell",
+        any(target_os = "windows", target_os = "linux", target_os = "macos")
+    ))]
+    Drop,
 }
 impl Shared {
     pub(crate) fn preview(self: &Arc<Self>, bytes: usize) -> Result<PreviewCharge, FileRejection> {
@@ -88,6 +114,21 @@ impl Shared {
         Ok(PreviewCharge {
             shared: self.clone(),
             bytes,
+        })
+    }
+    #[cfg(all(
+        feature = "shell",
+        any(target_os = "windows", target_os = "linux", target_os = "macos")
+    ))]
+    pub(crate) fn drop_permit(self: &Arc<Self>) -> Result<Permit, FileRejection> {
+        let mut budget = self.0.lock().expect("file budget");
+        if budget.stats.dropping {
+            return Err(FileRejection::Busy);
+        }
+        budget.stats.dropping = true;
+        Ok(Permit {
+            shared: self.clone(),
+            kind: Operation::Drop,
         })
     }
     pub(crate) fn permit(self: &Arc<Self>, picker: bool) -> Result<Permit, FileRejection> {
@@ -105,7 +146,11 @@ impl Shared {
         }
         Ok(Permit {
             shared: self.clone(),
-            picker,
+            kind: if picker {
+                Operation::Picker
+            } else {
+                Operation::Read
+            },
         })
     }
     pub(crate) fn select(
@@ -155,10 +200,14 @@ impl Drop for PreviewCharge {
 impl Drop for Permit {
     fn drop(&mut self) {
         let mut budget = self.shared.0.lock().expect("file budget");
-        if self.picker {
-            budget.stats.picker = false;
-        } else {
-            budget.stats.reads -= 1;
+        match self.kind {
+            Operation::Picker => budget.stats.picker = false,
+            #[cfg(all(
+                feature = "shell",
+                any(target_os = "windows", target_os = "linux", target_os = "macos")
+            ))]
+            Operation::Drop => budget.stats.dropping = false,
+            Operation::Read => budget.stats.reads -= 1,
         }
     }
 }

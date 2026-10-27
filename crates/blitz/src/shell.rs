@@ -178,6 +178,16 @@ impl WindowApp {
     pub fn renderer(&self) -> &Renderer {
         &self.renderer
     }
+    #[cfg(all(
+        feature = "files",
+        any(target_os = "windows", target_os = "linux", target_os = "macos")
+    ))]
+    /// Forward native file-transfer and availability events in a custom Winit
+    /// host. Shell already forwards these once per window. Validated semantic
+    /// input is queued; business callbacks run only in a later observation.
+    pub fn handle_native_file_event(&self, event: &WindowEvent, event_loop: &dyn ActiveEventLoop) {
+        files_io::file_drop::native_event(&self.renderer, event, event_loop);
+    }
     pub fn mount(&self, widget: impl Widget) -> glory_ui::Result {
         self.app.mount(widget)
     }
@@ -1896,6 +1906,12 @@ impl ApplicationHandler for Shell {
         }
         if let Some(view) = self.inner.windows.get_mut(&id) {
             prepare(view);
+            #[cfg(all(
+                feature = "files",
+                any(target_os = "windows", target_os = "linux", target_os = "macos")
+            ))]
+            view.downcast_doc_mut::<WindowApp>()
+                .handle_native_file_event(&event, event_loop);
             if let WindowEvent::ThemeChanged(theme) = &event {
                 queue_color_scheme(
                     &mut view.downcast_doc_mut::<WindowApp>().renderer.0.borrow_mut(),

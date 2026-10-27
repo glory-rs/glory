@@ -143,7 +143,7 @@ fn check_layer<'a>(
 fn check_mode<'a>(
     node: impl Into<glory_render::DescriptorView<'a>>,
     patch: Option<&glory_render::Patch>,
-    files_enabled: bool,
+    files_enabled: Option<glory_render::FileCapabilities>,
 ) -> Result<(), Error> {
     let node = node.into();
     use glory_render::Props;
@@ -1346,7 +1346,7 @@ impl Renderer {
         #[cfg(feature = "files")]
         let (config, files) = {
             let mut config = config;
-            let files = files_io::Io::new(config.files.clone());
+            let files = files_io::Io::new(config.files.clone(), interactive);
             files.install_provider(&mut config);
             (config, files)
         };
@@ -1508,7 +1508,7 @@ impl Render for Renderer {
         patch: Option<&glory_render::Patch>,
     ) -> Result<(), Error> {
         check_layer(node, patch)?;
-        let files_enabled = self.capabilities().files.is_some();
+        let files_enabled = self.capabilities().files;
         check_mode(node, patch, files_enabled)?;
         graphic::check(node, patch)?;
         match patch {
@@ -1580,9 +1580,9 @@ impl Render for Renderer {
     fn apply(&mut self, mutations: &[Mutation]) -> Result<Receipt, Error> {
         let mut state = self.0.borrow_mut();
         #[cfg(feature = "files")]
-        let files_enabled = state.files.capabilities().is_some();
+        let files_enabled = state.files.capabilities();
         #[cfg(not(feature = "files"))]
-        let files_enabled = false;
+        let files_enabled = None;
         let State { mapper, dom, .. } = &mut *state;
         // Check at each operation, not ahead of the entire batch: direct users
         // must retain an accepted prefix and its query watermark on rejection.

@@ -16,7 +16,7 @@ Mac，最新证据见文末 Apple/移动输入记录，不能继续把“没有 
 | Web 发布 | 可复现 gzip、哈希清单、预览协商/HEAD/身份回退 | 指纹命名、Brotli/图片转换、WASM 分包 |
 | 运行时权限 | 有界 Owner future/driver API；Android 安全 JNI；iOS Swift 宿主；SDK 控制的授权状态查询 | iOS Rust 应用连接待最小 FFI 声明授权；真实系统弹窗选择、真机及其他权限类别 |
 | 原生剪贴板 | 显式可选桌面 worker 与 Android 安全 JNI；CopyText 与原生编辑器复制/剪切/粘贴；实际 Sapid 四主题消费端、macOS 系统往返和 Android ARM64 前台系统读写/ClipData 恢复 | iOS 系统 driver、Windows/Linux 实际 OS 往返、移动系统菜单及真实键盘/读屏 |
-| 原生文件服务 | 显式可选 driver、桌面系统选择器实现、稳定句柄分块读取、文档私有 PNG/JPEG 预览；真实文件替换/截断、解码及撤权回归、Sapid 四主题消费端通过 | 实际 OS 选择器输入验收、原生拖放、Android/iOS driver、macOS sandbox security scope 与平台读屏 |
+| 原生文件服务 | 显式可选 driver、桌面系统选择器、Winit 文件拖放通道、稳定句柄分块读取及私有 PNG/JPEG 预览；真实文件替换/截断、解码及撤权回归、Sapid 四主题消费端通过 | 实际 OS 选择器/拖动输入验收、Android/iOS driver、macOS sandbox security scope 与平台读屏 |
 | 原生控件 | Checkbox/Switch/Mixed 和 Radio 的绘制、受控更新、点击/Space/AX 动作；Radio 分组与键盘导航；placeholder 独立提示布局与绘制；combobox/typeahead 协议及 listbox/tree 弹层；原生 Select 单选/多选/分组、选择属性与 AX；五项实际选择控件消费端通过；菜单/菜单栏/右键菜单/Palette 协议、八项实际消费端与浏览器回归通过；TagsInput/PillsInput 的原生输入与 provider 粘贴协议、五项实际消费端通过；两端模拟器初始显示 | 富文本、系统文件服务、iOS 剪贴板/移动系统菜单、其他弹层及系统菜单服务仍开放；实际输入/读屏单独验收 |
 
 整体差距仍未关闭。签名身份/设备等外部条件和仍需实现的软件功能分别保留，
@@ -865,3 +865,35 @@ FileInput/FileAttachment/FileButton 四主题消费端覆盖读取、显式预�
 
 这批仍不关闭完整文件服务缺口：系统选择器真实输入验收、macOS sandbox security scope、
 原生拖放、移动 driver、读屏和真机流程继续保留。没有将协议/CPU 或编译结果当作这些验收。
+
+
+## 2026-10-27：桌面原生文件拖放通道
+
+桌面交互 WindowApp 现接通 Winit DragEntered/Position/Dropped/Left 和异步数据回执；
+`Files::desktop()` 显式安装 opener，注入服务可用 `with_drop_driver` 选择自己的执行端。
+只有当前可用且配置允许的 File 控件接受 Copy，悬停只查询类型，不读取 URI 或打开文件。
+确认投放后核对当前传输 ID/回执编号，拒绝外来/重复/迟到数据，并在文档借用外读取 URI。
+只保留本地绝对 file URI；数量、单项 4096 字节和合计 128 KiB 在路径复制/打开前检查，
+系统 API 返回原始 URI 集合之前的分配不在该预算内，也不把 URI 来源当作 OS sandbox。
+
+选择器和投放共用令牌/元数据/filter/大小/预览预算与稳定句柄；投放另有跨文档共享的
+一个当前许可，取消/超时不提前归还尚未结束的 opener。成功选择器撤销旧投放，成功投放
+撤销仍待返回的选择器，投放失败不清除原选择或挂起的选择器。生命周期、配置、禁用、
+模态/焦点范围及实际作者 CSS 可见性在读取/交付前重新核对。未开始的操作直接跳过，
+已经开始的实际 OS 工作保留到结束；不保存完成 ID、历史路径或 UI Owner。
+
+十三项专项通过，覆盖带偏移的实际非零布局与 1x/2x 命中、回执匹配、URI 拒绝、
+配置/Owner 退休、CSS 隐藏、模态/焦点边界、foreign 回调和 future/析构重入、跨文档额度、
+超时及选择器竞争。Sapid 实际 Dropzone 四主题消费端通过：自有原生事件源使用真实 Winit
+接口及生产桌面 opener，文件改名并替换原路径后仍可读取/预览原始 PNG，拒绝保留选择，
+Remove/Owner 清理释放引用与预览。该事件源没有执行系统鼠标拖动，OS 输入验收仍独立。
+
+最终全工作区含文档测试 **1084 项、222 个结果报告**通过（其中包含上述 13 项专项）；
+既有会修改系统剪贴板的一项 opt-in 测试仍在普通 gate 中忽略，没有新增 OS 剪贴板操作。
+native/WASM 全工作区严格 Clippy、无 shell 的 files 严格 Clippy、默认依赖图隔离、
+Android/iOS 适配器严格 Clippy（--no-deps）及固定 fork 来源核对通过。Sapid 原生
+文件消费端共三项、四主题循环及严格 Clippy 通过，widget inventory 重新生成和检查通过。
+
+引擎固定 SHA 不变，无新 unsafe。详细边界见 [native-files.md](native-files.md)，
+本批证据为 `/Volumes/Data/Caches/glory/native-file-drop/result.json`。移动 picker/driver、
+OS 选择器/拖动、sandbox security scope、真机/读屏以及报告其他缺口继续推进。

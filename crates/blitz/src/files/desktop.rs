@@ -13,6 +13,7 @@ pub(super) struct Desktop {
     worker: Arc<Worker>,
     picker: Arc<AtomicBool>,
     reads: Arc<AtomicUsize>,
+    dropping: Arc<AtomicBool>,
 }
 struct PickPermit(Arc<AtomicBool>);
 impl Drop for PickPermit {
@@ -32,6 +33,7 @@ impl Desktop {
             worker: Arc::new(Worker::new()?),
             picker: Arc::new(AtomicBool::new(false)),
             reads: Arc::new(AtomicUsize::new(0)),
+            dropping: Arc::new(AtomicBool::new(false)),
         })
     }
 }
@@ -192,6 +194,38 @@ impl FilePicker for Desktop {
                         .unwrap_or(Err(FileRejection::Failed))
                     }
                 };
+                let _ = sender.send(result);
+            }))?;
+            receiver.await.map_err(|_| FileRejection::Unavailable)?
+        })
+    }
+}
+
+impl FileDrop for Desktop {
+    fn open(&self, paths: Vec<PathBuf>) -> Reply<Vec<SelectedFile>> {
+        let worker = self.worker.clone();
+        let reads = self.reads.clone();
+        let dropping = self.dropping.clone();
+        Box::pin(async move {
+            if paths.is_empty() || paths.len() > glory_render::MAX_FILE_COUNT {
+                return Err(FileRejection::Count);
+            }
+            if dropping.swap(true, Ordering::AcqRel) {
+                return Err(FileRejection::Busy);
+            }
+            let permit = PickPermit(dropping);
+            let (sender, receiver) = oneshot::channel();
+            let opener = worker.clone();
+            worker.send(Box::pin(async move {
+                let result = tokio::task::spawn_blocking(move || {
+                    let _permit = permit;
+                    paths
+                        .into_iter()
+                        .map(|path| open(path, opener.clone(), reads.clone()))
+                        .collect()
+                })
+                .await
+                .unwrap_or(Err(FileRejection::Failed));
                 let _ = sender.send(result);
             }))?;
             receiver.await.map_err(|_| FileRejection::Unavailable)?

@@ -220,8 +220,16 @@ retired feature aliases or count compilation as proof of platform acceptance.
   Clear/remove/revision retirement also evicts that URL's engine reuse cache and
   pending delivery. Already delivered pixels are separate from revocable grants.
   Shared UI rechecks file rights after earlier events in an already drained tick.
-  No drop capability until the platform input path exists; mobile and actual OS
-  dialog/reader acceptance remain separate. See docs/native-files.md.
+  Interactive desktop drop requires an explicit opener and FileConfig opt-in;
+  headless/mobile still reject it. Match the current Winit transfer/receipt pair,
+  fetch only after Drop, and accept Copy/local absolute file URIs only. Bound URI
+  count/bytes before path copies/opens; platform raw allocation stays separate.
+  One shared drop slot survives cancelled receipts until native settlement. Resolve
+  actual CSS visibility before reads/publication; retain modal/focus scope checks.
+  A successful drop/chooser supersedes the other current result; rejected drops
+  preserve the chooser. Poll/drop opener futures and native URI callbacks outside
+  document borrows. Custom hosts forward native file/availability events once;
+  mobile and actual OS drag/dialog/reader acceptance remain separate. See docs/native-files.md.
   Input placeholder is a bounded, independent presentation layout, lazily shaped
   only while empty/non-composing and released when hidden/cleared. Hint-only
   changes preserve editor identity, raw generation, selection, IME and value

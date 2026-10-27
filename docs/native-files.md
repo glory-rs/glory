@@ -17,13 +17,16 @@ The desktop driver uses pinned Rfd 0.17.2 native dialogs on macOS/Windows and
 XDG desktop portals on Linux. An application can instead implement the safe
 `FilePicker`/`FileReader` traits. Constructors must return promptly; work begins
 only when polled, completions wake the host, and no UI/runtime state crosses
-threads. Clone one `Files` service to share admission across documents. Separate
+threads. `Files::desktop()` also connects its native drop opener. Custom services
+must opt into `with_drop_driver(Arc<dyn FileDrop>)`; an injected chooser does not
+implicitly grant ambient file opening. Clone one `Files` service to share admission across documents. Separate
 service instances have separate budgets; custom drivers must themselves retain
 physical permits for uncancellable work after their receiver is dropped.
 
 ## Selection and reading
 
-One service admits one current picker and four reads, including pending results.
+One service admits one current picker, one native drop transfer/opener and four
+reads, including pending results.
 The default deadline is 120 seconds, configurable from a nonzero duration through
 600 seconds. Cancellation/timeout withdraws delivery; it does not dismiss an OS
 dialog or interrupt a blocking read. The desktop driver separately retains its
@@ -59,6 +62,49 @@ callbacks; it does not claim to interrupt physical work.
 The native file button uses intrinsic focus, pointer and Enter/Space activation.
 Sapid retains selection policy and attachment state in its normal widget Owners.
 No host business controller or source scan is added.
+
+## Native file drop
+
+An interactive desktop WindowApp advertises `FileCapabilities::drop` only when
+an explicit opener is configured. Headless/mobile hosts still reject declarations
+requiring drop. A node must also opt into `FileConfig::drop`; Sapid Dropzone does
+this on its existing real File button.
+
+Shell forwards Winit `DragEntered`, `DragPosition`, `DragDropped`, `DragLeft`,
+`DataTransferReceived` and availability events. Custom Winit embedders can forward
+all their owned window events once through `WindowApp::handle_native_file_event`;
+this queues input, leaving business callbacks to ordinary observation. Hover
+queries only advertised URI-list metadata and advertises Copy only. It does not
+fetch URIs or open files. Native physical coordinates are divided by the current
+DPI/zoom before real layout hit testing; modal/focus scopes and current enabled,
+visible, connected ancestry restrict targets.
+
+Only a confirmed native drop starts a fetch. One current transfer ID and its
+returned request serial match incoming data; foreign, duplicate and stale receipts
+are ignored before reading the source. URI conversion runs on the native event
+thread outside the document borrow. Platform `TypedData::try_as_uris` allocation
+precedes Glory's transfer budget: at most the declared count (globally 32), 4096
+UTF-8 bytes per URI and 128 KiB aggregate are retained before any paths are copied
+or opened. Only absolute local file URIs are accepted; remote hosts, network/text
+coercion, credentials, queries, fragments and raw/decoded controls are rejected.
+A native local-file URI accepted by the application is an explicit path grant,
+not an OS sandbox or proof that its producer came from a filesystem browser.
+
+The drop opener returns the same stable readers as the chooser, using bounded
+worker admission and a physical permit owned by the actual blocking closure.
+Selection metadata/filter/size budgets and transactional replacement are shared.
+Clear/remove/revision change, hiding, focus loss, surface/DPI changes and Owner
+retirement revoke late acceptance. Author CSS visibility is resolved before raw
+reads and after foreign work; presentation cannot revive a retired grant. A
+successful chooser result retires an older drop; a successful drop retires the
+pending chooser. Rejected drops preserve both the prior selection and any pending
+chooser. No callback or completed-transfer history is retained.
+
+`WouldBlock`/`Deadlock` waits for another matching native receipt, rather than
+polling the OS. The normal file-service deadline reports once. Cancellation or
+expiry withdraws delivery while an uncancellable raw transfer/opener retains its
+slot until receipt/settlement or document teardown. Already-started blocking
+opener permits remain owned by the driver through the actual OS operation.
 
 ## Image previews
 
@@ -116,7 +162,20 @@ cargo test --locked --manifest-path ../sapid/examples/native/Cargo.toml --featur
 
 Actual desktop dialog selection/cancellation has not been accepted through OS
 input. macOS sandbox security-scoped URLs/bookmarks, Windows/Linux dialog runtime,
-Android/iOS platform pickers, file drag/drop and actual assistive-technology
-interaction remain open. `FileCapabilities::drop` is false, and declarations
-requiring drop are explicitly rejected. Injected-driver, CPU and compile evidence
+Android/iOS platform pickers, actual OS drag-source/destination interaction and
+assistive-technology acceptance remain open. Native drop protocol/engine tests
+use application-owned native event sources and do not prove a system drag gesture. Injected-driver, CPU and compile evidence
 do not establish those flows or complete the full file-service/platform gap.
+
+
+The drop follow-up is recorded in `native-file-drop-*.log` and
+`native-file-drop/result.json`. Thirteen focused tests cover nonzero, offset
+1x/2x hit targets, ID/receipt admission, URI budgets, close/disable/config/Owner
+retirement, actual CSS visibility, modal/focus scopes, decoder/read reuse,
+reentrant native callbacks and future/destructor ownership, cross-document
+admission, deadlines and chooser/drop races. The actual Sapid Dropzone test uses
+Winit's real event-loop interface with an owned event source and the production
+desktop opener: selected files are renamed and their original paths replaced,
+yet chunk reads and PNG previews still decode the original opened data. All four
+themes cover rejection preserving selection, Remove and cleanup. Actual OS
+pointer/drag and reader acceptance remain separate from this evidence.
