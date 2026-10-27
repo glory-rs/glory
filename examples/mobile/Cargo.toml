@@ -23,7 +23,7 @@ android-assets-probe = ["android-assets"]
 network = ["glory/blitz-network", "dep:jni"]
 network-probe = ["network"]
 permissions = ["glory/blitz-permissions", "dep:jni"]
-permissions-probe = ["permissions"]
+permissions-probe = ["permissions", "dep:futures-timer"]
 permissions-host-probe = ["permissions"]
 files = ["glory/blitz-files", "dep:jni"]
 files-probe = ["files", "dep:futures-timer"]
@@ -45,6 +45,8 @@ glory = { path = "../../crates/glory", features = ["blitz-shell", "blitz-package
 
 [target.'cfg(target_os = "android")'.dependencies]
 jni = { version = "=0.22.4", default-features = false, optional = true }
+
+[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
 futures-timer = { version = "=3.0.3", optional = true }
 
 [lints.rust]

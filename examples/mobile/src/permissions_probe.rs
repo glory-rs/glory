@@ -21,6 +21,8 @@ pub(crate) fn fixture(service: Permissions) -> impl Widget {
         scope.owner().on_cleanup(move || cleanup.close())?;
         let query = service.clone();
         scope.owner().spawn(async move {
+            #[cfg(target_os = "ios")]
+            ios_cancellation_probe().await;
             let mut lines = Vec::new();
             for (kind, label) in KINDS {
                 let result = query.query(kind).await;
@@ -115,4 +117,93 @@ pub(crate) fn fixture(service: Permissions) -> impl Widget {
             ))
             .show_in(scope)
     })
+}
+
+#[cfg(target_os = "ios")]
+async fn ios_cancellation_probe() {
+    crate::ios_permissions::audit_integer_abi();
+    use glory::blitz::permissions::{NativeStats, PermissionError};
+    use glory::core::{Runtime, executor::Executor};
+    use std::{
+        cell::Cell,
+        future::Future,
+        pin::Pin,
+        rc::Rc,
+        task::{Context, Waker},
+    };
+    let service = crate::ios_permissions::service().expect("iOS permission client");
+    for _ in 0..8 {
+        let mut future = service.query(Permission::Notifications);
+        assert!(
+            Pin::new(&mut future)
+                .poll(&mut Context::from_waker(Waker::noop()))
+                .is_pending()
+        );
+        drop(future);
+    }
+    assert_eq!(service.stats().waiting, 0);
+    assert_eq!(
+        service.native_stats().unwrap(),
+        NativeStats {
+            records: 0,
+            active_prompts: 0,
+            active_queries: 8
+        }
+    );
+    let executor = Rc::new(Executor::new(2));
+    let runtime = Runtime::with_host(executor.clone());
+    let owner = runtime.owner();
+    let delivered = Rc::new(Cell::new(false));
+    let callback = delivered.clone();
+    let future = service.query(Permission::Notifications);
+    owner
+        .spawn(async move {
+            let _ = future.await;
+            callback.set(true);
+        })
+        .unwrap();
+    assert!(executor.poll_one());
+    owner.dispose();
+    assert_eq!(runtime.stats().tasks, 0);
+    assert_eq!(service.stats().waiting, 0);
+    assert_eq!(
+        service.native_stats().unwrap(),
+        NativeStats {
+            records: 0,
+            active_prompts: 0,
+            active_queries: 9
+        }
+    );
+    service
+        .query(Permission::Notifications)
+        .await
+        .expect("live notification query");
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(2);
+    while service.native_stats().unwrap().active_queries != 0 {
+        assert!(
+            std::time::Instant::now() < deadline,
+            "native queries did not drain"
+        );
+        futures_timer::Delay::new(std::time::Duration::from_millis(10)).await;
+    }
+    assert!(!executor.poll_one());
+    assert!(!delivered.get());
+    assert_eq!(
+        service.native_stats().unwrap(),
+        NativeStats {
+            records: 0,
+            active_prompts: 0,
+            active_queries: 0
+        }
+    );
+    service.close();
+    service.close();
+    assert_eq!(service.native_stats(), Err(PermissionError::Closed));
+    assert_eq!(
+        service.query(Permission::Camera).await,
+        Err(PermissionError::Closed)
+    );
+    eprintln!(
+        "Glory iOS Rust permissions cancellation passed: 8 dropped queries, Owner retirement, native callbacks drained, no late delivery, idempotent close"
+    );
 }

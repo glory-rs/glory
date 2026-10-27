@@ -266,10 +266,21 @@ include explicit example usage descriptions; ordinary bundles exclude them and
 the host code. The Swift ledger tests cover cancelled/retired clients, stale replies,
 32 uncancellable query slots and 1,000 client retirements. Device code links as well.
 
-The Swift host is prepared, but the Rust iOS permission connection is not installed:
-it awaits the separate approval for an application-only integer FFI declaration.
-`permissions-probe` therefore targets Android; `permissions-host-probe` targets iOS.
-Neither the Swift query probe nor a compiled request API counts as actual dialog
+`GLORY_IOS_FEATURES=permissions-probe sh examples/mobile/build-ios.sh` instead runs
+the shared Rust six-permission view through `ios_permissions::service()`. This
+application-local driver uses the separately user-authorized six-function integer
+FFI declaration; every function is safe to call with arbitrary integers, with no
+pointers or unsafe call blocks. Runtime crates retain their unsafe prohibition.
+The driver validates replies/IDs and closes its Swift client exactly once on
+explicit close or Drop. Ordinary Owner cleanup closes the service. The Swift-only
+`permissions-host-probe` remains a separate fixture; select one probe at a time.
+
+The Rust probe first cancels eight real notification queries and one Owner task,
+checks that native query admission remains charged, then awaits a live query and
+drains all native callbacks. It checks no late Owner delivery and idempotent close
+before querying all six permissions for the view. SDK grant/revoke/reset phases
+are recorded in `ios-permission-connection/result.json` under the data-volume cache.
+Neither these SDK queries nor a compiled request API counts as actual dialog
 acceptance. The native request APIs follow [Apple's media authorization model](https://developer.apple.com/documentation/avfoundation/requesting-authorization-to-capture-and-save-media).
 
 Evidence under `/Volumes/Data/Caches/glory/permissions/` distinguishes SDK-controlled

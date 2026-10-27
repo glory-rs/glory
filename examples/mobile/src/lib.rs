@@ -145,6 +145,8 @@ compile_error!("select one mobile acceptance view");
     )
 ))]
 compile_error!("select one mobile acceptance view");
+#[cfg(all(feature = "permissions", any(target_os = "ios", test)))]
+pub mod ios_permissions;
 #[cfg(feature = "network-probe")]
 mod network_probe;
 #[cfg(feature = "permissions-probe")]
@@ -158,10 +160,13 @@ mod permissions_probe;
     )
 ))]
 compile_error!("select one mobile acceptance view");
-#[cfg(all(feature = "permissions-probe", not(target_os = "android")))]
-compile_error!(
-    "permissions-probe currently targets Android; permissions-host-probe checks the Swift iOS host"
-);
+#[cfg(all(
+    feature = "permissions-probe",
+    not(any(target_os = "android", target_os = "ios"))
+))]
+compile_error!("permissions-probe requires the Android or iOS application host");
+#[cfg(all(feature = "permissions-probe", feature = "permissions-host-probe"))]
+compile_error!("select the Rust permission view or the isolated Swift host probe");
 #[cfg(all(feature = "permissions-host-probe", not(target_os = "ios")))]
 compile_error!("permissions-host-probe runs the Swift iOS host; Android uses permissions-probe");
 #[cfg(all(
@@ -264,6 +269,8 @@ fn asset_window(
     let content = keyboard_probe::fixture();
     #[cfg(all(feature = "permissions-probe", target_os = "android"))]
     let content = permissions_probe::fixture(android_permissions()?);
+    #[cfg(all(feature = "permissions-probe", target_os = "ios"))]
+    let content = permissions_probe::fixture(ios_permissions::service()?);
     #[cfg(feature = "controls-probe")]
     let content = controls_probe::fixture();
     #[cfg(feature = "radio-probe")]

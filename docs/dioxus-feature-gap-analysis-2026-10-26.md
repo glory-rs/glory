@@ -486,8 +486,8 @@ iOS 原生实现位于应用 Swift 宿主：AVFoundation、Photos、CoreLocation
 校验用途描述，区分 Limited/Restricted/Provisional/Ephemeral，弱 client 防迟到回执，
 单 prompt 与 32 个不可中断查询独立计数。Swift ledger 实测取消不提前归还许可、
 旧回调不覆盖复用 ID、32 query slot 和 1,000 次 client 退休。Apple SDK 模拟器和
-arm64 device 都实际链接。Rust 应用连接仍等待一处仅含整数的最小 FFI 声明授权；
-尚未新增该声明或其他 unsafe。不能把 Swift 宿主等同 Rust iOS 权限全链路完成。
+arm64 device 都实际链接。当时尚缺 Rust 应用连接；现已按用户另行授权的应用级
+整数 FFI 接通，见文末“iOS Rust 权限连接”。真实弹窗和设备验收仍独立开放。
 
 ARM64 Android SDK 状态测试验证初始 Denied、照片部分选择/近似定位 Limited、全部
 Granted 及恢复；Swift iOS query probe 验证 SDK grant/revoke/reset 的真实 native
@@ -497,7 +497,7 @@ Granted 及恢复；Swift iOS query probe 验证 SDK grant/revoke/reset 的真�
 
 八项新 Rust 回归覆盖 Owner 取消、重入准入、poll 内关闭、deadline、200 个预算拒绝
 及恢复、scalar 校验和 ID 耗尽。当前全工作区 978 项、native/WASM 严格 Clippy 通过。
-权限缺口继续开放，直到 Rust iOS 连接及真实授权弹窗/设备流程有对应证据。
+完整权限缺口继续开放，直到真实授权弹窗/设备流程也有对应证据。
 
 复核补上 Android 照片状态的边界：完整图片/视频权限均 Granted 时，不要求同时
 授予 selected-only 权限；只授予一种媒体或仅所选媒体仍为 Limited。八种组合的
@@ -969,3 +969,39 @@ Suspend/Resume/Dispose、真实开合/流布局/像素、反向、嵌套、内�
 通过。fork 默认配置独立 130 项通过，其他 canonical 配置单独复验。当前实现与命令见
 [native-collapse.md](native-collapse.md)，证据位于 `/Volumes/Data/Caches/glory/native-collapse/`。
 这些结果不替代 OS 输入、读屏、真机呈现、Sheet、富文本或应用服务等其余缺口。
+
+## 2026-10-27：iOS Rust 权限连接（实现及 SDK 查询验收完成）
+
+用户明确允许移动示例的单处应用级整数 FFI 声明后，新增
+`examples/mobile/src/ios_permissions.rs`，将现有 `PermissionDriver` 接到 Swift
+宿主的六个 `@_cdecl` 函数。仅这一个 `unsafe extern "C"` 声明块局部允许 lint，
+所有函数为 `safe fn`，参数/返回值只有 i64 或 unit；不跨 ABI 传指针或对象，
+没有 unsafe 调用块，也没有扩大 Glory 运行时的 unsafe 例外。Swift 在 main
+串行验证 client/request/kind/action 并拥有所有原生对象；Rust 使用同一协议解码，
+拒绝无效 ID/回包，并在 close/Drop 时恰好一次关闭 client。关闭后不能重新调用宿主。
+
+`GLORY_IOS_FEATURES=permissions-probe sh examples/mobile/build-ios.sh` 现在显示
+共用 Rust 六权限视图。构造及启动只查询授权，申请仍由按钮触发；Owner cleanup
+关闭服务。保留单独 Swift `permissions-host-probe`，两种 probe 不可同时选择。
+普通构建继续排除权限 host、导出符号和敏感用途描述。
+
+iOS 27 / iPhone 17 自有模拟器实际执行 Rust→C ABI→Swift→OS 查询，并验证：
+
+- 六类初始状态均为 Undetermined；SDK grant/revoke/reset 后，麦克风、照片读取、
+  照片添加和定位分别为 Granted、Denied、Undetermined，测试后恢复初始状态。
+- 每阶段先丢弃八个真实通知查询，再退休一个正在等待通知查询的 Owner。
+  Rust 等待数/回执立即归零，九个原生查询仍实际计费，回调结束后才全部排空。
+  后续存活查询正常返回，无迟到 Owner 投递，重复 close 幂等。
+- 对真实导出传入最小/最大、负数和零 client，以及非法 request/kind/action，
+  得到协议错误且不残留回执；没有访问相机、音频、照片内容或定位坐标。
+
+两个新增应用连接单元测试、既有八项权限运行时回归和 Swift ledger 测试通过；
+iOS probe/仅 permissions 配置、macOS 应用测试和 Android GameActivity probe 的
+严格 Clippy 通过。arm64 iOS device 实际链接通过，未进行设备签名/真机启动。
+模拟器最终恢复普通 Counter，安装二进制 SHA 与构建产物一致。证据及原始日志在
+`/Volumes/Data/Caches/glory/ios-permission-connection/result.json`；首轮截图因系统
+代理无数据盘写权限失败的日志单独保留，查询验收不依赖截图。
+
+这一批关闭 Rust iOS 权限连接实现和 SDK 查询链路缺口。真实授权弹窗选择、
+相机/通知的系统授权变化、后台/场景重连时的弹窗、真机/读屏，以及 iOS 文件/
+剪贴板等其余平台和应用能力仍待补齐；不能把这些 SDK 查询计作弹窗输入验收。

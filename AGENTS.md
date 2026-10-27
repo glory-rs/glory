@@ -291,8 +291,8 @@ retired feature aliases or count compilation as proof of platform acceptance.
   Optional permissions (facade blitz-permissions) has explicit drivers and
   Owner-cancellable local futures. Android safe JNI and the app's Swift host
   have SDK-controlled authorization-query evidence, separately from actual
-  permission-dialog acceptance. The Rust iOS application connection awaits a
-  separate minimal FFI declaration exception; none is authorized by this note.
+  permission-dialog acceptance. The Rust iOS application connection uses the
+  separately authorized six-function integer ABI in examples/mobile only.
   Linux Fontique uses fontconfig-dlopen; cross-checks do not prove runtime font
   availability or display-server acceptance.
   Optional shell also has explicit AndroidApp and UIKit entry paths; see
@@ -832,6 +832,12 @@ retired feature aliases or count compilation as proof of platform acceptance.
   User-authorized exception (2026-10-26): only the Android application entry
   in examples/mobile may use #[unsafe(no_mangle)] with a local lint allowance
   to export android_main. No unsafe blocks or runtime-crate exceptions.
+  User-authorized exception (2026-10-27): only examples/mobile/src/ios_permissions.rs
+  may declare the six glory_permissions_{open,begin,poll,cancel,close,stats}
+  functions in one locally allowed unsafe extern "C" block, each a safe fn using
+  only i64 arguments/results (or unit). Swift validates every integer and owns
+  native objects/main-thread dispatch. No pointers, unsafe call blocks, broader
+  application exceptions or runtime-crate unsafe are authorized.
 - Optional `render::profile::Profile` is local and fixed at 31 aggregate phase
   samples, not an event/row/frame trace. App::set_profile shares it with runtime
   and supported adapters; None performs no profiling clock reads. Clock callbacks
