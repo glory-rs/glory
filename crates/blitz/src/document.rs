@@ -109,6 +109,7 @@ fn check_layer<'a>(
                     | glory_render::Role::AlertDialog
                     | glory_render::Role::Listbox
                     | glory_render::Role::Tree
+                    | glory_render::Role::Menu
             )
         ) || layer.sheet.is_some()
             || !matches!(
@@ -116,6 +117,7 @@ fn check_layer<'a>(
                 glory_render::LayerPlacement::Center
                     | glory_render::LayerPlacement::Anchor(_)
                     | glory_render::LayerPlacement::Viewport(_)
+                    | glory_render::LayerPlacement::ContextPoint(_)
             )
             || value.is_some_and(|s| s.translation.is_some())
             || style
@@ -143,19 +145,8 @@ fn check_mode<'a>(
         Some(Patch::Semantics(Change::Clear)) => None,
         _ => node.semantics.as_ref(),
     };
-    let role = match patch {
-        Some(Patch::Role(Change::Set(role))) => *role,
-        Some(Patch::Role(Change::Clear)) => None,
-        _ => node.role,
-    };
-    if role == Some(glory_render::Role::Menubar) || semantics.is_some_and(|s| s.menubar_item) {
-        return Err(Error::Unsupported("native menubar controls"));
-    }
     if semantics.is_some_and(|semantics| semantics.tags_input.is_some()) {
         return Err(Error::Unsupported("native tags input policy"));
-    }
-    if semantics.is_some_and(|semantics| semantics.context_menu.is_some()) {
-        return Err(Error::Unsupported("native context menu input"));
     }
     if matches!(node.props, Props::RichEditor(_)) {
         return Err(Error::Unsupported("native rich editing"));
@@ -1689,12 +1680,6 @@ impl Render for Renderer {
         let descriptor = state.mapper.tree().node(node)?.descriptor.view();
         if enabled {
             kind.validate_target(descriptor)?;
-            if matches!(kind, EventKind::Menu | EventKind::ContextMenu) {
-                return Err(Error::Unsupported("native menu input"));
-            }
-            if kind == EventKind::Palette {
-                return Err(Error::Unsupported("native palette shortcut input"));
-            }
         }
         if enabled && matches!(kind, EventKind::Scroll | EventKind::Resize) {
             state.dom.main(node)?;
@@ -1744,7 +1729,12 @@ impl Render for Renderer {
         {
             return Err(Error::Unsupported("focus in disabled fieldset"));
         }
-        if !state.mapper.tree().active(action.node()) {
+        // ExitMenu runs after a controlled close has hidden the Menu. Its
+        // driver separately verifies mounted ancestry and the current return
+        // target; other actions still require an active presentation.
+        if !state.mapper.tree().active(action.node())
+            && !matches!(action, glory_render::Action::ExitMenu { .. })
+        {
             return Err(Error::Unsupported("action on disconnected Blitz range"));
         }
         match action {
@@ -1833,8 +1823,16 @@ impl Render for Renderer {
                 Ok(())
             }
             glory_render::Action::RevealOption { node } => choice::reveal(&mut state, node),
-            glory_render::Action::ExitMenu { .. } => {
-                Err(Error::Unsupported("native menu focus navigation"))
+            glory_render::Action::ExitMenu { node, backwards } => {
+                #[cfg(feature = "shell")]
+                {
+                    shell::menu::exit(&mut state, node, backwards)
+                }
+                #[cfg(not(feature = "shell"))]
+                {
+                    let _ = (node, backwards);
+                    Err(Error::Unsupported("headless Blitz menu focus"))
+                }
             }
             glory_render::Action::Focus(id) => state.focus(id),
             glory_render::Action::ScrollTo { node, x, y } => {

@@ -17,10 +17,23 @@ pub(super) struct Open {
 
 #[derive(Default)]
 pub(super) struct Layers {
-    declared: BTreeMap<NodeId, Layer>,
+    pub(super) declared: BTreeMap<NodeId, Layer>,
     pub open: Vec<Open>,
     lost: BTreeSet<NodeId>,
     scroll: Option<blitz_dom::Point<f64>>,
+}
+
+// Blitz's client rect includes the queried node's own scroll. Placement and
+// outside-hit policy need its border box, retaining all ancestor/viewport scroll.
+fn border_box(dom: &Dom, physical: EngineId) -> Option<Rect> {
+    let rect = dom.doc.get_client_bounding_rect(physical)?;
+    let own = dom.doc.get_node(physical)?.scroll_offset();
+    Some(Rect {
+        x: rect.x + own.x,
+        y: rect.y + own.y,
+        width: rect.width,
+        height: rect.height,
+    })
 }
 
 pub(super) fn inside(tree: &glory_render::memory::Memory, mut id: NodeId, scope: NodeId) -> bool {
@@ -511,7 +524,7 @@ fn sync_inner(
             continue;
         }
         let main = state.dom.main(entry.id)?;
-        let Some(panel) = state.dom.doc.get_client_bounding_rect(main) else {
+        let Some(panel) = border_box(&state.dom, main) else {
             continue;
         };
         let (width, height) = state.dom.doc.viewport().logical_size();
@@ -519,6 +532,14 @@ fn sync_inner(
             LayerPlacement::Center => (
                 (f64::from(width) - panel.width) / 2.,
                 (f64::from(height) - panel.height) / 2.,
+            ),
+            LayerPlacement::ContextPoint(point) => (
+                point
+                    .x
+                    .clamp(8.0, (f64::from(width) - panel.width - 8.0).max(8.0)),
+                point
+                    .y
+                    .clamp(8.0, (f64::from(height) - panel.height - 8.0).max(8.0)),
             ),
             LayerPlacement::Viewport(placement) => {
                 let position = placement.resolve(
@@ -545,7 +566,7 @@ fn sync_inner(
                     continue;
                 };
                 let anchor = state.dom.main(anchor)?;
-                let Some(anchor) = state.dom.doc.get_client_bounding_rect(anchor) else {
+                let Some(anchor) = border_box(&state.dom, anchor) else {
                     continue;
                 };
                 let position = policy.resolve(
@@ -798,7 +819,7 @@ pub(super) fn receive(
                     .dom
                     .main(top.id)
                     .ok()
-                    .and_then(|id| state.dom.doc.get_client_bounding_rect(id))
+                    .and_then(|id| border_box(&state.dom, id))
                     .is_some_and(|rect| {
                         x >= rect.x
                             && y >= rect.y
@@ -837,7 +858,7 @@ pub(super) fn receive(
                         .dom
                         .main(state.layers.modal().expect("modal branch"))
                         .ok()
-                        .and_then(|id| state.dom.doc.get_client_bounding_rect(id))
+                        .and_then(|id| border_box(&state.dom, id))
                         .is_some_and(|rect| {
                             x < rect.x
                                 || y < rect.y

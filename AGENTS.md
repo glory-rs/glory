@@ -165,6 +165,17 @@ retired feature aliases or count compilation as proof of platform acceptance.
   current groups/options, selected state and validated actions, never form values.
   Actual Sapid Select/Combobox/MultiSelect consumers now pass; retain prior failed
   evidence. OS input/reader acceptance stays separate. See docs/native-choice.md.
+  Menu/Menubar/ContextMenu/Palette reuse shared commands and current ancestry;
+  components retain matching, controlled state and submenu policy. ContextPoint
+  uses finite viewport CSS pixels and current modal/focus scopes. Border-box
+  placement/hit tests undo only the queried node's own scroll. ExitMenu permits
+  its own controlled-close hidden range, rejects disconnected/suspended ancestry,
+  and bounds current Tab traversal while excluding all Menu trees and the whole
+  menubar/context boundary. No visited-menu registry or host-side controller.
+  Sapid requests explicit reveal after visible bindings; Focus still does not
+  scroll. Explicit programmatic scrolling cancels old touch inertia in the fork.
+  Protocol/CPU/AX models and SDK initial display do not prove OS input/reader
+  acceptance or platform system-menu services. See docs/native-menus.md.
   Input placeholder is a bounded, independent presentation layout, lazily shaped
   only while empty/non-composing and released when hidden/cleared. Hint-only
   changes preserve editor identity, raw generation, selection, IME and value

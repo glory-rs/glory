@@ -32,6 +32,7 @@ radio-probe = []
 placeholder-probe = []
 choice-probe = []
 select-probe = []
+menu-probe = []
 
 [dependencies]
 counter = { path = "../counter" }

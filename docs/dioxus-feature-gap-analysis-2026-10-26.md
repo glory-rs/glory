@@ -15,7 +15,7 @@ Mac，最新证据见文末 Apple/移动输入记录，不能继续把“没有 
 | 桌面开发 | native watch、错误保留旧进程、成功重启与退出回收 | 状态保持、真正 Rust 热补丁、检查器 |
 | Web 发布 | 可复现 gzip、哈希清单、预览协商/HEAD/身份回退 | 指纹命名、Brotli/图片转换、WASM 分包 |
 | 运行时权限 | 有界 Owner future/driver API；Android 安全 JNI；iOS Swift 宿主；SDK 控制的授权状态查询 | iOS Rust 应用连接待最小 FFI 声明授权；真实系统弹窗选择、真机及其他权限类别 |
-| 原生控件 | Checkbox/Switch/Mixed 和 Radio 的绘制、受控更新、点击/Space/AX 动作；Radio 分组与键盘导航；placeholder 独立提示布局与绘制；combobox/typeahead 协议及 listbox/tree 弹层；原生 Select 单选/多选/分组、选择属性与 AX；五项实际消费端通过；两端模拟器初始显示 | 菜单、富文本、文件/语义剪贴板等仍开放；实际读屏单独验收 |
+| 原生控件 | Checkbox/Switch/Mixed 和 Radio 的绘制、受控更新、点击/Space/AX 动作；Radio 分组与键盘导航；placeholder 独立提示布局与绘制；combobox/typeahead 协议及 listbox/tree 弹层；原生 Select 单选/多选/分组、选择属性与 AX；五项实际选择控件消费端通过；菜单/菜单栏/右键菜单/Palette 协议、八项实际消费端与浏览器回归通过；两端模拟器初始显示 | TagsInput、富文本、文件/语义剪贴板、其他弹层及系统菜单服务仍开放；实际读屏单独验收 |
 
 整体差距仍未关闭。签名身份/设备等外部条件和仍需实现的软件功能分别保留，
 没有用模拟器或编译结果替代完整平台交付。
@@ -670,3 +670,45 @@ headless 无默认 feature 检查通过。普通 Android/iOS 包另行构建；i
 这些是原生协议/CPU 与 SDK 初始显示证据；完整系统输入、VoiceOver/TalkBack 和
 签名真机安装另行验收。菜单、TagsInput、富文本、文件/剪贴板、移动权限后续连接、
 应用服务和报告其他缺口继续开放。实现边界见 [native-choice.md](native-choice.md)。
+
+
+## 2026-10-27：原生菜单、菜单栏、右键菜单与 Palette
+
+Blitz shell 连接共享 Menu/ContextMenu/Palette 与 RTL/Typeahead 命令，复用 Sapid
+的成员、子菜单、受控开关及勾选/单选控制器。ContextMenu 使用最近显式 region，
+保留 Native/Override 编辑器策略、预编辑及修饰键保护；ContextPoint 以真实 CSS
+视口像素定位并保留父模态/焦点范围。Menu Layer 管理实际焦点，Tab 按当前物理
+顺序退出整个菜单栏或上下文 region，不进入其他 Menu 子树；关闭和 ExitMenu
+同批提交时允许本 Menu 自身隐藏，挂起/断连/禁用目标仍拒绝。遍历预算为 65,536
+已挂载物理节点，无访问历史、选项注册表或另一套宿主菜单控制器。
+
+实际长菜单消费者发现两处缺口：滚动后的 Layer 命中误用内容偏移，导致底部点击
+被当作外部关闭；Sapid 导航只发 Focus，没有显式请求滚动显露。适配器现补偿被
+查询节点自己的 scroll，保留祖先/视口偏移；Sapid 只保留一个当前 NodeId 意图，
+在可见绑定后发 Focus/ScrollIntoView，关闭及 Tab 撤销旧意图，包括受控关闭拒绝。
+Focus 的不滚动契约不变。同批菜单导航后打开 Palette modal 不夺回输入焦点。
+
+真正的 [Blitz fork f7178424](https://github.com/glory-rs/blitz/commit/f717842413c46125d0d9bd425890fbe62777a559)
+另修复显式程序滚动没有取消旧触摸惯性的问题。原先 Home 显露首项后会被后续 fling
+覆盖；修复后该回归通过，惯性帧自己的滚动链继续工作。固定 SHA、活动锁文件与
+来源记录同步，无 Cargo checkout 修改、vendor、全局 patch 或新 unsafe。
+
+最终 Glory 全工作区含文档测试 **1024 项**通过，Sapid **1153 项**通过；native/WASM
+严格 Clippy、headless 检查及 CLI 25 项与严格 Clippy 通过。八项实际菜单消费端
+覆盖四主题（适用时）、子菜单、受控拒绝、中文 Command 搜索/执行、模态恢复、
+长列表显露/滚动点击和同批焦点隔离；原有五项选择控件消费端仍通过。
+既有四组浏览器验收共 **49 个报告**通过，含四主题 CSR/水合、流式协议与清理。
+Home 检查验证默认事件未被拦截，实际光标行首移动使用对应平台快捷键；原失败
+记录保留。Fork 精简配置 127 项、并行/writing-mode 128 项及来源检查通过；fork
+Clippy 仍显式排除既有 result_large_err/needless_return，未伪称全 fork 无例外严格通过。
+
+两端 menu-probe 实际安装、SDK 启动并核对菜单/中文/勾选项初始画面与已安装二进制
+哈希。Android 首帧仍是启动画面，保留原帧并另存实际绘制帧。普通 Android/iOS 包
+另行构建，iOS device 以 15.0 部署目标链接；这些不替代实际触摸/系统键盘、读屏
+或签名真机验收。源文件、日志、浏览器报告与图像摘要见
+`/Volumes/Data/Caches/glory/native-menus/result.json`；实现边界见
+[native-menus.md](native-menus.md)。
+
+这里完成自绘语义菜单与 Palette 连接。平台系统菜单栏/托盘、TagsInput、富文本、
+文件/语义剪贴板、Tooltip/navigation Group/Sheet 等弹层、移动权限 Rust 后续连接、
+读屏/真机/分发、应用服务和发布工具仍按本报告继续补齐，整体差距不标为关闭。

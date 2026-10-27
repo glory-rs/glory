@@ -2,65 +2,43 @@
 use glory_blitz::Renderer;
 use glory_render::*;
 #[test]
-fn native_context_policy_rejects_before_facets_and_keeps_accepted_prefix_watermark() {
+fn native_context_policy_admission_keeps_later_rejection_prefix_watermark() {
     let runtime = RuntimeId::new();
     let mut ids = NodeIds::new(runtime);
-    let plain_id = ids.allocate();
+    let id = ids.allocate();
     let rejected = ids.allocate();
-    let mut plain = Descriptor::new(Props::View);
-    plain.role = Some(Role::Group);
-    plain.focus = FocusMode::TabStop;
-    plain.semantics = Some(Box::new(Semantics {
+    let mut region = Descriptor::new(Props::View);
+    region.role = Some(Role::Group);
+    region.focus = FocusMode::TabStop;
+    region.semantics = Some(Box::new(Semantics {
         id: Some(SemanticId::new("area").unwrap()),
+        context_menu: Some(ContextEditPolicy::Override),
         ..Default::default()
     }));
-    let mut refined = plain.clone();
-    refined.semantics.as_mut().unwrap().context_menu = Some(ContextEditPolicy::Override);
-    let patch = Patch::Semantics(Change::Set(refined.semantics.clone()));
     let mut renderer = Renderer::new(runtime);
-    renderer.preflight(plain.view(), None).unwrap();
-    assert_eq!(
-        renderer.preflight(refined.view(), None),
-        Err(Error::Unsupported("native context menu input"))
-    );
-    assert_eq!(
-        renderer.preflight(plain.view(), Some(&patch)),
-        Err(Error::Unsupported("native context menu input"))
-    );
+    renderer.preflight(region.view(), None).unwrap();
     assert_eq!(
         renderer.apply(&[
             Mutation::Create {
-                id: plain_id,
-                node: Box::new(plain)
+                id,
+                node: Box::new(region)
             },
             Mutation::Place {
-                id: plain_id,
+                id,
                 parent: None,
                 before: None
             },
             Mutation::Create {
                 id: rejected,
-                node: Box::new(refined)
+                node: Box::new(Descriptor::new(Props::File(Default::default())))
             }
         ]),
-        Err(Error::Unsupported("native context menu input"))
+        Err(Error::Unsupported("native file picker controls"))
     );
-    assert_eq!(renderer.stats().nodes, 1);
+    renderer.listen(id, EventKind::ContextMenu, true).unwrap();
     assert_eq!(renderer.stats().applied, 2);
-    assert!(
-        renderer
-            .engine_id(rejected, glory_html::Part::Main)
-            .is_err()
-    );
-    assert_eq!(
-        renderer.apply(&[Mutation::Patch {
-            id: plain_id,
-            patch
-        }]),
-        Err(Error::Unsupported("native context menu input"))
-    );
     renderer
-        .request(Query::Bounds(plain_id), QueryToken(6001))
+        .request(Query::Bounds(id), QueryToken(6001))
         .unwrap();
     let mut inputs = Vec::new();
     renderer.drain(&mut inputs);

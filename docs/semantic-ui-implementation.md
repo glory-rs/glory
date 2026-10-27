@@ -2563,3 +2563,19 @@ active-descendant/multiple 状态与 PasswordInput 保护有独立回归。
 TreeSelect/Cascader 的四主题命令/CPU 绘制通过，Select/Combobox/MultiSelect 的
 三项仍因隐藏表单代理依赖 Props::Select 而失败。保留失败并继续完整原生 Select，
 不增加 hidden 特判；见 [当前范围与后续要求](native-choice.md)。整体差距继续开放。
+
+
+## 2026-10-27：原生菜单、上下文与显式显露
+
+原生 Select 的后续完成记录见 [native-choice.md](native-choice.md)。本批继续连接
+共享 Menu/Menubar/ContextMenu/Palette，保留组件自己的受控状态/成员/搜索与子菜单。
+ContextPoint、当前模态边界和关闭后 ExitMenu 使用真实物理几何/焦点，滚动菜单点击
+使用仅补偿自身 scroll 的 border box。Sapid 在可见绑定后发出 Focus 与显式 reveal，
+关闭撤销旧焦点意图；Glory Focus 的 prevent-scroll 契约未改变。
+
+Blitz 固定 f7178424 修复程序滚动未取消触摸惯性，完整源身份和锁文件同步。
+Glory 1024、Sapid 1153、实际菜单消费端 8、既有选择控件消费端 5 项通过；四组
+浏览器验收 49 个报告通过。native/WASM 严格 Clippy、CLI 25 项及严格 Clippy、
+headless、fork 来源/测试、普通移动包及设备链接通过。两端探针仅声明 SDK 安装、
+初始画面与安装哈希，不替代 OS 输入/读屏或签名真机。完整实现、失败保留与证据
+见 [native-menus.md](native-menus.md) 和 [功能差距报告](dioxus-feature-gap-analysis-2026-10-26.md)。

@@ -2,7 +2,8 @@
 use glory_blitz::Renderer;
 use glory_render::*;
 #[test]
-fn native_menubar_role_and_intrinsic_root_refinement_reject_before_facets_with_prefix_watermarks() {
+fn native_menubar_role_and_intrinsic_root_refinement_admit_with_later_rejection_prefix_watermarks()
+{
     let runtime = RuntimeId::new();
     let mut ids = NodeIds::new(runtime);
     let accepted = ids.allocate();
@@ -16,22 +17,12 @@ fn native_menubar_role_and_intrinsic_root_refinement_reject_before_facets_with_p
         ..Default::default()
     }));
     let mut renderer = Renderer::new(runtime);
-    assert_eq!(
-        renderer.preflight(bar.view(), None),
-        Err(Error::Unsupported("native menubar controls"))
-    );
-    assert_eq!(
-        renderer.preflight(
-            plain.view(),
-            Some(&Patch::Role(Change::Set(Some(Role::Menubar))))
-        ),
-        Err(Error::Unsupported("native menubar controls"))
-    );
+    renderer.preflight(bar.view(), None).unwrap();
     assert_eq!(
         renderer.apply(&[
             Mutation::Create {
                 id: accepted,
-                node: Box::new(plain)
+                node: Box::new(bar)
             },
             Mutation::Place {
                 id: accepted,
@@ -40,21 +31,16 @@ fn native_menubar_role_and_intrinsic_root_refinement_reject_before_facets_with_p
             },
             Mutation::Create {
                 id: rejected,
-                node: Box::new(bar)
-            }
+                node: Box::new(Descriptor::new(Props::File(Default::default())))
+            },
         ]),
-        Err(Error::Unsupported("native menubar controls"))
+        Err(Error::Unsupported("native file picker controls"))
     );
     assert_eq!(renderer.stats().applied, 2);
     assert_eq!(renderer.stats().nodes, 1);
-    assert!(
-        renderer
-            .engine_id(rejected, glory_html::Part::Main)
-            .is_err()
-    );
-    let mut root = Descriptor::new(Props::Button(ButtonProps::default()));
-    root.focus = FocusMode::TabStop;
-    root.semantics = Some(Box::new(Semantics {
+    let mut trigger = Descriptor::new(Props::Button(ButtonProps::default()));
+    trigger.focus = FocusMode::TabStop;
+    trigger.semantics = Some(Box::new(Semantics {
         id: Some(SemanticId::new("trigger").unwrap()),
         menubar_item: true,
         navigation_item: true,
@@ -67,24 +53,7 @@ fn native_menubar_role_and_intrinsic_root_refinement_reject_before_facets_with_p
         expanded: Some(false),
         ..Default::default()
     }));
-    assert_eq!(
-        renderer.preflight(root.view(), None),
-        Err(Error::Unsupported("native menubar controls"))
-    );
-    assert_eq!(
-        renderer.apply(&[Mutation::Create {
-            id: rejected,
-            node: Box::new(root)
-        }]),
-        Err(Error::Unsupported("native menubar controls"))
-    );
-    assert_eq!(renderer.stats().nodes, 1);
-    assert_eq!(renderer.stats().applied, 2);
-    assert!(
-        renderer
-            .engine_id(rejected, glory_html::Part::Main)
-            .is_err()
-    );
+    renderer.preflight(trigger.view(), None).unwrap();
     renderer
         .request(Query::Bounds(accepted), QueryToken(6101))
         .unwrap();

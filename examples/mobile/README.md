@@ -441,6 +441,24 @@ Select `GLORY_ANDROID_FEATURES=choice-probe` for `build-android-game.sh`, or
 `GLORY_IOS_FEATURES=choice-probe` for `build-ios.sh`. This opt-in view uses the
 shared combobox/option protocol and an initially open native CPU listbox with
 ASCII/Chinese options, a disabled member and an IME reference. It is independent
-of intrinsic `Props::Select`, which remains a separate gap. Ordinary builds
+of intrinsic `Props::Select`, which is now implemented separately; see
+[the current native choice coverage](../../docs/native-choice.md). Ordinary builds
 keep Counter. SDK screenshots establish initial display only; framework input
 regressions and actual OS touch/keyboard/reader acceptance are separate evidence.
+
+
+### Native Select and menu probes
+
+`GLORY_ANDROID_FEATURES=select-probe` / `GLORY_IOS_FEATURES=select-probe` selects
+single, rows and multiple intrinsic Select controls. `menu-probe` selects a
+Menubar, initially open managed Menu with disabled/Chinese/check items, explicit
+context region and a Palette shortcut/dialog. The command-input button becomes
+visible after the initial popup closes; matching/search policy is tested with
+actual Sapid consumers rather than claimed for this small protocol fixture.
+
+Pass the selected feature to the corresponding existing Android GameActivity or
+iOS build script. Select only one acceptance view. SDK installation, launch,
+installed-binary hashes and initial menu pixels are recorded under
+`/Volumes/Data/Caches/glory/native-menus`. Real OS input, VoiceOver/TalkBack,
+permission dialogs and signed device installation remain separate acceptance.
+See [native menu boundaries](../../docs/native-menus.md).

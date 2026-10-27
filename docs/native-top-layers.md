@@ -1,12 +1,14 @@
 # Native viewport top layers
 
 The genuine `glory-rs/blitz` fork is pinned to
-`0811cfd9e7ca3ddcc126ad7ef42f453dfba5be8d`. The provenance record and Cargo
-lockfiles resolve all four Blitz packages to that full commit. No vendored code,
+`f717842413c46125d0d9bd425890fbe62777a559`. The provenance record and Cargo
+lockfiles resolve all five Blitz/Stylo packages to that full commit. No vendored code,
 managed Cargo checkout edits, global patches or DOM portals are involved.
 
-The final current-pin provenance and combined native regressions pass in
-`D:/BuildCache/sapid/final-engine-forks.log` and `final-native-acceptance.log`.
+Current-pin provenance and native regressions pass in
+`/Volumes/Data/Caches/glory/menu-provenance.log` and `menu-workspace-tests.log`.
+The earlier baseline remains in `D:/BuildCache/sapid/final-engine-forks.log`
+and `final-native-acceptance.log`.
 The two pre-existing interactive desktop/UIA tests remain ignored in this run;
 actual displayed-window or OS client acceptance is not inferred from it.
 
@@ -55,9 +57,11 @@ consumer focus failure is retained in `modals-native-current-tests.log`.
 Listbox layers now use Preserve focus and current combobox active-descendant
 relations; option pointer activation keeps the editor/trigger focused. Tree layers
 use Manage focus with actual TreeItem focus and return to the current trigger.
-Their current regressions and remaining intrinsic Select dependency are recorded
-in [native choices](native-choice.md). Menu, Tooltip and navigation Group layers,
-sheet, ContextPoint and a Layer's own Translation remain explicit native rejections. Descriptor preflight,
+Their current regressions and completed intrinsic Select implementation are recorded
+in [native choices](native-choice.md). Menu layers, ContextPoint placement and
+controlled-close Tab exit are connected in [native menus](native-menus.md).
+Tooltip and navigation Group layers, sheet and a Layer's own Translation remain
+explicit native rejections. Descriptor preflight,
 placement preflight and direct apply retain their accepted-prefix and query
 watermark contract. Supporting Dialog does not imply those facets or OS screen
 reader acceptance.

@@ -20,6 +20,11 @@ mod accesskit_platform;
 #[cfg(test)]
 #[path = "choice_tests.rs"]
 mod choice_tests;
+#[path = "menu.rs"]
+pub(super) mod menu;
+#[cfg(test)]
+#[path = "menu_tests.rs"]
+mod menu_tests;
 #[cfg(test)]
 #[path = "native_select_tests.rs"]
 mod native_select_tests;
@@ -256,6 +261,10 @@ impl EventHandler for Events {
         let mut state = self.renderer.0.borrow_mut();
         if matches!(event.data, DomEventData::Click(_)) && std::mem::take(&mut state.suppress_click)
         {
+            event_state.prevent_default();
+            return;
+        }
+        if menu::context(&mut state, event.target, &event.data) {
             event_state.prevent_default();
             return;
         }
@@ -779,9 +788,15 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
     });
     if let Some(origin) = origin {
         let editable = state.mapper.tree().node(origin).is_ok_and(|node| {
-            matches!(node.descriptor.view().props, glory_render::Props::Input(_))
+            matches!(
+                node.descriptor.view().props,
+                glory_render::Props::Input(_) | glory_render::Props::Select(_)
+            )
         });
         let key_name = key.key.to_string();
+        if menu::key(state, origin, target, key, &key_name) {
+            return true;
+        }
         if choice::key(state, origin, target, key, &key_name) {
             return true;
         }
@@ -1171,13 +1186,21 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
             let own_interest = state.subscriptions.contains(&(origin, EventKind::Keyboard));
             let mut cursor = Some(origin);
             let mut interested = false;
+            let mut palette_interest = false;
             let mut in_form = false;
             while let Some(id) = cursor {
                 in_form |= state.mapper.tree().node(id).is_ok_and(|node| {
                     node.descriptor.view().field_part() == Some(glory_render::FieldPart::Form)
                 });
-                if state.subscriptions.contains(&(id, EventKind::Keyboard)) {
-                    interested = true;
+                if !interested {
+                    if command == glory_render::KeyboardCommand::Palette
+                        && state.subscriptions.contains(&(id, EventKind::Palette))
+                    {
+                        interested = true;
+                        palette_interest = true;
+                    } else if state.subscriptions.contains(&(id, EventKind::Keyboard)) {
+                        interested = true;
+                    }
                 }
                 cursor = state
                     .mapper
@@ -1197,9 +1220,13 @@ fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
                 }
                 state.inputs.push(Input::Event {
                     node: origin,
-                    event: Event::Keyboard {
-                        from: origin,
-                        command,
+                    event: if palette_interest {
+                        Event::Palette { from: origin }
+                    } else {
+                        Event::Keyboard {
+                            from: origin,
+                            command,
+                        }
                     },
                 });
                 return true;

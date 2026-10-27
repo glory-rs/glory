@@ -2,7 +2,7 @@
 use glory_blitz::Renderer;
 use glory_render::*;
 #[test]
-fn native_palette_interest_rejects_explicitly_and_preserves_prefix_query_watermark() {
+fn native_palette_interest_is_admitted_and_preserves_prefix_query_watermark() {
     let runtime = RuntimeId::new();
     let id = NodeIds::new(runtime).allocate();
     let mut renderer = Renderer::new(runtime);
@@ -19,10 +19,7 @@ fn native_palette_interest_rejects_explicitly_and_preserves_prefix_query_waterma
             },
         ])
         .unwrap();
-    assert_eq!(
-        renderer.listen(id, EventKind::Palette, true),
-        Err(Error::Unsupported("native palette shortcut input"))
-    );
+    renderer.listen(id, EventKind::Palette, true).unwrap();
     renderer.listen(id, EventKind::Palette, false).unwrap();
     assert_eq!(renderer.stats().nodes, 1);
     assert_eq!(renderer.stats().applied, 2);
