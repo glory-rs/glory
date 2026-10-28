@@ -48,12 +48,15 @@ def main():
     installed = adb("shell", "pm", "path", package).removeprefix("package:")
     remote = adb("shell", "sha256sum", installed).split()[0]
     local = hashlib.sha256(options.apk.read_bytes()).hexdigest()
-    passed = remote == local and "Glory Android files acceptance: Ok(())" in logs
+    pipes = all(f"Glory Android pipe refusal passed mode={mode} opens={count} closes={count} failures=0 prior=1" in logs
+                for mode, count in [(5, 1), (6, 2)])
+    passed = remote == local and pipes and "Glory Android files acceptance: Ok(())" in logs
     result = {
         "serial": options.serial, "avd": name, "pid": pid,
+        "pipe_refusal_and_partial_rollback": pipes,
         "apk_sha256": local, "installed_sha256": remote, "passed": passed,
-        "scope": "Owned Activity selection/cancel/refusal results, ContentResolver/PFD reads, semantic multi-selection/read/private PNG decode, revocation and actual provider descriptor closure",
-        "limits": "ARM64 emulator with acceptance-only selector/provider; no system DocumentsUI input, real-device, non-seekable provider or screen-reader acceptance",
+        "scope": "Owned Activity selection/cancel/refusal results, ContentResolver/PFD reads, semantic multi-selection/read/private PNG decode, revocation, non-seekable FIFO refusal/partial rollback, preserved prior grants and actual provider endpoint closure",
+        "limits": "ARM64 emulator with acceptance-only selector/provider; no system DocumentsUI input, real-device or screen-reader acceptance",
     }
     (output / "sdk-result.json").write_text(json.dumps(result, indent=2) + "\n")
     print(json.dumps({"pid": pid, "passed": passed, "installed_hash_matches": remote == local}))

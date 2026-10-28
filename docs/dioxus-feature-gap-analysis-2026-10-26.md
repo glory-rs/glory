@@ -2,7 +2,7 @@
 
 Glory 的主要缺口集中在移动平台交付、桌面分发、应用级导航与文档服务、开发调试工具。响应式内核、浏览器渲染、SSR、水合、流式资源传递和常用交互组件已经有实现；不能把旧架构删除的能力、README 未列出的能力和真实缺口混为一谈。本轮按现有语义架构补齐，SSR 的 HTTP 框架集成只支持 Salvo。
 
-## 当前进度（2026-10-27，移动服务与原生控件补齐中）
+## 当前进度（2026-10-28，移动文件服务验收推进中）
 
 下方“起始状态”和 Windows 会话记录保留为比较基线；当前主机已是 Apple Silicon
 Mac，最新证据见文末 Apple/移动输入记录，不能继续把“没有 Mac”当作当前状态。
@@ -14,10 +14,10 @@ Mac，最新证据见文末 Apple/移动输入记录，不能继续把“没有 
 | Android | NativeActivity 基线；明确选择的 GameActivity、ARM64 模拟器真实拼音预编辑/提交/取消、Unicode 选区、汉字/emoji 删除、APK AssetManager 读取、HTTP(S)/系统证书校验与真实连接取消 | 真机/16 KiB 内核运行、TalkBack、运行时权限及真机网络、生产分发 |
 | 桌面开发 | native watch、错误保留旧进程、成功重启与退出回收 | 状态保持、真正 Rust 热补丁、检查器 |
 | Web 发布 | 可复现 gzip、哈希清单、预览协商/HEAD/身份回退 | 指纹命名、Brotli/图片转换、WASM 分包 |
-| 运行时权限 | 有界 Owner future/driver API；Android 安全 JNI；iOS Swift 宿主；SDK 控制的授权状态查询 | iOS Rust 应用连接待最小 FFI 声明授权；真实系统弹窗选择、真机及其他权限类别 |
-| 原生剪贴板 | 显式可选桌面 worker 与 Android 安全 JNI；CopyText 与原生编辑器复制/剪切/粘贴；实际 Sapid 四主题消费端、macOS 系统往返和 Android ARM64 前台系统读写/ClipData 恢复 | iOS 系统 driver、Windows/Linux 实际 OS 往返、移动系统菜单及真实键盘/读屏 |
-| 原生文件服务 | 显式可选 driver、桌面系统选择器、Winit 文件拖放通道、Android 安全 JNI/ContentResolver/PFD、稳定句柄分块读取及私有 PNG/JPEG 预览；桌面实际文件/消费端与 Android 自有源 SDK 链路通过 | 实际 OS 选择器/拖动输入验收、iOS driver、Android 非 seekable provider、macOS sandbox security scope 与平台读屏 |
-| 原生控件 | Checkbox/Switch/Mixed 和 Radio 绘制与输入、placeholder、选择控件、菜单/Palette、TagsInput/PillsInput 的协议和实际消费端；现补齐 Collapsible 的原生 intrinsic-height 过渡、匹配完成回执、四主题双内容策略与编辑器身份/Owner 清理；两端模拟器已有控件初始显示 | 富文本、系统文件服务、iOS 剪贴板/移动系统菜单、Sheet 及其他弹层/系统菜单仍开放；实际输入/读屏单独验收 |
+| 运行时权限 | 有界 Owner future/driver API；Android 安全 JNI；iOS Swift 宿主及已授权的最小整数 FFI 连接；SDK 控制的授权状态查询 | 真实系统弹窗选择、真机及其他权限类别 |
+| 原生剪贴板 | 显式可选桌面 worker 与 Android 安全 JNI；CopyText 与原生编辑器复制/剪切/粘贴；实际 Sapid 四主题消费端、macOS 系统往返和 Android ARM64 前台系统读写/ClipData 恢复；iOS UIPasteboard 整数桥、SDK 读写及条件恢复 | Windows/Linux 实际 OS 往返、跨应用粘贴弹窗、移动系统菜单及真实键盘/读屏 |
+| 原生文件服务 | 显式可选 driver、桌面系统选择器、Winit 文件拖放通道、Android 安全 JNI/ContentResolver/PFD、稳定句柄分块读取及私有 PNG/JPEG 预览；桌面实际文件/消费端、Android 自有源 SDK 与真实 FIFO 拒绝/回滚、iOS UIKit 系统选择器与外部 Local Storage/enumerating 扩展链路通过 | Android DocumentsUI/桌面实际拖动输入、iOS 只读 replicated 元数据、商业云盘/真机、macOS sandbox security scope 与平台读屏 |
+| 原生控件 | Checkbox/Switch/Mixed 和 Radio 绘制与输入、placeholder、选择控件、菜单/Palette、TagsInput/PillsInput 的协议和实际消费端；现补齐 Collapsible 的原生 intrinsic-height 过渡、匹配完成回执、四主题双内容策略与编辑器身份/Owner 清理；两端模拟器已有控件初始显示 | 富文本、移动系统菜单、Sheet 及其他弹层/系统菜单仍开放；实际输入/读屏单独验收 |
 
 整体差距仍未关闭。签名身份/设备等外部条件和仍需实现的软件功能分别保留，
 没有用模拟器或编译结果替代完整平台交付。
@@ -1120,3 +1120,35 @@ cannotSetMetadata，未能完成内容选择；保留失败日志，**未关闭�
 本轮关闭独立 enumerating provider 协议夹具的延迟 hydration/一次失败恢复验收；
 第三方商业云盘、replicated hydration、真实网络/离线/下载取消、真机 sandbox、
 发布签名和 VoiceOver 仍分别开放。没有使用私有 entitlement 或绕过系统保护。
+
+
+### 2026-10-28：replicated EPERM 对照、下载协议修正与 Android 管道拒绝
+
+本轮没有再把 EPERM 归因于“所有 replicated provider 都不支持模拟器”。使用独立
+全新 domain 对照：放开元数据 capabilities 的临时夹具可以列出四个文件，并实际
+通过系统选择器、延迟 fetchContents、外部 scoped 精确读取和 PNG 预览。保留只读
+capabilities 的模型仍为空列表；公开 getUserVisibleURL 请求同一已知 PNG 再次得到
+NSPOSIX EPERM / cannotSetMetadata，尚未进入下载回调。显式文件系统标志的只读
+对照也未恢复列表。该结果将问题缩小到只读元数据路径，但未证明具体 OS 内部根因，
+也不能拿临时读写 capabilities 作为只读提供者修复。主分支保持原有只读声明；下一步
+需要真机只读对照区分环境/系统行为与模型要求，不以私有 entitlement 或改权限绕过。
+
+另修复 replicated 夹具下载实现的三个可完成问题：使用对应 domain manager 提供的
+同卷临时目录，拒绝不匹配的指定 contentVersion（不误报 noSuchItem 导致删除），
+Progress 取消及时且只完成一次、禁止延迟任务再写文件并清理写入/取消竞态临时文件。
+新增主机回归覆盖成功字节/目录、版本、目录失败、提前取消、完成后取消及写入中
+取消；修正后的实现也在 iPad 临时对照通过真实系统链路。这里的主机取消回归不是
+系统下载取消或真机验收。所有读写能力对照源码/产物仅在数据盘诊断目录，未替换
+正常只读夹具。生产 Glory runtime 和整数 ABI 未改。
+
+继续关闭 Android 非 seekable provider 的拒绝验收：probe 的非导出 ContentProvider
+实际返回 Linux FIFO PFD；单独管道与“PNG + 管道”两种选择均以 Bytes 拒绝。写端
+poll(POLLERR) 观察最后读端真实关闭，混合选择回滚先开的 PNG，原有 PNG 授权仍能
+读取。两个管道 opens/closes=2/2、失败=0，最终 provider/原生/共用/私有预览额度归零。
+未加入管道读取、缓冲到磁盘或假装支持随机读取流；原生产拒绝逻辑无需修改。
+ARM64 模拟器实际 SDK 脚本校对新 APK 安装散列和两个新阶段，严格 Clippy、Java
+台账和应用回归通过。DocumentsUI 用户输入、真实设备和 TalkBack 仍分别开放。
+
+证据：`/Volumes/Data/Caches/glory/ios-replicated-diagnosis/result.json` 与
+`/Volumes/Data/Caches/glory/android-pipe-acceptance/sdk-result.json`。当前进度表同步
+移除了已经完成的 iOS driver/权限桥以及 Android 管道拒绝的旧待办。

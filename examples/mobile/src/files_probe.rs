@@ -41,6 +41,20 @@ fn provider_handles() -> ProbeResult<i32> {
             .i()?)
     })
 }
+fn pipe_stat(name: &str) -> ProbeResult<i32> {
+    JavaVM::singleton()?.attach_current_thread(|env| -> ProbeResult<_> {
+        let class = env.load_class(jni_str!("rs.glory.counter.GloryFilesProbeProvider"))?;
+        let name = match name {
+            "pipeOpens" => jni_str!("pipeOpens"),
+            "pipeCloses" => jni_str!("pipeCloses"),
+            "pipeFailures" => jni_str!("pipeFailures"),
+            _ => return Err("unknown pipe counter".into()),
+        };
+        Ok(env
+            .call_static_method(class, name, jni_sig!(() -> i32), &[])?
+            .i()?)
+    })
+}
 async fn foreground() -> ProbeResult {
     let deadline = Instant::now() + Duration::from_secs(15);
     loop {
@@ -153,6 +167,31 @@ pub(crate) fn fixture(driver: Arc<AndroidFiles>, files: Files, renderer: Rendere
                         (Err(error), Some(expected)) if error == expected => (),
                         _ => return Err("native cancellation/refusal mismatch".into()),
                     }
+                }
+                // Real Linux FIFO PFDs must be refused without reading/spooling.
+                // Mixed selection also opens then rolls back a regular source.
+                for mode in [5, 6] {
+                    foreground().await?;
+                    let opened = pipe_stat("pipeOpens")?;
+                    let closed = pipe_stat("pipeCloses")?;
+                    configure(mode)?;
+                    let config = FileConfig { multiple: true, max_files: 2, ..Default::default() };
+                    if !matches!(driver.pick(config).await, Err(FileRejection::Bytes)) {
+                        return Err("non-seekable source was not refused".into());
+                    }
+                    let deadline = Instant::now() + Duration::from_secs(8);
+                    loop {
+                        let stats = native(driver.stats())?;
+                        if pipe_stat("pipeOpens")? == opened + 1 && pipe_stat("pipeCloses")? == closed + 1
+                            && pipe_stat("pipeFailures")? == 0 && provider_handles()? == 1
+                            && stats.picker == 0 && stats.handles == 1 && stats.jobs == 0 { break; }
+                        if Instant::now() > deadline { return Err("pipe/rollback descriptors did not settle".into()); }
+                        pause().await;
+                    }
+                    if native(single[0].reader.read(0, 8).await)? != b"\x89PNG\r\n\x1a\n" {
+                        return Err("pipe refusal revoked prior grant".into());
+                    }
+                    eprintln!("Glory Android pipe refusal passed mode={mode} opens={} closes={} failures=0 prior=1", pipe_stat("pipeOpens")?, pipe_stat("pipeCloses")?);
                 }
                 for (config, expected) in [
                     (

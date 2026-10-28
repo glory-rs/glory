@@ -371,3 +371,38 @@ selected. That path is **not accepted**. Its failure logs are retained separatel
 No private entitlement or sandbox bypass is used. Replicated-provider hydration,
 commercial/cloud providers, actual network/offline/cancellation recovery,
 real-device sandbox/distribution and VoiceOver remain open.
+
+
+### Read-only replicated diagnosis and Android FIFO refusal (2026-10-28)
+
+The replicated result is narrower than a blanket simulator limitation. Fresh
+writable-capability control domains list all four dataless items and complete
+actual picker/download/scoped reads/private PNG painting. The unchanged read-only
+model remains empty; resolving its known PNG through public getUserVisibleURL
+returns POSIX EPERM / cannotSetMetadata before fetchContents. Explicit POSIX flag
+controls did not restore the read-only listing. This isolates a metadata-policy
+path; it does not identify the precise OS defect. Writable controls are diagnostics
+under the data cache, not a shipped relaxation of the read-only fixture. A real
+device comparison of the read-only case remains necessary before claiming its
+platform acceptance. No private entitlement or permission bypass was introduced.
+
+The replicated fixture now uses its domain manager's temporaryDirectoryURL,
+validates requested contentVersion, and has exactly-once prompt Progress
+cancellation, suppressed late writes and temporary-file cleanup if cancellation
+races writing. `sh examples/mobile/check-ios-provider.sh` covers these paths on
+the host. The fixed download implementation also passed an iPad actual-picker
+control. This is not OS-driven download-cancellation or real-device proof.
+Apple's [fetch contract](https://developer.apple.com/documentation/fileprovider/nsfileproviderreplicatedextension/fetchcontents(for:version:request:completionhandler:))
+and [temporary directory contract](https://developer.apple.com/documentation/fileprovider/nsfileprovidermanager/temporarydirectoryurl())
+define the relevant version/volume requirements.
+
+Android files-probe now returns real FIFO PFDs from its non-exported owned
+provider, separately and after a valid PNG in a mixed selection. Existing
+production fstat/regular/seek guards refuse them as Bytes; descriptors close,
+the partially opened regular file rolls back, and the prior PNG grant still
+reads. A bounded writer-side poll(POLLERR) observes the final reader endpoint
+closing, rather than inferring closure from a Rust receipt drop. Both cases
+passed on Glory_Input ARM64 with two pipe opens/closes and zero observer failures;
+all native/provider/shared/preview quotas drain. The checker requires these
+specific new stages plus installed APK hashes. This closes non-seekable refusal
+acceptance, not support for random reads over pipes or actual DocumentsUI input.

@@ -686,3 +686,30 @@ in fileproviderd with POSIX EPERM / cannotSetMetadata. This variant has no passi
 hydration acceptance. Do not substitute enumerating results for replicated/cloud
 or real-device proof; uninstall its owned `rs.glory.hydration` host after recording
 failures. See `docs/native-files.md` for the remaining boundaries.
+
+
+### Replicated download regression and FIFO acceptance follow-up
+
+`sh examples/mobile/check-ios-provider.sh` checks requested-version refusal,
+same-volume directory placement, exact contents, directory errors, prompt and
+late cancellation, and temporary-file cleanup when cancellation races a write.
+Run after sourcing the approved Apple environment. The replicated fixture uses
+its own domain manager's temporaryDirectoryURL. Host checks do not substitute
+for OS-driven cancellation or device acceptance.
+
+Fresh diagnostic domains with writable metadata completed actual replicated
+picker/download/read/preview on these simulators; read-only metadata still gives
+an empty listing and public getUserVisibleURL fails with EPERM/cannotSetMetadata.
+Explicit POSIX flags did not recover the read-only case. The main fixture retains
+its original read-only capabilities. Do not report the diagnostic controls as a
+read-only fix or assume all replicated providers require a real device; compare
+the remaining read-only case on a real device. Raw controls, sources, screenshots
+and logs are in `/Volumes/Data/Caches/glory/ios-replicated-diagnosis/`.
+
+The Android `files-probe` SDK checker now additionally requires two real FIFO
+rejections: pipe alone, and PNG followed by pipe. It verifies reader-end closure
+through the writer's poll(POLLERR), mixed-selection rollback and preservation of
+a prior readable grant. Normal APKs exclude both provider/selector classes and
+the observer. This is intentional refusal of non-regular/non-seekable sources;
+no stream spooling is added. Evidence is
+`/Volumes/Data/Caches/glory/android-pipe-acceptance/sdk-result.json`.

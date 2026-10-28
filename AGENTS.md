@@ -258,7 +258,10 @@ retired feature aliases or count compilation as proof of platform acceptance.
   the non-wrapping native request-code watermark, no URI/authorization history.
   files-probe's owned selector/provider and their DEX classes belong only to the
   probe APK. SDK result/PFD/private-decode evidence does not prove DocumentsUI
-  input, non-seekable provider, real-device, TalkBack or iOS file acceptance.
+  input, real-device, TalkBack or iOS file acceptance. The owned files-probe now
+  also verifies real FIFO refusal, mixed-selection rollback, retained prior grant
+  and final read-end closure observed by bounded writer-side poll(POLLERR). No
+  pipe spooling/random-read support is implied; its observer stays out of normal APKs.
   iOS's application-owned ios_io drivers use the separately authorized single
   integer ABI. UIKit/pasteboard work runs on main, coordinated regular-handle
   opens/reads/closes on workers, all outside ledger/document locks. Clients and
@@ -286,8 +289,12 @@ retired feature aliases or count compilation as proof of platform acceptance.
   fail-once recovery, scoped exact reads/preview/cancel/close on both simulators.
   Only its host/extension share an App Group; the consumer has no group entitlement.
   Files may hydrate thumbnails before Open. Fixed counters contain no bodies or
-  user paths; no real network/cloud account is involved. Replicated dataless
-  materialization returned POSIX EPERM in these simulators and is not accepted.
+  user paths; no real network/cloud account is involved. Read-only replicated
+  metadata still fails with POSIX EPERM before fetchContents; fresh writable
+  diagnostic controls passed actual picker/download/read/preview. Do not infer
+  blanket simulator unavailability or ship relaxed capabilities as a read-only
+  fix. Domain-manager temporary storage, version refusal and exactly-once prompt
+  cancellation have host regressions; they do not prove OS-driven cancellation.
   Commercial/cloud providers, replicated hydration, actual network/offline/download
   cancellation, real-device sandbox and readers remain separate.
   Input placeholder is a bounded, independent presentation layout, lazily shaped

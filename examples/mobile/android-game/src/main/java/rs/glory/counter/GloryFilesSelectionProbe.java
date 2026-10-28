@@ -24,6 +24,12 @@ public final class GloryFilesSelectionProbe extends Activity {
             result.setClipData(clip);
         } else if(mode==3) result.setData(Uri.parse("file:///owned-source-not-allowed.png"));
         else if(mode==4) result.setData(png).setFlags(0);
+        else if(mode==5) result.setData(Uri.parse("content://rs.glory.counter.files-probe/pipe"));
+        else if(mode==6) {
+            ClipData clip=ClipData.newRawUri("Owned rollback",png);
+            clip.addItem(new ClipData.Item(Uri.parse("content://rs.glory.counter.files-probe/pipe")));
+            result.setClipData(clip);
+        }
         else if(getIntent().getBooleanExtra(Intent.EXTRA_ALLOW_MULTIPLE,false)) {
             ClipData clip=ClipData.newRawUri("Owned files",Uri.parse("content://rs.glory.counter.files-probe/text"));
             clip.addItem(new ClipData.Item(png)); result.setClipData(clip);

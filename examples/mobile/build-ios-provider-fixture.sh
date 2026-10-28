@@ -50,7 +50,7 @@ if [ "$provider_principal" = GloryEnumeratingProvider ]; then
 fi
 fixture_sdk=$(xcrun --sdk iphonesimulator --show-sdk-path)
 # Simulator entitlements belong in the executable as well as its signature.
-xcrun --sdk iphonesimulator swiftc $provider_flags "$fixture_source/$provider_source" "$fixture_source/Model.swift" "$fixture_source/Evidence.swift" \
+xcrun --sdk iphonesimulator swiftc $provider_flags "$fixture_source/$provider_source" "$fixture_source/Model.swift" "$fixture_source/Download.swift" "$fixture_source/Evidence.swift" \
   -target "$fixture_arch-apple-ios16.0-simulator" -sdk "$fixture_sdk" \
   -warnings-as-errors -application-extension -parse-as-library -Xlinker -e -Xlinker _NSExtensionMain -module-name GloryHydrationProvider \
   -Xlinker -sectcreate -Xlinker __TEXT -Xlinker __entitlements -Xlinker "$fixture_stage/entitlements.plist" \

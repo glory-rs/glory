@@ -18,6 +18,16 @@ final class FixtureItem: NSObject, NSFileProviderItem {
         if filename.hasSuffix(".png") { return Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGMQ2RL1HwAEJAIiMMFhVgAAAABJRU5ErkJggg==")! }
         return Data([1, 2, 3, 4])
     }
+    static func content(_ id: NSFileProviderItemIdentifier, version: NSFileProviderItemVersion?) throws -> FixtureItem {
+        let item = try get(id)
+        guard id != .rootContainer else { throw CocoaError(.fileReadUnsupportedScheme) }
+        // iOS has no versionNoLongerAvailable constant. Use a valid Cocoa error;
+        // never return noSuchItem (which would make the system delete the item).
+        if let version = version, version.contentVersion != item.itemVersion.contentVersion {
+            throw CocoaError(.fileReadUnknown)
+        }
+        return item
+    }
     static func get(_ id: NSFileProviderItemIdentifier) throws -> FixtureItem {
         guard id == .rootContainer || names.contains(id.rawValue) else { throw NSFileProviderError(.noSuchItem) }
         return FixtureItem(id)

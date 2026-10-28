@@ -29,7 +29,7 @@ final class ProviderScene: UIResponder, UIWindowSceneDelegate {
             }
         }
         #else
-        label.text = "Glory Hydration enumerating extension ready\nUse Files → Browse → Glory Hydration\nContents are provided after a three-second delay."
+        label.text = "Glory Downloads enumerating extension ready\nUse Files → Browse → Glory Downloads\nContents are provided after a three-second delay."
         #endif
     }
 }
