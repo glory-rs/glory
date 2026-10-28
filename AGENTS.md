@@ -262,6 +262,14 @@ retired feature aliases or count compilation as proof of platform acceptance.
   also verifies real FIFO refusal, mixed-selection rollback, retained prior grant
   and final read-end closure observed by bounded writer-side poll(POLLERR). No
   pipe spooling/random-read support is implied; its observer stays out of normal APKs.
+  Separate files-ui-probe uses the real ACTION_OPEN_DOCUMENT/DocumentsUI and
+  system providers, with only owned Download fixtures and finite body-free counters.
+  Its ARM64 emulator acceptance covers single/multiple selection, Cancel/count
+  preservation, private preview/revocation, paused Owner retirement and ignored
+  late results. The fake selector/provider are absent from this APK; the trace
+  class and probe view are absent from ordinary APKs. Keep task polling alive
+  while the render surface is suspended, without drawing or bypassing Android's
+  process lifecycle. Real-device, cloud hydration and TalkBack remain separate.
   iOS's application-owned ios_io drivers use the separately authorized single
   integer ABI. UIKit/pasteboard work runs on main, coordinated regular-handle
   opens/reads/closes on workers, all outside ledger/document locks. Clients and

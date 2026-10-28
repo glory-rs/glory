@@ -6,6 +6,33 @@ use glory::blitz::{
 };
 use glory::prelude::{group, image};
 use std::{collections::BTreeMap, sync::Arc};
+#[cfg(all(feature = "files-ui-probe", target_os = "android"))]
+mod files_ui_probe;
+#[cfg(all(feature = "files-ui-probe", not(target_os = "android")))]
+compile_error!("files-ui-probe requires Android DocumentsUI");
+#[cfg(all(
+    feature = "files-ui-probe",
+    any(
+        feature = "files-probe",
+        feature = "ios-files-ui-probe",
+        feature = "ios-io-probe",
+        feature = "clipboard-probe",
+        feature = "network-probe",
+        feature = "permissions-probe",
+        feature = "permissions-host-probe",
+        feature = "android-assets-probe",
+        feature = "ime-probe",
+        feature = "keyboard-probe",
+        feature = "controls-probe",
+        feature = "radio-probe",
+        feature = "placeholder-probe",
+        feature = "choice-probe",
+        feature = "select-probe",
+        feature = "menu-probe",
+        feature = "tags-probe"
+    )
+))]
+compile_error!("select one mobile acceptance view");
 #[cfg(all(feature = "files-probe", target_os = "android"))]
 mod files_probe;
 #[cfg(all(feature = "files-probe", not(target_os = "android")))]
@@ -282,8 +309,18 @@ fn asset_window(
     #[cfg(all(feature = "files", target_os = "ios"))]
     let file_driver = ios_io::files()
         .map_err(|error| std::io::Error::other(format!("iOS file host: {error:?}")))?;
-    #[cfg(all(feature = "files", any(target_os = "android", target_os = "ios")))]
+    #[cfg(all(
+        feature = "files",
+        any(target_os = "android", target_os = "ios"),
+        not(feature = "files-ui-probe")
+    ))]
     let files = glory::blitz::files::Files::new(file_driver.clone());
+    #[cfg(all(feature = "files-ui-probe", target_os = "android"))]
+    let files = glory::blitz::files::Files::with_timeout(
+        file_driver.clone(),
+        std::time::Duration::from_secs(600),
+    )
+    .map_err(|error| std::io::Error::other(format!("system picker deadline: {error:?}")))?;
     let window = WindowApp::with_config(Config {
         #[cfg(all(feature = "clipboard", any(target_os = "android", target_os = "ios")))]
         clipboard: Some(glory::blitz::clipboard::Clipboard::new(clipboard.clone())),
@@ -320,7 +357,8 @@ fn asset_window(
         feature = "clipboard-probe",
         feature = "files-probe",
         feature = "ios-io-probe",
-        feature = "ios-files-ui-probe"
+        feature = "ios-files-ui-probe",
+        feature = "files-ui-probe"
     )))]
     let content = counter::Counter;
     #[cfg(feature = "ime-probe")]
@@ -347,6 +385,8 @@ fn asset_window(
     let content = tags_probe::fixture();
     #[cfg(all(feature = "clipboard-probe", target_os = "android"))]
     let content = clipboard_probe::fixture(clipboard);
+    #[cfg(all(feature = "files-ui-probe", target_os = "android"))]
+    let content = files_ui_probe::fixture(file_driver, files, window.renderer().clone());
     #[cfg(all(feature = "files-probe", target_os = "android"))]
     let content = files_probe::fixture(file_driver, files, window.renderer().clone());
     #[cfg(all(feature = "ios-io-probe", target_os = "ios"))]

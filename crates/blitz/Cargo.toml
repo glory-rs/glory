@@ -31,13 +31,13 @@ glory-ui = { path = "../ui", version = "0.3.1", optional = true }
 tokio = { version = "1.54.1", default-features = false, features = ["rt", "sync", "time", "macros"], optional = true }
 futures-timer = { version = "=3.0.3", optional = true }
 percent-encoding = { version = "2.3.2", optional = true }
-blitz-dom = { git = "https://github.com/glory-rs/blitz", rev = "ee125981e0e5a217e758be5c470df23cdd9e2fc3", version = "=0.3.0-beta.4", default-features = false, features = ["system-fonts", "complex-scripts"] }
-blitz-traits = { git = "https://github.com/glory-rs/blitz", rev = "ee125981e0e5a217e758be5c470df23cdd9e2fc3", version = "=0.3.0-beta.4", default-features = false }
+blitz-dom = { git = "https://github.com/glory-rs/blitz", rev = "ae532b0e4d3b4e54c804d17d181b176246a64771", version = "=0.3.0-beta.4", default-features = false, features = ["system-fonts", "complex-scripts"] }
+blitz-traits = { git = "https://github.com/glory-rs/blitz", rev = "ae532b0e4d3b4e54c804d17d181b176246a64771", version = "=0.3.0-beta.4", default-features = false }
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
 # Typed visibility returned by Blitz's public computed-style API. Keep this
 # engine detail inside the adapter; glory-style remains the portable value crate.
 style = { package = "stylo", version = "=0.22.0", default-features = false }
-blitz-paint = { git = "https://github.com/glory-rs/blitz", rev = "ee125981e0e5a217e758be5c470df23cdd9e2fc3", version = "=0.3.0-beta.4", default-features = false, optional = true }
+blitz-paint = { git = "https://github.com/glory-rs/blitz", rev = "ae532b0e4d3b4e54c804d17d181b176246a64771", version = "=0.3.0-beta.4", default-features = false, optional = true }
 anyrender = { version = "=0.14.0", optional = true }
 kurbo = { version = "=0.13.1", optional = true }
 peniko = { version = "=0.6.1", optional = true }
@@ -61,8 +61,8 @@ jni = { version = "=0.22.4", default-features = false, optional = true }
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider"], optional = true }
 rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"], optional = true }
 rustls-platform-verifier = { version = "0.7.1", optional = true }
-blitz-shell = { git = "https://github.com/glory-rs/blitz", rev = "ee125981e0e5a217e758be5c470df23cdd9e2fc3", version = "=0.3.0-beta.4", default-features = false, optional = true }
-winit = { git = "https://github.com/glory-rs/winit", rev = "3b6f5a09697acb936567af64e53c915b0b1a2af9", version = "=0.31.0-beta.4", optional = true }
+blitz-shell = { git = "https://github.com/glory-rs/blitz", rev = "ae532b0e4d3b4e54c804d17d181b176246a64771", version = "=0.3.0-beta.4", default-features = false, optional = true }
+winit = { git = "https://github.com/glory-rs/winit", rev = "d93f6db0c70fc2e1ffc10db4ff51961f0da7ea81", version = "=0.31.0-beta.4", optional = true }
 keyboard-types = { version = "0.8.3", optional = true }
 softbuffer_window_renderer = { version = "=0.9.0", optional = true }
 

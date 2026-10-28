@@ -559,6 +559,95 @@ exclude the fixture Activity/provider from their manifest and DEX; default build
 also keep `GLORY_FILES=false` and initialize no file service. Native drop remains
 desktop-only. See [the file contract](../../docs/native-files.md).
 
+### Actual Android DocumentsUI input
+
+`files-ui-probe` mounts a separate interactive acceptance view using the production
+implicit `ACTION_OPEN_DOCUMENT`. It compiles finite counters, but excludes the
+SDK probe's selector Activity and ContentProvider. Its 600-second picker deadline
+allows manual navigation; ordinary services keep their existing timeout.
+
+Use the owned `Glory_Input` ARM64 AVD and archive the APK before another build:
+
+```sh
+export GLORY_BUILD_ROOT=/Volumes/Data/Caches/glory/android
+GLORY_ANDROID_FEATURES=files-ui-probe sh examples/mobile/build-android-game.sh
+mkdir -p /Volumes/Data/Caches/glory/android-system-files/consumer
+cp "$GLORY_BUILD_ROOT/package-game-aarch64-debug/glory-counter.apk" \
+  /Volumes/Data/Caches/glory/android-system-files/consumer/glory-counter.apk
+python3 examples/mobile/check-android-system-files.py \
+  --adb "$GLORY_BUILD_ROOT/sdk/platform-tools/adb" --serial emulator-5554 \
+  --output /Volumes/Data/Caches/glory/android-system-files --prepare
+"$GLORY_BUILD_ROOT/sdk/platform-tools/adb" -s emulator-5554 install -r \
+  /Volumes/Data/Caches/glory/android-system-files/consumer/glory-counter.apk
+"$GLORY_BUILD_ROOT/sdk/platform-tools/adb" -s emulator-5554 shell am force-stop rs.glory.counter
+"$GLORY_BUILD_ROOT/sdk/platform-tools/adb" -s emulator-5554 shell am start -W \
+  -f 0x10008000 -n rs.glory.counter/.GloryGameActivity
+```
+
+Preparation writes only four hash-checked owned files in
+`Download/glory-owned-system-files`: exact UTF-8 TXT (38 bytes), badge PNG
+(70 bytes), count-only extra TXT (28 bytes) and rejected BIN (4 bytes). It refuses
+to overwrite unknown bytes. Wait for emulated public storage to mount after boot.
+Navigate the real picker through its drawer's internal storage, Download, then
+that folder; the Downloads provider's own list may be empty. Read no personal files.
+
+Perform these actions through native UI input, never injected activity results:
+
+1. Press **Open then retire requester**. Keep DocumentsUI foreground for three
+   seconds and require `Glory DocumentsUI retired pending: permit retained, second
+   picker busy` in this process's log. Before returning a result, save its log and
+   `adb shell dumpsys activity activities` foreground record as below. Then select
+   the owned text file within 90 seconds. Require the app's ignored-result status
+   and `retired passed`; no PFD may open for that result.
+2. **Choose system documents**: select the 38-byte TXT and require exact-read
+   success. Reopen, then use Android Back until the picker cancels. The original
+   grant must remain readable. With emulator mouse input a grid item may require
+   a double-click to open; use the visible native selection state.
+3. Reopen; check BIN is dimmed by TXT/PNG filters. Long-press PNG, select the
+   38-byte TXT, require **2 selected**, then press the system **Select** button.
+   Require exact reads and the rendered green private preview. Reopen and cancel;
+   both prior grants and the preview remain available.
+4. Reopen; select both TXT files and PNG, require **3 selected**, then Select.
+   Require Count refusal and both previous grants still readable.
+5. **Clear and verify release**: require stale-token rejection, no private preview,
+   zero native/shared resource charges and matching PFD opens/closes (3/3).
+
+Capture the paused phase while the system picker is still foreground (substitute
+the actual current PID; do not reuse a previous process log):
+
+```sh
+adb=/Volumes/Data/Caches/glory/android/sdk/platform-tools/adb
+pid=$($adb -s emulator-5554 shell pidof rs.glory.counter)
+$adb -s emulator-5554 logcat --pid "$pid" -d -v threadtime \
+  > /Volumes/Data/Caches/glory/android-system-files/retired-pending.log
+$adb -s emulator-5554 shell dumpsys activity activities \
+  > /Volumes/Data/Caches/glory/android-system-files/retired-foreground.txt
+# After completing all actual UI phases:
+python3 examples/mobile/check-android-system-files.py \
+  --adb "$adb" --serial emulator-5554 \
+  --apk /Volumes/Data/Caches/glory/android-system-files/consumer/glory-counter.apk \
+  --aapt2 /Volumes/Data/Caches/glory/android/sdk/build-tools/36.0.0/aapt2 \
+  --pending-log /Volumes/Data/Caches/glory/android-system-files/retired-pending.log \
+  --foreground /Volumes/Data/Caches/glory/android-system-files/retired-foreground.txt \
+  --output /Volumes/Data/Caches/glory/android-system-files
+```
+
+The checker sends no UI input; it checks actual ordered logs, installed hashes,
+fixture hashes, foreground DocumentsUI evidence, injection-class isolation and
+absence of broad storage permissions. Record screenshots separately. Trace slots
+are launches, OK results, cancelled results, PFD opens, PFD closes, recognized system
+URI grants, completed bounded reads and ignored retired results; no URI/body log.
+Use `--cleanup` with the same adb/serial/output after verification to remove only
+the four unchanged owned files, then rebuild and restore the ordinary APK.
+
+2026-10-28: the full native-input sequence passed on Android 16 ARM64. It exposed
+and fixed Winit dropping explicit wakes while paused and Blitz clearing document
+poll wakers on surface suspension. Tasks retain the live window lifetime; rendering
+stays suspended. Android process freezing/termination is still OS-owned. Evidence:
+`/Volumes/Data/Caches/glory/android-system-files/system-result.json` plus screenshots.
+This closes emulator DocumentsUI input; real devices, cloud providers/hydration and
+TalkBack remain independent acceptance items.
+
 ### iOS native files and clipboard
 
 `GLORY_IOS_FEATURES=clipboard,files sh examples/mobile/build-ios.sh` installs

@@ -9,7 +9,7 @@ sdk="$ANDROID_HOME/platforms/android-36/android.jar"
 mkdir -p "$classes"
 cat > "$classes/BuildConfig.java" <<'JAVA'
 package rs.glory.counter;
-final class BuildConfig { static final boolean GLORY_FILES_PROBE=true; }
+final class BuildConfig { static final boolean GLORY_FILES_PROBE=true; static final boolean GLORY_FILES_UI_PROBE=false; }
 JAVA
 "$JAVA_HOME/bin/javac" -Xlint:all -Werror -d "$classes" -cp "$sdk" \
     "$classes/BuildConfig.java" \

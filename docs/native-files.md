@@ -157,6 +157,34 @@ actual descriptor-close callbacks. It uses no injected UI input. This evidence
 does not establish system DocumentsUI gestures, real devices or reader speech.
 Commands are in the [mobile example](../examples/mobile/README.md).
 
+Separate `files-ui-probe` now has actual ARM64 Android 16 DocumentsUI acceptance
+(2026-10-28). Native input selected only the four owned Download fixtures; no
+Activity result/URI injection, private selector/provider, broad storage permission,
+persisted grant or personal cloud account was used. Single TXT and TXT+PNG reads
+match exact bytes; the PNG decodes and paints through the private preview path.
+System Cancel preserves one/two prior grants. Selecting three documents against
+max_files=2 refuses the group before opening descriptors and preserves prior reads.
+Clear rejects the retired token, revokes the private cache address, releases native
+and shared budgets, and balances original PFD opens/closes at 3/3.
+
+The real picker exposed two paused-host issues, fixed in the genuine engine forks:
+Winit now dispatches explicit proxy wakes while the Activity is paused; Blitz
+retains the live View's document poll waker when suspending its render surface.
+Redraw remains gated by surface/activity state; a paused redraw alone does not
+force polling. During the system Activity, the requesting Owner actually retires
+after three seconds, the outstanding picker retains admission, and a second pick
+returns Busy. Returning a real late selection then releases that permit without
+opening a PFD or delivering a callback. This does not keep a process alive against
+Android's own freezing/termination policies.
+
+`check-android-system-files.py` verifies ordered phase logs, the still-foreground
+DocumentsUI record captured after retirement and before returning a result,
+installed APK bytes, fixture hashes, absent injection classes and storage
+permissions. It sends no UI input. Evidence and screenshots are under
+`/Volumes/Data/Caches/glory/android-system-files/`; `system-result.json` records
+APK SHA-256 `cbad8e048aa13f6422f529f4a2b0d8a610a5db40555e7e1d621dcf448a079f00`.
+Real-device sandbox enforcement, commercial cloud/hydration and TalkBack remain open.
+
 ## Image previews
 
 Enable `FileConfig::preview` explicitly. PNG/JPEG requests first read at most
@@ -213,7 +241,7 @@ cargo test --locked --manifest-path ../sapid/examples/native/Cargo.toml --featur
 
 Actual desktop dialog selection/cancellation has not been accepted through OS
 input. macOS sandbox security-scoped URLs/bookmarks, Windows/Linux dialog runtime,
-iOS third-party/cloud provider flows, Android system DocumentsUI input and non-seekable providers,
+iOS commercial cloud/replicated provider flows, Android cloud providers and non-seekable streaming support,
 actual OS drag-source/destination interaction and
 assistive-technology acceptance remain open. Native drop protocol/engine tests
 use application-owned native event sources and do not prove a system drag gesture. Injected-driver, CPU and compile evidence

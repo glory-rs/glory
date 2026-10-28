@@ -19,7 +19,7 @@
     {
       "name": "blitz",
       "git": "https://github.com/glory-rs/blitz",
-      "rev": "ee125981e0e5a217e758be5c470df23cdd9e2fc3",
+      "rev": "ae532b0e4d3b4e54c804d17d181b176246a64771",
       "upstream": "https://github.com/DioxusLabs/blitz",
       "upstream_rev": "92b11f1bd8ab7975411328b0406a95a09445b4e7",
       "packages": [
@@ -155,13 +155,14 @@
         "winit-win32",
         "winit-x11"
       ],
-      "rev": "3b6f5a09697acb936567af64e53c915b0b1a2af9",
+      "rev": "d93f6db0c70fc2e1ffc10db4ff51961f0da7ea81",
       "upstream": "https://github.com/rust-windowing/winit",
       "upstream_rev": "d597ced770f3263f66ab901cc27bf7984e314465",
       "rustc_tests": [
         "winit-android/src/event_loop_lifetime.rs",
         "winit-uikit/src/text_input_model.rs",
-        "winit-android/src/text_input_model.rs"
+        "winit-android/src/text_input_model.rs",
+        "winit-android/src/wake_policy.rs"
       ],
       "tests": [
         "-p",

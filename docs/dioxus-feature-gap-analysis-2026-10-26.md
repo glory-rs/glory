@@ -16,7 +16,7 @@ Mac，最新证据见文末 Apple/移动输入记录，不能继续把“没有 
 | Web 发布 | 可复现 gzip、哈希清单、预览协商/HEAD/身份回退 | 指纹命名、Brotli/图片转换、WASM 分包 |
 | 运行时权限 | 有界 Owner future/driver API；Android 安全 JNI；iOS Swift 宿主及已授权的最小整数 FFI 连接；SDK 控制的授权状态查询 | 真实系统弹窗选择、真机及其他权限类别 |
 | 原生剪贴板 | 显式可选桌面 worker 与 Android 安全 JNI；CopyText 与原生编辑器复制/剪切/粘贴；实际 Sapid 四主题消费端、macOS 系统往返和 Android ARM64 前台系统读写/ClipData 恢复；iOS UIPasteboard 整数桥、SDK 读写及条件恢复 | Windows/Linux 实际 OS 往返、跨应用粘贴弹窗、移动系统菜单及真实键盘/读屏 |
-| 原生文件服务 | 显式可选 driver、桌面系统选择器、Winit 文件拖放通道、Android 安全 JNI/ContentResolver/PFD、稳定句柄分块读取及私有 PNG/JPEG 预览；桌面实际文件/消费端、Android 自有源 SDK 与真实 FIFO 拒绝/回滚、iOS UIKit 系统选择器与外部 Local Storage/enumerating 扩展链路通过 | Android DocumentsUI/桌面实际拖动输入、iOS 只读 replicated 元数据、商业云盘/真机、macOS sandbox security scope 与平台读屏 |
+| 原生文件服务 | 显式可选 driver、桌面系统选择器、Winit 文件拖放通道、Android 安全 JNI/ContentResolver/PFD、稳定句柄分块读取及私有 PNG/JPEG 预览；桌面实际文件/消费端、Android 真实 DocumentsUI 单/多选及取消/超限保留/退役/释放、自有源 SDK 与 FIFO 拒绝/回滚、iOS UIKit 与外部 Local Storage/enumerating 扩展链路通过 | 桌面实际拖动输入、iOS 只读 replicated 元数据、商业云盘/真机、macOS sandbox security scope 与平台读屏 |
 | 原生控件 | Checkbox/Switch/Mixed 和 Radio 绘制与输入、placeholder、选择控件、菜单/Palette、TagsInput/PillsInput 的协议和实际消费端；现补齐 Collapsible 的原生 intrinsic-height 过渡、匹配完成回执、四主题双内容策略与编辑器身份/Owner 清理；两端模拟器已有控件初始显示 | 富文本、移动系统菜单、Sheet 及其他弹层/系统菜单仍开放；实际输入/读屏单独验收 |
 
 整体差距仍未关闭。签名身份/设备等外部条件和仍需实现的软件功能分别保留，
@@ -1152,3 +1152,37 @@ ARM64 模拟器实际 SDK 脚本校对新 APK 安装散列和两个新阶段，�
 证据：`/Volumes/Data/Caches/glory/ios-replicated-diagnosis/result.json` 与
 `/Volumes/Data/Caches/glory/android-pipe-acceptance/sdk-result.json`。当前进度表同步
 移除了已经完成的 iOS driver/权限桥以及 Android 管道拒绝的旧待办。
+
+### 2026-10-28：Android 真实 DocumentsUI 交互及暂停任务修复
+
+新增独立 `files-ui-probe`，在自有 Android 16 ARM64 AVD 上通过实际系统界面完成
+选择。它使用生产隐式 ACTION_OPEN_DOCUMENT；SDK 夹具的 selector Activity/provider
+不在此 APK 中，没有注入结果/URI、宽泛存储权限、持久授权或个人云盘。四个自有
+Download 文件按散列准备，正常读取仅限已知 TXT/PNG；BIN 在系统筛选下不可选。
+
+本轮真实输入通过：38 字节 Unicode TXT 单选、TXT+PNG 两项多选、精确读取及私有
+PNG 解码/实际绘制、系统 Back 取消后保留一/两项授权、三项选择的 Count 拒绝并保留
+原授权、清空后旧令牌拒绝读取以及原生/共用/预览额度释放。最终原始 PFD opens/closes
+为 3/3，超限选择没有新增打开。复核实际安装 APK 散列与所测包一致。
+
+实际选择器让父 Activity 暂停，暴露两个原有问题：Winit 丢弃暂停期间明确的 proxy
+唤醒；Blitz 销毁渲染表面时清除了仍存续文档的任务唤醒器。均在真正 GitHub fork
+内以安全 Rust 修复，Glory、独立示例锁文件及 Sapid 原生消费端统一固定新完整 SHA。
+绘制继续由活动表面控制，只有待绘制标记时不会热轮询。复测在 DocumentsUI 仍为前台
+时观察 Owner 三秒退役，原选择器仍占许可、第二个请求返回 Busy；实际返回迟到文件
+结果后释放许可、不打开 PFD、不调用已退役回调。不改变 Android 自身进程冻结/终止策略。
+
+新增无 UI 注入的证据校验/自有文件准备清理脚本，保存有界计数、前台 Activity 记录、
+安装/文件散列及实际截图。严格 Android Clippy、引擎库/四项新唤醒策略回归及
+Android Native/GameActivity、UIKit simulator/device 编译检查通过；原 SDK FIFO/
+混合回滚回归再次通过。Glory 工作区 all-features 完整测试 1,089 项及全目标严格
+Clippy、移动应用六项 IO 回归通过。Sapid 联动检查顺带修正 image/lightboxes 验收遗漏共享资产
+模块的问题，文件/图片/灯箱回归和原生全目标严格 Clippy 通过。普通 APK 已重建并
+实际恢复 Counter，确认验收视图/计数类/注入选择器均缺席，未新增存储权限；四个
+自有文件已按散列清理，仅停止本轮创建的模拟器。
+
+证据：`/Volumes/Data/Caches/glory/android-system-files/system-result.json`、
+`sdk-regression/sdk-result.json`、`ordinary/isolation.json` 及同目录截图/日志。
+真实交互包 SHA-256：`cbad8e048aa13f6422f529f4a2b0d8a610a5db40555e7e1d621dcf448a079f00`。
+Android 系统选择器的模拟器输入缺口已关闭；真实设备、商业云盘/hydration、TalkBack、
+桌面真实拖动及 iOS 只读 replicated/真机等边界继续保留。

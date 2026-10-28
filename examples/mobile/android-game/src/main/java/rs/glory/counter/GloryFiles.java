@@ -25,6 +25,19 @@ import java.util.List;
 // All selection and reads are explicit app-owned content URI grants. No names
 // become paths, no persistent grants/storage permission, native export or unsafe.
 public final class GloryFiles {
+    // Reflection keeps the opt-in trace class out of ordinary/SDK-injection APKs.
+    private static void trace(int index) {
+        if(BuildConfig.GLORY_FILES_UI_PROBE) {
+            try { Class.forName("rs.glory.counter.GlorySystemFilesTrace").getMethod("mark",int.class).invoke(null,index); }
+            catch(ReflectiveOperationException error) { throw new IllegalStateException("missing system-files trace",error); }
+        }
+    }
+    private static void launched(Intent intent) {
+        if(BuildConfig.GLORY_FILES_UI_PROBE) {
+            android.util.Log.i("GlorySystemFiles","ACTION_OPEN_DOCUMENT launched explicit="+(intent.getComponent()!=null));
+            trace(0);
+        }
+    }
     private static FilesLedger shared;
     private static synchronized FilesLedger shared() { if(shared==null) shared=new FilesLedger(); return shared; }
     public static final class Coordinator {
@@ -62,11 +75,13 @@ public final class GloryFiles {
             // receives a real Android activity result and reads a real provider;
             // it does not establish system DocumentsUI/user-input acceptance.
             if(BuildConfig.GLORY_FILES_PROBE) intent.setClassName(current,"rs.glory.counter.GloryFilesSelectionProbe");
-            current.startActivityForResult(intent,code); return true;
+            current.startActivityForResult(intent,code); launched(intent); return true;
         }
         public boolean result(int code,int result,Intent data) {
             if(!ledger.owns(code)) return false;
+            trace(result==Activity.RESULT_OK ? 1 : 2);
             FilesLedger.Config config=ledger.wanted(code);
+            if(config==null) trace(7);
             if(config==null || result!=Activity.RESULT_OK) { ledger.result(code,null); return true; }
             if(data==null || (data.getFlags()&Intent.FLAG_GRANT_READ_URI_PERMISSION)==0) { ledger.failResult(code,FilesLedger.UNAVAILABLE); return true; }
             try {
@@ -78,6 +93,7 @@ public final class GloryFiles {
                 int bytes=0;
                 for(Uri uri:uris) {
                     if(uri==null || !"content".equals(uri.getScheme()) || uri.getAuthority()==null || uri.getFragment()!=null) throw new FilesLedger.Refusal(FilesLedger.TYPE);
+                    if("com.android.providers.downloads.documents".equals(uri.getAuthority()) || "com.android.externalstorage.documents".equals(uri.getAuthority()) || "com.android.providers.media.documents".equals(uri.getAuthority())) trace(5);
                     String text=uri.toString();
                     if(text.length()>4096) throw new FilesLedger.Refusal(FilesLedger.METADATA);
                     int length=text.getBytes(StandardCharsets.UTF_8).length; bytes+=length;
@@ -102,6 +118,7 @@ public final class GloryFiles {
         if(type.length()>127) throw new FilesLedger.Refusal(FilesLedger.METADATA);
         ParcelFileDescriptor descriptor=resolver.openFileDescriptor(uri,"r");
         if(descriptor==null) throw new FilesLedger.Refusal(FilesLedger.UNAVAILABLE);
+        trace(3);
         try {
             if((Os.fstat(descriptor.getFileDescriptor()).st_mode&OsConstants.S_IFMT)!=OsConstants.S_IFREG) throw new FilesLedger.Refusal(FilesLedger.BYTES);
             long size=descriptor.getStatSize();
@@ -112,13 +129,13 @@ public final class GloryFiles {
                 @Override public byte[] read(long offset,int length) throws IOException {
                     byte[] bytes=new byte[length]; ByteBuffer output=ByteBuffer.wrap(bytes);
                     while(output.hasRemaining()) { int read=channel.read(output,offset+output.position()); if(read<=0) throw new IOException("short provider read"); }
-                    return bytes;
+                    trace(6); return bytes;
                 }
-                @Override public void close() throws IOException { try { stream.close(); } finally { descriptor.close(); } }
+                @Override public void close() throws IOException { try { stream.close(); } finally { descriptor.close(); trace(4); } }
             };
             return new FilesLedger.Offered(name,type,size,source);
         } catch(IOException | RuntimeException | ErrnoException error) {
-            try { descriptor.close(); } catch(IOException ignored) {}
+            try { descriptor.close(); trace(4); } catch(IOException ignored) {}
             if(error instanceof IOException) throw (IOException)error;
             throw new IOException("provider descriptor unavailable",error);
         }
