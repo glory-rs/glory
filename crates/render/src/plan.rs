@@ -32,6 +32,7 @@ struct Declaration {
     document_roots: Box<[usize]>,
     choice_roots: Box<[usize]>,
     external_options: bool,
+    submission: bool,
 }
 #[derive(Debug)]
 pub(crate) struct Facts {
@@ -51,8 +52,14 @@ impl Declaration {
         let mut layers = 0;
         let mut focus_scopes = 0;
         let mut external_options = false;
+        let mut submission = true;
         for (index, node) in nodes.iter().enumerate() {
             let d = node.descriptor.view();
+            submission &= d.semantics.is_none()
+                && matches!(
+                    d.props,
+                    Props::View | Props::Text(_) | Props::Button(_) | Props::Link(_)
+                );
             let layer = d.semantics.as_ref().is_some_and(|s| s.layer.is_some());
             let focus = crate::focus_scope::declared(d);
             let live_names = d.semantics.is_some();
@@ -103,6 +110,7 @@ impl Declaration {
             document_roots: document_roots.into_boxed_slice(),
             choice_roots: choice_roots.into_boxed_slice(),
             external_options,
+            submission,
         }
     }
 }
@@ -193,6 +201,9 @@ impl Plan {
     }
     pub fn nodes(&self) -> &[PlanNode] {
         &self.0.nodes
+    }
+    pub(crate) fn supports_submission(&self) -> bool {
+        self.0.submission
     }
     pub(crate) fn facts(&self, index: usize) -> &Facts {
         &self.0.facts[index]

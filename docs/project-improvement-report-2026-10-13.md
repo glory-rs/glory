@@ -61,7 +61,7 @@ resource: payload_drop_count=0
 
 **影响：** SSR 请求重复创建 app 状态和 resource 时，值可能一直保留；CSR 长会话反复挂载组件也有累积风险。free-list 已修复“失效后不复用”的问题，但无法回收从未 invalidated 的值。
 
-**改进：** app 状态交给 app/holder 生命周期的 Owner；组件资源交给 scope 或明确的任务所有者。保留现有 Cage/Bond/Lotus API，给直接创建 Cage 的用户说明 Owner 使用方式。处理所有权时同时处理在途任务，避免回收后任务继续 `revise` stale handle。
+**改进：** app 状态交给 app/holder 生命周期的 Owner；组件资源交给 scope 或明确的任务所有者。保留现有 Cage/Bond/Vary API，给直接创建 Cage 的用户说明 Owner 使用方式。处理所有权时同时处理在途任务，避免回收后任务继续 `revise` stale handle。
 
 **验收：** holder drop、组件 detach、替换同类型 app 状态后 payload 正确析构；重复挂载和销毁后 slot 复用数趋于稳定；stale task 完成不 panic、不影响新组件。
 

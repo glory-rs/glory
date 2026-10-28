@@ -1,5 +1,29 @@
 # Performance Notes
 
+## 公共 keyed API、DSL 与标准 suite — 2026-10-29
+
+[实施和完整测量](v2-display-completion-results-2026-10-29.md)：列表和生命周期由框架接管，
+XML/手写共用 KeyedList；最终四轮 2160 样本对照当前实际 DSL 起点及 Dioxus/Leptos。
+千行创建/选行/清空 Script 改善 21.4%/20.8%/11.8%；替换/局部更新慢 4.1%/4.7%，
+万行慢 1.2%、交换 wall 慢 3.4%。性能目标未全部达到，体积增长和全部回退均保留。
+标准 HTML-table suite 完整运行八个框架的 CPU、内存和体积组；最终 120 个结果文件。
+连续移动共享选区快照避免布局屏障，标准交换行 total 107.0→42.7 ms。
+减少 BindingId 记录的实验因受控清空回退而撤回，减少记录不直接代表更快。
+
+## 主 benchmark 使用显示 DSL — 2026-10-28
+
+[迁移与同批测量](benchmark-display-dsl-migration-2026-10-28.md)：Glory 默认入口已改为 XML，
+独立 html-template 应用合并移除，手写对照与专项探针转为主入口 feature。
+新旧主入口／手写／Dioxus 四轮 1728 样本，万行 Script 161.544→57.860 ms，wall 416.15→321.00 ms；
+小操作 wall 和 DSL 相对手写的万行差距保留。响应图 40003→30003，原型历史成绩不与新批次混池。
+
+## 稀疏 HTML 模板实验 — 2026-10-28
+
+[原型和同批结果](v2-html-template-prototype-results-2026-10-28.md)已实现直接 HTML 模板实例，
+将 raw elements 从逐元素 UI／Mapper Memory 和 Entry 中移出。相同响应图版本的万行创建
+Script 降低 67.3%，两 RAF wall 降低 31.3%；绑定合并单列，不作为默认入口。
+这改变了显示契约，尚不覆盖旧语义组件的完整能力；更新／交换的 wall 回退也保留在报告中。
+
 ## 跨 mutation 字段提交试验（已撤回）— 2026-10-26
 
 [字段提交报告](field-submit-plan-2026-10-26.md)记录已撤回的 Text/Label/Classes

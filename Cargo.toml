@@ -1,7 +1,7 @@
 [workspace]
 # The supported semantic workspace; retired adapter/tool packages are removed.
 # See docs/semantic-ui-implementation.md for implementation and platform scope.
-members = ["crates/style", "crates/render", "crates/core", "crates/resource", "crates/i18n", "crates/ui", "crates/html", "crates/web", "crates/ssr", "crates/blitz", "crates/glory", "crates/salvo-adapter"]
+members = ["crates/style", "crates/render", "crates/core", "crates/resource", "crates/i18n", "crates/ui", "crates/html", "crates/web", "crates/ssr", "crates/blitz", "crates/glory", "crates/salvo-adapter", "crates/view-macros"]
 exclude = ["examples", "benchmarks", "tools/cli"]
 resolver = "2"
 

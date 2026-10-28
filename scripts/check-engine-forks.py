@@ -10,6 +10,7 @@ import tomllib
 
 
 def run(*args, **kwargs):
+    kwargs.setdefault("encoding", "utf-8")
     return subprocess.run(args, check=True, text=True, **kwargs)
 
 
@@ -75,8 +76,14 @@ def main():
     assert member_names == {
         "glory", "glory-style", "glory-render", "glory-core", "glory-resource",
         "glory-i18n", "glory-ui", "glory-html", "glory-web", "glory-ssr", "glory-blitz",
-        "glory-salvo",
+        "glory-salvo", "glory-view-macros",
     }, member_names
+    compiler = next(package for package in metadata["packages"] if package["name"] == "glory-view-macros")
+    assert any("proc-macro" in target["kind"] for target in compiler["targets"])
+    for features in ([], ["--features", "web"]):
+        graph = output("cargo", "tree", "--locked", "-p", "glory", "--no-default-features", *features,
+                       "--edges", "normal,build", "--prefix", "none", "--manifest-path", str(root / "Cargo.toml"))
+        assert "glory-view-macros" not in graph, "runtime graph acquired the optional display compiler"
     lock = tomllib.loads((root / "Cargo.lock").read_text(encoding="utf-8"))
     for fork in record["forks"]:
         assert len(fork["rev"]) == 40 and all(c in "0123456789abcdef" for c in fork["rev"])

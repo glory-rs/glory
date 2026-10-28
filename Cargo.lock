@@ -1608,6 +1608,7 @@ dependencies = [
  "glory-ssr",
  "glory-style",
  "glory-ui",
+ "glory-view-macros",
  "glory-web",
 ]
 
@@ -1738,6 +1739,15 @@ dependencies = [
  "glory-core",
  "glory-render",
  "glory-style",
+]
+
+[[package]]
+name = "glory-view-macros"
+version = "0.3.1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
 ]
 
 [[package]]

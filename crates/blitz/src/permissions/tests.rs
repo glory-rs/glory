@@ -101,9 +101,22 @@ fn requests_are_lazy_cancel_releases_delivery_but_not_the_os_prompt_and_old_ids_
     assert!(poll(&mut next).is_pending());
     assert_eq!(fake.0.borrow().native, Some(3));
     fake.complete();
-    std::thread::sleep(Duration::from_millis(8));
+    // The OS timer thread can wake later than 8 ms under a parallel build.
+    // Wait for actual settlement, bounded independently of the service timeout.
+    let deadline = Instant::now() + Duration::from_secs(2);
+    let ready = loop {
+        let ready = poll(&mut next);
+        if ready.is_ready() {
+            break ready;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "completed permission did not settle"
+        );
+        std::thread::sleep(Duration::from_millis(1));
+    };
     assert_eq!(
-        poll(&mut next),
+        ready,
         Poll::Ready(Ok(PermissionState {
             status: Status::Granted,
             rationale: false

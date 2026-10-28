@@ -110,7 +110,7 @@ cross-browser acceptance must be stated separately from Chromium CDP input tests
 ## Sapid component and bounded history
 
 An optional dependency-free `editor` feature exposes RichTextEditor and its
-controller/finite document types. It retains Cage/Bond/Lotus, four themes,
+controller/finite document types. It retains Cage/Bond/Vary, four themes,
 unstyled and explicit style overrides, controlled source silence and internal/
 typed-before-generic callback order. Toolbar buttons are outside the editable
 control and use true toolbar/control semantics. No native fallback textarea is

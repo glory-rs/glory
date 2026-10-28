@@ -15,7 +15,7 @@ use web_sys::{Document, Node};
 #[path = "plan_parts.rs"]
 mod addresses;
 pub(super) use addresses::index as part_index;
-use addresses::{Layout, Retirement};
+use addresses::{Layout, Retirement, submission_shape};
 
 #[path = "plan_fields.rs"]
 mod fields;
@@ -171,7 +171,7 @@ extern "C" {
         objects: &[JsValue],
         records: &[u32],
         strings: &str,
-        created: &js_sys::Array,
+        created: Option<&js_sys::Array>,
         live: bool,
     ) -> Result<js_sys::Array, JsValue>;
     #[wasm_bindgen(catch, js_name = gloryPlanText)]
@@ -241,6 +241,7 @@ impl Target<'_> {
 pub(super) struct Prototype {
     pub(super) host: JsValue,
     layout: Layout,
+    submission: bool,
 }
 impl Prototype {
     pub(super) fn parts(&self) -> u32 {
@@ -347,11 +348,26 @@ fn deferred(name: &str) -> bool {
     )
 }
 impl Plans {
-    pub(super) fn cached(&self, plan: &Plan) -> bool {
-        self.0
-            .borrow()
-            .get(&plan.identity())
-            .is_some_and(|cached| cached.source.upgrade().is_some_and(|p| p.same(plan)))
+    pub(super) fn submission(
+        &self,
+        document: &Document,
+        plan: &Plan,
+        shape: &PlanShape,
+        pending: bool,
+    ) -> Result<Option<Rc<Prototype>>, Error> {
+        if let Some(cached) = self.0.borrow().get(&plan.identity())
+            && cached.source.upgrade().is_some_and(|p| p.same(plan))
+        {
+            return Ok(cached
+                .prototype
+                .submission
+                .then(|| cached.prototype.clone()));
+        }
+        // Cold prototype DOM work must not overtake a queued prefix.
+        if pending || !submission_shape(shape) {
+            return Ok(None);
+        }
+        self.get(document, plan, shape)
     }
     pub(super) fn get(
         &self,
@@ -359,14 +375,14 @@ impl Plans {
         plan: &Plan,
         shape: &PlanShape,
     ) -> Result<Option<Rc<Prototype>>, Error> {
-        if shape.shapes.iter().any(|node| node.pieces.is_empty()) {
-            return Ok(None);
-        }
         let key = plan.identity();
         if let Some(cached) = self.0.borrow().get(&key)
             && cached.source.upgrade().is_some_and(|p| p.same(plan))
         {
             return Ok(Some(cached.prototype.clone()));
+        }
+        if shape.shapes.iter().any(|node| node.pieces.is_empty()) {
+            return Ok(None);
         }
         let (mut nodes, mut bytes) = shape.weight();
         {
@@ -439,6 +455,7 @@ impl Plans {
         let prototype = Rc::new(Prototype {
             host: prototype(root, &all_parts, &owners, &virtual_parts, &fields).map_err(backend)?,
             layout: Layout::new(shape)?,
+            submission: submission_shape(shape),
         });
         let (nodes, bytes) = shape.weight();
         self.0.borrow_mut().insert(

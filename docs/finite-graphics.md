@@ -14,7 +14,7 @@ clips the path. An absent alternative explicitly marks decoration; decorative
 graphics reject names, naming relations and explicit focus. A present alternative
 is nonempty and at most 1024 UTF-8 bytes. An explicit accessible name overrides
 the alternative, and clearing the name restores it. Graphics accept no semantic
-children and cannot impersonate structural roles. `ui::graphic().drawing(Lotus)`
+children and cannot impersonate structural roles. `ui::graphic().drawing(Vary)`
 uses the normal staged builder and field binding preflight.
 
 `Patch::Graphic(Change<Box<GraphicProps>>)` replaces only drawing payload. Keep is a

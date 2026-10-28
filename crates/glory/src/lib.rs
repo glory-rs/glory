@@ -2,7 +2,7 @@
 #[cfg(all(feature = "blitz", not(target_arch = "wasm32")))]
 pub use glory_blitz as blitz;
 pub use glory_core as core;
-pub use glory_core::{Bond, Cage, Lotus, Owner, Resource, ResourceSeed, ResourceState, Runtime};
+pub use glory_core::{Bond, Cage, Owner, Resource, ResourceSeed, ResourceState, Runtime, Vary};
 #[cfg(feature = "i18n")]
 pub use glory_i18n as i18n;
 pub use glory_render as render;
@@ -40,10 +40,58 @@ pub mod html {
 }
 pub use glory_ui::{App, Scope, Widget};
 
-pub mod prelude {
-    pub use glory_core::{
-        Bond, Cage, Lotus, Owner, Resource, ResourceSeed, ResourceState, Runtime,
+/// Direct display data/configuration; distinct from semantic widget builders.
+#[cfg(feature = "html")]
+pub mod display {
+    #[cfg(feature = "dsl")]
+    pub use crate::{component, field, template, view};
+    pub use glory_core::{Bond, Cage, KeyedEntry, KeyedList, ListError, Runtime, Scope, Vary};
+    pub use glory_html::view::*;
+    #[cfg(feature = "web")]
+    pub use glory_web::view::{
+        BoolValue, ChildContent, Component, Content, Each, Error, IntoView, Result, TextValue,
+        View, child_content, component, computed, content, each, empty, lazy, show, view,
     };
+    #[cfg(all(feature = "web", target_arch = "wasm32"))]
+    pub use glory_web::{
+        template::{App, Children, WeakApp},
+        view::Mounted,
+    };
+    /// The direct HTML display API, without the semantic Widget prelude.
+    pub mod prelude {
+        #[cfg(feature = "dsl")]
+        pub use crate::{component, field, template, view};
+        pub use glory_core::{Bond, Cage, KeyedEntry, KeyedList, ListError, Runtime, Scope, Vary};
+        pub use glory_html::view::{
+            Click, Field, Outlet, Template, attr, bind_attr, button, children, class, div, element,
+            field, on_click, outlet, span, text, toggle_class,
+        };
+        #[cfg(feature = "web")]
+        pub use glory_web::view::{
+            BoolValue, ChildContent, Component, Content, Each, Error, IntoView, Result, TextValue,
+            View, child_content, component, computed, content, each, empty, lazy, show, view,
+        };
+        #[cfg(all(feature = "web", target_arch = "wasm32"))]
+        pub use glory_web::{template::App, view::Mounted};
+    }
+}
+#[cfg(feature = "dsl")]
+pub use glory_view_macros::{component, expand_field as __field};
+#[cfg(feature = "dsl")]
+#[doc(hidden)]
+pub use glory_view_macros::{expand_template as __template, expand_view as __view};
+#[cfg(feature = "dsl")]
+#[macro_export]
+macro_rules! field {($($tokens:tt)*)=>{$crate::__field!(($crate::display);$($tokens)*)};}
+#[cfg(feature = "dsl")]
+#[macro_export]
+macro_rules! view {($($tokens:tt)*)=>{$crate::__view!(($crate::display);$($tokens)*)};}
+#[cfg(feature = "dsl")]
+#[macro_export]
+macro_rules! template {($($tokens:tt)*)=>{$crate::__template!(($crate::display);$($tokens)*)};}
+
+pub mod prelude {
+    pub use glory_core::{Bond, Cage, Owner, Resource, ResourceSeed, ResourceState, Runtime, Vary};
     #[cfg(feature = "resources")]
     pub use glory_resource::Resources;
     pub use glory_style::{

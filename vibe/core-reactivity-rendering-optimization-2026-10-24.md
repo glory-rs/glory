@@ -8,7 +8,7 @@
 
 ## 结论与证据范围
 
-保留当前架构：Cage/Bond/Lotus、属性级 Binding、显式 Owner、代际身份、有限语义树和类型化渲染协议。下一轮重点是降低这些机制的分配、复制、登记和提交成本。
+保留当前架构：Cage/Bond/Vary、属性级 Binding、显式 Owner、代际身份、有限语义树和类型化渲染协议。下一轮重点是降低这些机制的分配、复制、登记和提交成本。
 
 本轮实现、独立构建、原始数据、撤回项和验收范围见 [实施与实测报告](../docs/reactive-runtime-optimization-2026-10-24.md)。before 冻结 494 个输入，内部候选逐项独立构建；两批分别 1,944 / 1,296 个主样本，不混池。标准 benchmark 的 15 个应用输入与 before 一致。
 
@@ -136,7 +136,7 @@ Leptos v0.8.19 的实际边集代码使用 IndexSet 和 FxHasher，并要求删�
 
 借鉴 Leptos 对普通派生闭包与 Memo 的区分：昂贵计算、多消费者共享结果和需要派生层相等门控时保留 Bond；廉价单消费者转换可以避免独立缓存节点。直接属性计算仍保留 Binding 对最后成功注入值的比较，不能把“属性值需要相等比较”本身当成必须额外创建 Bond 的理由。
 
-已提供 content_fn / class_fn / style_fn / label_fn，以及 PlanInstance::bind_fn 等显式 API，并以 Owner::compute 约束普通 builder 初值。见 [直接属性测试](../crates/ui/tests/direct_properties.rs)。它没有改变 Cage::map 或 Lotus 的语义。不得自动合并无关属性的订阅，不得引入隐式回调记忆化。计算仍应纯净，生命周期仍归 Binding 的 Owner。
+已提供 content_fn / class_fn / style_fn / label_fn，以及 PlanInstance::bind_fn 等显式 API，并以 Owner::compute 约束普通 builder 初值。见 [直接属性测试](../crates/ui/tests/direct_properties.rs)。它没有改变 Cage::map 或 Vary 的语义。不得自动合并无关属性的订阅，不得引入隐式回调记忆化。计算仍应纯净，生命周期仍归 Binding 的 Owner。
 
 初值与后续运行都要受纯计算限制，不能只把初值包在 untracked 中就认为已经禁止写入。普通 builder 保留完整初值校验/预检先于身份分配的边界；PlanInstance 已有身份，其动态安装应遵守现有 patch 预检与失败前不改变模型/队列的边界，不能误称实例尚未分配身份。追踪只属于最终属性 Binding。还要验证首次安装、源在安装前变化、相等输出、条件依赖、Owner 退休与值版本耗尽。
 
@@ -194,7 +194,7 @@ Core、UI、Memory、Mapper 和 DOM 各自承担不同退休责任。先减少�
 
 | 设计 | 原因 |
 |---|---|
-| Cage/Bond/Lotus 和属性级 Binding | 保持公共模型与局部更新粒度 |
+| Cage/Bond/Vary 和属性级 Binding | 保持公共模型与局部更新粒度 |
 | 直接依赖、推送失效与按需验证 | 避免整组件重跑，并支持动态依赖 |
 | Bond 显式相等门控 | 不强迫任意业务数据实现 PartialEq |
 | Structure → Binding → Effect | 结构和行状态先于属性注入 |

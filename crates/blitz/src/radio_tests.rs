@@ -54,7 +54,7 @@ fn radio_label_control_space_and_repeated_activation_publish_only_one_way_target
     let selected = app.app.scope().cage(0usize);
     let make = |index: usize, initial: bool| {
         let seen = seen.clone();
-        let value: glory_core::Lotus<bool> = if index < 2 {
+        let value: glory_core::Vary<bool> = if index < 2 {
             app.app.scope().bond(move || selected.get() == index).into()
         } else {
             initial.into()

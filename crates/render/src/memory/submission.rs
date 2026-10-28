@@ -1,6 +1,7 @@
 //! Bounded speculative host preparation. Only touched fields and moved/retired
 //! nodes are retained; no model/descriptor snapshot or application callback.
 use super::*;
+use std::ops::Range;
 
 const LIMIT: usize = 256;
 const NODE_LIMIT: usize = 4096;
@@ -36,7 +37,7 @@ impl Link {
     }
 }
 enum Undo {
-    Create(Vec<(NodeId, Option<(u32, bool)>)>),
+    Create(Range<usize>),
     Patch {
         id: NodeId,
         inverse: Patch,
@@ -46,7 +47,7 @@ enum Undo {
     Dispose {
         root: NodeId,
         link: Link,
-        nodes: Vec<(NodeId, Node)>,
+        nodes: Range<usize>,
     },
 }
 struct Record {
@@ -62,6 +63,8 @@ struct Record {
 pub struct Submission<'a> {
     tree: &'a mut Memory,
     records: Vec<Record>,
+    created: Vec<(NodeId, Option<(u32, bool)>)>,
+    retired: Vec<(NodeId, Node)>,
     weight: usize,
 }
 impl Memory {
@@ -74,6 +77,8 @@ impl Memory {
         Ok(Submission {
             tree: self,
             records: Vec::new(),
+            created: Vec::new(),
+            retired: Vec::new(),
             weight: 0,
         })
     }
@@ -97,14 +102,7 @@ impl Submission<'_> {
         }
         match mutation {
             Mutation::CreatePlan { plan, .. } => {
-                plan.nodes().len() <= NODE_LIMIT - self.weight
-                    && plan.nodes().iter().all(|n| {
-                        n.descriptor.semantics.is_none()
-                            && matches!(
-                                n.descriptor.props,
-                                Props::View | Props::Text(_) | Props::Button(_) | Props::Link(_)
-                            )
-                    })
+                plan.nodes().len() <= NODE_LIMIT - self.weight && plan.supports_submission()
             }
             Mutation::Patch { patch, .. } => {
                 matches!(patch, Patch::Text(_) | Patch::Label(_) | Patch::Classes(_))
@@ -160,12 +158,16 @@ impl Submission<'_> {
         let undo = match mutation {
             Mutation::CreatePlan { ids, .. } => {
                 weight = ids.len();
-                let old = ids
-                    .iter()
-                    .map(|id| (*id, self.tree.generations.get(&id.slot()).copied()))
-                    .collect();
-                self.tree.apply(std::slice::from_ref(mutation))?;
-                Undo::Create(old)
+                let first = self.created.len();
+                self.created.extend(
+                    ids.iter()
+                        .map(|id| (*id, self.tree.generations.get(&id.slot()).copied())),
+                );
+                if let Err(error) = self.tree.apply(std::slice::from_ref(mutation)) {
+                    self.created.truncate(first);
+                    return Err(error);
+                }
+                Undo::Create(first..self.created.len())
             }
             Mutation::Place { id, .. } => {
                 let link = Link::read(self.tree.node(*id)?);
@@ -193,24 +195,24 @@ impl Submission<'_> {
                 }
                 self.tree.unlink(*id);
                 weight = ids.len();
-                let nodes = ids
-                    .iter()
-                    .map(|id| {
-                        self.tree
-                            .generations
-                            .get_mut(&id.slot())
-                            .expect("live generation")
-                            .1 = false;
-                        (*id, self.tree.nodes.remove(id).expect("retired node"))
-                    })
-                    .collect();
+                let first = self.retired.len();
+                self.retired.reserve(ids.len());
+                for id in &ids {
+                    self.tree
+                        .generations
+                        .get_mut(&id.slot())
+                        .expect("live generation")
+                        .1 = false;
+                    self.retired
+                        .push((*id, self.tree.nodes.remove(id).expect("retired node")));
+                }
                 self.tree.stats.disposed += ids.len() as u64;
                 self.tree.receipt.applied += 1;
                 retired = Some(ids);
                 Undo::Dispose {
                     root: *id,
                     link,
-                    nodes,
+                    nodes: first..self.retired.len(),
                 }
             }
             _ => return Err(Error::Unsupported("use submission patch")),
@@ -235,8 +237,11 @@ impl Submission<'_> {
             self.weight -= weight;
             match undo {
                 Undo::Create(ids) => {
-                    self.tree.retire(ids[0].0, None).expect("new subtree");
-                    for (id, generation) in ids {
+                    assert_eq!(ids.end, self.created.len(), "creation journal suffix");
+                    self.tree
+                        .retire(self.created[ids.start].0, None)
+                        .expect("new subtree");
+                    for (id, generation) in self.created.drain(ids) {
                         if let Some(generation) = generation {
                             self.tree.generations.insert(id.slot(), generation);
                         } else {
@@ -260,7 +265,8 @@ impl Submission<'_> {
                 }
                 Undo::Place(id, link) => link.restore(self.tree, id),
                 Undo::Dispose { root, link, nodes } => {
-                    for (id, mut node) in nodes {
+                    assert_eq!(nodes.end, self.retired.len(), "retirement journal suffix");
+                    for (id, mut node) in self.retired.drain(nodes) {
                         if id == root {
                             node.placed = false;
                         }
@@ -282,6 +288,8 @@ impl Submission<'_> {
         assert!(accepted <= self.records.len());
         self.rollback(accepted);
         self.records.clear();
+        self.created.clear();
+        self.retired.clear();
         self.weight = 0;
         self.tree.receipt
     }

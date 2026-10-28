@@ -5,6 +5,9 @@ mod patch;
 mod plan;
 #[cfg(test)]
 mod rich_tests;
+/// Experimental sparse HTML display declarations, independent of semantic nodes.
+pub mod template;
+pub mod view;
 pub use plan::PlanShape;
 #[cfg(test)]
 mod anchor_tests;

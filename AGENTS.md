@@ -1,5 +1,71 @@
 # AGENTS.md
 
+The public value/Cage/Bond input wrapper is named `Vary`; use the enum and its
+new name directly, without retaining a compatibility alias for the former name.
+
+Display list naming is `Each` / `each(...)` / XML `<Each>`. The existing
+`ui::Each` is the semantic Widget adapter; `display::Each` is the sparse display
+adapter. They share keyed reconciliation, not their complete row/host model.
+Use namespaces to distinguish these layers; do not add a built-in `For` alias.
+
+For the completed keyed/content API and retained performance changes, read
+`docs/v2-display-completion-results-2026-10-29.md`. Consecutive display moves
+snapshot selection once and reset at other commands/packet boundaries. Keep
+focus/selection, failure-prefix and GC acceptance. Removing the instance's
+BindingId list regressed controlled table-clear measurements and was reverted;
+do not infer speed from fewer records or allocations alone.
+
+## User-directed v2 display model (2026-10-28)
+
+The user has explicitly revised the v2 direction: HTML/CSS is the standard
+display contract; raw HTML elements and Glory's higher-level widgets are
+different layers. Follow `docs/v2-html-template-runtime-architecture-2026-10-28.md`
+for this new design and its pinned Dioxus 0.7.10 source comparison.
+An XML-like DSL should emit shared display templates and dynamic slots. A raw
+`<button>` must not implicitly instantiate a Glory Button widget or enter a
+complete per-element UI/Mapper semantic Memory. Keep Cage/Bond/Vary; retain
+instance/root/range, dynamic target, event/ref and necessary control state.
+Physical DOM/layout/AX nodes still exist. Native targets align with the
+HTML/CSS model through the document engine, with explicit verified support.
+
+This authorizes the frontend/instance-model change beyond the former
+handwritten-builders-only rule. Do not present a macro that merely expands
+to the existing full-identity Plan as completing this direction. Keep the
+current implementation, uncommitted optimizations and measurement evidence
+as migration baselines; a design document is not an implemented new runtime.
+The architecture and verification rules below describe that semantic baseline
+and its existing APIs, not a requirement to reify every raw template element.
+No new unsafe code, vendoring, implicit I/O grants or unverified platform
+acceptance is authorized by this display-layer change.
+
+The first experimental direct path now lives in `glory_html::template` and
+`glory_web::template` (wasm32). See
+`docs/v2-html-template-prototype-results-2026-10-28.md` for its measured
+div/span/button profile, Scope ownership, fault/teardown rules and boundaries.
+It creates no per-HTML-element UI/Mapper Memory or semantic Entry. The canonical
+`benchmarks/glory` fixture now uses the XML display DSL with the same keyed Cache;
+`handwritten` selects the equivalent named-template frontend, and `acceptance`
+adds density/fault/GC probes outside timed artifacts. The duplicate standalone
+html-template application and grouped-binding experiment were retired; frozen
+sources/results remain in the earlier reports. Do not restore a second rows model.
+A first XML frontend and
+the handwritten named-slot API are now implemented; follow
+`docs/v2-view-api-and-xml-dsl-2026-10-28.md`. The optional `glory/dsl` feature
+provides `view!`/`template!` through `glory-view-macros`; default runtime graphs
+must not acquire that compiler. Raw data lives in html::view, configurations in
+web::view, facade exports in glory::display. Both frontends use the same sparse
+host. Components require explicit Component::Props and own only their actual
+component Scope. Keep Source sealed so unchecked wire data cannot bypass the
+display profile. SSR/hydration/native and controlled editor migration remain;
+neither this prototype nor its smaller WASM proves full semantic API equivalence.
+
+The keyed/content guide `docs/v2-display-keyed-content-guide-2026-10-28.md`
+describes the current public API: KeyedList with generational member identities,
+Each/Show/Content ranges, field projections, component children, optional
+component macro and display prelude. The canonical benchmark delegates row
+ownership to Each. The standard table fixture is separate in the sibling
+js-framework-benchmark; do not mix its scores with the self-suite's div workload.
+
 ## Active architecture
 
 The user authorized the breaking semantic rewrite in
@@ -12,7 +78,7 @@ html, web, ssr, blitz, glory and salvo-adapter. The opt-in i18n package was auth
 the semantic rewrite; see `crates/i18n/README.md` for its boundaries.
 Truck, the old core runtime, routing, CLI/macros/serverfn/hot-reload and the old
 desktop/native/liveview/tui adapters and examples have been removed. Only the
-12 active runtime packages and migrated examples/benchmarks are supported. The
+12 active runtime packages, the new opt-in view-macros compiler, and migrated examples/benchmarks are supported. The
 new `tools/cli` is a separate library-only host tooling workspace, explicitly
 authorized after the cleanup. It must not depend on runtime crates or enter
 the facade/default/HTML/SSR/WASM runtime graphs. Applications own a tiny private
@@ -322,8 +388,10 @@ retired feature aliases or count compilation as proof of platform acceptance.
 
 ## Design rules
 
-- Pure handwritten Rust builders. No RSX/UI DSL or template VM.
-- Keep Cage/Bond/Lotus as Glory's public reactive model; do not substitute an
+- The implemented semantic baseline uses handwritten Rust builders. For the
+  user-authorized v2 frontend and template representation, follow the display
+  model section above rather than treating this baseline as a ban on the DSL.
+- Keep Cage/Bond/Vary as Glory's public reactive model; do not substitute an
   unrelated third-party Signal API.
 - Copy reactive handles are local (!Send/!Sync), generational, and Owner-owned.
   `get()` now returns an owned clone. For large data use `with(...)` to borrow

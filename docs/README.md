@@ -2,6 +2,40 @@
 
 Start here when evaluating or extending Glory:
 
+- [Keyed API implementation and complete benchmark evidence](v2-display-completion-results-2026-10-29.md):
+  delivered interfaces, full Rust/browser checks, alternating self-suite measurements,
+  the separate standard table suite and remaining performance/capability limits.
+
+- [Keyed display API and XML guide](v2-display-keyed-content-guide-2026-10-28.md):
+  implemented Each/Show/Content, authoritative keyed values and field projections,
+  component children/macros, boolean classes, display prelude and a normal application example.
+
+- [v2 display API, DSL and performance completion plan](v2-display-completion-plan-2026-10-28.md):
+  staged keyed data ownership, public lists and content ranges, XML control flow and children,
+  concise canonical application, measured performance gates and component ergonomics.
+  Implementation status and the original measurable exit conditions are kept separately.
+
+- [Canonical benchmark migration to the display DSL](benchmark-display-dsl-migration-2026-10-28.md):
+  Glory's default XML entry, handwritten feature comparison, removal of the duplicate
+  html-template application, preserved probes and fresh legacy/DSL/Dioxus measurements.
+
+- [Handwritten display API and XML DSL](v2-view-api-and-xml-dsl-2026-10-28.md):
+  named Field/Click/Outlet declarations, value/handle/computed binding semantics,
+  shared XML extraction, explicit component Props, opt-in macros and equivalent browser fixtures.
+
+- [v2 sparse HTML template prototype and measurements](v2-html-template-prototype-results-2026-10-28.md):
+  direct HTML instances, no per-element semantic Memory/Entry, same-graph and grouped-binding
+  experiments, four alternating rounds against current v2 and Dioxus, fault/GC acceptance and scope limits.
+
+- [v2 HTML display templates and higher-level widgets](v2-html-template-runtime-architecture-2026-10-28.md):
+  user-directed HTML/CSS display contract, raw elements versus components,
+  pinned Dioxus 0.7.10 implementation comparison, sparse instance records and migration criteria.
+  The first limited browser runtime and XML frontend are implemented; platform migration remains.
+
+- [v2 Plan submission preparation and journal optimization](v2-plan-submit-cost-optimization-2026-10-28.md):
+  same-machine A/B against remote v2, compact host object tables and contiguous prefix journals;
+  clear/10k Script gains, unchanged 1k results, wall regressions, and Blink layout GC evidence.
+
 - [Glory v2 Plan host batch prototype](v2-plan-host-batch-prototype-2026-10-28.md):
   bounded JS creation/initialization/attachment/retirement, prefix confirmation,
   input-state barriers, independent A/B and Dioxus comparison, and baseline gate failures.

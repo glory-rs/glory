@@ -1,5 +1,6 @@
 //! Pure bounded preparation, with explicit host-prefix confirmation.
 use super::*;
+use std::ops::Range;
 use std::rc::Rc;
 
 pub enum PreparedOp {
@@ -12,8 +13,8 @@ pub enum PreparedOp {
     Op(Op),
 }
 enum Keys {
-    Create(Vec<NodeId>),
-    Dispose(Vec<(NodeId, u64)>),
+    Create(Range<usize>),
+    Dispose(Range<usize>),
     None,
 }
 pub struct Submission<'a> {
@@ -23,6 +24,8 @@ pub struct Submission<'a> {
     receipt: &'a mut Receipt,
     plans: &'a mut plan::Plans,
     undo: Vec<(u64, Keys)>,
+    created_keys: Vec<NodeId>,
+    retired_keys: Vec<(NodeId, u64)>,
 }
 impl Mapper {
     pub fn submission(&mut self) -> Result<Submission<'_>, Error> {
@@ -33,6 +36,8 @@ impl Mapper {
             receipt: &mut self.receipt,
             plans: &mut self.plans,
             undo: Vec::new(),
+            created_keys: Vec::new(),
+            retired_keys: Vec::new(),
         })
     }
 }
@@ -68,6 +73,8 @@ impl Submission<'_> {
                     self.keys.insert(*id, *key);
                 }
                 *self.next_key = end;
+                let first = self.created_keys.len();
+                self.created_keys.extend_from_slice(ids);
                 (
                     PreparedOp::Plan {
                         plan: plan.clone(),
@@ -75,7 +82,7 @@ impl Submission<'_> {
                         keys,
                         shape,
                     },
-                    Keys::Create(ids.clone()),
+                    Keys::Create(first..self.created_keys.len()),
                 )
             }
             Mutation::Patch { id, patch } => {
@@ -113,13 +120,15 @@ impl Submission<'_> {
             }
             Mutation::Dispose { id } => {
                 let subtree = self.tree.apply(mutation)?.expect("retirement");
-                let keys = subtree
-                    .iter()
-                    .map(|id| (*id, self.keys.remove(id).expect("live key")))
-                    .collect();
+                let first = self.retired_keys.len();
+                self.retired_keys.extend(
+                    subtree
+                        .iter()
+                        .map(|id| (*id, self.keys.remove(id).expect("live key"))),
+                );
                 (
                     PreparedOp::Op(Op::Dispose { id: *id, subtree }),
-                    Keys::Dispose(keys),
+                    Keys::Dispose(first..self.retired_keys.len()),
                 )
             }
             _ => return Err(Error::Unsupported("submission operation")),
@@ -132,11 +141,15 @@ impl Submission<'_> {
             let (next_key, keys) = self.undo.pop().expect("suffix keys");
             match keys {
                 Keys::Create(ids) => {
-                    for id in ids {
+                    assert_eq!(ids.end, self.created_keys.len(), "created key suffix");
+                    for id in self.created_keys.drain(ids) {
                         self.keys.remove(&id);
                     }
                 }
-                Keys::Dispose(keys) => self.keys.extend(keys),
+                Keys::Dispose(keys) => {
+                    assert_eq!(keys.end, self.retired_keys.len(), "retired key suffix");
+                    self.keys.extend(self.retired_keys.drain(keys));
+                }
                 Keys::None => {}
             }
             *self.next_key = next_key;
@@ -150,6 +163,8 @@ impl Submission<'_> {
         assert!(accepted <= self.undo.len());
         self.rollback_keys(accepted);
         self.undo.clear();
+        self.created_keys.clear();
+        self.retired_keys.clear();
         // Move the tree guard out while leaving this object's key-drop inert.
         let receipt = self.tree.confirm(accepted);
         *self.receipt = receipt;
@@ -215,6 +230,24 @@ mod tests {
         fn apply(&mut self, _: Op) -> Result<(), Error> {
             Ok(())
         }
+    }
+    #[test]
+    fn rejected_creation_does_not_shift_later_creation_or_generation_rollback() {
+        let runtime = RuntimeId::new();
+        let ops = scenario(runtime);
+        let mut mapper = Mapper::new(runtime);
+        {
+            let mut batch = mapper.submission().unwrap();
+            batch.prepare(&ops[0]).unwrap();
+            assert!(batch.prepare(&ops[0]).is_err());
+            batch.prepare(&ops[4]).unwrap();
+        }
+        assert!(mapper.tree.is_empty());
+        assert!(mapper.keys.is_empty());
+        assert_eq!(mapper.next_key, 0);
+        assert_eq!(mapper.tree.receipt().applied, 0);
+        mapper.apply(&ops, &mut Null).unwrap();
+        assert!(mapper.tree.is_empty());
     }
     #[test]
     fn every_host_prefix_matches_sequential_semantics_keys_and_generation_reuse() {

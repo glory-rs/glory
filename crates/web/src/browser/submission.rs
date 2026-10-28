@@ -9,20 +9,34 @@ const MAX_RECORDS: usize = 4096;
 const MAX_BYTES: usize = 64 * 1024;
 
 enum Confirm {
-    Create(Vec<(NodeId, Rc<Entry>)>),
+    Create(usize),
     Place(Rc<Entry>, Option<NodeId>),
     Dispose(NodeId, Vec<NodeId>, Rc<plans::Instance>),
     Fields,
+}
+struct Target {
+    entry: Rc<Entry>,
+    created: bool,
+}
+impl std::ops::Deref for Target {
+    type Target = Entry;
+    fn deref(&self) -> &Entry {
+        &self.entry
+    }
 }
 struct Packet {
     objects: Vec<JsValue>,
     records: Vec<u32>,
     strings: String,
     units: u32,
-    bank: js_sys::Array,
+    bank: Option<js_sys::Array>,
     parts: u32,
-    entries: HashMap<NodeId, Rc<Entry>>,
+    entries: HashMap<NodeId, usize>,
+    created: Vec<(NodeId, Rc<Entry>)>,
     confirms: Vec<Confirm>,
+    bank_object: Option<u32>,
+    prototype_object: Option<(Rc<plans::Prototype>, u32)>,
+    destination: Option<(Option<NodeId>, (u32, u32, u32))>,
 }
 impl Packet {
     fn new() -> Self {
@@ -31,10 +45,14 @@ impl Packet {
             records: Vec::new(),
             strings: String::new(),
             units: 0,
-            bank: js_sys::Array::new(),
+            bank: None,
             parts: 0,
             entries: HashMap::new(),
+            created: Vec::new(),
             confirms: Vec::new(),
+            bank_object: None,
+            prototype_object: None,
+            destination: None,
         }
     }
     fn object(&mut self, value: &JsValue) -> u32 {
@@ -51,40 +69,65 @@ impl Packet {
     fn record(&mut self, record: [u32; 10]) {
         self.records.extend(record);
     }
-    fn entry(&self, dom: &Dom, id: NodeId) -> Result<Rc<Entry>, Error> {
+    fn entry(&self, dom: &Dom, id: NodeId) -> Result<Target, Error> {
         self.entries
             .get(&id)
-            .cloned()
+            .map(|index| Target {
+                entry: self.created[*index].1.clone(),
+                created: true,
+            })
             .map(Ok)
-            .unwrap_or_else(|| dom.entry(id))
+            .unwrap_or_else(|| {
+                dom.entry(id).map(|entry| Target {
+                    entry,
+                    created: false,
+                })
+            })
     }
-    fn target(&mut self, entry: &Entry, part: Part) -> Result<(u32, u32), Error> {
+    fn target(&mut self, entry: &Target, part: Part) -> Result<(u32, u32), Error> {
         if let Some((instance, member)) = &entry.parts.planned {
             let address = instance
                 .address(*member, part)
                 .ok_or(Error::Unsupported("HTML part"))?;
-            Ok((self.object(&instance.values), address))
+            let object = if entry.created {
+                if let Some(object) = self.bank_object {
+                    object
+                } else {
+                    let object = self.object(&instance.values);
+                    self.bank_object = Some(object);
+                    object
+                }
+            } else {
+                self.object(&instance.values)
+            };
+            Ok((object, address))
         } else {
             Ok((self.object(entry.node(part)?.as_ref()), NONE))
         }
     }
     fn destination(&mut self, dom: &Dom, parent: Option<NodeId>) -> Result<(u32, u32, u32), Error> {
-        if let Some(parent) = parent {
+        if let Some((cached, destination)) = self.destination
+            && cached == parent
+        {
+            return Ok(destination);
+        }
+        let destination = if let Some(parent) = parent {
             let entry = self.entry(dom, parent)?;
             if let Some(part) = entry.children {
                 let (object, address) = self.target(&entry, part)?;
-                return Ok((object, address, 0));
+                (object, address, 0)
+            } else if entry.parts.is_empty() {
+                (self.object(entry.last().as_ref()), NONE, 1)
+            } else {
+                return Err(Error::InvalidProps("node has no HTML child slot"));
             }
-            if entry.parts.is_empty() {
-                return Ok((self.object(entry.last().as_ref()), NONE, 1));
-            }
-            return Err(Error::InvalidProps("node has no HTML child slot"));
-        }
-        if let Some(end) = dom.root_end.borrow().as_ref() {
-            Ok((self.object(end.as_ref()), NONE, 1))
+        } else if let Some(end) = dom.root_end.borrow().as_ref() {
+            (self.object(end.as_ref()), NONE, 1)
         } else {
-            Ok((self.object(dom.root.as_ref()), NONE, 0))
-        }
+            (self.object(dom.root.as_ref()), NONE, 0)
+        };
+        self.destination = Some((parent, destination));
+        Ok(destination)
     }
     fn encode(&mut self, dom: &Dom, op: PreparedOp) -> Result<bool, Error> {
         match op {
@@ -95,25 +138,26 @@ impl Packet {
                 shape,
             } => {
                 shape.validate_instance(&plan, &ids, &keys)?;
-                if shape.shapes.iter().any(|shape| shape.edit != EditKind::None || shape.select_options.is_some() || shape.pieces.is_empty() || shape.pieces.iter().any(|piece| match &piece.kind {
-                    Kind::Element { attributes, properties, .. } => properties.iter().any(|(name, value)| *name != "disabled" || !matches!(value, Property::Bool(disabled) if *disabled == attributes.contains_key("disabled"))),
-                    Kind::Text(_) => false,
-                })) { return Ok(false); }
-                // Cold prototype DOM work must not overtake a queued prefix.
-                if !self.confirms.is_empty() && !dom.plans.cached(&plan) {
-                    return Ok(false);
-                }
-                let Some(prototype) = dom.plans.get(&dom.document, &plan, &shape)? else {
+                let Some(prototype) = dom.plans.submission(
+                    &dom.document,
+                    &plan,
+                    &shape,
+                    !self.confirms.is_empty(),
+                )?
+                else {
                     return Ok(false);
                 };
-                let mut tokens = String::with_capacity(ids.len() * 24);
+                // Canonical decimal identities are ASCII. Append directly to
+                // this segment's bounded string area, without a row-local String.
+                let first_byte = self.strings.len();
+                let start = self.units;
                 use std::fmt::Write;
                 for (index, id) in ids.iter().enumerate() {
                     if index != 0 {
-                        tokens.push('\0');
+                        self.strings.push('\0');
                     }
                     write!(
-                        &mut tokens,
+                        &mut self.strings,
                         "{}.{}.{}",
                         id.runtime().value(),
                         id.slot(),
@@ -121,17 +165,20 @@ impl Packet {
                     )
                     .expect("identity string");
                 }
-                if self.strings.len() + tokens.len() > MAX_BYTES {
+                if self.strings.len() > MAX_BYTES {
+                    self.strings.truncate(first_byte);
                     return Ok(false);
                 }
+                self.units += (self.strings.len() - first_byte) as u32;
+                let end = self.units;
                 let offset = self.parts;
                 let instance = plans::Instance::pooled(
                     prototype.clone(),
-                    self.bank.clone(),
+                    self.bank.get_or_insert_with(js_sys::Array::new).clone(),
                     offset,
                     ids.len(),
                 );
-                let mut entries = Vec::with_capacity(ids.len());
+                let first = self.created.len();
                 for (index, node_shape) in shape.shapes.iter().enumerate() {
                     let parts = Parts::planned(instance.clone(), index);
                     let entry = Entry::new(
@@ -142,17 +189,23 @@ impl Packet {
                         None,
                         false,
                     );
-                    entries.push((ids[index], entry));
-                }
-                for (index, (_, entry)) in entries.iter().enumerate() {
                     entry.parent.set(shape.parents[index].map(|p| ids[p]));
+                    self.entries.insert(ids[index], self.created.len());
+                    self.created.push((ids[index], entry));
                 }
                 self.parts += prototype.parts();
-                let object = self.object(&prototype.host);
-                let (start, end) = self.string(&tokens);
+                let object = if let Some((cached, object)) = &self.prototype_object
+                    && Rc::ptr_eq(cached, &prototype)
+                {
+                    *object
+                } else {
+                    let object = self.object(&prototype.host);
+                    self.prototype_object = Some((prototype, object));
+                    object
+                };
                 self.record([1, object, offset, 0, 0, 0, 0, 0, start, end]);
-                self.entries.extend(entries.iter().cloned());
-                self.confirms.push(Confirm::Create(entries));
+                self.confirms
+                    .push(Confirm::Create(self.created.len() - first));
             }
             PreparedOp::Op(Op::Patch { id, edits }) => {
                 let entry = self.entry(dom, id)?;
@@ -226,7 +279,7 @@ impl Packet {
                     0,
                     0,
                 ]);
-                self.confirms.push(Confirm::Place(entry, parent));
+                self.confirms.push(Confirm::Place(entry.entry, parent));
             }
             PreparedOp::Op(Op::Dispose { id, subtree }) => {
                 let entry = self.entry(dom, id)?;
@@ -273,12 +326,13 @@ impl Packet {
         self.record([0; 10]);
         Ok(true)
     }
-    fn confirm(self, dom: &Dom, accepted: usize) -> Result<(), Error> {
-        for confirm in self.confirms.into_iter().take(accepted) {
+    fn confirm(&mut self, dom: &Dom, accepted: usize) -> Result<(), Error> {
+        let mut created = self.created.drain(..);
+        for confirm in self.confirms.drain(..).take(accepted) {
             match confirm {
-                Confirm::Create(entries) => {
+                Confirm::Create(count) => {
                     let mut table = dom.entries.borrow_mut();
-                    for (id, entry) in entries {
+                    for (id, entry) in created.by_ref().take(count) {
                         table.insert(id, entry);
                     }
                 }
@@ -344,7 +398,7 @@ pub(in crate::browser) fn apply(
         &packet.objects,
         &packet.records,
         &packet.strings,
-        &packet.bank,
+        packet.bank.as_ref(),
         dom.live.get(),
     )
     .map_err(backend)?;

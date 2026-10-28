@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::hash::Hash;
 use std::rc::Rc;
 
-use glory_core::{Cage, Lotus};
+use glory_core::{Cage, Vary};
 use glory_render::{Descriptor, Props};
 
 use crate::app::{Error, Mounted, Result, Scope, WeakScope, Widget};
@@ -10,12 +10,12 @@ use crate::list::{Cache, RowHost};
 
 type Factory = Box<dyn FnMut() -> Box<dyn Widget>>;
 pub struct When {
-    condition: Option<Lotus<bool>>,
+    condition: Option<Vary<bool>>,
     yes: Option<Factory>,
     no: Option<Factory>,
 }
 pub fn when<W: Widget>(
-    condition: impl Into<Lotus<bool>>,
+    condition: impl Into<Vary<bool>>,
     mut yes: impl FnMut() -> W + 'static,
 ) -> When {
     When {
@@ -97,7 +97,7 @@ enum RowFactory<T: 'static> {
 }
 type KeyFn<T, K> = Box<dyn Fn(&T) -> K>;
 pub struct Each<T: Clone + 'static, K: Clone + Eq + Hash + 'static> {
-    items: Option<Lotus<Vec<T>>>,
+    items: Option<Vary<Vec<T>>>,
     key: Option<KeyFn<T, K>>,
     render: Option<RowFactory<T>>,
 }
@@ -105,7 +105,7 @@ pub struct Each<T: Clone + 'static, K: Clone + Eq + Hash + 'static> {
 /// list controls; ordinary each intentionally scans/renders the whole sequence.
 /// Row factories receive owned reactive item/index handles and run once per key.
 pub fn each<T: Clone + 'static, K: Clone + Eq + Hash + 'static, W: Widget>(
-    items: impl Into<Lotus<Vec<T>>>,
+    items: impl Into<Vary<Vec<T>>>,
     key: impl Fn(&T) -> K + 'static,
     mut render: impl FnMut(Cage<T>, Cage<usize>) -> W + 'static,
 ) -> Each<T, K> {
@@ -124,7 +124,7 @@ pub fn each<T: Clone + 'static, K: Clone + Eq + Hash + 'static, W: Widget>(
 /// The factory runs under the row Owner, without item/index Cages or a separate
 /// data Owner. Removed keys retire immediately; reinsertion gets a fresh seed.
 pub fn each_seed<T: Clone + 'static, K: Clone + Eq + Hash + 'static, W: Widget>(
-    items: impl Into<Lotus<Vec<T>>>,
+    items: impl Into<Vary<Vec<T>>>,
     key: impl Fn(&T) -> K + 'static,
     mut render: impl FnMut(T) -> W + 'static,
 ) -> Each<T, K> {

@@ -2,7 +2,20 @@
 
 ## Unreleased
 
-Glory uses the breaking semantic UI architecture: Owner-scoped Cage/Bond/Lotus,
+The optional XML display frontend now includes framework-owned keyed data and
+`Each`, conditional/content ranges, component children, `field!`, typed boolean
+class bindings, generated component Props and a display prelude. Handwritten
+and XML frontends share the sparse HTML runtime. The canonical rows benchmark
+uses this API; an independent standard HTML-table fixture lives in the sibling
+js-framework-benchmark checkout. See the display guide for supported browser
+capabilities and ownership contracts.
+
+Display moves snapshot selection once per consecutive move run, cutting queries
+between dirty DOM mutations while retaining focus, selection and failure-prefix
+behavior. The default benchmark remains XML; complete standard-table results
+and reverted instance-record experiments are documented separately.
+
+Glory uses the breaking semantic UI architecture: Owner-scoped Cage/Bond/Vary,
 finite rendering contracts, handwritten builders, shared HTML mapping and
 separate Web, SSR, Salvo and Blitz hosts. Optional resources, CSS and i18n keep
 their documented dependency boundaries.

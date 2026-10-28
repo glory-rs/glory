@@ -1,4 +1,49 @@
-# Glory / Leptos / Dioxus: current semantic browser benchmark
+# Glory / Leptos / Dioxus: current rows benchmark
+
+The current keyed public API, completed checks and measurements are documented in
+[the implementation report](../docs/v2-display-completion-results-2026-10-29.md).
+Glory's XML and handwritten frontends share `model.rs`; application code no
+longer implements RowHost, scopes or a separate label registry. `Each` owns
+mounted row lifetimes; the standalone html-template app remains retired.
+
+The sibling js-framework-benchmark now has an independent standard HTML-table
+Glory fixture. Build its Rust implementations with
+`scripts/build-js-framework-benchmark.ps1`; after building JS peers and starting
+the upstream server, `python benchmarks/run-standard.py --out <new D: directory>`
+freezes inputs and runs all enabled upstream cases for eight keyed frameworks.
+Those results use a different workload and must stay separate from this suite.
+
+Final 2026-10-29 self-suite: four alternating rounds, 2160 samples. XML create-1k
+Script improves 21.4%, selection 20.8%, clear 11.8%; replace/update/10k retain
+4.1%/4.7%/1.2% regressions. The full report includes wall regressions, all peers
+and the standard table suite's complete CPU/memory/size matrix.
+If Chrome trace collection alone fails with `No commit event found`, preserve
+the run and use `python benchmarks/finish-standard.py <run-directory>` to rerun
+whole failed cases. It rejects other failures and preserves earlier traces.
+
+Glory 主入口 [glory/src/main.rs](glory/src/main.rs) 已迁移到新的显示 DSL。
+默认构建测 XML；`--features handwritten` 用同一业务模型和 keyed Cache 对比手写 API；
+`--features acceptance` 增加专项探针，不进入计时构建。
+独立 `html-template` 应用已合并移除，避免维护两份相同 workload。
+见[迁移和同批测量](../docs/benchmark-display-dsl-migration-2026-10-28.md)。
+该迁移阶段的四轮 1728 样本：千行／万行创建 Script 为 **7.275／57.860 ms**，万行两 RAF wall 为 **321.00 ms**。
+相对同批旧主入口分别降低 59.6%／64.2%／22.9%；保留小操作 wall 回退与 DSL/手写差异。
+
+下列报告按历史阶段保留，旧入口的数字不代表当前 DSL 主入口。
+
+[2026-10-28 稀疏 HTML 模板原型](../docs/v2-html-template-prototype-results-2026-10-28.md)：
+旧 v2／保留相同响应图的新模板／合并绑定／Dioxus 四轮 1728 样本。
+模板版千行／万行创建 Script 降低 55.1%／67.3%，万行两 RAF wall 降低 31.3%。
+实例改为根和动态目标；原有逐语义节点能力不属于新 profile，编辑器／SSR／native 尚未迁移。
+完整数据、DOM 身份、万行布局和六处截图一致，并保留小操作 wall 与合并绑定清空的回退。
+当时的独立原型现已归入主 benchmark；历史源码与结果仍由报告中的冻结快照保存。
+当前使用[独立驱动](compare.cjs)、[专用验收](display-acceptance.js)和[汇总程序](summarize.py)。
+
+[2026-10-28 v2 提交准备与暂存日志优化](../docs/v2-plan-submit-cost-optimization-2026-10-28.md)：
+同机原 v2／候选／Dioxus 四轮 1296 样本。清空千行／创建万行 Script 改善 27.1%／4.4%，
+千行创建和替换基本持平；万行两 RAF wall 回退 1.7%，不宣称整体应用提速。
+对象表引用减少约 66%，WASM 减少 4886 B；31 浏览器验收和 548 项相关 Rust 测试通过。
+报告保留早期清空回退、消融、全部慢样本及 Blink 旧布局片段造成的 GC 验收修正。
 
 [2026-10-28 v2 Plan 浏览器批量提交原型](../docs/v2-plan-host-batch-prototype-2026-10-28.md)：
 完整覆盖受限 Plan 的创建、初始化、挂接和退休，千行创建导入调用 5,034→154。
@@ -92,7 +137,7 @@ Glory / Leptos / Dioxus 的千行创建 Script 为 **19.391 / 13.241 / 4.388 ms*
 **20.975 / 30.986 / 247.109 / 15.317 ms**；选行约快 30%，替换约快 5%，
 批量创建收益不稳定。保留两份 Memory、完整身份、真实几何和逐像素检查。
 报告同时记录原生高扇出、WASM Node 体积增加、空帧/多依赖回退、缓冲保留成本和撤回实验。
-标准 benchmark 继续用原来的 Bond/Lotus，直接闭包 API 作为独立迁移对照。
+标准 benchmark 继续用原来的 Bond/Vary，直接闭包 API 作为独立迁移对照。
 
 上轮实测见 [2026-10-24 双份 Memory 声明共享报告](../docs/shared-declarations-2026-10-24.md)：
 六份全新独立构建、复制声明/共享声明/内联消融对照，最终 **1,296 个**正式样本。
@@ -175,15 +220,18 @@ separately from the earlier three-framework table below. The anchor failure was
 subsequently [fixed](../docs/anchor-residual-fix-2026-10-23.md). Use `bulk-compare.cjs`
 and `summarize-bulk.py` for the paired run; the report includes exact commands.
 
-The active workload is **semantic-rows-v1**. It compares Glory's new public Rust
-builders and full keyed `each` with Leptos 0.8.22 and Dioxus 0.7.10. All three
+The active workload is **semantic-rows-v1**. It compares Glory's XML display DSL
+and full keyed Cache with Leptos 0.8.22 and Dioxus 0.7.10. Glory's explicit
+display profile is **html-display-v1**, with independent class/label bindings
+and no intermediate class Bond (3 graph nodes per row). All three
 use the same seeded Rust generator, div/button/span element structure and CSS.
 Framework-specific attributes and comment markers remain measured overhead.
 The operations are create 1k/10k, replace, update every tenth label, select,
 swap, remove, append and clear. Every row is mounted; this is not a virtual list.
 
 These are **local comparison results**, not official HTML-table scores. The
-official adapter script is explicitly disabled for this changed DOM contract.
+old self-suite adapter script is disabled for this div DOM contract; the sibling
+standard-table fixture described above is separate.
 Historical official tables below do not describe the current architecture.
 
 ## Run
@@ -225,11 +273,17 @@ The module exposes `window.__BENCH__.runAll()`; structured three-app measurement
 should use compare.ps1 so the CPU counters and conformance checks are included.
 The old Trunk cache/output path is no longer used by the supported runner.
 
+For a controlled XML/handwritten/Dioxus run, build independent targets from a
+single snapshot with `build.ps1 -Apps glory`, `-Handwritten` in a second BuildRoot,
+and `-Probes` in a third. `compare.cjs` records full identities/10k geometry,
+six identical screenshots, paired per-operation CPU/wall samples and build manifests.
+Its default directory layout and the exact commands are in the migration report.
+
 ## What is validated and timed
 
 - An independent JS seed oracle verifies row IDs/labels and all nine operations.
 - Swap must preserve keyed DOM identities. Every one of the 10k rows has a box.
-- Clear/recreate checks that Glory's live label registry and graph return to
+- Clear/recreate checks that Glory's live keyed projections and graph return to
   baseline. Other frameworks' internal reactive graphs are not inspected.
 - Same-checkpoint viewport PNGs are byte-identical; final normalized row-data
   hashes agree for every timed sample. This is not a claim about every pixel
@@ -255,7 +309,7 @@ Chrome 155.0.8059.84, 1280×900, 324 measured samples. Wall medians in ms:
 | create_10k | 2809.90 | 509.30 | 554.90 |
 | clear_1k | 83.05 | 20.70 | 10.50 |
 
-Glory currently trails substantially on bulk mount/replacement/append/clear;
+In that frozen 2026-10-23 round, Glory trails substantially on bulk mount/replacement/append/clear;
 create-10k is about 2.81 s versus 0.51/0.55 s. Its script time is the largest
 gap. Small updates are much closer. The Leptos mixed selection result is
 history-sensitive; fresh-list diagnostics do not reproduce it as a general

@@ -3,6 +3,17 @@ pub(crate) struct Key {
     pub slot: u32,
     pub generation: u32,
 }
+impl Key {
+    pub fn packed(self) -> u64 {
+        (u64::from(self.generation) << 32) | u64::from(self.slot)
+    }
+    pub fn unpack(value: u64) -> Self {
+        Self {
+            slot: value as u32,
+            generation: (value >> 32) as u32,
+        }
+    }
+}
 
 struct Slot<T> {
     generation: u32,

@@ -3,7 +3,9 @@ param(
  [string]$BuildRoot='D:/BuildCache/glory-framework-compare',
  [string]$SourceRoot='',
  [string]$Bindgen='',
- [switch]$SkipBuild
+ [switch]$SkipBuild,
+ [switch]$Handwritten,
+ [switch]$Probes
 )
 $ErrorActionPreference='Stop'
 $BuildRoot=[IO.Path]::GetFullPath($BuildRoot)
@@ -26,15 +28,18 @@ try {
  $version=& $Bindgen --version
  if($LASTEXITCODE -ne 0 -or $version.Trim() -ne 'wasm-bindgen 0.2.129'){throw 'Use wasm-bindgen-cli 0.2.129 installed under D:/BuildCache'}
  foreach($app in $Apps){
+  $featureArgs=@()
+  if($Handwritten){if($app -ne 'glory'){throw 'Handwritten applies only to glory'}; $featureArgs=@('--features','handwritten')}
+  if($Probes){if($app -ne 'glory'){throw 'Probes apply only to glory'}; $featureArgs+=@('--features','acceptance')}
   $manifest="$SourceRoot/benchmarks/$app/Cargo.toml"
   $env:CARGO_TARGET_DIR="$BuildRoot/$app/target"
   $metadata=cargo metadata --manifest-path $manifest --no-deps --format-version 1 | ConvertFrom-Json
   if($LASTEXITCODE -ne 0 -or [IO.Path]::GetFullPath($metadata.target_directory) -ne [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)){throw "Wrong target for $app"}
   $metadata | ConvertTo-Json -Depth 100 | Set-Content "$BuildRoot/$app-metadata-final.json"
   if(-not $SkipBuild){
-   cargo clippy --locked --manifest-path $manifest --target wasm32-unknown-unknown --all-targets -- -D warnings > "$BuildRoot/$app-clippy.txt" 2>&1
+   cargo clippy --locked --manifest-path $manifest @featureArgs --target wasm32-unknown-unknown --all-targets -- -D warnings > "$BuildRoot/$app-clippy.txt" 2>&1
    if($LASTEXITCODE -ne 0){throw "$app clippy failed"}
-   cargo build --locked --manifest-path $manifest --release --target wasm32-unknown-unknown --message-format=json-render-diagnostics > "$BuildRoot/$app-build.jsonl" 2> "$BuildRoot/$app-build.txt"
+   cargo build --locked --manifest-path $manifest @featureArgs --release --target wasm32-unknown-unknown --message-format=json-render-diagnostics > "$BuildRoot/$app-build.jsonl" 2> "$BuildRoot/$app-build.txt"
    if($LASTEXITCODE -ne 0){throw "$app release build failed"}
   }
   $site="$BuildRoot/site/$app"

@@ -14,7 +14,7 @@
 - wasm-bindgen 会为桥接生成 `snippets/glory-web-<hash>/inlineN.js`。[流式测试服务器](../examples/semantic-web/src/bin/stream_fixture.rs) 已补齐这些模块的服务，只接受固定 namespace/hash/数字文件名，未开放任意路径。部署需要服务完整的 wasm-bindgen 输出目录；现有两个构建脚本本来就将其保存在输出目录。
 - [创建验收](../examples/semantic-web/create-acceptance.js) 增加真实浏览器对照：Unicode/NUL、缺失与空属性、属性顺序、完整 u64 身份字符串、host 异常和原型隔离。没有修改业务 benchmark、数据生成器、计时方法或 CSS。
 
-默认依赖图、Rust builder/Cage/Bond/Lotus、SSR/stream v3 格式均未改变，没有新增依赖、第三方修改或 vendor。
+默认依赖图、Rust builder/Cage/Bond/Vary、SSR/stream v3 格式均未改变，没有新增依赖、第三方修改或 vendor。
 
 ## 2. 同一 benchmark 的实际前后结果
 
@@ -134,7 +134,7 @@ Glory 的解码次数减少约 **41%**，属性数没有减少，这也是收益
 
 **P2：数字身份索引与构造分配。** 优先测量受 Runtime/generation 保护的紧凑或分页存储、有限 Part 索引、静态字段共享，以及已消费 builder 的空对象保留。保留完整 key 比较、代际耗尽、活节点清理和 graph borrow 外析构；不为用户数据改成不完整 key 或缓存历史。两个 Memory 的职责先保留，只共享真正不可变的静态载荷；不能用整 Descriptor 的共享写时全克隆，破坏现有 prepare_patch 仅触碰字段的收益。
 
-**P3：Owner/Scope 的结构瘦身。** Dioxus 不为每个静态元素建立相同 Owner，值得研究。但 Glory 的 Scope 包含独立取消、cleanup、query requester 和 listener Instance 语义，应先让静态构造计划明确哪些节点没有独立生命周期，再减少对象。不可直接共享所有行的 Owner，也不更换 Cage/Bond/Lotus。必须用自定义组件析构、跨 Scope listener、owner-owned query/task 和重入测试作门槛。
+**P3：Owner/Scope 的结构瘦身。** Dioxus 不为每个静态元素建立相同 Owner，值得研究。但 Glory 的 Scope 包含独立取消、cleanup、query requester 和 listener Instance 语义，应先让静态构造计划明确哪些节点没有独立生命周期，再减少对象。不可直接共享所有行的 Owner，也不更换 Cage/Bond/Vary。必须用自定义组件析构、跨 Scope listener、owner-owned query/task 和重入测试作门槛。
 
 上述是后续改造建议，未作为本轮已经实现的功能或性能承诺。优先级依据本轮成本证据，不根据理论上“更轻”就合入。
 

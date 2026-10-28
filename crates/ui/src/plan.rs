@@ -1,6 +1,6 @@
 //! Explicit reusable construction from the ordinary handwritten Rust builders.
 use crate::{Result, Scope, WeakScope, Widget};
-use glory_core::Lotus;
+use glory_core::Vary;
 use glory_render::{Change, Event, EventKind, NodeId, Patch};
 use std::rc::Rc;
 
@@ -95,7 +95,7 @@ impl PlanInstance {
     pub fn bind<T: Clone + PartialEq + 'static>(
         &self,
         part: &PlanPart,
-        value: impl Into<Lotus<T>>,
+        value: impl Into<Vary<T>>,
         patch: impl FnMut(T) -> Patch + 'static,
     ) -> Result {
         let (scope, id) = self.resolve(part)?;
@@ -125,13 +125,13 @@ impl PlanInstance {
             ))
         })
     }
-    pub fn text(&self, part: &PlanPart, value: impl Into<Lotus<String>>) -> Result {
+    pub fn text(&self, part: &PlanPart, value: impl Into<Vary<String>>) -> Result {
         self.bind(part, value, |v| Patch::Text(Change::Set(v)))
     }
-    pub fn label(&self, part: &PlanPart, value: impl Into<Lotus<String>>) -> Result {
+    pub fn label(&self, part: &PlanPart, value: impl Into<Vary<String>>) -> Result {
         self.bind(part, value, |v| Patch::Label(Change::Set(v)))
     }
-    pub fn class(&self, part: &PlanPart, value: impl Into<Lotus<String>>) -> Result {
+    pub fn class(&self, part: &PlanPart, value: impl Into<Vary<String>>) -> Result {
         self.bind(part, value, |v| {
             Patch::Classes(Change::Set(
                 v.split_whitespace().map(str::to_owned).collect(),
@@ -152,10 +152,10 @@ impl PlanInstance {
 pub(crate) fn bind<T: Clone + PartialEq + 'static>(
     scope: &Scope,
     node: NodeId,
-    value: Lotus<T>,
+    value: Vary<T>,
     mut patch: impl FnMut(T) -> Patch + 'static,
 ) -> Result {
-    if let Lotus::Value(value) = value {
+    if let Vary::Value(value) = value {
         return match patch(value) {
             Patch::RichDocument {
                 document: Change::Set(value),

@@ -14,6 +14,9 @@ files = [root/'Cargo.toml', root/'Cargo.lock']
 for member in members:
     files.extend(p for p in (root/member).rglob('*') if p.is_file() and 'target' not in p.parts)
 files.extend(root/'benchmarks'/name for name in ['data.rs','bench-harness.js','semantic.css'])
+files.extend(root/'benchmarks'/name for name in ['build.ps1','snapshot.py','compare.cjs','summarize.py','acceptance.js','bulk-integrity.js','display-acceptance.js','browser-run.js','scenarios/pin-browser.ps1'])
+files.extend([root/'benchmarks/profile-display.cjs',root/'scripts/build-js-framework-benchmark.ps1'])
+files.append(root/'benchmarks/profile-submit-counts.cjs')
 for app in ['glory','leptos','dioxus','role-patches']:
     base=root/'benchmarks'/app
     files.extend(base/name for name in ['Cargo.toml','Cargo.lock','index.html'])

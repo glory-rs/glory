@@ -156,7 +156,7 @@ Dioxus 的 sampled run 57.388 ms 已高于正式万行 Script 44.815 ms，说明
 
 ## 8. 对 Glory 的改进优先级
 
-以下均保留纯手写 Rust、Cage/Bond/Lotus、双 Memory、完整节点身份及输入/查询/成功前缀契约。Dioxus 的 Sledgehammer 本身属于通用指令解释机制，不建议直接引入；静态/动态分离和批量传输可以独立借鉴。
+以下均保留纯手写 Rust、Cage/Bond/Vary、双 Memory、完整节点身份及输入/查询/成功前缀契约。Dioxus 的 Sledgehammer 本身属于通用指令解释机制，不建议直接引入；静态/动态分离和批量传输可以独立借鉴。
 
 | 优先级 | 具体实验 | 可减少的计算 | 约束与验收 |
 |---|---|---|---|

@@ -63,14 +63,15 @@ pub fn submission_probe(stage: u8) -> std::result::Result<usize, JsValue> {
         let mut probe = probe.borrow_mut();
         let probe = probe.as_mut().ok_or_else(|| js("probe not mounted"))?;
         match stage {
-            1 => {
-                for index in 0..4 {
+            1 | 6 => {
+                let count = if stage == 6 { 600 } else { 4 };
+                for index in 0..count {
                     let row = probe.owner.instantiate(&probe.declaration).map_err(js)?;
                     row.text(&probe.text, format!("row {index}")).map_err(js)?;
                     probe.rows.push(row);
                 }
             }
-            2 => {
+            2 | 7 => {
                 for (index, row) in probe.rows.iter().enumerate() {
                     row.text(&probe.text, format!("changed🙂 {index}"))
                         .map_err(js)?;
@@ -109,6 +110,31 @@ pub fn submission_probe(stage: u8) -> std::result::Result<usize, JsValue> {
                 probe.owner.place(node, Some(parent), None).map_err(js)?;
                 probe.web.app().flush().map_err(js)?;
                 victim.dispose();
+            }
+            8 => {
+                for row in probe.rows.iter().take(300) {
+                    row.text(&probe.text, "segment prefix🙂".to_owned())
+                        .map_err(js)?;
+                }
+                let accepted = probe.owner.instantiate(&probe.declaration).map_err(js)?;
+                accepted
+                    .text(&probe.text, "accepted new instance🙂".to_owned())
+                    .map_err(js)?;
+                probe.rows.push(accepted);
+                probe.rows[300]
+                    .class(&probe.root, "submit-row throw-here".to_owned())
+                    .map_err(js)?;
+                let suffix = probe.owner.instantiate(&probe.declaration).map_err(js)?;
+                suffix
+                    .text(&probe.text, "unexecuted new instance".to_owned())
+                    .map_err(js)?;
+                probe.rows.push(suffix);
+                assert!(probe.web.app().flush().is_err());
+                assert!(matches!(
+                    probe.web.app().flush(),
+                    Err(glory::ui::Error::Faulted)
+                ));
+                return Ok(1);
             }
             _ => return Err(js("unknown submission probe stage")),
         }

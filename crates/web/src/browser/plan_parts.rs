@@ -1,6 +1,6 @@
 //! Immutable physical addresses and current member ownership of one explicit
 //! Plan. No DOM search, business values, callbacks or visited-row history.
-use glory_html::{Part, PlanShape};
+use glory_html::{EditKind, Kind, Part, PlanShape, Property};
 use glory_render::{Error, MAX_PLAN_NODES};
 
 pub(crate) fn index(part: Part) -> usize {
@@ -12,8 +12,31 @@ pub(crate) fn index(part: Part) -> usize {
     }
 }
 
+/// Immutable physical eligibility; live identity/placement still validates for
+/// every submission. Prototypes retain this fact, never an instance's state.
+pub(super) fn submission_shape(shape: &PlanShape) -> bool {
+    shape.shapes.iter().all(|shape| {
+        shape.edit == EditKind::None
+            && shape.select_options.is_none()
+            && !shape.pieces.is_empty()
+            && shape.pieces.iter().all(|piece| match &piece.kind {
+                Kind::Element {
+                    attributes,
+                    properties,
+                    ..
+                } => properties.iter().all(|(name, value)| {
+                    *name == "disabled"
+                        && matches!(value, Property::Bool(disabled) if *disabled == attributes.contains_key("disabled"))
+                }),
+                Kind::Text(_) => true,
+            })
+    })
+}
+
 pub(super) struct Layout {
     members: Vec<[Option<u32>; 4]>,
+    #[cfg(target_arch = "wasm32")]
+    parts: u32,
 }
 impl Layout {
     #[cfg(target_arch = "wasm32")]
@@ -22,10 +45,7 @@ impl Layout {
     }
     #[cfg(target_arch = "wasm32")]
     pub fn parts(&self) -> u32 {
-        self.members
-            .iter()
-            .flat_map(|parts| parts.iter().flatten())
-            .count() as u32
+        self.parts
     }
     pub fn new(shapes: &PlanShape) -> Result<Self, Error> {
         if shapes.shapes.is_empty() || shapes.shapes.len() > MAX_PLAN_NODES {
@@ -42,7 +62,11 @@ impl Layout {
             }
             members.push(parts);
         }
-        Ok(Self { members })
+        Ok(Self {
+            members,
+            #[cfg(target_arch = "wasm32")]
+            parts: offset,
+        })
     }
     pub fn address(&self, member: usize, part: Part) -> Option<u32> {
         self.members[member][index(part)]
@@ -89,6 +113,28 @@ mod tests {
     use super::*;
     use glory_html::shape;
     use glory_render::*;
+    #[test]
+    fn submission_rejects_editor_properties_ranges_and_disabled_disagreement() {
+        let mut shapes = PlanShape {
+            shapes: vec![shape(&Descriptor::new(Props::Button(Default::default()))).unwrap()],
+            parents: vec![None],
+        };
+        assert!(submission_shape(&shapes));
+        let piece = shapes.shapes[0]
+            .pieces
+            .iter_mut()
+            .find(|piece| matches!(piece.kind, Kind::Element { .. }))
+            .unwrap();
+        let Kind::Element { properties, .. } = &mut piece.kind else {
+            unreachable!()
+        };
+        properties.insert("disabled", Property::Bool(true));
+        assert!(!submission_shape(&shapes));
+        shapes.shapes[0] = shape(&Descriptor::new(Props::Input(Default::default()))).unwrap();
+        assert!(!submission_shape(&shapes));
+        shapes.shapes[0] = shape(&Descriptor::new(Props::Group)).unwrap();
+        assert!(!submission_shape(&shapes));
+    }
     #[test]
     fn physical_addresses_preserve_all_parts_including_control_roots() {
         let shapes = PlanShape {

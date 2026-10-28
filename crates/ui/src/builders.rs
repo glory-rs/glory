@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use glory_core::{Cage, Lotus};
+use glory_core::{Cage, Vary};
 use glory_render::{
     ButtonProps, Change, CheckProps, Descriptor, Event, EventKind, FocusMode, ImageProps,
     InputProps, ItemPosition, LinkProps, NodeId, Patch, Props, Purpose, Role, TextKind, TextProps,
@@ -77,13 +77,13 @@ impl Element {
     fn set<T: Clone + PartialEq + 'static>(
         &mut self,
         slot: Slot,
-        value: impl Into<Lotus<T>>,
+        value: impl Into<Vary<T>>,
         mut patch: impl FnMut(T) -> Patch + 'static,
     ) {
         self.initial.remove(&slot);
         self.bindings.remove(&slot);
         match value.into() {
-            Lotus::Value(value) => {
+            Vary::Value(value) => {
                 self.initial.insert(slot, patch(value));
             }
             value => {
@@ -357,7 +357,7 @@ macro_rules! common {
     ($($name:ident),+) => {$ (
         impl $name {
             /// Set the complete whitespace-separated class list (last call wins).
-            pub fn class(mut self, value: impl Into<Lotus<String>>) -> Self {
+            pub fn class(mut self, value: impl Into<Vary<String>>) -> Self {
                 self.inner.set(Slot::Classes, value, |value: String| Patch::Classes(Change::Set(value.split_whitespace().map(str::to_owned).collect()))); self
             }
             /// Compute one property directly in its pure Binding.
@@ -367,18 +367,18 @@ macro_rules! common {
             pub fn style_fn(mut self, read: impl FnMut() -> Style + 'static) -> Self {
                 self.inner.set_fn(Slot::Style, read, |value| Patch::Style(Change::Set(Box::new(value)))); self
             }
-            pub fn style(mut self, value: impl Into<Lotus<Style>>) -> Self {
+            pub fn style(mut self, value: impl Into<Vary<Style>>) -> Self {
                 self.inner.set(Slot::Style, value, |value| Patch::Style(Change::Set(Box::new(value)))); self
             }
             /// Accessible name. Plain inline/paragraph text uses content;
             /// decorative images have no accessible name. A named generic View
             /// becomes an accessible group without changing its layout box.
-            pub fn name(mut self, value: impl Into<Lotus<String>>) -> Self {
+            pub fn name(mut self, value: impl Into<Vary<String>>) -> Self {
                 self.inner.set(Slot::Name, value, |value| Patch::Name(Change::Set(Some(value)))); self
             }
-            pub fn focus(mut self, mode: impl Into<Lotus<FocusMode>>) -> Self { self.inner.set(Slot::Focus, mode, |value| Patch::Focus(Change::Set(value))); self }
+            pub fn focus(mut self, mode: impl Into<Vary<FocusMode>>) -> Self { self.inner.set(Slot::Focus, mode, |value| Patch::Focus(Change::Set(value))); self }
             /// Finite composite-widget state and document-scoped relations.
-            pub fn semantics(mut self, value: impl Into<Lotus<Option<Box<glory_render::Semantics>>>>) -> Self {
+            pub fn semantics(mut self, value: impl Into<Vary<Option<Box<glory_render::Semantics>>>>) -> Self {
                 self.inner.set(Slot::Semantics, value, |value| Patch::Semantics(Change::Set(value))); self
             }
             pub fn on(mut self, kind: EventKind, handler: impl FnMut(Event) + 'static) -> Self { self.inner.handlers.insert(kind, Box::new(handler)); self }
@@ -391,7 +391,7 @@ common!(
     View, Text, Button, Input, File, Select, Check, Image, Graphic, Link, RichEditor
 );
 impl RichEditor {
-    pub fn document(mut self, value: impl Into<Lotus<Rc<glory_render::RichDocument>>>) -> Self {
+    pub fn document(mut self, value: impl Into<Vary<Rc<glory_render::RichDocument>>>) -> Self {
         self.inner
             .set(Slot::RichDocument, value, |document| Patch::RichDocument {
                 document: Change::Set(document),
@@ -399,7 +399,7 @@ impl RichEditor {
             });
         self
     }
-    pub fn enabled(mut self, value: impl Into<Lotus<bool>>) -> Self {
+    pub fn enabled(mut self, value: impl Into<Vary<bool>>) -> Self {
         self.inner.set(Slot::Enabled, value, |value| {
             Patch::Enabled(Change::Set(value))
         });
@@ -407,7 +407,7 @@ impl RichEditor {
     }
 }
 impl Graphic {
-    pub fn drawing(mut self, value: impl Into<Lotus<glory_render::GraphicProps>>) -> Self {
+    pub fn drawing(mut self, value: impl Into<Vary<glory_render::GraphicProps>>) -> Self {
         self.inner.set(Slot::Graphic, value, |value| {
             Patch::Graphic(Change::Set(Box::new(value)))
         });
@@ -445,7 +445,7 @@ impl View {
         });
         self
     }
-    pub fn item(mut self, value: impl Into<Lotus<Option<ItemPosition>>>) -> Self {
+    pub fn item(mut self, value: impl Into<Vary<Option<ItemPosition>>>) -> Self {
         self.inner
             .set(Slot::Item, value, |value| Patch::Item(Change::Set(value)));
         self
@@ -463,13 +463,13 @@ macro_rules! label {
             pub fn label_fn(mut self, read: impl FnMut() -> String + 'static) -> Self {
                 self.inner.set_fn(Slot::Label, read, |value| Patch::Label(Change::Set(value))); self
             }
-            pub fn label(mut self, value: impl Into<Lotus<String>>) -> Self { self.inner.set(Slot::Label, value, |value| Patch::Label(Change::Set(value))); self } }
+            pub fn label(mut self, value: impl Into<Vary<String>>) -> Self { self.inner.set(Slot::Label, value, |value| Patch::Label(Change::Set(value))); self } }
     )+};
 }
 label!(Button, Check, Link);
 macro_rules! enabled {
     ($($name:ident),+) => {$ (
-        impl $name { pub fn enabled(mut self, value: impl Into<Lotus<bool>>) -> Self { self.inner.set(Slot::Enabled, value, |value| Patch::Enabled(Change::Set(value))); self } }
+        impl $name { pub fn enabled(mut self, value: impl Into<Vary<bool>>) -> Self { self.inner.set(Slot::Enabled, value, |value| Patch::Enabled(Change::Set(value))); self } }
     )+};
 }
 enabled!(Button, Input, File, Check);
@@ -502,7 +502,7 @@ impl Text {
             .set_fn(Slot::Text, read, |value| Patch::Text(Change::Set(value)));
         self
     }
-    pub fn content(mut self, value: impl Into<Lotus<String>>) -> Self {
+    pub fn content(mut self, value: impl Into<Vary<String>>) -> Self {
         self.inner
             .set(Slot::Text, value, |value| Patch::Text(Change::Set(value)));
         self
@@ -513,7 +513,7 @@ impl Text {
         });
         self
     }
-    pub fn selectable(mut self, value: impl Into<Lotus<bool>>) -> Self {
+    pub fn selectable(mut self, value: impl Into<Vary<bool>>) -> Self {
         self.inner.set(Slot::Selectable, value, |value| {
             Patch::Selectable(Change::Set(value))
         });
@@ -521,7 +521,7 @@ impl Text {
     }
 }
 impl Input {
-    pub fn value(mut self, value: impl Into<Lotus<String>>) -> Self {
+    pub fn value(mut self, value: impl Into<Vary<String>>) -> Self {
         // Static configuration starts at one; bound writes allocate from the
         // live node so explicit Scope patches cannot make this producer regress.
         self.inner.set(Slot::Value, value, |value| Patch::Value {
@@ -530,7 +530,7 @@ impl Input {
         });
         self
     }
-    pub fn purpose(mut self, value: impl Into<Lotus<Purpose>>) -> Self {
+    pub fn purpose(mut self, value: impl Into<Vary<Purpose>>) -> Self {
         self.inner.set(Slot::Purpose, value, |value| {
             Patch::Purpose(Change::Set(value))
         });
@@ -544,14 +544,14 @@ impl Input {
     }
 }
 impl Check {
-    pub fn mode(mut self, value: impl Into<Lotus<glory_render::CheckMode>>) -> Self {
+    pub fn mode(mut self, value: impl Into<Vary<glory_render::CheckMode>>) -> Self {
         self.inner.set(Slot::CheckMode, value, |value| {
             Patch::CheckMode(Change::Set(value))
         });
         self
     }
 
-    pub fn checked(mut self, value: impl Into<Lotus<bool>>) -> Self {
+    pub fn checked(mut self, value: impl Into<Vary<bool>>) -> Self {
         self.inner.set(Slot::Checked, value, |value| {
             Patch::Checked(Change::Set(value))
         });
@@ -559,14 +559,14 @@ impl Check {
     }
 }
 impl Image {
-    pub fn source(mut self, value: impl Into<Lotus<String>>) -> Self {
+    pub fn source(mut self, value: impl Into<Vary<String>>) -> Self {
         self.inner.set(Slot::Source, value, |value| Patch::Source {
             source: Change::Set(value),
             revision: 1,
         });
         self
     }
-    pub fn alt(mut self, value: impl Into<Lotus<String>>) -> Self {
+    pub fn alt(mut self, value: impl Into<Vary<String>>) -> Self {
         self.inner.needs_alt = false;
         self.inner.set(Slot::Alternative, value, |value| {
             Patch::Alternative(Change::Set(Some(value)))
@@ -582,7 +582,7 @@ impl Image {
     }
 }
 impl Link {
-    pub fn target(mut self, value: impl Into<Lotus<String>>) -> Self {
+    pub fn target(mut self, value: impl Into<Vary<String>>) -> Self {
         self.inner.set(Slot::Target, value, |value| {
             Patch::Target(Change::Set(value))
         });
@@ -672,7 +672,7 @@ impl Select {
             .props = Props::Select(value);
         self
     }
-    pub fn selected(mut self, value: impl Into<Lotus<Vec<glory_render::SemanticId>>>) -> Self {
+    pub fn selected(mut self, value: impl Into<Vary<Vec<glory_render::SemanticId>>>) -> Self {
         self.inner.set(Slot::SelectSelection, value, |keys| {
             Patch::SelectSelection {
                 keys: Change::Set(keys),
@@ -681,7 +681,7 @@ impl Select {
         });
         self
     }
-    pub fn enabled(mut self, value: impl Into<Lotus<bool>>) -> Self {
+    pub fn enabled(mut self, value: impl Into<Vary<bool>>) -> Self {
         self.inner
             .set(Slot::Enabled, value, |v| Patch::Enabled(Change::Set(v)));
         self

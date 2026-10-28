@@ -4,7 +4,7 @@ use std::hash::Hash;
 use std::ops::Range;
 use std::rc::Rc;
 
-use glory_core::{Cage, Lotus, untracked};
+use glory_core::{Cage, Vary, untracked};
 use glory_render::profile::Phase;
 use glory_render::{
     Action, Descriptor, Event, EventKind, FocusMode, ItemPosition, Navigation, NodeId, Props, Rect,
@@ -22,7 +22,7 @@ type KeyAt<K> = Rc<dyn Fn(usize) -> K>;
 type Locate<K> = Rc<dyn Fn(&K) -> Option<usize>>;
 type RenderRow<K> = Box<dyn FnMut(Cage<usize>, K) -> Box<dyn Widget>>;
 
-fn check_table_rows(count: usize, offset: Option<&Lotus<u32>>) -> Result {
+fn check_table_rows(count: usize, offset: Option<&Vary<u32>>) -> Result {
     if let Some(offset) = offset {
         let offset = offset.try_get()?;
         if count > (u32::MAX - offset) as usize {
@@ -58,12 +58,12 @@ pub struct ListStats {
 /// mounted outside that window; blur releases it. Ordinary each intentionally
 /// renders everything.
 pub struct List<K: Clone + Eq + Hash + 'static> {
-    table_offset: Option<Lotus<u32>>,
-    count: Option<Lotus<usize>>,
-    name: Option<Lotus<String>>,
+    table_offset: Option<Vary<u32>>,
+    count: Option<Vary<usize>>,
+    name: Option<Vary<String>>,
     key: Option<KeyAt<K>>,
     locate: Option<Locate<K>>,
-    revision: Option<Lotus<u64>>,
+    revision: Option<Vary<u64>>,
     render: Option<RenderRow<K>>,
     height: f64,
     row_height: f64,
@@ -72,12 +72,12 @@ pub struct List<K: Clone + Eq + Hash + 'static> {
     overscan: usize,
     row_limit: usize,
     limit: f64,
-    position: Option<Lotus<f64>>,
+    position: Option<Vary<f64>>,
     on_scroll: Option<Box<dyn FnMut(f64)>>,
     inspect: Option<Box<dyn FnMut(ListStats)>>,
 }
 pub fn list<K: Clone + Eq + Hash + 'static, W: Widget>(
-    count: impl Into<Lotus<usize>>,
+    count: impl Into<Vary<usize>>,
     key: impl Fn(usize) -> K + 'static,
     mut render: impl FnMut(Cage<usize>, K) -> W + 'static,
 ) -> List<K> {
@@ -105,11 +105,11 @@ impl<K: Clone + Eq + Hash> List<K> {
     /// Windowed structural rows inside an application's semantic Table. The
     /// scroll root/surface stay generic; callers supply ColumnHeader/Cell content.
     /// Coordinates include an explicit offset (for example one header row).
-    pub fn table_rows(mut self, offset: impl Into<Lotus<u32>>) -> Self {
+    pub fn table_rows(mut self, offset: impl Into<Vary<u32>>) -> Self {
         self.table_offset = Some(offset.into());
         self
     }
-    pub fn name(mut self, value: impl Into<Lotus<String>>) -> Self {
+    pub fn name(mut self, value: impl Into<Vary<String>>) -> Self {
         self.name = Some(value.into());
         self
     }
@@ -144,7 +144,7 @@ impl<K: Clone + Eq + Hash> List<K> {
     }
     /// Explicit data edit version for sources whose key closure is not reactive.
     /// Ordinary scrolls never relocate cached height metadata.
-    pub fn revision(mut self, value: impl Into<Lotus<u64>>) -> Self {
+    pub fn revision(mut self, value: impl Into<Vary<u64>>) -> Self {
         self.revision = Some(value.into());
         self
     }
@@ -165,7 +165,7 @@ impl<K: Clone + Eq + Hash> List<K> {
     }
     /// Programmatic logical offset. on_scroll may echo its reported value back
     /// into this source without issuing a new seek or cancelling navigation.
-    pub fn position(mut self, value: impl Into<Lotus<f64>>) -> Self {
+    pub fn position(mut self, value: impl Into<Vary<f64>>) -> Self {
         self.position = Some(value.into());
         self
     }
@@ -220,7 +220,7 @@ struct Row {
     item: ItemPosition,
 }
 struct Rows<K> {
-    table_offset: Option<Lotus<u32>>,
+    table_offset: Option<Vary<u32>>,
     parent: WeakScope,
     keys: Vec<K>,
     start: usize,
@@ -612,8 +612,8 @@ impl<K: Clone + Eq + Hash + 'static> Widget for List<K> {
                     .is_some_and(|(index, key)| *index >= len || key_at(*index) != *key);
                 let had_focus = pin.is_some();
                 measured.get();
-                let revision = data_revision.as_ref().map(Lotus::try_get).transpose()?;
-                let position = desired.as_ref().map(Lotus::try_get).transpose()?;
+                let revision = data_revision.as_ref().map(Vary::try_get).transpose()?;
+                let position = desired.as_ref().map(Vary::try_get).transpose()?;
                 let native_changed = state.native_sequence != input.sequence;
                 let mut user_scrolled = false;
                 let mut user_moved = false;

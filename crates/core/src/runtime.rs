@@ -15,6 +15,9 @@ use dependencies::Dependencies;
 use glory_render::profile::{Phase, Profile};
 #[path = "fields.rs"]
 mod fields;
+#[path = "keyed.rs"]
+mod keyed;
+pub use keyed::{KeyedEntry, KeyedList, ListError, RowToken};
 
 pub type LocalFuture = Pin<Box<dyn Future<Output = ()>>>;
 type Cancel = Box<dyn FnOnce()>;
@@ -1278,6 +1281,21 @@ pub struct InstanceId {
     key: Key,
 }
 impl InstanceId {
+    /// Create an owned child from a validated, non-owning parent identity.
+    /// Controllers may capture this identity without retaining their own Scope.
+    pub fn child_scope(self) -> Result<Scope, AccessError> {
+        allow_creation()?;
+        let state = lookup(self.runtime)?;
+        let owner = {
+            let state = state.borrow();
+            let instance = state.instances.get(self.key).ok_or(AccessError::Disposed)?;
+            if state.owners.get(instance.owner).is_none() {
+                return Err(AccessError::Disposed);
+            }
+            instance.owner
+        };
+        make_scope(make_owner(self.runtime, &state, owner)?, Some(self.key))
+    }
     /// Whether this generational instance and its Owner are still live.
     /// Does not enter construction context or invoke application code.
     pub fn is_alive(self) -> bool {
@@ -1669,12 +1687,12 @@ impl<T> Bond<T> {
 }
 
 #[derive(Clone, Debug)]
-pub enum Lotus<T: 'static> {
+pub enum Vary<T: 'static> {
     Value(T),
     Cage(Cage<T>),
     Bond(Bond<T>),
 }
-impl<T> Lotus<T> {
+impl<T> Vary<T> {
     pub fn try_with<R>(&self, f: impl FnOnce(&T) -> R) -> Result<R, AccessError> {
         match self {
             Self::Value(value) => Ok(f(value)),
@@ -1705,22 +1723,22 @@ impl<T> Lotus<T> {
         !matches!(self, Self::Value(_))
     }
 }
-impl<T> From<T> for Lotus<T> {
+impl<T> From<T> for Vary<T> {
     fn from(value: T) -> Self {
         Self::Value(value)
     }
 }
-impl<T> From<Cage<T>> for Lotus<T> {
+impl<T> From<Cage<T>> for Vary<T> {
     fn from(value: Cage<T>) -> Self {
         Self::Cage(value)
     }
 }
-impl<T> From<Bond<T>> for Lotus<T> {
+impl<T> From<Bond<T>> for Vary<T> {
     fn from(value: Bond<T>) -> Self {
         Self::Bond(value)
     }
 }
-impl From<&str> for Lotus<String> {
+impl From<&str> for Vary<String> {
     fn from(value: &str) -> Self {
         Self::Value(value.to_owned())
     }

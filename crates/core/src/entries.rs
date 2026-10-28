@@ -213,6 +213,61 @@ where
     )
 }
 
+// Private list membership already has a generational numeric key. No second
+// Hash/Eq registry or reactive alias is needed for this intermediate path.
+struct Member<T: 'static> {
+    key: Key,
+    types: PhantomData<fn() -> T>,
+}
+impl<T: 'static> Projection for Member<T> {
+    fn read<'a>(&self, value: &'a dyn Any) -> Result<&'a dyn Any, AccessError> {
+        value
+            .downcast_ref::<Arena<T>>()
+            .ok_or(AccessError::TypeMismatch)?
+            .get(self.key)
+            .map(|v| v as &dyn Any)
+            .ok_or(AccessError::MissingField)
+    }
+    fn write<'a>(&self, value: &'a mut dyn Any) -> Result<&'a mut dyn Any, AccessError> {
+        value
+            .downcast_mut::<Arena<T>>()
+            .ok_or(AccessError::TypeMismatch)?
+            .get_mut(self.key)
+            .map(|v| v as &mut dyn Any)
+            .ok_or(AccessError::MissingField)
+    }
+}
+pub(super) fn keyed_context<T: 'static>(
+    source: Cage<Arena<T>>,
+    key: u64,
+) -> Result<(Context, PathGuard), AccessError> {
+    let context = Context::new(source.handle.runtime, source.handle.key)?;
+    let id = context.canonical::<T>(
+        Segment::Entry(key),
+        None,
+        move || {
+            Rc::new(Member::<T> {
+                key: Key::unpack(key),
+                types: PhantomData,
+            }) as Rc<dyn Projection>
+        },
+        None,
+    )?;
+    let guard = PathGuard {
+        state: context.state.clone(),
+        id,
+    };
+    let path = context.state.borrow().field_path(id)?;
+    Ok((
+        Context {
+            parent: Parent::Field(id),
+            depth: context.depth + 1,
+            path,
+            ..context
+        },
+        guard,
+    ))
+}
 impl<T: 'static> Cage<Vec<T>> {
     /// Track a Vec position, including a currently missing one, without copying
     /// its element. Insert/remove/reorder retarget this position. For stable

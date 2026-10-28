@@ -53,7 +53,7 @@ Public-site 的归属在恢复时再次核对已有文件状态。任何共享�
 
 ### P1：运行入口与共用能力
 
-- [ ] 使用 Glory 纯 Rust builders、Cage/Bond/Lotus 与 Owner 生命周期；不引入 RSX 翻译器、兼容 VDOM 或伪 Signal API。
+- [ ] 使用 Glory 纯 Rust builders、Cage/Bond/Vary 与 Owner 生命周期；不引入 RSX 翻译器、兼容 VDOM 或伪 Signal API。
 - [ ] 重写路由解析、动态参数、查询参数和未知路径；浏览器接入 pushState/replaceState/popstate、深链接和刷新。
 - [ ] 保持 API 端点、强类型请求/响应、认证与授权语义，剥离 API 层对 UI 框架的耦合。
 - [ ] 建立按作用域取消的异步加载与写操作状态，覆盖离页、快速切换、过期回复、失败、重试和重复提交。

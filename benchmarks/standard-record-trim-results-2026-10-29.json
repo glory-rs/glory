@@ -1,0 +1,7297 @@
+{
+  "schema": 1,
+  "evidence": "D:\\BuildCache\\glory-display-completion-20261028\\official-delivered",
+  "metadata": {
+    "started": "2026-10-28T17:32:00.495771+00:00",
+    "root": "D:\\Works\\glory-rs\\js-framework-benchmark",
+    "frameworks": [
+      "glory",
+      "leptos",
+      "dioxus",
+      "react-hooks",
+      "solid",
+      "vue",
+      "svelte",
+      "vanillajs"
+    ],
+    "source_sha256": {
+      "frameworks/keyed/leptos/.gitignore": "dcb877f6fe769bf07dd282313f6ec9f906e54aa8e562715cec7cb2283d839b0f",
+      "frameworks/keyed/leptos/Cargo.lock": "134ac44b94a0c873f1d712a29f9a41ab2b723cdd2457d9ca4743dc2cd308f28c",
+      "frameworks/keyed/leptos/Cargo.toml": "53507698de29241cd83f0852902b65543d9e9e798313abdee1f72f5664f6dc7d",
+      "frameworks/keyed/leptos/index.html": "3814e6f790c8bbbc56e7478f7f96985073425e0b39cfa6844b36764187da6561",
+      "frameworks/keyed/leptos/package-lock.json": "5278a45904b2ad33a5ebe19f57bd2811243f16dda18cfe44ffb49a324849ed93",
+      "frameworks/keyed/leptos/package.json": "19b15827d3b01a0827dc32d7250d0a154177fdf38bd4314b63e4ae47a01892a6",
+      "frameworks/keyed/leptos/README.md": "e876541c838a8bd9b0cd2276e4d6519903556bad312956defd3e467aac9fbb00",
+      "frameworks/keyed/leptos/bundled-dist/app.d.ts": "49a44e209e8d860cae2516ece970c56822d202a502c7c713bb0a69d0b6d93228",
+      "frameworks/keyed/leptos/bundled-dist/app.js": "5b0eafccd9ad9453385a006b023fdcf65b8dd838958dc2f883d63d9b96bac0f8",
+      "frameworks/keyed/leptos/bundled-dist/app_bg.wasm": "3056e3e825be9cc3f47eb2aa8acf20f4d268d9893d329c976f2946dec41db0eb",
+      "frameworks/keyed/leptos/bundled-dist/app_bg.wasm.d.ts": "791039876e056110a1cb3075505afe66cdcd5d1a5881f77d3cced432c968fded",
+      "frameworks/keyed/leptos/bundled-dist/index.html": "16be27be2540714689f8a6d5fa9dd4e69425dec254ce3b8efd51053a2f4b5a56",
+      "frameworks/keyed/leptos/bundled-dist/js-framework-benchmark-leptos.js": "2afda3f6597a1baae2449e474195e45626190b02564b7d4840c572cb22dd3b4c",
+      "frameworks/keyed/leptos/bundled-dist/js-framework-benchmark-leptos_bg.wasm": "416b04773d5e49debe744644a37e468d27f0258c6234df4c683e4498ca5405ae",
+      "frameworks/keyed/leptos/src/lib.rs": "e3453cd3bf58f70520e5aeb4f9692205bea2c4e95bf0cef11b8cbfa0755e59f0",
+      "frameworks/keyed/dioxus/.gitignore": "dcb877f6fe769bf07dd282313f6ec9f906e54aa8e562715cec7cb2283d839b0f",
+      "frameworks/keyed/dioxus/build.sh": "45ff8c0cd9a22e1a9077ab34f701dfea3b5e3a3e80f88b3c0c375da090489593",
+      "frameworks/keyed/dioxus/Cargo.lock": "2c6b085074598e1f5af5162451a9d210e318fe1130c4a90764f0f7c72970a45e",
+      "frameworks/keyed/dioxus/Cargo.toml": "ec3dd8cc69bf6aaa3a63bec61fb6fe007b8654d4f196f2a4bd57c3d39d4bb250",
+      "frameworks/keyed/dioxus/index.html": "e5cbb770ca7b9c5c52e56d601c976c7b5e9508d326151e374d7d8001a4db8947",
+      "frameworks/keyed/dioxus/isKeyed.js": "d42493948cab6e411296098289806e9958abbfc96a40007dcfc5ab44dc1465e2",
+      "frameworks/keyed/dioxus/package-lock.json": "bcc65f43c64890210e8274595a7b1f20a32ecad678fa113b6486fef3da93246b",
+      "frameworks/keyed/dioxus/package.json": "d80aecc027f774dff90d6d0fdbac4e3833125872dae4cb576b7ee257508ce270",
+      "frameworks/keyed/dioxus/README.md": "e876541c838a8bd9b0cd2276e4d6519903556bad312956defd3e467aac9fbb00",
+      "frameworks/keyed/dioxus/trunk.html": "3216617acace8e7d791a172a13a3865480906f22c8aade2598022e1623fcb3cd",
+      "frameworks/keyed/dioxus/trunk.toml": "5fb7ff7e734b571b44f1cc542b40ba9d9d216a8bba58d78d985987bc7fef81f0",
+      "frameworks/keyed/dioxus/bundled-dist/app.d.ts": "4d63217f566a9dbf7020f080e9e2d6be07525d45081c7f6ff1ab0445a67ed8d5",
+      "frameworks/keyed/dioxus/bundled-dist/app.js": "2ed6a7030d9aee7ff462c82e7e763e718a1467dc5b8a5dde186f1f1f39b5f1e5",
+      "frameworks/keyed/dioxus/bundled-dist/app_bg.wasm": "3710721f3d32c109834beb8f69421d6116b4d70afbb23d29158511d78556dfce",
+      "frameworks/keyed/dioxus/bundled-dist/app_bg.wasm.d.ts": "e3db91b0a4e53c9ee615e79b5ac0d40225236d2f03836ad05de617b4bfb1e0d5",
+      "frameworks/keyed/dioxus/bundled-dist/dioxus_benchmark.js": "7b8f51caaad42ec5230551a03f40b798799458b2f936b34787d049b03645f5b2",
+      "frameworks/keyed/dioxus/bundled-dist/dioxus_benchmark_bg.wasm": "f06c8a994e692ae630f87a08c42139cc08248ecb788a32729226697252ceed97",
+      "frameworks/keyed/dioxus/bundled-dist/index.html": "e5cbb770ca7b9c5c52e56d601c976c7b5e9508d326151e374d7d8001a4db8947",
+      "frameworks/keyed/dioxus/src/main.rs": "eced82954d115b3693e5789ae1b75d2538187a3aa0eb9c860d1dcb6f2d1169a0",
+      "frameworks/keyed/dioxus/bundled-dist/snippets/dioxus-cli-config-c2775606adf80e62/inline0.js": "24e4d9511cadbb9227eaedd1edbf84434d0906d2447ab4438090669dffa94113",
+      "frameworks/keyed/dioxus/bundled-dist/snippets/dioxus-interpreter-js-20451f6aefec841d/inline0.js": "cd533b7b9f2192fa535f92f4f266d03d47c23105cf500498d0bc8d6cc90dc6cf",
+      "frameworks/keyed/dioxus/bundled-dist/snippets/dioxus-interpreter-js-ce7056f341163470/inline0.js": "0285a399f30b1a62842e9d7976d9013f9af4096689b1a2d1ede5a271d0125d89",
+      "frameworks/keyed/dioxus/bundled-dist/snippets/dioxus-web-eae67878b22d6805/inline0.js": "853d44dbc9d2696e80d66c056e21d69e77b2bf68f9636826becd029f67c884a5",
+      "frameworks/keyed/dioxus/bundled-dist/snippets/dioxus-web-fe956e4b19891335/inline0.js": "6be032b90fc41caf18657ecba64168b90f5a6a4964fb3f10b7e42d56b82e93c1",
+      "frameworks/keyed/dioxus/bundled-dist/snippets/dioxus-interpreter-js-ce7056f341163470/src/js/hydrate.js": "280c7b5905b881d1504a220f666e1c3c360ebaf332a44d99ab13dde92f0ee2e2",
+      "frameworks/keyed/dioxus/bundled-dist/snippets/dioxus-interpreter-js-ce7056f341163470/src/js/patch_console.js": "a184106715d8b20000cdb3105ccbe16b0613feb287f578cc9f4009834906e539",
+      "frameworks/keyed/dioxus/bundled-dist/snippets/dioxus-interpreter-js-ce7056f341163470/src/js/set_attribute.js": "71248862ada387ab18ba57dc865800c027604c247f1ccf58578f9aab1bf8078b",
+      "frameworks/keyed/dioxus/bundled-dist/snippets/dioxus-interpreter-js-20451f6aefec841d/src/js/hydrate.js": "0659b58e105fbc8e7e97feb8aa123f455520333ae10c326fa37ec0eb4b08e833",
+      "frameworks/keyed/dioxus/bundled-dist/snippets/dioxus-interpreter-js-20451f6aefec841d/src/js/patch_console.js": "9ef1d21e8c05e91f5dd9e46c8f47ae574185a64497527b687f8fdb9b98045f83",
+      "frameworks/keyed/dioxus/bundled-dist/snippets/dioxus-interpreter-js-20451f6aefec841d/src/js/set_attribute.js": "5b56995f71fe629934f4ab5eb292d5cfccd9d99037eb9a39ede5078c78db88df",
+      "frameworks/keyed/react-hooks/index.html": "473db759e56083da48b9ed46673dbcecee70a1321fa4fb553943e5849c80b4af",
+      "frameworks/keyed/react-hooks/package-lock.json": "1c94b8d7aa53a72b558dbe4bfc305f5c86668a5bad3fd34f86770f04476aa2d6",
+      "frameworks/keyed/react-hooks/package.json": "4e1495eb534faae69c564a9a5e7a036dbb6c1a364383b37a31c71d26792f2dbc",
+      "frameworks/keyed/react-hooks/webpack.config.js": "67f733e63d695c8bff3d87de7555a3547721c55979d76a40d940ca2fc78244a8",
+      "frameworks/keyed/react-hooks/dist/main.js": "501f594158cea6a26fa05d25f0bae6b2eb463a55fe0a6975594b5df3e13cd62a",
+      "frameworks/keyed/react-hooks/dist/main.js.LICENSE.txt": "fcd44eaa24992e4f238a50dc8ab77d8b2052e6c8006c8aef3187f764cf55406d",
+      "frameworks/keyed/react-hooks/src/main.jsx": "bca23967f42a708fe826f55204e700acaa6bf68ac2d84111d25cbe0e553e665d",
+      "frameworks/keyed/solid/index.html": "522775aa6fe51db249b0fa814d7c33f8acb8b87e74466728072af15bee99c6e6",
+      "frameworks/keyed/solid/package-lock.json": "4cf207c89bdea0040b1a0205cad7985a9d56807452aa3df1fc50bc8a87965c8d",
+      "frameworks/keyed/solid/package.json": "67a6df74e128f3540d0fe217c77a869df0cfa49e55dd48c7965e5c2f3ef38581",
+      "frameworks/keyed/solid/rollup.config.js": "ebc09e7a0bdf76763f95bd9d6055fe323c31eb5c90684c5e23aa3d31d852ed9a",
+      "frameworks/keyed/solid/dist/main.js": "9a7954aedff39e0f0107a9223f717bdcee63a1609b5bb2626065283f633314fe",
+      "frameworks/keyed/solid/src/main.jsx": "6b6a3c2843e37a222202a5d3c567069f033c1b2464aac68f65cee107e18f75e2",
+      "frameworks/keyed/vue/.gitignore": "d50ab07e11fa4bf3b1c7c3312e1d7baeab56cca756832ccf40476823ad2a38b7",
+      "frameworks/keyed/vue/.npmrc": "2d2a164460fb5bcd1d8e4b4bab8dfd4b05680863a3f3af56aa4b2b016ef843cc",
+      "frameworks/keyed/vue/index.html": "5b67067c067c93b724445570ddac8b0dd3fea2c330bb4b50ca9cb58158c76a82",
+      "frameworks/keyed/vue/package-lock.json": "30e455d0e47b60308898012dc392c6b4acc756b9b9f93d67051ff21933b4fd5b",
+      "frameworks/keyed/vue/package.json": "283812f7ed92822b04ec4545a399f5a44a715eb7e4cd23b1423610e8da6fd266",
+      "frameworks/keyed/vue/README.md": "c111d838352113e2c94bae6be6a14f3419476006eadffcdf4a8ed3bc66f56dee",
+      "frameworks/keyed/vue/vite.config.js": "08700e31be92227c65b454b7fd760138b809795cce5cbe86b17b0954874ba250",
+      "frameworks/keyed/vue/dist/index.html": "f7cc6f0afff15c0750bf3f4c1961dabe0d26ba1972f72f71b785c9f6ed7630ae",
+      "frameworks/keyed/vue/dist/vite.svg": "4a748afd443918bb16591c834c401dae33e87861ab5dbad0811c3a3b4a9214fb",
+      "frameworks/keyed/vue/public/vite.svg": "4a748afd443918bb16591c834c401dae33e87861ab5dbad0811c3a3b4a9214fb",
+      "frameworks/keyed/vue/src/App.vue": "1d200def466996fddc037c2837aa31a0fdc2d13fc9c0d70e836e0de174121f7d",
+      "frameworks/keyed/vue/src/data.js": "c24c455fa3e60684d4165e681fde15365cc0a414a9b8277b573f1190f5bfdcee",
+      "frameworks/keyed/vue/src/main.js": "ade4e6ade0df33597d58ee6ce74a8dab8a3b741914ad5b699f78dfc302a26a2b",
+      "frameworks/keyed/vue/dist/assets/index-LG75j6e7.js": "e783ec6ef7a57144951f5e54a77fff6bee4f03c166bc1627eaca6bf44f24d677",
+      "frameworks/keyed/svelte/.npmrc": "2d2a164460fb5bcd1d8e4b4bab8dfd4b05680863a3f3af56aa4b2b016ef843cc",
+      "frameworks/keyed/svelte/index.html": "a917015d935dfc0c1a9ca5dd52fbdf1b9d6f0b105728ad5d222d432d05c3eda0",
+      "frameworks/keyed/svelte/package-lock.json": "b690422d472bed4f6c6b7b6466d510a002ad6b50d39fa12fc1f75a5f82ae4d61",
+      "frameworks/keyed/svelte/package.json": "927d3a89b2e4a572b6e512e5abb25d31a88b8c92b06dfc6c4f5d9cd787bcad57",
+      "frameworks/keyed/svelte/rollup.config.js": "3f46445155cb7b8ba252d18811c682266d2dd9c7049f240ff38bd14531344f52",
+      "frameworks/keyed/svelte/dist/main.js": "38f1cfb64a26539ae1dad97f33e01f3b1211759a6e7fece1650d2a04c5b9c809",
+      "frameworks/keyed/svelte/src/main.js": "d3a3f9cc20f383e076b226a8d415e6cea441c782c30af1fbf9f92caf2aa646e7",
+      "frameworks/keyed/svelte/src/Main.svelte": "05e38bd83d505271e0496efe392a70830603b8df969ec4aef550e32a95c7d78b",
+      "frameworks/keyed/vanillajs/index.html": "01486bb342ff5fedd28ef8115240ca4e1e2a9cfd97defe0f8089946e91d05776",
+      "frameworks/keyed/vanillajs/package-lock.json": "334424fed6ffa1ee41a6479f723329ef1f4e5d444980b2a971216bfa18028143",
+      "frameworks/keyed/vanillajs/package.json": "1b5bb46221c98c796bf37b91814c2f10c1cb003539857d1b2646605d4bc8cc5f",
+      "frameworks/keyed/vanillajs/src/Main.js": "b0fffa1911f5898c66e1db7d6bb330be971499d18b9da54844f37d8ec7dde4fb",
+      "webdriver-ts/src/benchmarkRunner.ts": "b6eace66ac6564dfd9f9c9f59d286fbb3dc2b7dbe653ac7dee92e3ee276da61d",
+      "webdriver-ts/src/benchmarksCommon.ts": "4d55f48c3a0eb48a123027e1e70327e1a284ff5c7f922d53364f1ca718ededd0",
+      "webdriver-ts/src/benchmarksLighthouse.ts": "2d07c21e3e571a0fe9ec012c27014ba7773715ce7429d8f5fb8fefe57d47bbdd",
+      "webdriver-ts/src/benchmarksPlaywright.ts": "c7060e1e508e72f2b7911214e53d0a60892c72147e0a1e03c9ded968de9e7e1d",
+      "webdriver-ts/src/benchmarksPuppeteer.ts": "39be757a85326e4eae70e0760d118c85da9b72e48fd5eaef3acaac4bd97d4852",
+      "webdriver-ts/src/benchmarksSize.ts": "6b5bacd48a96be7cb76a133312d997df835a098d9fc8b283106527a70c5ec5e5",
+      "webdriver-ts/src/benchmarksWebdriverAfterframe.ts": "129eda428ac69813a19410789768cd797024b0a4fa4fc67356cba13dee0fa028",
+      "webdriver-ts/src/benchmarksWebdriverCDP.ts": "5945c3c7594173374383e203d2bb36d8bd154d083a016a83e8cfa559939ccc23",
+      "webdriver-ts/src/common.ts": "4ea94912eb02831965ac69e8d77261bccf1a3b8375ddbd4300f5fc95b0659ffb",
+      "webdriver-ts/src/computeDuration.test.ts": "3862d4814ea498dd1498de00bcabfbbcd65f2d2e0fc4a151e9e7befad1501b06",
+      "webdriver-ts/src/createResultJS.ts": "9db6ec5dee5713ec224bd760bdec0a475223b8e7961939518b4ff60a909a6425",
+      "webdriver-ts/src/forkedBenchmarkRunnerLighthouse.ts": "e7ff30ef4fd5a72acd1cd40dde9c1ecd4e320a1f5496ea41f60b822fb5e473b5",
+      "webdriver-ts/src/forkedBenchmarkRunnerPlaywright.ts": "daee8073f893417083552a7d22ea0c78bdb4f1b0b19f3671c89d692a3bdceb8e",
+      "webdriver-ts/src/forkedBenchmarkRunnerPuppeteer.ts": "d6616fdf8d5a8619de4b91c5bec0bcb291d699094b2e4a6e4229529fb389aef5",
+      "webdriver-ts/src/forkedBenchmarkRunnerSize.ts": "e09f5602cc7d8109dc84dbe5e5de8231b7650e0ef92f24471e348722d8666da7",
+      "webdriver-ts/src/forkedBenchmarkRunnerWebdriverAfterframe.ts": "72e485110599047bf54df0a416a5263f81421d4d7ae15db841cd6ddee3e5e1fb",
+      "webdriver-ts/src/forkedBenchmarkRunnerWebdriverCDP.ts": "806f0b022a2a0710788ea5a594577ad7c7912a128d88bcd52522a04507732187",
+      "webdriver-ts/src/interval.test.ts": "b6cc9fcf4f2fb504059ac4456f93cc2879844024725725abc871e813515792b2",
+      "webdriver-ts/src/interval.ts": "a7e25a1edbad6a3a820a0721a59e5da5f4ffaac4e3f1f36bd3193ed1eae491ca",
+      "webdriver-ts/src/isCSPCompliant.ts": "27702fe349bafabedfc5f8627de7eab4f923b27720d6f6580b5fbcea0849a7a8",
+      "webdriver-ts/src/isKeyed.ts": "d80823b348b0aba3131a661dc06876d764fc6e26f44a8f810599c6ce7cf274d8",
+      "webdriver-ts/src/lighthouseConfig.ts": "f63edcae3dd2d2abd1a3defad57df667fb7d859d3de4faa3ffc93069b4985252",
+      "webdriver-ts/src/parseTrace.ts": "2feaecdcb32cb4d24be3a4c95f8a2d2602c645ace05e3f453bd75c8b98875cbb",
+      "webdriver-ts/src/playwrightAccess.ts": "7682934c384492bc1cd9f365bd378e86c8e05367f484402893aef8f00e9aed22",
+      "webdriver-ts/src/puppeteerAccess.ts": "4ef701821c37cbf9363977775364c430b84e83dd1a95c51116fa7da5669a68ee",
+      "webdriver-ts/src/stats.test.ts": "008e3d0f73f1163f2aab54c18b6b6e3d2ecb33a4b16110cdabe6e616d9bd674d",
+      "webdriver-ts/src/stats.ts": "6548b78eafe21051465ee81e3d4045c4323909bbc2efc477e69fb2deeb29161c",
+      "webdriver-ts/src/timeline.ts": "e64e6df5b89fb3b4587a3bffb72d0c3245625d1ce3f4215be06dfe0bcd9f70f9",
+      "webdriver-ts/src/webdriverAccess.ts": "e085d41960de7004f054d8b9ce9208afb655023134f52d495636ebaf33d16177",
+      "webdriver-ts/src/webdriverCDPAccess.ts": "411c683c58f19e2a4f07ce76875d41990ad1dd62525a9e7d82b0e3cd67dd60b8",
+      "webdriver-ts/src/writeResults.ts": "32b67633048efa3b0fcc119b4f45ecba8428524f96b3f5bc9398bf86f796cbf6",
+      "webdriver-ts/src/types/jstat.d.ts": "0c56ae17d4afa3cf3c676d8ce09b047ef457e58c020802c97c7041b14c844369",
+      "webdriver-ts/dist/benchmarkRunner.js": "be2774d48f0495b6df82022ddf14d1f9f3b41caeec7c855e1f92da4909192f1e",
+      "webdriver-ts/dist/benchmarkRunner.js.map": "11ef7fcddc3686366bd96b96d82976f9c17a284c31987b0eb1b289bb987f499d",
+      "webdriver-ts/dist/benchmarksCommon.js": "409e0269e493b6342d6fd7e0a682e703db45233ef90c3e0fb509005a27a9157c",
+      "webdriver-ts/dist/benchmarksCommon.js.map": "7ea5cd4d923af8dbfe04d4607d688b0e4f2d6c7c22de81f447cca7a596dd60df",
+      "webdriver-ts/dist/benchmarksLighthouse.js": "4a7045e5a632ae20fbe8d41d92947bf10b477d157739ebe6dbc16f6d4559660a",
+      "webdriver-ts/dist/benchmarksLighthouse.js.map": "3e03cde64f3ff3989de4ce891f234d58a76d4d76f3806337f60fcfa9e4faaa32",
+      "webdriver-ts/dist/benchmarksPlaywright.js": "284ba4357ad99bca89fcb10ed7a8f5a77a01aa98838797e384281f1fc0dbbe19",
+      "webdriver-ts/dist/benchmarksPlaywright.js.map": "63c3379c3de91bd8556af619590f957b2c04230b8a629a552b906d54370e3cb4",
+      "webdriver-ts/dist/benchmarksPuppeteer.js": "20e7386ac68b1f07f55961e6c23e63fc8076e70810a5d78768a4663d7d7be03b",
+      "webdriver-ts/dist/benchmarksPuppeteer.js.map": "798a1775fac98398c4f05ee9f044b559bd4fefaf058a1b2be36872d61e89d8cf",
+      "webdriver-ts/dist/benchmarksSize.js": "d093e48c291f66f58193628d488646217265862468708b1fd7bac98acb744b84",
+      "webdriver-ts/dist/benchmarksSize.js.map": "da208df1c86082ffbeaeab05e7652484e88f8171c4b6281ef9c53485e13b168f",
+      "webdriver-ts/dist/benchmarksWebdriverAfterframe.js": "34021baf02c52f793f6f504e6400267c810a1e77dc60d60018172710f406274a",
+      "webdriver-ts/dist/benchmarksWebdriverAfterframe.js.map": "3141d5ee6fd5507c3937048e29adac9de008582f08216305bccbd0061e65d6b3",
+      "webdriver-ts/dist/benchmarksWebdriverCDP.js": "a35767d74568662d14ba095399d5d35de31b3f3f45f8e16cc5b3b08373914b6c",
+      "webdriver-ts/dist/benchmarksWebdriverCDP.js.map": "ec4acd86641a9e3011b1989c6a66151cb628949a2443ff85a2ae84312263d2bf",
+      "webdriver-ts/dist/common.js": "a3dbb72e7e7fa6bac6f0350aae6e8ff47862577a13824d57c5b295014ce9940b",
+      "webdriver-ts/dist/common.js.map": "56e4629dc4289dc333abc38bfd73959a94c6f702611c4dee2ae62efa65c8acd8",
+      "webdriver-ts/dist/createResultJS.js": "5cc5eec4db846defa562d52a0de351638d231de81ff92ff818b32ad104d46f14",
+      "webdriver-ts/dist/createResultJS.js.map": "fe168d081934d89f94d5d83dd05b7d11cabcd3e235dd8fd838de697cc5ee8c30",
+      "webdriver-ts/dist/forkedBenchmarkRunnerLighthouse.js": "c0eb7ce4e030fbbec1bf716a65d2a54f9e33623a1e7b2fe8d0d8728758983700",
+      "webdriver-ts/dist/forkedBenchmarkRunnerLighthouse.js.map": "144556f327920d50e856b482323cc0eefc32a65c6dec7936031a1d57a8ada553",
+      "webdriver-ts/dist/forkedBenchmarkRunnerPlaywright.js": "e6f3c98e73fe65a4c325b9b2762287fb135d9ededf085ccbee16da7325718c83",
+      "webdriver-ts/dist/forkedBenchmarkRunnerPlaywright.js.map": "12127c7b6a8a1207de794c29fb0209eafa3e48a097251f63cefbf1157f79d3da",
+      "webdriver-ts/dist/forkedBenchmarkRunnerPuppeteer.js": "4380853a070ef46f09d8e8501adb47b5dfb27601703ddbe1d87c720b20d9337a",
+      "webdriver-ts/dist/forkedBenchmarkRunnerPuppeteer.js.map": "10fc77d32f1fbbc7ffe00dd66fec47fc08f6757136cddb05cd247d9c44831b4d",
+      "webdriver-ts/dist/forkedBenchmarkRunnerSize.js": "d0a22b5b22b3de59f5d2e7d1d01756d35e6575758e6401f0ec066847c28f899d",
+      "webdriver-ts/dist/forkedBenchmarkRunnerSize.js.map": "43257a7a691a205b4edf10828689b021805d3ccdd66389f07fd27cc5ba400c08",
+      "webdriver-ts/dist/forkedBenchmarkRunnerWebdriverAfterframe.js": "d3f1e75d2c9430821171303c512a3c93baafe831c5f5a5afffb9c01acb173429",
+      "webdriver-ts/dist/forkedBenchmarkRunnerWebdriverAfterframe.js.map": "b6756955a08a0e41add1f271e448288989329c7615071ac2530e73c69bb1a221",
+      "webdriver-ts/dist/forkedBenchmarkRunnerWebdriverCDP.js": "c4b8fe3e29ba488c023bf4065a6944f294a6baa305569832c1bef465a4bcda6d",
+      "webdriver-ts/dist/forkedBenchmarkRunnerWebdriverCDP.js.map": "4bce5debec22e260056cb6904f6b7a04fd3a7587f6a147666730cbba8c29c954",
+      "webdriver-ts/dist/interval.js": "4090ab243c1f62c31dc0eebf8702b98e72bf9b62bab8c98a9682d89b23c806db",
+      "webdriver-ts/dist/interval.js.map": "171e4a5db34eaba54c5bf53b46bedea693983df7cea537bfe9a4d3e30aac312c",
+      "webdriver-ts/dist/isCSPCompliant.js": "773218cad585db098200d07ac84da594b86a27972c7f59718ea8cdedf1db97ea",
+      "webdriver-ts/dist/isCSPCompliant.js.map": "820fa959a14469ad27749282be9dfefbb8320d09bdeb9ed827da7902d34d55aa",
+      "webdriver-ts/dist/isKeyed.js": "289201f415d5ddb04f1520493e273c94e813624e3aef27db34b516472cd97956",
+      "webdriver-ts/dist/isKeyed.js.map": "7a0a16eb0527c8b564ba95761bb9bb83ed62752b57a176beb2a0d9cb0ef342ad",
+      "webdriver-ts/dist/lighthouseConfig.js": "90d05ea3805ed1246e6e49a723191e0342b8f9ca4f2b9924ca9623622adfc755",
+      "webdriver-ts/dist/lighthouseConfig.js.map": "7413ebcb2f7ed7903a5b2c8ffeff4936cf633d5668b6dee1146bf64ebf530092",
+      "webdriver-ts/dist/parseTrace.js": "6ca0c9bff837782e6f2b8fc18a845ab1d7d64b2fee37a9abfa3d87e264c733d2",
+      "webdriver-ts/dist/parseTrace.js.map": "012eda098a57cce94bf69597a86d7da6c0b8f1caa937ebd6af209a163c97825e",
+      "webdriver-ts/dist/playwrightAccess.js": "70dd1f77a519b0f4266c34bf30e572b77080af1545ef4f2e7e6a8525e05b99fd",
+      "webdriver-ts/dist/playwrightAccess.js.map": "f1db4e71fc28cc1b3bb3c03de565585f0e25684196d18147ffb439151f3eeb32",
+      "webdriver-ts/dist/puppeteerAccess.js": "97c737346e05c2deff23018ad66120d967b3367f346004393697ae49d569b35e",
+      "webdriver-ts/dist/puppeteerAccess.js.map": "0e2d8e58b644fc5092c608267759cfd4ba4b49ccb9187f3b04135822fd89d91e",
+      "webdriver-ts/dist/stats.js": "7f2501bff106a271c8f8505c26bcdb9c1ea2e0de9d5ec5db01b1b39fbbdc6cd0",
+      "webdriver-ts/dist/stats.js.map": "3015ca6672b9e530be227c3be9368a7de83e925ab25b32e564e104229177b460",
+      "webdriver-ts/dist/timeline.js": "ce397ac034cc9c5f6aa52b04584573f70a6a68a03d22242d2e4e262e9ce131cb",
+      "webdriver-ts/dist/timeline.js.map": "0c922248ef4263b4e45d60b9e4df335c088bcacf96e7960a7d4489907709f7b9",
+      "webdriver-ts/dist/webdriverAccess.js": "e6b83d87d5d64863d48773507d839a73edd43a5915713e660670fa5bd2065650",
+      "webdriver-ts/dist/webdriverAccess.js.map": "e187f3088a6425239a160af52d68fbf5b3a75b55637c832bafce721b6152dd52",
+      "webdriver-ts/dist/webdriverCDPAccess.js": "1e4ccc64dab1def5de1b5955a5378010fa576ce18dbedab4cd0c17b0a0e0089c",
+      "webdriver-ts/dist/webdriverCDPAccess.js.map": "de1153324e12d96a1b253262f347a59332f0fe74cab956671a1a4199c265ecaf",
+      "webdriver-ts/dist/writeResults.js": "5415ca237e44fabf3ce044b015a547558d7cbd0e18a81a8c201b0008d2712b37",
+      "webdriver-ts/dist/writeResults.js.map": "c58a4e9e450c19d0f2fc24e908bd3d8afb8703f0775c4aa744870067110d0d77",
+      "server/src/fastify.d.ts": "c36674469401d867862b4dc2a57a4a56c651f95a98545ce7255d08e96193503e",
+      "server/src/config/directories.ts": "e22bb27c708b79049d8042aa642d577d8acad349d6a258d41f5c6447edb36a1c",
+      "server/src/csp/cspControllers.ts": "017e2451590dc9b8f30cbfbe7895a44b4cb123868571e67886460804bce5a321",
+      "server/src/csp/cspDecorator.ts": "586a627e87212a7fa6c70838e8346c6f27017babd9189ae8c34e6fee8fe6f267",
+      "server/src/csp/cspRouter.ts": "13ff295c68a36a6de3f5f7ddfa5c4dec9520a4d5d256747a074ce5ad5a236284",
+      "server/src/frameworks/frameworksControllers.ts": "d3047a3739d98da75ab5ae81fb7b6839e18ce9ffa02d8d12cf9bb89503ebb58e",
+      "server/src/frameworks/frameworksRouter.ts": "32e89f973073af29d2b305b577a6ed0b52eb940cb02e8cced0921c0c8782ea2d",
+      "server/src/frameworks/frameworksServices.ts": "85eac2b51a46435512463161c9f641af62d4af7456365df65a9130ca780288b2",
+      "server/src/responseSize/responseSizeController.ts": "5481fc7af288facdbccd6613d90d4c2eb70543ccdcba3614ad4d270748941917",
+      "server/src/responseSize/responseSizeDecorator.ts": "f0b0c1de6492c45682f9b878a022bf07a3b75de4c1c6f8cec73b21545d9be1c5",
+      "server/src/responseSize/responseSizeRouter.ts": "887da19225500344ec32a3d07b3df29e0a25116662d1bb8470cf8fe9cb393a34",
+      "server/src/static/staticRouter.ts": "7b1bbd21885a744727542f6d0b80d88a41fb7d5c2586f7d7b8eb892edd2cd1e1",
+      "server/src/frameworks/helpers/buildFrameworkVersionString.ts": "86f1a73e182d8d773810387f04bc3eeb1186c15edc83c429c7a1d1d819a80c96",
+      "server/src/frameworks/helpers/copyProps.ts": "712d0a1d64041f11aa5cd3939c5edc3c98647f3fd38c97dd82128d27e1fbd7ac",
+      "server/src/frameworks/helpers/index.ts": "be36a7058d2a723f8947b3ecfeb76cf048298725bb3287812797c0bf91de9551",
+      "server/src/frameworks/helpers/prepareFrameworkData.ts": "da66ae4291b5f7d3f35750a15634183944d9484cd95a462bb6ae7dcecd58465d",
+      "server/src/frameworks/types/index.ts": "e368da90ba226d305983204b87b959d152902e2429025682d00b504bb9f89463",
+      "webdriver-ts/package.json": "064cfc47d080a2a0ccac935870bd1c6f9574028ea9e44a54e8929556093d4e83",
+      "webdriver-ts/package-lock.json": "02f40e665e631c6c98c0f9c466726ba4a7c697c8cfcc6add25975da3b905655e",
+      "webdriver-ts/tsconfig.json": "466fc8365404b0345063256209fae1fa0ef793f8cb1a3dc16b8f8e69e0200e3d",
+      "server/package.json": "8d22a8c2201b5edec117fa809f9c91cadc4907c28f372d193ee58b6c9a117344",
+      "server/package-lock.json": "321920c20fc6604fb99783ff2579860c49cdda936ff860abffaa493f6bc0136c",
+      "server/tsconfig.json": "49bcd6d5bea546c8225db33af3d594aef6d5f492c37cdb1069d50a54f1d2759f",
+      "frameworks/keyed/glory/build.ps1": "d99bf8271f10140c67036687ebe6c70a360b2ea85bdb6572b85706d2aad15ac2",
+      "frameworks/keyed/glory/Cargo.lock": "93beff59f385029fff27c910388a8ff6b44a636da41ff9b9d3111b9faa855ab4",
+      "frameworks/keyed/glory/Cargo.toml": "13f8fd312796ec919c13aee24a6351522d1842438f88255f924bb30c40bcd8ae",
+      "frameworks/keyed/glory/index.html": "f161778c419e8d238727de23cd2b7d9ea8ebeff0f3f2392e7c378f51a1c2df90",
+      "frameworks/keyed/glory/package-lock.json": "92a6eb5c5bc4b0563ef98cd815bf10e6344767298effeaf99eb7f55108fd6a6b",
+      "frameworks/keyed/glory/package.json": "667c00e8d35422f292e992a49ba6f1141b7a2d2a8fcf6d978d0d541083ca6726",
+      "frameworks/keyed/glory/README.md": "a46e33cdb7b6bafc2de6653460e3d2c2e364c9c92d9f541d38d5475c70b9e90c",
+      "frameworks/keyed/glory/bundled-dist/app.d.ts": "2d08046168942dff214ba590517cdf4379275133b7885ec60bf3049821e7894f",
+      "frameworks/keyed/glory/bundled-dist/app.js": "64227afc0a1c3aa7bf833ad6324bed48c599304cbedcb92384c26dbb1b0bef70",
+      "frameworks/keyed/glory/bundled-dist/app_bg.wasm": "e33ea7f3c09aadde565a73608c578d090ebc4ff94f72cbecaa6fae94c113d18a",
+      "frameworks/keyed/glory/bundled-dist/app_bg.wasm.d.ts": "cc66b9f8f78ab12b0fee2fb802408fab4a05d7df6ae96477cc984a10821c3223",
+      "frameworks/keyed/glory/bundled-dist/index.html": "299c48bcf04c17068a9a72288bfeba013128c4dec5fca5dd13833cd4b3f6c8a9",
+      "frameworks/keyed/glory/src/data.rs": "3669373c2ad30d60e8695b3fda3b725314a655740dd11eedc45fb857772e0d54",
+      "frameworks/keyed/glory/src/main.rs": "14db8f5c4698717fe71286caa8d6ca8ab75c51d8a8e35ed3b6cbb526d042d505",
+      "frameworks/keyed/glory/bundled-dist/snippets/glory-web-3dfc31990f887acc/inline0.js": "3c2410aa6d4f0fc7f861051bfa7fedab3e8ce01d9fd60ccfed2c7f680e714c08",
+      "frameworks/keyed/glory/bundled-dist/snippets/glory-web-3dfc31990f887acc/inline1.js": "45e8c3a81e54d0b00ea65a0969fbb335cc27e4397dec91c3630bd172a49b7280",
+      "frameworks/keyed/glory/bundled-dist/snippets/glory-web-3dfc31990f887acc/src/template_host.js": "2d4bec2105c2e64ac8ca2495ac337deff08f3b06980ba09c9a388d7b9c2103d2",
+      "css/currentStyle.css": "bba3c2e16899c7cd12cc6b86effde7b2280c88c2e9bf404704155c45dfbcc968",
+      "css/github-markdown.css": "c65e2e6a5e310ced1e958598c37acbc40bfc7c657a06087ad0fb3b5308b596f5",
+      "css/main.css": "dc17af07aa3310cf63feeb120eb94d0867d2346310467727e69443274bfe54a2",
+      "css/useMinimalCss.css": "5219001faefc94f47f167b973a5f037c9d3b921e13d991638ce7d1b2b0357b45",
+      "css/useOriginalBootstrap.css": "bba3c2e16899c7cd12cc6b86effde7b2280c88c2e9bf404704155c45dfbcc968",
+      "css/bootstrap/CHANGELOG.md": "799b11c918dcd92c5dca29376f3170d69c2333b65693a8b4d582188b304fa760",
+      "css/bootstrap/Gruntfile.js": "681e955ecf817d4d8fa0a98a13be16525b64ddaf5d8f023001690708d862641a",
+      "css/bootstrap/LICENSE": "9c3e01cc2ff753c4255d573a139ea1972068f6be4451de71e77032e90b78e28e",
+      "css/bootstrap/package.json": "de08baeb7bcbfa132bdc9bc2291dc3d00820033801593426112ef4207306bf51",
+      "css/bootstrap/README.md": "c99ebd38e6530ce3a60113ad249c894fa9e56def4a9db507c860ea0884182f97",
+      "css/bootstrap/fonts/glyphicons-halflings-regular.eot": "13634da87d9e23f8c3ed9108ce1724d183a39ad072e73e1b3d8cbf646d2d0407",
+      "css/bootstrap/fonts/glyphicons-halflings-regular.svg": "d985cda034eab4c9f2403976f8d171fbf6efc4b593107d8b1401e5b6daa46295",
+      "css/bootstrap/fonts/glyphicons-halflings-regular.ttf": "e395044093757d82afcb138957d06a1ea9361bdcf0b442d06a18a8051af57456",
+      "css/bootstrap/fonts/glyphicons-halflings-regular.woff": "a26394f7ede100ca118eff2eda08596275a9839b959c226e15439557a5a80742",
+      "css/bootstrap/fonts/glyphicons-halflings-regular.woff2": "fe185d11a49676890d47bb783312a0cda5a44c4039214094e7957b4c040ef11c",
+      "css/bootstrap/grunt/.jshintrc": "e6738629dee919d6ecdb95a00d67569f139ccc06b8982471fd2c76e79634b019",
+      "css/bootstrap/grunt/bs-commonjs-generator.js": "38dfd9de3409863498f96a2a10ba6f3098dcd9a50f8d34920270597e0b31cf84",
+      "css/bootstrap/grunt/bs-glyphicons-data-generator.js": "acfe681190bd807eb582e8116bf43747b3fa0ec2d4b4466a8c124ff003bd1aae",
+      "css/bootstrap/grunt/bs-lessdoc-parser.js": "ad0ff1bfe784883db787a9824d98fd5764b15c17790ef94ba8a64d25986c9520",
+      "css/bootstrap/grunt/bs-raw-files-generator.js": "ccb11557ee64f6c2d4cab012a3efa245eb4c426003355e29d006b9c5d9a31402",
+      "css/bootstrap/grunt/configBridge.json": "3e1642af6a05cb5676060bc202bdca51a44d1838dc7dc715bfe5cc1636e4d70b",
+      "css/bootstrap/grunt/sauce_browsers.yml": "6f0fbb632a4410a6f7c71912a632cce22383489394598f8569cb00df2a781ff6",
+      "css/bootstrap/js/affix.js": "d06f8b20bb2cbb03db61626d053aa54f54f6fce5dc3370469119f4c51ab12bdf",
+      "css/bootstrap/js/alert.js": "c33fba87c85e06556cdbd3e407b98d86e1963f8d7d7368847e791d43549d8ae5",
+      "css/bootstrap/js/button.js": "a0600d74c8c81092ef1989914d8952408d7f782781eb69b5c97a1e75b17d6025",
+      "css/bootstrap/js/carousel.js": "5708b39d01857ff465e2ed3b9d773099ec87e9358895f0e5c6a2b72519fc957e",
+      "css/bootstrap/js/collapse.js": "43e3cd52e9b2f02ad7e6d729d1d8852100607500c8e834a9bc9634c32c45858a",
+      "css/bootstrap/js/dropdown.js": "35e2381bb52cbaa02e75cad7884d790260ebc1f611b6b710e8df10762d577575",
+      "css/bootstrap/js/modal.js": "91524af503d413292988cbd0f6745342c716d3efa5fe8090ed0d72b1f34fc1b3",
+      "css/bootstrap/js/popover.js": "b8674419d40e02a7d16465eb6b32ff9578ed678cf1da79a738ff5186673a2372",
+      "css/bootstrap/js/scrollspy.js": "7e7a4e0d072860e11969c76d982226e5d55fa82a7faf2783ced2690e3891ba11",
+      "css/bootstrap/js/tab.js": "faa0b0e2ee39402fa2bf6942ef83eb1bc4f92cefc7726c0668a46024938a3f0d",
+      "css/bootstrap/js/tooltip.js": "7de82645d528b9b0681cfef714ab2f5c257dac61b25ee68bcf65b9e2d0b727b4",
+      "css/bootstrap/js/transition.js": "1adcf058e720aa01b1833df9880cecce33e1c579ba6f8e02bdd63bde5de94bb5",
+      "css/bootstrap/less/alerts.less": "ec1e5cbea834df50b5f243f6b7a22b006b52371c704ee3d51c1a53f31f5c7596",
+      "css/bootstrap/less/badges.less": "8ffa3fa540b22cc45b70a435f07ea9d2153b9d42460907d7b877a37ba83ad347",
+      "css/bootstrap/less/bootstrap.less": "fe27341bf7cfc7fe69a3ab07044b3d53e200c78198ede41d442ac60f76460f13",
+      "css/bootstrap/less/breadcrumbs.less": "3b3ecf9eb410493d7a24d62fd0da3c3209821723458382c59583e731f1cbf0a5",
+      "css/bootstrap/less/button-groups.less": "af80afb765bc46efe73bc0f43cc6ebad22192420839aecc783baf9da325fb83d",
+      "css/bootstrap/less/buttons.less": "ca33cfee4488f2fb1dfa03b1c28df9f7c71f29706cfc19e740388e58659bfd02",
+      "css/bootstrap/less/carousel.less": "a65739e850657e8169722be1a2834c15aac1814e148bcbef811c432f3aba68ce",
+      "css/bootstrap/less/close.less": "d536bc3af29e8a9eaf7afd14b108d908a5b885cc3ba7d67478f52e9e6149d7cf",
+      "css/bootstrap/less/code.less": "230e2ceb4e224aed537a98e36331a7877432ca3ca4a905141237309d76a50833",
+      "css/bootstrap/less/component-animations.less": "a8dfc8410cc632c8e5c2c4fff2b1362083a8b4c51b8e2398d7bec3f8fa2518b1",
+      "css/bootstrap/less/dropdowns.less": "212e69022acbb4a67212bc0c046e999b29b15e5fdc057efd364a9e09b6e220fa",
+      "css/bootstrap/less/forms.less": "615c591ca1e6f88039bfb896b113d3f40b0ac1542853292bade9c8b491029b78",
+      "css/bootstrap/less/glyphicons.less": "b4afc58993951eb7445f21d7159113e1ac52d5fbb7aa4e59bd49336923a6fae4",
+      "css/bootstrap/less/grid.less": "a23ba3b4448b02bb5fb7ee89f2b9ffb08eb9ba5aef7c916ab908d7805f77f6a5",
+      "css/bootstrap/less/input-groups.less": "791b0a2f4b22eb358e61d9d71e624ec561fe9065f27fc318f54e0ee09d9a659c",
+      "css/bootstrap/less/jumbotron.less": "00c2f5927a76217db840262c1be100ea63ee12fdccf83ff5a28314646dd6dc6f",
+      "css/bootstrap/less/labels.less": "834d16ce9a7372fc0dcbed76de418519bea8ac08f4fd53593c8a39ef9f1c0403",
+      "css/bootstrap/less/list-group.less": "50c6b7bd73d2278c2a010432bf575cc7a5aec424c93efd0cb03610e0de275e8e",
+      "css/bootstrap/less/media.less": "175e52fcbc3016bb4133763a21c8ffcfdd9747b810b5c73765d9908c1d533ac3",
+      "css/bootstrap/less/mixins.less": "2a79b5474d2bcb85e088fadac03380aee3596ddc37e671f8c8827e7ea725e9bd",
+      "css/bootstrap/less/modals.less": "453a53f34ecfa4ffe07cabe0ccaa7176953b6e01517887f5d8cccbe88b6fbf69",
+      "css/bootstrap/less/navbar.less": "2289bebac761baace2805d634bd2e395f152537836f709768963585cff738e05",
+      "css/bootstrap/less/navs.less": "eaf40ac5ee741e17292c488fbeb29191794fb860de0cebff5e8926b1144f6c73",
+      "css/bootstrap/less/normalize.less": "301829c5ee481cef874ffa6ae8e3f1bc43aff724495002b6c6a97e4ba8186b95",
+      "css/bootstrap/less/pager.less": "463a306977333af40aa6081d6e530d28493838202df0c9658b6616d2542a3989",
+      "css/bootstrap/less/pagination.less": "5a2e42d13a2bf48b047cf169a348cb710c0fd263e0ff8a2107252712655f6133",
+      "css/bootstrap/less/panels.less": "d71f8564e1c2729db389e4d05b5fb3cf097e5b13070b2df08e4ff27d5f53f890",
+      "css/bootstrap/less/popovers.less": "8d79e98f8fa3ce8885f5db4b44c5e1c0d188abcd1f402387a0105e0b219c19dc",
+      "css/bootstrap/less/print.less": "9fe574f7bdd7bb14872e9b3a5240d2196899e6ad1a85bd9e35fde42770683926",
+      "css/bootstrap/less/progress-bars.less": "d2673d7aec52f422341bf9a0666d391f7a85d8e473f25e379f7830839e9606fb",
+      "css/bootstrap/less/responsive-embed.less": "07810396b7fad99e0a4feafa5d66d4087e4d5476718985ca60eba7c263f35b6b",
+      "css/bootstrap/less/responsive-utilities.less": "0b81f691c8fab1bc1489bdbb3c94b4e751ca6b642923544c565191837686581c",
+      "css/bootstrap/less/scaffolding.less": "3694d82b2f1de9012f201c3f429072ab7937864d2b3024f1d03c491db691cf8a",
+      "css/bootstrap/less/tables.less": "08fcaf85f2c90e465d9e91e8eaf50835895299f965bce8c9043651451d407b42",
+      "css/bootstrap/less/theme.less": "4705d12bc0b5e8ac2ae17fb0a0b6828822bbec2714daa3a205ac4387d0b90209",
+      "css/bootstrap/less/thumbnails.less": "c9bb616a1a51da0ef054817f27d014711af4158981fb19fca9427e44d25c6251",
+      "css/bootstrap/less/tooltip.less": "1df69396fe2f0d72f586373b086efc37d00344bec001876371e2f4416634f0cf",
+      "css/bootstrap/less/type.less": "c085aec9954732505eab0ad4db91e7ca8b83f88491824c95dce075bc751f002d",
+      "css/bootstrap/less/utilities.less": "2964cb1371490701a2e79125009f843a874056940aef5aab08b0055ea0314c8a",
+      "css/bootstrap/less/variables.less": "6af12a8f6f42a959d3a46b0bd41f4b4e73ce8e2439ace87263552ca020b34a58",
+      "css/bootstrap/less/wells.less": "03639cb373ad91619d0d07549be8c023461fbb0a777e1372c4e3b4046b8fad5e",
+      "css/bootstrap/less/mixins/alerts.less": "2aef621486dde37d403340889d3b413a1cb56842c1fcf5d6ef026d1edacd3c89",
+      "css/bootstrap/less/mixins/background-variant.less": "780faffdad0b7284af2084025622f21d2392d071c2c893f76bdc60b9f884838f",
+      "css/bootstrap/less/mixins/border-radius.less": "e7135abe1c680bc1bcbd8da348b6f8d2b46e4ecdc0d94fc33d34792e1143deb1",
+      "css/bootstrap/less/mixins/buttons.less": "515bdba761d4365db457a4252eac3f3bc93f0e22192a6b902cb68c43589ea677",
+      "css/bootstrap/less/mixins/center-block.less": "1f0cbd70b351c19286ecc43a1bc6ddff8587ef3b5be9ebe1b6c9ef1aec85a456",
+      "css/bootstrap/less/mixins/clearfix.less": "0d959dc3eeaef00dfb4a9c4f516d5f1522349e13c3fe4f884edd8c65e2203d60",
+      "css/bootstrap/less/mixins/forms.less": "da01e9cb91fcecb71a6d7ee3ab6d930880685efc9b079efda796404a46cc8c88",
+      "css/bootstrap/less/mixins/gradients.less": "31e2b1f8012d28c8bb1de3f16cdc1a51583793acb6c6bf986e0eaed0414b4c8d",
+      "css/bootstrap/less/mixins/grid-framework.less": "53f8f3898bf14b2c109de8b438c23d948bcd245498694ad121caf03cd4f66456",
+      "css/bootstrap/less/mixins/grid.less": "8a68fa09e900789953204cc5c8df3ac810521e32e88e4a01dde72e3df114ede8",
+      "css/bootstrap/less/mixins/hide-text.less": "1a93e4abc4ac5cc19f62789e9afa18db1c4ade851cf8605a9015eb23b9504c8e",
+      "css/bootstrap/less/mixins/image.less": "daab425462730a2f38719cdb9701b7090be934ae204bd1aa9e8e3764790d6499",
+      "css/bootstrap/less/mixins/labels.less": "ffa874438bfb1a2624a28cb172408777fe04ca7f2c61674311b6665a914339fc",
+      "css/bootstrap/less/mixins/list-group.less": "3bb2631787ce83a546288df272bf0210f91ad8ea84ffd491d9dd894284241a9f",
+      "css/bootstrap/less/mixins/nav-divider.less": "953a4a60519e18edab489ed2e1a3b12ffe7960cc4cef3da4df39f858f619f4fd",
+      "css/bootstrap/less/mixins/nav-vertical-align.less": "bdacf3f46bf400ba7a9c7a7fcb86a16e7ef241550ba3ed2f7f1d7066f128125a",
+      "css/bootstrap/less/mixins/opacity.less": "3c983bf54ce9d9125cd6ba84cabe0dfc1edd19c91364451fea6dc437a2d84718",
+      "css/bootstrap/less/mixins/pagination.less": "d80cb2438debf5421a281378a54f58d18b864b9bf29217d810f3c0064decaae4",
+      "css/bootstrap/less/mixins/panels.less": "e74909487c2e6dd14b9aeba7865a0ba0b8c914bec1586a0aa40b65515c28b167",
+      "css/bootstrap/less/mixins/progress-bar.less": "0c3063159b030502eddb76b2476be7d8ebb351aed2c9fe1b0032e52a10ff2382",
+      "css/bootstrap/less/mixins/reset-filter.less": "c4d231408837854ed08f8898274df925a8b505c5b6e4831ee34132f569ecfe24",
+      "css/bootstrap/less/mixins/reset-text.less": "4f6805dfa9a532a67a334bbd2b7954478f1eab12fef17f0feadbe93886337be9",
+      "css/bootstrap/less/mixins/resize.less": "b9adeb75dbdbf9f4171eb9f80e9c25df5895a8584efd4eea84e10ca5f15e9e52",
+      "css/bootstrap/less/mixins/responsive-visibility.less": "544bb2d73b28f85c4d9ee2c5eb391eca30f432eac07870786d041d68d07571fd",
+      "css/bootstrap/less/mixins/size.less": "28bf643df836c230ef0106fca0bb7545eb9243fbf9f14d42def9343dcb8013f1",
+      "css/bootstrap/less/mixins/tab-focus.less": "c1e494f9bc8f5da41d326cc39efebd16284089cd6faa0c314c78599b2b5ec467",
+      "css/bootstrap/less/mixins/table-row.less": "7ac08549ee692ab8899b4a8bb3ae7ae34aae8a745aff36a8fc68c06a6c0184c5",
+      "css/bootstrap/less/mixins/text-emphasis.less": "f819aa725fab94256b001126f5f550820b6ae5273893a5135bfe5eb1d0dd6338",
+      "css/bootstrap/less/mixins/text-overflow.less": "1c56bdb8cc2923bc35be5751da31e12fd72f5f6f7c788b639044f245fa69345d",
+      "css/bootstrap/less/mixins/vendor-prefixes.less": "18a2818052ff188fbc46dc9b4fbaf29faab8575558d5dd0527d04c7e56df966b",
+      "css/bootstrap/dist/css/bootstrap-theme.css": "d5aa6d11c3519b83d1aa9279eec34533f02f3e47a435299b781af73573eb52f0",
+      "css/bootstrap/dist/css/bootstrap-theme.css.map": "41f758a1ad3e085f537164e9c403b9ba6aa54adaeb919e679e0f2a7190d883ec",
+      "css/bootstrap/dist/css/bootstrap-theme.min.css": "a3b3d435fb2cc1ae4cb06a366ec6c10d7b770e4dfd7b91759e66cfb22d4addf7",
+      "css/bootstrap/dist/css/bootstrap-theme.min.css.map": "2fc2446e4ce0cfe209c2bcb6fbefce8db774e33f320207de8b783d08c9e4d1e8",
+      "css/bootstrap/dist/css/bootstrap.css": "03fd71b5486c03a9739d7f60d903b94611cf7abe4a70dd044d5be7f7a9f7cba8",
+      "css/bootstrap/dist/css/bootstrap.css.map": "42a1805ce7839781584540493a2c31ecb7c0a0c1fa422207c18b31be8bb90515",
+      "css/bootstrap/dist/css/bootstrap.min.css": "880de7665b1aaa840303313deca3352af257d55aed4584d5e17f0fbffe0fde01",
+      "css/bootstrap/dist/css/bootstrap.min.css.map": "9a7b77ba6d2bb6756421479e6d441dc2d5f2e75f04cb9e90fea50ddf819a5daa",
+      "css/bootstrap/dist/fonts/glyphicons-halflings-regular.eot": "13634da87d9e23f8c3ed9108ce1724d183a39ad072e73e1b3d8cbf646d2d0407",
+      "css/bootstrap/dist/fonts/glyphicons-halflings-regular.svg": "d985cda034eab4c9f2403976f8d171fbf6efc4b593107d8b1401e5b6daa46295",
+      "css/bootstrap/dist/fonts/glyphicons-halflings-regular.ttf": "e395044093757d82afcb138957d06a1ea9361bdcf0b442d06a18a8051af57456",
+      "css/bootstrap/dist/fonts/glyphicons-halflings-regular.woff": "a26394f7ede100ca118eff2eda08596275a9839b959c226e15439557a5a80742",
+      "css/bootstrap/dist/fonts/glyphicons-halflings-regular.woff2": "fe185d11a49676890d47bb783312a0cda5a44c4039214094e7957b4c040ef11c",
+      "css/bootstrap/dist/js/bootstrap.js": "edc51565bcc1c2d1a6939935cd20dba24328f9f4c2dc305b4009367393c1b99a",
+      "css/bootstrap/dist/js/bootstrap.min.js": "5a4a5359110a773bd154da94c48ffd6a6233a29dfd5a9314555f5ae6c3e47459",
+      "css/bootstrap/dist/js/npm.js": "8c39eb1edbd80d8adaa581dc45792a1271bd187c4eff0e5a8d1905b007911469"
+    },
+    "chrome": "C:/Program Files/Google/Chrome/Application/chrome.exe",
+    "configuration": "Unmodified upstream defaults: 15 CPU samples (selection adds 10), one per memory/size case; default CPU throttles; no slowest samples dropped",
+    "glory_inputs": "D:/BuildCache/glory-display-completion-20261028/selection-cache/inputs/inputs.json",
+    "upstream_commit": "ca8715d9ae84916fd24de3a79457d8c328f9b766",
+    "environment": {
+      "cpu": "Intel(R) Core(TM) Ultra 9 285H",
+      "os": "Microsoft Windows 11 Pro",
+      "chrome": "155.0.8059.86",
+      "node": "v24.18.0",
+      "rust": "rustc 1.98.0 (88d9e12ae 2026-08-18)"
+    },
+    "retries": {
+      "peers_run": [
+        {
+          "framework": "glory",
+          "case": "08_create1k-after1k_x2",
+          "attempt": 1,
+          "exit_code": 0,
+          "archive": "D:\\BuildCache\\glory-display-completion-20261028\\official-final\\retries\\glory-08_create1k-after1k_x2-1"
+        },
+        {
+          "framework": "leptos",
+          "case": "03_update10th1k_x16",
+          "attempt": 1,
+          "exit_code": 1,
+          "archive": "D:\\BuildCache\\glory-display-completion-20261028\\official-final\\retries\\leptos-03_update10th1k_x16-1"
+        },
+        {
+          "framework": "leptos",
+          "case": "03_update10th1k_x16",
+          "attempt": 2,
+          "exit_code": 0,
+          "archive": "D:\\BuildCache\\glory-display-completion-20261028\\official-final\\retries\\leptos-03_update10th1k_x16-2"
+        },
+        {
+          "framework": "react-hooks",
+          "case": "02_replace1k",
+          "attempt": 1,
+          "exit_code": 0,
+          "archive": "D:\\BuildCache\\glory-display-completion-20261028\\official-final\\retries\\react-hooks-02_replace1k-1"
+        },
+        {
+          "framework": "solid",
+          "case": "03_update10th1k_x16",
+          "attempt": 1,
+          "exit_code": 0,
+          "archive": "D:\\BuildCache\\glory-display-completion-20261028\\official-final\\retries\\solid-03_update10th1k_x16-1"
+        },
+        {
+          "framework": "vanillajs",
+          "case": "02_replace1k",
+          "attempt": 1,
+          "exit_code": 0,
+          "archive": "D:\\BuildCache\\glory-display-completion-20261028\\official-final\\retries\\vanillajs-02_replace1k-1"
+        }
+      ],
+      "glory_run": [
+        {
+          "framework": "glory",
+          "case": "03_update10th1k_x16",
+          "attempt": 1,
+          "exit_code": 0,
+          "archive": "D:\\BuildCache\\glory-display-completion-20261028\\official-glory-final\\retries\\glory-03_update10th1k_x16-1"
+        }
+      ]
+    },
+    "completed": "2026-10-28T17:40:25.548141+00:00",
+    "result_files": 120,
+    "collection": "Staged: unchanged peers preserved; all 15 Glory cases rerun after generic runtime changes",
+    "reference_runs": {
+      "peers": "D:\\BuildCache\\glory-display-completion-20261028\\official-final",
+      "glory": "D:\\BuildCache\\glory-display-completion-20261028\\official-glory-final"
+    },
+    "keyed_checks": [
+      "D:\\BuildCache\\glory-display-completion-20261028\\official-final\\is-keyed.log",
+      "D:\\BuildCache\\glory-display-completion-20261028\\official-glory-final\\is-keyed.log"
+    ]
+  },
+  "statistic": "Median; upstream values, means and all slow samples retained",
+  "results": [
+    {
+      "framework": "dioxus-v0.7.10-keyed",
+      "keyed": true,
+      "benchmark": "01_run1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 42,
+          "max": 53.3,
+          "median": 45.1,
+          "mean": 45.67999999999999,
+          "stddev": 3.3554220513755255,
+          "values": [
+            44.2,
+            42.7,
+            45.3,
+            42.1,
+            45.1,
+            43.3,
+            53.3,
+            51.1,
+            46.9,
+            45.1,
+            49,
+            47.9,
+            43.3,
+            42,
+            43.9
+          ]
+        },
+        "script": {
+          "min": 6.9,
+          "max": 10.7,
+          "median": 8.1,
+          "mean": 8.24,
+          "stddev": 0.8757037985855393,
+          "values": [
+            8.2,
+            7.8,
+            8.1,
+            8,
+            8.2,
+            7.6,
+            10.7,
+            8.9,
+            9.3,
+            7.7,
+            8.4,
+            8.1,
+            6.9,
+            7.8,
+            7.9
+          ]
+        },
+        "paint": {
+          "min": 33,
+          "max": 41.7,
+          "median": 36,
+          "mean": 36.36,
+          "stddev": 2.696770555418356,
+          "values": [
+            34.9,
+            33.7,
+            36,
+            33,
+            36.1,
+            34.9,
+            41.7,
+            41,
+            36.8,
+            36.5,
+            39.4,
+            38.5,
+            35,
+            33.1,
+            34.8
+          ]
+        }
+      }
+    },
+    {
+      "framework": "dioxus-v0.7.10-keyed",
+      "keyed": true,
+      "benchmark": "02_replace1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 43.3,
+          "max": 56.4,
+          "median": 52.6,
+          "mean": 51.70000000000001,
+          "stddev": 3.36833998962609,
+          "values": [
+            55,
+            50.6,
+            53.7,
+            52.6,
+            49.9,
+            56.4,
+            47.2,
+            53.3,
+            49.5,
+            50.4,
+            51.8,
+            54.2,
+            54.7,
+            52.9,
+            43.3
+          ]
+        },
+        "script": {
+          "min": 12.9,
+          "max": 19.8,
+          "median": 14.5,
+          "mean": 14.826666666666672,
+          "stddev": 1.6507429784652672,
+          "values": [
+            14.5,
+            16.9,
+            15.3,
+            14.8,
+            14.9,
+            14.3,
+            13.7,
+            14,
+            14.7,
+            14.2,
+            14.2,
+            14.8,
+            19.8,
+            13.4,
+            12.9
+          ]
+        },
+        "paint": {
+          "min": 29.7,
+          "max": 41,
+          "median": 36.7,
+          "mean": 35.9,
+          "stddev": 2.988788574465772,
+          "values": [
+            39,
+            33,
+            37.4,
+            36.8,
+            34.2,
+            41,
+            32.6,
+            38,
+            34,
+            35.5,
+            36.7,
+            38.5,
+            33.8,
+            38.3,
+            29.7
+          ]
+        }
+      }
+    },
+    {
+      "framework": "dioxus-v0.7.10-keyed",
+      "keyed": true,
+      "benchmark": "03_update10th1k_x16",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 40.9,
+          "max": 81.4,
+          "median": 58.3,
+          "mean": 58.833333333333336,
+          "stddev": 13.487119075339292,
+          "values": [
+            75.2,
+            70.6,
+            44.3,
+            44.2,
+            58.3,
+            40.9,
+            81.4,
+            69.1,
+            57.7,
+            60.8,
+            59.7,
+            44.7,
+            77.8,
+            51.7,
+            46.1
+          ]
+        },
+        "script": {
+          "min": 4,
+          "max": 11.7,
+          "median": 7.5,
+          "mean": 7.6800000000000015,
+          "stddev": 2.1099085965307327,
+          "values": [
+            8.5,
+            9.9,
+            4.8,
+            8.1,
+            6.2,
+            5,
+            11.7,
+            7.5,
+            8.9,
+            10,
+            7.3,
+            6.9,
+            8.9,
+            4,
+            7.5
+          ]
+        },
+        "paint": {
+          "min": 32.2,
+          "max": 63.1,
+          "median": 43.4,
+          "mean": 45.50000000000001,
+          "stddev": 10.53334840264142,
+          "values": [
+            60.6,
+            55.5,
+            36.4,
+            32.2,
+            42.2,
+            32.8,
+            63.1,
+            52.6,
+            43.4,
+            46,
+            48.7,
+            34.3,
+            57.7,
+            43.3,
+            33.7
+          ]
+        }
+      }
+    },
+    {
+      "framework": "dioxus-v0.7.10-keyed",
+      "keyed": true,
+      "benchmark": "04_select1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 11.2,
+          "max": 41.7,
+          "median": 17.6,
+          "mean": 20.152,
+          "stddev": 8.15424838146758,
+          "values": [
+            24.6,
+            11.6,
+            17.6,
+            19.6,
+            11.2,
+            29.9,
+            12.3,
+            41.7,
+            40.2,
+            14.9,
+            18.9,
+            14.8,
+            29.4,
+            17.6,
+            15.8,
+            13.1,
+            11.9,
+            27,
+            17.6,
+            17.5,
+            22.1,
+            20.2,
+            19.8,
+            20.8,
+            13.7
+          ]
+        },
+        "script": {
+          "min": 1.6,
+          "max": 4.7,
+          "median": 2.2,
+          "mean": 2.62,
+          "stddev": 0.9543758868146938,
+          "values": [
+            3,
+            1.8,
+            1.8,
+            1.8,
+            1.6,
+            2.8,
+            2,
+            4.7,
+            4,
+            2,
+            2.6,
+            2.6,
+            4,
+            4,
+            1.8,
+            2.4,
+            1.8,
+            1.6,
+            2.2,
+            2,
+            3.9,
+            4.1,
+            1.8,
+            2.2,
+            3
+          ]
+        },
+        "paint": {
+          "min": 7.8,
+          "max": 32.9,
+          "median": 11.7,
+          "mean": 14.408000000000001,
+          "stddev": 7.166177502685795,
+          "values": [
+            18.8,
+            8.2,
+            9.7,
+            9.6,
+            7.8,
+            22.8,
+            8.5,
+            32.2,
+            32.9,
+            10.9,
+            12.9,
+            10.3,
+            22.1,
+            10.9,
+            12.5,
+            8.7,
+            8.3,
+            23.1,
+            9,
+            11.7,
+            15.4,
+            14,
+            14.4,
+            16.4,
+            9.1
+          ]
+        }
+      }
+    },
+    {
+      "framework": "dioxus-v0.7.10-keyed",
+      "keyed": true,
+      "benchmark": "05_swap1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 44.9,
+          "max": 100.8,
+          "median": 72.4,
+          "mean": 69.23333333333333,
+          "stddev": 18.9133991304225,
+          "values": [
+            100.8,
+            57.3,
+            58,
+            44.9,
+            48.4,
+            58.7,
+            72.5,
+            93.3,
+            95.2,
+            72.4,
+            45.9,
+            75.3,
+            82.5,
+            83.4,
+            49.9
+          ]
+        },
+        "script": {
+          "min": 4,
+          "max": 10.7,
+          "median": 5.9,
+          "mean": 6.793333333333333,
+          "stddev": 2.3553788493169256,
+          "values": [
+            10.6,
+            7.7,
+            5.2,
+            5,
+            4.6,
+            5.5,
+            5.9,
+            9.5,
+            10.7,
+            7.5,
+            5.2,
+            4,
+            10,
+            4.6,
+            5.9
+          ]
+        },
+        "paint": {
+          "min": 37.1,
+          "max": 78,
+          "median": 58.8,
+          "mean": 56.5,
+          "stddev": 15.129111011556496,
+          "values": [
+            78,
+            46.7,
+            47.7,
+            37.1,
+            40.5,
+            46.3,
+            58.8,
+            77,
+            75.4,
+            59.7,
+            37.4,
+            63.7,
+            67.7,
+            71.5,
+            40
+          ]
+        }
+      }
+    },
+    {
+      "framework": "dioxus-v0.7.10-keyed",
+      "keyed": true,
+      "benchmark": "06_remove-one-1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 25.8,
+          "max": 59.2,
+          "median": 33.9,
+          "mean": 38.86000000000001,
+          "stddev": 11.049615377921533,
+          "values": [
+            56.6,
+            27.7,
+            30.2,
+            33.7,
+            52.3,
+            31.6,
+            40.1,
+            33.9,
+            25.8,
+            41.7,
+            52.1,
+            28.7,
+            59.2,
+            33.5,
+            35.8
+          ]
+        },
+        "script": {
+          "min": 1.6,
+          "max": 3.7,
+          "median": 2.8,
+          "mean": 2.586666666666667,
+          "stddev": 0.720978171520833,
+          "values": [
+            3.2,
+            2,
+            3.2,
+            2.8,
+            3.7,
+            1.8,
+            1.6,
+            2.2,
+            1.8,
+            3.2,
+            3.1,
+            3.1,
+            3.3,
+            1.6,
+            2.2
+          ]
+        },
+        "paint": {
+          "min": 22.5,
+          "max": 51.9,
+          "median": 29.7,
+          "mean": 34.02,
+          "stddev": 9.976057051045483,
+          "values": [
+            50.3,
+            24.4,
+            25.4,
+            28.7,
+            45.6,
+            27.8,
+            36.2,
+            29.4,
+            22.5,
+            36.6,
+            46.1,
+            23.7,
+            51.9,
+            29.7,
+            32
+          ]
+        }
+      }
+    },
+    {
+      "framework": "dioxus-v0.7.10-keyed",
+      "keyed": true,
+      "benchmark": "07_create10k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 526.1,
+          "max": 593.9,
+          "median": 567.8,
+          "mean": 565.3066666666666,
+          "stddev": 18.877668843169726,
+          "values": [
+            574.4,
+            567.8,
+            584.7,
+            582.9,
+            584.7,
+            557.7,
+            555.3,
+            526.1,
+            575.8,
+            551.4,
+            593.9,
+            578.6,
+            545.5,
+            552.5,
+            548.3
+          ]
+        },
+        "script": {
+          "min": 96,
+          "max": 114.3,
+          "median": 100.3,
+          "mean": 102.47999999999998,
+          "stddev": 5.770516193795589,
+          "values": [
+            101.8,
+            107.6,
+            99.6,
+            105,
+            113.5,
+            99.3,
+            96,
+            101.5,
+            97.3,
+            106.6,
+            114.3,
+            100.3,
+            100,
+            96.9,
+            97.5
+          ]
+        },
+        "paint": {
+          "min": 416.3,
+          "max": 473.7,
+          "median": 450.7,
+          "mean": 451.72666666666663,
+          "stddev": 16.299275473234417,
+          "values": [
+            462.3,
+            450.7,
+            473.7,
+            466,
+            461.4,
+            448.5,
+            448.5,
+            416.3,
+            467.2,
+            435.9,
+            466.1,
+            466.5,
+            433.2,
+            441.8,
+            437.8
+          ]
+        }
+      }
+    },
+    {
+      "framework": "dioxus-v0.7.10-keyed",
+      "keyed": true,
+      "benchmark": "08_create1k-after1k_x2",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 52.6,
+          "max": 64.1,
+          "median": 57.8,
+          "mean": 57.486666666666665,
+          "stddev": 3.015404892658142,
+          "values": [
+            57.6,
+            55.9,
+            54.3,
+            58.3,
+            52.6,
+            58.3,
+            58.8,
+            59,
+            61.3,
+            59.6,
+            64.1,
+            57.8,
+            54.7,
+            53.9,
+            56.1
+          ]
+        },
+        "script": {
+          "min": 9.1,
+          "max": 11.6,
+          "median": 9.9,
+          "mean": 10.080000000000002,
+          "stddev": 0.7692296703288853,
+          "values": [
+            9.5,
+            9.1,
+            9.6,
+            11.6,
+            9.3,
+            10.8,
+            10.2,
+            10.4,
+            11.3,
+            10.9,
+            9.4,
+            9.9,
+            10,
+            9.4,
+            9.8
+          ]
+        },
+        "paint": {
+          "min": 41.1,
+          "max": 52.2,
+          "median": 45.5,
+          "mean": 45.42,
+          "stddev": 2.644995274097858,
+          "values": [
+            45.9,
+            44.3,
+            43.2,
+            44.6,
+            41.1,
+            45.5,
+            47.1,
+            46,
+            48,
+            47.1,
+            52.2,
+            46,
+            42.9,
+            43,
+            44.4
+          ]
+        }
+      }
+    },
+    {
+      "framework": "dioxus-v0.7.10-keyed",
+      "keyed": true,
+      "benchmark": "09_clear1k_x8",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 48.3,
+          "max": 85.4,
+          "median": 67.1,
+          "mean": 67.7,
+          "stddev": 10.249459916084778,
+          "values": [
+            78.1,
+            69.3,
+            64.3,
+            56.9,
+            64.3,
+            60.3,
+            61.6,
+            83.7,
+            67.1,
+            48.3,
+            69.7,
+            58.2,
+            85.4,
+            75.7,
+            72.6
+          ]
+        },
+        "script": {
+          "min": 40.1,
+          "max": 75,
+          "median": 58.7,
+          "mean": 58.71333333333333,
+          "stddev": 9.870581591394751,
+          "values": [
+            65.9,
+            63.9,
+            58.7,
+            47.7,
+            58.2,
+            49.7,
+            52.1,
+            73.6,
+            53,
+            40.1,
+            61,
+            50.4,
+            75,
+            65,
+            66.4
+          ]
+        },
+        "paint": {
+          "min": 3.5,
+          "max": 8.4,
+          "median": 5.5,
+          "mean": 5.606666666666667,
+          "stddev": 1.5313237348622208,
+          "values": [
+            7.5,
+            3.6,
+            3.5,
+            7,
+            4.2,
+            5.1,
+            4.2,
+            6.7,
+            8.4,
+            5.5,
+            6.3,
+            5,
+            7,
+            6.1,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "framework": "dioxus-v0.7.10-keyed",
+      "keyed": true,
+      "benchmark": "21_ready-memory",
+      "type": "memory",
+      "values": {
+        "DEFAULT": {
+          "min": 1.9068174362182617,
+          "max": 1.9068174362182617,
+          "median": 1.9068174362182617,
+          "mean": 1.9068174362182617,
+          "stddev": null,
+          "values": [
+            1.9068174362182617
+          ]
+        }
+      }
+    },
+    {
+      "framework": "dioxus-v0.7.10-keyed",
+      "keyed": true,
+      "benchmark": "22_run-memory",
+      "type": "memory",
+      "values": {
+        "DEFAULT": {
+          "min": 6.289865493774414,
+          "max": 6.289865493774414,
+          "median": 6.289865493774414,
+          "mean": 6.289865493774414,
+          "stddev": null,
+          "values": [
+            6.289865493774414
+          ]
+        }
+      }
+    },
+    {
+      "framework": "dioxus-v0.7.10-keyed",
+      "keyed": true,
+      "benchmark": "25_run-clear-memory",
+      "type": "memory",
+      "values": {
+        "DEFAULT": {
+          "min": 6.9046173095703125,
+          "max": 6.9046173095703125,
+          "median": 6.9046173095703125,
+          "mean": 6.9046173095703125,
+          "stddev": null,
+          "values": [
+            6.9046173095703125
+          ]
+        }
+      }
+    },
+    {
+      "framework": "dioxus-v0.7.10-keyed",
+      "keyed": true,
+      "benchmark": "41_size-uncompressed",
+      "type": "size",
+      "values": {
+        "DEFAULT": {
+          "min": 422.3,
+          "max": 422.3,
+          "median": 422.3,
+          "mean": 422.3,
+          "stddev": null,
+          "values": [
+            422.3
+          ]
+        }
+      }
+    },
+    {
+      "framework": "dioxus-v0.7.10-keyed",
+      "keyed": true,
+      "benchmark": "42_size-compressed",
+      "type": "size",
+      "values": {
+        "DEFAULT": {
+          "min": 114.8,
+          "max": 114.8,
+          "median": 114.8,
+          "mean": 114.8,
+          "stddev": null,
+          "values": [
+            114.8
+          ]
+        }
+      }
+    },
+    {
+      "framework": "dioxus-v0.7.10-keyed",
+      "keyed": true,
+      "benchmark": "43_first-paint",
+      "type": "size",
+      "values": {
+        "DEFAULT": {
+          "min": 737.4,
+          "max": 737.4,
+          "median": 737.4,
+          "mean": 737.4,
+          "stddev": null,
+          "values": [
+            737.4
+          ]
+        }
+      }
+    },
+    {
+      "framework": "glory-v0.3.1-v2-keyed",
+      "keyed": true,
+      "benchmark": "01_run1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 40.9,
+          "max": 54.8,
+          "median": 46.9,
+          "mean": 47.19333333333334,
+          "stddev": 3.8443774652390856,
+          "values": [
+            54.8,
+            43.4,
+            43.3,
+            52.2,
+            47.6,
+            46.8,
+            51.1,
+            40.9,
+            46.9,
+            43.7,
+            47.1,
+            51,
+            49,
+            45.1,
+            45
+          ]
+        },
+        "script": {
+          "min": 7.4,
+          "max": 12.2,
+          "median": 8.8,
+          "mean": 8.946666666666665,
+          "stddev": 1.3542877235267392,
+          "values": [
+            7.9,
+            8.2,
+            8.1,
+            8.8,
+            9.5,
+            11.1,
+            10.4,
+            7.4,
+            8.9,
+            8.3,
+            8.9,
+            12.2,
+            7.4,
+            8.8,
+            8.3
+          ]
+        },
+        "paint": {
+          "min": 32.7,
+          "max": 42.5,
+          "median": 36.6,
+          "mean": 36.75333333333333,
+          "stddev": 2.5656708024738215,
+          "values": [
+            37.2,
+            34.6,
+            34.6,
+            42.5,
+            37.3,
+            34.9,
+            39.4,
+            32.7,
+            37.2,
+            34.7,
+            36.6,
+            37.4,
+            40.7,
+            35.6,
+            35.9
+          ]
+        }
+      }
+    },
+    {
+      "framework": "glory-v0.3.1-v2-keyed",
+      "keyed": true,
+      "benchmark": "02_replace1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 50.2,
+          "max": 65.4,
+          "median": 53.7,
+          "mean": 55.48,
+          "stddev": 4.56449027039947,
+          "values": [
+            50.7,
+            62.9,
+            50.2,
+            53.3,
+            57.5,
+            53.9,
+            53.5,
+            60.5,
+            53.3,
+            51.5,
+            57.8,
+            56.6,
+            53.7,
+            65.4,
+            51.4
+          ]
+        },
+        "script": {
+          "min": 13.6,
+          "max": 22.1,
+          "median": 15.2,
+          "mean": 15.866666666666667,
+          "stddev": 2.090340596535362,
+          "values": [
+            14.8,
+            22.1,
+            15.2,
+            13.6,
+            15.2,
+            16.3,
+            15,
+            18.6,
+            16,
+            15.2,
+            15.8,
+            14.1,
+            16.6,
+            15,
+            14.5
+          ]
+        },
+        "paint": {
+          "min": 34.1,
+          "max": 49.1,
+          "median": 37,
+          "mean": 38.56666666666667,
+          "stddev": 3.86017517490494,
+          "values": [
+            35,
+            39.9,
+            34.1,
+            38.7,
+            41.4,
+            36.8,
+            37,
+            41.1,
+            36.4,
+            35,
+            40.4,
+            41.6,
+            36.1,
+            49.1,
+            35.9
+          ]
+        }
+      }
+    },
+    {
+      "framework": "glory-v0.3.1-v2-keyed",
+      "keyed": true,
+      "benchmark": "03_update10th1k_x16",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 40.8,
+          "max": 98,
+          "median": 58.3,
+          "mean": 66.02666666666667,
+          "stddev": 17.11868096832341,
+          "values": [
+            40.8,
+            58.3,
+            78.1,
+            52.7,
+            55.1,
+            77.1,
+            77.2,
+            52.7,
+            54.4,
+            98,
+            79.3,
+            47.7,
+            89.7,
+            52.3,
+            77
+          ]
+        },
+        "script": {
+          "min": 4,
+          "max": 8.5,
+          "median": 6.3,
+          "mean": 6.26,
+          "stddev": 1.379337315007257,
+          "values": [
+            4,
+            5.7,
+            4.4,
+            5.1,
+            6.8,
+            8.5,
+            5.2,
+            5.8,
+            6.7,
+            8.1,
+            8.3,
+            6.3,
+            5.2,
+            6.7,
+            7.1
+          ]
+        },
+        "paint": {
+          "min": 33.1,
+          "max": 63.2,
+          "median": 41.6,
+          "mean": 45.78666666666667,
+          "stddev": 10.60612132326467,
+          "values": [
+            33.1,
+            46.9,
+            36.2,
+            41.6,
+            42.6,
+            63,
+            61,
+            41,
+            41.2,
+            45.6,
+            59.4,
+            36.8,
+            34.6,
+            40.6,
+            63.2
+          ]
+        }
+      }
+    },
+    {
+      "framework": "glory-v0.3.1-v2-keyed",
+      "keyed": true,
+      "benchmark": "04_select1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 13.3,
+          "max": 46.4,
+          "median": 26.2,
+          "mean": 27.924000000000007,
+          "stddev": 7.975236673604114,
+          "values": [
+            29.9,
+            27.8,
+            35.8,
+            27.5,
+            13.3,
+            27,
+            37.6,
+            23.2,
+            43.7,
+            21.9,
+            38.7,
+            22.5,
+            24.9,
+            22.9,
+            46.4,
+            19.8,
+            25.2,
+            25.9,
+            26.2,
+            36.9,
+            29.1,
+            24.4,
+            17.4,
+            21.8,
+            28.3
+          ]
+        },
+        "script": {
+          "min": 2.4,
+          "max": 12.3,
+          "median": 3.3,
+          "mean": 4.044,
+          "stddev": 2.1505968163899682,
+          "values": [
+            3.8,
+            3.4,
+            2.8,
+            3.8,
+            3,
+            2.4,
+            6.3,
+            3.5,
+            12.3,
+            2.8,
+            3.8,
+            2.6,
+            2.8,
+            3.2,
+            7.1,
+            3,
+            2.6,
+            3,
+            2.6,
+            3.3,
+            6.7,
+            3.2,
+            3.9,
+            3.9,
+            5.3
+          ]
+        },
+        "paint": {
+          "min": 6.5,
+          "max": 31.8,
+          "median": 9.9,
+          "mean": 13.131999999999998,
+          "stddev": 6.911989583325484,
+          "values": [
+            14.5,
+            10.7,
+            19.1,
+            9.5,
+            8.2,
+            9.2,
+            26.9,
+            6.9,
+            23.6,
+            6.5,
+            22.2,
+            8.3,
+            8.7,
+            7.2,
+            31.8,
+            8.1,
+            8.1,
+            9.2,
+            8.5,
+            18.1,
+            15.5,
+            9.9,
+            10.5,
+            10.1,
+            17
+          ]
+        }
+      }
+    },
+    {
+      "framework": "glory-v0.3.1-v2-keyed",
+      "keyed": true,
+      "benchmark": "05_swap1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 37.1,
+          "max": 86,
+          "median": 69.6,
+          "mean": 62.806666666666665,
+          "stddev": 16.92367178441684,
+          "values": [
+            70.7,
+            46.6,
+            43.3,
+            69.6,
+            59,
+            44.2,
+            72.6,
+            59,
+            83.9,
+            83.1,
+            74.5,
+            86,
+            40.3,
+            37.1,
+            72.2
+          ]
+        },
+        "script": {
+          "min": 2.4,
+          "max": 6.3,
+          "median": 3,
+          "mean": 3.406666666666666,
+          "stddev": 1.190118041364365,
+          "values": [
+            2.4,
+            3,
+            3.4,
+            3,
+            3.2,
+            2.4,
+            3,
+            3.9,
+            2.8,
+            3.6,
+            6.3,
+            5.9,
+            2.4,
+            2.4,
+            3.4
+          ]
+        },
+        "paint": {
+          "min": 31.9,
+          "max": 73.6,
+          "median": 58.9,
+          "mean": 53.05333333333333,
+          "stddev": 14.316816618761242,
+          "values": [
+            60.4,
+            39.8,
+            36.3,
+            59.2,
+            49.6,
+            39.2,
+            61.7,
+            45.9,
+            73.6,
+            69.8,
+            58.9,
+            73.3,
+            34.9,
+            31.9,
+            61.3
+          ]
+        }
+      }
+    },
+    {
+      "framework": "glory-v0.3.1-v2-keyed",
+      "keyed": true,
+      "benchmark": "06_remove-one-1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 27,
+          "max": 46.5,
+          "median": 35.6,
+          "mean": 36.37333333333334,
+          "stddev": 5.423160210307885,
+          "values": [
+            32,
+            35.6,
+            46.5,
+            36.1,
+            38.5,
+            33,
+            32.5,
+            44.4,
+            40.3,
+            27,
+            34.8,
+            33.2,
+            42.1,
+            39.3,
+            30.3
+          ]
+        },
+        "script": {
+          "min": 1.1,
+          "max": 2.2,
+          "median": 1.4,
+          "mean": 1.5,
+          "stddev": 0.35856858280031817,
+          "values": [
+            1.3,
+            1.2,
+            1.8,
+            1.4,
+            1.6,
+            1.2,
+            1.7,
+            2,
+            1.2,
+            1.2,
+            1.4,
+            1.1,
+            2.2,
+            2,
+            1.2
+          ]
+        },
+        "paint": {
+          "min": 21.6,
+          "max": 41.9,
+          "median": 29.2,
+          "mean": 30.913333333333334,
+          "stddev": 5.985919987373544,
+          "values": [
+            28.3,
+            28.4,
+            41.9,
+            29.2,
+            29.2,
+            23.3,
+            28.2,
+            39.9,
+            36.6,
+            21.6,
+            27.8,
+            29.8,
+            37.9,
+            35.1,
+            26.5
+          ]
+        }
+      }
+    },
+    {
+      "framework": "glory-v0.3.1-v2-keyed",
+      "keyed": true,
+      "benchmark": "07_create10k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 534,
+          "max": 581.4,
+          "median": 552.7,
+          "mean": 555.42,
+          "stddev": 13.6333205262485,
+          "values": [
+            566.5,
+            546.4,
+            542.9,
+            555.6,
+            548.2,
+            569.7,
+            571.2,
+            563.5,
+            545.6,
+            539.3,
+            548,
+            566.3,
+            534,
+            581.4,
+            552.7
+          ]
+        },
+        "script": {
+          "min": 101.8,
+          "max": 115.3,
+          "median": 106.4,
+          "mean": 107.56666666666665,
+          "stddev": 4.435516827136326,
+          "values": [
+            114.1,
+            106.4,
+            105.6,
+            104.2,
+            106.7,
+            103.2,
+            115.3,
+            108.7,
+            104.8,
+            105.7,
+            114.6,
+            108.8,
+            101.8,
+            111.2,
+            102.4
+          ]
+        },
+        "paint": {
+          "min": 422.1,
+          "max": 457.7,
+          "median": 440.9,
+          "mean": 438.1066666666667,
+          "stddev": 11.645505979724946,
+          "values": [
+            442.4,
+            431.6,
+            429,
+            442.8,
+            432.5,
+            457.2,
+            445,
+            445.1,
+            431.4,
+            422.1,
+            422.7,
+            447.8,
+            423.4,
+            457.7,
+            440.9
+          ]
+        }
+      }
+    },
+    {
+      "framework": "glory-v0.3.1-v2-keyed",
+      "keyed": true,
+      "benchmark": "08_create1k-after1k_x2",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 50.5,
+          "max": 84.5,
+          "median": 58.4,
+          "mean": 60.986666666666665,
+          "stddev": 7.833159065944018,
+          "values": [
+            84.5,
+            55.8,
+            55.9,
+            63.5,
+            58.4,
+            62,
+            61.1,
+            67.9,
+            57.5,
+            62,
+            56.3,
+            57.3,
+            50.5,
+            65.1,
+            57
+          ]
+        },
+        "script": {
+          "min": 8.8,
+          "max": 11.4,
+          "median": 10.5,
+          "mean": 10.226666666666667,
+          "stddev": 0.7638873015856524,
+          "values": [
+            10.5,
+            10.5,
+            10.3,
+            10.9,
+            11,
+            10.5,
+            9.7,
+            11.1,
+            9.9,
+            10.6,
+            8.8,
+            9.5,
+            9.1,
+            11.4,
+            9.6
+          ]
+        },
+        "paint": {
+          "min": 40.2,
+          "max": 71.6,
+          "median": 45.5,
+          "mean": 48.63333333333333,
+          "stddev": 7.331016950178842,
+          "values": [
+            71.6,
+            43.5,
+            44.2,
+            50.6,
+            45.4,
+            49.1,
+            49.1,
+            54.5,
+            44.9,
+            49.5,
+            44.8,
+            45.5,
+            40.2,
+            51.4,
+            45.2
+          ]
+        }
+      }
+    },
+    {
+      "framework": "glory-v0.3.1-v2-keyed",
+      "keyed": true,
+      "benchmark": "09_clear1k_x8",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 50.4,
+          "max": 98.2,
+          "median": 75,
+          "mean": 72.78666666666666,
+          "stddev": 13.112745526322671,
+          "values": [
+            80.3,
+            57.7,
+            78.2,
+            69.4,
+            60.7,
+            95.3,
+            77.7,
+            98.2,
+            72.4,
+            66.6,
+            75,
+            58.7,
+            50.4,
+            76.2,
+            75
+          ]
+        },
+        "script": {
+          "min": 43.5,
+          "max": 87.1,
+          "median": 63.5,
+          "mean": 63.00666666666667,
+          "stddev": 12.327870089856598,
+          "values": [
+            63.5,
+            50.4,
+            65.5,
+            56.7,
+            54.4,
+            86.5,
+            64.9,
+            87.1,
+            63.5,
+            58,
+            68.6,
+            47.7,
+            43.5,
+            68.5,
+            66.3
+          ]
+        },
+        "paint": {
+          "min": 3.8,
+          "max": 8.5,
+          "median": 5.2,
+          "mean": 5.406666666666667,
+          "stddev": 1.2191722406538597,
+          "values": [
+            8.5,
+            5.1,
+            6.7,
+            5.5,
+            4.2,
+            5.1,
+            5.8,
+            5.8,
+            6.4,
+            5.2,
+            4.4,
+            6,
+            3.8,
+            4.6,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "framework": "glory-v0.3.1-v2-keyed",
+      "keyed": true,
+      "benchmark": "21_ready-memory",
+      "type": "memory",
+      "values": {
+        "DEFAULT": {
+          "min": 1.8017892837524414,
+          "max": 1.8017892837524414,
+          "median": 1.8017892837524414,
+          "mean": 1.8017892837524414,
+          "stddev": null,
+          "values": [
+            1.8017892837524414
+          ]
+        }
+      }
+    },
+    {
+      "framework": "glory-v0.3.1-v2-keyed",
+      "keyed": true,
+      "benchmark": "22_run-memory",
+      "type": "memory",
+      "values": {
+        "DEFAULT": {
+          "min": 5.663237571716309,
+          "max": 5.663237571716309,
+          "median": 5.663237571716309,
+          "mean": 5.663237571716309,
+          "stddev": null,
+          "values": [
+            5.663237571716309
+          ]
+        }
+      }
+    },
+    {
+      "framework": "glory-v0.3.1-v2-keyed",
+      "keyed": true,
+      "benchmark": "25_run-clear-memory",
+      "type": "memory",
+      "values": {
+        "DEFAULT": {
+          "min": 4.189749717712402,
+          "max": 4.189749717712402,
+          "median": 4.189749717712402,
+          "mean": 4.189749717712402,
+          "stddev": null,
+          "values": [
+            4.189749717712402
+          ]
+        }
+      }
+    },
+    {
+      "framework": "glory-v0.3.1-v2-keyed",
+      "keyed": true,
+      "benchmark": "41_size-uncompressed",
+      "type": "size",
+      "values": {
+        "DEFAULT": {
+          "min": 474.3,
+          "max": 474.3,
+          "median": 474.3,
+          "mean": 474.3,
+          "stddev": null,
+          "values": [
+            474.3
+          ]
+        }
+      }
+    },
+    {
+      "framework": "glory-v0.3.1-v2-keyed",
+      "keyed": true,
+      "benchmark": "42_size-compressed",
+      "type": "size",
+      "values": {
+        "DEFAULT": {
+          "min": 112.7,
+          "max": 112.7,
+          "median": 112.7,
+          "mean": 112.7,
+          "stddev": null,
+          "values": [
+            112.7
+          ]
+        }
+      }
+    },
+    {
+      "framework": "glory-v0.3.1-v2-keyed",
+      "keyed": true,
+      "benchmark": "43_first-paint",
+      "type": "size",
+      "values": {
+        "DEFAULT": {
+          "min": 725,
+          "max": 725,
+          "median": 725,
+          "mean": 725,
+          "stddev": null,
+          "values": [
+            725
+          ]
+        }
+      }
+    },
+    {
+      "framework": "leptos-v0.8.22-keyed",
+      "keyed": true,
+      "benchmark": "01_run1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 44.6,
+          "max": 55.6,
+          "median": 48.8,
+          "mean": 48.99333333333334,
+          "stddev": 3.0850947349813307,
+          "values": [
+            51.8,
+            49.8,
+            50.5,
+            51.6,
+            46.6,
+            48.8,
+            45.3,
+            46,
+            55.6,
+            46.9,
+            51.7,
+            51.4,
+            47.3,
+            47,
+            44.6
+          ]
+        },
+        "script": {
+          "min": 10.1,
+          "max": 12.8,
+          "median": 10.5,
+          "mean": 10.840000000000002,
+          "stddev": 0.8584038343676845,
+          "values": [
+            10.4,
+            11.5,
+            12.1,
+            10.1,
+            10.1,
+            10.4,
+            10.5,
+            10.5,
+            12.8,
+            10.1,
+            11.8,
+            10.1,
+            11.4,
+            10.3,
+            10.5
+          ]
+        },
+        "paint": {
+          "min": 33.4,
+          "max": 41.5,
+          "median": 37,
+          "mean": 37.08000000000001,
+          "stddev": 2.6235744428437435,
+          "values": [
+            39.6,
+            37,
+            37.6,
+            40.7,
+            35.2,
+            37.2,
+            34,
+            34.4,
+            41.5,
+            35.9,
+            39.1,
+            40.3,
+            35,
+            35.3,
+            33.4
+          ]
+        }
+      }
+    },
+    {
+      "framework": "leptos-v0.8.22-keyed",
+      "keyed": true,
+      "benchmark": "02_replace1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 51.4,
+          "max": 60.8,
+          "median": 55.8,
+          "mean": 56.173333333333325,
+          "stddev": 2.6703308159601993,
+          "values": [
+            58.4,
+            60.8,
+            58.6,
+            51.4,
+            54.9,
+            56.4,
+            52.6,
+            54.9,
+            55,
+            55.8,
+            55,
+            56.9,
+            60.3,
+            53.8,
+            57.8
+          ]
+        },
+        "script": {
+          "min": 15.5,
+          "max": 22.4,
+          "median": 18.4,
+          "mean": 18.09333333333333,
+          "stddev": 1.7584354517852614,
+          "values": [
+            17.3,
+            20.4,
+            18.7,
+            17,
+            17.3,
+            18.9,
+            15.5,
+            16.5,
+            18.5,
+            17.2,
+            18.5,
+            18.9,
+            22.4,
+            15.9,
+            18.4
+          ]
+        },
+        "paint": {
+          "min": 33.3,
+          "max": 39.5,
+          "median": 36.9,
+          "mean": 36.96,
+          "stddev": 1.667247517831197,
+          "values": [
+            39.5,
+            39.2,
+            39,
+            33.3,
+            36.3,
+            36.7,
+            36.2,
+            37,
+            35.4,
+            37.8,
+            35.1,
+            36.6,
+            36.9,
+            37,
+            38.4
+          ]
+        }
+      }
+    },
+    {
+      "framework": "leptos-v0.8.22-keyed",
+      "keyed": true,
+      "benchmark": "03_update10th1k_x16",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 40.3,
+          "max": 83.1,
+          "median": 60.7,
+          "mean": 60.79999999999999,
+          "stddev": 12.639902802519599,
+          "values": [
+            83.1,
+            74.3,
+            67.3,
+            48,
+            51.2,
+            62.6,
+            43.7,
+            58,
+            52.4,
+            40.3,
+            56.8,
+            60.7,
+            64.8,
+            68.8,
+            80
+          ]
+        },
+        "script": {
+          "min": 3.2,
+          "max": 86,
+          "median": 5.1,
+          "mean": 11.026666666666667,
+          "stddev": 20.841869489312224,
+          "values": [
+            86,
+            8.3,
+            5.4,
+            4.8,
+            3.4,
+            5.1,
+            4,
+            4.4,
+            5,
+            3.8,
+            3.2,
+            5.7,
+            7.7,
+            8.7,
+            9.9
+          ]
+        },
+        "paint": {
+          "min": 32.7,
+          "max": 64,
+          "median": 49.3,
+          "mean": 48.5,
+          "stddev": 9.080434224985373,
+          "values": [
+            64,
+            57.7,
+            55.4,
+            39.1,
+            42.8,
+            45.7,
+            35.8,
+            48.5,
+            41.8,
+            32.7,
+            49.3,
+            49.6,
+            49.4,
+            54.7,
+            61
+          ]
+        }
+      }
+    },
+    {
+      "framework": "leptos-v0.8.22-keyed",
+      "keyed": true,
+      "benchmark": "04_select1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 12,
+          "max": 64.4,
+          "median": 21.8,
+          "mean": 23.256000000000004,
+          "stddev": 10.581551556049488,
+          "values": [
+            34.6,
+            23.8,
+            26.3,
+            17.5,
+            12.8,
+            21.8,
+            18.8,
+            20,
+            25.7,
+            27.5,
+            15.6,
+            23.3,
+            32.5,
+            28.8,
+            64.4,
+            15,
+            13.3,
+            14.1,
+            19.4,
+            12,
+            17.3,
+            28.1,
+            26.8,
+            19,
+            23
+          ]
+        },
+        "script": {
+          "min": 2.2,
+          "max": 6.7,
+          "median": 3.4,
+          "mean": 3.7480000000000007,
+          "stddev": 1.2396639329538741,
+          "values": [
+            6.7,
+            2.2,
+            5.7,
+            2.6,
+            2.6,
+            2.8,
+            2.4,
+            2.6,
+            2.4,
+            4,
+            4,
+            5.2,
+            4.7,
+            3.4,
+            3.4,
+            4.6,
+            2.8,
+            3,
+            3.2,
+            2.6,
+            4.1,
+            5.5,
+            4.9,
+            5,
+            3.3
+          ]
+        },
+        "paint": {
+          "min": 7.9,
+          "max": 28,
+          "median": 14.8,
+          "mean": 14.995999999999999,
+          "stddev": 5.787089078284522,
+          "values": [
+            21.2,
+            9.4,
+            17.5,
+            12.2,
+            8.2,
+            16.2,
+            10.4,
+            14.9,
+            21.8,
+            19,
+            9.7,
+            14.8,
+            24.5,
+            21.8,
+            28,
+            7.9,
+            8.7,
+            8.5,
+            13.6,
+            8.1,
+            11.3,
+            19.9,
+            19.7,
+            11.5,
+            16.1
+          ]
+        }
+      }
+    },
+    {
+      "framework": "leptos-v0.8.22-keyed",
+      "keyed": true,
+      "benchmark": "05_swap1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 35.9,
+          "max": 97.7,
+          "median": 41.6,
+          "mean": 49.79333333333334,
+          "stddev": 18.74233049492385,
+          "values": [
+            97.7,
+            51.1,
+            50.1,
+            40.3,
+            36.7,
+            40,
+            36.9,
+            35.9,
+            50.5,
+            42.8,
+            60.8,
+            86.9,
+            38.8,
+            41.6,
+            36.8
+          ]
+        },
+        "script": {
+          "min": 2.2,
+          "max": 6.1,
+          "median": 2.8,
+          "mean": 3.3666666666666663,
+          "stddev": 1.2390472530287515,
+          "values": [
+            5.3,
+            3,
+            2.6,
+            2.6,
+            2.6,
+            3.8,
+            3,
+            2.8,
+            5.3,
+            2.6,
+            3.8,
+            6.1,
+            2.4,
+            2.2,
+            2.4
+          ]
+        },
+        "paint": {
+          "min": 29.9,
+          "max": 84.8,
+          "median": 37,
+          "mean": 42.04,
+          "stddev": 15.922257557089248,
+          "values": [
+            84.8,
+            44.1,
+            41.8,
+            33.3,
+            30.8,
+            33.3,
+            31,
+            29.9,
+            40.5,
+            37.3,
+            51.3,
+            71,
+            33.2,
+            37,
+            31.3
+          ]
+        }
+      }
+    },
+    {
+      "framework": "leptos-v0.8.22-keyed",
+      "keyed": true,
+      "benchmark": "06_remove-one-1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 21.9,
+          "max": 49.9,
+          "median": 32.2,
+          "mean": 34.85333333333333,
+          "stddev": 10.933948879304223,
+          "values": [
+            43.6,
+            43,
+            25.2,
+            45.4,
+            49.8,
+            24.2,
+            21.9,
+            47.9,
+            23.2,
+            39.2,
+            49.9,
+            24.2,
+            32.2,
+            29,
+            24.1
+          ]
+        },
+        "script": {
+          "min": 1.1,
+          "max": 3.4,
+          "median": 1.5,
+          "mean": 1.74,
+          "stddev": 0.6695414208887411,
+          "values": [
+            2.6,
+            1.4,
+            1.2,
+            2.6,
+            2.3,
+            1.6,
+            1.3,
+            3.4,
+            1.6,
+            1.1,
+            1.4,
+            1.6,
+            1.2,
+            1.5,
+            1.3
+          ]
+        },
+        "paint": {
+          "min": 19.1,
+          "max": 44.8,
+          "median": 28.2,
+          "mean": 30.64666666666667,
+          "stddev": 9.99019995986543,
+          "values": [
+            38.9,
+            38.6,
+            22.6,
+            39.8,
+            44.1,
+            21.1,
+            19.1,
+            41.9,
+            19.8,
+            35.4,
+            44.8,
+            20.8,
+            28.2,
+            23.4,
+            21.2
+          ]
+        }
+      }
+    },
+    {
+      "framework": "leptos-v0.8.22-keyed",
+      "keyed": true,
+      "benchmark": "07_create10k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 520.3,
+          "max": 595.8,
+          "median": 550.2,
+          "mean": 557.1266666666667,
+          "stddev": 20.89967418292402,
+          "values": [
+            549.1,
+            569.8,
+            538.3,
+            572.5,
+            537.9,
+            546.3,
+            582.3,
+            571.5,
+            520.3,
+            548.5,
+            562.7,
+            577.8,
+            550.2,
+            595.8,
+            533.9
+          ]
+        },
+        "script": {
+          "min": 108.4,
+          "max": 125.1,
+          "median": 115.7,
+          "mean": 116.00666666666667,
+          "stddev": 5.549834832377145,
+          "values": [
+            119.8,
+            118.1,
+            123.4,
+            117.9,
+            111.9,
+            108.4,
+            115.7,
+            119.7,
+            110.9,
+            111,
+            108.8,
+            125.1,
+            123.7,
+            113.5,
+            112.2
+          ]
+        },
+        "paint": {
+          "min": 400.7,
+          "max": 472,
+          "median": 427.7,
+          "mean": 431.5666666666666,
+          "stddev": 19.505481525043397,
+          "values": [
+            422.6,
+            441.9,
+            405.6,
+            446.1,
+            415.8,
+            427.7,
+            454.9,
+            441.8,
+            400.7,
+            427.6,
+            441.7,
+            443.2,
+            418.4,
+            472,
+            413.5
+          ]
+        }
+      }
+    },
+    {
+      "framework": "leptos-v0.8.22-keyed",
+      "keyed": true,
+      "benchmark": "08_create1k-after1k_x2",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 55.5,
+          "max": 67.4,
+          "median": 59.5,
+          "mean": 59.86666666666667,
+          "stddev": 3.2128462385213767,
+          "values": [
+            62.6,
+            55.5,
+            59.7,
+            61.6,
+            58.3,
+            59.5,
+            55.8,
+            58.8,
+            67.4,
+            57.2,
+            61,
+            62.4,
+            59.3,
+            56.1,
+            62.8
+          ]
+        },
+        "script": {
+          "min": 10,
+          "max": 11.6,
+          "median": 10.4,
+          "mean": 10.600000000000001,
+          "stddev": 0.5113008619478082,
+          "values": [
+            11.6,
+            11,
+            10.8,
+            10,
+            10.1,
+            10.2,
+            10.1,
+            10.9,
+            11.3,
+            10.3,
+            10.1,
+            11,
+            10.2,
+            10.4,
+            11
+          ]
+        },
+        "paint": {
+          "min": 43,
+          "max": 53.8,
+          "median": 47,
+          "mean": 47.23333333333333,
+          "stddev": 2.857238093650846,
+          "values": [
+            48.5,
+            43,
+            46.7,
+            49.6,
+            46.3,
+            47.4,
+            44,
+            45.5,
+            53.8,
+            45,
+            48.7,
+            49.5,
+            47,
+            43.7,
+            49.8
+          ]
+        }
+      }
+    },
+    {
+      "framework": "leptos-v0.8.22-keyed",
+      "keyed": true,
+      "benchmark": "09_clear1k_x8",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 47.7,
+          "max": 99.6,
+          "median": 83.1,
+          "mean": 80.53999999999999,
+          "stddev": 14.92561556519529,
+          "values": [
+            57.9,
+            83.5,
+            83.1,
+            89.6,
+            81.8,
+            61.5,
+            73.2,
+            47.7,
+            99.6,
+            78.6,
+            96.1,
+            91.5,
+            92.5,
+            79.2,
+            92.3
+          ]
+        },
+        "script": {
+          "min": 41,
+          "max": 88.6,
+          "median": 73.8,
+          "mean": 71.26,
+          "stddev": 15.186968097681643,
+          "values": [
+            47.4,
+            72.5,
+            77.2,
+            83.5,
+            73.8,
+            52.1,
+            57.6,
+            41,
+            88.4,
+            70.1,
+            88.6,
+            79.7,
+            84.5,
+            69,
+            83.5
+          ]
+        },
+        "paint": {
+          "min": 3.7,
+          "max": 8.5,
+          "median": 5.7,
+          "mean": 5.633333333333335,
+          "stddev": 1.5281485841494915,
+          "values": [
+            5.1,
+            6.9,
+            3.9,
+            3.7,
+            4.4,
+            6.2,
+            8.5,
+            3.8,
+            6.9,
+            5.7,
+            3.9,
+            7.4,
+            4.9,
+            7.1,
+            6.1
+          ]
+        }
+      }
+    },
+    {
+      "framework": "leptos-v0.8.22-keyed",
+      "keyed": true,
+      "benchmark": "21_ready-memory",
+      "type": "memory",
+      "values": {
+        "DEFAULT": {
+          "min": 1.7736454010009766,
+          "max": 1.7736454010009766,
+          "median": 1.7736454010009766,
+          "mean": 1.7736454010009766,
+          "stddev": null,
+          "values": [
+            1.7736454010009766
+          ]
+        }
+      }
+    },
+    {
+      "framework": "leptos-v0.8.22-keyed",
+      "keyed": true,
+      "benchmark": "22_run-memory",
+      "type": "memory",
+      "values": {
+        "DEFAULT": {
+          "min": 5.607978820800781,
+          "max": 5.607978820800781,
+          "median": 5.607978820800781,
+          "mean": 5.607978820800781,
+          "stddev": null,
+          "values": [
+            5.607978820800781
+          ]
+        }
+      }
+    },
+    {
+      "framework": "leptos-v0.8.22-keyed",
+      "keyed": true,
+      "benchmark": "25_run-clear-memory",
+      "type": "memory",
+      "values": {
+        "DEFAULT": {
+          "min": 4.5759124755859375,
+          "max": 4.5759124755859375,
+          "median": 4.5759124755859375,
+          "mean": 4.5759124755859375,
+          "stddev": null,
+          "values": [
+            4.5759124755859375
+          ]
+        }
+      }
+    },
+    {
+      "framework": "leptos-v0.8.22-keyed",
+      "keyed": true,
+      "benchmark": "41_size-uncompressed",
+      "type": "size",
+      "values": {
+        "DEFAULT": {
+          "min": 189.7,
+          "max": 189.7,
+          "median": 189.7,
+          "mean": 189.7,
+          "stddev": null,
+          "values": [
+            189.7
+          ]
+        }
+      }
+    },
+    {
+      "framework": "leptos-v0.8.22-keyed",
+      "keyed": true,
+      "benchmark": "42_size-compressed",
+      "type": "size",
+      "values": {
+        "DEFAULT": {
+          "min": 48.8,
+          "max": 48.8,
+          "median": 48.8,
+          "mean": 48.8,
+          "stddev": null,
+          "values": [
+            48.8
+          ]
+        }
+      }
+    },
+    {
+      "framework": "leptos-v0.8.22-keyed",
+      "keyed": true,
+      "benchmark": "43_first-paint",
+      "type": "size",
+      "values": {
+        "DEFAULT": {
+          "min": 371.3,
+          "max": 371.3,
+          "median": 371.3,
+          "mean": 371.3,
+          "stddev": null,
+          "values": [
+            371.3
+          ]
+        }
+      }
+    },
+    {
+      "framework": "react-hooks-v19.2.0-keyed",
+      "keyed": true,
+      "benchmark": "01_run1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 42.7,
+          "max": 60.5,
+          "median": 48.6,
+          "mean": 48.52666666666666,
+          "stddev": 5.053777465091499,
+          "values": [
+            50.2,
+            49.1,
+            48.6,
+            47.4,
+            54.8,
+            44.6,
+            44.3,
+            55.3,
+            43.5,
+            49,
+            45.3,
+            60.5,
+            42.7,
+            43.9,
+            48.7
+          ]
+        },
+        "script": {
+          "min": 7.8,
+          "max": 14.2,
+          "median": 9.4,
+          "mean": 9.953333333333335,
+          "stddev": 1.7224843630501792,
+          "values": [
+            9,
+            9.4,
+            9.2,
+            11.9,
+            11.4,
+            9.2,
+            9,
+            9.5,
+            8.3,
+            11.8,
+            9.9,
+            14.2,
+            8.2,
+            7.8,
+            10.5
+          ]
+        },
+        "paint": {
+          "min": 33.6,
+          "max": 45.4,
+          "median": 36.3,
+          "mean": 37.44666666666667,
+          "stddev": 3.996224408589878,
+          "values": [
+            39.8,
+            38.7,
+            37.8,
+            34.5,
+            42.5,
+            34.3,
+            34.1,
+            44.7,
+            34.2,
+            36.3,
+            34.1,
+            45.4,
+            33.6,
+            34.8,
+            36.9
+          ]
+        }
+      }
+    },
+    {
+      "framework": "react-hooks-v19.2.0-keyed",
+      "keyed": true,
+      "benchmark": "02_replace1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 51.8,
+          "max": 155.4,
+          "median": 58.6,
+          "mean": 65.62,
+          "stddev": 25.175333733069532,
+          "values": [
+            64.5,
+            62.6,
+            66.3,
+            57.6,
+            58.6,
+            58,
+            60.9,
+            57.5,
+            55.9,
+            56.8,
+            65,
+            155.4,
+            51.8,
+            53.6,
+            59.8
+          ]
+        },
+        "script": {
+          "min": 15.5,
+          "max": 23.4,
+          "median": 17.8,
+          "mean": 18.873333333333335,
+          "stddev": 2.542627062892311,
+          "values": [
+            18.6,
+            23,
+            22.4,
+            17.5,
+            16.4,
+            17.7,
+            18.9,
+            18.1,
+            16.9,
+            17.1,
+            23.4,
+            17.8,
+            15.5,
+            17.8,
+            22
+          ]
+        },
+        "paint": {
+          "min": 35,
+          "max": 44.9,
+          "median": 39.2,
+          "mean": 39.45333333333333,
+          "stddev": 2.703401737141736,
+          "values": [
+            44.9,
+            38.9,
+            42.6,
+            39.2,
+            41.2,
+            39.4,
+            41,
+            38.5,
+            38.1,
+            38.9,
+            40.8,
+            41.7,
+            35.3,
+            35,
+            36.3
+          ]
+        }
+      }
+    },
+    {
+      "framework": "react-hooks-v19.2.0-keyed",
+      "keyed": true,
+      "benchmark": "03_update10th1k_x16",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 41.7,
+          "max": 81.8,
+          "median": 50.4,
+          "mean": 55.02,
+          "stddev": 12.610890984723142,
+          "values": [
+            72.8,
+            55.9,
+            66.7,
+            45.3,
+            68.7,
+            48.3,
+            47.1,
+            41.8,
+            60.4,
+            81.8,
+            57.1,
+            41.7,
+            50.4,
+            44.4,
+            42.9
+          ]
+        },
+        "script": {
+          "min": 8.1,
+          "max": 22.1,
+          "median": 10.1,
+          "mean": 12.033333333333333,
+          "stddev": 4.1272035961180205,
+          "values": [
+            14.9,
+            10.1,
+            14.5,
+            14.3,
+            22.1,
+            8.1,
+            10.1,
+            9.5,
+            8.5,
+            17.4,
+            15.1,
+            9.1,
+            8.7,
+            8.8,
+            9.3
+          ]
+        },
+        "paint": {
+          "min": 27.2,
+          "max": 56.3,
+          "median": 34.6,
+          "mean": 36.71333333333333,
+          "stddev": 8.93187443666675,
+          "values": [
+            49.5,
+            39.4,
+            44.7,
+            27.2,
+            39.9,
+            34.6,
+            31.9,
+            27.2,
+            44.2,
+            56.3,
+            37.8,
+            27.4,
+            32.6,
+            28.8,
+            29.2
+          ]
+        }
+      }
+    },
+    {
+      "framework": "react-hooks-v19.2.0-keyed",
+      "keyed": true,
+      "benchmark": "04_select1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 14.8,
+          "max": 41.9,
+          "median": 20,
+          "mean": 22.199999999999996,
+          "stddev": 6.359245238233858,
+          "values": [
+            41.9,
+            23.4,
+            29.9,
+            15.9,
+            19.9,
+            21.6,
+            19.3,
+            16.1,
+            21.2,
+            16.1,
+            30.3,
+            26.5,
+            26.5,
+            23.3,
+            16.9,
+            19.4,
+            19.2,
+            19.2,
+            26.3,
+            26.5,
+            29.5,
+            16.3,
+            15,
+            20,
+            14.8
+          ]
+        },
+        "script": {
+          "min": 5.3,
+          "max": 14.1,
+          "median": 7.6,
+          "mean": 8.307999999999998,
+          "stddev": 2.4969848484388795,
+          "values": [
+            14.1,
+            6.7,
+            10.7,
+            6.5,
+            8,
+            7.5,
+            7.6,
+            6.3,
+            9.8,
+            6.7,
+            13.9,
+            8.1,
+            12.5,
+            12.2,
+            5.3,
+            7,
+            8.3,
+            8.7,
+            7.6,
+            6,
+            8.3,
+            6.6,
+            6.7,
+            6.5,
+            6.1
+          ]
+        },
+        "paint": {
+          "min": 6.5,
+          "max": 21.8,
+          "median": 9.6,
+          "mean": 11.323999999999998,
+          "stddev": 4.11898854898465,
+          "values": [
+            21.8,
+            14.2,
+            16.6,
+            7.7,
+            9.9,
+            11.4,
+            9.1,
+            7.6,
+            8.7,
+            7.4,
+            13.7,
+            15.3,
+            9.6,
+            8.3,
+            10.1,
+            9.3,
+            8.9,
+            8.6,
+            16,
+            17.4,
+            18,
+            8.2,
+            6.5,
+            11.5,
+            7.3
+          ]
+        }
+      }
+    },
+    {
+      "framework": "react-hooks-v19.2.0-keyed",
+      "keyed": true,
+      "benchmark": "05_swap1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 224.2,
+          "max": 369.9,
+          "median": 264.8,
+          "mean": 276.29999999999995,
+          "stddev": 52.166601247486746,
+          "values": [
+            358.2,
+            283.6,
+            235.5,
+            229.2,
+            245.8,
+            224.6,
+            345.2,
+            326.6,
+            264.8,
+            270,
+            304.9,
+            369.9,
+            224.2,
+            229.4,
+            232.6
+          ]
+        },
+        "script": {
+          "min": 36.2,
+          "max": 84.1,
+          "median": 45.6,
+          "mean": 53.04666666666667,
+          "stddev": 16.275874638190576,
+          "values": [
+            81.2,
+            84.1,
+            36.2,
+            42.1,
+            42.7,
+            41.4,
+            80.3,
+            43.7,
+            46.8,
+            52.7,
+            43.7,
+            63.9,
+            39.9,
+            45.6,
+            51.4
+          ]
+        },
+        "paint": {
+          "min": 174.4,
+          "max": 299.6,
+          "median": 196.9,
+          "mean": 214.92000000000002,
+          "stddev": 42.06541164832287,
+          "values": [
+            264.3,
+            190.4,
+            191.5,
+            179.6,
+            196.9,
+            174.4,
+            256.2,
+            274.5,
+            212.5,
+            207.5,
+            247.1,
+            299.6,
+            176.4,
+            178.2,
+            174.7
+          ]
+        }
+      }
+    },
+    {
+      "framework": "react-hooks-v19.2.0-keyed",
+      "keyed": true,
+      "benchmark": "06_remove-one-1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 25.6,
+          "max": 54.7,
+          "median": 31.2,
+          "mean": 35.31333333333332,
+          "stddev": 9.894072299446101,
+          "values": [
+            40.9,
+            43.4,
+            31.2,
+            52.4,
+            45.4,
+            27.2,
+            33.8,
+            28,
+            54.7,
+            25.6,
+            26.9,
+            29.7,
+            26.4,
+            26.2,
+            37.9
+          ]
+        },
+        "script": {
+          "min": 2.5,
+          "max": 5.6,
+          "median": 3.2,
+          "mean": 3.6599999999999997,
+          "stddev": 1.1788614361808116,
+          "values": [
+            4.7,
+            5.4,
+            2.6,
+            3.1,
+            5.6,
+            2.5,
+            4.8,
+            2.9,
+            5.5,
+            2.9,
+            2.5,
+            3.2,
+            3.2,
+            2.6,
+            3.4
+          ]
+        },
+        "paint": {
+          "min": 20.2,
+          "max": 45.9,
+          "median": 26.6,
+          "mean": 29.153333333333332,
+          "stddev": 8.64092146761697,
+          "values": [
+            33.2,
+            35,
+            26.6,
+            45.5,
+            37.3,
+            22.2,
+            27.4,
+            23.2,
+            45.9,
+            20.9,
+            22.1,
+            24.5,
+            21.4,
+            20.2,
+            31.9
+          ]
+        }
+      }
+    },
+    {
+      "framework": "react-hooks-v19.2.0-keyed",
+      "keyed": true,
+      "benchmark": "07_create10k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 705.6,
+          "max": 831.1,
+          "median": 780.5,
+          "mean": 774.7666666666667,
+          "stddev": 31.608942375461385,
+          "values": [
+            752.3,
+            747.3,
+            785.7,
+            785.2,
+            705.6,
+            770.2,
+            754.3,
+            793.4,
+            804,
+            780.5,
+            746.7,
+            764.1,
+            818.4,
+            831.1,
+            782.7
+          ]
+        },
+        "script": {
+          "min": 249.8,
+          "max": 325.3,
+          "median": 294.4,
+          "mean": 293.7866666666667,
+          "stddev": 27.64646365054584,
+          "values": [
+            266.8,
+            281.6,
+            325.2,
+            308.1,
+            249.8,
+            325.3,
+            259.5,
+            315.3,
+            323,
+            258.4,
+            271.1,
+            294.4,
+            324.8,
+            315.1,
+            288.4
+          ]
+        },
+        "paint": {
+          "min": 433.4,
+          "max": 509.4,
+          "median": 463.5,
+          "mean": 467.7666666666667,
+          "stddev": 20.987025470400475,
+          "values": [
+            470.6,
+            453.8,
+            446.4,
+            463.1,
+            442.9,
+            433.4,
+            480,
+            463.5,
+            467.4,
+            509.4,
+            463.3,
+            456.5,
+            481.1,
+            503.3,
+            481.8
+          ]
+        }
+      }
+    },
+    {
+      "framework": "react-hooks-v19.2.0-keyed",
+      "keyed": true,
+      "benchmark": "08_create1k-after1k_x2",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 52.5,
+          "max": 68.5,
+          "median": 60.7,
+          "mean": 60.44666666666667,
+          "stddev": 4.54954733488739,
+          "values": [
+            68.5,
+            65.2,
+            58.6,
+            60.7,
+            60.2,
+            52.9,
+            52.5,
+            58.1,
+            65.5,
+            63.5,
+            55.1,
+            62.2,
+            62.8,
+            59.7,
+            61.2
+          ]
+        },
+        "script": {
+          "min": 9.8,
+          "max": 13.1,
+          "median": 10.7,
+          "mean": 11.026666666666666,
+          "stddev": 1.0367991034681603,
+          "values": [
+            12.4,
+            12.6,
+            10.6,
+            11.6,
+            10,
+            10.7,
+            10.2,
+            10.7,
+            13.1,
+            11.1,
+            9.8,
+            10,
+            11.7,
+            10.8,
+            10.1
+          ]
+        },
+        "paint": {
+          "min": 40.5,
+          "max": 53.7,
+          "median": 48.4,
+          "mean": 47.36666666666666,
+          "stddev": 3.7553136956026663,
+          "values": [
+            53.7,
+            49.9,
+            45.5,
+            47.3,
+            48.4,
+            40.5,
+            40.5,
+            45,
+            50,
+            50.1,
+            43.4,
+            50.5,
+            49.4,
+            47.4,
+            48.9
+          ]
+        }
+      }
+    },
+    {
+      "framework": "react-hooks-v19.2.0-keyed",
+      "keyed": true,
+      "benchmark": "09_clear1k_x8",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 36.9,
+          "max": 96.6,
+          "median": 68.3,
+          "mean": 67.60000000000001,
+          "stddev": 17.017679882152812,
+          "values": [
+            36.9,
+            61.8,
+            74.2,
+            96.6,
+            80.5,
+            79.1,
+            44.7,
+            63.1,
+            88.7,
+            71,
+            53.5,
+            82.1,
+            68.3,
+            45.6,
+            67.9
+          ]
+        },
+        "script": {
+          "min": 31.3,
+          "max": 81.9,
+          "median": 60.1,
+          "mean": 58.86666666666667,
+          "stddev": 15.54756143794475,
+          "values": [
+            31.3,
+            53.1,
+            63.5,
+            81.9,
+            70.1,
+            71.7,
+            37.7,
+            55.6,
+            79.3,
+            59.8,
+            45.2,
+            74.9,
+            60.1,
+            38.3,
+            60.5
+          ]
+        },
+        "paint": {
+          "min": 3.2,
+          "max": 8.1,
+          "median": 5.2,
+          "mean": 5.219999999999999,
+          "stddev": 1.39242850547421,
+          "values": [
+            4,
+            5.2,
+            6.3,
+            8.1,
+            7.1,
+            4.2,
+            3.4,
+            4.8,
+            6.5,
+            5.3,
+            5.3,
+            3.9,
+            6,
+            5,
+            3.2
+          ]
+        }
+      }
+    },
+    {
+      "framework": "react-hooks-v19.2.0-keyed",
+      "keyed": true,
+      "benchmark": "21_ready-memory",
+      "type": "memory",
+      "values": {
+        "DEFAULT": {
+          "min": 1.185272216796875,
+          "max": 1.185272216796875,
+          "median": 1.185272216796875,
+          "mean": 1.185272216796875,
+          "stddev": null,
+          "values": [
+            1.185272216796875
+          ]
+        }
+      }
+    },
+    {
+      "framework": "react-hooks-v19.2.0-keyed",
+      "keyed": true,
+      "benchmark": "22_run-memory",
+      "type": "memory",
+      "values": {
+        "DEFAULT": {
+          "min": 4.580458641052246,
+          "max": 4.580458641052246,
+          "median": 4.580458641052246,
+          "mean": 4.580458641052246,
+          "stddev": null,
+          "values": [
+            4.580458641052246
+          ]
+        }
+      }
+    },
+    {
+      "framework": "react-hooks-v19.2.0-keyed",
+      "keyed": true,
+      "benchmark": "25_run-clear-memory",
+      "type": "memory",
+      "values": {
+        "DEFAULT": {
+          "min": 1.9730424880981445,
+          "max": 1.9730424880981445,
+          "median": 1.9730424880981445,
+          "mean": 1.9730424880981445,
+          "stddev": null,
+          "values": [
+            1.9730424880981445
+          ]
+        }
+      }
+    },
+    {
+      "framework": "react-hooks-v19.2.0-keyed",
+      "keyed": true,
+      "benchmark": "41_size-uncompressed",
+      "type": "size",
+      "values": {
+        "DEFAULT": {
+          "min": 190.3,
+          "max": 190.3,
+          "median": 190.3,
+          "mean": 190.3,
+          "stddev": null,
+          "values": [
+            190.3
+          ]
+        }
+      }
+    },
+    {
+      "framework": "react-hooks-v19.2.0-keyed",
+      "keyed": true,
+      "benchmark": "42_size-compressed",
+      "type": "size",
+      "values": {
+        "DEFAULT": {
+          "min": 51.4,
+          "max": 51.4,
+          "median": 51.4,
+          "mean": 51.4,
+          "stddev": null,
+          "values": [
+            51.4
+          ]
+        }
+      }
+    },
+    {
+      "framework": "react-hooks-v19.2.0-keyed",
+      "keyed": true,
+      "benchmark": "43_first-paint",
+      "type": "size",
+      "values": {
+        "DEFAULT": {
+          "min": 329.3,
+          "max": 329.3,
+          "median": 329.3,
+          "mean": 329.3,
+          "stddev": null,
+          "values": [
+            329.3
+          ]
+        }
+      }
+    },
+    {
+      "framework": "solid-v1.9.3-keyed",
+      "keyed": true,
+      "benchmark": "01_run1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 40.8,
+          "max": 60.8,
+          "median": 47,
+          "mean": 47.35333333333333,
+          "stddev": 5.159715754444877,
+          "values": [
+            47.2,
+            40.9,
+            42.1,
+            46.4,
+            49.7,
+            43.7,
+            46.5,
+            47,
+            49.3,
+            48.7,
+            60.8,
+            45.4,
+            47.4,
+            40.8,
+            54.4
+          ]
+        },
+        "script": {
+          "min": 4.2,
+          "max": 7,
+          "median": 5.8,
+          "mean": 5.653333333333333,
+          "stddev": 0.8425019429114237,
+          "values": [
+            4.8,
+            4.2,
+            6.2,
+            6,
+            5.2,
+            5.8,
+            6.5,
+            6.8,
+            4.9,
+            5.8,
+            7,
+            6,
+            4.4,
+            5.2,
+            6
+          ]
+        },
+        "paint": {
+          "min": 34.7,
+          "max": 52.1,
+          "median": 39,
+          "mean": 40.56666666666667,
+          "stddev": 4.711940253481674,
+          "values": [
+            41.7,
+            35.7,
+            34.9,
+            39,
+            43.3,
+            36.9,
+            38.9,
+            39,
+            43.6,
+            41.8,
+            52.1,
+            38.1,
+            42,
+            34.7,
+            46.8
+          ]
+        }
+      }
+    },
+    {
+      "framework": "solid-v1.9.3-keyed",
+      "keyed": true,
+      "benchmark": "02_replace1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 41.3,
+          "max": 54.7,
+          "median": 47.3,
+          "mean": 47.92666666666666,
+          "stddev": 3.8949540005841756,
+          "values": [
+            41.3,
+            46.4,
+            49.7,
+            52.5,
+            48.5,
+            44.3,
+            47.1,
+            42,
+            52.8,
+            47.3,
+            50.9,
+            49.5,
+            54.7,
+            47.3,
+            44.6
+          ]
+        },
+        "script": {
+          "min": 7.6,
+          "max": 11.8,
+          "median": 8.9,
+          "mean": 9.186666666666667,
+          "stddev": 1.1236844159579087,
+          "values": [
+            7.6,
+            9.5,
+            8.3,
+            9.7,
+            9.9,
+            8.6,
+            8.8,
+            8.2,
+            10.7,
+            9.5,
+            8.9,
+            9.8,
+            11.8,
+            8.8,
+            7.7
+          ]
+        },
+        "paint": {
+          "min": 32.2,
+          "max": 42,
+          "median": 37.1,
+          "mean": 37.54666666666667,
+          "stddev": 3.1332016183055265,
+          "values": [
+            32.7,
+            35.8,
+            40.4,
+            41.8,
+            37.2,
+            34.4,
+            36.8,
+            32.2,
+            40.8,
+            36.5,
+            40.8,
+            38.6,
+            42,
+            37.1,
+            36.1
+          ]
+        }
+      }
+    },
+    {
+      "framework": "solid-v1.9.3-keyed",
+      "keyed": true,
+      "benchmark": "03_update10th1k_x16",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 33.5,
+          "max": 148.4,
+          "median": 43.9,
+          "mean": 56.47333333333334,
+          "stddev": 30.231215340313085,
+          "values": [
+            35.2,
+            54.1,
+            148.4,
+            33.5,
+            43.9,
+            76.2,
+            34.3,
+            71.9,
+            35.9,
+            42.7,
+            36.2,
+            63.1,
+            44.8,
+            43.7,
+            83.2
+          ]
+        },
+        "script": {
+          "min": 2,
+          "max": 7,
+          "median": 4,
+          "mean": 4.3,
+          "stddev": 1.4971401308590226,
+          "values": [
+            2,
+            4,
+            5.6,
+            2.8,
+            6.1,
+            5.9,
+            3.5,
+            4.8,
+            3.7,
+            2.8,
+            3,
+            5.9,
+            3.2,
+            4.2,
+            7
+          ]
+        },
+        "paint": {
+          "min": 17.3,
+          "max": 65.4,
+          "median": 35.6,
+          "mean": 40.333333333333336,
+          "stddev": 14.374464793349285,
+          "values": [
+            17.3,
+            44,
+            53.6,
+            27.8,
+            32.6,
+            58.8,
+            27.3,
+            60.5,
+            29.2,
+            36.4,
+            29.9,
+            51.1,
+            35.5,
+            35.6,
+            65.4
+          ]
+        }
+      }
+    },
+    {
+      "framework": "solid-v1.9.3-keyed",
+      "keyed": true,
+      "benchmark": "04_select1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 10.7,
+          "max": 48.9,
+          "median": 16.7,
+          "mean": 19.944000000000003,
+          "stddev": 9.056309034774229,
+          "values": [
+            27.8,
+            16.7,
+            13.1,
+            10.7,
+            13.1,
+            13.1,
+            14.1,
+            15.2,
+            48.9,
+            33.8,
+            11.3,
+            18.9,
+            11.7,
+            16.9,
+            14.8,
+            22.4,
+            31,
+            24.5,
+            14.5,
+            13.7,
+            24.4,
+            29,
+            25.5,
+            12.7,
+            20.8
+          ]
+        },
+        "script": {
+          "min": 1.6,
+          "max": 5.6,
+          "median": 3,
+          "mean": 3.2599999999999993,
+          "stddev": 1.3919410907075052,
+          "values": [
+            4.7,
+            1.6,
+            2.2,
+            1.8,
+            2,
+            2.8,
+            1.6,
+            1.8,
+            1.6,
+            5.3,
+            3,
+            2.4,
+            2,
+            2.6,
+            2.1,
+            5.6,
+            4.9,
+            4.9,
+            3.2,
+            3.4,
+            5.3,
+            5.2,
+            4.5,
+            3.2,
+            3.8
+          ]
+        },
+        "paint": {
+          "min": 6.5,
+          "max": 23.1,
+          "median": 12.4,
+          "mean": 12.736,
+          "stddev": 5.292752906884406,
+          "values": [
+            19.9,
+            13.3,
+            9.2,
+            7.4,
+            9.8,
+            6.5,
+            7.2,
+            6.5,
+            20.5,
+            22.3,
+            6.8,
+            14.1,
+            8.4,
+            12.4,
+            9.9,
+            12.9,
+            23.1,
+            16.8,
+            9.3,
+            8.1,
+            14.8,
+            17.4,
+            18.7,
+            8,
+            15.1
+          ]
+        }
+      }
+    },
+    {
+      "framework": "solid-v1.9.3-keyed",
+      "keyed": true,
+      "benchmark": "05_swap1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 37,
+          "max": 83.1,
+          "median": 44.5,
+          "mean": 50.81333333333334,
+          "stddev": 14.987464603397575,
+          "values": [
+            57.2,
+            44.5,
+            39.3,
+            37,
+            42.3,
+            75.3,
+            73,
+            48.3,
+            40.7,
+            56,
+            38.7,
+            83.1,
+            39.5,
+            40.4,
+            46.9
+          ]
+        },
+        "script": {
+          "min": 2.2,
+          "max": 6.3,
+          "median": 3.2,
+          "mean": 3.2533333333333325,
+          "stddev": 1.0809167185222701,
+          "values": [
+            2.2,
+            3.3,
+            2.8,
+            2.6,
+            3.2,
+            3.2,
+            3.8,
+            2.5,
+            3.2,
+            2.8,
+            4.9,
+            6.3,
+            2.6,
+            3.2,
+            2.2
+          ]
+        },
+        "paint": {
+          "min": 31.5,
+          "max": 67.8,
+          "median": 37,
+          "mean": 43.07333333333333,
+          "stddev": 12.5792610881486,
+          "values": [
+            49.5,
+            37,
+            33.5,
+            31.9,
+            35.3,
+            65.6,
+            61.3,
+            41.4,
+            34,
+            48.4,
+            31.5,
+            67.8,
+            34.1,
+            34.5,
+            40.3
+          ]
+        }
+      }
+    },
+    {
+      "framework": "solid-v1.9.3-keyed",
+      "keyed": true,
+      "benchmark": "06_remove-one-1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 22.6,
+          "max": 49,
+          "median": 33.5,
+          "mean": 33.81333333333334,
+          "stddev": 8.628926987313136,
+          "values": [
+            32.3,
+            35.3,
+            38.7,
+            25.9,
+            23.9,
+            41.8,
+            43.3,
+            33.5,
+            22.6,
+            49,
+            25.6,
+            41.3,
+            25.2,
+            25.9,
+            42.9
+          ]
+        },
+        "script": {
+          "min": 0.6,
+          "max": 1.6,
+          "median": 1,
+          "mean": 1.0933333333333333,
+          "stddev": 0.29632671801497046,
+          "values": [
+            1.2,
+            0.8,
+            1.2,
+            1.2,
+            1,
+            0.6,
+            0.8,
+            1,
+            1,
+            1.5,
+            0.8,
+            1.3,
+            0.9,
+            1.6,
+            1.5
+          ]
+        },
+        "paint": {
+          "min": 20.1,
+          "max": 44,
+          "median": 25.6,
+          "mean": 29.339999999999996,
+          "stddev": 8.652893818172705,
+          "values": [
+            23.8,
+            31.6,
+            34.6,
+            22.3,
+            21.2,
+            38.4,
+            39.6,
+            25.6,
+            20.1,
+            44,
+            20.2,
+            37.3,
+            20.4,
+            22.2,
+            38.8
+          ]
+        }
+      }
+    },
+    {
+      "framework": "solid-v1.9.3-keyed",
+      "keyed": true,
+      "benchmark": "07_create10k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 431.8,
+          "max": 503.7,
+          "median": 483.2,
+          "mean": 481.85333333333335,
+          "stddev": 21.187559242788364,
+          "values": [
+            468.2,
+            502.3,
+            499.1,
+            503.7,
+            475,
+            500.2,
+            460.3,
+            483.2,
+            474,
+            431.8,
+            492.8,
+            497.6,
+            502.5,
+            481.6,
+            455.5
+          ]
+        },
+        "script": {
+          "min": 38.2,
+          "max": 49.7,
+          "median": 42.8,
+          "mean": 43.02000000000001,
+          "stddev": 3.3443342279998616,
+          "values": [
+            38.4,
+            40.9,
+            42.2,
+            46.7,
+            46,
+            47.2,
+            39.7,
+            41,
+            42.8,
+            38.2,
+            44,
+            43.3,
+            49.7,
+            44.3,
+            40.9
+          ]
+        },
+        "paint": {
+          "min": 384.1,
+          "max": 450.1,
+          "median": 431.5,
+          "mean": 428.82,
+          "stddev": 18.532604473506375,
+          "values": [
+            420.2,
+            450.1,
+            447.7,
+            446.5,
+            420.4,
+            443.7,
+            411.1,
+            431.5,
+            422.8,
+            384.1,
+            438,
+            441.8,
+            442.3,
+            426.1,
+            406
+          ]
+        }
+      }
+    },
+    {
+      "framework": "solid-v1.9.3-keyed",
+      "keyed": true,
+      "benchmark": "08_create1k-after1k_x2",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 48.9,
+          "max": 63.1,
+          "median": 53.5,
+          "mean": 53.413333333333334,
+          "stddev": 3.602353727905185,
+          "values": [
+            54.3,
+            52.5,
+            53.5,
+            54.3,
+            50.1,
+            49.2,
+            48.9,
+            51.3,
+            63.1,
+            57.1,
+            54.5,
+            55.2,
+            50.3,
+            52,
+            54.9
+          ]
+        },
+        "script": {
+          "min": 4.3,
+          "max": 6.1,
+          "median": 4.8,
+          "mean": 4.806666666666666,
+          "stddev": 0.4772939595359695,
+          "values": [
+            4.6,
+            4.8,
+            4.4,
+            5.6,
+            4.7,
+            4.6,
+            4.8,
+            4.8,
+            4.8,
+            6.1,
+            4.4,
+            4.8,
+            4.3,
+            4.4,
+            5
+          ]
+        },
+        "paint": {
+          "min": 42.8,
+          "max": 48.8,
+          "median": 46.3,
+          "mean": 45.93333333333333,
+          "stddev": 2.0985255594844494,
+          "values": [
+            47.4,
+            46.3,
+            47.3,
+            46.7,
+            43.3,
+            43.2,
+            42.8,
+            45.1,
+            43.2,
+            48.8,
+            47.8,
+            48.3,
+            44.5,
+            46.1,
+            48.2
+          ]
+        }
+      }
+    },
+    {
+      "framework": "solid-v1.9.3-keyed",
+      "keyed": true,
+      "benchmark": "09_clear1k_x8",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 26.2,
+          "max": 64.6,
+          "median": 36.8,
+          "mean": 40.313333333333325,
+          "stddev": 11.397735781828816,
+          "values": [
+            32.8,
+            42.9,
+            26.2,
+            26.5,
+            29.4,
+            41.6,
+            49,
+            61.3,
+            35.7,
+            33.8,
+            45.9,
+            36.8,
+            35.3,
+            64.6,
+            42.9
+          ]
+        },
+        "script": {
+          "min": 19.8,
+          "max": 56.2,
+          "median": 28.9,
+          "mean": 31.09333333333333,
+          "stddev": 10.529039209095325,
+          "values": [
+            26,
+            31.4,
+            19.8,
+            20.9,
+            21.5,
+            28.9,
+            38.6,
+            49.2,
+            29.5,
+            22.3,
+            36.2,
+            25.8,
+            25.2,
+            56.2,
+            34.9
+          ]
+        },
+        "paint": {
+          "min": 2.9,
+          "max": 6.5,
+          "median": 4.7,
+          "mean": 4.793333333333334,
+          "stddev": 1.0700244768005922,
+          "values": [
+            3.8,
+            5.5,
+            2.9,
+            3.2,
+            4.3,
+            6.5,
+            5.9,
+            5.7,
+            4.1,
+            5.7,
+            4.9,
+            4.2,
+            6,
+            4.7,
+            4.5
+          ]
+        }
+      }
+    },
+    {
+      "framework": "solid-v1.9.3-keyed",
+      "keyed": true,
+      "benchmark": "21_ready-memory",
+      "type": "memory",
+      "values": {
+        "DEFAULT": {
+          "min": 0.5965032577514648,
+          "max": 0.5965032577514648,
+          "median": 0.5965032577514648,
+          "mean": 0.5965032577514648,
+          "stddev": null,
+          "values": [
+            0.5965032577514648
+          ]
+        }
+      }
+    },
+    {
+      "framework": "solid-v1.9.3-keyed",
+      "keyed": true,
+      "benchmark": "22_run-memory",
+      "type": "memory",
+      "values": {
+        "DEFAULT": {
+          "min": 2.8299312591552734,
+          "max": 2.8299312591552734,
+          "median": 2.8299312591552734,
+          "mean": 2.8299312591552734,
+          "stddev": null,
+          "values": [
+            2.8299312591552734
+          ]
+        }
+      }
+    },
+    {
+      "framework": "solid-v1.9.3-keyed",
+      "keyed": true,
+      "benchmark": "25_run-clear-memory",
+      "type": "memory",
+      "values": {
+        "DEFAULT": {
+          "min": 0.7256507873535156,
+          "max": 0.7256507873535156,
+          "median": 0.7256507873535156,
+          "mean": 0.7256507873535156,
+          "stddev": null,
+          "values": [
+            0.7256507873535156
+          ]
+        }
+      }
+    },
+    {
+      "framework": "solid-v1.9.3-keyed",
+      "keyed": true,
+      "benchmark": "41_size-uncompressed",
+      "type": "size",
+      "values": {
+        "DEFAULT": {
+          "min": 11.5,
+          "max": 11.5,
+          "median": 11.5,
+          "mean": 11.5,
+          "stddev": null,
+          "values": [
+            11.5
+          ]
+        }
+      }
+    },
+    {
+      "framework": "solid-v1.9.3-keyed",
+      "keyed": true,
+      "benchmark": "42_size-compressed",
+      "type": "size",
+      "values": {
+        "DEFAULT": {
+          "min": 4.5,
+          "max": 4.5,
+          "median": 4.5,
+          "mean": 4.5,
+          "stddev": null,
+          "values": [
+            4.5
+          ]
+        }
+      }
+    },
+    {
+      "framework": "solid-v1.9.3-keyed",
+      "keyed": true,
+      "benchmark": "43_first-paint",
+      "type": "size",
+      "values": {
+        "DEFAULT": {
+          "min": 106.5,
+          "max": 106.5,
+          "median": 106.5,
+          "mean": 106.5,
+          "stddev": null,
+          "values": [
+            106.5
+          ]
+        }
+      }
+    },
+    {
+      "framework": "svelte-v5.42.1-keyed",
+      "keyed": true,
+      "benchmark": "01_run1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 41.4,
+          "max": 53.4,
+          "median": 48.3,
+          "mean": 47.513333333333335,
+          "stddev": 4.276491664013967,
+          "values": [
+            42.4,
+            41.4,
+            51.7,
+            48.8,
+            53.1,
+            53.4,
+            52.8,
+            41.9,
+            44.6,
+            45.1,
+            50,
+            43.4,
+            50.1,
+            48.3,
+            45.7
+          ]
+        },
+        "script": {
+          "min": 4.8,
+          "max": 8.1,
+          "median": 6.1,
+          "mean": 6.393333333333333,
+          "stddev": 0.9815924864850024,
+          "values": [
+            4.8,
+            5.9,
+            7.2,
+            7.9,
+            8.1,
+            5.6,
+            6.8,
+            5.3,
+            5.7,
+            6.1,
+            6.4,
+            5.9,
+            7,
+            7.5,
+            5.7
+          ]
+        },
+        "paint": {
+          "min": 34.5,
+          "max": 46.4,
+          "median": 39.5,
+          "mean": 39.85333333333333,
+          "stddev": 3.651196803137034,
+          "values": [
+            36.4,
+            34.5,
+            43.2,
+            39.5,
+            43.9,
+            46.4,
+            44.5,
+            35.2,
+            37.8,
+            37.3,
+            42.2,
+            36.3,
+            41.6,
+            39.7,
+            39.3
+          ]
+        }
+      }
+    },
+    {
+      "framework": "svelte-v5.42.1-keyed",
+      "keyed": true,
+      "benchmark": "02_replace1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 43.7,
+          "max": 56.3,
+          "median": 48.3,
+          "mean": 48.166666666666664,
+          "stddev": 2.9757752091241856,
+          "values": [
+            56.3,
+            48.5,
+            46,
+            45.9,
+            43.7,
+            48.7,
+            47.9,
+            50,
+            46.9,
+            49.9,
+            45,
+            50.7,
+            48.3,
+            46.4,
+            48.3
+          ]
+        },
+        "script": {
+          "min": 8.9,
+          "max": 12.7,
+          "median": 10.3,
+          "mean": 10.266666666666664,
+          "stddev": 1.1146214390459892,
+          "values": [
+            11.5,
+            9.3,
+            12.7,
+            10.3,
+            8.9,
+            11.4,
+            9,
+            10.5,
+            8.9,
+            11.2,
+            9.9,
+            10.7,
+            9.2,
+            10.3,
+            10.2
+          ]
+        },
+        "paint": {
+          "min": 32.6,
+          "max": 43.7,
+          "median": 37.2,
+          "mean": 36.77333333333333,
+          "stddev": 2.75537569817534,
+          "values": [
+            43.7,
+            37.9,
+            32.6,
+            34.5,
+            33.5,
+            36.5,
+            37.7,
+            38.5,
+            36.9,
+            37.9,
+            33.6,
+            38.7,
+            37.6,
+            34.8,
+            37.2
+          ]
+        }
+      }
+    },
+    {
+      "framework": "svelte-v5.42.1-keyed",
+      "keyed": true,
+      "benchmark": "03_update10th1k_x16",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 34.9,
+          "max": 131,
+          "median": 39.2,
+          "mean": 48.88666666666667,
+          "stddev": 24.972867180964528,
+          "values": [
+            40.6,
+            44.3,
+            75.2,
+            43.7,
+            38.3,
+            49.6,
+            37.1,
+            35.6,
+            35.5,
+            34.9,
+            36.1,
+            131,
+            53.3,
+            38.9,
+            39.2
+          ]
+        },
+        "script": {
+          "min": 3.5,
+          "max": 8.1,
+          "median": 4.2,
+          "mean": 4.739999999999999,
+          "stddev": 1.3684193175234807,
+          "values": [
+            3.5,
+            4.3,
+            8.1,
+            5,
+            4.2,
+            5,
+            4,
+            3.5,
+            3.9,
+            4.6,
+            5.9,
+            3.8,
+            3.8,
+            7.3,
+            4.2
+          ]
+        },
+        "paint": {
+          "min": 26.3,
+          "max": 42.9,
+          "median": 31.8,
+          "mean": 32.43333333333333,
+          "stddev": 4.660880766959129,
+          "values": [
+            33.3,
+            35.8,
+            34.9,
+            34.2,
+            30.6,
+            39.5,
+            30.3,
+            29,
+            28.6,
+            27.8,
+            26.3,
+            34.2,
+            42.9,
+            27.3,
+            31.8
+          ]
+        }
+      }
+    },
+    {
+      "framework": "svelte-v5.42.1-keyed",
+      "keyed": true,
+      "benchmark": "04_select1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 12.7,
+          "max": 44.1,
+          "median": 21.4,
+          "mean": 24.1,
+          "stddev": 9.22031272065469,
+          "values": [
+            16.5,
+            19.9,
+            22.6,
+            22.2,
+            19.8,
+            44.1,
+            20.4,
+            16.4,
+            17,
+            15.9,
+            26.4,
+            27,
+            19.6,
+            27.4,
+            23,
+            21.4,
+            43.2,
+            43.5,
+            15,
+            20.2,
+            16.4,
+            23.2,
+            29,
+            12.7,
+            39.7
+          ]
+        },
+        "script": {
+          "min": 4.8,
+          "max": 13.5,
+          "median": 7,
+          "mean": 7.908,
+          "stddev": 2.6806280358652272,
+          "values": [
+            5.3,
+            7,
+            9.6,
+            6.9,
+            8.4,
+            11.3,
+            6.3,
+            5.3,
+            6.7,
+            5.6,
+            10.1,
+            6.2,
+            8.7,
+            13.5,
+            8.1,
+            7.9,
+            12.9,
+            11.1,
+            5.1,
+            6.6,
+            5.2,
+            4.8,
+            7.4,
+            5,
+            12.7
+          ]
+        },
+        "paint": {
+          "min": 6.2,
+          "max": 26.3,
+          "median": 10.1,
+          "mean": 12.204,
+          "stddev": 5.737993261294985,
+          "values": [
+            9,
+            10.1,
+            9.4,
+            11.5,
+            7.9,
+            26.3,
+            8.9,
+            8.1,
+            6.7,
+            7.3,
+            12.3,
+            15.1,
+            7.4,
+            10.6,
+            11.6,
+            9.1,
+            24.7,
+            23.4,
+            8.6,
+            10.5,
+            9.4,
+            16.2,
+            14.9,
+            6.2,
+            19.9
+          ]
+        }
+      }
+    },
+    {
+      "framework": "svelte-v5.42.1-keyed",
+      "keyed": true,
+      "benchmark": "05_swap1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 38,
+          "max": 97.3,
+          "median": 56.7,
+          "mean": 59.493333333333325,
+          "stddev": 18.139202481549916,
+          "values": [
+            74.9,
+            43.7,
+            49.4,
+            44.2,
+            86.9,
+            97.3,
+            38,
+            42.1,
+            59.5,
+            70.6,
+            56.7,
+            71.2,
+            40,
+            68.7,
+            49.2
+          ]
+        },
+        "script": {
+          "min": 3.2,
+          "max": 11.8,
+          "median": 5.1,
+          "mean": 6.58,
+          "stddev": 2.724806677283992,
+          "values": [
+            9.2,
+            4.1,
+            4.8,
+            8.1,
+            8.6,
+            10,
+            3.5,
+            3.2,
+            5.1,
+            11.8,
+            5.7,
+            5.1,
+            4.9,
+            9.8,
+            4.8
+          ]
+        },
+        "paint": {
+          "min": 31.7,
+          "max": 74.9,
+          "median": 44.9,
+          "mean": 47.019999999999996,
+          "stddev": 13.506940015097003,
+          "values": [
+            58.9,
+            36.8,
+            38.5,
+            31.7,
+            67.4,
+            74.9,
+            31.9,
+            36,
+            50,
+            51.1,
+            44.9,
+            59,
+            31.8,
+            51.3,
+            41.1
+          ]
+        }
+      }
+    },
+    {
+      "framework": "svelte-v5.42.1-keyed",
+      "keyed": true,
+      "benchmark": "06_remove-one-1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 23.8,
+          "max": 48.6,
+          "median": 27.4,
+          "mean": 30.506666666666668,
+          "stddev": 7.675328440312288,
+          "values": [
+            28.9,
+            24.4,
+            26.1,
+            31.2,
+            29.8,
+            37.4,
+            26.2,
+            24.2,
+            32.6,
+            26.8,
+            23.8,
+            27.4,
+            48.6,
+            45.5,
+            24.7
+          ]
+        },
+        "script": {
+          "min": 1.4,
+          "max": 3.5,
+          "median": 1.6,
+          "mean": 1.94,
+          "stddev": 0.6412042242085256,
+          "values": [
+            2.2,
+            1.4,
+            1.6,
+            1.6,
+            3.5,
+            1.9,
+            1.9,
+            1.6,
+            1.5,
+            1.4,
+            1.5,
+            1.8,
+            3.2,
+            2.4,
+            1.6
+          ]
+        },
+        "paint": {
+          "min": 20.6,
+          "max": 42.2,
+          "median": 23.7,
+          "mean": 26.433333333333334,
+          "stddev": 6.854473686856601,
+          "values": [
+            24.6,
+            21.1,
+            22.7,
+            27.1,
+            24.2,
+            31.8,
+            22.7,
+            20.9,
+            28.9,
+            23.4,
+            20.6,
+            23.7,
+            42.2,
+            40.8,
+            21.8
+          ]
+        }
+      }
+    },
+    {
+      "framework": "svelte-v5.42.1-keyed",
+      "keyed": true,
+      "benchmark": "07_create10k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 470.9,
+          "max": 504.9,
+          "median": 489.3,
+          "mean": 487.6000000000001,
+          "stddev": 9.687473502267911,
+          "values": [
+            504.9,
+            498.1,
+            496.5,
+            470.9,
+            485.5,
+            490.7,
+            491.1,
+            479,
+            473.5,
+            489.3,
+            488.6,
+            473.8,
+            486.7,
+            492.6,
+            492.8
+          ]
+        },
+        "script": {
+          "min": 43.1,
+          "max": 55.6,
+          "median": 46.1,
+          "mean": 46.980000000000004,
+          "stddev": 3.5494868844464187,
+          "values": [
+            48.5,
+            46.2,
+            46.1,
+            43.1,
+            47.2,
+            55.6,
+            45.5,
+            43.1,
+            45.9,
+            47.5,
+            48.5,
+            45.3,
+            53.6,
+            45.1,
+            43.5
+          ]
+        },
+        "paint": {
+          "min": 418.8,
+          "max": 446.7,
+          "median": 429.3,
+          "mean": 430.9866666666667,
+          "stddev": 8.920351263636803,
+          "values": [
+            446.7,
+            441.6,
+            439,
+            419,
+            429.3,
+            425.9,
+            437,
+            426.2,
+            419.2,
+            433.1,
+            428.6,
+            418.8,
+            423.9,
+            436.6,
+            439.9
+          ]
+        }
+      }
+    },
+    {
+      "framework": "svelte-v5.42.1-keyed",
+      "keyed": true,
+      "benchmark": "08_create1k-after1k_x2",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 49.7,
+          "max": 62,
+          "median": 53.3,
+          "mean": 54.77333333333334,
+          "stddev": 4.115209882977098,
+          "values": [
+            52.2,
+            60.1,
+            49.7,
+            51.8,
+            51.6,
+            50.6,
+            55.7,
+            53.8,
+            53.3,
+            59.1,
+            59.6,
+            62,
+            51.2,
+            51.7,
+            59.2
+          ]
+        },
+        "script": {
+          "min": 4.9,
+          "max": 6.9,
+          "median": 5.4,
+          "mean": 5.78,
+          "stddev": 0.6037975062646652,
+          "values": [
+            6.8,
+            5.9,
+            5.4,
+            5.4,
+            6.2,
+            5.3,
+            6.9,
+            6.3,
+            5.3,
+            4.9,
+            5.4,
+            6.4,
+            5.4,
+            5.4,
+            5.7
+          ]
+        },
+        "paint": {
+          "min": 42.3,
+          "max": 52.5,
+          "median": 45.5,
+          "mean": 46.75333333333334,
+          "stddev": 3.8509491718029114,
+          "values": [
+            43.5,
+            52.1,
+            42.3,
+            44.2,
+            43.6,
+            43.5,
+            45.8,
+            45.6,
+            45.5,
+            52.5,
+            51.2,
+            52.5,
+            43.8,
+            44.3,
+            50.9
+          ]
+        }
+      }
+    },
+    {
+      "framework": "svelte-v5.42.1-keyed",
+      "keyed": true,
+      "benchmark": "09_clear1k_x8",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 22.8,
+          "max": 66.3,
+          "median": 32.4,
+          "mean": 35.593333333333334,
+          "stddev": 12.343619905884674,
+          "values": [
+            56.4,
+            32.1,
+            24.6,
+            43.2,
+            26.8,
+            66.3,
+            22.8,
+            27.3,
+            40.6,
+            32.4,
+            27.8,
+            24,
+            33.4,
+            36,
+            40.2
+          ]
+        },
+        "script": {
+          "min": 16.9,
+          "max": 51.5,
+          "median": 21.6,
+          "mean": 26.72666666666667,
+          "stddev": 10.765916235088975,
+          "values": [
+            48.8,
+            22.4,
+            18.9,
+            32.6,
+            20.3,
+            51.5,
+            16.9,
+            21,
+            29.9,
+            24.6,
+            21.6,
+            19,
+            21.4,
+            18.7,
+            33.3
+          ]
+        },
+        "paint": {
+          "min": 2.9,
+          "max": 7.2,
+          "median": 4,
+          "mean": 4.48,
+          "stddev": 1.2874115781010251,
+          "values": [
+            4.3,
+            6.2,
+            3.8,
+            5.1,
+            4,
+            7.2,
+            3.6,
+            3.6,
+            5.6,
+            4.1,
+            3.7,
+            2.9,
+            6.2,
+            2.9,
+            4
+          ]
+        }
+      }
+    },
+    {
+      "framework": "svelte-v5.42.1-keyed",
+      "keyed": true,
+      "benchmark": "21_ready-memory",
+      "type": "memory",
+      "values": {
+        "DEFAULT": {
+          "min": 0.6711130142211914,
+          "max": 0.6711130142211914,
+          "median": 0.6711130142211914,
+          "mean": 0.6711130142211914,
+          "stddev": null,
+          "values": [
+            0.6711130142211914
+          ]
+        }
+      }
+    },
+    {
+      "framework": "svelte-v5.42.1-keyed",
+      "keyed": true,
+      "benchmark": "22_run-memory",
+      "type": "memory",
+      "values": {
+        "DEFAULT": {
+          "min": 3.0302886962890625,
+          "max": 3.0302886962890625,
+          "median": 3.0302886962890625,
+          "mean": 3.0302886962890625,
+          "stddev": null,
+          "values": [
+            3.0302886962890625
+          ]
+        }
+      }
+    },
+    {
+      "framework": "svelte-v5.42.1-keyed",
+      "keyed": true,
+      "benchmark": "25_run-clear-memory",
+      "type": "memory",
+      "values": {
+        "DEFAULT": {
+          "min": 0.9491119384765625,
+          "max": 0.9491119384765625,
+          "median": 0.9491119384765625,
+          "mean": 0.9491119384765625,
+          "stddev": null,
+          "values": [
+            0.9491119384765625
+          ]
+        }
+      }
+    },
+    {
+      "framework": "svelte-v5.42.1-keyed",
+      "keyed": true,
+      "benchmark": "41_size-uncompressed",
+      "type": "size",
+      "values": {
+        "DEFAULT": {
+          "min": 26.6,
+          "max": 26.6,
+          "median": 26.6,
+          "mean": 26.6,
+          "stddev": null,
+          "values": [
+            26.6
+          ]
+        }
+      }
+    },
+    {
+      "framework": "svelte-v5.42.1-keyed",
+      "keyed": true,
+      "benchmark": "42_size-compressed",
+      "type": "size",
+      "values": {
+        "DEFAULT": {
+          "min": 9.7,
+          "max": 9.7,
+          "median": 9.7,
+          "mean": 9.7,
+          "stddev": null,
+          "values": [
+            9.7
+          ]
+        }
+      }
+    },
+    {
+      "framework": "svelte-v5.42.1-keyed",
+      "keyed": true,
+      "benchmark": "43_first-paint",
+      "type": "size",
+      "values": {
+        "DEFAULT": {
+          "min": 134.5,
+          "max": 134.5,
+          "median": 134.5,
+          "mean": 134.5,
+          "stddev": null,
+          "values": [
+            134.5
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vanillajs-keyed",
+      "keyed": true,
+      "benchmark": "01_run1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 35.5,
+          "max": 51.4,
+          "median": 41.9,
+          "mean": 41.733333333333334,
+          "stddev": 4.9849296694661405,
+          "values": [
+            37.5,
+            35.5,
+            38.5,
+            37.6,
+            44.6,
+            49,
+            38.2,
+            37.4,
+            41.9,
+            43.3,
+            43.1,
+            51.4,
+            47.1,
+            45,
+            35.9
+          ]
+        },
+        "script": {
+          "min": 2.3,
+          "max": 5.8,
+          "median": 3.1,
+          "mean": 3.5933333333333333,
+          "stddev": 1.0532037292177119,
+          "values": [
+            2.3,
+            2.5,
+            2.8,
+            3,
+            2.9,
+            3.8,
+            3.1,
+            2.9,
+            3.7,
+            3.9,
+            4.8,
+            5.8,
+            4.1,
+            5.4,
+            2.9
+          ]
+        },
+        "paint": {
+          "min": 32.1,
+          "max": 44.1,
+          "median": 37.1,
+          "mean": 37.093333333333334,
+          "stddev": 4.047127140977671,
+          "values": [
+            34.2,
+            32.3,
+            34.4,
+            33.8,
+            40.5,
+            44.1,
+            34.2,
+            33.7,
+            37.3,
+            38.6,
+            37.1,
+            44,
+            41.9,
+            38.2,
+            32.1
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vanillajs-keyed",
+      "keyed": true,
+      "benchmark": "02_replace1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 36.4,
+          "max": 61.9,
+          "median": 44.7,
+          "mean": 45.133333333333326,
+          "stddev": 6.49391656713823,
+          "values": [
+            61.9,
+            39.9,
+            47.8,
+            48.3,
+            36.4,
+            41.8,
+            50.1,
+            38.3,
+            45.7,
+            46.7,
+            39.7,
+            44.7,
+            43.4,
+            40.3,
+            52
+          ]
+        },
+        "script": {
+          "min": 5,
+          "max": 7,
+          "median": 5.5,
+          "mean": 5.680000000000001,
+          "stddev": 0.5583137878597355,
+          "values": [
+            5.1,
+            6.1,
+            7,
+            5.5,
+            5.3,
+            5.3,
+            5.6,
+            5,
+            5.5,
+            5.6,
+            5.3,
+            5.8,
+            6.7,
+            5.9,
+            5.5
+          ]
+        },
+        "paint": {
+          "min": 30.1,
+          "max": 44.9,
+          "median": 37,
+          "mean": 37.07333333333334,
+          "stddev": 4.339596206802568,
+          "values": [
+            37,
+            32.7,
+            39.9,
+            41.3,
+            30.1,
+            35.5,
+            43.6,
+            32.1,
+            38.6,
+            40.2,
+            33.4,
+            37.4,
+            35.7,
+            33.7,
+            44.9
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vanillajs-keyed",
+      "keyed": true,
+      "benchmark": "03_update10th1k_x16",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 29.2,
+          "max": 99.5,
+          "median": 39,
+          "mean": 47.47333333333333,
+          "stddev": 18.426861862380097,
+          "values": [
+            29.2,
+            36.1,
+            38.9,
+            31.3,
+            51.9,
+            56.9,
+            52.2,
+            39,
+            34.1,
+            65.4,
+            32.1,
+            99.5,
+            36.6,
+            47.6,
+            61.3
+          ]
+        },
+        "script": {
+          "min": 1,
+          "max": 3.8,
+          "median": 1.8,
+          "mean": 2.1333333333333333,
+          "stddev": 0.9491851141649773,
+          "values": [
+            1.6,
+            1.8,
+            1.8,
+            1.6,
+            3.8,
+            1,
+            3.4,
+            1.4,
+            1.2,
+            2,
+            1.4,
+            3.4,
+            1.4,
+            3.4,
+            2.8
+          ]
+        },
+        "paint": {
+          "min": 24.6,
+          "max": 57.1,
+          "median": 33.8,
+          "mean": 38.56000000000001,
+          "stddev": 10.817499050810483,
+          "values": [
+            24.6,
+            30.8,
+            33.8,
+            27.5,
+            43.7,
+            49.6,
+            44.1,
+            33.2,
+            29.5,
+            57.1,
+            27.6,
+            53.5,
+            31.5,
+            38.8,
+            53.1
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vanillajs-keyed",
+      "keyed": true,
+      "benchmark": "04_select1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 8.7,
+          "max": 31.9,
+          "median": 18.4,
+          "mean": 17.644000000000002,
+          "stddev": 5.036953444295469,
+          "values": [
+            20.9,
+            19.4,
+            17,
+            18.3,
+            21.1,
+            21.7,
+            31.9,
+            18.4,
+            19.5,
+            11.7,
+            8.7,
+            19,
+            11.7,
+            21.8,
+            11.8,
+            21.6,
+            23.4,
+            15.2,
+            14.3,
+            18.5,
+            11.6,
+            17.1,
+            12.9,
+            13.1,
+            20.5
+          ]
+        },
+        "script": {
+          "min": 0.8,
+          "max": 1.8,
+          "median": 1.4,
+          "mean": 1.3040000000000003,
+          "stddev": 0.3421500645428357,
+          "values": [
+            1.2,
+            1.6,
+            1.6,
+            1.6,
+            1.4,
+            1,
+            0.8,
+            1.6,
+            0.8,
+            1.2,
+            1,
+            1.6,
+            0.8,
+            1.6,
+            1.2,
+            1.8,
+            0.8,
+            0.8,
+            1.4,
+            1.4,
+            1.4,
+            1.8,
+            1,
+            1.6,
+            1.6
+          ]
+        },
+        "paint": {
+          "min": 5.8,
+          "max": 18.2,
+          "median": 10.9,
+          "mean": 12.024,
+          "stddev": 3.989807848338898,
+          "values": [
+            8.9,
+            15.5,
+            13,
+            14.9,
+            17.1,
+            9.8,
+            18.2,
+            14.2,
+            9.8,
+            8.7,
+            6.4,
+            15.1,
+            5.8,
+            18,
+            8.9,
+            17.9,
+            6.5,
+            10.7,
+            10.9,
+            15.5,
+            8.1,
+            12.3,
+            9,
+            8.8,
+            16.6
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vanillajs-keyed",
+      "keyed": true,
+      "benchmark": "05_swap1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 34.9,
+          "max": 64.8,
+          "median": 53.1,
+          "mean": 51.54666666666666,
+          "stddev": 9.731089108527128,
+          "values": [
+            37.3,
+            44.6,
+            54,
+            64.5,
+            37.9,
+            44.8,
+            56.8,
+            53.1,
+            52.9,
+            55.6,
+            51.7,
+            63.3,
+            57,
+            34.9,
+            64.8
+          ]
+        },
+        "script": {
+          "min": 0.6,
+          "max": 2,
+          "median": 0.8,
+          "mean": 0.9733333333333333,
+          "stddev": 0.4527166674117278,
+          "values": [
+            0.8,
+            2,
+            1.2,
+            1.2,
+            0.6,
+            0.8,
+            1.8,
+            1.2,
+            0.8,
+            0.6,
+            0.6,
+            0.6,
+            0.6,
+            0.6,
+            1.2
+          ]
+        },
+        "paint": {
+          "min": 31.6,
+          "max": 59,
+          "median": 48.3,
+          "mean": 46.17333333333333,
+          "stddev": 9.204693419793022,
+          "values": [
+            32.4,
+            38.8,
+            47.8,
+            57.8,
+            32.5,
+            40.4,
+            49.9,
+            48.6,
+            48.3,
+            51.6,
+            46.3,
+            58.1,
+            49.5,
+            31.6,
+            59
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vanillajs-keyed",
+      "keyed": true,
+      "benchmark": "06_remove-one-1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 22.6,
+          "max": 43.3,
+          "median": 26.9,
+          "mean": 29.233333333333334,
+          "stddev": 6.806369565830719,
+          "values": [
+            28.4,
+            23.5,
+            26.9,
+            30.2,
+            43.3,
+            24.6,
+            22.7,
+            31,
+            22.6,
+            33.3,
+            26.4,
+            42.2,
+            22.7,
+            24.8,
+            35.9
+          ]
+        },
+        "script": {
+          "min": 0.8,
+          "max": 1.6,
+          "median": 1.2,
+          "mean": 1.133333333333333,
+          "stddev": 0.198805959477601,
+          "values": [
+            1.2,
+            1.2,
+            1.1,
+            0.9,
+            1.4,
+            1.2,
+            1,
+            1.2,
+            1.2,
+            1.2,
+            1,
+            1.6,
+            1,
+            1,
+            0.8
+          ]
+        },
+        "paint": {
+          "min": 19.6,
+          "max": 38.7,
+          "median": 23.3,
+          "mean": 25.713333333333328,
+          "stddev": 6.2692978265588275,
+          "values": [
+            25.2,
+            20.8,
+            23.3,
+            26,
+            38.7,
+            21.4,
+            20.3,
+            27.5,
+            20.1,
+            28.7,
+            21.7,
+            37.9,
+            19.6,
+            22.1,
+            32.4
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vanillajs-keyed",
+      "keyed": true,
+      "benchmark": "07_create10k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 418,
+          "max": 473.7,
+          "median": 434.7,
+          "mean": 441.51999999999987,
+          "stddev": 17.151268174686088,
+          "values": [
+            456.2,
+            447.7,
+            427.7,
+            434.7,
+            460.7,
+            429.5,
+            418,
+            441.2,
+            432.3,
+            430.1,
+            447.6,
+            473.7,
+            470.2,
+            424.9,
+            428.3
+          ]
+        },
+        "script": {
+          "min": 27.1,
+          "max": 34.2,
+          "median": 30.5,
+          "mean": 30.693333333333328,
+          "stddev": 2.1756662909379756,
+          "values": [
+            29.7,
+            29.6,
+            27.1,
+            30.5,
+            30,
+            28.5,
+            27.6,
+            31.4,
+            30.4,
+            30.9,
+            30.6,
+            34.2,
+            34.1,
+            31.9,
+            33.9
+          ]
+        },
+        "paint": {
+          "min": 379.7,
+          "max": 429,
+          "median": 395.7,
+          "mean": 401.0199999999999,
+          "stddev": 15.800551527444497,
+          "values": [
+            416.5,
+            409.5,
+            390.7,
+            395.7,
+            421,
+            391.7,
+            379.7,
+            398.6,
+            392.8,
+            390.1,
+            406.6,
+            429,
+            424.5,
+            383.7,
+            385.2
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vanillajs-keyed",
+      "keyed": true,
+      "benchmark": "08_create1k-after1k_x2",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 44.6,
+          "max": 62.5,
+          "median": 51.2,
+          "mean": 52.34666666666668,
+          "stddev": 5.292564415785423,
+          "values": [
+            44.6,
+            52.8,
+            49.2,
+            48.7,
+            53.8,
+            53.6,
+            47.6,
+            49.8,
+            46.6,
+            58.6,
+            62.5,
+            49.8,
+            61.7,
+            51.2,
+            54.7
+          ]
+        },
+        "script": {
+          "min": 2.5,
+          "max": 3.4,
+          "median": 2.7,
+          "mean": 2.7866666666666666,
+          "stddev": 0.24455985731416305,
+          "values": [
+            2.9,
+            3.1,
+            2.6,
+            2.5,
+            3.4,
+            2.6,
+            2.7,
+            2.8,
+            2.8,
+            2.9,
+            2.7,
+            2.6,
+            3,
+            2.7,
+            2.5
+          ]
+        },
+        "paint": {
+          "min": 40.1,
+          "max": 58.3,
+          "median": 46.8,
+          "mean": 47.72666666666666,
+          "stddev": 5.1834167808318785,
+          "values": [
+            40.1,
+            47.8,
+            44.5,
+            44.5,
+            48.2,
+            49.2,
+            43.2,
+            44.7,
+            42.4,
+            53.8,
+            58.3,
+            45.7,
+            56.5,
+            46.8,
+            50.2
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vanillajs-keyed",
+      "keyed": true,
+      "benchmark": "09_clear1k_x8",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 23.7,
+          "max": 51.3,
+          "median": 36.9,
+          "mean": 36.38,
+          "stddev": 10.38915643488784,
+          "values": [
+            45.3,
+            25.8,
+            23.7,
+            51.3,
+            25.8,
+            48.8,
+            36.1,
+            24.6,
+            36.9,
+            41.3,
+            27,
+            23.7,
+            41,
+            46.1,
+            48.3
+          ]
+        },
+        "script": {
+          "min": 13.9,
+          "max": 43.2,
+          "median": 28.7,
+          "mean": 26.36,
+          "stddev": 9.933191114354225,
+          "values": [
+            33.2,
+            13.9,
+            15.3,
+            43.2,
+            14.4,
+            35.7,
+            28.7,
+            15.3,
+            28,
+            29.1,
+            20,
+            15.5,
+            33.1,
+            29.9,
+            40.1
+          ]
+        },
+        "paint": {
+          "min": 2.8,
+          "max": 9.1,
+          "median": 4.2,
+          "mean": 4.62,
+          "stddev": 1.6488957343801767,
+          "values": [
+            5.7,
+            3.3,
+            3.2,
+            4.2,
+            3.1,
+            6.7,
+            4.2,
+            3.8,
+            4.8,
+            5.8,
+            4.5,
+            2.8,
+            4,
+            9.1,
+            4.1
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vanillajs-keyed",
+      "keyed": true,
+      "benchmark": "21_ready-memory",
+      "type": "memory",
+      "values": {
+        "DEFAULT": {
+          "min": 0.5541286468505859,
+          "max": 0.5541286468505859,
+          "median": 0.5541286468505859,
+          "mean": 0.5541286468505859,
+          "stddev": null,
+          "values": [
+            0.5541286468505859
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vanillajs-keyed",
+      "keyed": true,
+      "benchmark": "22_run-memory",
+      "type": "memory",
+      "values": {
+        "DEFAULT": {
+          "min": 2.0249671936035156,
+          "max": 2.0249671936035156,
+          "median": 2.0249671936035156,
+          "mean": 2.0249671936035156,
+          "stddev": null,
+          "values": [
+            2.0249671936035156
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vanillajs-keyed",
+      "keyed": true,
+      "benchmark": "25_run-clear-memory",
+      "type": "memory",
+      "values": {
+        "DEFAULT": {
+          "min": 0.653651237487793,
+          "max": 0.653651237487793,
+          "median": 0.653651237487793,
+          "mean": 0.653651237487793,
+          "stddev": null,
+          "values": [
+            0.653651237487793
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vanillajs-keyed",
+      "keyed": true,
+      "benchmark": "41_size-uncompressed",
+      "type": "size",
+      "values": {
+        "DEFAULT": {
+          "min": 11.7,
+          "max": 11.7,
+          "median": 11.7,
+          "mean": 11.7,
+          "stddev": null,
+          "values": [
+            11.7
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vanillajs-keyed",
+      "keyed": true,
+      "benchmark": "42_size-compressed",
+      "type": "size",
+      "values": {
+        "DEFAULT": {
+          "min": 2.5,
+          "max": 2.5,
+          "median": 2.5,
+          "mean": 2.5,
+          "stddev": null,
+          "values": [
+            2.5
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vanillajs-keyed",
+      "keyed": true,
+      "benchmark": "43_first-paint",
+      "type": "size",
+      "values": {
+        "DEFAULT": {
+          "min": 101.1,
+          "max": 101.1,
+          "median": 101.1,
+          "mean": 101.1,
+          "stddev": null,
+          "values": [
+            101.1
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vue-v3.5.39-keyed",
+      "keyed": true,
+      "benchmark": "01_run1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 43.3,
+          "max": 59.2,
+          "median": 46,
+          "mean": 46.86666666666667,
+          "stddev": 3.8136346867272866,
+          "values": [
+            46.5,
+            46.5,
+            48.3,
+            59.2,
+            44.6,
+            45.5,
+            46,
+            44.5,
+            48.2,
+            43.8,
+            48.4,
+            45.9,
+            48.1,
+            43.3,
+            44.2
+          ]
+        },
+        "script": {
+          "min": 7.7,
+          "max": 11.8,
+          "median": 8.5,
+          "mean": 8.893333333333334,
+          "stddev": 1.1208840048733646,
+          "values": [
+            8.9,
+            7.9,
+            10.4,
+            10.3,
+            8.6,
+            8.4,
+            8.3,
+            8.5,
+            11.8,
+            8.2,
+            8.5,
+            9,
+            7.7,
+            9,
+            7.9
+          ]
+        },
+        "paint": {
+          "min": 33.3,
+          "max": 47.4,
+          "median": 36,
+          "mean": 36.78666666666666,
+          "stddev": 3.3284201886752447,
+          "values": [
+            36.2,
+            37.4,
+            37,
+            47.4,
+            34.9,
+            36,
+            36.5,
+            35,
+            35.2,
+            34.5,
+            38.6,
+            35.3,
+            39.3,
+            33.3,
+            35.2
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vue-v3.5.39-keyed",
+      "keyed": true,
+      "benchmark": "02_replace1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 47,
+          "max": 56.7,
+          "median": 51.7,
+          "mean": 51.59333333333334,
+          "stddev": 2.3199343176252296,
+          "values": [
+            47,
+            52.7,
+            51.7,
+            52.8,
+            51.4,
+            50.7,
+            54.7,
+            51.9,
+            50.2,
+            51.5,
+            52.1,
+            56.7,
+            48.5,
+            49.9,
+            52.1
+          ]
+        },
+        "script": {
+          "min": 11.7,
+          "max": 14.9,
+          "median": 13,
+          "mean": 13.113333333333335,
+          "stddev": 1.014091195298013,
+          "values": [
+            12.1,
+            14.8,
+            13,
+            13.2,
+            14,
+            13,
+            13.8,
+            13,
+            12.3,
+            11.7,
+            12.6,
+            14.9,
+            12.3,
+            11.9,
+            14.1
+          ]
+        },
+        "paint": {
+          "min": 34.3,
+          "max": 40.8,
+          "median": 37.2,
+          "mean": 37.339999999999996,
+          "stddev": 1.6269164523284971,
+          "values": [
+            34.3,
+            36.5,
+            37.4,
+            38.7,
+            36.4,
+            36.6,
+            38.9,
+            37.7,
+            37,
+            38.7,
+            38.4,
+            40.8,
+            35,
+            37.2,
+            36.5
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vue-v3.5.39-keyed",
+      "keyed": true,
+      "benchmark": "03_update10th1k_x16",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 38.5,
+          "max": 85.2,
+          "median": 47.4,
+          "mean": 51.50666666666666,
+          "stddev": 14.860035890490531,
+          "values": [
+            68.5,
+            38.9,
+            38.9,
+            39.7,
+            47.4,
+            46.7,
+            48.9,
+            38.5,
+            81,
+            85.2,
+            49.5,
+            50.2,
+            44.7,
+            51.5,
+            43
+          ]
+        },
+        "script": {
+          "min": 5.2,
+          "max": 13.2,
+          "median": 6.3,
+          "mean": 6.993333333333334,
+          "stddev": 2.040821496592091,
+          "values": [
+            13.2,
+            6.2,
+            6.3,
+            6,
+            7.1,
+            5.2,
+            7.5,
+            5.9,
+            9.5,
+            7.9,
+            6.7,
+            6,
+            6.4,
+            5.6,
+            5.4
+          ]
+        },
+        "paint": {
+          "min": 28.3,
+          "max": 65.1,
+          "median": 35.5,
+          "mean": 38.77333333333333,
+          "stddev": 11.853418233131057,
+          "values": [
+            49.6,
+            28.7,
+            28.3,
+            29.5,
+            34.4,
+            37.3,
+            35.5,
+            28.5,
+            65.1,
+            64.3,
+            37.4,
+            39.7,
+            33.6,
+            37.1,
+            32.6
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vue-v3.5.39-keyed",
+      "keyed": true,
+      "benchmark": "04_select1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 10.1,
+          "max": 27.2,
+          "median": 15.5,
+          "mean": 16.839999999999996,
+          "stddev": 4.681434965193187,
+          "values": [
+            14.3,
+            15.7,
+            14.8,
+            11.9,
+            15.5,
+            16.7,
+            13.3,
+            20.2,
+            25.2,
+            10.1,
+            14.2,
+            21.4,
+            22.8,
+            19.6,
+            18,
+            14.7,
+            13.8,
+            27.2,
+            12.8,
+            20.6,
+            24.2,
+            11.1,
+            12.5,
+            12.6,
+            17.8
+          ]
+        },
+        "script": {
+          "min": 2,
+          "max": 6.3,
+          "median": 3.8,
+          "mean": 3.9279999999999995,
+          "stddev": 1.1286127177498342,
+          "values": [
+            4.4,
+            3.6,
+            3.1,
+            4.5,
+            4.2,
+            3.8,
+            3.2,
+            6.1,
+            6.3,
+            2.8,
+            5.7,
+            4.3,
+            4.4,
+            3.4,
+            3.8,
+            4.2,
+            3.3,
+            5.3,
+            5.1,
+            3.4,
+            3.2,
+            2,
+            2.2,
+            3.1,
+            2.8
+          ]
+        },
+        "paint": {
+          "min": 5.6,
+          "max": 18.8,
+          "median": 9.5,
+          "mean": 10.364000000000003,
+          "stddev": 3.6050751263554366,
+          "values": [
+            8.1,
+            10.2,
+            10.4,
+            5.6,
+            9.5,
+            11.3,
+            8.3,
+            10.3,
+            13.8,
+            6.4,
+            7.1,
+            14.6,
+            15.3,
+            13.9,
+            12.3,
+            8.7,
+            7.1,
+            16.9,
+            5.6,
+            12.9,
+            18.8,
+            8,
+            8.9,
+            8.4,
+            6.7
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vue-v3.5.39-keyed",
+      "keyed": true,
+      "benchmark": "05_swap1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 39.8,
+          "max": 74.2,
+          "median": 51,
+          "mean": 52.940000000000005,
+          "stddev": 9.622057991926678,
+          "values": [
+            49.5,
+            51,
+            61.3,
+            52.2,
+            52.4,
+            48.6,
+            52.9,
+            46.8,
+            39.8,
+            46.1,
+            40.9,
+            74.2,
+            66.2,
+            47.7,
+            64.5
+          ]
+        },
+        "script": {
+          "min": 2.8,
+          "max": 8.1,
+          "median": 4.8,
+          "mean": 4.9866666666666655,
+          "stddev": 1.4826938161269008,
+          "values": [
+            4,
+            5.6,
+            8.1,
+            6.5,
+            5.4,
+            2.8,
+            3.1,
+            4.7,
+            4,
+            4.7,
+            5,
+            4.8,
+            7.5,
+            3.8,
+            4.8
+          ]
+        },
+        "paint": {
+          "min": 32.8,
+          "max": 63.4,
+          "median": 40.4,
+          "mean": 42.74666666666666,
+          "stddev": 8.084806444071202,
+          "values": [
+            40.4,
+            38.5,
+            47.2,
+            42,
+            40,
+            38.9,
+            43.8,
+            37.7,
+            32.9,
+            38.4,
+            32.8,
+            63.4,
+            50.9,
+            41,
+            53.3
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vue-v3.5.39-keyed",
+      "keyed": true,
+      "benchmark": "06_remove-one-1k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 30.1,
+          "max": 62.1,
+          "median": 38.7,
+          "mean": 41.61333333333333,
+          "stddev": 10.480517071940588,
+          "values": [
+            54.2,
+            62.1,
+            32.5,
+            40.4,
+            38.1,
+            33.3,
+            38.1,
+            38.7,
+            30.1,
+            43.4,
+            31.1,
+            38.8,
+            49.3,
+            32.9,
+            61.2
+          ]
+        },
+        "script": {
+          "min": 4.9,
+          "max": 10.6,
+          "median": 5.8,
+          "mean": 6.646666666666666,
+          "stddev": 1.7795933189783504,
+          "values": [
+            10.6,
+            8.7,
+            5.8,
+            5.6,
+            6.3,
+            5.1,
+            5.6,
+            5.1,
+            4.9,
+            6.6,
+            5.6,
+            5.5,
+            9.1,
+            6.3,
+            8.9
+          ]
+        },
+        "paint": {
+          "min": 23.3,
+          "max": 48.2,
+          "median": 29.2,
+          "mean": 31.586666666666662,
+          "stddev": 8.178531711278067,
+          "values": [
+            40,
+            48.2,
+            24.3,
+            31.1,
+            28.8,
+            25.5,
+            29.2,
+            30.6,
+            23.4,
+            33.5,
+            23.3,
+            28.9,
+            35.2,
+            23.9,
+            47.9
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vue-v3.5.39-keyed",
+      "keyed": true,
+      "benchmark": "07_create10k",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 516.5,
+          "max": 561.4,
+          "median": 534.8,
+          "mean": 535.8,
+          "stddev": 11.223317564020762,
+          "values": [
+            516.5,
+            538.5,
+            529.5,
+            561.4,
+            534.8,
+            537.8,
+            538.4,
+            531.8,
+            530.5,
+            521.7,
+            527.3,
+            539.9,
+            532.6,
+            544.3,
+            552
+          ]
+        },
+        "script": {
+          "min": 75.3,
+          "max": 91.8,
+          "median": 81.2,
+          "mean": 81.9,
+          "stddev": 5.654959896283212,
+          "values": [
+            75.3,
+            91.7,
+            82,
+            91.8,
+            81.2,
+            82,
+            79.1,
+            76.6,
+            77.7,
+            80.5,
+            82.8,
+            75.7,
+            84.5,
+            90.9,
+            76.7
+          ]
+        },
+        "paint": {
+          "min": 429.9,
+          "max": 466.1,
+          "median": 443.6,
+          "mean": 443.85333333333335,
+          "stddev": 9.79539736426295,
+          "values": [
+            431.3,
+            437.5,
+            438.1,
+            458.8,
+            444.4,
+            446.4,
+            447.7,
+            443.3,
+            443.6,
+            429.9,
+            435.6,
+            452.7,
+            438.3,
+            444.1,
+            466.1
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vue-v3.5.39-keyed",
+      "keyed": true,
+      "benchmark": "08_create1k-after1k_x2",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 52.7,
+          "max": 68,
+          "median": 58.7,
+          "mean": 58.54666666666665,
+          "stddev": 3.7982828200322807,
+          "values": [
+            53.7,
+            59.8,
+            59.1,
+            56.5,
+            57.7,
+            58.7,
+            52.7,
+            58.5,
+            68,
+            62.8,
+            56.6,
+            59.8,
+            61.1,
+            58.9,
+            54.3
+          ]
+        },
+        "script": {
+          "min": 7.9,
+          "max": 10.3,
+          "median": 9,
+          "mean": 9.026666666666667,
+          "stddev": 0.7959420893028647,
+          "values": [
+            8.6,
+            10.1,
+            8.9,
+            8,
+            9.2,
+            9.2,
+            8.1,
+            8.8,
+            9,
+            9.4,
+            8.1,
+            9.7,
+            10.3,
+            10.1,
+            7.9
+          ]
+        },
+        "paint": {
+          "min": 42.9,
+          "max": 56.2,
+          "median": 47.3,
+          "mean": 47.34666666666668,
+          "stddev": 3.1910290921059734,
+          "values": [
+            43.4,
+            47.3,
+            47.4,
+            46.6,
+            46.6,
+            47.7,
+            42.9,
+            47.5,
+            56.2,
+            51,
+            46,
+            47.7,
+            49.1,
+            46.3,
+            44.5
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vue-v3.5.39-keyed",
+      "keyed": true,
+      "benchmark": "09_clear1k_x8",
+      "type": "cpu",
+      "values": {
+        "total": {
+          "min": 27.8,
+          "max": 72.2,
+          "median": 38.9,
+          "mean": 42.94666666666667,
+          "stddev": 13.518023242358787,
+          "values": [
+            68.5,
+            72.2,
+            31.1,
+            33.5,
+            29.8,
+            27.8,
+            39.2,
+            34.8,
+            33.5,
+            52.3,
+            37.9,
+            48.8,
+            43.8,
+            38.9,
+            52.1
+          ]
+        },
+        "script": {
+          "min": 22.6,
+          "max": 62.5,
+          "median": 30.2,
+          "mean": 34.760000000000005,
+          "stddev": 11.764462224367565,
+          "values": [
+            56.5,
+            62.5,
+            25.2,
+            28.1,
+            24.3,
+            22.6,
+            29.5,
+            26.9,
+            27.3,
+            44.1,
+            30.2,
+            36,
+            37.5,
+            30.9,
+            39.8
+          ]
+        },
+        "paint": {
+          "min": 2.9,
+          "max": 8.1,
+          "median": 4.7,
+          "mean": 4.653333333333333,
+          "stddev": 1.5352369136235557,
+          "values": [
+            6.3,
+            6.3,
+            3.2,
+            3.6,
+            2.9,
+            3,
+            5.6,
+            3.5,
+            3.5,
+            5.1,
+            4.8,
+            5.8,
+            3.4,
+            4.7,
+            8.1
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vue-v3.5.39-keyed",
+      "keyed": true,
+      "benchmark": "21_ready-memory",
+      "type": "memory",
+      "values": {
+        "DEFAULT": {
+          "min": 0.8702278137207031,
+          "max": 0.8702278137207031,
+          "median": 0.8702278137207031,
+          "mean": 0.8702278137207031,
+          "stddev": null,
+          "values": [
+            0.8702278137207031
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vue-v3.5.39-keyed",
+      "keyed": true,
+      "benchmark": "22_run-memory",
+      "type": "memory",
+      "values": {
+        "DEFAULT": {
+          "min": 4.069190979003906,
+          "max": 4.069190979003906,
+          "median": 4.069190979003906,
+          "mean": 4.069190979003906,
+          "stddev": null,
+          "values": [
+            4.069190979003906
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vue-v3.5.39-keyed",
+      "keyed": true,
+      "benchmark": "25_run-clear-memory",
+      "type": "memory",
+      "values": {
+        "DEFAULT": {
+          "min": 1.195399284362793,
+          "max": 1.195399284362793,
+          "median": 1.195399284362793,
+          "mean": 1.195399284362793,
+          "stddev": null,
+          "values": [
+            1.195399284362793
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vue-v3.5.39-keyed",
+      "keyed": true,
+      "benchmark": "41_size-uncompressed",
+      "type": "size",
+      "values": {
+        "DEFAULT": {
+          "min": 64.3,
+          "max": 64.3,
+          "median": 64.3,
+          "mean": 64.3,
+          "stddev": null,
+          "values": [
+            64.3
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vue-v3.5.39-keyed",
+      "keyed": true,
+      "benchmark": "42_size-compressed",
+      "type": "size",
+      "values": {
+        "DEFAULT": {
+          "min": 23.3,
+          "max": 23.3,
+          "median": 23.3,
+          "mean": 23.3,
+          "stddev": null,
+          "values": [
+            23.3
+          ]
+        }
+      }
+    },
+    {
+      "framework": "vue-v3.5.39-keyed",
+      "keyed": true,
+      "benchmark": "43_first-paint",
+      "type": "size",
+      "values": {
+        "DEFAULT": {
+          "min": 128.1,
+          "max": 128.1,
+          "median": 128.1,
+          "mean": 128.1,
+          "stddev": null,
+          "values": [
+            128.1
+          ]
+        }
+      }
+    }
+  ]
+}

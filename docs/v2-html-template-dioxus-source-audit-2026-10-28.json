@@ -1,0 +1,130 @@
+{
+  "date": "2026-10-28",
+  "versions": "Dioxus 0.7.10 published registry sources; same version as benchmark",
+  "files": {
+    "rsx_tag_classification": {
+      "path": "D:\\BuildCache\\glory-semantic-ui\\cargo\\registry\\src\\index.crates.io-1949cf8c6b5b557f\\dioxus-rsx-0.7.10\\src\\node.rs",
+      "sha256": "e41b6d256f0a2d1d000efee116549a4d1f47e92b9c791b25000714e59c82519a",
+      "package_vcs": {
+        "git": {
+          "sha1": "57d6794ad60b949e5bd8aa282f6f8c3dc97a365e"
+        },
+        "path_in_vcs": "packages/rsx"
+      }
+    },
+    "rsx_static_template_output": {
+      "path": "D:\\BuildCache\\glory-semantic-ui\\cargo\\registry\\src\\index.crates.io-1949cf8c6b5b557f\\dioxus-rsx-0.7.10\\src\\template_body.rs",
+      "sha256": "72b2b7f82bf850ffaf775a4f37750222ed2b44efd47c7681664fa6630f9caec2",
+      "package_vcs": {
+        "git": {
+          "sha1": "57d6794ad60b949e5bd8aa282f6f8c3dc97a365e"
+        },
+        "path_in_vcs": "packages/rsx"
+      }
+    },
+    "rsx_html_element_output": {
+      "path": "D:\\BuildCache\\glory-semantic-ui\\cargo\\registry\\src\\index.crates.io-1949cf8c6b5b557f\\dioxus-rsx-0.7.10\\src\\element.rs",
+      "sha256": "c68c67ee781c742eb7e5a0e56458327641a746cd790618270f345f6a03d64a28",
+      "package_vcs": {
+        "git": {
+          "sha1": "57d6794ad60b949e5bd8aa282f6f8c3dc97a365e"
+        },
+        "path_in_vcs": "packages/rsx"
+      }
+    },
+    "rsx_component_output": {
+      "path": "D:\\BuildCache\\glory-semantic-ui\\cargo\\registry\\src\\index.crates.io-1949cf8c6b5b557f\\dioxus-rsx-0.7.10\\src\\component.rs",
+      "sha256": "ea29a3757c05ea5e4e714c09538ce18a85f6aa5da594124544596160f74d62df",
+      "package_vcs": {
+        "git": {
+          "sha1": "57d6794ad60b949e5bd8aa282f6f8c3dc97a365e"
+        },
+        "path_in_vcs": "packages/rsx"
+      }
+    },
+    "template_and_mount_records": {
+      "path": "D:\\BuildCache\\glory-semantic-ui\\cargo\\registry\\src\\index.crates.io-1949cf8c6b5b557f\\dioxus-core-0.7.10\\src\\nodes.rs",
+      "sha256": "085e14f69a24c79e3bf8b4cf39c24e78dfbd8ecbb1868d2a4ec668f5fc6a3527",
+      "package_vcs": {
+        "git": {
+          "sha1": "57d6794ad60b949e5bd8aa282f6f8c3dc97a365e",
+          "dirty": true
+        },
+        "path_in_vcs": "packages/core"
+      }
+    },
+    "template_instantiation_and_diff": {
+      "path": "D:\\BuildCache\\glory-semantic-ui\\cargo\\registry\\src\\index.crates.io-1949cf8c6b5b557f\\dioxus-core-0.7.10\\src\\diff\\node.rs",
+      "sha256": "562b37a54c951681bf68c7e1f2094f6bee896bea22f11850885b71f7dd4ac19b",
+      "package_vcs": {
+        "git": {
+          "sha1": "57d6794ad60b949e5bd8aa282f6f8c3dc97a365e",
+          "dirty": true
+        },
+        "path_in_vcs": "packages/core"
+      }
+    },
+    "component_scope_allocation": {
+      "path": "D:\\BuildCache\\glory-semantic-ui\\cargo\\registry\\src\\index.crates.io-1949cf8c6b5b557f\\dioxus-core-0.7.10\\src\\diff\\component.rs",
+      "sha256": "65ad4d06fbed970572f04426ceb903e52690a87fb9256a073875bfb23e0cb2d9",
+      "package_vcs": {
+        "git": {
+          "sha1": "57d6794ad60b949e5bd8aa282f6f8c3dc97a365e",
+          "dirty": true
+        },
+        "path_in_vcs": "packages/core"
+      }
+    },
+    "web_template_and_mutations": {
+      "path": "D:\\BuildCache\\glory-semantic-ui\\cargo\\registry\\src\\index.crates.io-1949cf8c6b5b557f\\dioxus-web-0.7.10\\src\\mutations.rs",
+      "sha256": "bf1ac323556ee881c29978f0905f1723459323512af682b65345f36a70e71504",
+      "package_vcs": {
+        "git": {
+          "sha1": "57d6794ad60b949e5bd8aa282f6f8c3dc97a365e",
+          "dirty": true
+        },
+        "path_in_vcs": "packages/web"
+      }
+    },
+    "js_template_clone_and_targets": {
+      "path": "D:\\BuildCache\\glory-semantic-ui\\cargo\\registry\\src\\index.crates.io-1949cf8c6b5b557f\\dioxus-interpreter-js-0.7.10\\src\\unified_bindings.rs",
+      "sha256": "7e1e39643152a294e8faddb3618ae936cd17da21dfff8d244676d01aab6a14ce",
+      "package_vcs": {
+        "git": {
+          "sha1": "57d6794ad60b949e5bd8aa282f6f8c3dc97a365e"
+        },
+        "path_in_vcs": "packages/interpreter"
+      }
+    },
+    "native_webview_mutation_channel": {
+      "path": "D:\\BuildCache\\glory-semantic-ui\\cargo\\registry\\src\\index.crates.io-1949cf8c6b5b557f\\dioxus-interpreter-js-0.7.10\\src\\write_native_mutations.rs",
+      "sha256": "4a2a27cbed22887e312c97e607349e27dbf79f00d73bd32118f5224e0155bc20",
+      "package_vcs": {
+        "git": {
+          "sha1": "57d6794ad60b949e5bd8aa282f6f8c3dc97a365e"
+        },
+        "path_in_vcs": "packages/interpreter"
+      }
+    }
+  },
+  "glory_existing_benchmark_stats": {
+    "evidence": "D:\\BuildCache\\glory-v2-host-cost-20261028\\final\\evidence.json",
+    "sha256": "e79ad1a5e1f6cb8bf7c20890953b6ce56272cbb4b447d0842bffffc92f5e3004",
+    "census": {
+      "before": {
+        "rows": 10000,
+        "labels": 10000,
+        "nodes": 80010,
+        "graph": 40003,
+        "owners": 10013
+      },
+      "candidate4": {
+        "rows": 10000,
+        "labels": 10000,
+        "nodes": 80010,
+        "graph": 40003,
+        "owners": 10013
+      }
+    }
+  }
+}

@@ -24,6 +24,7 @@ async (hostPage) => {
       }
     });
     await page.goto('http://127.0.0.1:8788/plans.html');
+    await page.bringToFront();
     await page.waitForFunction(() => window.ready);
     const initial = await page.evaluate(() => {
       demo.submission_probe(0);
@@ -68,9 +69,13 @@ async (hostPage) => {
     // remain eligible for the host retirement segment.
     assert(retired.rows === 0 && retired.runs >= 1, 'full Plan retirement did not run');
     assert(retired.value === 'native🙂draft' && retired.start === 2 && retired.end === 5 && retired.direction === 'backward' && retired.focused, 'batch work rewrote editing state');
+    // Blink's old layout fragments can retain detached rows until its next
+    // rendering lifecycle. Check bank ownership after that lifecycle settles.
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     const cdp = await page.context().newCDPSession(page);
     for (let i = 0; i < 4; i++) { await cdp.send('HeapProfiler.collectGarbage'); await page.evaluate(() => new Promise(resolve => setTimeout(resolve, 0))); }
-    assert(await page.evaluate(() => retiredSubmissionRows.every(ref => !ref.deref()) && !retiredSubmissionText.deref()), 'shared bank retained retired nodes');
+    const released = await page.evaluate(() => ({ rows: retiredSubmissionRows.map(ref => !!ref.deref()), text: !!retiredSubmissionText.deref() }));
+    assert(released.rows.every(alive => !alive) && !released.text, 'shared bank retained retired nodes: ' + JSON.stringify(released));
     await page.evaluate(() => { demo.submission_probe(9); demo.submission_probe(0); demo.submission_probe(1); });
     const fault = await page.evaluate(() => {
       const original = Element.prototype.setAttribute;
@@ -95,7 +100,36 @@ async (hostPage) => {
       return clean;
     });
     assert(focusedRetirement, 'focused Plan retirement must use the native loss barrier');
+    const segments = await page.evaluate(() => {
+      demo.submission_probe(0);
+      submissionRuns = 0;
+      demo.submission_probe(6);
+      const createdRuns = submissionRuns, rows = [...document.querySelectorAll('.submit-row')];
+      const descendants = rows.map(row => [row, ...row.querySelectorAll('*'), ...[...row.querySelectorAll('*')].flatMap(element => [...element.childNodes].filter(node => node.nodeType === 3))]);
+      submissionRuns = 0;
+      demo.submission_probe(7);
+      const current = [...document.querySelectorAll('.submit-row')];
+      return { createdRuns, fieldRuns: submissionRuns, count: current.length,
+        preserved: rows.every((row, i) => row === current[i] && row.textContent === `changed🙂 ${i}press` && descendants[i].every(node => node.isConnected)) };
+    });
+    assert(segments.count === 600 && segments.createdRuns > 1 && segments.fieldRuns > 1 && segments.preserved, 'segment buffers reused live banks or lost field-only targets');
+    const segmentFault = await page.evaluate(() => {
+      const original = Element.prototype.setAttribute;
+      let injected = 0;
+      Element.prototype.setAttribute = function(name, value) {
+        if (name === 'class' && value.includes('throw-here')) { injected++; throw Error('segment injected fault'); }
+        return original.call(this, name, value);
+      };
+      let faulted;
+      try { faulted = demo.submission_probe(8); } finally { Element.prototype.setAttribute = original; }
+      const rows = [...document.querySelectorAll('.submit-row')];
+      return { injected, faulted, count: rows.length, prefix: rows.slice(0, 300).every(row => row.textContent === 'segment prefix🙂press'),
+        untouched: rows[300].textContent === 'changed🙂 300press', appended: rows.at(-1).textContent };
+    });
+    assert(segmentFault.injected === 1 && segmentFault.faulted === 1 && segmentFault.count === 601 && segmentFault.prefix && segmentFault.untouched && segmentFault.appended === 'accepted new instance🙂press', 'cross-segment host failure lost accepted creations or executed the suffix');
+    await page.evaluate(() => demo.submission_probe(9));
+    assert(await page.evaluate(() => document.getElementById('app').childNodes.length === 0), 'cross-segment fault cleanup retained nodes');
     assert(errors.length === 0, errors.join('\n'));
-    return { initial, growth, retired, fault, focusedRetirement, errors };
+    return { initial, growth, retired, fault, focusedRetirement, segments, segmentFault, errors };
   } finally { await page.close(); }
 }

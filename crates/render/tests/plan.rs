@@ -2,6 +2,38 @@ use glory_render::{
     memory::{Memory, Subtree},
     *,
 };
+#[test]
+fn submission_checks_shared_declaration_without_admitting_controls_or_semantics() {
+    let mut memory = Memory::new(RuntimeId::new());
+    let batch = memory.submission().unwrap();
+    for (props, expected) in [
+        (Props::View, true),
+        (Props::Text(Default::default()), true),
+        (Props::Button(Default::default()), true),
+        (Props::Input(Default::default()), false),
+        (Props::Group, false),
+    ] {
+        let plan = Plan::new(vec![node(None, props)]).unwrap();
+        for declaration in [plan.clone(), plan] {
+            assert_eq!(
+                batch.supports(&Mutation::CreatePlan {
+                    plan: declaration,
+                    ids: vec![]
+                }),
+                expected
+            );
+        }
+    }
+    let mut descriptor = Descriptor::new(Props::View);
+    descriptor.semantics = Some(Default::default());
+    let plan = Plan::new(vec![PlanNode {
+        parent: None,
+        descriptor,
+    }])
+    .unwrap();
+    assert!(!batch.supports(&Mutation::CreatePlan { plan, ids: vec![] }));
+}
+
 fn node(parent: Option<usize>, props: Props) -> PlanNode {
     PlanNode {
         parent,

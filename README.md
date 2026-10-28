@@ -33,6 +33,12 @@ limited to Salvo.
 
 ## Available now
 
+- The opt-in [XML display API](docs/v2-display-keyed-content-guide-2026-10-28.md)
+  extracts shared HTML templates and binds Cage/Bond/Vary fields. Raw HTML
+  elements need no semantic Widget object. Handwritten configurations use the
+  same runtime; `Each`, `Show`, content ranges, component children and optional
+  `#[component]` cover ordinary browser composition. See the
+  [counter/list example](examples/display-web/src/bin/counter.rs).
 - `glory-style`: explicit portable style values, separate from CSS engines.
   Ordered `Family` fallbacks, fractional font weights, `WhiteSpace`, border
   width/style/color, uniform `radius` and group `opacity` use the same mapping
@@ -44,7 +50,7 @@ limited to Salvo.
 - `glory-render`: eight semantic node kinds, typed properties/events/queries,
   generational node identities and a reference interpreter. Focus queries read
   actual control focus at acceptance; focus requests alone do not imply success.
-- `glory-core`: owned Cage/Bond/Lotus, direct dependency tracking, equality
+- `glory-core`: owned Cage/Bond/Vary, direct dependency tracking, equality
   gates, bindings/effects, per-Runtime scheduling, logical scopes and tasks.
 - `glory-resource`: optional request-scoped named resource registry and
   versioned JSON snapshots with explicit schemas and bounded input.

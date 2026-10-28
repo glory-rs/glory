@@ -1,6 +1,6 @@
 # 手写 Rust 静态构造计划与创建/替换优化
 
-本轮实现显式、不可变的静态语义构造计划，沿用普通 Rust builders、Cage/Bond/Lotus 和有限语义节点。计划编译发生在应用声明阶段；行数据、事件捕获、受控编辑状态和 generational NodeId 在实例化阶段独立创建。
+本轮实现显式、不可变的静态语义构造计划，沿用普通 Rust builders、Cage/Bond/Vary 和有限语义节点。计划编译发生在应用声明阶段；行数据、事件捕获、受控编辑状态和 generational NodeId 在实例化阶段独立创建。
 
 ## API 与使用边界
 

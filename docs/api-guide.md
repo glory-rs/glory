@@ -1,7 +1,7 @@
 # Glory API Guide
 
 The active API uses semantic builders from `glory::prelude`, an application
-`App`, and Owner-scoped `Cage`, `Bond` and `Lotus` handles. The previous HTML
+`App`, and Owner-scoped `Cage`, `Bond` and `Vary` handles. The previous HTML
 builder API, context container and holder lifecycle have been removed.
 
 Start with the [cross-platform counter](../examples/counter/README.md) and its

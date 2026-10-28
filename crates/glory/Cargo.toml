@@ -9,6 +9,7 @@ autotests = false
 
 [features]
 default = []
+dsl = ["web", "dep:glory-view-macros"]
 css = ["glory-style/css", "glory-html?/css", "glory-ssr?/css", "glory-blitz?/css"]
 html = ["dep:glory-html"]
 web = ["html", "dep:glory-web"]
@@ -33,6 +34,7 @@ blitz-android-game-activity = ["blitz-shell", "glory-blitz/android-game-activity
 blitz-accesskit = ["blitz-shell", "glory-blitz/accesskit"]
 
 [dependencies]
+glory-view-macros = { path = "../view-macros", version = "0.3.1", optional = true }
 glory-core = { path = "../core", version = "0.3.1" }
 glory-ui = { path = "../ui", version = "0.3.1" }
 glory-render = { path = "../render", version = "0.3.1" }
@@ -53,6 +55,11 @@ workspace = true
 name = "semantic_html"
 path = "tests/semantic_html.rs"
 required-features = ["ssr"]
+
+[[test]]
+name = "display_dsl"
+path = "tests/display_dsl.rs"
+required-features = ["dsl"]
 
 [[example]]
 name = "semantic_blitz"

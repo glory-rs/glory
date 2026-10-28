@@ -4,6 +4,9 @@ use std::any::TypeId;
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::mem::size_of;
+#[path = "sparse.rs"]
+mod sparse;
+use sparse::SparseMap;
 #[path = "entries.rs"]
 mod entries;
 use entries::{EntryIndex, EntryKey};
@@ -132,14 +135,14 @@ pub(super) struct FieldData {
     layout: Option<Layout>,
     depth: usize,
     projection: Rc<dyn Projection>,
-    children: BTreeMap<Segment, FieldId>,
+    children: SparseMap<Segment, FieldId>,
     // Exactly one alias node per live Owner; owner generations prevent reuse.
-    aliases: BTreeMap<Key, Key>,
+    aliases: SparseMap<Key, Key>,
     _entry: Option<Rc<EntryKey>>,
 }
 #[derive(Default)]
 pub(super) struct Fields {
-    roots: BTreeMap<Key, BTreeMap<Segment, FieldId>>,
+    roots: BTreeMap<Key, SparseMap<Segment, FieldId>>,
     slots: Arena<FieldData>,
     aliases: BTreeMap<Key, FieldId>,
     indices: BTreeMap<Parent, Rc<EntryIndex>>,
@@ -229,7 +232,7 @@ impl Fields {
     pub fn capacity(&self) -> usize {
         self.slots.capacity()
     }
-    fn children(&self, parent: Parent) -> Option<&BTreeMap<Segment, FieldId>> {
+    fn children(&self, parent: Parent) -> Option<&SparseMap<Segment, FieldId>> {
         match parent {
             Parent::Root(root) => self.roots.get(&root),
             Parent::Field(id) => self.slots.get(id.0).map(|f| &f.children),
@@ -239,7 +242,7 @@ impl Fields {
         &self,
         parent: Parent,
         selection: Selection,
-    ) -> Option<std::collections::btree_map::Range<'_, Segment, FieldId>> {
+    ) -> Option<sparse::Range<'_, Segment, FieldId>> {
         use std::ops::Bound::{Excluded, Included};
         let bounds = match selection {
             Selection::Entry(Some(id)) => {
@@ -676,40 +679,111 @@ impl<T> Cage<T> {
             return Err(AccessError::InvalidField("empty field name"));
         }
         let context = Context::new(self.handle.runtime, self.handle.key)?;
-        let selected_offset = {
-            let borrowed = context
-                .path
-                .value
-                .try_borrow()
-                .map_err(|_| AccessError::Borrowed)?;
-            project(|| {
-                let parent = context
-                    .path
-                    .read(borrowed.as_ref())?
-                    .downcast_ref::<T>()
-                    .ok_or(AccessError::TypeMismatch)?;
-                offset(parent, get(parent))
-            })?
-        };
-        let parent = context.path.projection.clone();
-        context.register(
-            Segment::Field(name),
-            Some(Layout {
-                offset: selected_offset,
-                size: size_of::<U>(),
-            }),
-            move || {
-                Rc::new(Map::<T, U, _, _> {
-                    parent,
-                    get,
-                    get_mut,
-                    offset: selected_offset,
-                    types: PhantomData,
-                }) as Rc<dyn Projection>
-            },
-            None,
-        )
+        inline(context, name, get, get_mut)
     }
+}
+
+fn inline<T: 'static, U: 'static>(
+    context: Context,
+    name: Cow<'static, str>,
+    get: impl for<'a> Fn(&'a T) -> &'a U + 'static,
+    get_mut: impl for<'a> Fn(&'a mut T) -> &'a mut U + 'static,
+) -> Result<Cage<U>, AccessError> {
+    if name.is_empty() {
+        return Err(AccessError::InvalidField("empty field name"));
+    }
+    let selected_offset = {
+        let borrowed = context
+            .path
+            .value
+            .try_borrow()
+            .map_err(|_| AccessError::Borrowed)?;
+        project(|| {
+            let parent = context
+                .path
+                .read(borrowed.as_ref())?
+                .downcast_ref::<T>()
+                .ok_or(AccessError::TypeMismatch)?;
+            offset(parent, get(parent))
+        })?
+    };
+    let parent = context.path.projection.clone();
+    context.register(
+        Segment::Field(name),
+        Some(Layout {
+            offset: selected_offset,
+            size: size_of::<U>(),
+        }),
+        move || {
+            Rc::new(Map::<T, U, _, _> {
+                parent,
+                get,
+                get_mut,
+                offset: selected_offset,
+                types: PhantomData,
+            }) as Rc<dyn Projection>
+        },
+        None,
+    )
+}
+struct PathGuard {
+    state: Shared,
+    id: FieldId,
+}
+impl Drop for PathGuard {
+    fn drop(&mut self) {
+        let removed = {
+            let mut graph = self.state.borrow_mut();
+            let mut removed = Vec::new();
+            let mut id = self.id;
+            while let Some(field) = graph.fields.slots.get(id.0) {
+                if !field.aliases.is_empty() || !field.children.is_empty() {
+                    break;
+                }
+                let field = graph.fields.slots.remove(id.0).expect("live path");
+                graph.fields.invalidate_target(field.root);
+                graph.fields.indices.remove(&Parent::Field(id));
+                graph.fields.unlink(field.parent, &field.segment);
+                let parent = field.parent;
+                removed.push(field);
+                match parent {
+                    Parent::Field(next) => id = next,
+                    Parent::Root(_) => break,
+                }
+            }
+            removed
+        };
+        drop(removed);
+    }
+}
+pub(super) fn keyed_field<T: 'static, U: 'static>(
+    source: Cage<Arena<T>>,
+    key: u64,
+    name: impl Into<Cow<'static, str>>,
+    get: impl for<'a> Fn(&'a T) -> &'a U + 'static,
+    get_mut: impl for<'a> Fn(&'a mut T) -> &'a mut U + 'static,
+) -> Result<Cage<U>, AccessError> {
+    let (context, _guard) = entries::keyed_context(source, key)?;
+    inline(context, name.into(), get, get_mut)
+}
+pub(super) fn update_member<T: 'static, R>(
+    source: Cage<Arena<T>>,
+    id: u64,
+    edit: impl FnOnce(&mut T) -> R,
+) -> Result<R, AccessError> {
+    collections::update_member(source, id, edit)
+}
+pub(super) fn append_members<T: 'static, R>(
+    source: Cage<Arena<T>>,
+    edit: impl FnOnce(&mut Arena<T>) -> R,
+) -> Result<R, AccessError> {
+    collections::append_members(source, edit)
+}
+pub(super) fn remove_member<T: 'static>(
+    source: Cage<Arena<T>>,
+    id: u64,
+) -> Result<Option<T>, AccessError> {
+    collections::remove_member(source, id)
 }
 
 struct Context {
@@ -769,6 +843,16 @@ impl Context {
         projection: impl FnOnce() -> Rc<dyn Projection>,
         entry: Option<(Rc<EntryKey>, Rc<EntryIndex>)>,
     ) -> Result<Cage<U>, AccessError> {
+        let id = self.canonical::<U>(segment, layout, projection, entry)?;
+        self.alias(id)
+    }
+    fn canonical<U: 'static>(
+        &self,
+        segment: Segment,
+        layout: Option<Layout>,
+        projection: impl FnOnce() -> Rc<dyn Projection>,
+        entry: Option<(Rc<EntryKey>, Rc<EntryIndex>)>,
+    ) -> Result<FieldId, AccessError> {
         let mut graph = self.state.borrow_mut();
         let (owner, parent) = (self.owner, self.parent);
         if graph.owners.get(owner).is_none() || graph.nodes.get(self.source).is_none() {
@@ -797,11 +881,6 @@ impl Context {
             }
             if field.layout != layout {
                 return Err(AccessError::InvalidField("same name selects another field"));
-            }
-            if let Some(key) = field.aliases.get(&owner) {
-                return Ok(Cage {
-                    handle: Handle::new(self.runtime, *key),
-                });
             }
             id
         } else {
@@ -850,8 +929,8 @@ impl Context {
                 // Private factories only allocate/capture validated accessors;
                 // they never invoke user getters, hashers or destructors here.
                 projection: projection(),
-                children: BTreeMap::new(),
-                aliases: BTreeMap::new(),
+                children: SparseMap::default(),
+                aliases: SparseMap::default(),
                 _entry: entry.as_ref().map(|(key, _)| key.clone()),
             }));
             if let Some((_, index)) = &entry {
@@ -882,6 +961,26 @@ impl Context {
             }
             id
         };
+        Ok(id)
+    }
+    fn alias<U: 'static>(&self, id: FieldId) -> Result<Cage<U>, AccessError> {
+        let mut graph = self.state.borrow_mut();
+        let owner = self.owner;
+        if graph.owners.get(owner).is_none() || graph.nodes.get(self.source).is_none() {
+            return Err(AccessError::Disposed);
+        }
+        if let Some(key) = graph
+            .fields
+            .slots
+            .get(id.0)
+            .ok_or(AccessError::Disposed)?
+            .aliases
+            .get(&owner)
+        {
+            return Ok(Cage {
+                handle: Handle::new(self.runtime, *key),
+            });
+        }
         let node = Node {
             owner,
             compute: Compute::Source,

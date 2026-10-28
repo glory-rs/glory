@@ -36,7 +36,7 @@ Mac，最新证据见文末 Apple/移动输入记录，不能继续把“没有 
 | 功能 | Dioxus 源码 | Glory 起始状态 | 差距及处置 |
 |---|---|---|---|
 | UI 声明与更新 | `packages/rsx`、`core`、`core-macro`，模板和 VirtualDOM | 手写 builders、显式 Plan、有限语义补丁 | 保持架构选择，不引入 RSX、VDOM 或兼容别名 |
-| 响应式状态 | `signals`、`stores`、`hooks` | Cage/Bond/Lotus、Owner、Binding、逻辑字段和集合编辑 | 已覆盖核心用途；Deref/自定义容器投影仍有差距 |
+| 响应式状态 | `signals`、`stores`、`hooks` | Cage/Bond/Vary、Owner、Binding、逻辑字段和集合编辑 | 已覆盖核心用途；Deref/自定义容器投影仍有差距 |
 | 异步状态与取消 | `hooks/src/use_resource.rs`、`use_future.rs` | Owner resource/task、Host、原生 ready-only executor | 已有生命周期与过期请求撤权；不需要另一套异步运行时 |
 | Web | `packages/web`、`interpreter` | WASM DOM、RAF、Plan 批处理、受控输入 | 有实现和 Chromium 验收；浏览器覆盖范围仍需持续扩大 |
 | 同步 SSR 与水合 | `packages/ssr`、`web`、`fullstack-server` | 共用 HTML mapper、Snapshot、显式资源恢复 | 已有实现；SSR HTTP 集成仅 Salvo |

@@ -1,6 +1,7 @@
 // Supplement the shared seeded-data oracle with descendant identity and geometry.
 async page => {
  const steps=[];
+ const baseline=await page.evaluate(()=>window.__BENCH_STATS__?.()??null);
  const click=async selector=>page.evaluate(async selector=>{document.querySelector(selector).click();await window.__BENCH__.settle();},selector);
  await click('.bench-run');
  await page.evaluate(()=>{
@@ -37,7 +38,9 @@ async page => {
   return {rows:rows.length,sha256:[...new Uint8Array(hash)].map(byte=>byte.toString(16).padStart(2,'0')).join(''),first:rectangles[0],last:rectangles.at(-1)};
  });
  await click('.bench-clear');
- const stats=await page.evaluate(()=>window.__BENCH_STATS__());
- if(stats.rows||stats.labels||stats.nodes!==10||stats.graph!==3)throw Error('clear retained live row state');
- return {steps,geometry,cleanup:{rows:stats.rows,labels:stats.labels,nodes:stats.nodes,graph:stats.graph}};
+ const stats=await page.evaluate(()=>window.__BENCH_STATS__?.()??null);
+ if(JSON.stringify(stats)!==JSON.stringify(baseline))throw Error('clear retained live row state');
+ if(stats?.profile==='html-display-v1'&&(stats.instances!==1||stats.targets!==7||stats.records!==1||stats.graph!==3||stats.owners!==2))throw Error('invalid display profile cleanup');
+ if(stats?.profile==='html-display-keyed-v2'&&(stats.instances!==1||stats.targets!==7||stats.records!==1||stats.graph!==5||stats.owners!==2))throw Error('invalid keyed display profile cleanup');
+ return {steps,geometry,cleanup:stats};
 }

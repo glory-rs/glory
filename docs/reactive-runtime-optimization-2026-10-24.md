@@ -4,7 +4,7 @@
 
 测量日期：2026-10-24；报告更新：2026-10-25 / Asia/Shanghai。实施、独立计时、文档复核及最终合并回归均已完成。
 
-本报告执行 [核心优化评估](../vibe/core-reactivity-rendering-optimization-2026-10-24.md)。保留 Cage/Bond/Lotus、属性 Binding、Owner、两份独立 Memory 和完整节点身份。主要收益来自响应式传播/求值，不是批量构造的数量级突破。
+本报告执行 [核心优化评估](../vibe/core-reactivity-rendering-optimization-2026-10-24.md)。保留 Cage/Bond/Vary、属性 Binding、Owner、两份独立 Memory 和完整节点身份。主要收益来自响应式传播/求值，不是批量构造的数量级突破。
 
 ## 1. 保留、选用与撤回
 

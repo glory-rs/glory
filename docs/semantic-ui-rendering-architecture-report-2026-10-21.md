@@ -2,6 +2,10 @@
 
 评估日期：2026-10-21。Glory 基线提交：`d2f92dfa13745377dc2d579d2ac95d9a1b7cc1cb`，workspace 版本 `0.3.1`。
 
+v2 方向更新（2026-10-28）：用户已选择 HTML/CSS 标准显示元素与高层 widgets 分层，
+以[HTML 模板运行时设计](v2-html-template-runtime-architecture-2026-10-28.md)为后续迁移基准。
+本文继续记录现有语义实现的历史目标与证据，不将每个原始 HTML 元素必须具备完整语义身份作为 v2 新路径的前提。
+
 修订：v38（2026-10-23）。采用允许破坏兼容的重构路径，不兼容旧应用 API、源码、协议和持久化格式。本批修复测量缓存淘汰顺序，并在64/1024预算下复验滚动优化、位置与最终画面（§12.19）；重复失效优化见§12.18，引擎阶段观测见§12.17，节点退休队列见§12.16，清理/查询归属见§12.15，同路径复用和回调上下文见§12.14，集合结构编辑见§12.13，字体/装饰见§8.12，窗口协调见§12.12，旧架构退出见§13.4。主题、其他平台与剩余优化仍按原范围推进。
 
 依赖维护已按用户要求改为组织 fork：第三方修改只在 [glory-rs/blitz](https://github.com/glory-rs/blitz) 和 [glory-rs/taffy](https://github.com/glory-rs/taffy) 维护，Glory 使用完整 Git revision，不使用 vendor、副本补丁树或全局 Cargo patch。具体提交、升级与测试流程见[引擎依赖维护](engine-forks.md)。下文早期本地包的实施描述已被这一决策替代；它们不是当前依赖方式。
@@ -82,13 +86,13 @@
 
 建议采用以下决策：
 
-1. 保留纯 Rust builder、`Widget`、`Cage/Bond/Lotus`、keyed `Each`、批处理和命令流积累，不改成 RSX、DSL 或 VDOM 框架。
+1. 保留纯 Rust builder、`Widget`、`Cage/Bond/Vary`、keyed `Each`、批处理和命令流积累，不改成 RSX、DSL 或 VDOM 框架。
 2. 增加小规模的语义组件层，区分组件语义、视觉样式、HTML 标签映射；不继续以扩充 HTML 标签覆盖率作为公共核心的目标。
 3. 直接重设 render contract、节点身份和生命周期，删除由旧 HTML API 造成的核心耦合；旧 Command/Node/feature 不作为兼容约束。
 4. 用 `html` 表示共同的 HTML 映射，用较短的 `web` 表示浏览器宿主，用独立的 `ssr` crate 表示服务器序列化；`hydrate` 是 web 的可选能力。
 5. 将 CSS 复用路线明确为 browser + Blitz：Blitz 直接提供现成 CSS/文字/布局引擎，不重复实现这套系统。GTK 等非 HTML 工具包另按 Portable CSS 子集适配。
 6. 首选 Blitz 作为实际第二引擎，按无窗口文档、绘制、窗口与交互顺序验证。当前已接通文档/CPU 绘制/桌面窗口，继续补齐平台交互与移动宿主；GTK、GPUI、Makepad 暂不同时实施。
-7. 不承诺兼容旧组件内部结构和响应式实现。保留 Cage/Bond/Lotus 的概念价值，允许更换订阅存储与调度实现；首发以绑定正确性为准，不以全量性能优化为前提。
+7. 不承诺兼容旧组件内部结构和响应式实现。保留 Cage/Bond/Vary 的概念价值，允许更换订阅存储与调度实现；首发以绑定正确性为准，不以全量性能优化为前提。
 8. 组件使用 `view`、`group`、`text`、`button`、`input`、`check`、`image`、`link`；短且完整的单词优先，避免 `container/fragment` 与难懂的缩写。
 
 必须明确的产品取舍：**跨后端优先保证语义、状态和交互契约；布局按支持配置保证；像素完全一致不作为默认承诺。** 以后若需要一致像素，可以另选共享布局与自绘后端配置。
@@ -137,7 +141,7 @@
 以下是值得继承的设计与实现经验，不是旧符号、类型布局或协议兼容承诺。允许提取算法后删除原模块。
 
 - Builder 与显式响应式绑定：无需全量重建 UI，也无需引入模板编译器。
-- Cage/Bond/Lotus 的用户模型、Owner 与代际失效：抽象后端不要求改换信号类型。
+- Cage/Bond/Vary 的用户模型、Owner 与代际失效：抽象后端不要求改换信号类型。
 - Widget 与控制流组件：Each、Switch、Loader、Suspense 的逻辑可以重建在语义树；公开构造名按新词表确定。
 - Each 的稳定 key 和 LIS：保留列表身份与减少移动仍然有价值。
 - Holder 的实例隔离、batch 和命令队列：应作为运行时与提交边界继续使用。
@@ -212,7 +216,7 @@ Blitz 官方将 style resolution、box layout、text layout、paint、windowing 
 
 ```text
 应用 Rust 代码
-  ├─ 业务组件、Cage/Bond/Lotus、语义事件
+  ├─ 业务组件、Cage/Bond/Vary、语义事件
   ├─ view/text/button/input 等 builder
   └─ class、类型化 style、可选 CSS 资源
                   │
@@ -258,7 +262,7 @@ CSR/hydrate   static/stream    WebView / Blitz
 |---|---|
 | `glory-style` | 叶子层：样式值、资源标识、支持 profile；不引用 runtime。重型 CSS parser/resolver 按需启用 |
 | `glory-render` | 语义节点/props/event/query、Render trait、能力与提交数据；依赖 style，不依赖 core 或某个引擎 |
-| `glory-core` | Cage/Bond/Lotus、实例/Scope、Binding、Owner/Task、调度与宿主服务端口；依赖 render |
+| `glory-core` | Cage/Bond/Vary、实例/Scope、Binding、Owner/Task、调度与宿主服务端口；依赖 render |
 | `glory-resource` | 可选的请求级命名资源注册表、显式 schema 与 JSON 快照；依赖 core/serde，无 HTML/HTTP/DOM。2026-10-22 实施时从 core/HTML mapper 单独分出 |
 | `glory-i18n` | 可选 Fluent 资源与应用本地语言选择；目录不可变，响应式消息归明确 Owner，不进入默认 core/HTML/SSR 依赖图 |
 | `glory-ui` | 纯 Rust 短名称组件 builder、内容模型、控制流；依赖 core/render/style |
@@ -275,7 +279,7 @@ CSR/hydrate   static/stream    WebView / Blitz
 
 目录采用短名称，与现有 workspace 风格一致：当前活动包为 `crates/{style,render,core,resource,i18n,ui,html,web,ssr,blitz,glory,salvo-adapter}`。旧 CLI、路由、宏、serverfn、devtools、热更新与 command adapter 源码已于 2026-10-26 清理；未来外围工具按实际需求依赖新端口实现，不保留旧运行时或 wire 兼容层。resource 单独提供可选序列化，避免 core/HTML mapper 因资源快照而依赖 serde。
 
-`glory-render` 中的 Node/Props/Mutation 是稳定职责边界，但 v1 类型本身允许随开发修改；协议 freeze 仅在实际远程通道交付时进行。core 不包含 HtmlOptions/GTK Widget/Blitz Node 等具体类型。响应式样式 builder 在 ui 中求值为 style patch，style 值层不反向依赖 Lotus。
+`glory-render` 中的 Node/Props/Mutation 是稳定职责边界，但 v1 类型本身允许随开发修改；协议 freeze 仅在实际远程通道交付时进行。core 不包含 HtmlOptions/GTK Widget/Blitz Node 等具体类型。响应式样式 builder 在 ui 中求值为 style patch，style 值层不反向依赖 Vary。
 
 原 `glory-native` 的 Blitz 实现提取为 `glory-blitz`；原 `glory-desktop` 的 Wry 宿主按引擎改为未来的 `glory-wry`。旧 crate 名、feature、重导出与序列化格式可以删除，不建立别名或旧项目自动转换器。迁移过程中可用旧代码作离线参考，但新发布只维护一套架构。
 
@@ -369,7 +373,7 @@ Android Surface 消失或桌面窗口尺寸为零时，停止呈现并释放需�
 crates/
   style/       样式值与支持范围
   render/      语义节点、Mutation、Event、Query、Render
-  core/        Runtime、Owner、Cage/Bond/Lotus、Host
+  core/        Runtime、Owner、Cage/Bond/Vary、Host
   resource/    可选请求数据与快照
   ui/          builder、组件生命周期、each/when/list
   html/        一份 HTML 映射与输出操作
@@ -480,7 +484,7 @@ fn counter_layout() -> Style {
 }
 ```
 
-CSS 字符串与类型化输入不应维护两套意义不同的属性。动态属性可接受 Lotus；具体绑定只更新发生变化的 style slot。
+CSS 字符串与类型化输入不应维护两套意义不同的属性。动态属性可接受 Vary；具体绑定只更新发生变化的 style slot。
 
 ### 6.3 平台映射 API
 
@@ -1759,7 +1763,7 @@ D:/BuildCache/glory-semantic-ui/measurement-evidence-2026-10-23.json。
 
 新版本不保证旧源码、feature、crate 名、DOM builder、wire serde 或持久化快照可直接使用；不提供 legacy prelude、兼容 Node alias、双协议解释器或旧项目转换器。旧测试中有价值的语义用新 API 重写，不以旧示例原样编译作为准入条件。业务用户数据格式不属于本框架提案，实施时也不需要读写或清理真实用户数据。
 
-Glory 仍保留纯 Rust builder 和 Cage/Bond/Lotus 这一产品方向；它们的构造、所有权和内部实现允许调整。全量 HTML/SVG 需求通过 HTML 专属扩展进入，不再把旧 HTML tag 列表当成新的跨平台公共组件目录。
+Glory 仍保留纯 Rust builder 和 Cage/Bond/Vary 这一产品方向；它们的构造、所有权和内部实现允许调整。全量 HTML/SVG 需求通过 HTML 专属扩展进入，不再把旧 HTML tag 列表当成新的跨平台公共组件目录。
 
 采用一条新的架构开发线，按纵向功能合入；正式版本只维护一套公开架构。阶段可以依次交付，不必在一个不可审查的大提交中重写全部 crate。中间构建以新包和新验收为准，避免为维持即将删除的 workspace 成员而增加临时桥接代码。
 

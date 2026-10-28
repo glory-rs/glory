@@ -101,6 +101,49 @@ fn selected<K: Eq + Hash + 'static>(
         index.map(|index| index.find(key)).transpose()?.flatten(),
     ))
 }
+pub(super) fn update_member<T: 'static, R>(
+    source: Cage<Arena<T>>,
+    id: u64,
+    edit: impl FnOnce(&mut T) -> R,
+) -> Result<R, AccessError> {
+    let key = Key::unpack(id);
+    mutate(
+        source,
+        |arena, _| {
+            if arena.get(key).is_none() {
+                return Err(AccessError::MissingField);
+            }
+            Ok(Plan::Change(Selection::Entry(Some(id)), ()))
+        },
+        |arena, ()| edit(arena.get_mut(key).expect("validated member")),
+    )
+}
+pub(super) fn append_members<T: 'static, R>(
+    source: Cage<Arena<T>>,
+    edit: impl FnOnce(&mut Arena<T>) -> R,
+) -> Result<R, AccessError> {
+    mutate(
+        source,
+        |_, _| Ok(Plan::Change(Selection::Entry(None), ())),
+        |arena, ()| edit(arena),
+    )
+}
+pub(super) fn remove_member<T: 'static>(
+    source: Cage<Arena<T>>,
+    id: u64,
+) -> Result<Option<T>, AccessError> {
+    mutate(
+        source,
+        |arena, _| {
+            Ok(if arena.get(Key::unpack(id)).is_none() {
+                Plan::Noop(None)
+            } else {
+                Plan::Change(Selection::Entry(Some(id)), ())
+            })
+        },
+        |arena, ()| arena.remove(Key::unpack(id)),
+    )
+}
 fn items(start: usize, end: usize) -> Selection {
     Selection::Items { start, end }
 }
@@ -221,6 +264,14 @@ impl<T: 'static> Cage<Vec<T>> {
 macro_rules! map_edits {
     ($map:ty, [$($generic:tt)*]) => {
         impl<$($generic)*> Cage<$map> {
+            /// Edit one present key without constructing a persistent entry alias.
+            /// Only that key's registered fields and map/ancestor readers publish.
+            pub fn try_update<R>(self, key: &K, edit: impl FnOnce(&mut V) -> R) -> Result<R, AccessError> {
+                mutate(self, |map, index| {
+                    if !project(|| Ok(map.contains_key(key)))? { return Err(AccessError::MissingField); }
+                    Ok(Plan::Change(selected(index,key)?, ()))
+                }, |map, ()| edit(project(||Ok(map.get_mut(key))).expect("pure map lookup").expect("validated present key")))
+            }
             /// Insert/replace one key. Publishes the map/ancestors and that key's
             /// live aliases/children; unrelated keys are not invalidated. Keys
             /// and values need not be Clone. Hash/Eq/Ord/hasher must be pure.

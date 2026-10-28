@@ -12,7 +12,7 @@
 
 use fluent_bundle::{FluentBundle, FluentResource};
 use fluent_syntax::ast;
-use glory_core::{AccessError, Bond, Lotus, Owner};
+use glory_core::{AccessError, Bond, Owner, Vary};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
@@ -255,11 +255,11 @@ impl Catalog {
 #[derive(Clone)]
 pub struct I18n {
     catalog: Rc<Catalog>,
-    locale: Lotus<Locale>,
+    locale: Vary<Locale>,
 }
 
 impl I18n {
-    pub fn new(catalog: Rc<Catalog>, locale: impl Into<Lotus<Locale>>) -> Self {
+    pub fn new(catalog: Rc<Catalog>, locale: impl Into<Vary<Locale>>) -> Self {
         Self {
             catalog,
             locale: locale.into(),
@@ -294,17 +294,17 @@ impl I18n {
             return Err(AccessError::Disposed.into());
         }
         let runtime = match &self.locale {
-            Lotus::Value(_) => None,
-            Lotus::Cage(value) => Some(value.runtime()),
-            Lotus::Bond(value) => Some(value.runtime()),
+            Vary::Value(_) => None,
+            Vary::Cage(value) => Some(value.runtime()),
+            Vary::Bond(value) => Some(value.runtime()),
         };
         if runtime.is_some_and(|runtime| runtime != owner.runtime()) {
             return Err(AccessError::WrongRuntime.into());
         }
         // Validate a reactive source before retaining the user's argument closure.
         match &self.locale {
-            Lotus::Cage(value) if !value.is_alive() => return Err(AccessError::Disposed.into()),
-            Lotus::Bond(value) if !value.is_alive() => return Err(AccessError::Disposed.into()),
+            Vary::Cage(value) if !value.is_alive() => return Err(AccessError::Disposed.into()),
+            Vary::Bond(value) if !value.is_alive() => return Err(AccessError::Disposed.into()),
             _ => {}
         }
         let context = self.clone();

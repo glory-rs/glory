@@ -1,0 +1,40 @@
+{
+  "date": "2026-10-28",
+  "leptos_lock_version": "0.8.22",
+  "leptos_macro_archive_checksum": "0902af1e6947ffc7e906b7003a165f76f178dc711a47b74241025090b0c32a72",
+  "packages": [
+    {
+      "name": "leptos_macro",
+      "version": "0.8.19",
+      "root": "D:\\BuildCache\\glory-dsl-20261028\\research\\leptos_macro-0.8.19",
+      "vcs": {
+        "git": {
+          "sha1": "58fe6c1ad0cd175e9c8ec204895a9739d52fda16"
+        },
+        "path_in_vcs": "leptos_macro"
+      },
+      "sha256": {
+        "src/lib.rs": "f289c8b7fd2fc152e63928b2bcd86bea1548ffc6359011cc363a411e44fb22d8",
+        "src/view/mod.rs": "13c716bd0114b31192192cf102fc010622edc5069338be4f9633d92570d6aa65",
+        "src/view/component_builder.rs": "e9fea49ca71668f066d5377c8969cb0b724cf7aee8418bce2da08f30fadf3d1c"
+      }
+    },
+    {
+      "name": "dioxus-rsx",
+      "version": "0.7.10",
+      "root": "D:\\BuildCache\\glory-semantic-ui\\cargo\\registry\\src\\index.crates.io-1949cf8c6b5b557f\\dioxus-rsx-0.7.10",
+      "vcs": {
+        "git": {
+          "sha1": "57d6794ad60b949e5bd8aa282f6f8c3dc97a365e"
+        },
+        "path_in_vcs": "packages/rsx"
+      },
+      "sha256": {
+        "src/node.rs": "e41b6d256f0a2d1d000efee116549a4d1f47e92b9c791b25000714e59c82519a",
+        "src/template_body.rs": "72b2b7f82bf850ffaf775a4f37750222ed2b44efd47c7681664fa6630f9caec2",
+        "src/element.rs": "c68c67ee781c742eb7e5a0e56458327641a746cd790618270f345f6a03d64a28",
+        "src/component.rs": "ea29a3757c05ea5e4e714c09538ce18a85f6aa5da594124544596160f74d62df"
+      }
+    }
+  ]
+}

@@ -372,7 +372,9 @@ fn rejected_uri_payloads_do_not_open_paths_or_replace_a_selected_grant() {
         ),
         (
             8,
-            vec!["file:///owned/a%00b".into()],
+            // Keep the file URI valid for the host platform, then inject a
+            // decoded NUL. A Unix path is a Type rejection on Windows first.
+            vec![format!("{}%00", uri().0)],
             FileRejection::Metadata,
         ),
     ] {

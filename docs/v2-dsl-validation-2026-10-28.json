@@ -1,0 +1,270 @@
+{
+  "date": "2026-10-28",
+  "rust_tests_passed": 612,
+  "rust_log": "D:\\BuildCache\\glory-dsl-20261028\\tests-verified.txt",
+  "diagnostics": [
+    {
+      "name": "renamed_facade",
+      "expected": null,
+      "returncode": 0,
+      "source": "fn main(){let _=g::view!{<div><span>\"ok\"</span></div>};}"
+    },
+    {
+      "name": "closing_tag",
+      "expected": "closing tag does not match",
+      "returncode": 101,
+      "source": "fn main(){let _=g::view!{<div></span>};}"
+    },
+    {
+      "name": "unquoted_text",
+      "expected": "quoted text",
+      "returncode": 101,
+      "source": "fn main(){let _=g::view!{<span>hello</span>};}"
+    },
+    {
+      "name": "invalid_content",
+      "expected": "invalid HTML content context",
+      "returncode": 101,
+      "source": "fn main(){let _=g::view!{<button><div/></button>};}"
+    },
+    {
+      "name": "unsupported_tag",
+      "expected": "unsupported HTML tag",
+      "returncode": 101,
+      "source": "fn main(){let _=g::view!{<input/>};}"
+    },
+    {
+      "name": "missing_prop",
+      "expected": "missing field `initial`",
+      "returncode": 101,
+      "source": "use g::display::*;\nstruct Counter; struct Props {initial:u32}\nimpl Component for Counter {type Props=Props;\n fn view(_scope:&Scope,props:Props)->impl IntoView {g::view!{<span>{props.initial}</span>}}\n}\nfn main(){let _=g::view!{<Counter/>};}"
+    },
+    {
+      "name": "unknown_prop",
+      "expected": "no field named `inital`",
+      "returncode": 101,
+      "source": "use g::display::*;\nstruct Counter; struct Props {initial:u32}\nimpl Component for Counter {type Props=Props;\n fn view(_scope:&Scope,props:Props)->impl IntoView {g::view!{<span>{props.initial}</span>}}\n}\nfn main(){let _=g::view!{<Counter inital={1}/>};}"
+    },
+    {
+      "name": "wrong_prop_type",
+      "expected": "mismatched types",
+      "returncode": 101,
+      "source": "use g::display::*;\nstruct Counter; struct Props {initial:u32}\nimpl Component for Counter {type Props=Props;\n fn view(_scope:&Scope,props:Props)->impl IntoView {g::view!{<span>{props.initial}</span>}}\n}\nfn main(){let _=g::view!{<Counter initial={\"bad\"}/>};}"
+    },
+    {
+      "name": "wrong_slot_kind",
+      "expected": "mismatched types",
+      "returncode": 101,
+      "source": "fn main(){let _=g::template!{<span><field slot={g::display::Click::new(\"click\")}/></span>};}"
+    },
+    {
+      "name": "not_displayable",
+      "expected": "TextValue",
+      "returncode": 101,
+      "source": "fn main(){let _=g::view!{<span>{vec![1,2]}</span>};}"
+    },
+    {
+      "name": "empty_fragment",
+      "expected": "empty XML view",
+      "returncode": 101,
+      "source": "fn main(){let _=g::view!{<></>};}"
+    },
+    {
+      "name": "sealed_wire_source",
+      "expected": "sealed",
+      "returncode": 101,
+      "source": "struct Forged; impl g::display::Source for Forged {fn compile(&self)->std::result::Result<g::display::Compiled,g::html::template::Error>{unimplemented!()}} fn main(){}"
+    }
+  ],
+  "browser_evidence": "D:\\BuildCache\\glory-dsl-20261028\\completed-browser\\evidence.json",
+  "browser_evidence_sha256": "98149314ad6f1833e954da9eb5811a7b4fdbc7ae7e88607e51c8770d48a427f5",
+  "browser": "155.0.8059.86",
+  "runs": [
+    {
+      "variant": "hand",
+      "baseline": {
+        "root": "0",
+        "computed": "0",
+        "once": "0",
+        "child": "10",
+        "double": "20",
+        "stats": {
+          "instances": 2,
+          "targets": 13,
+          "records": 2,
+          "graph": 12,
+          "owners": 3
+        }
+      },
+      "screenshot_sha256": "586712700e11997d76e6d08705ce4a5f7aba419934c292d00d53db654f2d4a25",
+      "errors": [],
+      "teardown": true,
+      "collected": true
+    },
+    {
+      "variant": "dsl",
+      "baseline": {
+        "root": "0",
+        "computed": "0",
+        "once": "0",
+        "child": "10",
+        "double": "20",
+        "stats": {
+          "instances": 2,
+          "targets": 13,
+          "records": 2,
+          "graph": 12,
+          "owners": 3
+        }
+      },
+      "screenshot_sha256": "586712700e11997d76e6d08705ce4a5f7aba419934c292d00d53db654f2d4a25",
+      "errors": [],
+      "teardown": true,
+      "collected": true
+    }
+  ],
+  "compatibility_sparse_runtime": {
+    "density": [
+      {
+        "physical": 2,
+        "instances": 1,
+        "targets": 2
+      },
+      {
+        "physical": 201,
+        "instances": 1,
+        "targets": 2
+      }
+    ],
+    "probes": null,
+    "focus": {
+      "atomic": true,
+      "fallback": true
+    },
+    "grow": {
+      "calls": 1000,
+      "reentry": false,
+      "stats": {
+        "rows": 1000,
+        "labels": 1000,
+        "semantic_nodes": 0,
+        "instances": 1001,
+        "targets": 5007,
+        "records": 1001,
+        "graph": 4003,
+        "owners": 1002
+      }
+    },
+    "createFailure": {
+      "calls": 300,
+      "stats": {
+        "rows": 1000,
+        "labels": 1000,
+        "semantic_nodes": 0,
+        "instances": 300,
+        "targets": 1502,
+        "records": 1001,
+        "graph": 4003,
+        "owners": 1002
+      },
+      "physical": 0,
+      "retry": false,
+      "after": {
+        "rows": 1000,
+        "labels": 1000,
+        "semantic_nodes": 0,
+        "instances": 300,
+        "targets": 1502,
+        "records": 1001,
+        "graph": 4003,
+        "owners": 1002
+      },
+      "closed": {
+        "instances": 0,
+        "targets": 0,
+        "records": 0,
+        "graph": 0,
+        "owners": 1
+      },
+      "children": 0
+    },
+    "placeFailure": {
+      "calls": 300,
+      "stats": {
+        "rows": 1000,
+        "labels": 1000,
+        "semantic_nodes": 0,
+        "instances": 1001,
+        "targets": 5007,
+        "records": 1001,
+        "graph": 4003,
+        "owners": 1002
+      },
+      "physical": 299,
+      "retry": false,
+      "closed": {
+        "instances": 0,
+        "targets": 0,
+        "records": 0,
+        "graph": 0,
+        "owners": 1
+      }
+    },
+    "writeFailure": {
+      "calls": 20,
+      "changed": 19,
+      "retry": false,
+      "closed": {
+        "instances": 0,
+        "targets": 0,
+        "records": 0,
+        "graph": 0,
+        "owners": 1
+      }
+    },
+    "retireFailure": {
+      "calls": 17,
+      "stats": {
+        "rows": 0,
+        "labels": 0,
+        "semantic_nodes": 0,
+        "instances": 985,
+        "targets": 4927,
+        "records": 1,
+        "graph": 3,
+        "owners": 2
+      },
+      "physical": 984,
+      "retry": false,
+      "closed": {
+        "instances": 0,
+        "targets": 0,
+        "records": 0,
+        "graph": 0,
+        "owners": 1
+      }
+    },
+    "collected": true
+  },
+  "source_sha256": {
+    "Cargo.toml": "80eeb2b7277dc2f973a9c3a2f15a6cfbd86cf3f875821352aec6fd959335cbdf",
+    "Cargo.lock": "fc6784fe58a888564abba9c0a6339f1db0f18dea8dfc07e5ef19dd20bb87807b",
+    "crates/view-macros/Cargo.toml": "43f67467602ee8441a60471f42515680de6ab91d0f80b0a0a8f4778d010bb5ef",
+    "crates/view-macros/src/lib.rs": "2588174d3c72a8756a8ee01ecd9b8c314c53d71d8d3363c599b8ee54b42adea7",
+    "crates/html/src/view.rs": "727b25d6f7faf1477d64b02b6294f312bd95377ae398c39a334dc2cdf4bed482",
+    "crates/html/src/template.rs": "f15159a3473692bf5d6718d32ca7d6a2a9451b04a54afcf6d15356660303edf3",
+    "crates/web/src/view.rs": "af2df4eadf702a376fefb749e9eda6c096a969d4c4f59c1e739bc5186977ebf6",
+    "crates/web/src/template.rs": "9584bb3fb0149562d7fe29268455ce0559b94ec6932b007e98a3b64e7f0b3643",
+    "crates/web/src/template_host.js": "5422d0ecacd28d743f12ce569ba15fed4fbc08775e73982cdf3e67ad741ed265",
+    "crates/glory/Cargo.toml": "0dbdfd39cc12e469014980c2e3c87cf99d5410a45d634113f820c93e82329873",
+    "crates/glory/src/lib.rs": "b69bcc145912b2ee5ea0f9093db118be2127ef16195abd1f14523cf2ccc28860",
+    "crates/glory/tests/display_dsl.rs": "9382967db948260e45d4b9d7560eb1e2d8d2045bd82f91db5e4b9452325feea2",
+    "examples/display-web/Cargo.toml": "9a07ff7e5c3f64b12ae3c288ae91f12e8c78134479386c8c4c358c6526e251e3",
+    "examples/display-web/Cargo.lock": "f18f2813ba64e37c3c7f6cf0a0269f87cfce0f00b816f74609362381ff9306f6",
+    "examples/display-web/src/main.rs": "1ceba4ced39d1a05ebd2bf53938a7ed682111f187678df2a7c9bd6044ade7e57",
+    "examples/display-web/acceptance.cjs": "9f22ff4d79e463cf2762f1a8f1c62caf51a8e9b55801065387fe04e6c2552a84",
+    "scripts/build-display-web.ps1": "dbef59adc9facaf2efeeb1bba7d0043f90ba7942a7515525c5aa864e55a65ae2",
+    "scripts/check-display-diagnostics.py": "4636ce47e18884ec0462e5c8c54032f45e6b97af6a44439fff85bece61910cd0"
+  },
+  "timing_claim": "No new performance ranking; shared data/configuration and functionality validated"
+}
