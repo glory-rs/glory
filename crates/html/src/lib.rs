@@ -337,6 +337,8 @@ pub struct Mapper {
     receipt: Receipt,
     plans: plan::Plans,
 }
+mod submission;
+pub use submission::{PreparedOp, Submission};
 impl Mapper {
     pub fn new(runtime: RuntimeId) -> Self {
         Self {

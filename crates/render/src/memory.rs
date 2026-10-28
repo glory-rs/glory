@@ -8,6 +8,8 @@ use crate::*;
 
 mod children;
 pub use children::Children;
+mod submission;
+pub use submission::Submission;
 
 /// Current live Layer facets, including hidden/detached declarations. Physical
 /// hosts may open fewer; this shared admission bound prevents late host failure.

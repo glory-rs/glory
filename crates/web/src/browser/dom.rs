@@ -14,6 +14,8 @@ mod templates;
 use templates::Templates;
 #[path = "plans.rs"]
 mod plans;
+#[path = "submission.rs"]
+pub(super) mod submission;
 
 // HTML has exactly four typed parts. Explicit plans keep their original
 // physical nodes together and only cross the bridge for parts actually used.
@@ -893,6 +895,14 @@ impl Dom {
         Ok(())
     }
     fn dispose(&self, id: NodeId, subtree: Vec<NodeId>) -> Result<(), Error> {
+        self.dispose_confirmed(id, subtree, false)
+    }
+    fn dispose_confirmed(
+        &self,
+        id: NodeId,
+        subtree: Vec<NodeId>,
+        confirmed: bool,
+    ) -> Result<(), Error> {
         let entry = self.entry(id)?;
         // Remove lookup/queued state before native focus events from removal.
         let removed: Vec<_> = {
@@ -954,7 +964,9 @@ impl Dom {
             }
             Ok(())
         };
-        let result = if let Boundary::Part(part) = entry.boundary {
+        let result = if confirmed {
+            Ok(())
+        } else if let Boundary::Part(part) = entry.boundary {
             if let Some(target) = entry.parts.target(part) {
                 target.remove()
             } else {

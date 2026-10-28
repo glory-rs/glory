@@ -4,7 +4,7 @@ use super::{Boundary, Dom, Entry, Parts, backend, virtual_shape};
 use glory_html::{Edit, Kind, Part, PlanShape};
 use glory_render::{Error, NodeId, Plan, WeakPlan};
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::{BTreeMap, HashMap},
     fmt::Write,
     rc::Rc,
@@ -53,11 +53,11 @@ export function gloryClonePlan(plan, tokens, live) {
     }
     return parts;
 }
-export function gloryRetirePlanParts(plan, parts, masks) {
+export function gloryRetirePlanParts(plan, parts, offset, masks) {
     // The typed u32 slice is borrowed for this synchronous call only.
-    for (let index = 0; index < parts.length; index++) {
+    for (let index = 0; index < plan.owners.length; index++) {
         const owner = plan.owners[index];
-        if (masks[owner >>> 5] & (1 << (owner & 31))) parts[index] = null;
+        if (masks[owner >>> 5] & (1 << (owner & 31))) parts[offset + index] = null;
     }
 }
 export function gloryPlanText(parts, address, value) {
@@ -101,6 +101,50 @@ export function gloryRemovePlanPart(parts, address) {
     const node = parts[address], parent = node.parentNode;
     if (parent) parent.removeChild(node);
 }
+export function gloryReleasePlan(parts, start, count) {
+    parts.fill(null, start, start + count);
+}
+export function glorySubmitPlans(objects, borrowed, strings, created, live) {
+    // DOM hooks can reenter WASM and grow memory. All inputs below are owned
+    // by JS before the first DOM operation; never keep a borrowed WASM view.
+    const records = borrowed.slice();
+    const node = (object, address) => address === 4294967295 ? objects[object] : objects[object][address];
+    let completed = 0;
+    try {
+        for (let i = 0; i < records.length; i += 10) {
+            const kind = records[i], object = records[i+1], address = records[i+2];
+            if (kind === 0) { completed++; continue; }
+            if (kind === 1) {
+                const parts = gloryClonePlan(objects[object], strings.substring(records[i+8], records[i+9]), live);
+                for (let j = 0; j < parts.length; j++) created[address+j] = parts[j];
+            } else if (kind === 2) {
+                node(object, address).nodeValue = strings.substring(records[i+8], records[i+9]);
+            } else if (kind === 3 || kind === 4) {
+                const target = node(object, address), name = strings.substring(records[i+7], records[i+8]);
+                if (kind === 3) target.setAttribute(name, strings.substring(records[i+8], records[i+9]));
+                else target.removeAttribute(name);
+            } else if (kind === 5) {
+                const target = node(object, address);
+                // Preserve the existing connected-move selection/IME path.
+                if (target.isConnected) return [completed, 1, null];
+                const destination = node(records[i+3], records[i+4]);
+                const parent = records[i+7] ? destination.parentNode : destination;
+                if (!parent) throw new Error('detached Group end');
+                const before = records[i+5] === 4294967295 ? (records[i+7] ? destination : null) : node(records[i+5], records[i+6]);
+                parent.insertBefore(target, before);
+            } else if (kind === 6) {
+                const target = node(object, address);
+                // Focus retirement removes Rust lookups before native loss
+                // callbacks. Keep that existing path for a focused subtree.
+                const active = target.getRootNode().activeElement;
+                if (active && target.contains(active)) return [completed, 1, null];
+                if (target.parentNode) target.parentNode.removeChild(target);
+                objects[object].fill(null, records[i+3], records[i+4]);
+            } else throw new Error('unknown Plan submission operation');
+        }
+        return [completed, 0, null];
+    } catch (error) { return [completed, 2, String(error)]; }
+}
 ")]
 extern "C" {
     #[wasm_bindgen(catch, js_name = gloryPlan)]
@@ -114,7 +158,22 @@ extern "C" {
     #[wasm_bindgen(catch, js_name = gloryClonePlan)]
     fn clone_plan(plan: &JsValue, tokens: &str, live: bool) -> Result<js_sys::Array, JsValue>;
     #[wasm_bindgen(catch, js_name = gloryRetirePlanParts)]
-    fn retire_parts(plan: &JsValue, parts: &js_sys::Array, masks: &[u32]) -> Result<(), JsValue>;
+    fn retire_parts(
+        plan: &JsValue,
+        parts: &js_sys::Array,
+        offset: u32,
+        masks: &[u32],
+    ) -> Result<(), JsValue>;
+    #[wasm_bindgen(js_name = gloryReleasePlan)]
+    fn release_plan(parts: &js_sys::Array, start: u32, count: u32);
+    #[wasm_bindgen(catch, js_name = glorySubmitPlans)]
+    pub(super) fn submit_plans(
+        objects: &[JsValue],
+        records: &[u32],
+        strings: &str,
+        created: &js_sys::Array,
+        live: bool,
+    ) -> Result<js_sys::Array, JsValue>;
     #[wasm_bindgen(catch, js_name = gloryPlanText)]
     fn write_text(parts: &js_sys::Array, address: u32, value: &str) -> Result<(), JsValue>;
     #[wasm_bindgen(catch, js_name = gloryPlanAttribute)]
@@ -179,18 +238,29 @@ impl Target<'_> {
         remove_part(&self.instance.values, self.address).map_err(backend)
     }
 }
-struct Prototype {
-    host: JsValue,
+pub(super) struct Prototype {
+    pub(super) host: JsValue,
     layout: Layout,
+}
+impl Prototype {
+    pub(super) fn parts(&self) -> u32 {
+        self.layout.parts()
+    }
 }
 /// One detached clone's original physical parts. All semantic members keep
 /// their independent Entry/NodeId; this only shares their host addressing.
 pub(super) struct Instance {
-    prototype: Rc<Prototype>,
-    values: js_sys::Array,
+    pub(super) prototype: Rc<Prototype>,
+    pub(super) values: js_sys::Array,
+    pub(super) offset: u32,
+    pub(super) pooled: bool,
+    pub(super) cleared: Cell<bool>,
     retirement: RefCell<Retirement>,
 }
 impl Instance {
+    pub(super) fn members(&self) -> usize {
+        self.prototype.layout.members()
+    }
     pub fn target(&self, member: usize, part: Part) -> Option<Target<'_>> {
         self.address(member, part).map(|address| Target {
             instance: self,
@@ -233,7 +303,10 @@ impl Instance {
         Ok(batch.len())
     }
     pub fn address(&self, member: usize, part: Part) -> Option<u32> {
-        self.prototype.layout.address(member, part)
+        self.prototype
+            .layout
+            .address(member, part)
+            .map(|address| self.offset + address)
     }
     pub fn node(&self, address: u32) -> Node {
         // Layout and clone come from the same validated immutable prototype.
@@ -246,9 +319,17 @@ impl Instance {
     pub fn flush_retired(&self) -> Result<(), Error> {
         let pending = self.retirement.borrow_mut().take();
         if let Some(masks) = pending {
-            retire_parts(&self.prototype.host, &self.values, &masks).map_err(backend)?;
+            retire_parts(&self.prototype.host, &self.values, self.offset, &masks)
+                .map_err(backend)?;
         }
         Ok(())
+    }
+}
+impl Drop for Instance {
+    fn drop(&mut self) {
+        if self.pooled && !self.cleared.get() {
+            release_plan(&self.values, self.offset, self.prototype.layout.parts());
+        }
     }
 }
 struct Cached {
@@ -266,7 +347,13 @@ fn deferred(name: &str) -> bool {
     )
 }
 impl Plans {
-    fn get(
+    pub(super) fn cached(&self, plan: &Plan) -> bool {
+        self.0
+            .borrow()
+            .get(&plan.identity())
+            .is_some_and(|cached| cached.source.upgrade().is_some_and(|p| p.same(plan)))
+    }
+    pub(super) fn get(
         &self,
         document: &Document,
         plan: &Plan,
@@ -443,6 +530,9 @@ impl Dom {
         let instance = Rc::new(Instance {
             prototype,
             values,
+            offset: 0,
+            pooled: false,
+            cleared: Cell::new(false),
             retirement: RefCell::new(Retirement::new(ids.len())),
         });
         let mut entries = Vec::with_capacity(ids.len());
@@ -464,5 +554,23 @@ impl Dom {
             table.insert(*id, entry);
         }
         Ok(())
+    }
+}
+
+impl Instance {
+    pub(super) fn pooled(
+        prototype: Rc<Prototype>,
+        values: js_sys::Array,
+        offset: u32,
+        members: usize,
+    ) -> Rc<Self> {
+        Rc::new(Self {
+            prototype,
+            values,
+            offset,
+            pooled: true,
+            cleared: Cell::new(false),
+            retirement: RefCell::new(Retirement::new(members)),
+        })
     }
 }

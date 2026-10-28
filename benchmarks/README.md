@@ -1,5 +1,11 @@
 # Glory / Leptos / Dioxus: current semantic browser benchmark
 
+[2026-10-28 v2 Plan 浏览器批量提交原型](../docs/v2-plan-host-batch-prototype-2026-10-28.md)：
+完整覆盖受限 Plan 的创建、初始化、挂接和退休，千行创建导入调用 5,034→154。
+四轮 1,296 个同批样本中，万行创建两 RAF 耗时改善 5.0%，替换、选行、清空等回退；
+未确认整体收益，保留在 v2 原型，不据此引入 DSL。主表采用页面内两 RAF 计时，
+CPU 仅作整轮读取，不能与旧报告逐操作 ScriptDuration 混用。
+
 [2026-10-26 渲染流程架构改进](../docs/render-pipeline-implementation-2026-10-26.md)：
 统一 UI 退休清单和索引维护、共用纯 Entry 初始化，并明确控制器更新依赖。29 组浏览器、
 共享层/Blitz/Salvo 回归通过；保留两组 A/B 的环境干扰和回退，不声称整体提速。

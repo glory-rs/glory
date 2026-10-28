@@ -2,6 +2,14 @@
 
 Start here when evaluating or extending Glory:
 
+- [Glory v2 Plan host batch prototype](v2-plan-host-batch-prototype-2026-10-28.md):
+  bounded JS creation/initialization/attachment/retirement, prefix confirmation,
+  input-state barriers, independent A/B and Dioxus comparison, and baseline gate failures.
+
+- [Glory v2 DSL and browser batching investigation](v2-dsl-and-host-batching-investigation-2026-10-28.md):
+  XML-like compilation, data projections, Dioxus 0.7.10 source comparison,
+  whole-batch JS execution, prefix/error boundaries and separate validation tracks.
+
 - [Glory and Dioxus feature gaps](dioxus-feature-gap-analysis-2026-10-26.md):
   current source comparison, platform delivery boundaries and implementation priorities;
   SSR framework integration remains Salvo-only.

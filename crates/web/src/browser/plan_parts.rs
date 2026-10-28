@@ -16,6 +16,17 @@ pub(super) struct Layout {
     members: Vec<[Option<u32>; 4]>,
 }
 impl Layout {
+    #[cfg(target_arch = "wasm32")]
+    pub fn members(&self) -> usize {
+        self.members.len()
+    }
+    #[cfg(target_arch = "wasm32")]
+    pub fn parts(&self) -> u32 {
+        self.members
+            .iter()
+            .flat_map(|parts| parts.iter().flatten())
+            .count() as u32
+    }
     pub fn new(shapes: &PlanShape) -> Result<Self, Error> {
         if shapes.shapes.is_empty() || shapes.shapes.len() > MAX_PLAN_NODES {
             return Err(Error::InvalidProps("plan part member count"));

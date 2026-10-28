@@ -5,6 +5,9 @@ async (hostPage) => {
     const results = [];
     for (const hydrate of [false, true]) {
       await page.goto(`http://127.0.0.1:8788/unicode-selection.html${hydrate ? '?hydrate=1' : ''}`);
+      // The fixture's plain buttons exist before its async WASM module installs
+      // handlers. Wait for mounting before sending the first real click.
+      await page.waitForFunction(() => document.getElementById('mode').textContent.length > 0);
       await page.getByRole('button', { name: 'Write Unicode', exact: true }).click();
       const root = hydrate ? '#input-ssr' : '#app';
       if (hydrate && !await page.locator('#mode').innerText().then(text => text.includes('preserved'))) {

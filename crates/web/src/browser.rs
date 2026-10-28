@@ -146,7 +146,19 @@ impl Render for Renderer {
         }
         let mut mapper = self.mapper.borrow_mut();
         let result = if self.supports_layers && self.supports_translations {
-            mapper.apply(mutations, &mut dom::Sink(self.dom.clone()))
+            (|| {
+                let mut pending = mutations;
+                while !pending.is_empty() {
+                    let completed = dom::submission::apply(&self.dom, &mut mapper, pending)?;
+                    if completed == 0 {
+                        mapper.apply(&pending[..1], &mut dom::Sink(self.dom.clone()))?;
+                        pending = &pending[1..];
+                    } else {
+                        pending = &pending[completed..];
+                    }
+                }
+                Ok(mapper.receipt())
+            })()
         } else {
             // Legacy hosts reject per operation and retain accepted prefixes.
             (|| {

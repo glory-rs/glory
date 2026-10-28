@@ -50,6 +50,8 @@ pub mod size_form;
 mod stream_client;
 pub mod streaming;
 #[cfg(target_arch = "wasm32")]
+mod submission_client;
+#[cfg(target_arch = "wasm32")]
 mod targets;
 #[cfg(target_arch = "wasm32")]
 mod browser {

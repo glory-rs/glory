@@ -1,0 +1,1946 @@
+{
+  "date": "2026-10-28",
+  "branch": "v2",
+  "baseline_head": "f046098d795027e2d15e8c6b587188327ea1b7fc",
+  "contract": "semantic-rows-v1",
+  "browser": "156.0.8078.48",
+  "primary_metric": "click_to_two_raf_ms",
+  "launch": {
+    "headless": true,
+    "args": [
+      "--disable-gpu"
+    ],
+    "fresh_browser_per_variant": true
+  },
+  "source": "D:/BuildCache/glory-v2-plan-batch/wall-1793163411424/evidence.json",
+  "complete": true,
+  "rounds": 12,
+  "samples": 1296,
+  "operations": [
+    {
+      "key": "create_1k",
+      "before": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 65.05000001192093,
+        "wall_p10": 59.67000000476837,
+        "wall_p90": 74.5,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 66.09999996423721
+          },
+          {
+            "round": 1,
+            "ms": 64.09999996423721
+          },
+          {
+            "round": 2,
+            "ms": 65.10000002384186
+          },
+          {
+            "round": 3,
+            "ms": 65.44999998807907
+          }
+        ]
+      },
+      "after": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 62.55000001192093,
+        "wall_p10": 55.37999997138977,
+        "wall_p90": 83.7199999570847,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 61.59999996423721
+          },
+          {
+            "round": 1,
+            "ms": 62.30000001192093
+          },
+          {
+            "round": 2,
+            "ms": 61.450000047683716
+          },
+          {
+            "round": 3,
+            "ms": 79.09999996423721
+          }
+        ]
+      },
+      "dioxus": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 49.200000047683716,
+        "wall_p10": 32.649999988079074,
+        "wall_p90": 102.04999996423723,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 40.14999997615814
+          },
+          {
+            "round": 1,
+            "ms": 33.80000001192093
+          },
+          {
+            "round": 2,
+            "ms": 50.34999996423721
+          },
+          {
+            "round": 3,
+            "ms": 49.19999998807907
+          }
+        ]
+      },
+      "change_percent": -3.843197539649279
+    },
+    {
+      "key": "replace_1k",
+      "before": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 67.75,
+        "wall_p10": 60.709999966621396,
+        "wall_p90": 133.9999999523163,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 70.75000005960464
+          },
+          {
+            "round": 1,
+            "ms": 67.75
+          },
+          {
+            "round": 2,
+            "ms": 70.25
+          },
+          {
+            "round": 3,
+            "ms": 65.5
+          }
+        ]
+      },
+      "after": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 69.45000004768372,
+        "wall_p10": 61.09999998807907,
+        "wall_p90": 131.60999994277964,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 67.60000002384186
+          },
+          {
+            "round": 1,
+            "ms": 67.80000001192093
+          },
+          {
+            "round": 2,
+            "ms": 68.5
+          },
+          {
+            "round": 3,
+            "ms": 86.64999997615814
+          }
+        ]
+      },
+      "dioxus": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 50.59999996423721,
+        "wall_p10": 48.709999966621396,
+        "wall_p90": 66.62000002861024,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 50.35000002384186
+          },
+          {
+            "round": 1,
+            "ms": 51.89999997615814
+          },
+          {
+            "round": 2,
+            "ms": 50.950000047683716
+          },
+          {
+            "round": 3,
+            "ms": 50.55000001192093
+          }
+        ]
+      },
+      "change_percent": 2.509225162632789
+    },
+    {
+      "key": "update_10th",
+      "before": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 27.399999976158142,
+        "wall_p10": 18.80999994277954,
+        "wall_p90": 45.80999995470066,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 28.75
+          },
+          {
+            "round": 1,
+            "ms": 28.150000035762787
+          },
+          {
+            "round": 2,
+            "ms": 25.75
+          },
+          {
+            "round": 3,
+            "ms": 27.25
+          }
+        ]
+      },
+      "after": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 28.399999976158142,
+        "wall_p10": 24.190000033378602,
+        "wall_p90": 45.289999973774115,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 30.700000047683716
+          },
+          {
+            "round": 1,
+            "ms": 28.94999998807907
+          },
+          {
+            "round": 2,
+            "ms": 27.25
+          },
+          {
+            "round": 3,
+            "ms": 28.899999976158142
+          }
+        ]
+      },
+      "dioxus": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 33.30000001192093,
+        "wall_p10": 29.720000004768373,
+        "wall_p90": 34.10000002384186,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 33.10000002384186
+          },
+          {
+            "round": 1,
+            "ms": 33.5
+          },
+          {
+            "round": 2,
+            "ms": 33.25
+          },
+          {
+            "round": 3,
+            "ms": 33.30000001192093
+          }
+        ]
+      },
+      "change_percent": 3.649635039672039
+    },
+    {
+      "key": "select_row",
+      "before": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 26.700000047683716,
+        "wall_p10": 18.880000007152557,
+        "wall_p90": 46.48999997377416,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 27.600000023841858
+          },
+          {
+            "round": 1,
+            "ms": 26.649999976158142
+          },
+          {
+            "round": 2,
+            "ms": 27
+          },
+          {
+            "round": 3,
+            "ms": 24.19999998807907
+          }
+        ]
+      },
+      "after": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 29.5,
+        "wall_p10": 24.450000059604644,
+        "wall_p90": 31.599999940395357,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 30.399999976158142
+          },
+          {
+            "round": 1,
+            "ms": 30.149999976158142
+          },
+          {
+            "round": 2,
+            "ms": 26.80000001192093
+          },
+          {
+            "round": 3,
+            "ms": 27.649999976158142
+          }
+        ]
+      },
+      "dioxus": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 33.5,
+        "wall_p10": 31.899999976158142,
+        "wall_p90": 34.45999999046326,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 33.90000003576279
+          },
+          {
+            "round": 1,
+            "ms": 33.09999990463257
+          },
+          {
+            "round": 2,
+            "ms": 33.55000001192093
+          },
+          {
+            "round": 3,
+            "ms": 33.5
+          }
+        ]
+      },
+      "change_percent": 10.486891188448478
+    },
+    {
+      "key": "swap_rows",
+      "before": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 27.05000001192093,
+        "wall_p10": 20.710000038146973,
+        "wall_p90": 31,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 26.94999998807907
+          },
+          {
+            "round": 1,
+            "ms": 27.250000059604645
+          },
+          {
+            "round": 2,
+            "ms": 26.799999952316284
+          },
+          {
+            "round": 3,
+            "ms": 27.05000001192093
+          }
+        ]
+      },
+      "after": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 29,
+        "wall_p10": 23.140000033378602,
+        "wall_p90": 31.560000014305114,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 30.19999998807907
+          },
+          {
+            "round": 1,
+            "ms": 30.05000001192093
+          },
+          {
+            "round": 2,
+            "ms": 27.849999964237213
+          },
+          {
+            "round": 3,
+            "ms": 27.30000001192093
+          }
+        ]
+      },
+      "dioxus": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 33.299999952316284,
+        "wall_p10": 32.46999999284744,
+        "wall_p90": 34.720000016689305,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 33.65000003576279
+          },
+          {
+            "round": 1,
+            "ms": 33.199999928474426
+          },
+          {
+            "round": 2,
+            "ms": 33.19999998807907
+          },
+          {
+            "round": 3,
+            "ms": 33.39999997615814
+          }
+        ]
+      },
+      "change_percent": 7.208872411163436
+    },
+    {
+      "key": "remove_row",
+      "before": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 26.94999998807907,
+        "wall_p10": 20.800000035762785,
+        "wall_p90": 30.130000030994417,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 27.349999964237213
+          },
+          {
+            "round": 1,
+            "ms": 25.949999928474426
+          },
+          {
+            "round": 2,
+            "ms": 27.05000001192093
+          },
+          {
+            "round": 3,
+            "ms": 27.649999976158142
+          }
+        ]
+      },
+      "after": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 27.899999976158142,
+        "wall_p10": 23.169999957084656,
+        "wall_p90": 32,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 27.900000035762787
+          },
+          {
+            "round": 1,
+            "ms": 27.150000035762787
+          },
+          {
+            "round": 2,
+            "ms": 27.849999964237213
+          },
+          {
+            "round": 3,
+            "ms": 30.19999998807907
+          }
+        ]
+      },
+      "dioxus": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 33.39999997615814,
+        "wall_p10": 32.299999952316284,
+        "wall_p90": 34.199999964237215,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 33.55000001192093
+          },
+          {
+            "round": 1,
+            "ms": 33
+          },
+          {
+            "round": 2,
+            "ms": 33.69999998807907
+          },
+          {
+            "round": 3,
+            "ms": 33.15000003576279
+          }
+        ]
+      },
+      "change_percent": 3.525046339514981
+    },
+    {
+      "key": "append_1k",
+      "before": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 59.35000002384186,
+        "wall_p10": 52.02000004053116,
+        "wall_p90": 72.83000000715256,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 56.60000002384186
+          },
+          {
+            "round": 1,
+            "ms": 61.14999997615814
+          },
+          {
+            "round": 2,
+            "ms": 59.90000003576279
+          },
+          {
+            "round": 3,
+            "ms": 59.35000002384186
+          }
+        ]
+      },
+      "after": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 60.10000002384186,
+        "wall_p10": 49.52999995946884,
+        "wall_p90": 69.62000004053117,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 57.35000002384186
+          },
+          {
+            "round": 1,
+            "ms": 62.44999998807907
+          },
+          {
+            "round": 2,
+            "ms": 60.10000002384186
+          },
+          {
+            "round": 3,
+            "ms": 60.09999996423721
+          }
+        ]
+      },
+      "dioxus": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 49.55000001192093,
+        "wall_p10": 37.28000004291535,
+        "wall_p90": 51.89999997615814,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 50.19999998807907
+          },
+          {
+            "round": 1,
+            "ms": 48.59999996423721
+          },
+          {
+            "round": 2,
+            "ms": 49.750000059604645
+          },
+          {
+            "round": 3,
+            "ms": 49.89999997615814
+          }
+        ]
+      },
+      "change_percent": 1.2636899742185514
+    },
+    {
+      "key": "create_10k",
+      "before": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 525.6999999284744,
+        "wall_p10": 492.129999935627,
+        "wall_p90": 565.460000038147,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 515.25
+          },
+          {
+            "round": 1,
+            "ms": 532.0499999523163
+          },
+          {
+            "round": 2,
+            "ms": 527.1999999284744
+          },
+          {
+            "round": 3,
+            "ms": 525.6000000238419
+          }
+        ]
+      },
+      "after": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 499.25,
+        "wall_p10": 450.4800000309944,
+        "wall_p90": 557.5500000000001,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 487.9500000476837
+          },
+          {
+            "round": 1,
+            "ms": 494.1500000357628
+          },
+          {
+            "round": 2,
+            "ms": 516.3500000238419
+          },
+          {
+            "round": 3,
+            "ms": 514.8500000238419
+          }
+        ]
+      },
+      "dioxus": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 339.44999998807907,
+        "wall_p10": 297.39999997615814,
+        "wall_p90": 405.779999983311,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 321.35000002384186
+          },
+          {
+            "round": 1,
+            "ms": 341.1500000357628
+          },
+          {
+            "round": 2,
+            "ms": 328.0999999642372
+          },
+          {
+            "round": 3,
+            "ms": 352.7999999523163
+          }
+        ]
+      },
+      "change_percent": -5.031386709544061
+    },
+    {
+      "key": "clear_1k",
+      "before": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 19.849999964237213,
+        "wall_p10": 17.309999990463258,
+        "wall_p90": 34.06999994516373,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 19.55000001192093
+          },
+          {
+            "round": 1,
+            "ms": 19.299999952316284
+          },
+          {
+            "round": 2,
+            "ms": 20.400000035762787
+          },
+          {
+            "round": 3,
+            "ms": 20.650000035762787
+          }
+        ]
+      },
+      "after": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 21.399999976158142,
+        "wall_p10": 17.509999918937684,
+        "wall_p90": 30.729999935626985,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 21.399999976158142
+          },
+          {
+            "round": 1,
+            "ms": 21.5
+          },
+          {
+            "round": 2,
+            "ms": 20.30000001192093
+          },
+          {
+            "round": 3,
+            "ms": 21.30000001192093
+          }
+        ]
+      },
+      "dioxus": {
+        "samples": 48,
+        "script_median": null,
+        "wall_median": 33.250000059604645,
+        "wall_p10": 31.94000002145767,
+        "wall_p90": 34.03000000715256,
+        "round_medians": [
+          {
+            "round": 0,
+            "ms": 33.14999997615814
+          },
+          {
+            "round": 1,
+            "ms": 33.15000003576279
+          },
+          {
+            "round": 2,
+            "ms": 33.35000002384186
+          },
+          {
+            "round": 3,
+            "ms": 33.250000059604645
+          }
+        ]
+      },
+      "change_percent": 7.80856430586141
+    }
+  ],
+  "artifacts": {
+    "before": {
+      "wasm": "b71c63050d452c5abd09d87a90f48146bf1131c361d4a9d9e20e349a49fa572f"
+    },
+    "after": {
+      "wasm": "e51ab78c8b62ea21b3b2f4a110aa3f4dedb09a7da78b57a053c8f0c2e1d3b5da"
+    },
+    "dioxus": {
+      "wasm": "d3cd1ae3f9bae080bbed867fdc4c0257a137c7629910fe38e087097963b72bd0"
+    }
+  },
+  "environment": [
+    {
+      "round": 0,
+      "name": "before",
+      "loadBefore": {
+        "load": 22,
+        "builds": [
+          {
+            "Id": 110308,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 114568,
+            "ProcessName": "cargo",
+            "CPU": 2.328125
+          }
+        ]
+      },
+      "loadAfter": {
+        "load": 23,
+        "builds": [
+          {
+            "Id": 110308,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 114568,
+            "ProcessName": "cargo",
+            "CPU": 2.328125
+          }
+        ]
+      }
+    },
+    {
+      "round": 0,
+      "name": "after",
+      "loadBefore": {
+        "load": 8,
+        "builds": [
+          {
+            "Id": 110308,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 114568,
+            "ProcessName": "cargo",
+            "CPU": 2.328125
+          }
+        ]
+      },
+      "loadAfter": {
+        "load": 21,
+        "builds": [
+          {
+            "Id": 110308,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 114568,
+            "ProcessName": "cargo",
+            "CPU": 2.328125
+          }
+        ]
+      }
+    },
+    {
+      "round": 0,
+      "name": "dioxus",
+      "loadBefore": {
+        "load": 35,
+        "builds": [
+          {
+            "Id": 83276,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 108404,
+            "ProcessName": "cargo",
+            "CPU": 0.03125
+          },
+          {
+            "Id": 110308,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 114568,
+            "ProcessName": "cargo",
+            "CPU": 2.328125
+          }
+        ]
+      },
+      "loadAfter": {
+        "load": 40,
+        "builds": [
+          {
+            "Id": 5676,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 15340,
+            "ProcessName": "cargo",
+            "CPU": 0.484375
+          },
+          {
+            "Id": 21596,
+            "ProcessName": "cargo",
+            "CPU": 0.28125
+          },
+          {
+            "Id": 59964,
+            "ProcessName": "cargo",
+            "CPU": 0.21875
+          },
+          {
+            "Id": 70896,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 96104,
+            "ProcessName": "cargo",
+            "CPU": 0.046875
+          },
+          {
+            "Id": 110308,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 114568,
+            "ProcessName": "cargo",
+            "CPU": 2.328125
+          },
+          {
+            "Id": 115992,
+            "ProcessName": "cargo",
+            "CPU": 0.03125
+          },
+          {
+            "Id": 122596,
+            "ProcessName": "cargo",
+            "CPU": 0.484375
+          },
+          {
+            "Id": 123468,
+            "ProcessName": "cargo",
+            "CPU": 0.046875
+          },
+          {
+            "Id": 32480,
+            "ProcessName": "rustc",
+            "CPU": 0
+          },
+          {
+            "Id": 43732,
+            "ProcessName": "rustc",
+            "CPU": 0.09375
+          }
+        ]
+      }
+    },
+    {
+      "round": 1,
+      "name": "dioxus",
+      "loadBefore": {
+        "load": 33,
+        "builds": [
+          {
+            "Id": 15340,
+            "ProcessName": "cargo",
+            "CPU": 0.65625
+          },
+          {
+            "Id": 59964,
+            "ProcessName": "cargo",
+            "CPU": 0.265625
+          },
+          {
+            "Id": 70896,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 110308,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 114568,
+            "ProcessName": "cargo",
+            "CPU": 2.328125
+          },
+          {
+            "Id": 115992,
+            "ProcessName": "cargo",
+            "CPU": 0.03125
+          },
+          {
+            "Id": 122596,
+            "ProcessName": "cargo",
+            "CPU": 0.484375
+          },
+          {
+            "Id": 123468,
+            "ProcessName": "cargo",
+            "CPU": 0.046875
+          },
+          {
+            "Id": 77252,
+            "ProcessName": "rustc",
+            "CPU": 0.578125
+          },
+          {
+            "Id": 96044,
+            "ProcessName": "rustc",
+            "CPU": 1.875
+          },
+          {
+            "Id": 123660,
+            "ProcessName": "rustc",
+            "CPU": 1.328125
+          }
+        ]
+      },
+      "loadAfter": {
+        "load": 23,
+        "builds": [
+          {
+            "Id": 15340,
+            "ProcessName": "cargo",
+            "CPU": 1.515625
+          },
+          {
+            "Id": 70896,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 110308,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 114568,
+            "ProcessName": "cargo",
+            "CPU": 2.328125
+          },
+          {
+            "Id": 115992,
+            "ProcessName": "cargo",
+            "CPU": 0.03125
+          },
+          {
+            "Id": 122596,
+            "ProcessName": "cargo",
+            "CPU": 0.5
+          }
+        ]
+      }
+    },
+    {
+      "round": 1,
+      "name": "after",
+      "loadBefore": {
+        "load": 17,
+        "builds": [
+          {
+            "Id": 15340,
+            "ProcessName": "cargo",
+            "CPU": 1.578125
+          },
+          {
+            "Id": 70896,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 110308,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 114568,
+            "ProcessName": "cargo",
+            "CPU": 2.328125
+          },
+          {
+            "Id": 115992,
+            "ProcessName": "cargo",
+            "CPU": 0.03125
+          },
+          {
+            "Id": 122596,
+            "ProcessName": "cargo",
+            "CPU": 0.53125
+          },
+          {
+            "Id": 106944,
+            "ProcessName": "rustc",
+            "CPU": 0.140625
+          }
+        ]
+      },
+      "loadAfter": {
+        "load": 45,
+        "builds": [
+          {
+            "Id": 15340,
+            "ProcessName": "cargo",
+            "CPU": 1.765625
+          },
+          {
+            "Id": 27344,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 70896,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 101848,
+            "ProcessName": "cargo",
+            "CPU": 0.03125
+          },
+          {
+            "Id": 106756,
+            "ProcessName": "cargo",
+            "CPU": 0.5
+          },
+          {
+            "Id": 110308,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 114568,
+            "ProcessName": "cargo",
+            "CPU": 2.328125
+          },
+          {
+            "Id": 115992,
+            "ProcessName": "cargo",
+            "CPU": 0.03125
+          },
+          {
+            "Id": 122596,
+            "ProcessName": "cargo",
+            "CPU": 0.890625
+          },
+          {
+            "Id": 86460,
+            "ProcessName": "rustc",
+            "CPU": 0.015625
+          }
+        ]
+      }
+    },
+    {
+      "round": 1,
+      "name": "before",
+      "loadBefore": {
+        "load": 33,
+        "builds": [
+          {
+            "Id": 15340,
+            "ProcessName": "cargo",
+            "CPU": 1.78125
+          },
+          {
+            "Id": 70896,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 110308,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 114568,
+            "ProcessName": "cargo",
+            "CPU": 2.328125
+          },
+          {
+            "Id": 115992,
+            "ProcessName": "cargo",
+            "CPU": 0.03125
+          },
+          {
+            "Id": 122596,
+            "ProcessName": "cargo",
+            "CPU": 0.90625
+          },
+          {
+            "Id": 41788,
+            "ProcessName": "rustc",
+            "CPU": 0.140625
+          }
+        ]
+      },
+      "loadAfter": {
+        "load": 28,
+        "builds": [
+          {
+            "Id": 15340,
+            "ProcessName": "cargo",
+            "CPU": 1.953125
+          },
+          {
+            "Id": 70896,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 110308,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 114568,
+            "ProcessName": "cargo",
+            "CPU": 2.328125
+          },
+          {
+            "Id": 115992,
+            "ProcessName": "cargo",
+            "CPU": 0.03125
+          },
+          {
+            "Id": 122596,
+            "ProcessName": "cargo",
+            "CPU": 1.421875
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "name": "before",
+      "loadBefore": {
+        "load": 25,
+        "builds": [
+          {
+            "Id": 15340,
+            "ProcessName": "cargo",
+            "CPU": 2.03125
+          },
+          {
+            "Id": 70896,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 110308,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 114568,
+            "ProcessName": "cargo",
+            "CPU": 2.328125
+          },
+          {
+            "Id": 115992,
+            "ProcessName": "cargo",
+            "CPU": 0.03125
+          },
+          {
+            "Id": 122596,
+            "ProcessName": "cargo",
+            "CPU": 1.4375
+          },
+          {
+            "Id": 92500,
+            "ProcessName": "rustc",
+            "CPU": 0.53125
+          }
+        ]
+      },
+      "loadAfter": {
+        "load": 42,
+        "builds": [
+          {
+            "Id": 15092,
+            "ProcessName": "cargo",
+            "CPU": 0.875
+          },
+          {
+            "Id": 15340,
+            "ProcessName": "cargo",
+            "CPU": 3.5625
+          },
+          {
+            "Id": 25976,
+            "ProcessName": "cargo",
+            "CPU": 0
+          },
+          {
+            "Id": 110308,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 114568,
+            "ProcessName": "cargo",
+            "CPU": 2.328125
+          },
+          {
+            "Id": 115992,
+            "ProcessName": "cargo",
+            "CPU": 0.03125
+          },
+          {
+            "Id": 10760,
+            "ProcessName": "rustc",
+            "CPU": 0.0625
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "name": "after",
+      "loadBefore": {
+        "load": 19,
+        "builds": [
+          {
+            "Id": 15092,
+            "ProcessName": "cargo",
+            "CPU": 0.875
+          },
+          {
+            "Id": 15340,
+            "ProcessName": "cargo",
+            "CPU": 3.625
+          },
+          {
+            "Id": 25976,
+            "ProcessName": "cargo",
+            "CPU": 0
+          },
+          {
+            "Id": 110308,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 114568,
+            "ProcessName": "cargo",
+            "CPU": 2.328125
+          },
+          {
+            "Id": 115992,
+            "ProcessName": "cargo",
+            "CPU": 0.03125
+          },
+          {
+            "Id": 92368,
+            "ProcessName": "rustc",
+            "CPU": 0.53125
+          },
+          {
+            "Id": 107576,
+            "ProcessName": "rustc",
+            "CPU": 0.34375
+          }
+        ]
+      },
+      "loadAfter": {
+        "load": 36,
+        "builds": [
+          {
+            "Id": 15092,
+            "ProcessName": "cargo",
+            "CPU": 1.25
+          },
+          {
+            "Id": 15340,
+            "ProcessName": "cargo",
+            "CPU": 4.109375
+          },
+          {
+            "Id": 25976,
+            "ProcessName": "cargo",
+            "CPU": 0
+          },
+          {
+            "Id": 110308,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 114568,
+            "ProcessName": "cargo",
+            "CPU": 2.328125
+          },
+          {
+            "Id": 115992,
+            "ProcessName": "cargo",
+            "CPU": 0.03125
+          },
+          {
+            "Id": 664,
+            "ProcessName": "rustc",
+            "CPU": 1.40625
+          },
+          {
+            "Id": 92508,
+            "ProcessName": "rustc",
+            "CPU": 0.09375
+          }
+        ]
+      }
+    },
+    {
+      "round": 2,
+      "name": "dioxus",
+      "loadBefore": {
+        "load": 27,
+        "builds": [
+          {
+            "Id": 15092,
+            "ProcessName": "cargo",
+            "CPU": 1.265625
+          },
+          {
+            "Id": 15340,
+            "ProcessName": "cargo",
+            "CPU": 4.140625
+          },
+          {
+            "Id": 25976,
+            "ProcessName": "cargo",
+            "CPU": 0
+          },
+          {
+            "Id": 110308,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 114568,
+            "ProcessName": "cargo",
+            "CPU": 2.328125
+          },
+          {
+            "Id": 115992,
+            "ProcessName": "cargo",
+            "CPU": 0.03125
+          },
+          {
+            "Id": 105360,
+            "ProcessName": "rustc",
+            "CPU": 0.109375
+          },
+          {
+            "Id": 108584,
+            "ProcessName": "rustc",
+            "CPU": 0.46875
+          }
+        ]
+      },
+      "loadAfter": {
+        "load": 22,
+        "builds": [
+          {
+            "Id": 15092,
+            "ProcessName": "cargo",
+            "CPU": 1.6875
+          },
+          {
+            "Id": 25976,
+            "ProcessName": "cargo",
+            "CPU": 0
+          },
+          {
+            "Id": 110308,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 114568,
+            "ProcessName": "cargo",
+            "CPU": 2.328125
+          }
+        ]
+      }
+    },
+    {
+      "round": 3,
+      "name": "dioxus",
+      "loadBefore": {
+        "load": 38,
+        "builds": [
+          {
+            "Id": 15092,
+            "ProcessName": "cargo",
+            "CPU": 1.6875
+          },
+          {
+            "Id": 25976,
+            "ProcessName": "cargo",
+            "CPU": 0
+          },
+          {
+            "Id": 110308,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 114568,
+            "ProcessName": "cargo",
+            "CPU": 2.328125
+          }
+        ]
+      },
+      "loadAfter": {
+        "load": 48,
+        "builds": [
+          {
+            "Id": 12744,
+            "ProcessName": "cargo",
+            "CPU": 0.03125
+          },
+          {
+            "Id": 22852,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 53868,
+            "ProcessName": "cargo",
+            "CPU": 0
+          },
+          {
+            "Id": 82968,
+            "ProcessName": "cargo",
+            "CPU": 0.484375
+          },
+          {
+            "Id": 110308,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 112796,
+            "ProcessName": "cargo",
+            "CPU": 0.03125
+          },
+          {
+            "Id": 114568,
+            "ProcessName": "cargo",
+            "CPU": 2.328125
+          },
+          {
+            "Id": 119388,
+            "ProcessName": "cargo",
+            "CPU": 0.828125
+          },
+          {
+            "Id": 123024,
+            "ProcessName": "cargo",
+            "CPU": 0.328125
+          },
+          {
+            "Id": 29796,
+            "ProcessName": "rustc",
+            "CPU": 0.75
+          },
+          {
+            "Id": 34044,
+            "ProcessName": "rustc",
+            "CPU": 0.6875
+          },
+          {
+            "Id": 42264,
+            "ProcessName": "rustc",
+            "CPU": 0.546875
+          },
+          {
+            "Id": 119912,
+            "ProcessName": "rustc",
+            "CPU": 0.59375
+          }
+        ]
+      }
+    },
+    {
+      "round": 3,
+      "name": "after",
+      "loadBefore": {
+        "load": 64,
+        "builds": [
+          {
+            "Id": 12744,
+            "ProcessName": "cargo",
+            "CPU": 0.03125
+          },
+          {
+            "Id": 22852,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 53868,
+            "ProcessName": "cargo",
+            "CPU": 0
+          },
+          {
+            "Id": 82968,
+            "ProcessName": "cargo",
+            "CPU": 0.5
+          },
+          {
+            "Id": 110308,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 112796,
+            "ProcessName": "cargo",
+            "CPU": 0.03125
+          },
+          {
+            "Id": 114568,
+            "ProcessName": "cargo",
+            "CPU": 2.328125
+          },
+          {
+            "Id": 119388,
+            "ProcessName": "cargo",
+            "CPU": 0.875
+          },
+          {
+            "Id": 123024,
+            "ProcessName": "cargo",
+            "CPU": 0.34375
+          },
+          {
+            "Id": 39828,
+            "ProcessName": "rustc",
+            "CPU": 1.609375
+          },
+          {
+            "Id": 42536,
+            "ProcessName": "rustc",
+            "CPU": 0.609375
+          },
+          {
+            "Id": 102244,
+            "ProcessName": "rustc",
+            "CPU": 1.890625
+          },
+          {
+            "Id": 117568,
+            "ProcessName": "rustc",
+            "CPU": 1.453125
+          }
+        ]
+      },
+      "loadAfter": {
+        "load": 34,
+        "builds": [
+          {
+            "Id": 85512,
+            "ProcessName": "cargo",
+            "CPU": 0.09375
+          },
+          {
+            "Id": 87008,
+            "ProcessName": "cargo",
+            "CPU": 0
+          },
+          {
+            "Id": 94444,
+            "ProcessName": "cargo",
+            "CPU": 0.234375
+          },
+          {
+            "Id": 108332,
+            "ProcessName": "cargo",
+            "CPU": 0.203125
+          },
+          {
+            "Id": 110308,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 114568,
+            "ProcessName": "cargo",
+            "CPU": 2.328125
+          },
+          {
+            "Id": 117508,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 61864,
+            "ProcessName": "rustc",
+            "CPU": 0.296875
+          },
+          {
+            "Id": 65836,
+            "ProcessName": "rustc",
+            "CPU": 2.1875
+          }
+        ]
+      }
+    },
+    {
+      "round": 3,
+      "name": "before",
+      "loadBefore": {
+        "load": 31,
+        "builds": [
+          {
+            "Id": 108332,
+            "ProcessName": "cargo",
+            "CPU": 0.453125
+          },
+          {
+            "Id": 110308,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 114568,
+            "ProcessName": "cargo",
+            "CPU": 2.328125
+          },
+          {
+            "Id": 117508,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 97920,
+            "ProcessName": "rustc",
+            "CPU": 0.96875
+          },
+          {
+            "Id": 108628,
+            "ProcessName": "rustc",
+            "CPU": 0.375
+          }
+        ]
+      },
+      "loadAfter": {
+        "load": 38,
+        "builds": [
+          {
+            "Id": 108332,
+            "ProcessName": "cargo",
+            "CPU": 1.78125
+          },
+          {
+            "Id": 110308,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 114568,
+            "ProcessName": "cargo",
+            "CPU": 2.328125
+          },
+          {
+            "Id": 117508,
+            "ProcessName": "cargo",
+            "CPU": 0.015625
+          },
+          {
+            "Id": 17648,
+            "ProcessName": "rustc",
+            "CPU": 1.84375
+          },
+          {
+            "Id": 114520,
+            "ProcessName": "rustc",
+            "CPU": 14.40625
+          }
+        ]
+      }
+    }
+  ],
+  "aggregate_cpu": [
+    {
+      "round": 0,
+      "name": "before",
+      "ScriptDuration": 10547.445,
+      "LayoutDuration": 4714.338,
+      "RecalcStyleDuration": 2283.532,
+      "TaskDuration": 24486.797999999995
+    },
+    {
+      "round": 0,
+      "name": "after",
+      "ScriptDuration": 9838.961,
+      "LayoutDuration": 4749.2210000000005,
+      "RecalcStyleDuration": 2256.837,
+      "TaskDuration": 22034.832000000002
+    },
+    {
+      "round": 0,
+      "name": "dioxus",
+      "ScriptDuration": 3324.25,
+      "LayoutDuration": 4750.879,
+      "RecalcStyleDuration": 2022.6350000000002,
+      "TaskDuration": 14945.853
+    },
+    {
+      "round": 1,
+      "name": "dioxus",
+      "ScriptDuration": 3351.893,
+      "LayoutDuration": 4742.505999999999,
+      "RecalcStyleDuration": 2032.2350000000001,
+      "TaskDuration": 14991.543
+    },
+    {
+      "round": 1,
+      "name": "after",
+      "ScriptDuration": 9975.422,
+      "LayoutDuration": 4946.116,
+      "RecalcStyleDuration": 2289.56,
+      "TaskDuration": 22117.556
+    },
+    {
+      "round": 1,
+      "name": "before",
+      "ScriptDuration": 10602.391000000001,
+      "LayoutDuration": 4872.928,
+      "RecalcStyleDuration": 2317.005,
+      "TaskDuration": 22920.453
+    },
+    {
+      "round": 2,
+      "name": "before",
+      "ScriptDuration": 10867.466,
+      "LayoutDuration": 4904.935,
+      "RecalcStyleDuration": 2287.433,
+      "TaskDuration": 24092.018999999997
+    },
+    {
+      "round": 2,
+      "name": "after",
+      "ScriptDuration": 10228.028999999999,
+      "LayoutDuration": 5074.014,
+      "RecalcStyleDuration": 2327.1009999999997,
+      "TaskDuration": 22583.897
+    },
+    {
+      "round": 2,
+      "name": "dioxus",
+      "ScriptDuration": 3350.476,
+      "LayoutDuration": 4762.092,
+      "RecalcStyleDuration": 2036.6080000000002,
+      "TaskDuration": 15151.256
+    },
+    {
+      "round": 3,
+      "name": "dioxus",
+      "ScriptDuration": 3337.5249999999996,
+      "LayoutDuration": 4734.656,
+      "RecalcStyleDuration": 2039.1319999999998,
+      "TaskDuration": 15308.932
+    },
+    {
+      "round": 3,
+      "name": "after",
+      "ScriptDuration": 10755.357,
+      "LayoutDuration": 5182.68,
+      "RecalcStyleDuration": 2443.038,
+      "TaskDuration": 24034.513
+    },
+    {
+      "round": 3,
+      "name": "before",
+      "ScriptDuration": 10559.121,
+      "LayoutDuration": 4793.29,
+      "RecalcStyleDuration": 2337.0890000000004,
+      "TaskDuration": 22763.383
+    }
+  ],
+  "count_source": "D:/BuildCache/glory-v2-plan-batch/counts-1793161785143/evidence.json",
+  "counts": [
+    {
+      "name": "before",
+      "retention": {
+        "rowsInDocument": 0,
+        "retainedOriginalRoots": 0,
+        "tracked": 10000
+      },
+      "operations": [
+        {
+          "key": "create",
+          "imports": 5034,
+          "batch_runs": 0
+        },
+        {
+          "key": "replace",
+          "imports": 6034,
+          "batch_runs": 0
+        },
+        {
+          "key": "clear",
+          "imports": 1034,
+          "batch_runs": 0
+        },
+        {
+          "key": "tenk",
+          "imports": 50034,
+          "batch_runs": 0
+        }
+      ]
+    },
+    {
+      "name": "after",
+      "retention": {
+        "rowsInDocument": 0,
+        "retainedOriginalRoots": 0,
+        "tracked": 10000
+      },
+      "operations": [
+        {
+          "key": "create",
+          "imports": 154,
+          "batch_runs": 20
+        },
+        {
+          "key": "replace",
+          "imports": 178,
+          "batch_runs": 24
+        },
+        {
+          "key": "clear",
+          "imports": 58,
+          "batch_runs": 4
+        },
+        {
+          "key": "tenk",
+          "imports": 1210,
+          "batch_runs": 196
+        }
+      ]
+    },
+    {
+      "name": "dioxus",
+      "retention": {
+        "rowsInDocument": 0,
+        "retainedOriginalRoots": 10000,
+        "tracked": 10000
+      },
+      "operations": [
+        {
+          "key": "create",
+          "imports": 10,
+          "batch_runs": 1
+        },
+        {
+          "key": "replace",
+          "imports": 12,
+          "batch_runs": 1
+        },
+        {
+          "key": "clear",
+          "imports": 10,
+          "batch_runs": 1
+        },
+        {
+          "key": "tenk",
+          "imports": 12,
+          "batch_runs": 1
+        }
+      ]
+    }
+  ],
+  "sizes": {
+    "before": {
+      "wasm_bytes": 1845213,
+      "wasm_sha256": "b71c63050d452c5abd09d87a90f48146bf1131c361d4a9d9e20e349a49fa572f",
+      "js_bytes": 69114
+    },
+    "after": {
+      "wasm_bytes": 1913143,
+      "wasm_sha256": "e51ab78c8b62ea21b3b2f4a110aa3f4dedb09a7da78b57a053c8f0c2e1d3b5da",
+      "js_bytes": 72781
+    },
+    "dioxus": {
+      "wasm_bytes": 457458,
+      "wasm_sha256": "d3cd1ae3f9bae080bbed867fdc4c0257a137c7629910fe38e087097963b72bd0",
+      "js_bytes": 55831
+    }
+  }
+}
