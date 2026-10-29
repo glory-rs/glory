@@ -3,6 +3,8 @@ name: semantic-ui
 on:
   pull_request:
   push:
+    branches: [main]
+  workflow_call:
 
 permissions:
   contents: read
@@ -46,7 +48,15 @@ jobs:
           cargo install wasm-bindgen-cli --version 0.2.129 --locked --root D:/BuildCache/glory-semantic-ui/tools
           if ($LASTEXITCODE) { throw 'WASM tools installation failed' }
           'D:/BuildCache/glory-semantic-ui/tools/bin' >> $env:GITHUB_PATH
-      - name: Test active workspace, forks, Windows hosts and WASM
+      - name: Validate release tooling and plan
+        run: |
+          python -m unittest discover -s scripts -p test_release.py
+          if ($LASTEXITCODE) { throw 'Release tooling tests failed' }
+          python scripts/release.py
+          if ($LASTEXITCODE) { throw 'Release plan failed' }
+          python scripts/release.py --check-package glory-style
+          if ($LASTEXITCODE) { throw 'Archive contents failed' }
+      - name: Test active workspace, engines, Windows hosts and WASM
         run: ./scripts/check-semantic-ui.ps1 -Web -Window
       - name: Install browser driver and build streaming fixture
         run: |

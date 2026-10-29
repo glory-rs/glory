@@ -144,7 +144,7 @@ try:
     tap(130, 400)  # Clear after recreation
     assert label(screen("clear")) == zero, "input did not recover after surface recreation"
     # Finish the Activity, then recreate it without force-stopping the process.
-    # This fails on the original winit once-per-process event-loop flag.
+    # This fails on the original wingy once-per-process event-loop flag.
     adb("shell", "input", "keyevent", "4")
     time.sleep(1)
     adb("shell", "am", "start", "-n", activity)

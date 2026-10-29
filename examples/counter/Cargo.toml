@@ -15,7 +15,7 @@ crate-type = ["cdylib", "rlib"]
 [features]
 default = []
 web = ["glory/web", "dep:wasm-bindgen", "dep:web-sys"]
-desktop = ["glory/blitz-accesskit"]
+desktop = ["glory/apace-accesskit"]
 
 [[bin]]
 name = "counter-desktop"

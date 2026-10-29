@@ -1,6 +1,6 @@
 //! Glory's semantic Rust UI facade.
-#[cfg(all(feature = "blitz", not(target_arch = "wasm32")))]
-pub use glory_blitz as blitz;
+#[cfg(all(feature = "apace", not(target_arch = "wasm32")))]
+pub use glory_apace as apace;
 pub use glory_core as core;
 pub use glory_core::{Bond, Cage, Owner, Resource, ResourceSeed, ResourceState, Runtime, Vary};
 #[cfg(feature = "i18n")]

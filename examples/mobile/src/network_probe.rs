@@ -1,5 +1,5 @@
 //! Opt-in real socket/platform TLS checks. Never block the UIKit/Activity loop.
-use glory::blitz::assets::{
+use glory::apace::assets::{
     Bytes, LoadConfig, Loader, NetHandler, NetProvider, NetReady, Request, Url,
 };
 use std::{

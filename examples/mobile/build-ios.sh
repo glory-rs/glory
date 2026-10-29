@@ -44,7 +44,7 @@ cp "$CARGO_TARGET_DIR/$target/$profile/counter-ios" "$app/counter-ios"
 cp "$project/ios/Info.plist" "$app/Info.plist"
 python3 - "$build/metadata.json" "$app/Info.plist" <<'PY'
 import json,plistlib,sys
-m=json.load(open(sys.argv[1])); ids={p['id'] for p in m['packages'] if p['name']=='glory-blitz'}
+m=json.load(open(sys.argv[1])); ids={p['id'] for p in m['packages'] if p['name']=='glory-apace'}
 if any(n['id'] in ids and 'permissions' in n['features'] for n in m['resolve']['nodes']):
     with open(sys.argv[2],'rb') as file: info=plistlib.load(file)
     info.update(NSCameraUsageDescription='Glory permission acceptance checks camera authorization without capturing images.',

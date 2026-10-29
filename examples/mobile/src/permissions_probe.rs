@@ -1,6 +1,6 @@
 //! Permission requests happen only from these explicit buttons. Startup queries
 //! inspect authorization; they do not activate camera, microphone or location.
-use glory::blitz::permissions::{Permission, Permissions};
+use glory::apace::permissions::{Permission, Permissions};
 use glory::prelude::*;
 
 const KINDS: [(Permission, &str); 6] = [
@@ -122,7 +122,7 @@ pub(crate) fn fixture(service: Permissions) -> impl Widget {
 #[cfg(target_os = "ios")]
 async fn ios_cancellation_probe() {
     crate::ios_permissions::audit_integer_abi();
-    use glory::blitz::permissions::{NativeStats, PermissionError};
+    use glory::apace::permissions::{NativeStats, PermissionError};
     use glory::core::{Runtime, executor::Executor};
     use std::{
         cell::Cell,

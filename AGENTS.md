@@ -86,7 +86,7 @@ report and `docs/semantic-ui-implementation.md`; do not preserve the former
 HTML API/feature/wire format through compatibility aliases.
 
 The active workspace currently contains style, render, core, resource, i18n, ui,
-html, web, ssr, blitz, glory and salvo-adapter. The opt-in i18n package was authorized after
+html, web, ssr, apace, glory and salvo-adapter. The opt-in i18n package was authorized after
 the semantic rewrite; see `crates/i18n/README.md` for its boundaries.
 Truck, the old core runtime, routing, CLI/macros/serverfn/hot-reload and the old
 desktop/native/liveview/tui adapters and examples have been removed. Only the
@@ -110,7 +110,7 @@ retired feature aliases or count compilation as proof of platform acceptance.
   Maximum sizes use Limit::{None,Px,Percent}, not Length::Auto. Option::None
   leaves the stylesheet in charge; Some(Limit::None) explicitly removes its cap.
   Keep min > max valid (the engine applies the minimum). HTML/RECORD profiles
-  are v4 after FieldSizing; the native Blitz profile is v5 and rejects FieldSizing
+  are v4 after FieldSizing; the native Apace profile is v5 and rejects FieldSizing
   until intrinsic editor sizing exists. Fixed-row Textarea uses ordinary dimensions.
   Family distinguishes named faces from generics; named faces serialize as CSS
   strings (escape quotes, backslashes, controls and '<', including in Sheet).
@@ -185,23 +185,23 @@ retired feature aliases or count compilation as proof of platform acceptance.
   HTML edits before WASM, then performs End rekey/resource handoff. Serve it
   under the app's CSP. Bootstrap::head_script installs pre-edit capture;
   Frame::to_html emits complete inert data + parser-blocking external script.
-- `glory`: facade; outer hosts join by actual technology (web/ssr/blitz/etc.).
+- `glory`: facade; outer hosts join by actual technology (web/ssr/apace/etc.).
 - `glory-salvo`: native HTTP integration over semantic SSR. Ordinary responses
   use glory-ssr; optional stream owns each !Send request on an admitted local
   worker, transferring only owned HTML/errors to Salvo. Share bounded admission,
   request one frame per body demand and cancel pending I/O on body drop. Never
   eagerly collect the stream or move UI state across threads. Serve the matching
   STREAM_SCRIPT under the app's CSP. Axum/Actix legacy adapters were removed.
-- `glory-blitz`: native-only document interpreter over html's typed edits.
+- `glory-apace`: native-only document interpreter over html's typed edits.
   Pinned dom/traits/paint beta.4; system fonts and real CSS/box/text layout.
-  STYLE_PROFILE is native-specific (blitz v4), not Profile::HTML: typed Sticky
+  STYLE_PROFILE is native-specific (apace v4), not Profile::HTML: typed Sticky
   and AnchorAuto are rejected until actual sticky offsets/automatic anchoring
   exist. Explicit AnchorNone remains valid for manual virtual-list anchors.
   Keep App checks, descriptor-local preflight and direct apply in agreement;
   reject per operation to preserve an accepted prefix/query watermark. Raw
   author CSS retains engine-specific coverage and does not widen this promise.
   Optional paint records AnyRender frames; raster uses Vello CPU without a GPU.
-  Optional desktop shell provides winit/CPU-softbuffer windows, ready-only Host
+  Optional desktop shell provides wingy/CPU-softbuffer windows, ready-only Host
   and queued activation/focus/navigation/editing. WindowApp supports controlled
   text/check events, UTF-16 selection and native IME protocol; the standalone
   Renderer has no input driver.
@@ -281,7 +281,7 @@ retired feature aliases or count compilation as proof of platform acceptance.
   editor; delimited paste remains an atomic component proposal. Stock platform
   clipboard services and real mobile input/readers stay separate from injected
   provider/CPU/AX evidence. See docs/native-tags.md.
-  Optional clipboard (facade blitz-clipboard) requires an explicit Config service.
+  Optional clipboard (facade apace-clipboard) requires an explicit Config service.
   Semantic writes and shell editor copy/cut/paste share one current operation;
   cancellation/deadline cannot refund an unsettled native permit. Foreign future
   construction/poll/drop run outside document borrows. Revalidate current focus,
@@ -301,7 +301,7 @@ retired feature aliases or count compilation as proof of platform acceptance.
   native permits survive receipt cancellation; ordinary APKs initialize nothing.
   The owned SDK probe preserves original ClipData only in RAM. Its service-call
   evidence does not establish native menus, keyboard, TalkBack or real devices.
-  Optional files (facade blitz-files) requires explicit Config::files. Keep
+  Optional files (facade apace-files) requires explicit Config::files. Keep
   one picker/four reads and shared live reference/metadata/declared-byte budgets;
   native driver permits survive cancelled receipts until actual OS completion.
   Open selected regular files once; display names never become paths. Read exact
@@ -314,7 +314,7 @@ retired feature aliases or count compilation as proof of platform acceptance.
   pending delivery. Already delivered pixels are separate from revocable grants.
   Shared UI rechecks file rights after earlier events in an already drained tick.
   Interactive desktop drop requires an explicit opener and FileConfig opt-in;
-  headless/mobile still reject it. Match the current Winit transfer/receipt pair,
+  headless/mobile still reject it. Match the current Wingy transfer/receipt pair,
   fetch only after Drop, and accept Copy/local absolute file URIs only. Bound URI
   count/bytes before path copies/opens; platform raw allocation stays separate.
   One shared drop slot survives cancelled receipts until native settlement. Resolve
@@ -356,17 +356,17 @@ retired feature aliases or count compilation as proof of platform acceptance.
   desktop assets includes it and adds HTTP(S)/mounted-file transport with explicit
   origins/roots and job/body/deadline budgets. Shared resource leases
   also bound requests/completed results and charged payloads. Optional accesskit
-  (facade blitz-accesskit) adds a semantic tree/action bridge; Windows UIA has
-  actual client acceptance. Optional android-assets (facade blitz-android-assets)
+  (facade apace-accesskit) adds a semantic tree/action bridge; Windows UIA has
+  actual client acceptance. Optional android-assets (facade apace-android-assets)
   binds an explicit application AssetManager/prefix under asset://android/;
   bounded APK streaming and ARM64 emulator CSS/PNG/Unicode evidence exist.
-  Optional network (facade blitz-network) supplies the same bounded native HTTP(S)
+  Optional network (facade apace-network) supplies the same bounded native HTTP(S)
   worker on desktop/Android/iOS. Actual mobile simulator HTTP/TLS/socket cancellation
   evidence exists; Android requires explicit Application-based AndroidTls setup.
   Runtime permissions, real-device networks, Unix AT-SPI clients and
   screen-reader/text-selection acceptance remain pending. Facade
-  `blitz` is optional and must not enter default/HTML/SSR dependency graphs.
-  Optional permissions (facade blitz-permissions) has explicit drivers and
+  `apace` is optional and must not enter default/HTML/SSR dependency graphs.
+  Optional permissions (facade apace-permissions) has explicit drivers and
   Owner-cancellable local futures. Android safe JNI and the app's Swift host
   have SDK-controlled authorization-query evidence, separately from actual
   permission-dialog acceptance. The Rust iOS application connection uses the
@@ -381,7 +381,7 @@ retired feature aliases or count compilation as proof of platform acceptance.
   Android embedded CSS/PNG has actual emulator pixel/lifecycle evidence. iOS now has
   simulator/device linking and actual iOS 27 simulator pixel, touch, software-key,
   Home/restore and rotation evidence. The app-owned Swift scene bridge forwards
-  actual UIKit lifecycle events; the Winit fork attaches windows to UIWindowScene.
+  actual UIKit lifecycle events; the Wingy fork attaches windows to UIWindowScene.
   The app-owned Swift host also reattaches that same single window after scene
   disconnect/reconnect; an isolated iPad simulator fixture has real UIKit session
   destruction/reactivation evidence. Multiple independent Glory scenes and
@@ -520,7 +520,7 @@ retired feature aliases or count compilation as proof of platform acceptance.
   queues contain tokens only, not captured application callbacks. Late/duplicate
   responses cannot resurrect a retired request or a reused identity. No owning
   Scope is retained by the registry. UiStats exposes live query/Owner/target counts.
-- AccessKit types stay in blitz's optional desktop adapter. Export only the live
+- AccessKit types stay in apace's optional desktop adapter. Export only the live
   semantic tree (Group is transparent), never a virtual-list source. Cache only
   live nodes, emit changed nodes, and allocate non-recycled document-local IDs.
   Retire mappings on removal/deactivation; never reset the ID counter. Platform
@@ -587,7 +587,7 @@ retired feature aliases or count compilation as proof of platform acceptance.
   Unsupported queries on live identities still complete asynchronously with
   the accepted watermark. See docs/semantic-ui-contract.md for exact scope.
 - Optional glory-render/conformance provides assertion-based adapter probes;
-  SSR/Blitz enable it only as a dev dependency. Keep it out of default production
+  SSR/Apace enable it only as a dev dependency. Keep it out of default production
   graphs. The eight-target matrix establishes explicit CSS boxes; it does not
   prove empty-inline geometry, all props, OS input or accessibility acceptance.
 - Event::validate_payload checks finite/local geometry, ScrollAck, navigation
@@ -634,11 +634,11 @@ retired feature aliases or count compilation as proof of platform acceptance.
   before queue changes. Native hosts additionally refuse shaped-cluster interiors
   without rounding or changing the prior selection; this is not native drag/handle
   selection support.
-- Blitz Groups use offline parks and comment ranges, never a layout wrapper.
+- Apace Groups use offline parks and comment ranges, never a layout wrapper.
   Dispose reclaims separately suspended descendants and engine identities.
   Controlled props pending first attachment must be replayed through descendants;
   ordinary moves must not rewrite values. A private textarea text seed covers
-  Blitz's lazy editor initialization. beta.4 Bounds compensates only the queried
+  Apace's lazy editor initialization. beta.4 Bounds compensates only the queried
   node's own scroll; do not add back ancestor/viewport offsets.
 - Paint FrameInfo records process-local document identity, RuntimeId, visual
   revision, applied watermark and physical size/effective scale. A RuntimeId
@@ -654,18 +654,19 @@ retired feature aliases or count compilation as proof of platform acceptance.
   stable, coalesced host-waker relay even for requests made before a shell exists.
   They never run business callbacks. Close retires the relay; late completions
   must not decode into or wake a closed document.
-- Never vendor third-party code in this repository. Modify upstream code in
-  genuine forks under the glory-rs GitHub organization, retaining upstream
-  package names, repository structure and licenses. Pin full Git commit SHAs;
+- Never vendor third-party code in this repository. Maintain upstream-derived
+  code in glory-rs/apace, glory-rs/takia and glory-rs/wingy, retaining provenance,
+  licenses and copyright notices. The user authorized these new crate namespaces
+  and registry publication on 2026-10-29. Use exact published crate versions;
   do not use moving branch dependencies or application-level global patches.
-- The six engine/layout packages use glory-rs/blitz and glory-rs/taffy Git
-  revisions recorded in docs/engine-forks.json. They stay outside the twelve-package
+- Engine/layout packages use published Apace and Takia versions, with release
+  source revisions recorded in docs/engine-forks.json. They stay outside the runtime
   workspace. Run python scripts/check-engine-forks.py --test to verify Cargo's
   resolved sources/lock and run fork-owned tests in separate clean Git checkouts
   under the approved per-host build root. Do not edit Cargo's managed Git checkouts. Update the
-  dependency rev, lockfiles and provenance record together after a fork change.
-  The additional twelve dpi/Winit platform packages share the immutable
-  glory-rs/winit revision in that record; Blitz's fork pins the same revision.
+  version, lockfiles and provenance record together after a fork release.
+  The additional twelve dpi/Wingy platform packages share the published Wingy
+  family in that record; Apace uses the same exact registry versions.
   Its Android Activity lifetime tests run from the clean fork with --test.
   Existing upstream unsafe is unchanged; local resource additions use safe Rust.
   Do not reformat unrelated third-party files with the workspace line length.
@@ -685,8 +686,8 @@ retired feature aliases or count compilation as proof of platform acceptance.
   successful registration budget. Providers must honor cancellation/close and
   bound encoded bodies, jobs, queues, deadlines and URL/redirect policy; the
   injected test provider is not a production transport.
-- Native `glory-blitz/package` (facade blitz-package) owns one Loader per document.
-  Native network (facade blitz-network) includes package and adds HTTP(S) on
+- Native `glory-apace/package` (facade apace-package) owns one Loader per document.
+  Native network (facade apace-network) includes package and adds HTTP(S) on
   Windows/Linux/macOS/Android/iOS. Desktop assets includes network and file mounts.
   Package-only builds reject nonempty origins/mounts and exclude desktop transport
   dependencies. Do not bypass NetHandler::prepare when serving immutable bytes;
@@ -770,12 +771,12 @@ retired feature aliases or count compilation as proof of platform acceptance.
   can progress now; do not use pending I/O, animations or future RAF as its flag.
   WindowApp uses 8 passes before painting, separately from its 64 task polls.
   Exhaustion yields and schedules another turn, not an unbounded loop or error.
-  Blitz includes dirty layout, unobserved revisions, queued inputs/completions,
+  Apace includes dirty layout, unobserved revisions, queued inputs/completions,
   new Resize/Scroll interests and no-op ScrollAck in this flag. Focus cleanup
   can dirty style after resolution and requires another pass. Stable geometry
   does not require an extra redraw. A ready turn is not an atomic display or
   promise that an asynchronous completion cannot arrive immediately afterward.
-- When a Blitz stylesheet changes, upgrade only pending state-only snapshots
+- When a Apace stylesheet changes, upgrade only pending state-only snapshots
   before Stylo stylesheet invalidation reads their classes/ids. Preserve already
   captured attributes and the original element state; no full source-list scan.
   This safe fork fix is recorded alongside the existing resource patch.
@@ -797,7 +798,7 @@ retired feature aliases or count compilation as proof of platform acceptance.
   focus transitions are ordering barriers; do not coalesce A/B/A out of order.
   Live suspended scopes still receive terminal FocusChanged(false) and
   Composition(false) to release pins/editing; disposed identities receive none.
-- Blitz controlled value/checked attribute edits must not bypass their property
+- Apace controlled value/checked attribute edits must not bypass their property
   path. Equal text echoes acknowledge revisions without resetting the editor.
   Composition defers differing program values; terminal input carries its old
   revision, so a newer program write wins. Empty Preedit ends/cancels immediately;
@@ -827,7 +828,7 @@ retired feature aliases or count compilation as proof of platform acceptance.
 - Scroll observations carry the last ScrollAck (requested and actually accepted
   coordinates) separately from current offsets. Keep it on later observations:
   native movement can race the first acknowledgement. Web reads back the setter's
-  accepted offset at the action barrier; Blitz does the same. Per-live-node
+  accepted offset at the action barrier; Apace does the same. Per-live-node
   metadata is bounded and disposed with the node. List preserves quantization
   bias within a destination and resets it on a new navigation/external seek;
   never widen a tolerance to swallow a genuine 1px input. Runtime Event metadata
@@ -905,7 +906,7 @@ retired feature aliases or count compilation as proof of platform acceptance.
   have native zoom/DPR quantization; distinguish it from framework drift.
 - No new unsafe code in Glory; workspace denies it.
   User-authorized exception (2026-10-26, Apple follow-up): the genuine
-  glory-rs/winit UIKit fork may add the minimum Objective-C UITextInput
+  glory-rs/wingy UIKit fork may add the minimum Objective-C UITextInput
   protocol bridge declarations/FFI required for native IME. Keep safety comments,
   main-thread ownership and native/model tests. This does not authorize unsafe
   in Glory runtime crates or unrelated fork/platform code.
@@ -928,7 +929,7 @@ retired feature aliases or count compilation as proof of platform acceptance.
   as p95/frame time. Reconcile units are successful RowHost key reads (often
   cached), not database/source accesses; record source reads separately.
   Validate units are prior dependency counts; Commit units are mutations.
-  Blitz Layout includes Dom::resolve; its 13 nested engine phases distinguish
+  Apace Layout includes Dom::resolve; its 13 nested engine phases distinguish
   style/damage/construction/box layout/transforms/paint tree/cleanup/hover/child
   documents and actual Parley shaping/breaking/alignment. TextShape covers only
   inline builder.build_into (UTF-8 byte units), not editor/password/marker work
@@ -1020,7 +1021,7 @@ style writes, invalid finite-domain refusal, editor identity/dirty value/selecti
 preservation, recovery and cleanup. Percent cases have a definite containing box;
 they do not establish every intrinsic/indefinite sizing combination.
 Release baselines: cargo bench -p glory-ui --bench semantic_frames; native
-offscreen CPU: cargo run -p glory-blitz --example profile --features raster --release.
+offscreen CPU: cargo run -p glory-apace --example profile --features raster --release.
 Both separate setup/cold/warm work and expose aggregate inclusive phases; their
 logical update count need not equal the number of actual draws.
 

@@ -1,5 +1,15 @@
 # Glory
 
+Version 0.6.0 uses the published Apace, Takia and Wingy engine families.
+Native applications use `glory::apace`, the `apace-*` features and
+`glory-apace`. See [release instructions](RELEASING.md) and
+[engine provenance](docs/engine-forks.md).
+
+```toml
+[dependencies]
+glory = { version = "=0.6.0", default-features = false, features = ["dsl"] }
+```
+
 Glory is being rebuilt as a Rust semantic UI framework: handwritten builders,
 owned fine-grained reactivity, and replaceable rendering hosts. No UI DSL or
 virtual DOM is required.
@@ -19,7 +29,7 @@ and `bin/glory` launchers for build, preview, watch/reload and diagnostics; no
 global Glory CLI installation is required.
 
 The migrated [counter example](examples/counter) shares one semantic component,
-state, event handlers and typed styles between Web and Blitz desktop hosts.
+state, event handlers and typed styles between Web and Apace desktop hosts.
 Its README includes build/run commands and the current platform boundaries.
 
 The [mobile counter](examples/mobile/README.md) adds explicit Android NativeActivity
@@ -54,10 +64,10 @@ limited to Salvo.
 - `glory-style`: explicit portable style values, separate from CSS engines.
   Ordered `Family` fallbacks, fractional font weights, `WhiteSpace`, border
   width/style/color, uniform `radius` and group `opacity` use the same mapping
-  in HTML and Blitz. Font selection and text layout remain host-owned.
+  in HTML and Apace. Font selection and text layout remain host-owned.
   Optional `css` adds bounded `Sheet::parse` for the current typed properties,
   class/child/descendant selectors and five states. HTML lowering is shared by
-  browser/SSR/Blitz; each target checks its profile before installation. This is
+  browser/SSR/Apace; each target checks its profile before installation. This is
   a finite subset, not complete CSS or a GTK cascade implementation.
 - `glory-render`: eight semantic node kinds, typed properties/events/queries,
   generational node identities and a reference interpreter. Focus queries read
@@ -92,34 +102,34 @@ limited to Salvo.
   local workers preserve body-driven backpressure and cancellation on disconnect.
   Run `cargo run -p glory-salvo --example ssr --features stream` for `/plain`,
   `/stream` and the matching browser script. Legacy Axum/Actix adapters are removed.
-- `glory-blitz`: native headless document adapter using the same HTML edits,
+- `glory-apace`: native headless document adapter using the same HTML edits,
   actual CSS/box/text layout, viewport/DPI, measurements and programmatic scrolling.
-  Enable optional `blitz`; run `cargo run -p glory --example semantic_blitz --features blitz`.
-  Optional `blitz-paint` records frames and `blitz-raster` produces CPU RGBA8
+  Enable optional `apace`; run `cargo run -p glory --example semantic_apace --features apace`.
+  Optional `apace-paint` records frames and `apace-raster` produces CPU RGBA8
   pixels; unchanged frames skip raster work. Windows and Ubuntu/WSL have actual
-  document and pixel-test evidence. Optional `blitz-shell` adds a desktop CPU
+  document and pixel-test evidence. Optional `apace-shell` adds a desktop CPU
   window/event-loop host with queued activation, focus, navigation, controlled
   editing and IME protocol.
   Password supports grapheme masking with matching pointer/caret/scroll geometry,
   raw controlled values and IME protocol. Web/SSR retain HTML password support.
   Config supports explicit resource
-  providers with bounded engine caches and cancellation. Optional `blitz-package`
+  providers with bounded engine caches and cancellation. Optional `apace-package`
   supplies an offline embedded-byte loader shared by desktop and mobile;
-  `blitz-assets` adds desktop HTTP(S)/mounted-file transport with explicit origins,
+  `apace-assets` adds desktop HTTP(S)/mounted-file transport with explicit origins,
   directory roots and transport
   budgets. Shared request/completion leases keep decoded results bounded while
   the host is paused. Measured lists preserve anchors and navigation visibility
   through delayed intrinsic PNG sizes in browser and native document tests.
-  Optional `blitz-accesskit` connects the live semantic tree and Focus/Click/SetValue
+  Optional `apace-accesskit` connects the live semantic tree and Focus/Click/SetValue
   actions to desktop AccessKit. Virtual-row ScrollIntoView uses the shared list
   controller, then native ancestors/viewport, preserving the editor and its focus.
   Windows UI Automation and macOS AX have real client evidence;
   password values stay out of the tree, and list exports remain windowed.
   Linux AT-SPI clients, screen-reader announcements, remaining platform IME and
-  Android system integrations still need their own acceptance; see the [current boundary](crates/blitz/README.md).
+  Android system integrations still need their own acceptance; see the [current boundary](crates/apace/README.md).
 
 External resource loading policies, platform accessibility acceptance, complete
-Blitz OS input acceptance and Android host integration remain in progress. DOM
+Apace OS input acceptance and Android host integration remain in progress. DOM
 behavior has automated Chromium evidence; native window test scope and remaining
 OS/device requirements are recorded separately in the implementation ledger.
 
@@ -128,7 +138,7 @@ Optional phase timing uses `render::profile::Profile::native()` and
 `web_app.enable_profile()?`. Snapshots retain 31 aggregate phases without a
 frame history. Timings include nested work and must not be added together.
 Use `None` to disable profiling, or `profile.reset()` for a new interval.
-The `semantic_frames` UI bench and Blitz `profile` example provide release
+The `semantic_frames` UI bench and Apace `profile` example provide release
 baselines; they do not report browser internals, presentation waits or FPS.
 
 Native hosts can call `app.settle(8)?` before drawing to consume bounded local
@@ -297,7 +307,7 @@ metadata does not validate arbitrary stylesheets or promise identical engines.
 Maximum sizes use `Limit::{None, Px, Percent}`. `max_width(Limit::None)` removes
 a stylesheet cap; leaving `max_width` absent lets that stylesheet apply. Preferred
 and minimum sizes continue to use `Length`, including `Auto`.
-Blitz publishes its own `STYLE_PROFILE` (blitz v3): typed sticky positioning and
+Apace publishes its own `STYLE_PROFILE` (apace v3): typed sticky positioning and
 automatic scroll anchoring return an explicit unsupported error until the pinned
 engine implements their geometry. Disabling anchoring remains supported for
 Glory's virtual lists. Raw author CSS retains the selected engine's coverage.
@@ -378,7 +388,7 @@ On Windows PowerShell:
 The script places Cargo home, target output and compiler temporary files under
 `D:/BuildCache/glory-semantic-ui`, checks the actual target directory with
 Cargo metadata, and runs formatting, active-workspace tests and strict Clippy.
-Engine modifications live in the [glory-rs Blitz/Taffy forks](docs/engine-forks.md),
+Engine modifications live in the [glory-rs Apace/Takia forks](docs/engine-forks.md),
 with full Git revisions and fork-owned tests checked by the same script.
 Optional native profiling splits engine style, construction, box layout and
 text work into bounded aggregate counters. After building the raster `profile`

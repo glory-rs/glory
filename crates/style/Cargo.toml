@@ -1,4 +1,5 @@
 [package]
+repository.workspace = true
 name = "glory-style"
 version.workspace = true
 edition.workspace = true

@@ -1,6 +1,7 @@
-"""Verify immutable engine Git dependencies; optionally test clean fork checkouts."""
+"""Verify published engine versions and provenance; optionally test release sources."""
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -75,7 +76,7 @@ def main():
     member_names = {package["name"] for package in metadata["packages"] if package["id"] in members}
     assert member_names == {
         "glory", "glory-style", "glory-render", "glory-core", "glory-resource",
-        "glory-i18n", "glory-ui", "glory-html", "glory-web", "glory-ssr", "glory-blitz",
+        "glory-i18n", "glory-ui", "glory-html", "glory-web", "glory-ssr", "glory-apace",
         "glory-salvo", "glory-view-macros",
     }, member_names
     compiler = next(package for package in metadata["packages"] if package["name"] == "glory-view-macros")
@@ -87,17 +88,26 @@ def main():
     lock = tomllib.loads((root / "Cargo.lock").read_text(encoding="utf-8"))
     for fork in record["forks"]:
         assert len(fork["rev"]) == 40 and all(c in "0123456789abcdef" for c in fork["rev"])
-        source = f"git+{fork['git']}?rev={fork['rev']}#{fork['rev']}"
+        source = "registry+https://github.com/rust-lang/crates.io-index"
         for name in fork["packages"]:
+            version = fork.get("versions", {}).get(name, fork["version"])
             resolved = [package for package in metadata["packages"] if package["name"] == name]
             assert len(resolved) == 1 and resolved[0]["source"] == source, (name, resolved)
+            assert resolved[0]["version"] == version, (name, resolved[0]["version"], version)
             locked = [package for package in lock["package"] if package["name"] == name]
             assert len(locked) == 1 and locked[0].get("source") == source, (name, locked)
+            assert locked[0]["version"] == version and len(locked[0].get("checksum", "")) == 64, (name, locked)
+            archive_root = Path(resolved[0]["manifest_path"]).parent
+            vcs = json.loads((archive_root / ".cargo_vcs_info.json").read_text(encoding="utf-8"))
+            expected_revision = fork.get("revisions", {}).get(name, fork["rev"])
+            assert vcs["git"]["sha1"] == expected_revision, (name, vcs, expected_revision)
+            archive = paths["CARGO_HOME"] / "registry/cache" / archive_root.parent.name / f"{name}-{version}.crate"
+            assert hashlib.sha256(archive.read_bytes()).hexdigest() == locked[0]["checksum"], name
         if options.test:
             directory = paths["CARGO_TARGET_DIR"].parent / "engine-forks" / fork["name"]
             directory.parent.mkdir(parents=True, exist_ok=True)
             test_fork(fork, directory, paths["CARGO_TARGET_DIR"], options.android)
-    retired = {"glory-blitz-dom", "glory-blitz-traits", "glory-blitz-paint", "glory-blitz-shell", "glory-taffy", "glory-stylo-taffy"}
+    retired = {"glory-apace-dom", "glory-apace-traits", "glory-apace-paint", "glory-apace-shell", "glory-takia", "glory-stylo-takia"}
     for lockfile in (
         root / "Cargo.lock",
         root / "examples/semantic-web/Cargo.lock",
@@ -107,12 +117,16 @@ def main():
         packages = tomllib.loads(lockfile.read_text(encoding="utf-8"))["package"]
         assert not retired.intersection(package["name"] for package in packages), lockfile
         for fork in record["forks"]:
-            expected = f"git+{fork['git']}?rev={fork['rev']}#{fork['rev']}"
+            expected = "registry+https://github.com/rust-lang/crates.io-index"
             for package in packages:
                 if package["name"] in fork["packages"]:
                     assert package.get("source") == expected, (lockfile, package)
+                    assert package["version"] == fork.get("versions", {}).get(package["name"], fork["version"]), (lockfile, package)
+        legacy = {"blitz-dom", "blitz-traits", "blitz-paint", "blitz-shell", "stylo_taffy", "taffy", "winit", "winit-core"}
+        assert not legacy.intersection(package["name"] for package in packages), lockfile
+        assert not any(package["name"].startswith(("winit-", "glory-blitz", "blitz-")) for package in packages), lockfile
     assert not (root / "vendor").exists(), "Engine sources belong in the organization forks"
-    print(f"Verified {len(record['forks'])} immutable glory-rs Git forks, {sum(len(fork['packages']) for fork in record['forks'])} engine/platform packages, one shared type identity per package; {len(member_names)} Glory workspace crates.")
+    print(f"Verified {len(record['forks'])} published engine families with exact versions, registry checksums and release source commits; {sum(len(fork['packages']) for fork in record['forks'])} engine/platform packages with one shared type identity; {len(member_names)} Glory workspace crates.")
 
 
 if __name__ == "__main__":

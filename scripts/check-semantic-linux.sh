@@ -46,16 +46,16 @@ python3 scripts/check-engine-forks.py --test
 cargo fmt --all -- --check
 cargo test --locked --workspace --all-features
 cargo clippy --locked --workspace --all-features --all-targets -- -D warnings
-cargo clippy --locked -p glory-blitz --no-default-features --all-targets -- -D warnings
-cargo clippy --locked -p glory-blitz --no-default-features --features paint --all-targets -- -D warnings
+cargo clippy --locked -p glory-apace --no-default-features --all-targets -- -D warnings
+cargo clippy --locked -p glory-apace --no-default-features --features paint --all-targets -- -D warnings
 if "$glory_paint"; then
-    cargo run --locked -p glory-blitz --example raster --features raster -- "$glory_artifacts/blitz-paint-linux.png"
+    cargo run --locked -p glory-apace --example raster --features raster -- "$glory_artifacts/apace-paint-linux.png"
 fi
 if "$glory_window"; then
     for GLORY_WINDOW_BACKEND in x11 wayland; do
         export GLORY_WINDOW_BACKEND
         printf 'Native window acceptance: %s\n' "$GLORY_WINDOW_BACKEND"
-        cargo test --locked -p glory-blitz --features shell --lib real_windows -- --ignored --nocapture --test-threads=1
-        cargo test --locked -p glory-blitz --features accesskit --lib real_windows -- --ignored --nocapture --test-threads=1
+        cargo test --locked -p glory-apace --features shell --lib real_windows -- --ignored --nocapture --test-threads=1
+        cargo test --locked -p glory-apace --features accesskit --lib real_windows -- --ignored --nocapture --test-threads=1
     done
 fi

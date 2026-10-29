@@ -1,4 +1,5 @@
 [package]
+repository.workspace = true
 name = "glory-ui"
 version.workspace = true
 edition.workspace = true
@@ -7,9 +8,9 @@ license.workspace = true
 description = "Pure Rust semantic widgets and windowed lists for Glory"
 
 [dependencies]
-glory-core = { path = "../core", version = "0.3.1" }
-glory-render = { path = "../render", version = "0.3.1" }
-glory-style = { path = "../style", version = "0.3.1" }
+glory-core = { path = "../core", version = "0.6.0" }
+glory-render = { path = "../render", version = "0.6.0" }
+glory-style = { path = "../style", version = "0.6.0" }
 
 [[bench]]
 name = "virtual_list"

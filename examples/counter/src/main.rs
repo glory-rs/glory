@@ -1,7 +1,7 @@
 //! Desktop host. The component and all event handlers live in the shared library.
 #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use glory::blitz::shell::{Shell, WindowApp, WindowAttributes};
+    use glory::apace::shell::{Shell, WindowApp, WindowAttributes};
 
     let app = WindowApp::new();
     app.mount(counter::Counter)?;

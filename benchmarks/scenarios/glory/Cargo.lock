@@ -40,7 +40,7 @@ dependencies = [
 
 [[package]]
 name = "glory"
-version = "0.3.1"
+version = "0.6.0"
 dependencies = [
  "glory-core",
  "glory-html",
@@ -52,14 +52,14 @@ dependencies = [
 
 [[package]]
 name = "glory-core"
-version = "0.3.1"
+version = "0.6.0"
 dependencies = [
  "glory-render",
 ]
 
 [[package]]
 name = "glory-html"
-version = "0.3.1"
+version = "0.6.0"
 dependencies = [
  "glory-render",
  "glory-style",
@@ -67,18 +67,18 @@ dependencies = [
 
 [[package]]
 name = "glory-render"
-version = "0.3.1"
+version = "0.6.0"
 dependencies = [
  "glory-style",
 ]
 
 [[package]]
 name = "glory-style"
-version = "0.3.1"
+version = "0.6.0"
 
 [[package]]
 name = "glory-ui"
-version = "0.3.1"
+version = "0.6.0"
 dependencies = [
  "glory-core",
  "glory-render",
@@ -87,7 +87,7 @@ dependencies = [
 
 [[package]]
 name = "glory-web"
-version = "0.3.1"
+version = "0.6.0"
 dependencies = [
  "futures-util",
  "glory-core",

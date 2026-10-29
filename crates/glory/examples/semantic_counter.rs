@@ -21,6 +21,6 @@ fn main() -> Result {
     let app = App::memory();
     app.mount(Counter)?;
     println!("semantic nodes: {}", app.stats().nodes);
-    // Memory is a reference interpreter; Web/Blitz hosts will own actual pixels.
+    // Memory is a reference interpreter; Web/Apace hosts will own actual pixels.
     Ok(())
 }

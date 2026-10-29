@@ -20,7 +20,7 @@
 
 2026-10-25 [Plan 批量准备优化](plan-batch-preparation-optimization-2026-10-25.md)保留共享声明摘要和严格单调 slot 的批内唯一性证明，乱序保留 HashSet 回退；两份 Memory、完整身份和当前上下文校验不变。千行创建/替换 Script 改善 7.5%/4.2%，5,000 行看板初始化改善 6.0%；万行不稳定、密集更新回退另列。最终同批 1,800 样本，Windows/Linux 908/907、27 组浏览器及 64/1024 真实行高验收通过。直接组装子树实验未保留。
 
-2026-10-24 原生 viewport top-layer 扩展已由 genuine Blitz fork、driver 和独立实际
+2026-10-24 原生 viewport top-layer 扩展已由 genuine Apace fork、driver 和独立实际
 consumer 验证：Dialog/AlertDialog Manage、非 modal Dialog Preserve、十二种锚点定位、
 modal 焦点/AX/滚动及关闭清理均有证据。全部 native targets 195 通过计数/45 结果报告
 （含零测试 examples；库 93 通过/2 忽略）及严格 Clippy 通过，记录在
@@ -34,9 +34,9 @@ modal 焦点/AX/滚动及关闭清理均有证据。全部 native targets 195 �
 - [x] R2：纯 Rust UI builder、each/when、延迟创建、无盒子的 group、统一门面。另已接入公开的定高 list 组件，证据见下方 R2 验证。
 - [ ] R3：共用 HTML mapper、Web DOM/事件/IME/资源、多 Runtime、样式与真实浏览器验收。DOM、组合事件协议、定高/变高列表及 owned 异步资源已验收；外部资源加载策略、操作系统输入法仍待补。
 - [x] R4：SSR/document/快照/hydrate/真实流式输出、取消与背压。首发契约已在 Windows Chromium 与 loopback HTTP 验收：渐进 DOM/CSP、资源恢复、流结束接管、慢消费者与断开取消；证据和明确适用范围见下方 R4 渐进 HTML 一节。
-- [ ] R5：Blitz 无窗口文档与 shell、Windows/Linux 验收。文档/CPU 像素、shell、焦点/选区/导航和受控编辑/组合协议、资源内核、桌面 HTTP/包/文件挂载 Loader、共享请求/完成背压及固有 PNG 高度锚点已有证据；可选AccessKit桥和Windows UIA的编辑/激活/虚拟行显示请求也已实测，范围见末节。真实OS IME、Unix AT-SPI客户端、读屏器/完整文本接口及Android资源仍待完成，不能以合成输入或局部预算代替它们。
+- [ ] R5：Apace 无窗口文档与 shell、Windows/Linux 验收。文档/CPU 像素、shell、焦点/选区/导航和受控编辑/组合协议、资源内核、桌面 HTTP/包/文件挂载 Loader、共享请求/完成背压及固有 PNG 高度锚点已有证据；可选AccessKit桥和Windows UIA的编辑/激活/虚拟行显示请求也已实测，范围见末节。真实OS IME、Unix AT-SPI客户端、读屏器/完整文本接口及Android资源仍待完成，不能以合成输入或局部预算代替它们。
 - [ ] R6：Android Activity/Surface/IME/恢复/打包与设备验收。
-- [ ] R7：惰性验证、字段依赖、样式缓存、性能与资源观测。Blitz 帧级视觉 revision/缓冲复用、固定聚合阶段计时/重复基线，以及绘制前有预算的本地观察已有实现；引擎内部/呈现时间分解、字段依赖、样式缓存仍待完成。
+- [ ] R7：惰性验证、字段依赖、样式缓存、性能与资源观测。Apace 帧级视觉 revision/缓冲复用、固定聚合阶段计时/重复基线，以及绘制前有预算的本地观察已有实现；引擎内部/呈现时间分解、字段依赖、样式缓存仍待完成。
 - [x] 清理旧依赖、feature、示例、CLI 和文档；只留新公开架构。2026-10-26 删除剩余 9 个未支持的旧包及相关入口；历史评估保留 Git 固定链接。平台与其余架构目标不因此标为完成。
 
 R8 的其他工具包按报告作为后续按需适配项，不用空 crate 或未运行的平台宣称已支持。
@@ -52,7 +52,7 @@ R8 的其他工具包按报告作为后续按需适配项，不用空 crate 或�
 - [x] 列表逻辑行键盘导航、焦点回退与语义位置/总数元数据；定高/变高的真实按键、DOM 属性和 Chromium AX role/name/focus 已验证，见末节。
 - [ ] 列表真实平台辅助技术验收，包括屏幕阅读器对位置/总数的朗读与浏览/交互模式；DOM/AX 检查不能代替它。
 - [x] 每帧合并滚动/视口/行测量，避免读写布局交错；支持真实滚动容器与视口变化。
-- [x] 固有 PNG 迟到增高/缩小保持锚点；End 在首次占位测量后持续保持可见；滚动确认区分量化与真实小幅移动。Web/Blitz 及受控位置回写均有验收。
+- [x] 固有 PNG 迟到增高/缩小保持锚点；End 在首次占位测量后持续保持可见；滚动确认区分量化与真实小幅移动。Web/Apace 及受控位置回写均有验收。
 - [x] 原生绘制前有预算地消费本地几何反馈；变高列表避免中间绘制，预算耗尽让出宿主，异步 Web/I/O 不同步空转。CPU 像素、实际宿主与交替 release 对照见末节。
 - [x] 超长列表使用逻辑坐标与受限物理滚动范围，验证首尾跳转与坐标精度。浏览器证据为 1 亿行、24 亿逻辑像素，算法证据另含 240 亿像素。
 - [x] 至少百万条数据的算法、实际浏览器 DOM 数量、滚动行为与清理验收；性能报告区分算法、响应式和布局成本。当前浏览器验收不声称帧率。
@@ -197,7 +197,7 @@ data-gly-live 只用于 VirtualPart；普通节点不创建停放 fragment，真
 极远逻辑段另有 0.125px 投影变化回归，完整门禁与独立快照见
 [滚动余差修复报告](anchor-residual-fix-2026-10-23.md)。
 
-已建立 style/render/core/resource/ui/html/web/ssr/blitz/glory 十个活动 workspace 包。依赖主线为 style ← render ← core ← ui；HTML mapper 只依赖 render/style，web/ssr/blitz 在外层组装，可选 resource 依赖 core/serde。门面默认不引入 Web/GPU/serde/Blitz，web、ssr feature 可同时开启；resources feature 可独立使用，只向已选择的宿主转发集成。原生 blitz feature 另行选择，不为默认/HTML/SSR 引入引擎。旧 core 入口与门面已经替换，旧 feature 和全局 Node alias 不再编入活动代码。旧适配器和工具目录暂时移出 workspace，旧 core 未引用源文件作为行为提取参考，最后仍需清理；这是实现过程的中间状态，不是最终兼容方案。
+已建立 style/render/core/resource/ui/html/web/ssr/apace/glory 十个活动 workspace 包。依赖主线为 style ← render ← core ← ui；HTML mapper 只依赖 render/style，web/ssr/apace 在外层组装，可选 resource 依赖 core/serde。门面默认不引入 Web/GPU/serde/Apace，web、ssr feature 可同时开启；resources feature 可独立使用，只向已选择的宿主转发集成。原生 apace feature 另行选择，不为默认/HTML/SSR 引入引擎。旧 core 入口与门面已经替换，旧 feature 和全局 Node alias 不再编入活动代码。旧适配器和工具目录暂时移出 workspace，旧 core 未引用源文件作为行为提取参考，最后仍需清理；这是实现过程的中间状态，不是最终兼容方案。
 
 已实现并验证的子项：
 
@@ -274,7 +274,7 @@ Key Bond 只读取当前窗口。窗口范围不变的像素滚动不重新取 k
 
 R2 完成时活动 workspace 验证为 64 项运行测试、1 项编译失败测试、fmt 和严格 Clippy；`cargo run -p glory --example semantic_counter` 输出 4 个语义节点。`cargo check --workspace --all-targets` 在 WASM、Android aarch64 和 Linux x86_64 目标均通过。它们仍是参考解释器和编译证据；新增真实 DOM 证据见下面的 R3 记录。
 
-后续继续补全 R3 资源与平台输入验收、R4 请求资源与 stream，再推进 Blitz/Android。同步 SSR 与 DOM 接管已有子集证据；整体目标仍未完成。
+后续继续补全 R3 资源与平台输入验收、R4 请求资源与 stream，再推进 Apace/Android。同步 SSR 与 DOM 接管已有子集证据；整体目标仍未完成。
 
 构建统一使用 `D:/BuildCache/glory-semantic-ui`，每次新构建配置先核对 cargo metadata 的 target_directory。后续记录实际命令和结果，不能用设计文件替代运行证据。
 
@@ -312,7 +312,7 @@ R2 完成时活动 workspace 验证为 64 项运行测试、1 项编译失败测
 - 同一帧 200 次原生 scroll 只读取最终窗口的 34 个 key；之后窗口内一次像素滚动不读 key。逻辑偏移跟随实际 fractional scrollTop，不因总条数放大；缩放/DPR 引起的浏览器舍入单独计量。
 - 卸载后节点与根声明清空，挂载→跳转→立即卸载重复三次无应用异常。
 
-以上为首次 R3 定高列表的 DOM 证据，没有采集 layout/paint 计时、堆快照、FPS，也没有运行其他浏览器/原生窗口/手机。后续变高与 prepend 证据见下节；焦点 pinning、键盘与无障碍、资源边界、hydrate/stream、Blitz/Android 和旧代码清理仍未完成。
+以上为首次 R3 定高列表的 DOM 证据，没有采集 layout/paint 计时、堆快照、FPS，也没有运行其他浏览器/原生窗口/手机。后续变高与 prepend 证据见下节；焦点 pinning、键盘与无障碍、资源边界、hydrate/stream、Apace/Android 和旧代码清理仍未完成。
 
 ## 大列表：变高测量与稳定 key 锚点
 
@@ -397,7 +397,7 @@ text().content(user.map(|state| match state {
 - `examples/semantic-web/resource-acceptance.js` 在 Windows Chromium 155 运行公开 API 与真实 Web async/RAF 宿主。匹配种子没有请求；切换 key 后旧 key 已无可完成 job；新结果唤醒 RAF 并更新标签，无手工 flush；业务失败、refresh 与 cancel 均通过。
 - 同一页面的 1 亿行源，为每个挂载行创建真正等待中的 future；80 次远跳最多 15 行、15 个请求、136 个图槽和 34 个语义节点。总共启动 1137 个 future，其中 2 个完成、1135 个取消；卸载后 job/任务/图/DOM 全为 0，无浏览器错误。测试 I/O 可控，不包含真实 HTTP。
 
-本轮活动 workspace 通过 88 项运行测试、1 项 !Send 编译失败测试；fmt、host/WASM 严格 Clippy 与独立浏览器例子构建通过，Android/Linux 的 all-features/all-targets 编译检查通过。原定高、变高、接管脚本已在同一新构建上复跑通过；四组浏览器原始结果保存于 `D:/BuildCache/glory-semantic-ui/resource-acceptance-result-2026-10-22.json`。资源跨请求隔离与序列化、真正 streaming 的异步边界/背压/断开取消、列表焦点/键盘及 Blitz/Android 设备仍未交付，整体目标保持进行中。
+本轮活动 workspace 通过 88 项运行测试、1 项 !Send 编译失败测试；fmt、host/WASM 严格 Clippy 与独立浏览器例子构建通过，Android/Linux 的 all-features/all-targets 编译检查通过。原定高、变高、接管脚本已在同一新构建上复跑通过；四组浏览器原始结果保存于 `D:/BuildCache/glory-semantic-ui/resource-acceptance-result-2026-10-22.json`。资源跨请求隔离与序列化、真正 streaming 的异步边界/背压/断开取消、列表焦点/键盘及 Apace/Android 设备仍未交付，整体目标保持进行中。
 
 ## R4：请求级命名资源快照（2026-10-22）
 
@@ -421,7 +421,7 @@ SSR 的 `snapshot_resources_with(&resources,factory)` 在 App 存活时取得 HT
 - payload 包含 `</script><script>window.payloadInjected=1</script>` 等字符串，页面只产生预期的两个 script 元素，注入标记未执行，无 CSP/应用 console error。版本、block 属性、重复名称、超 8MiB、schema、类型、DOM 结构七种错误均保留原页面，修复后原页重试、无重复首次加载。
 - 既有资源滚动脚本新增真实命名注册：1 亿行、80 次远跳，live 注册数始终等于当前挂载行数（最多 15），卸载后为 0。请求/节点/图槽上限仍为 15/34/136，原有 1137 个 future 的生命周期结果不变。
 
-本轮 `check-semantic-ui.ps1 -Web` 通过 98 项运行测试、1 项 !Send 编译失败测试、fmt 和 host/WASM 严格 Clippy；Android/Linux all-features/all-targets 编译通过。定高、变高、普通接管、行资源、资源快照五组真实浏览器脚本均通过。证据保存于 D 盘 `resource-snapshot-acceptance-result-2026-10-22.json`。以上没有完成真正 streaming：异步边界、shell 先到、背压、请求断开取消及 patch/CSP 集成仍待实施；列表焦点/键盘、Blitz、Android 设备、R0/R7 和旧架构清理也仍在完整交付范围内。
+本轮 `check-semantic-ui.ps1 -Web` 通过 98 项运行测试、1 项 !Send 编译失败测试、fmt 和 host/WASM 严格 Clippy；Android/Linux all-features/all-targets 编译通过。定高、变高、普通接管、行资源、资源快照五组真实浏览器脚本均通过。证据保存于 D 盘 `resource-snapshot-acceptance-result-2026-10-22.json`。以上没有完成真正 streaming：异步边界、shell 先到、背压、请求断开取消及 patch/CSP 集成仍待实施；列表焦点/键盘、Apace、Android 设备、R0/R7 和旧架构清理也仍在完整交付范围内。
 
 ## R4：拉取式服务端帧与 HTTP 取消（2026-10-22）
 
@@ -448,7 +448,7 @@ HTML snapshot 格式现为 **v2**。普通 SSR 快照导出与 Web staged build 
 - `python scripts/check-semantic-stream.py` 通过：shell 4.385ms、首个 patch 107.204ms、第二个 patch 510.978ms、End 511.228ms（本机单次观测）。消费者确实在资源完成前读到 shell；End 含两个资源终值。之后五次在等待资源时关闭真实 HTTP 连接，completed/cancelled 为 1/5，active 与 timer 均为 0。延迟是测试指定的 100ms/500ms，数字不能当渲染吞吐/FPS。原始结果在 `D:/BuildCache/glory-semantic-ui/pull-stream-http-result-2026-10-22.json`。
 - 105 项运行测试、1 项 !Send 编译失败测试、host/WASM 严格 Clippy、独立例子格式/检查均通过。HTML v2 后，普通接管、资源接管、定高、变高、行请求五组 Chromium 回归通过，列表窗口/请求上限不变；Android/Linux all-features/all-targets 编译通过。stream feature 依赖图没有自动引入 web、HTTP、窗口或 GPU。
 
-R4 继续保持未完成：需要浏览器增量帧应用与原位范围移动、CSP 下的 bootstrap/template 传输、等待期间的预输入/焦点保护、End rekey 后真正 hydration、真实渐进页面与慢消费者网络验收。现有普通快照 CSP/接管证据不能代替这些流式场景。整个目标的列表焦点/键盘、Blitz/Android、R0/R7 与旧代码/工具清理也仍保留。
+R4 继续保持未完成：需要浏览器增量帧应用与原位范围移动、CSP 下的 bootstrap/template 传输、等待期间的预输入/焦点保护、End rekey 后真正 hydration、真实渐进页面与慢消费者网络验收。现有普通快照 CSP/接管证据不能代替这些流式场景。整个目标的列表焦点/键盘、Apace/Android、R0/R7 与旧代码/工具清理也仍保留。
 
 ## R4：渐进 HTML、CSP bootstrap 与最终接管（2026-10-22）
 
@@ -614,7 +614,7 @@ List::row_limit 默认 4096，覆盖窗口和 overscan；至多一条焦点 pin 
 
 错误时 ListStats::inspect 仍保存上次成功窗口的 rows=11/12；表格的 0 是实际 DOM 和 runtime tasks，不把缓存指标误当存活行。RowLimit 在范围重置/后续帧可诊断两次，脚本明确归为预期错误；其他错误为空。恢复后 End 继续到逻辑第 1 亿行，原始结果保存于 `D:/BuildCache/glory-semantic-ui/contract-profile-budget-browser-2026-10-22-r2.json`。
 
-这证明异常输入下资源数量有界及恢复正确，未测 FPS/layout/paint。完整目标仍保留 R0 Portable stylesheet/能力审计、R3 外部资源/OS IME/平台辅助技术、R5 Blitz、R6 Android、R7 性能与字段依赖，以及旧源码/工具清理。
+这证明异常输入下资源数量有界及恢复正确，未测 FPS/layout/paint。完整目标仍保留 R0 Portable stylesheet/能力审计、R3 外部资源/OS IME/平台辅助技术、R5 Apace、R6 Android、R7 性能与字段依赖，以及旧源码/工具清理。
 
 ## R0：查询屏障响应校验（2026-10-22）
 
@@ -632,19 +632,19 @@ List::row_limit 默认 4096，覆盖窗口和 overscan；至多一条焦点 pin 
 
 R0 仍需 Portable stylesheet 校验与完整内容/能力/错误矩阵审计；R3/R5/R6/R7 与旧代码清理保持未完成。上述屏障验证不能替代显示完成、OS IME、辅助技术或原生设备验收。
 
-## R5：真实 Blitz 无窗口消费者（2026-10-22）
+## R5：真实 Apace 无窗口消费者（2026-10-22）
 
 ### 交付与依赖
 
-新增活动包 glory-blitz，固定 blitz-dom/blitz-traits 为 0.3.0-beta.4。当前选择的依赖图使用 Stylo 0.22、Taffy 0.15、Parley/Fontique 0.12；没有窗口、绘制或 Dioxus 依赖，也没有把这些类型泄露进 core/ui/render/style。源码和发布元数据在 D 盘检查；上游模块职责可参照 [Blitz 架构](https://github.com/DioxusLabs/blitz#architecture)。门面原生 `blitz` feature 单独启用；实查默认 facade 不含引擎/serde，HTML+SSR 不含 Blitz/Stylo/Taffy/Parley/WGPU。
+新增活动包 glory-apace，固定 apace-dom/apace-traits 为 0.3.0-beta.4。当前选择的依赖图使用 Stylo 0.22、Takia 0.15、Parley/Fontique 0.12；没有窗口、绘制或 Dioxus 依赖，也没有把这些类型泄露进 core/ui/render/style。源码和发布元数据在 D 盘检查；上游模块职责可参照 [Apace 架构](https://github.com/DioxusLabs/apace#architecture)。门面原生 `apace` feature 单独启用；实查默认 facade 不含引擎/serde，HTML+SSR 不含 Apace/Stylo/Takia/Parley/WGPU。
 
-Render→共享 HtmlMapper→Dom Sink→Blitz 程序化文档变更。更新不输出整棵 HTML 再 parse，也不为 Blitz 另设布局树。Renderer 的 clone 指向同一文档；set_css 替换一个 author style 文本，set_viewport 输入物理尺寸/DPI，inspect 只读引擎，stats 提供 live ranges/engine nodes/interests/layouts/property writes。原生例子 `cargo run -p glory --example semantic_blitz --features blitz` 实际输出 3 个语义节点与 320×38 logical-pixel panel，更新复用原组件。
+Render→共享 HtmlMapper→Dom Sink→Apace 程序化文档变更。更新不输出整棵 HTML 再 parse，也不为 Apace 另设布局树。Renderer 的 clone 指向同一文档；set_css 替换一个 author style 文本，set_viewport 输入物理尺寸/DPI，inspect 只读引擎，stats 提供 live ranges/engine nodes/interests/layouts/property writes。原生例子 `cargo run -p glory --example semantic_apace --features apace` 实际输出 3 个语义节点与 320×38 logical-pixel panel，更新复用原组件。
 
 Linux 系统字体采用 Fontique 的 fontconfig-dlopen：第一次从 Windows cross-check 遇到 pkg-config 目标库探测失败，已通过明确的 Linux/FreeBSD 依赖 feature 改成运行时加载 Fontconfig；没有伪造目标 pkg-config 或关掉系统字体换取通过。该目标运行时仍须具备 Fontconfig/字体，当前只做了编译检查，不据此声称 Linux 字体或窗口已验收。
 
 ### 物理范围与控件初始状态
 
-普通节点可映射多个 Main/Control/Content part；Group 使用注释首尾和一个离线 park，不引入布局盒子。Place 整体移动物理范围，Suspend 保留其对象，Dispose 同时回收逻辑后代里的另行暂停范围和 park；Blitz 自身的代际 NodeId 加上 Glory 的 NodeId 映射避免复用旧身份。
+普通节点可映射多个 Main/Control/Content part；Group 使用注释首尾和一个离线 park，不引入布局盒子。Place 整体移动物理范围，Suspend 保留其对象，Dispose 同时回收逻辑后代里的另行暂停范围和 park；Apace 自身的代际 NodeId 加上 Glory 的 NodeId 映射避免复用旧身份。
 
 受控 value/checked/disabled 通过引擎 mutator 进入表单状态。离线构造的后代首次入文档时应用 pending 属性，后续普通重排不重放受控值；离线 Patch 在恢复后保持新值。textarea 的编辑器在 layout 阶段才生成，且初值读取子文本；适配层为其维护一个私有文本种子，使首次布局前的初值/变更和后续编辑器值都正确。它不是语义子 Widget，也不清空标签或业务后代。
 
@@ -673,17 +673,17 @@ beta.4 的 get_client_bounding_rect 路径扣除了被查询节点自己的 scro
 
 测试另外检查第 1 亿行文本及实际 border-box 位于滚动根视口；实际引擎 ScrollTo +1 后，逻辑偏移增量为 1，而不是按 24 亿逻辑像素缩放；清空后 ranges/interests/tasks/edges 为 0，引擎 live nodes 回到空文档基线，仅保留应用主动持有的一个 position Cage。以上没有计时绘制或测 FPS，也没有运行 OS 窗口/硬件滚轮。
 
-最终 **141 项运行测试、1 项 !Send 编译失败用例**，fmt、host/WASM 严格 Clippy、Web 例子构建，以及十包 workspace 在 Android aarch64/Linux x86_64 上的 all-features/all-targets 编译通过。编译器为 Windows MSVC rustc 1.98.0；这不是 MSRV 1.94 的单独证明。证据保存在 D:/BuildCache/glory-semantic-ui/{blitz-full-check,blitz-list-final,blitz-android-check,blitz-linux-check}.txt。本轮 Web 解释器未改，完成了重建，浏览器运行证据沿用上一轮九组，未把构建当成再次执行浏览器验收。
+最终 **141 项运行测试、1 项 !Send 编译失败用例**，fmt、host/WASM 严格 Clippy、Web 例子构建，以及十包 workspace 在 Android aarch64/Linux x86_64 上的 all-features/all-targets 编译通过。编译器为 Windows MSVC rustc 1.98.0；这不是 MSRV 1.94 的单独证明。证据保存在 D:/BuildCache/glory-semantic-ui/{apace-full-check,apace-list-final,apace-android-check,apace-linux-check}.txt。本轮 Web 解释器未改，完成了重建，浏览器运行证据沿用上一轮九组，未把构建当成再次执行浏览器验收。
 
 R5 保持未完成：paint/shell、原生输入/焦点/编辑/无障碍/资源服务与 Windows/Linux 实际窗口准入仍需推进；R6 Android lifecycle/Surface/IME/设备、R0/R3/R7 和旧架构清理也仍在完整目标内。
 
-本轮测试汇总、适用范围、原始指标和实现文件 SHA-256 另存于 `D:/BuildCache/glory-semantic-ui/blitz-document-evidence-2026-10-22.json`，供后续 shell/paint 验收区分文档与平台证据。
+本轮测试汇总、适用范围、原始指标和实现文件 SHA-256 另存于 `D:/BuildCache/glory-semantic-ui/apace-document-evidence-2026-10-22.json`，供后续 shell/paint 验收区分文档与平台证据。
 
 ## R5：可选绘制、CPU 光栅与 Linux 实跑（2026-10-22）
 
 ### 分层与缓存契约
 
-新增 glory-blitz/paint（blitz-paint =0.3.0-beta.4、AnyRender =0.14.0），向任意 PaintScene 记录一帧；raster 再启用匹配的 anyrender_vello_cpu =0.18.0。门面转发 blitz-paint/blitz-raster，默认不启用；绘制没有反向进入 core/ui/style，也没有创建 GPU、窗口、事件循环或阻塞执行器。版本选择依据本地发布源码及 [AnyRender 兼容矩阵](https://github.com/DioxusLabs/anyrender#version-compatibility)。
+新增 glory-apace/paint（apace-paint =0.3.0-beta.4、AnyRender =0.14.0），向任意 PaintScene 记录一帧；raster 再启用匹配的 anyrender_vello_cpu =0.18.0。门面转发 apace-paint/apace-raster，默认不启用；绘制没有反向进入 core/ui/style，也没有创建 GPU、窗口、事件循环或阻塞执行器。版本选择依据本地发布源码及 [AnyRender 兼容矩阵](https://github.com/DioxusLabs/anyrender#version-compatibility)。
 
 Renderer::paint 先重置 scene，解决已提交文档的布局，然后记录完整帧。它不会替应用调用 App::flush；未提交 Cage 改值仍显示上一提交，提交后才更新像素。FrameInfo 区分 applied 与 visual revision，包含物理尺寸、有效 DPI×zoom 和文档身份。几何查询先解决 layout 时也不能消耗视觉失效；回归先 query 再 paint 仍得到新颜色。
 
@@ -709,7 +709,7 @@ Raster::draw 对未变更帧跳过布局、编码和光栅化；无可见差异�
 
 变高窗口在非整行位置可能多覆盖一条部分行，因此上限为 ceil(120/24)+1+4=10。命令数也受裁剪、行高和文字分布影响，不能把 17/19 解释成模式之间的通用效率排名。31 帧使用同一 buffer 指针；清空后像素全透明、ranges=0，clear 后 buffer capacity=0。没有随着 1 亿条源或 30 次访问历史保留组件/帧。
 
-Windows 与 Linux 均导出了 720×480 的实际 UI：`blitz-paint.png`/`blitz-paint-end.png`、`blitz-paint-linux.png`/`blitz-paint-linux-end.png`，位于 D:/BuildCache/glory-semantic-ui。已逐图检查，末尾包含 Entry 99999999、更新后的 Count: 3、实际文字、表单和复选框；两平台使用系统字体，排版细节可不同，不声称逐像素一致。
+Windows 与 Linux 均导出了 720×480 的实际 UI：`apace-paint.png`/`apace-paint-end.png`、`apace-paint-linux.png`/`apace-paint-linux-end.png`，位于 D:/BuildCache/glory-semantic-ui。已逐图检查，末尾包含 Entry 99999999、更新后的 Count: 3、实际文字、表单和复选框；两平台使用系统字体，排版细节可不同，不声称逐像素一致。
 
 ### Linux 存储与复现
 
@@ -725,13 +725,13 @@ sh scripts/check-semantic-linux.sh --paint
 
 Windows 的 check-semantic-ui.ps1 -Web 与 Linux 脚本均通过；当前是 **148 项运行测试、1 项 !Send 编译失败用例**。Windows 另验证 default facade、HTML/SSR 不含绘图引擎，paint-only 不含 CPU raster/WGPU；Android/Linux cross-check 继续只代表编译。Web 解释器未修改，本轮有 WASM 检查和重建，未重复宣称执行此前九组浏览器脚本。
 
-本轮原始记录为 blitz-paint-full-check.txt、blitz-paint-tests.txt、blitz-linux-final-check.txt 和平台 cross-check 日志；精确指标/源码与 PNG 哈希见 blitz-paint-evidence-2026-10-22.json，均位于 D 盘任务构建目录。
+本轮原始记录为 apace-paint-full-check.txt、apace-paint-tests.txt、apace-linux-final-check.txt 和平台 cross-check 日志；精确指标/源码与 PNG 哈希见 apace-paint-evidence-2026-10-22.json，均位于 D 盘任务构建目录。
 
 尚未做 dirty rectangle/逐节点 paint cache；变更帧的 CPU 路径重画完整缓冲，成本还取决于物理视口面积，没有测 FPS 或布局/绘制时间分解。shell、真实 OS 窗口、输入/焦点/IME、无障碍、外部资源与 Android 设备仍未完成，R5/R6/R7 保持未勾选。R0/R3 与旧架构/工具清理也继续保留，整个目标没有缩减到无窗口或 CPU 绘制。
 
 ## R5 桌面窗口宿主与共享执行器（2026-10-22）
 
-新增 `glory-blitz/shell`、门面 `blitz-shell` 与纯 Rust 的 `examples/window.rs`。`shell::{WindowApp, Shell, WindowAttributes}` 使用 blitz-shell 0.3.0-beta.4 / winit 0.31.0-beta.3，CPU 窗口由 Vello CPU 0.18 和 softbuffer_window_renderer 0.9 驱动；不依赖离屏 Raster API，不引入 GPU。只在 Windows/Linux/macOS 目标选入桌面依赖；macOS 尚无运行证据，Android 继续单独实现。
+新增 `glory-apace/shell`、门面 `apace-shell` 与纯 Rust 的 `examples/window.rs`。`shell::{WindowApp, Shell, WindowAttributes}` 使用 apace-shell 0.3.0-beta.4 / wingy 0.31.0-beta.3，CPU 窗口由 Vello CPU 0.18 和 softbuffer_window_renderer 0.9 驱动；不依赖离屏 Raster API，不引入 GPU。只在 Windows/Linux/macOS 目标选入桌面依赖；macOS 尚无运行证据，Android 继续单独实现。
 
 `WindowApp` 独立拥有 App、Renderer 和本地执行器。原生回调只排入 activation，App::pump 在引擎借用结束后执行业务。Scroll/Resize 观测与虚拟窗口提交先于 paint。`core::executor::Executor` 从 SSR host 提取供两个真实消费者共用；SSR 的 pull/backpressure 仍由其 stream 层控制，未改为主动推送。
 
@@ -755,7 +755,7 @@ Windows 的 check-semantic-ui.ps1 -Web 与 Linux 脚本均通过；当前是 **1
 
 ```powershell
 ./scripts/check-semantic-ui.ps1 -Web -Window
-cargo run -p glory-blitz --features shell --example window
+cargo run -p glory-apace --features shell --example window
 ```
 
 ```sh
@@ -768,7 +768,7 @@ sh scripts/check-semantic-linux.sh --window
 
 Linux verifier 分开以 GLORY_WINDOW_BACKEND=x11/wayland 运行同一窗口测试，不能以默认后端通过代替另一后端。Ubuntu noble 的 libxkbcommon-x11-0 1.6.0-1build1 与 libxcb-xkb1 1.15-1ubuntu2 从发行版仓库下载并解包到上述 D: runtime 目录，依赖经 ldd 核对。Windows 与 Linux 的 Cargo home/target/tmp/cache 继续全部在 D:；原 8GiB ext4 构建镜像因窗口调试产物耗尽，核对 backing file 后在线扩容到 16GiB，无 C: target/cache 回退。
 
-依赖隔离已检查：默认门面、HTML/SSR 不含窗口引擎；CPU shell 不含 WGPU/Metal/Vulkan 绘制依赖；Android all-features 实际图不含 desktop winit/blitz-shell/softbuffer。Android 的构建通过不代表已经提供移动窗口入口。WASM 严格检查及 fixture 重建已有证据；本次未修改 Web 解释器，不重复声称跑过旧九组浏览器脚本。
+依赖隔离已检查：默认门面、HTML/SSR 不含窗口引擎；CPU shell 不含 WGPU/Metal/Vulkan 绘制依赖；Android all-features 实际图不含 desktop wingy/apace-shell/softbuffer。Android 的构建通过不代表已经提供移动窗口入口。WASM 严格检查及 fixture 重建已有证据；本次未修改 Web 解释器，不重复声称跑过旧九组浏览器脚本。
 
 本轮仍未完成原生编辑/value/composition/selection、focus/列表逻辑导航、实际 OS IME/辅助技术、外部资源 provider、Android Activity/Surface/设备、R7 时间分解与字段/style 优化、R0/R3 审计及旧架构清理。focus/input capabilities 保持 false，activation 子集不等于完整输入支持；R5/R6/R7 和完整目标保持未完成。
 
@@ -776,7 +776,7 @@ Linux verifier 分开以 GLORY_WINDOW_BACKEND=x11/wayland 运行同一窗口测�
 
 共享执行器后也重跑实际 HTTP/TCP 传输验收：本次 shell 约 2.8ms 到达，两个资源 patch 约 110/513ms，End 约 514ms；暂停读端后 produced 稳定为 2，断开后 active/timers 均为 0。时间仅为这次 loopback 运行值，不作为生产性能指标。专用 fixture 已在测试后停止。
 
-原始记录位于 D:/BuildCache/glory-semantic-ui：blitz-shell-full-check.txt、blitz-shell-linux-final.txt、blitz-shell-android-check.txt、blitz-shell-deps-*.txt、blitz-shell-stream-acceptance.json；源码/锁文件/验证脚本哈希和确切单次窗口计数见 blitz-shell-evidence-2026-10-22.json。
+原始记录位于 D:/BuildCache/glory-semantic-ui：apace-shell-full-check.txt、apace-shell-linux-final.txt、apace-shell-android-check.txt、apace-shell-deps-*.txt、apace-shell-stream-acceptance.json；源码/锁文件/验证脚本哈希和确切单次窗口计数见 apace-shell-evidence-2026-10-22.json。
 
 ## R5 焦点、受控编辑与原生组合协议（2026-10-22）
 
@@ -792,7 +792,7 @@ WindowApp 现在安装原生焦点与编辑驱动，按实例报告 focus=true/i
 - Selection 将 Parley 的 UTF-8 byte 位置转换为 UTF-16 code units，包含 emoji 和 preedit。查询仍是提交屏障，不表示窗口已显示。
 - 实际发现并修复暂停后的焦点 pin 未释放：App 原先忽略所有 inactive 事件，现允许 live 但 Suspend 的 Scope 接收终止 FocusChanged(false)/Composition(false)。普通输入仍忽略，Dispose/过期代次不再回调。UI 与 native 回归覆盖此区别。
 
-受控编辑在 `crates/blitz/src/editing.rs`，不复制业务响应式运行时：
+受控编辑在 `crates/apace/src/editing.rs`，不复制业务响应式运行时：
 
 1. 共用 mapper 的 Revision 被保留为 requested/accepted 水位。相同 value 回写只确认版本，不触碰原生 editor、光标或 preedit；不同值在组合期间暂存。结束时旧输入携带旧水位，App 拒绝它覆盖更新的程序值。
 2. value attribute 的增量更新不再绕过 property 路径，避免在组合期间提前重写 editor；checked 也只有一条受控路径。beta.4 的 checked setter 解析 bool，更新时使用其实际表示，覆盖 false→true→false。
@@ -801,7 +801,7 @@ WindowApp 现在安装原生焦点与编辑驱动，按实例报告 focus=true/i
 5. 单行 paste/IME 去掉 CR/LF，多行与程序 textarea 值统一 CRLF/CR 为 LF；原生粘贴清理同步转换 anchor/focus，避免合法粘贴导致无效 Input props 或光标跳动。普通多行 LF 不触发额外 setter。
 6. 启用上游 complex-scripts 分词数据；中文/Japanese 的模型缺失诊断消失。系统字体、文字整形与 OS IME 候选窗仍是不同层。
 
-新增 8 项原生编辑回归，另有 4 项原生焦点/导航测试。覆盖受控 echo、Enter、多行、CJK/emoji、选区替换取消、周围删除、无效字节偏移、程序写入交错、重复空 Preedit、过期输入、换行粘贴、label/control 复选事件及 Space 激活。它们是实际 Blitz/Parley 引擎上的合成协议，不是操作 OS 输入法的自动化。
+新增 8 项原生编辑回归，另有 4 项原生焦点/导航测试。覆盖受控 echo、Enter、多行、CJK/emoji、选区替换取消、周围删除、无效字节偏移、程序写入交错、重复空 Preedit、过期输入、换行粘贴、label/control 复选事件及 Space 激活。它们是实际 Apace/Parley 引擎上的合成协议，不是操作 OS 输入法的自动化。
 
 大列表使用同一公开 List：定高与 24/28/32px 变高的一亿行源，180px 视口、overscan=2。行编辑现在绑定行 Owner 的 Cage，并将事件回写。组合输入中连续 30 次远跳，原生编辑对象、草稿与选区保持，窗口外最多一个焦点 pin；indexed prepend 保留同一对象，Suspend 清理组合/焦点，blur 或删除后回收。存活行 ≤15、图槽 <256、源 key 累计读取 <2500 的断言通过，没有按数据总量或访问历史保留编辑器。
 
@@ -815,25 +815,25 @@ WindowApp 现在安装原生焦点与编辑驱动，按实例报告 focus=true/i
 
 77 与旧阶段的 64 不作性能排名：新 fixture 每行多了编辑控件。以上仍是合成输入 + 实际窗口/CPU present；没有物理键盘/鼠标、OS IME、剪贴板系统集成、屏幕阅读器、移动设备、FPS 或阶段耗时结论。
 
-最终验证：Windows 与 Ubuntu WSL 均通过 169 项运行测试、1 项 !Send 编译失败用例及 workspace all-features/all-targets 严格 Clippy；Linux 另验证无窗口 default/paint 的 Clippy。显式窗口测试 Windows 1 项、Linux X11/Wayland 各 1 项，日志 passed 合计 171/172。Windows WASM 严格检查和 fixture 重建通过；Android all-features/all-targets 编译通过，仍无移动宿主入口。default/HTML+SSR 不包含 Blitz/窗口，CPU shell 不包含 GPU 绘图实现，Android 实际依赖图不包含桌面 shell/winit/softbuffer。
+最终验证：Windows 与 Ubuntu WSL 均通过 169 项运行测试、1 项 !Send 编译失败用例及 workspace all-features/all-targets 严格 Clippy；Linux 另验证无窗口 default/paint 的 Clippy。显式窗口测试 Windows 1 项、Linux X11/Wayland 各 1 项，日志 passed 合计 171/172。Windows WASM 严格检查和 fixture 重建通过；Android all-features/all-targets 编译通过，仍无移动宿主入口。default/HTML+SSR 不包含 Apace/窗口，CPU shell 不包含 GPU 绘图实现，Android 实际依赖图不包含桌面 shell/wingy/softbuffer。
 
 UI 生命周期变化后，重新执行 Chromium 155 的 acceptance.js、focus-acceptance.js、navigation-acceptance.js，三组 errors 均为空。基础列表 80 次远跳最多 33 行/84 DOM 节点/140 图槽，每 host tick 最多 34 次 key 读取；焦点 fixture 定高/变高最多 14/16 行，程序 setter 为零，所有行最终 created=dropped。浏览器原生按键/选区与 AX role/name/focus 有证据，OS IME 与实际辅助技术继续独立验收。测试 HTTP fixture 已停止。
 
-复现入口仍为 `./scripts/check-semantic-ui.ps1 -Web -Window` 与 `scripts/check-semantic-linux.sh --window`；原生编辑单测可定向运行 `cargo test -p glory-blitz --features shell --lib editing_tests`。Cargo home/target/tmp 均在 D:，Linux 使用已核对 D: backing file 的 ext4 loop。记录位于 D:/BuildCache/glory-semantic-ui：blitz-editing-final-{windows,linux}.txt、blitz-editing-full-check.txt（含 WASM）、blitz-editing-android-check.txt、blitz-editing-deps-*.txt、blitz-editing-browser-2026-10-22.json；源码/锁文件/验证脚本哈希与范围见 blitz-editing-evidence-2026-10-22.json。
+复现入口仍为 `./scripts/check-semantic-ui.ps1 -Web -Window` 与 `scripts/check-semantic-linux.sh --window`；原生编辑单测可定向运行 `cargo test -p glory-apace --features shell --lib editing_tests`。Cargo home/target/tmp 均在 D:，Linux 使用已核对 D: backing file 的 ext4 loop。记录位于 D:/BuildCache/glory-semantic-ui：apace-editing-final-{windows,linux}.txt、apace-editing-full-check.txt（含 WASM）、apace-editing-android-check.txt、apace-editing-deps-*.txt、apace-editing-browser-2026-10-22.json；源码/锁文件/验证脚本哈希与范围见 apace-editing-evidence-2026-10-22.json。
 
 后续仍需 R0 契约/能力/内容审计，R3/R5 外部资源策略与真实平台输入/辅助技术，R6 Activity/Surface/真机，R7 时间分解、字段依赖/style 优化及旧架构清理。完整目标保持进行中。
 
 ## R5 资源内核与图片滚动历史回收（2026-10-22）
 
-本轮先完成资源协议/预算/生命周期底座，没有将标准 HTTP/文件/打包资产 loader 计为完成。最初核对发现：固定 Blitz 版本将所有解码过的图片按 URL 永久保留，仅限制 Glory 行节点或请求并发不能限制滚动历史内存。上游公开 API 也没有回收该缓存的接口。
+本轮先完成资源协议/预算/生命周期底座，没有将标准 HTTP/文件/打包资产 loader 计为完成。最初核对发现：固定 Apace 版本将所有解码过的图片按 URL 永久保留，仅限制 Glory 行节点或请求并发不能限制滚动历史内存。上游公开 API 也没有回收该缓存的接口。
 
-因此在 `vendor/` 保存固定 `0.3.0-beta.4` 来源的 dom/traits/paint/shell 四包，原提交为 `92b11f1bd8ab7975411328b0406a95a09445b4e7`。它们以 glory-blitz-* 本地 package 身份保持类型一致，Rust 依赖别名仍为 blitz_dom 等；用户应用无需全局 Cargo patch。四包不进入十包活动 workspace。除资源补丁与 manifest 外，原源码保持；paint 仅注释一个 SVG 未启用时的未使用 variant，shell 源码没有改动。原 archive/file SHA-256、许可证与可审查差异见 vendor/blitz-source.json、vendor/blitz.patch、vendor/README.md。没有新增资源实现的 unsafe。
+因此在 `vendor/` 保存固定 `0.3.0-beta.4` 来源的 dom/traits/paint/shell 四包，原提交为 `92b11f1bd8ab7975411328b0406a95a09445b4e7`。它们以 glory-apace-* 本地 package 身份保持类型一致，Rust 依赖别名仍为 apace_dom 等；用户应用无需全局 Cargo patch。四包不进入十包活动 workspace。除资源补丁与 manifest 外，原源码保持；paint 仅注释一个 SVG 未启用时的未使用 variant，shell 源码没有改动。原 archive/file SHA-256、许可证与可审查差异见 vendor/apace-source.json、vendor/apace.patch、vendor/README.md。没有新增资源实现的 unsafe。
 
-`scripts/check-vendored-blitz.py` 校验 103 个文件，意外更改原源码或未记录的补丁会失败；刷新已声明补丁时从 D: 的原 archive 源提取差异并检查新增 unsafe。Windows/Linux verifier 已接入来源验证和额外 69 项引擎单测。根与 semantic-web 的 Cargo.lock 改为保留，构建/检查使用 --locked，避免新依赖在后续机器静默漂移。分发/发布本地 fork 仍是后续 release 工作，此处没有 crates.io 发布声明。
+`scripts/check-vendored-apace.py` 校验 103 个文件，意外更改原源码或未记录的补丁会失败；刷新已声明补丁时从 D: 的原 archive 源提取差异并检查新增 unsafe。Windows/Linux verifier 已接入来源验证和额外 69 项引擎单测。根与 semantic-web 的 Cargo.lock 改为保留，构建/检查使用 --locked，避免新依赖在后续机器静默漂移。分发/发布本地 fork 仍是后续 release 工作，此处没有 crates.io 发布声明。
 
 实现边界：
 
-- `glory_blitz::Config` 为 Renderer/WindowApp 提供显式 base URL、ResourceLimits 和 provider。默认 `glory://app/` 不授权网络/文件访问，也不安装实际 I/O。自定义 provider 使用 `glory_blitz::assets` 导出的接口；它们属于 adapter，不进入 core/UI。
+- `glory_apace::Config` 为 Renderer/WindowApp 提供显式 base URL、ResourceLimits 和 provider。默认 `glory://app/` 不授权网络/文件访问，也不安装实际 I/O。自定义 provider 使用 `glory_apace::assets` 导出的接口；它们属于 adapter，不进入 core/UI。
 - decoded-image 复用缓存同时限制条目和 payload 字节，命中更新 LRU；默认 64 项/16MiB。pending image 默认 128 个 URL、每 URL 最多 4096 waiter；新消费者超限计入 rejected。配置不支持缩小到现有不可回收注册/等待资源以下。
 - 单张图片在解码和 RGBA 扩展前检查尺寸及输出字节，默认每维 4096px、RGBA 16MiB。接通 PNG/JPEG/WebP codec；不启用 SVG，也不以猜测的 RGBA 大小缓存其不透明树。
 - 外部字体按成功注册次数和原始数据量限制，默认每文档 64 次/32MiB。坏字体不消耗成功配额；quota 拒绝与解析失败分别计数。该统计不包括系统字体/UA 字体。
@@ -850,17 +850,17 @@ UI 生命周期变化后，重新执行 Chromium 155 的 acceptance.js、focus-a
 
 最终验证：Windows 与 Ubuntu WSL 均通过 178 项框架运行测试、1 项 !Send 编译失败用例、额外 69 项引擎单测及严格 Clippy；Linux 另通过 default/paint 组合。显式窗口测试仍覆盖 Windows 一次、WSLg X11/Wayland 各一次，日志 passed 合计 249/250。它们沿用受控编辑 fixture，峰值 14 个任务/77 引擎节点，累计 key 本次分别为 676/669/670；不是本轮图片注入测试的节点计数，也未新增真实窗口网络请求声明。
 
-Windows WASM 严格检查与 fixture 重建通过；本轮没有改变 Web/UI 解释器，不重复声称重跑浏览器脚本。Android all-features/all-targets 编译通过。实际依赖图确认 default 与 HTML+SSR 不包含原版或本地 fork 的 Blitz/image/window，CPU shell 不引入 GPU 绘图实现，Android 不引入桌面 winit/shell/softbuffer。
+Windows WASM 严格检查与 fixture 重建通过；本轮没有改变 Web/UI 解释器，不重复声称重跑浏览器脚本。Android all-features/all-targets 编译通过。实际依赖图确认 default 与 HTML+SSR 不包含原版或本地 fork 的 Apace/image/window，CPU shell 不引入 GPU 绘图实现，Android 不引入桌面 wingy/shell/softbuffer。
 
 Linux 首轮链接阶段出现 Bus error，当时 D: backing 的 32GiB ext4 分区剩余约 1.7GiB。确认进程终止与实际挂载后，只清理任务 target/debug/incremental，释放后约 7.2GiB；重跑设置 CARGO_INCREMENTAL=0 后通过。记录相关条件，不把一次链接失败断言为源码问题或已证明的唯一磁盘故障原因；没有回退到 C: target/cache。
 
-原始记录：D:/BuildCache/glory-semantic-ui/blitz-assets-final-{windows,linux}.txt、blitz-assets-kernel-tests.txt、blitz-assets-upstream-tests.txt、blitz-assets-android-check.txt、blitz-assets-deps-*.txt。失败首轮保留在 blitz-assets-full-linux.txt，最终源码/锁文件/来源与验证脚本的 SHA-256 见 blitz-assets-kernel-evidence-2026-10-22.json。
+原始记录：D:/BuildCache/glory-semantic-ui/apace-assets-final-{windows,linux}.txt、apace-assets-kernel-tests.txt、apace-assets-upstream-tests.txt、apace-assets-android-check.txt、apace-assets-deps-*.txt。失败首轮保留在 apace-assets-full-linux.txt，最终源码/锁文件/来源与验证脚本的 SHA-256 见 apace-assets-kernel-evidence-2026-10-22.json。
 
 下一步继续标准 asset loader 的 URL/redirect/路径策略、encoded-body/并发/队列/期限预算和真实 I/O 取消，再接宿主资源包及 Android。重定向后的 CSS 相对地址、异步图片对变高锚点的影响需要专门验收。R0、R3/R5、R6、R7、平台辅助技术及旧架构清理保持未完成，整体目标继续推进。
 
 ## R5 桌面 HTTP 与内置资产包（2026-10-22）
 
-本阶段更新上一节的 transport 子项，新增可选 `glory-blitz/assets`（门面 `blitz-assets`），没有增加空 crate，也未让 core/UI/默认门面依赖 HTTP。`assets::{Loader, LoadConfig, LoadLimits, LoadStats}` 属于真实渲染适配器服务；应用数据的 Cage/Resource 不与图片/CSS 传输混合。Loader 每文档独立，不能复用于第二个 WindowApp 或关闭后重开。可运行示例为 `crates/blitz/examples/assets.rs`，需要 `assets,shell`，默认只读显式内置 CSS 包，不发网络请求。
+本阶段更新上一节的 transport 子项，新增可选 `glory-apace/assets`（门面 `apace-assets`），没有增加空 crate，也未让 core/UI/默认门面依赖 HTTP。`assets::{Loader, LoadConfig, LoadLimits, LoadStats}` 属于真实渲染适配器服务；应用数据的 Cage/Resource 不与图片/CSS 传输混合。Loader 每文档独立，不能复用于第二个 WindowApp 或关闭后重开。可运行示例为 `crates/apace/examples/assets.rs`，需要 `assets,shell`，默认只读显式内置 CSS 包，不发网络请求。
 
 策略和生命周期如下：
 
@@ -889,7 +889,7 @@ Linux 首轮链接阶段出现 Bus error，当时 D: backing 的 32GiB ext4 分�
 
 WASM 严格检查与 fixture 重建通过，没有在本轮重跑浏览器脚本。Android all-features/all-targets 编译通过；依赖图确认默认门面与 HTML+SSR 没有引擎/HTTP/window，普通 shell 没有自动引入 HTTP/TLS/GPU，Android 没有桌面 Loader/shell 依赖。构建/缓存/tmp 都在 D:。Linux 核对现有 loop0 及 backing file 后，将 D:/BuildCache/glory-semantic-ui/linux-build-cache.ext4 从 32GiB 在线扩到 64GiB，消除本轮约 1.6GiB 剩余空间的风险；没有使用 C: 回退。
 
-复现仍使用主 Windows/Linux verifier；定向入口为 `cargo test --locked -p glory-blitz --all-features --test loader --test resources -- --nocapture`。原始日志为 D:/BuildCache/glory-semantic-ui/blitz-loader-{tests,clippy,final-windows,final-linux,android-check}.txt 与 blitz-loader-deps-*.txt；确切源码、锁文件、来源 patch、脚本哈希和单次计数保存在 blitz-loader-evidence-2026-10-22.json。其窗口/传输/编译范围分开记录，不把其中任何一项算作 R5/R6 整体完成。
+复现仍使用主 Windows/Linux verifier；定向入口为 `cargo test --locked -p glory-apace --all-features --test loader --test resources -- --nocapture`。原始日志为 D:/BuildCache/glory-semantic-ui/apace-loader-{tests,clippy,final-windows,final-linux,android-check}.txt 与 apace-loader-deps-*.txt；确切源码、锁文件、来源 patch、脚本哈希和单次计数保存在 apace-loader-evidence-2026-10-22.json。其窗口/传输/编译范围分开记录，不把其中任何一项算作 R5/R6 整体完成。
 
 ## R5 请求租约与资源完成背压（2026-10-22）
 
@@ -913,9 +913,9 @@ WASM 严格检查与 fixture 重建通过，没有在本轮重跑浏览器脚本
 
 最终 Windows/Linux 均通过 189 项框架运行测试、1 项 !Send 编译失败用例、76 项引擎单测及严格 Clippy；Linux 另验证 default/paint。实窗继续是原受控编辑 fixture，Windows/X11/Wayland 各一次，14 tasks/77 引擎节点，本次 key 677/673/669；passed 合计 267/268。窗口 fixture 没有改成 HTTP 压力场景。WASM 严格检查和 fixture 重建、Android all-features/all-targets 编译及依赖隔离通过；本轮未重跑浏览器脚本，也不新增 OS IME/辅助技术/Android 设备验收声明。
 
-实现主要在 vendor/blitz-dom/src/resource_queue.rs、net/resources/document/mutator/layout/iframe 与 traits/net，外层只转发 prepare 并纳入 Loader 的等待/期限/取消。来源核对现在为 4 个 fork package/104 文件，iframe 变更与新增模块已显式登记，patch 没有增加新 unsafe。没有新增依赖，核心/默认门面和 HTML+SSR 仍不含引擎/HTTP，Android 不含桌面 shell/Loader。构建/cache/tmp 继续全在 D:。
+实现主要在 vendor/apace-dom/src/resource_queue.rs、net/resources/document/mutator/layout/iframe 与 traits/net，外层只转发 prepare 并纳入 Loader 的等待/期限/取消。来源核对现在为 4 个 fork package/104 文件，iframe 变更与新增模块已显式登记，patch 没有增加新 unsafe。没有新增依赖，核心/默认门面和 HTML+SSR 仍不含引擎/HTTP，Android 不含桌面 shell/Loader。构建/cache/tmp 继续全在 D:。
 
-原始记录为 D:/BuildCache/glory-semantic-ui/blitz-pressure-{tests,engine-tests,clippy,final-windows,final-linux,android-check}.txt 与 deps 日志；最终源码/锁文件/patch/脚本哈希及确切单次范围见 blitz-pressure-evidence-2026-10-22.json。首轮 loader fixture 在 shutdown 时解析半截 HTTP header 的旧假设被真实取消时序触发，已修复为关闭/不完整 header 直接结束；首轮失败保留在 blitz-pressure-baseline-tests.txt。
+原始记录为 D:/BuildCache/glory-semantic-ui/apace-pressure-{tests,engine-tests,clippy,final-windows,final-linux,android-check}.txt 与 deps 日志；最终源码/锁文件/patch/脚本哈希及确切单次范围见 apace-pressure-evidence-2026-10-22.json。首轮 loader fixture 在 shutdown 时解析半截 HTTP header 的旧假设被真实取消时序触发，已修复为关闭/不完整 header 直接结束；首轮失败保留在 apace-pressure-baseline-tests.txt。
 
 下一步继续未知图片固有高度的 measured-list 锚点、文件/Android 资产、真实平台输入/无障碍、R0/R7 以及旧架构清理。R5 与完整目标不因完成队列背压而标为完成。
 
@@ -924,42 +924,42 @@ WASM 严格检查与 fixture 重建通过，没有在本轮重跑浏览器脚本
 本阶段完成上一节的固有 PNG 高度子项，没有固定图片 CSS 高度，也没有把其他格式、字体到达、OS 输入或移动设备算作同一项完成。两个发现改变了共享契约：
 
 - 原生 End 目标已经测量占位 24px 后，导航意图被提前删除；图片到达变 96px，原 y=156 导致底端 252px，超出 180px 视口。`ui::list` 现为变高列表持续保留至多一个 reveal 意图，修正为 y=84、底端 180px；超出视口的行起点对齐。真实用户移动、新程序位置/数据或焦点移走即取消；定高导航仍立即结束。
-- Chromium 实际接受的 scrollTop 曾比请求偏约 0.28125 CSS px，旧的 0.25px 判断把程序赋值误认为用户滚动。没有扩大容忍吞掉小输入，而是在 render port 增加 ScrollRequest/ScrollAck：最后一次 requested/accepted 与当前 x/y 分开。Web 在 ScrollTo action 屏障立即读回接受值、安排观察；Blitz 也读回并报告。确认保留在后续观察中，所以原生移动抢在首个确认之前到达也可区分。元数据按活跃节点有界，销毁释放；HTML Snapshot/wire 版本不因运行时事件扩展而变更。
+- Chromium 实际接受的 scrollTop 曾比请求偏约 0.28125 CSS px，旧的 0.25px 判断把程序赋值误认为用户滚动。没有扩大容忍吞掉小输入，而是在 render port 增加 ScrollRequest/ScrollAck：最后一次 requested/accepted 与当前 x/y 分开。Web 在 ScrollTo action 屏障立即读回接受值、安排观察；Apace 也读回并报告。确认保留在后续观察中，所以原生移动抢在首个确认之前到达也可区分。元数据按活跃节点有界，销毁释放；HTML Snapshot/wire 版本不因运行时事件扩展而变更。
 
 控制器保留当前定位的量化偏差，新导航或外部 seek 重设，避免连续 Home/End 累积误差。`.position(cage).on_scroll(...)` 的相同受控回写只确认报告值，不重新 seek/取消 reveal；仅逻辑值变化才报告，空闲不回写。专门 UI 回归覆盖接受坐标 -0.625px 与确认同帧的 -1px 原生移动，真实逻辑 -1px 被保留；随后 Resize 不恢复已经取消的意图。既有导航 fixture 另验证反复首尾切换。
 
-实现位置：`crates/render/src/lib.rs`、`crates/ui/src/list/{widget,measure}.rs`、`crates/web/src/browser.rs`、`crates/web/src/browser/dom.rs`、`crates/blitz/src/document.rs`。不向 core 增加引擎类型，不在 adapter 复制列表算法；没有新增依赖，也没有改动本轮 vendor 源码。
+实现位置：`crates/render/src/lib.rs`、`crates/ui/src/list/{widget,measure}.rs`、`crates/web/src/browser.rs`、`crates/web/src/browser/dom.rs`、`crates/apace/src/document.rs`。不向 core 增加引擎类型，不在 adapter 复制列表算法；没有新增依赖，也没有改动本轮 vendor 源码。
 
 新增验收及实际范围：
 
 | 场景 | 实际行为与上界 | 单次观察 |
 |---|---|---|
-| Blitz 注入 PNG，一亿行/180px/overscan=2 | 上方 24→96px 保留同一 key 的 -7px；行内图片变 128px、源替换成 32px、迟到旧请求、40 远跳、测量 eviction 后返回；行≤16、测量≤64、height capacity<2000、nodes<64、图槽<256、key<4000 | key=1090，末窗 12 行、64 测量、height capacity=31，复用图片 3 项/8296B |
+| Apace 注入 PNG，一亿行/180px/overscan=2 | 上方 24→96px 保留同一 key 的 -7px；行内图片变 128px、源替换成 32px、迟到旧请求、40 远跳、测量 eviction 后返回；行≤16、测量≤64、height capacity<2000、nodes<64、图槽<256、key<4000 | key=1090，末窗 12 行、64 测量、height capacity=31，复用图片 3 项/8296B |
 | Headless WindowApp 导航 | 已测占位 End 后收到 96px；受控位置回写；原生/程序移动取消；宽度变化及 384px 超高目标起点对齐 | 目标 y=156→84、底端=180；不创建实际 OS 窗口 |
 | 真实 loopback HTTP | 门控上方和最后一行 PNG；实际解码、事件、测量与逻辑修正；结束 transport/lease 清零 | 相同 -7px 锚点与 84–180px End 行，key=57 |
 | Chromium intrinsic fixture | 实际 PNG decode/ResizeObserver；增长/缩小、受控回写、滚动/seek 取消、40 远跳、返回和卸载；行≤17、测量≤64、height capacity<2000、nodes<70、图槽<300、key<5000 | 峰值 11 行/28 语义槽/79 图槽；末测量64、height capacity644、key2109、errors=[] |
 
 浏览器版本 Chrome 155.0.8059.84，独立 context 请求 deviceScaleFactor=1，实际报告 DPR≈0.99999998，几何断言容忍 1 CSS px。PNG 通过 route 拦截完成，不宣称此脚本证明真实网络取消；真实 HTTP 由原生用例覆盖。key/报告次数和中间测量受调度影响，以上单次值不作固定性能指标，更不能作跨宿主速度、FPS 或 RSS 结论。
 
-新增 `examples/semantic-web/src/intrinsic.rs` 与 `intrinsic-acceptance.js`，WASM fixture 的 unmount 统一释放该 App。最终重跑全部十组浏览器脚本：acceptance、adaptive、focus、navigation、budget、resource、resource-snapshot、hydrate、intrinsic、stream，均通过；同时重跑 Python stream transport 检查。End 的原生修复前失败保留于 blitz-intrinsic-navigation-before.txt。
+新增 `examples/semantic-web/src/intrinsic.rs` 与 `intrinsic-acceptance.js`，WASM fixture 的 unmount 统一释放该 App。最终重跑全部十组浏览器脚本：acceptance、adaptive、focus、navigation、budget、resource、resource-snapshot、hydrate、intrinsic、stream，均通过；同时重跑 Python stream transport 检查。End 的原生修复前失败保留于 apace-intrinsic-navigation-before.txt。
 
 最终 Windows/Linux 全量 gate 各通过 193 项框架运行测试、1 项 !Send 编译失败用例、76 项引擎单测及严格 Clippy；Linux 另检查 default/paint。实窗仍是既有受控编辑/生命周期 fixture：Windows 一项、WSLg X11/Wayland 各一项，峰值 14 tasks/77 引擎节点，本次 key 分别 673/669/676；日志 passed 合计 271/272。不要把这三次窗口运行算成 HTTP/PNG 交互窗口验收。末次只追加超高行断言及注释后，Windows 严格 Clippy/定向测试、Linux 两项资源和一项真实 HTTP 定向测试继续通过。
 
 WASM workspace 与 fixture 的 all-targets 严格 Clippy、WASM 重建、Android workspace all-features/all-targets check 均通过；Android 仍只有编译证据，没有 Activity/Surface/设备。全部 Cargo home/target/tmp 在 D:，Linux metadata 指向 `/mnt/d/BuildCache/glory-semantic-ui/linux-fs/target`，loop0 backing 继续是 D: 的 ext4 image。固定来源核对仍为四包/104 文件，未改变其 patch/依赖。
 
-复现：主 verifier `./scripts/check-semantic-ui.ps1 -Web -Window`、`scripts/check-semantic-linux.sh --window`；定向运行 `cargo test --locked -p glory-blitz --all-features --test resources intrinsic -- --nocapture` 和 `cargo test --locked -p glory-blitz --all-features --test loader delayed_http_intrinsic -- --nocapture`。浏览器另执行十个 acceptance 函数，build 本身不执行它们。
+复现：主 verifier `./scripts/check-semantic-ui.ps1 -Web -Window`、`scripts/check-semantic-linux.sh --window`；定向运行 `cargo test --locked -p glory-apace --all-features --test resources intrinsic -- --nocapture` 和 `cargo test --locked -p glory-apace --all-features --test loader delayed_http_intrinsic -- --nocapture`。浏览器另执行十个 acceptance 函数，build 本身不执行它们。
 
 最终记录位于 D:/BuildCache/glory-semantic-ui：intrinsic-final-{windows,linux}.txt、intrinsic-linux-targeted.txt、intrinsic-{wasm-check,wasm-fixture-check,android-check,web-build,stream-transport}.txt、intrinsic-browser-final-2026-10-22.json；源码/锁文件/脚本及日志哈希见 intrinsic-evidence-2026-10-22.json。完整目标保持进行中：R0 内容/能力审计、R3/R5 平台输入/辅助技术及文件服务、R6 Android、R7 时间分解/字段与缓存优化、旧源码/工具清理仍待完成。
 
 ## R5 显式只读文件挂载与阻塞读取上界（2026-10-22）
 
-本阶段完成桌面文件来源，继续放在 glory-blitz/assets 内，不新增薄文件 crate，不把 filesystem/HTTP 引入 core/UI/默认门面。LoadConfig::mounts 将至多 32 个绝对目录映射为命名 asset:// 主机，app 保留给内置包；空 mounts 不授权磁盘。名称为至多 32 字节的 ASCII 小写字母/数字/连字符标签，根在构造时必须是现存目录。仍拒绝任意 file://、未知资产主机/凭据/端口和 HTTP 重定向进入资产命名空间。
+本阶段完成桌面文件来源，继续放在 glory-apace/assets 内，不新增薄文件 crate，不把 filesystem/HTTP 引入 core/UI/默认门面。LoadConfig::mounts 将至多 32 个绝对目录映射为命名 asset:// 主机，app 保留给内置包；空 mounts 不授权磁盘。名称为至多 32 字节的 ASCII 小写字母/数字/连字符标签，根在构造时必须是现存目录。仍拒绝任意 file://、未知资产主机/凭据/端口和 HTTP 重定向进入资产命名空间。
 
 文件访问使用固定 cap-std/cap-fs-ext 4.0.3 与 percent-encoding。构造时打开目录 capability，后续路径相对句柄解析；没有 canonicalize 判断后按环境路径重开的窗口。路径段按 UTF-8 解码一次，拒绝编码分隔符、NUL/控制字符、驱动器/ADS 和常见 Windows 设备名/尾点空格；query/fragment 不参与磁盘路径，但保留请求/缓存身份。root-relative 符号链接必须留在授予的目录内；实际打开后的 handle 再验证 regular file，目录、socket/FIFO 不读。挂载树中的 hardlink 是已授予文件，这不是进程级沙箱或可变文件的原子快照。
 
 读取复用原有 encoded body、transport 队列/worker/期限以及 prepare/完成租约，不设另一个历史文件内容缓存。默认 body 8MiB；读前 metadata 上限与逐块上限都检查，文件增长不能越过预算，分配容量不超过 body limit。chunk 至多 64KiB，chunk 之间检查取消/期限。文件任务在 spawn_blocking 前取得信号量许可，并让实际闭包持有它；取消 future 不提前归还还在执行的文件槽。底层 OS 文件系统调用可能不可中断；迟到结果不发布，不能声称强制终止了内核读。
 
-LoadStats 新增 file_active/file_peak_active，与 transport active/stopped 分开。停止异步 runtime 不代表已取消的 OS 调用已经返回。关闭停止许可准入、唤醒等待者并释放空闲根句柄；正在读取的闭包只保留自己的根克隆直到返回。Loader 仍用于统计时，关闭也不保留所有挂载根的 Windows 锁。相关实现为 crates/blitz/src/loader/files.rs 与 loader.rs；没有改变 vendor 代码或语义 render 协议。
+LoadStats 新增 file_active/file_peak_active，与 transport active/stopped 分开。停止异步 runtime 不代表已取消的 OS 调用已经返回。关闭停止许可准入、唤醒等待者并释放空闲根句柄；正在读取的闭包只保留自己的根克隆直到返回。Loader 仍用于统计时，关闭也不保留所有挂载根的 Windows 锁。相关实现为 crates/apace/src/loader/files.rs 与 loader.rs；没有改变 vendor 代码或语义 render 协议。
 
 新增实际验收：
 
@@ -974,19 +974,19 @@ LoadStats 新增 file_active/file_peak_active，与 transport active/stopped 分
 
 Windows 主 verifier 的 -Web 通过 WASM 工作区/fixture 严格检查并重建可运行样例；Android all-features/all-targets check 通过。依赖树确认默认门面和 HTML+SSR 不包含引擎/HTTP/cap-std，Android 不包含桌面 Loader/文件 capability/shell。macOS 没有本轮编译或运行证据。根 Cargo.lock 新增 11 个 capability 相关解析包，均为 opt-in desktop assets 依赖；四个 engine fork/104 文件的来源核对继续通过。
 
-assets 示例可接收绝对目录参数，显式从该目录加载 theme.css；无参数仍只读内置包。复现入口：cargo test --locked -p glory-blitz --all-features --test files -- --nocapture；许可用例为 cargo test --locked -p glory-blitz --all-features --lib loader::files。完整检查仍用 ./scripts/check-semantic-ui.ps1 -Web 和 scripts/check-semantic-linux.sh。本轮 Cargo home/target/tmp、fixture 文件及 Linux ext4 backing 均在 D:。
+assets 示例可接收绝对目录参数，显式从该目录加载 theme.css；无参数仍只读内置包。复现入口：cargo test --locked -p glory-apace --all-features --test files -- --nocapture；许可用例为 cargo test --locked -p glory-apace --all-features --lib loader::files。完整检查仍用 ./scripts/check-semantic-ui.ps1 -Web 和 scripts/check-semantic-linux.sh。本轮 Cargo home/target/tmp、fixture 文件及 Linux ext4 backing 均在 D:。
 
 日志与证据：D:/BuildCache/glory-semantic-ui/file-final-{windows,linux}.txt、file-{tests-fixed,cancel-tests,linux-tests-fixed,android-check}.txt、file-deps-*.txt，最终哈希与范围记录为 file-assets-evidence-2026-10-22.json。Android AssetManager/Activity/Surface、实际 OS IME/辅助技术、R0 审计、R7 阶段耗时与缓存/字段优化、旧工具/源码清理仍待完成，整体目标保持进行中。
 
 ## R7 固定聚合阶段观测与重复基线（2026-10-22）
 
-本阶段提供实际计时/工作量和后续优化依据，不将整个 R7 标为完成。新增 render::profile 的 Profile/Phase/Sample/Snapshot/Span：18 个固定聚合槽位，无节点/事件/帧历史。默认 None 不读取诊断时钟；原有 RuntimeStats 计数仍正常工作。计时覆盖 Flush、Validate、实际 Derive/Structure/Bind/Effect、future poll、mount_with 构建、List Window/Reconcile、语义 Patch、非空 Commit、Observe/Action、Blitz 资源消费/合并 Layout/场景 Paint/变化帧 Draw。
+本阶段提供实际计时/工作量和后续优化依据，不将整个 R7 标为完成。新增 render::profile 的 Profile/Phase/Sample/Snapshot/Span：18 个固定聚合槽位，无节点/事件/帧历史。默认 None 不读取诊断时钟；原有 RuntimeStats 计数仍正常工作。计时覆盖 Flush、Validate、实际 Derive/Structure/Bind/Effect、future poll、mount_with 构建、List Window/Reconcile、语义 Patch、非空 Commit、Observe/Action、Apace 资源消费/合并 Layout/场景 Paint/变化帧 Draw。
 
 App::set_profile 同时更新 Runtime 和支持的 adapter，返回的旧/未使用 renderer handle 在借用结束后释放；Runtime 替换也在图借用之外 Drop。Profile 克隆共享聚合值，默认按 app/实验创建；不使用全局 profiler。native 工厂使用 Instant；WebApp::enable_profile 使用自身文档的 Performance，缺失则 Unsupported，不在 WASM 执行 std Instant。自定义时钟须轻量/单调、不重入 UI/图。clock callback 执行时不借用 samples；反向时间增加 invalid_clock，时间/次数饱和累加。reset 的 epoch 不回绕，旧 span 不污染新窗口。
 
 所有时间为包含耗时，彼此可重叠；max 是单次阶段调用最大值，不能当成整帧 p95/p99。Validate units=旧依赖数量，Reconcile units=成功协调的 RowHost key 读取（通常是缓存，不是原始数据源访问），Commit units=语义 mutation 数，其余默认一次调用为1。原始 source key 读取继续单独统计；错误协调的 units 为0，attempt 次数仍保留。Task 只计 future 的 poll，不把等待 I/O 的时间计作计算。
 
-Blitz Layout 包含 Glory Dom::resolve 调用内的 style/box/text 等；Paint 只计场景记录；Draw 含变化帧的 buffer/CPU 和嵌套布局/paint，不是纯光栅耗时。直接引擎调用、upstream 桌面 paint/present 路径、引擎内部更细分阶段和业务事件 handler 尚未全部计时。浏览器内部 style/layout/paint 也没有伪造计时，相关槽位保持0。启停/reset 不应生成 Patch、改变视觉版本或唤醒持续重画。
+Apace Layout 包含 Glory Dom::resolve 调用内的 style/box/text 等；Paint 只计场景记录；Draw 含变化帧的 buffer/CPU 和嵌套布局/paint，不是纯光栅耗时。直接引擎调用、upstream 桌面 paint/present 路径、引擎内部更细分阶段和业务事件 handler 尚未全部计时。浏览器内部 style/layout/paint 也没有伪造计时，相关槽位保持0。启停/reset 不应生成 Patch、改变视觉版本或唤醒持续重画。
 
 新增五项回归：两项 collector 测试验证嵌套包含时间、reset 撤销 live span、时钟倒退与 unwind；一项 runtime 测试验证 source 1→3、相等门控 parity 仍验证2次/求值1次但消费 Binding=0，关闭后 source 3→4 仍更新且诊断时钟读数不再增加；一项一亿行 List 测试验证同窗读取0、100次远跳有界及关闭/卸载；一项实际 CPU 像素测试验证共享 Layout/Paint/Draw、空闲五轮全为0且视觉版本不变、恢复更新与关闭观测。
 
@@ -1000,7 +1000,7 @@ WASM workspace/fixture 严格检查与重建、Android all-features/all-targets 
 
 没有新增依赖或修改 vendor；四包104文件来源检查继续通过。根与 fixture 锁文件保持不变，构建/缓存/tmp/临时服务数据在 D:；最终基线在本任务构建与浏览器脚本结束后按 Windows UI→Windows CPU→WSL UI 串行执行，未宣称宿主无其他负载。本轮启动的8788/8789服务均按实际PID/命令核对后停止。
 
-复现：cargo bench --locked -p glory-ui --bench semantic_frames；cargo run --locked -p glory-blitz --example profile --features raster --release。完整验证仍为 Windows verifier -Web -Window 与 Linux verifier --window；浏览器另执行十一组函数。最终日志为 D:/BuildCache/glory-semantic-ui/profile-final-{windows,linux}-r2.txt、profile-android-check.txt、profile-browser-2026-10-22.json、profile-benchmark-summary.json，源码/锁文件/二进制与数据哈希见 profile-evidence-2026-10-22.json。
+复现：cargo bench --locked -p glory-ui --bench semantic_frames；cargo run --locked -p glory-apace --example profile --features raster --release。完整验证仍为 Windows verifier -Web -Window 与 Linux verifier --window；浏览器另执行十一组函数。最终日志为 D:/BuildCache/glory-semantic-ui/profile-final-{windows,linux}-r2.txt、profile-android-check.txt、profile-browser-2026-10-22.json、profile-benchmark-summary.json，源码/锁文件/二进制与数据哈希见 profile-evidence-2026-10-22.json。
 
 下一步先对照原生测量稳定化与 Draw 次数，再补 style/text/box/纯光栅/呈现等待和事件 handler 计时，依据收益实施字段依赖、style/paint cache。R0 内容/能力审计、平台输入/辅助技术、Android 与旧架构清理也继续保留在完整范围中。
 
@@ -1008,9 +1008,9 @@ WASM workspace/fixture 严格检查与重建、Android all-features/all-targets 
 
 上一节提出的原生对照已落实为公共 `App::settle(limit)` 和只读 `Render::needs_observe()`。每轮调用原有 pump，保持输入、查询与更新顺序；最多 1–32 轮（默认8），返回 passes/handled/pending。耗尽只交回宿主，允许显示当前状态并安排下一轮，不无限循环或把尺寸反馈当成运行时故障。WindowApp 自动使用8轮，本地任务仍另限64次 poll；观察期间不继续 poll tasks，稳定后不为再次确认 geometry 额外唤醒重画。
 
-Blitz 以文档级待观察标记、未观察的视觉 revision、dirty layout、输入和已完成消息决定继续；未完成资源请求、动画时间不算可取得本地进展。新 Resize/Scroll interests 也需观察；ScrollTo 即使坐标不变，仍欠一次 ScrollAck。查询可能先 resolve，所以只检查 dirty 会漏观察；清除隐藏控件焦点则会在 resolve 后再次 dirty，必须继续一轮。异步消息在返回后仍可到达，settle 不构成原子显示事务。Memory 对已排队 Unsupported 查询响应启用有限重观察；Web 保持异步，不同步等待 RAF/ResizeObserver。
+Apace 以文档级待观察标记、未观察的视觉 revision、dirty layout、输入和已完成消息决定继续；未完成资源请求、动画时间不算可取得本地进展。新 Resize/Scroll interests 也需观察；ScrollTo 即使坐标不变，仍欠一次 ScrollAck。查询可能先 resolve，所以只检查 dirty 会漏观察；清除隐藏控件焦点则会在 resolve 后再次 dirty，必须继续一轮。异步消息在返回后仍可到达，settle 不构成原子显示事务。Memory 对已排队 Unsupported 查询响应启用有限重观察；Web 保持异步，不同步等待 RAF/ResizeObserver。
 
-本轮新增6项框架回归：Memory 五个串联查询在2轮预算后按序让出并恢复；Blitz 持续尺寸反馈让出/恢复、查询已 resolve 但仍欠观察及 no-op ScrollAck、等待 I/O 不空转而完成结果可消费、一亿行定高/变高 CPU 最终 geometry/pixels 与单次 Draw；另有 WindowApp 8轮观察预算与任务预算分离。CPU 像素场景为160×120、120px视口、overscan=2、60次带7px余量的远跳，逐次查实际行 Bounds 并比对该行颜色；断言行≤12、测量≤64、高度索引capacity<4096、节点<64、图槽<256、key<5000，空闲5轮无 Draw、卸载归零。初次定向记录定高/变高最多2/3轮，最终全量 gate 继续通过8轮内完成的同一测试。
+本轮新增6项框架回归：Memory 五个串联查询在2轮预算后按序让出并恢复；Apace 持续尺寸反馈让出/恢复、查询已 resolve 但仍欠观察及 no-op ScrollAck、等待 I/O 不空转而完成结果可消费、一亿行定高/变高 CPU 最终 geometry/pixels 与单次 Draw；另有 WindowApp 8轮观察预算与任务预算分离。CPU 像素场景为160×120、120px视口、overscan=2、60次带7px余量的远跳，逐次查实际行 Bounds 并比对该行颜色；断言行≤12、测量≤64、高度索引capacity<4096、节点<64、图槽<256、key<5000，空闲5轮无 Draw、卸载归零。初次定向记录定高/变高最多2/3轮，最终全量 gate 继续通过8轮内完成的同一测试。
 
 既有 wheel、focus、controlled editing/IME 协议用例的 helper 已收紧为一次宿主 poll 就不再有本地待观察工作。实窗 fixture 只在 waker 已安装且实际 poll 的轮次断言稳定；ResumeReady 前未激活的 poll 按上游生命周期为 no-op，暂停轮也不作该断言。持续尺寸反馈的独立测试仍要求预算耗尽并让出，不把真实应用一律假设为有限收敛。
 
@@ -1024,7 +1024,7 @@ Blitz 以文档级待观察标记、未观察的视觉 revision、dirty layout�
 
 本轮初次隐藏样式测试的崩溃、过早在 ResumeReady 前断言实窗已观察等失败日志均保留；最终源码重新执行完整 Windows/Linux gate 后通过。release 最终对照在本任务构建、浏览器验收和 owned 8788/8789服务结束后串行运行，未宣称整台机器无其他负载。没有执行 Linux 耗时对照；其单次绘制/最终像素行为由 Linux 全量测试验证，不能借用 Windows 数值作为 Linux 时间。
 
-复现：主 Windows verifier -Web -Window、Linux verifier --window；CPU 对照为 `cargo run --locked -p glory-blitz --example profile --features raster --release`。定向测试为 `cargo test --locked -p glory-blitz --all-features --test settle -- --nocapture`、`cargo test --locked -p glory-ui --test settle`。浏览器仍需单独执行十一组函数。原始记录位于D:/BuildCache/glory-semantic-ui：settle-final-{windows,linux}-r3.txt、settle-android-check.txt、settle-browser-2026-10-22.json、settle-stream-transport.txt、settle-benchmark-windows-final.jsonl、settle-benchmark-summary.json；源码、vendor、锁、二进制及日志哈希见 settle-evidence-2026-10-22.json。
+复现：主 Windows verifier -Web -Window、Linux verifier --window；CPU 对照为 `cargo run --locked -p glory-apace --example profile --features raster --release`。定向测试为 `cargo test --locked -p glory-apace --all-features --test settle -- --nocapture`、`cargo test --locked -p glory-ui --test settle`。浏览器仍需单独执行十一组函数。原始记录位于D:/BuildCache/glory-semantic-ui：settle-final-{windows,linux}-r3.txt、settle-android-check.txt、settle-browser-2026-10-22.json、settle-stream-transport.txt、settle-benchmark-windows-final.jsonl、settle-benchmark-summary.json；源码、vendor、锁、二进制及日志哈希见 settle-evidence-2026-10-22.json。
 
 R7继续保留 style/text/box/纯光栅/呈现等待与事件 handler 的观测、字段依赖和缓存收益验证；R0审计、实际 OS IME/辅助技术、Android宿主与旧代码清理也仍在完整目标内。
 
@@ -1032,15 +1032,15 @@ R7继续保留 style/text/box/纯光栅/呈现等待与事件 handler 的观测�
 
 新增[组件契约审计](semantic-ui-contract.md)，将八组件内容、11类事件、查询/动作、宿主 capability、错误与剩余项集中记录。不是将 R0 勾选完成：本轮只落实基础目标、订阅和一处 HTML 内容漏洞。
 
-render 层新增 Query/Action/EventKind::validate_target，UI 与参考/SSR/Web/Blitz 复用。Group 不再被 Web 的 DOM Range 偷偷转换成聚合 bounds；各后端一致把 Group 的物理查询/动作和直接 Resize/Scroll/Anchor/FocusChanged 目标诊断为 Unsupported，但逻辑 Activate/FocusWithin/Navigate 订阅保留。编辑事件仅针对 Input，checked事件仅针对Check，Selection先要求Input再看宿主类型/状态。SSR合法订阅仍可记录，不因没有输入驱动而拒绝整棵应用。
+render 层新增 Query/Action/EventKind::validate_target，UI 与参考/SSR/Web/Apace 复用。Group 不再被 Web 的 DOM Range 偷偷转换成聚合 bounds；各后端一致把 Group 的物理查询/动作和直接 Resize/Scroll/Anchor/FocusChanged 目标诊断为 Unsupported，但逻辑 Activate/FocusWithin/Navigate 订阅保留。编辑事件仅针对 Input，checked事件仅针对Check，Selection先要求Input再看宿主类型/状态。SSR合法订阅仍可记录，不因没有输入驱动而拒绝整棵应用。
 
 UI在替换或登记handler前验证，错误订阅不分配handler/listener；原有合法handler仍能执行，后续挂载/清理不受影响。动作先校验身份，再参数/目标，再capability，foreign/retired不被“不支持”遮盖，NaN坐标不进入队列。参考与SSR也补上直接action/listen的身份与目标检查；有效查询的Unsupported继续排队，保持请求水位与异步回调语义。
 
 HTML mapper在Place/Resume变更之前补查button上下文：TextKind::Inline虽可显式映射为p，也不能通过先放进Group再移动/恢复而进入button。回归验证操作失败后parent、suspended、HTML和sink操作数不变，恢复到合法位置仍可用。低层批次仍允许前缀应用，并非新增整个batch回滚；当前UI已进入物理提交后的失败仍按fault处理。普通列表移动只走祖先路径，只有button上下文遍历被移动的已挂载子树，不访问总数据源或历史行。
 
-新增7项框架测试：同一八目标/11类interest/24查询矩阵由Memory、SSR、真实Blitz文档各执行一次；两项UI验证错误订阅不覆盖handler、无fault和动作错误优先级；一项HTML验证Group移动/恢复的p覆盖；一项门面SSR验证直接和Group包裹的p失败、span成功。共用代码作为可选glory-render/conformance模块，SSR/Blitz仅通过dev-dependency开启，无新workspace包或第三方依赖，也不使用跨package文件包含。生产default及HTML+SSR的正常依赖图验证不含conformance或Blitz/window。
+新增7项框架测试：同一八目标/11类interest/24查询矩阵由Memory、SSR、真实Apace文档各执行一次；两项UI验证错误订阅不覆盖handler、无fault和动作错误优先级；一项HTML验证Group移动/恢复的p覆盖；一项门面SSR验证直接和Group包裹的p失败、span成功。共用代码作为可选glory-render/conformance模块，SSR/Apace仅通过dev-dependency开启，无新workspace包或第三方依赖，也不使用跨package文件包含。生产default及HTML+SSR的正常依赖图验证不含conformance或Apace/window。
 
-矩阵初次假定空inline span一定有引擎box，真实Blitz返回Unsupported。校正的是测试前提：矩阵现在显式建立display:block/64×24px盒子，再要求实际bounds/scroll；不将空inline或display:none可测作为统一保证。失败原日志保留。此后完整Windows/Linux运行相同测试通过，不能据此隐去空inline的后端差异。
+矩阵初次假定空inline span一定有引擎box，真实Apace返回Unsupported。校正的是测试前提：矩阵现在显式建立display:block/64×24px盒子，再要求实际bounds/scroll；不将空inline或display:none可测作为统一保证。失败原日志保留。此后完整Windows/Linux运行相同测试通过，不能据此隐去空inline的后端差异。
 
 新增target-acceptance.js及独立Rust fixture，实际浏览器中八语义节点仅生成七个元素，无Group wrapper；24个查询接受后仍未同步回调，随后按序完成，Group几何为Unsupported，waiter归零。错误注册后真实按钮可激活、文本可填入emoji，卸载无残留。该矩阵和原有十一组浏览器函数全通过，共十二组；Python stream transport也通过。既有百万/一亿行滚动、焦点/编辑、固有图片、资源、SSR/hydrate/stream预算继续通过，不因契约审计改成小列表替代场景。
 
@@ -1062,7 +1062,7 @@ Anchor/FocusWithin的嵌入来源检查runtime、generation、存活、逻辑祖
 
 本批也修复App::pump的早退：之前route错误会丢掉已drain批次后面的输入和query response，等待者可能永久悬空。现在保留第一项route错误，继续按序处理该批输入，完成query回调与有效写入，再flush。flush错误优先，否则返回第一项route错误。单独dispatch保留直接返回自身错误的行为；没有mutation全批回滚或业务panic捕获。实际fake-host用例把坏Scroll、有效编辑、坏Commit和有效查询响应放入同批，确认编辑/程序revision生效、waiter归零及下一轮恢复。
 
-新增6项框架测试：render的数值/单行值、嵌入来源/slot复用、队列移动与终止清理共3项；UI的同批恢复与直接焦点callback删除来源共2项；一亿行列表输入专项1项。后者180px视口、24px估值、overscan=2、row_limit=20、measure_limit=64，错误坐标/无关来源不增加key读取、节点、滚动动作或pin，正常测量/30次远跳后行≤13、测量≤64、索引capacity<4096、节点<64、图槽<256、累计key<5000，卸载归零。既有实际Web/Blitz滚动与像素用例继续保留，没有用此内存测试替换它们。
+新增6项框架测试：render的数值/单行值、嵌入来源/slot复用、队列移动与终止清理共3项；UI的同批恢复与直接焦点callback删除来源共2项；一亿行列表输入专项1项。后者180px视口、24px估值、overscan=2、row_limit=20、measure_limit=64，错误坐标/无关来源不增加key读取、节点、滚动动作或pin，正常测量/30次远跳后行≤13、测量≤64、索引capacity<4096、节点<64、图槽<256、累计key<5000，卸载归零。既有实际Web/Apace滚动与像素用例继续保留，没有用此内存测试替换它们。
 
 首轮导航回归发现“错误from已经retired”被来源通用检查提前忽略，已把Navigate的精确匹配放在该路径之前，保留原错误断言通过。新专项最初沿用120px fixture的12行假定；诊断显示180px在非整行偏移可相交9行，加双侧4行overscan为13，修正测试预算解释，未放宽row_limit或改变实现。原始失败日志保留。
 
@@ -1076,7 +1076,7 @@ Anchor/FocusWithin的嵌入来源检查runtime、generation、存活、逻辑祖
 
 ## R0 输入版本、规范值与实际接管（2026-10-22）
 
-本批补上上一节的文本输入版本与规范化。新的render::normalize_text在多行CRLF/CR→LF、单行主机输入移除换行、NUL→U+FFFD；已规范文本借用，无额外分配。程序单行声明仍先拒绝CR/LF，不能把错误声明偷偷过滤。Descriptor初始化/patch与Memory存储规范Input值，Web/HTML/Blitz复用该助手；业务Cage保留原始值，不因渲染被写回。规范等价输入会作为相等显示值确认版本，保留caret/preedit。
+本批补上上一节的文本输入版本与规范化。新的render::normalize_text在多行CRLF/CR→LF、单行主机输入移除换行、NUL→U+FFFD；已规范文本借用，无额外分配。程序单行声明仍先拒绝CR/LF，不能把错误声明偷偷过滤。Descriptor初始化/patch与Memory存储规范Input值，Web/HTML/Apace复用该助手；业务Cage保留原始值，不因渲染被写回。规范等价输入会作为相等显示值确认版本，保留caret/preedit。
 
 程序Set/Clear版本单调，相同版本只接受规范相同值，Keep忽略revision。InputRevision携带current/incoming，拒绝回退和同版本冲突；自动版本耗尽为InputRevisionExhausted，不panic/回绕。原builder的私有计数器会落后于显式Scope.patch，现在绑定从live节点读取下一版本，显式100后绑定101、有效输入后102，混用仍有序。失败写入不改变节点或消费版本，重挂新NodeId可建立新寿命。
 
@@ -1096,7 +1096,7 @@ Web Entry读值修复非规范主机文本并保留UTF-16选区；平常规范�
 
 没有新增第三方依赖或修改workspace/fixture锁与vendor，四包104文件来源检查继续通过。新增诊断crate只在D: BuildCache，不增加workspace成员。早期Commit变更的编译错误、fixture类型/导入及严格unused import失败日志均保留，修正后完整Windows gate重跑；Linux完整gate也通过。Cargo home/target/tmp、Linux backing、临时服务与探针全在D:，owned8788/8789结束后按PID/命令核对停止。
 
-复现为render/ui的input测试、Blitz lib的canonical_multiline/email_and_url测试、SSR input_purposes用例；完整Windows -Web -Window、Linux --window，浏览器十四组另执行。最终日志：D:/BuildCache/glory-semantic-ui/input-contract-final-windows-r2.txt、input-contract-final-linux.txt、input-contract-android-check.txt、input-contract-browser-2026-10-22.json、input-contract-stream-transport.txt；源码、锁、来源、fixture/探针二进制与结果哈希见input-contract-evidence-2026-10-22.json。
+复现为render/ui的input测试、Apace lib的canonical_multiline/email_and_url测试、SSR input_purposes用例；完整Windows -Web -Window、Linux --window，浏览器十四组另执行。最终日志：D:/BuildCache/glory-semantic-ui/input-contract-final-windows-r2.txt、input-contract-final-linux.txt、input-contract-android-check.txt、input-contract-browser-2026-10-22.json、input-contract-stream-transport.txt；源码、锁、来源、fixture/探针二进制与结果哈希见input-contract-evidence-2026-10-22.json。
 
 下一步优先修复已证实的Native Password缺口，并继续后端能力预检、focus回读和其余props/无障碍映射。实际OS IME/辅助技术、Android宿主、R7剩余观测/缓存及旧架构清理保持在完整目标中。
 
@@ -1106,17 +1106,17 @@ Web Entry读值修复非规范主机文本并保留UTF-16选区；平常规范�
 
 HTML mapper 共用 text_tag/view_tag 与 preflight：冲突 Text 映射在创建前拒绝；TextKind、View Role、Input Multiline 变更若改变 tag，Scope.patch 立即返回需要重挂的 InvalidProps。相同 tag 的变化仍允许，例如 Inline 显式 p 与 Paragraph 互换、div 的 List/Status 互换。局部检查不创建完整 Shape、不克隆 Input/Text 内容或样式，也不遍历业务列表。直接 Mapper.apply 原有 shape/difference 检查继续执行。
 
-固定 Blitz 的密码遮罩尚未实现。本批消除静默明文接受：新增 Password 与 Purpose 切换为 Password 都返回 Unsupported("Blitz password masking")。UI preflight 和直接 Renderer.apply 经 Mapper.apply_checked 共用拒绝规则，拒绝前不建立语义/引擎节点，不把全部 input capability 关闭。SSR/Web 保留 HTML Password。后续需要完整的原始值/遮罩索引投影与命中、caret、选区、滚动和 IME 几何，不能只在 paint 中换字形后宣称支持。
+固定 Apace 的密码遮罩尚未实现。本批消除静默明文接受：新增 Password 与 Purpose 切换为 Password 都返回 Unsupported("Apace password masking")。UI preflight 和直接 Renderer.apply 经 Mapper.apply_checked 共用拒绝规则，拒绝前不建立语义/引擎节点，不把全部 input capability 关闭。SSR/Web 保留 HTML Password。后续需要完整的原始值/遮罩索引投影与命中、caret、选区、滚动和 IME 几何，不能只在 paint 中换字形后宣称支持。
 
-同时修复直接批次错误后的查询水位：Mapper.receipt 暴露最后成功前缀；SSR/Web/Blitz 即使后续操作被拒绝，也同步该水位。测试以 Create/Place 成功、后续配置失败为例，查询保持 applied=2，下一次合法更新得到 3。仍不承诺整个 batch 回滚，宿主执行错误后的 App fault 规则保持；本批没有完成跨树 Place/Resume 的通用 UI 预检。
+同时修复直接批次错误后的查询水位：Mapper.receipt 暴露最后成功前缀；SSR/Web/Apace 即使后续操作被拒绝，也同步该水位。测试以 Create/Place 成功、后续配置失败为例，查询保持 applied=2，下一次合法更新得到 3。仍不承诺整个 batch 回滚，宿主执行错误后的 App fault 规则保持；本批没有完成跨树 Place/Resume 的通用 UI 预检。
 
-新增八项运行测试：SSR 四项覆盖结构拒绝后的模型/队列、未提交描述符、同 tag 合法更新、错误选项不分配身份、既有绑定继续更新及前缀水位；Blitz 三项覆盖 Password 创建/更新、直接 apply 无法绕过、身份未消费、前缀查询/恢复及无布局/属性写入；WindowApp 一项验证拒绝 Password 期间保留焦点、UTF-16 选区与正在进行的组合输入，随后仍可 commit 与键入。浏览器 target-acceptance 扩展四项拒绝及同 tag 更新，检查同一 DOM 输入、活动焦点、双向选区与后续编辑。描述符拒绝与密码控件实现完成分别记录。
+新增八项运行测试：SSR 四项覆盖结构拒绝后的模型/队列、未提交描述符、同 tag 合法更新、错误选项不分配身份、既有绑定继续更新及前缀水位；Apace 三项覆盖 Password 创建/更新、直接 apply 无法绕过、身份未消费、前缀查询/恢复及无布局/属性写入；WindowApp 一项验证拒绝 Password 期间保留焦点、UTF-16 选区与正在进行的组合输入，随后仍可 commit 与键入。浏览器 target-acceptance 扩展四项拒绝及同 tag 更新，检查同一 DOM 输入、活动焦点、双向选区与后续编辑。描述符拒绝与密码控件实现完成分别记录。
 
 最终 Windows passed=320（241 框架运行 + 1 编译失败用例 + 77 固定引擎 + 1 实窗），Ubuntu WSL passed=322（242 + 1 + 77 + X11/Wayland 两次实窗）。严格 workspace all-features/all-targets Clippy、Linux default/paint、WASM workspace/fixture 严格检查和重建通过；Android 同范围仅编译通过。十四组浏览器全部 errors=[]，Python stream transport 通过。原有一亿行/变高/资源回收回归保持：浏览器主列表峰值 33 行、84 节点、每 tick 34 次 key 读取；实际窗口峰值仍 14 tasks/77 引擎节点，累计 key Windows=677、X11=673、Wayland=671。未新增 release/FPS/RSS 结论。
 
 源码、workspace 成员、依赖锁与 vendor 来源约束保持；没有新增第三方依赖或本地引擎修改。构建、缓存、临时服务和结果仍在 D:；初次测试误把 engine_id 的 Result 当 Option，修正后七项 targeted 测试及最终完整 gates 通过，失败日志保留。报告更新 v13，继续区分语义层、布局拥有者、实际渲染技术与 OS 宿主；不会用 native 总 feature 或空平台包模糊支持范围。
 
-复现：glory-ssr/glory-blitz 的 preflight 集成测试、Blitz shell 的 rejected_password_configuration 用例；完整 Windows -Web -Window、Linux --window 和十四组浏览器。日志位于 D:/BuildCache/glory-semantic-ui/preflight-final-{windows,linux}.txt、preflight-targeted.txt、preflight-android-check.txt、preflight-browser-2026-10-22.json、preflight-stream-transport.txt，源码/锁/来源/二进制和日志哈希为 preflight-evidence-2026-10-22.json。
+复现：glory-ssr/glory-apace 的 preflight 集成测试、Apace shell 的 rejected_password_configuration 用例；完整 Windows -Web -Window、Linux --window 和十四组浏览器。日志位于 D:/BuildCache/glory-semantic-ui/preflight-final-{windows,linux}.txt、preflight-targeted.txt、preflight-android-check.txt、preflight-browser-2026-10-22.json、preflight-stream-transport.txt，源码/锁/来源/二进制和日志哈希为 preflight-evidence-2026-10-22.json。
 
 R0/R5 不因明确拒绝而勾选完成：原生密码遮罩、focus 结果回读、其余 props/无障碍与跨树预检仍需推进；真实 OS IME/辅助技术、Android Activity/Surface/资源/设备、R7 细分观测及收益驱动缓存、旧架构/工具清理仍在完整目标内。
 
@@ -1124,11 +1124,11 @@ R0/R5 不因明确拒绝而勾选完成：原生密码遮罩、focus 结果回�
 
 上一批描述符预检已完成；本批继续实际焦点契约。先运行真实 WindowApp 回归，确认旧路径中隐藏控件的正常焦点拒绝会令 App Faulted，并丢掉同批后续动作，失败记录为 focus-readback-baseline.txt。Web 的 HTMLElement.focus 正常返回也不能证明实际聚焦，不能用这两个不同结果推断业务焦点。
 
-新增 Query::Focus(NodeId) / QueryValue::Focus(bool)，复用身份/目标校验、异步响应、类型验证与接受时水位。Web 读 control 实际 Document/ShadowRoot.activeElement；Check 比较内部 checkbox；Blitz 在解析当前样式/布局后同步并比较 control。Group、SSR/Memory 与无交互 Blitz 明确 Unsupported。Focus 不等于 FocusWithin、OS 激活、IME 或显示完成；动作不推进 applied，同一水位的不同查询仍各自保存接受时的焦点值。
+新增 Query::Focus(NodeId) / QueryValue::Focus(bool)，复用身份/目标校验、异步响应、类型验证与接受时水位。Web 读 control 实际 Document/ShadowRoot.activeElement；Check 比较内部 checkbox；Apace 在解析当前样式/布局后同步并比较 control。Group、SSR/Memory 与无交互 Apace 明确 Unsupported。Focus 不等于 FocusWithin、OS 激活、IME 或显示完成；动作不推进 applied，同一水位的不同查询仍各自保存接受时的焦点值。
 
 Action::Focus 规定为不主动滚动的请求，不能只凭动作被处理就认为目标持有焦点。Scope 入队前仍检查身份、Group、disabled 和 capability；入队后发生布局/启用变化，adapter 的 Unsupported 焦点拒绝作为未达成请求，不再 fault App 或丢弃后续动作。真正 Backend 错误与其他动作错误仍 fault，有独立回归。这里没有把拒绝转换成伪造 FocusChanged，也没有提前给不可聚焦目标创建焦点 pin；需要结果时显式查询。
 
-新增五项运行测试：WindowApp 四项覆盖正常拒绝后后续动作/编辑、确切 control 与祖先差别、接受后转移焦点不改写旧响应、CSS 改变后的同步、同帧禁用与恢复，以及交互宿主的共用契约；UI 一项验证 Unsupported Focus 继续但真实后端/其他动作错误仍 fault。既有无效查询响应测试扩为10种载荷，验证 Focus bool 与错误类型。共用 conformance 为八组件32种查询，Focus/Selection 按宿主声明能力验证正向值；Memory/SSR/Blitz 文档和 WindowApp 均运行。
+新增五项运行测试：WindowApp 四项覆盖正常拒绝后后续动作/编辑、确切 control 与祖先差别、接受后转移焦点不改写旧响应、CSS 改变后的同步、同帧禁用与恢复，以及交互宿主的共用契约；UI 一项验证 Unsupported Focus 继续但真实后端/其他动作错误仍 fault。既有无效查询响应测试扩为10种载荷，验证 Focus bool 与错误类型。共用 conformance 为八组件32种查询，Focus/Selection 按宿主声明能力验证正向值；Memory/SSR/Apace 文档和 WindowApp 均运行。
 
 新增第十五组浏览器 focus-result-acceptance.js：八目标焦点矩阵、异步快照、普通 text/image 的 focus 请求未达成、programmatic View、Check 内控件、preventScroll、display:none/visibility:hidden/inert/opacity:0、visibility 子级覆盖、禁用与连接恢复、Shadow DOM 实际根以及清理。原有 target/event 矩阵同步为32查询；其他十三组业务/大列表/资源/接管/流式验收继续通过。Shadow 测试只证明本次焦点回读，不宣称全部 Shadow DOM/SSR/接管行为完成。
 
@@ -1136,7 +1136,7 @@ Action::Focus 规定为不主动滚动的请求，不能只凭动作被处理就
 
 严格 workspace all-features/all-targets Clippy、Linux default/paint、WASM workspace/fixture 严格检查和重建、Android 同范围编译通过。十五组浏览器全部 errors=[]；Python stream transport 通过。补充交互 conformance 后完整 Windows/Linux gates 重跑，最终浏览器测试的 WASM 与 stream 二进制哈希未变。未添加第三方依赖、修改锁、workspace成员或四包104文件 vendor 来源；所有构建与证据在 D:。验收服务按 PID/命令验证后停止。
 
-复现：Blitz shell 的 focus_tests、UI 的 query_barriers、各端口 targets，以及完整 Windows -Web -Window、Linux --window 和十五组浏览器。最终日志为 D:/BuildCache/glory-semantic-ui/focus-readback-final-{windows,linux}-r2.txt、focus-readback-native-final-targeted.txt、focus-readback-ui-targeted.txt、focus-readback-android-check.txt、focus-readback-browser-2026-10-22.json、focus-readback-stream-transport.txt；来源、源码/锁、日志和二进制哈希为 focus-readback-evidence-2026-10-22.json。架构报告更新 v14。
+复现：Apace shell 的 focus_tests、UI 的 query_barriers、各端口 targets，以及完整 Windows -Web -Window、Linux --window 和十五组浏览器。最终日志为 D:/BuildCache/glory-semantic-ui/focus-readback-final-{windows,linux}-r2.txt、focus-readback-native-final-targeted.txt、focus-readback-ui-targeted.txt、focus-readback-android-check.txt、focus-readback-browser-2026-10-22.json、focus-readback-stream-transport.txt；来源、源码/锁、日志和二进制哈希为 focus-readback-evidence-2026-10-22.json。架构报告更新 v14。
 
 基础焦点回读项已有上述证据，R0/R5 与完整目标仍未完成：Native Password 继续明确拒绝直至遮罩/编辑索引与几何整体实现；全部 props/角色/名称/无障碍、跨树预检、Portable stylesheet、真实 OS IME/辅助技术、Android 宿主与设备、R7 细分观测及收益驱动优化、旧架构/工具清理仍继续推进。
 
@@ -1146,7 +1146,7 @@ Action::Focus 规定为不主动滚动的请求，不能只凭动作被处理就
 
 方向键、Home/End、拖选与点击使用显示坐标；删除覆盖完整字素簇，组合字符、ZWJ emoji 等不会被按圆点的 UTF-8 字节偏移误删。Password 的单词移动/双击按整字段处理；Copy/Cut 不暴露原文，Paste 仍可编辑。预编辑只给对应圆点加组合标记，隐藏 caret 的组合状态也保留。引擎新增回归同时发现并修复原有 IME Commit 未清理 compose 而重复保留预编辑文本的问题。Text/Password 在同一控件切换时保留原始值、身份、焦点和选区，移除此前的临时 Unsupported 拒绝；其他 HTML 结构预检与成功前缀水位不变。
 
-宿主接口新增 Normal/Password 输入目的；winit 声明对应能力、初始目的与 cursor area，目的/区域相同时不重复提交，未发送 surrounding text。布局后仅对当前焦点控件修正滚动与 IME 区域，没有扫描整个输入树或列表。实际系统输入法是否遵守目的提示、辅助技术如何处理密码以及 Android 宿主仍需专门验收，本批的 ShellProvider 捕获与合成 IME 协议不替代这些证据。
+宿主接口新增 Normal/Password 输入目的；wingy 声明对应能力、初始目的与 cursor area，目的/区域相同时不重复提交，未发送 surrounding text。布局后仅对当前焦点控件修正滚动与 IME 区域，没有扫描整个输入树或列表。实际系统输入法是否遵守目的提示、辅助技术如何处理密码以及 Android 宿主仍需专门验收，本批的 ShellProvider 捕获与合成 IME 协议不替代这些证据。
 
 新增六项引擎测试与四项框架测试。CPU 像素比较覆盖 Latin/CJK/组合字符/家庭 emoji 的八字素簇密码与八圆点文本相同，明文正向控制及一/八圆点差异成立；同控件切换和受控更新保留身份。原来揭示明文缺口的独立探针源码不变，当前输出 password_equals_plaintext=false、equal_length_passwords_equal=true，与同值明文相差 1239 个通道。实际指针事件、UTF-16 选区、替换、双击、预编辑区域、DPI=2、水平滚动及缩短值后归零均有回归。引擎还覆盖 Apple 编辑命令与剪贴板边界。
 
@@ -1156,7 +1156,7 @@ Action::Focus 规定为不主动滚动的请求，不能只凭动作被处理就
 
 四个固定引擎包仍使用原锁定上游版本，显式维护14个引擎源码路径，新增 password.rs 后来源记录共105文件；补丁和来源校验通过，无新增 unsafe、第三方依赖、workspace 成员或锁文件变动。构建/缓存/探针/临时服务与证据在 D:，owned8788/8789按 PID/命令核对后停止。报告更新 v15，契约和后端 README 同步支持边界。
 
-复现：引擎 node::password 测试、Blitz 的 password 像素集成测试、editing_tests 中的 password 指针/IME/purpose 用例、focus_tests 的四组大列表，以及完整 Windows -Web -Window、Linux --window 和十五组浏览器。最终日志位于 D:/BuildCache/glory-semantic-ui/password-final-{windows,linux}-r3.txt、password-probe-final-r3.txt、password-android-check.txt、password-browser-2026-10-22.json、password-stream-transport.txt；来源、源码/锁、日志与二进制哈希见 password-evidence-2026-10-22.json。
+复现：引擎 node::password 测试、Apace 的 password 像素集成测试、editing_tests 中的 password 指针/IME/purpose 用例、focus_tests 的四组大列表，以及完整 Windows -Web -Window、Linux --window 和十五组浏览器。最终日志位于 D:/BuildCache/glory-semantic-ui/password-final-{windows,linux}-r3.txt、password-probe-final-r3.txt、password-android-check.txt、password-browser-2026-10-22.json、password-stream-transport.txt；来源、源码/锁、日志与二进制哈希见 password-evidence-2026-10-22.json。
 
 原生 Password 的上述显示/编辑投影已交付；完整目标继续推进：R0 其余 props/角色/名称/无障碍映射、跨树预检与 Portable stylesheet，真实 OS IME/辅助技术、Android Activity/Surface/资源/设备，R7 细分观测与收益驱动优化，以及旧架构/工具清理。
 
@@ -1164,19 +1164,19 @@ Action::Focus 规定为不主动滚动的请求，不能只凭动作被处理就
 
 本批先用真实 SSR App 复现按钮内 Inline text 显式映射 p 被 UI 接受，返回已分配 NodeId，直到提交才由 HTML mapper 拒绝的问题。通用语义错误也曾先创建节点，再因父节点是 leaf、button 内容非法或父节点已销毁而失败。新增 Render::preflight_place，借用 App 当前 Memory，Subtree::New 借用无身份描述符，Existing 指向存活逻辑范围。先执行共享 child/placement 校验，再检查 adapter 的内容规则；创建在分配身份前，移动/恢复在修改层级、暂停状态或输出队列前完成。
 
-预检看到尚未提交的祖先、Group 和描述符修改，不能读 adapter 的已提交树、执行布局/I/O 或业务回调。HTML 共用只读助手供同步 SSR、Web、Blitz 和直接 Mapper.apply 使用，现有按钮段落限制与 Group Place/Resume 保持一致。拒绝不消耗身份或改变模型/队列，旧父节点 slot 复用也不能将存活 scope 的孩子误挂到新节点。后续合法创建、绑定更新、移动/恢复可以继续。多根 widget 的多项操作及直接 apply 批次仍不承诺原子回滚，宿主实际失败保留 fault 契约。
+预检看到尚未提交的祖先、Group 和描述符修改，不能读 adapter 的已提交树、执行布局/I/O 或业务回调。HTML 共用只读助手供同步 SSR、Web、Apace 和直接 Mapper.apply 使用，现有按钮段落限制与 Group Place/Resume 保持一致。拒绝不消耗身份或改变模型/队列，旧父节点 slot 复用也不能将存活 scope 的孩子误挂到新节点。后续合法创建、绑定更新、移动/恢复可以继续。多根 widget 的多项操作及直接 apply 批次仍不承诺原子回滚，宿主实际失败保留 fault 契约。
 
 这里不创建整树快照、不克隆文本/样式、不访问业务源或保留访问历史。普通列表移动沿祖先链；受限制的交互/button 目的地才检查被移动的存活子树，包含暂停后代。共享与 adapter 校验可能各走祖先链，尚无新增 release 耗时收益结论。现有一亿行固定/变高、普通/密码输入、焦点 pin、远跳与清理回归继续执行。
 
 适配器总检查发现渐进 SSR 的私有 Renderer 没有自动继承同步 SSR 的能力预检，也未在直接批次的后续项拒绝后同步成功前缀水位。分别运行失败回归后修复：接入两项预检，拒绝后保留 Mapper 的成功水位；事件注册、动作和查询目标也复用共享校验，八组件/32查询 conformance 单独覆盖此私有端口。它仍没有物理焦点/输入能力。不能用同步 SSR 的测试代替流式 Renderer 的验收。
 
-新增八项框架运行测试：UI 两项创建/旧父节点与一项 staged Place/Resume 拒绝恢复，SSR 一项嵌套按钮创建，Blitz 一项无引擎工作/身份消费的创建，以及渐进 SSR 的预检、前缀水位与目标契约三项。HTML 原有 Group 移动/恢复测试扩展为直接检查只读助手、receipt 和 sink 均不变。浏览器 target-acceptance 的拒绝矩阵从4扩为6，保留活动输入的同一元素、双向选区、组合状态及后续编辑。
+新增八项框架运行测试：UI 两项创建/旧父节点与一项 staged Place/Resume 拒绝恢复，SSR 一项嵌套按钮创建，Apace 一项无引擎工作/身份消费的创建，以及渐进 SSR 的预检、前缀水位与目标契约三项。HTML 原有 Group 移动/恢复测试扩展为直接检查只读助手、receipt 和 sink 均不变。浏览器 target-acceptance 的拒绝矩阵从4扩为6，保留活动输入的同一元素、双向选区、组合状态及后续编辑。
 
 补齐私有流式端口后重新执行完整 checks。最终 Windows passed=343（258框架运行 + 1编译失败用例 + 83固定引擎 + 1实窗），Ubuntu WSL passed=345（259 + 1 + 83 + X11/Wayland两次实窗）。窗口峰值14 tasks/77引擎节点，累计 key Windows=675、X11=666、Wayland=673。浏览器十五组全部 errors=[]，主列表仍最多33行/84节点、每 tick 34次key读取；变高列表最多28行、64条测量记录。严格 workspace all-features/all-targets Clippy、Linux default/paint、WASM workspace/fixture 严格检查和重建通过；Android 同范围仅编译通过。十五组浏览器所用 WASM 在最后重建后哈希不变；受私有 SSR 修改影响的 stream fixture 重新编译后，流式浏览器和 Python transport 另外重跑通过。
 
 没有新增依赖、workspace成员、unsafe或修改锁文件/四包105文件引擎来源。所有构建/缓存/临时服务/结果在 D:，两轮验收服务分别按 PID/命令验证后停止。初期测试的 Widget 导入、raw create 清理假定、stream 测试访问 API 与临时 scope 寿命问题均修正，原始失败日志保留；最终完整检查之后只有文档/证据整理。没有新增 FPS/RSS 或 release 性能结论。
 
-复现：glory-ui 的 preflight 与 placement_tests、SSR/Blitz 的 preflight 集成测试、HTML content、SSR stream 单元与 conformance；完整 Windows -Web -Window、Linux --window 和十五组浏览器。最终日志位于 D:/BuildCache/glory-semantic-ui/tree-preflight-final-{windows,linux}-r2.txt、tree-preflight-android-check-r2.txt、tree-preflight-stream-targeted-r2.txt、tree-preflight-browser-final-2026-10-22.json、tree-preflight-stream-transport-r2.txt；源码、锁、来源、日志和二进制哈希见 tree-preflight-evidence-2026-10-22.json。报告更新 v16，契约与 AGENTS 同步。
+复现：glory-ui 的 preflight 与 placement_tests、SSR/Apace 的 preflight 集成测试、HTML content、SSR stream 单元与 conformance；完整 Windows -Web -Window、Linux --window 和十五组浏览器。最终日志位于 D:/BuildCache/glory-semantic-ui/tree-preflight-final-{windows,linux}-r2.txt、tree-preflight-android-check-r2.txt、tree-preflight-stream-targeted-r2.txt、tree-preflight-browser-final-2026-10-22.json、tree-preflight-stream-transport-r2.txt；源码、锁、来源、日志和二进制哈希见 tree-preflight-evidence-2026-10-22.json。报告更新 v16，契约与 AGENTS 同步。
 
 已补上当前父子规则的预检入口和具体缺口；R0 全部 props/角色/名称/无障碍与扩展行为仍需审计。Portable stylesheet、真实 OS IME/辅助技术、Android 宿主与设备、R7 细分观测/收益驱动优化以及旧架构/工具清理继续保留在完整目标中。
 
@@ -1194,7 +1194,7 @@ Plain Inline/Paragraph Text 通过 content 表达文字，只有 Heading 接受�
 
 没有新增依赖、workspace成员、unsafe或改变锁/四包105文件引擎来源。所有构建/缓存/fixture/证据在 D:，临时8788/8789按 PID/命令核对后停止。最初三项行为失败记录保留；最终完整检查后仅补 Rust 文档注释和文档，浏览器用例追加 AX 结果导出后单独重跑通过。Browser AX/引擎属性和输入协议不证明系统屏幕阅读器播报、OS IME 或 Android 实机支持。
 
-复现：render/html/ui/ssr 的 semantics 集成测试、Blitz editing_tests 的 semantic_metadata、完整 Windows -Web -Window、Linux --window，以及十六组浏览器。最终日志为 D:/BuildCache/glory-semantic-ui/semantics-final-{windows,linux}.txt、semantics-android-check.txt、semantics-native.txt、semantics-browser-2026-10-22.json、semantics-stream-transport.txt；源码/锁、来源、日志、AX 数据和二进制哈希见 semantics-evidence-2026-10-22.json。报告更新 v17，契约、README 与 AGENTS 同步。
+复现：render/html/ui/ssr 的 semantics 集成测试、Apace editing_tests 的 semantic_metadata、完整 Windows -Web -Window、Linux --window，以及十六组浏览器。最终日志为 D:/BuildCache/glory-semantic-ui/semantics-final-{windows,linux}.txt、semantics-android-check.txt、semantics-native.txt、semantics-browser-2026-10-22.json、semantics-stream-transport.txt；源码/锁、来源、日志、AX 数据和二进制哈希见 semantics-evidence-2026-10-22.json。报告更新 v17，契约、README 与 AGENTS 同步。
 
 有限角色/name/focus/item 的当前矩阵已有上述证据；其余属性/样式与扩展行为仍按 R0 审计。真实 OS IME/辅助技术桥与播报、Android Activity/Surface/资源/设备、Portable stylesheet、R7 细分观测和收益驱动优化、旧架构/工具清理继续保留在完整目标内。
 
@@ -1240,11 +1240,11 @@ HTML字段lowerer读取已验证的新描述符与旧字段，生成相应edits�
 
 完整目标继续：R0实际引擎属性/样式及扩展审计、Portable stylesheet、真实OS IME/辅助技术桥和播报、Android宿主/资源/设备、R7字段级响应依赖与细分/收益驱动缓存、旧架构/工具清理。此次合并的是失效传播，不是这些剩余能力的完成替代。
 
-## R0 Blitz 原生 inline profile 的实际滚动校验（2026-10-22）
+## R0 Apace 原生 inline profile 的实际滚动校验（2026-10-22）
 
-本轮继续R0实际能力审计。原生Renderer过去将Profile::HTML改名为blitz，所有有限值都被接受。先用独立D:诊断包通过同一App/Renderer、真实布局和异步Bounds/Scroll查询确认：sticky的首项在90px滚动后y=0→-90；自动锚定场景，上方块100→200px，锚项y=-10→90而scrollTop保持110。引擎解析了CSS，但未执行这两种滚动行为。修复前五项测试中四项失败，既有relative几何对照通过；原始布局日志和失败记录保留。
+本轮继续R0实际能力审计。原生Renderer过去将Profile::HTML改名为apace，所有有限值都被接受。先用独立D:诊断包通过同一App/Renderer、真实布局和异步Bounds/Scroll查询确认：sticky的首项在90px滚动后y=0→-90；自动锚定场景，上方块100→200px，锚项y=-10→90而scrollTop保持110。引擎解析了CSS，但未执行这两种滚动行为。修复前五项测试中四项失败，既有relative几何对照通过；原始布局日志和失败记录保留。
 
-现公开glory_blitz::STYLE_PROFILE（blitz v2，Css::Html），仅从原范围排除Sticky、AnchorAuto；AnchorNone继续接受，以保留Glory虚拟列表的手动锚点。App缓存的支持声明、无宿主查询的preflight和直接apply使用同一常量。Create/Style Set先数值/支持检查，direct Patch先验证节点；Keep/Clear及无关字段不扫描旧样式或大文本。direct apply按操作验证，拒绝不抹掉已接受的前缀，收据/异步查询水位和后续恢复保持。未新增样式解析器、布局树、行历史缓存或依赖。
+现公开glory_apace::STYLE_PROFILE（apace v2，Css::Html），仅从原范围排除Sticky、AnchorAuto；AnchorNone继续接受，以保留Glory虚拟列表的手动锚点。App缓存的支持声明、无宿主查询的preflight和直接apply使用同一常量。Create/Style Set先数值/支持检查，direct Patch先验证节点；Keep/Clear及无关字段不扫描旧样式或大文本。direct apply按操作验证，拒绝不抹掉已接受的前缀，收据/异步查询水位和后续恢复保持。未新增样式解析器、布局树、行历史缓存或依赖。
 
 七项回归包括profile全部property/value查询、拒绝前identity/queue/layout保持、staged patch/input值和物理身份、direct前缀/创建拒绝/查询恢复、实际relative坐标，以及五种overflow双轴滚动和交互WindowApp的焦点/值更新。Visible/Clip不可程序滚动，Hidden/Auto/Scroll实际offset和子项坐标变化一致。WindowApp测试没有创建系统窗口；下述单独实窗gate才证明窗口链路。测试初版固定值更新revision=1与已有初值版本冲突，已改为读取当前revision+1，保留失败日志；未放宽输入版本约束。
 
@@ -1254,15 +1254,15 @@ HTML字段lowerer读取已验证的新描述符与旧字段，生成相应edits�
 
 构建/缓存/诊断及证据全部在D:。本轮未启动HTTP或流服务；检查/探针进程均已终止。依赖、workspace/锁及四包105文件vendor未变，无新增unsafe。架构报告v20、契约、列表基线与README/AGENTS同步。R0全部属性/上下文/扩展、Portable文本、真实OS IME/辅助技术、Android宿主/资源/设备、R7字段依赖/性能细分/缓存及旧代码清理仍继续。
 
-复现：cargo test --locked -p glory-blitz --all-features --test style_profile；完整scripts/check-semantic-ui.ps1 -Web -Window、Linux scripts/check-semantic-linux.sh --window；Android --workspace --all-features --all-targets --target aarch64-linux-android。D:/BuildCache/glory-semantic-ui/native-style-final-{windows,linux}.txt、native-style-android.txt、native-style-targeted-final.txt记录最终结果；native-style-probe/{Cargo.toml,Cargo.lock,src/main.rs}、native-style-probe-{before,after}.txt和native-style-document-before.rs保留诊断及原始实现。完整源码、日志、二进制和未变依赖/vendor校验见native-style-evidence-2026-10-22.json。
+复现：cargo test --locked -p glory-apace --all-features --test style_profile；完整scripts/check-semantic-ui.ps1 -Web -Window、Linux scripts/check-semantic-linux.sh --window；Android --workspace --all-features --all-targets --target aarch64-linux-android。D:/BuildCache/glory-semantic-ui/native-style-final-{windows,linux}.txt、native-style-android.txt、native-style-targeted-final.txt记录最终结果；native-style-probe/{Cargo.toml,Cargo.lock,src/main.rs}、native-style-probe-{before,after}.txt和native-style-document-before.rs保留诊断及原始实现。完整源码、日志、二进制和未变依赖/vendor校验见native-style-evidence-2026-10-22.json。
 
 ## R0 最大尺寸的独立类型、样式表覆盖与实际布局（2026-10-22）
 
 延续实际样式审计，旧max_width/max_height使用Option<Length>，将Length::Auto视为合法并输出max-width:auto/max-height:auto。独立诊断在Glory validate通过的情况下测得：声明200×100px的盒子仍受class的80×40px上限约束。Chromium也拒绝这两个auto声明，inline max为空、computed max为80px；原样式域/formatter与诊断源码保留。该问题依据CSS Sizing最大尺寸语法修正，报告§8.9给出规范链接。
 
-现在使用短名Limit::{None,Px,Percent}；两项max字段为Option<Limit>，Style新增成对min/max builder，Glory prelude导出Limit。Length::Auto不能再传入max，compile-fail用例固定边界。Option::None表示没有inline声明，Some(Limit::None)显式取消class上限；数值仍要求有限/非负，min大于max合法并交由引擎执行min优先。HTML直接生成正确none/px/%，清除Style后恢复class规则；不引入兼容别名、额外布局树、DSL、wire字段或serde依赖。HTML/RECORD profile升v2，Blitz升v3；CSS/BASE_CSS与snapshot格式形状未变，Blitz继续拒绝Sticky/AnchorAuto。
+现在使用短名Limit::{None,Px,Percent}；两项max字段为Option<Limit>，Style新增成对min/max builder，Glory prelude导出Limit。Length::Auto不能再传入max，compile-fail用例固定边界。Option::None表示没有inline声明，Some(Limit::None)显式取消class上限；数值仍要求有限/非负，min大于max合法并交由引擎执行min优先。HTML直接生成正确none/px/%，清除Style后恢复class规则；不引入兼容别名、额外布局树、DSL、wire字段或serde依赖。HTML/RECORD profile升v2，Apace升v3；CSS/BASE_CSS与snapshot格式形状未变，Apace继续拒绝Sticky/AnchorAuto。
 
-两个新增Style单元测试覆盖两个轴、合法/非法数值、None/Px/Percent与profile property/value拒绝。HTML原差分矩阵增加六种Limit组合，最终1316项（469接受、847拒绝）；拒绝保持模型、输出、stats与水位。新增实际Blitz布局用例验证200×100取消上限、60×30像素、400×300包含块中25%/20%=100×60、min140×70覆盖max60×30、Style Clear回到80×40及非法值之后恢复，物理身份不变。独立探针改为Limit::None后输出none，实测200×100；前后源及记录保留，不用于性能对比。
+两个新增Style单元测试覆盖两个轴、合法/非法数值、None/Px/Percent与profile property/value拒绝。HTML原差分矩阵增加六种Limit组合，最终1316项（469接受、847拒绝）；拒绝保持模型、输出、stats与水位。新增实际Apace布局用例验证200×100取消上限、60×30像素、400×300包含块中25%/20%=100×60、min140×70覆盖max60×30、Style Clear回到80×40及非法值之后恢复，物理身份不变。独立探针改为Limit::None后输出none，实测200×100；前后源及记录保留，不用于性能对比。
 
 第十七套size-acceptance使用同一Rust form生成CSR与原生SSR快照。两种入口均完成七步尺寸变化、Keep零style写入、每种入口六项非法值零style写入、恢复与卸载。SSR接管保留预输入/输入与盒子身份；所有尺寸更新后焦点、值与双向UTF-16选区保持，再次键入正常。百分比场景有确定的父宽高；测试不宣称覆盖所有不确定尺寸/内在布局/字体和CSS组合。
 
@@ -1270,13 +1270,13 @@ HTML字段lowerer读取已验证的新描述符与旧字段，生成相应edits�
 
 首次Windows gate的框架/实窗检查通过，但新WASM fixture误用了UI的Result别名而编译失败；已改为本模块JsValue结果别名，最终完整gate重新通过，保留初次日志。未放宽任何类型、版本或布局断言。Rust生产修改在最终gate前固定，之后只补文档/证据。项目依赖、workspace/锁和四包105文件vendor未变，无新增unsafe；所有构建/缓存/诊断/日志在D:。测试服务按PID/命令验证后停止，8788/8789无监听；执行会话已回收。
 
-复现：cargo test --locked -p glory-style -p glory-html；cargo test --locked -p glory-blitz --test limits --test style_profile；完整Windows -Web -Window、Linux --window及Android --workspace --all-features --all-targets --target aarch64-linux-android；运行size-acceptance.js与既有十六套浏览器。D:/BuildCache/glory-semantic-ui/limit-final-{windows,linux}.txt、limit-android.txt、limit-oracle.txt、limit-browser-2026-10-22.json、limit-stream-transport.txt记录最终结果。limit-style-before.rs/limit-html-before.rs、limit-probe-before.rs、limit-probe/{Cargo.toml,Cargo.lock,src/main.rs}、limit-{baseline,after}.txt和limit-browser-diagnostic.json保留实际差异；完整来源/源码/日志/二进制哈希见limit-evidence-2026-10-22.json。
+复现：cargo test --locked -p glory-style -p glory-html；cargo test --locked -p glory-apace --test limits --test style_profile；完整Windows -Web -Window、Linux --window及Android --workspace --all-features --all-targets --target aarch64-linux-android；运行size-acceptance.js与既有十六套浏览器。D:/BuildCache/glory-semantic-ui/limit-final-{windows,linux}.txt、limit-android.txt、limit-oracle.txt、limit-browser-2026-10-22.json、limit-stream-transport.txt记录最终结果。limit-style-before.rs/limit-html-before.rs、limit-probe-before.rs、limit-probe/{Cargo.toml,Cargo.lock,src/main.rs}、limit-{baseline,after}.txt和limit-browser-diagnostic.json保留实际差异；完整来源/源码/日志/二进制哈希见limit-evidence-2026-10-22.json。
 
 报告更新v21。R0其余样式/上下文/后端扩展、Portable文本验证、真实OS IME/辅助技术、Android宿主/资源/设备、R7字段依赖与性能细分/收益驱动缓存、旧架构/工具清理仍按完整目标推进；这一尺寸域修复不将整体重构勾为完成。
 
 ## R5 可选 AccessKit 语义树、动作桥与 Windows UIA 客户端（2026-10-22）
 
-本轮推进原生平台边界，新增glory-blitz/accesskit和门面blitz-accesskit，接入AccessKit 0.25.0/accesskit_xplat 0.2.0；同一包内按accessibility/accesskit_platform模块组织，不新建native/OS占位crate，不改core/render/UI或HTML/SSR协议。上游接线尚未处理ActionRequested，且物理节点树不包含完整Glory集合语义，故使用Glory的已提交语义树、实际控件和引擎几何构建平台树，没有开启那条上游窗口接线。
+本轮推进原生平台边界，新增glory-apace/accesskit和门面apace-accesskit，接入AccessKit 0.25.0/apace_accesskit 0.2.0；同一包内按accessibility/accesskit_platform模块组织，不新建native/OS占位crate，不改core/render/UI或HTML/SSR协议。上游接线尚未处理ActionRequested，且物理节点树不包含完整Glory集合语义，故使用Glory的已提交语义树、实际控件和引擎几何构建平台树，没有开启那条上游窗口接线。
 
 平台对象在首次显示窗口前创建，保留调用者可见性意图。外部线程只投递WindowId+RuntimeId请求，主循环先poll/提交，再验证当前目标并处理Focus/Click/字符串SetValue。Click沿用Activate与Check一次CheckedChanged；值更新沿用规范化、组合结束和当前revision事件，业务回调由UI循环消费，借用adapter时不重入。失效、隐藏、禁用或不支持请求不破坏后续应用。关闭先释放adapter，平台对象也持有窗口引用直至自身释放；Surface暂停不因此Dispose语义树。
 
@@ -1288,13 +1288,13 @@ HTML字段lowerer读取已验证的新描述符与旧字段，生成相应edits�
 
 独立Windows UI Automation验收由隐藏控制台的.NET客户端进程驱动两个真实窗口，通过系统接口发现控件并调用Invoke/Toggle/Focus/SetValue。结果：A窗Count 0→1、B窗仍0；checked变On、emoji值写入成功、系统焦点正确；禁用Invoke被拒绝；Password.IsPassword=true且读不到原值；Editor bounds非零；100,000,000行源在系统树中仅7个ListItem。随后关闭两窗，所有业务Cage失效、语义节点归零，helper已经wait/join。这不是通过合成DomEvent或本地快照推断系统接口成功。
 
-最终Windows passed=385（297框架/doc-test + 2编译失败用例 + 83引擎 + 普通shell/AccessKit实窗/UIA三项验收），Ubuntu WSL passed=386（297 + 2 + 83 + X11/Wayland各普通/AccessKit共四项实窗）。严格workspace all-features/all-targets Clippy、Linux default/paint、WASM workspace/fixture严格检查与重建通过；Android只编译通过。默认门面normal/build依赖图不含AccessKit/winit/Stylo。浏览器源码与重建WASM哈希和v21已执行的十七套验收完全一致，本轮未重跑浏览器/stream服务，不把原结果描述成新执行。
+最终Windows passed=385（297框架/doc-test + 2编译失败用例 + 83引擎 + 普通shell/AccessKit实窗/UIA三项验收），Ubuntu WSL passed=386（297 + 2 + 83 + X11/Wayland各普通/AccessKit共四项实窗）。严格workspace all-features/all-targets Clippy、Linux default/paint、WASM workspace/fixture严格检查与重建通过；Android只编译通过。默认门面normal/build依赖图不含AccessKit/wingy/Stylo。浏览器源码与重建WASM哈希和v21已执行的十七套验收完全一致，本轮未重跑浏览器/stream服务，不把原结果描述成新执行。
 
-Linux新增依赖后首次链接发生Bus error，当时D盘loop卷仅余443MB。确认该次进程终止后，先用cargo metadata、realpath和loop backing核对target确在D盘本任务目录，再只cargo clean -p glory-blitz，释放2451个/约41GiB旧产物，卷恢复40GiB可用；保留源码/样本/日志，重新完整gate通过。首次跨壳cache同步变量转义失败也保留，改用绝对路径后同步；未改动测试断言或转移到C盘。后续首次同步/几何失效分离、UIA整数边界修正后再次完整验证。
+Linux新增依赖后首次链接发生Bus error，当时D盘loop卷仅余443MB。确认该次进程终止后，先用cargo metadata、realpath和loop backing核对target确在D盘本任务目录，再只cargo clean -p glory-apace，释放2451个/约41GiB旧产物，卷恢复40GiB可用；保留源码/样本/日志，重新完整gate通过。首次跨壳cache同步变量转义失败也保留，改用绝对路径后同步；未改动测试断言或转移到C盘。后续首次同步/几何失效分离、UIA整数边界修正后再次完整验证。
 
-新增可选SDK/Unix桥依赖（首次锁解析新增58包）；workspace成员和其余包边界不变，四包105文件vendor及补丁/来源哈希未变，无新增unsafe。构建、包cache、临时文件、UIA报告和诊断在D盘；未启动HTTP/stream服务，UIA子进程与执行会话均已终止。Native默认无窗口document仍不创建平台对象。项目README、blitz README、契约、AGENTS和架构报告v22同步。
+新增可选SDK/Unix桥依赖（首次锁解析新增58包）；workspace成员和其余包边界不变，四包105文件vendor及补丁/来源哈希未变，无新增unsafe。构建、包cache、临时文件、UIA报告和诊断在D盘；未启动HTTP/stream服务，UIA子进程与执行会话均已终止。Native默认无窗口document仍不创建平台对象。项目README、apace README、契约、AGENTS和架构报告v22同步。
 
-复现：cargo test --locked -p glory-blitz --features accesskit --lib accessibility::tests；Windows独立real_accesskit_windows_ui_automation需--ignored --nocapture --test-threads=1；完整scripts/check-semantic-ui.ps1 -Web -Window和Linux scripts/check-semantic-linux.sh --window已包含普通/AccessKit实窗与Windows UIA。直接应用可用cargo run -p glory-blitz --example window --features accesskit，门面选blitz-accesskit。D:/BuildCache/glory-semantic-ui/accesskit-final-{windows,linux}.txt、accesskit-android.txt、accesskit-position-boundary.txt、accesskit-default-tree.txt、accesskit-linux-{link-failure,clean}.txt及唯一accesskit-uia-*.json记录结果；完整源码、依赖/vendor、环境、日志和二进制哈希为accesskit-evidence-2026-10-22.json。
+复现：cargo test --locked -p glory-apace --features accesskit --lib accessibility::tests；Windows独立real_accesskit_windows_ui_automation需--ignored --nocapture --test-threads=1；完整scripts/check-semantic-ui.ps1 -Web -Window和Linux scripts/check-semantic-linux.sh --window已包含普通/AccessKit实窗与Windows UIA。直接应用可用cargo run -p glory-apace --example window --features accesskit，门面选apace-accesskit。D:/BuildCache/glory-semantic-ui/accesskit-final-{windows,linux}.txt、accesskit-android.txt、accesskit-position-boundary.txt、accesskit-default-tree.txt、accesskit-linux-{link-failure,clean}.txt及唯一accesskit-uia-*.json记录结果；完整源码、依赖/vendor、环境、日志和二进制哈希为accesskit-evidence-2026-10-22.json。
 
 继续保留完整目标：Unix AT-SPI客户端消费、实际屏幕阅读器/Live播报、完整文本行/选区与更多滚动动作，OS IME、Android宿主/资源/设备；R0样式/上下文/扩展、Portable文本、R7字段依赖/性能细分/收益驱动缓存，以及旧工具/源码清理仍未完成。Linux adapter创建/窗口成功不代表AT-SPI或读屏器通过，Windows UIA成功也不代表全部辅助技术已验收。
 
@@ -1302,7 +1302,7 @@ Linux新增依赖后首次链接发生Bus error，当时D盘loop卷仅余443MB�
 
 上一轮完成AccessKit基础桥，本轮补足真实辅助技术显示离屏焦点行的链路。render增加短名Navigation::Reveal；ui::list按事件原点所在的已挂载行解析稳定key/index，复用原布局与ScrollSpace，不向原生适配器泄漏业务源。Reveal不发送Focus、只要求scroll能力，Root/空列表无目标；不回退首行，也不继承同批Last/Next的临时游标。已有普通导航仍要求focus+scroll。只有实际解析到新目标才重置分段bias/确认状态，避免无目标请求破坏已有精度校正。
 
-Blitz可选桥只在有有效Root/Navigate的虚拟Row wrapper声明ScrollIntoView，接受None或可选ScrollHint；其他data拒绝。外部请求照旧只排队，业务与逻辑seek由主循环消费。导出前处理合并后的存活目标，以当前盒子和边框/client大小对原生祖先执行双轴nearest滚动，最后显示文档视口；引擎保持overflow规则。scroll导致observation失效时也安排下一次poll。退休、隐藏和停用重新验证/清理，原NodeId代次与AXID不复用；pending只存当前导出目标，不是访问历史。未新增另一套虚拟列表、CSS parser或平台crate。
+Apace可选桥只在有有效Root/Navigate的虚拟Row wrapper声明ScrollIntoView，接受None或可选ScrollHint；其他data拒绝。外部请求照旧只排队，业务与逻辑seek由主循环消费。导出前处理合并后的存活目标，以当前盒子和边框/client大小对原生祖先执行双轴nearest滚动，最后显示文档视口；引擎保持overflow规则。scroll导致observation失效时也安排下一次poll。退休、隐藏和停用重新验证/清理，原NodeId代次与AXID不复用；pending只存当前导出目标，不是访问历史。未新增另一套虚拟列表、CSS parser或平台crate。
 
 新增三项UI测试覆盖定高/变高100,000,000行、9千万行远跳后的嵌套Input身份/草稿、无Focus动作、少于50额外key/少于100节点，scroll-only能力、Root零读取/零动作，以及同批Last/Reveal按实际原点而非游标显示。两个新增AccessKit测试经真实consumer检查定高/变高编辑器焦点/值和可见几何、回调零源读取、非法data与退休拒绝、32次重复请求只留一个pending，以及border/双轴overflow:hidden祖先和文档viewport。焦点pin、稀疏测量、原生scroll确认及数据定位约束未放宽。
 
@@ -1314,7 +1314,7 @@ Blitz可选桥只在有有效Root/Navigate的虚拟Row wrapper声明ScrollIntoVi
 
 依赖、workspace、全部manifest/lock与四包105文件vendor/补丁来源未变，无新增unsafe。生产Rust在最终gate开始前固定；之后仅补文档/证据。所有build/cache/临时服务、失败日志/源与结果保存在D:；8788/8789按PID/命令核对后停止，最终无监听。报告v23、契约、列表基线、README/AGENTS同步。新增显示功能不等于FPS/RSS提升，也不证明任意未物化行的系统检索、百分比滚动、文本接口或读屏器播报。
 
-复现：cargo test --locked -p glory-ui --test list_widget；cargo test --locked -p glory-blitz --features accesskit --lib accessibility::tests；完整Windows scripts/check-semantic-ui.ps1 -Web -Window、Linux scripts/check-semantic-linux.sh --window；Android --workspace --all-features --all-targets --target aarch64-linux-android；17套examples/semantic-web/*acceptance.js及scripts/check-semantic-stream.py。D:/BuildCache/glory-semantic-ui/reveal-final-{windows,linux}.txt、reveal-android.txt、reveal-browser-2026-10-22.json、reveal-stream-transport.txt及accesskit-uia-1792674543841367.json记录最终结果，reveal-{render,navigation,widget,accessibility}-before.rs和reveal-uia-r*.txt保留前实现与诊断；完整哈希为reveal-evidence-2026-10-22.json。
+复现：cargo test --locked -p glory-ui --test list_widget；cargo test --locked -p glory-apace --features accesskit --lib accessibility::tests；完整Windows scripts/check-semantic-ui.ps1 -Web -Window、Linux scripts/check-semantic-linux.sh --window；Android --workspace --all-features --all-targets --target aarch64-linux-android；17套examples/semantic-web/*acceptance.js及scripts/check-semantic-stream.py。D:/BuildCache/glory-semantic-ui/reveal-final-{windows,linux}.txt、reveal-android.txt、reveal-browser-2026-10-22.json、reveal-stream-transport.txt及accesskit-uia-1792674543841367.json记录最终结果，reveal-{render,navigation,widget,accessibility}-before.rs和reveal-uia-r*.txt保留前实现与诊断；完整哈希为reveal-evidence-2026-10-22.json。
 
 完整目标继续保留：R0全部字段/样式/上下文与扩展审计，Portable文本验证，真实OS IME、Unix AT-SPI客户端、读屏器/Live播报、完整文本行/选区和更多滚动/项目检索，Android Activity/Surface/资源/设备，R7字段依赖/性能细分/收益驱动缓存，以及旧工具/源码清理。不能把本次已挂载行显示链路作为整个R5或整体目标完成。
 
@@ -1322,21 +1322,21 @@ Blitz可选桥只在有有效Root/Navigate的虚拟Row wrapper声明ScrollIntoVi
 
 本轮返回P0样式行为审计。先用独立D:探针创建46组实际布局，并在隔离Chromium文档中使用相同typed HTML声明比较：六种justify、四种align、零/小数/整grow/shrink、两轴与五种overflow自动最小尺寸。四组0.25因子存在约5px差异，其余42组在有限误差内一致。横轴300px容器、两个50px子项与10px gap，本应各97.5px却为92.5px；250px子项按shrink=0.25应197.5px却为192.5px，纵轴有相同问题。两项原生回归修复前均失败；探针原可执行文件、前锁和原输出保留。
 
-问题在Taffy 0.15.0：initial_free_space已经减去固定gap，小于1的未冻结因子之和分支又减一次。修复只移除grow/shrink分支中的第二次扣除并解释规范依据。没有在Glory添加几何补偿、第二套布局、拒绝小数或扩宽profile；HTML/RECORD v2、Blitz v3及合法数值域保持。修复后同一独立探针46组全部与Chromium相符，最大差约0.02451 CSS px；只四组输出改变，保留完整前后数据，不构造性能提速结论。
+问题在Takia 0.15.0：initial_free_space已经减去固定gap，小于1的未冻结因子之和分支又减一次。修复只移除grow/shrink分支中的第二次扣除并解释规范依据。没有在Glory添加几何补偿、第二套布局、拒绝小数或扩宽profile；HTML/RECORD v2、Apace v3及合法数值域保持。修复后同一独立探针46组全部与Chromium相符，最大差约0.02451 CSS px；只四组输出改变，保留完整前后数据，不构造性能提速结论。
 
-为保持Dom/Paint/Stylo连接的Rust类型身份一致，新增vendor/taffy与vendor/stylo_taffy，包名glory-taffy/glory-stylo-taffy；四个Blitz包仍beta.4。Taffy来源commit eb6450694f33e2b7413e40677f230ff63f0fc194，连接包保持Blitz原commit；原crate archive SHA及每文件原/后哈希均记录。未在Glory声明全局patch，也不要求应用复制patch配置。连接包只改manifest边和补充许可证；补充的上游license/rustfmt按精确commit URL与独立source hash验证。当前六包183文件，单独测试锁另行跟踪/校验，活动workspace仍十包。默认门面normal/build图无Blitz/Taffy/Stylo/AccessKit。
+为保持Dom/Paint/Stylo连接的Rust类型身份一致，新增vendor/takia与vendor/stylo_takia，包名glory-takia/glory-stylo-takia；四个Apace包仍beta.4。Takia来源commit eb6450694f33e2b7413e40677f230ff63f0fc194，连接包保持Apace原commit；原crate archive SHA及每文件原/后哈希均记录。未在Glory声明全局patch，也不要求应用复制patch配置。连接包只改manifest边和补充许可证；补充的上游license/rustfmt按精确commit URL与独立source hash验证。当前六包183文件，单独测试锁另行跟踪/校验，活动workspace仍十包。默认门面normal/build图无Apace/Takia/Stylo/AccessKit。
 
-两个Taffy直接回归覆盖两/三子项、零/不等/冻结/小于1/等于及大于1的因子和、0/10/25px gap与margin；原有169项加新2项，共171通过。render/conformance增加可选FlexCase数据，Native和Web使用相同46组描述符及规范预期局部矩形。两个Blitz测试分别构造全部46场景、在同一物理节点上连续修改36种非文字样式，检查实际坐标/尺寸与身份；相关CSS仅在验收范围生效，没有把数据矩阵放到生产滚动路径。
+两个Takia直接回归覆盖两/三子项、零/不等/冻结/小于1/等于及大于1的因子和、0/10/25px gap与margin；原有169项加新2项，共171通过。render/conformance增加可选FlexCase数据，Native和Web使用相同46组描述符及规范预期局部矩形。两个Apace测试分别构造全部46场景、在同一物理节点上连续修改36种非文字样式，检查实际坐标/尺寸与身份；相关CSS仅在验收范围生效，没有把数据矩阵放到生产滚动路径。
 
 第18套浏览器flex-acceptance以同一Rust组件生成CSR与SSR：各36次样式变更全部保持输入/父子盒身份、预输入emoji、焦点和双向UTF-16选区，随后实际键入和卸载；十种Text/overflow场景另行构建。两入口最大误差约0.02451px，所有delta有限，errors=[]。首版自定义fixture没有保留child Scope，导致两子项在build结束后释放；最初脚本未断言子项数而将空集合的-Infinity误差序列化为null。现明确retain Scope、断言恰好两个子项且误差有限，旧诊断不计为通过证据；修正后完整Windows gate和18套浏览器重新通过。
 
-首次对新vendor文件执行cargo fmt时继承了Blitz的100列配置，来源检查及时发现非局部格式变化；已从验证过的原archive还原未改源码，补入Taffy精确上游120列配置，最终183文件检查通过。独立Taffy有dev dependencies，不能在被排除的依赖上用-p运行；门禁改用--manifest-path vendor/taffy/Cargo.toml，并跟踪/校验其测试锁。WSL cache首次同步遇到尚未下载的可选parse包，已按锁fetch到D:并校验21包archive/source与原子同步稀疏索引，未改用C:或去掉offline要求。失败输出、原源码与来源恢复脚本保留。
+首次对新vendor文件执行cargo fmt时继承了Apace的100列配置，来源检查及时发现非局部格式变化；已从验证过的原archive还原未改源码，补入Takia精确上游120列配置，最终183文件检查通过。独立Takia有dev dependencies，不能在被排除的依赖上用-p运行；门禁改用--manifest-path vendor/takia/Cargo.toml，并跟踪/校验其测试锁。WSL cache首次同步遇到尚未下载的可选parse包，已按锁fetch到D:并校验21包archive/source与原子同步稀疏索引，未改用C:或去掉offline要求。失败输出、原源码与来源恢复脚本保留。
 
-最终Windows passed=563（304框架/doc-test + 2编译失败 + 83 Blitz + 171 Taffy + 普通/AccessKit实窗/UIA三项），Ubuntu WSL passed=564（304 + 2 + 83 + 171 + X11/Wayland各普通/AccessKit四项）。严格workspace all-features/all-targets Clippy、Linux default/paint、WASM workspace/fixture严格检查及重建通过；Android同范围编译通过。实窗峰值14tasks/77引擎节点，累计key为Windows674/674、Linux673/673/676/676；Windows UIA的离屏编辑行找回与关闭回收继续通过。18套浏览器errors=[]、新链接的stream fixture传输/取消/慢读背压通过，亿级窗口、资源、焦点与测量预算保持。
+最终Windows passed=563（304框架/doc-test + 2编译失败 + 83 Apace + 171 Takia + 普通/AccessKit实窗/UIA三项），Ubuntu WSL passed=564（304 + 2 + 83 + 171 + X11/Wayland各普通/AccessKit四项）。严格workspace all-features/all-targets Clippy、Linux default/paint、WASM workspace/fixture严格检查及重建通过；Android同范围编译通过。实窗峰值14tasks/77引擎节点，累计key为Windows674/674、Linux673/673/676/676；Windows UIA的离屏编辑行找回与关闭回收继续通过。18套浏览器errors=[]、新链接的stream fixture传输/取消/慢读背压通过，亿级窗口、资源、焦点与测量预算保持。
 
 构建/cache/临时文件、前后探针二进制和全部日志在D:，无新增unsafe；原库已有unsafe依靠未改文件原哈希保留。仅新增布局两包及相应本地依赖边，余下第三方生产依赖版本保持；测试锁与acceptance fixture的conformance opt-in独立记录。HTTP/stream helper按PID/命令验证后关闭，8788/8789无监听；fixture Scope修正后重新链接stream binary。报告v24、组件契约、列表基线和README/AGENTS同步。
 
-复现：cargo test --locked -p glory-blitz --test flex_layout；cargo test --locked --manifest-path vendor/taffy/Cargo.toml --lib；完整Windows -Web -Window、Linux --window、Android --workspace --all-features --all-targets --target aarch64-linux-android；18套examples/semantic-web/*acceptance.js及scripts/check-semantic-stream.py。D:/BuildCache/glory-semantic-ui/flex-final-{windows,linux}.txt、flex-android.txt、flex-browser-2026-10-22.json、flex-stream-transport.txt记录最终验收；layout-probe-native-{before,after}.jsonl、layout-probe-comparison-{before,after}.json、flex-probe-{before,after}.exe与flex-before-tests.txt保留原/后结果和失败；完整源码、锁、来源和二进制哈希为flex-evidence-2026-10-22.json。
+复现：cargo test --locked -p glory-apace --test flex_layout；cargo test --locked --manifest-path vendor/takia/Cargo.toml --lib；完整Windows -Web -Window、Linux --window、Android --workspace --all-features --all-targets --target aarch64-linux-android；18套examples/semantic-web/*acceptance.js及scripts/check-semantic-stream.py。D:/BuildCache/glory-semantic-ui/flex-final-{windows,linux}.txt、flex-android.txt、flex-browser-2026-10-22.json、flex-stream-transport.txt记录最终验收；layout-probe-native-{before,after}.jsonl、layout-probe-comparison-{before,after}.json、flex-probe-{before,after}.exe与flex-before-tests.txt保留原/后结果和失败；完整源码、锁、来源和二进制哈希为flex-evidence-2026-10-22.json。
 
 这次覆盖确定尺寸的有限flex行为，不代表R0全部属性/上下文、Grid/内在尺寸/字体、Portable stylesheet或跨引擎完整CSS已经完成；也不替代真实OS IME、AT-SPI/读屏、Android宿主/设备、R7字段依赖/性能细分/缓存，以及旧架构/工具清理。整体目标继续进行。
 
@@ -1354,7 +1354,7 @@ Blitz可选桥只在有有效Root/Navigate的虚拟Row wrapper声明ScrollIntoVi
 
 性能收益按场景记录：256字段20次单写无关派生5,120→0，失效访问10,260→20；选中字段访问为40，消费通知与原门控相同。批量1,000写入并不保证提速，32字段场景字段版本/路径开销高于原粗粒度批处理。初版复测还发现普通Cage批量写入受到字段分支开销影响，已拆回独立原写入guard，将投影/别名处理移至fields::revise，并消除重复节点查询；原始慢样本保留，最终原/后可执行文件交替复测。没有将微秒数据解释成FPS、RSS或平台呈现收益。
 
-完整门槛Windows575/Linux576项通过，分别执行`check-semantic-ui.ps1 -Web -Window`与`check-semantic-linux.sh --window`，含严格all-features/all-targets、Blitz83、Taffy171、普通/AccessKit窗口、Windows真实UIA；Android仍只做all-features/all-targets编译。独立fixture的fields_form SSR测试1项另执行，不计入workspace总数。快路径修正后重新构建WASM和stream，19套浏览器/流传输重新通过；实窗仍不超过14tasks/77引擎节点，HTTP/stream helper按PID/命令验证关闭，8788/8789无监听。
+完整门槛Windows575/Linux576项通过，分别执行`check-semantic-ui.ps1 -Web -Window`与`check-semantic-linux.sh --window`，含严格all-features/all-targets、Apace83、Takia171、普通/AccessKit窗口、Windows真实UIA；Android仍只做all-features/all-targets编译。独立fixture的fields_form SSR测试1项另执行，不计入workspace总数。快路径修正后重新构建WASM和stream，19套浏览器/流传输重新通过；实窗仍不超过14tasks/77引擎节点，HTTP/stream helper按PID/命令验证关闭，8788/8789无监听。
 
 诊断不隐藏：初次fixture opaque返回捕获Scope lifetime，改为Rust2024 use<>；CSR/接管错误类型不同，分别map_err后统一；while-let严格lint已修正。第一轮浏览器stream与其他套件并行时waitForFunction超时，隔离重跑通过，保留错误结果，未确认根因；最终快路径版stream单独执行。初版probe在after粗路径也创建两个writer别名，不能衡量无字段路径，已改为只在field模式创建；初版数据保留，不混入最终粗路径对照。
 
@@ -1376,7 +1376,7 @@ Blitz可选桥只在有有效Root/Navigate的虚拟Row wrapper声明ScrollIntoVi
 
 同一release二进制交替比较最佳粗路径map+with_partial_eq与rows.field→entry→map+with_partial_eq，观察者语义和消费次数相同；源1,024/131,072，观察行32/256，修改无关background/观察count，每20批次各写1或1,000，三次进程重复、每单元9样本。131,072源/256观察行的无关单写将key比较75,380→0、派生5,120→0、marked10,260→20；选中单写比较75,480→200、派生5,120→20、marked10,260→60，消费均20/40、所有写入仍发布版本。代价是同一配置图节点514→774（显式别名和保留的相等派生），并且32观察行每批1,000写入明显更慢；原样本和时间范围全部保留。此为Windows核心诊断，不含布局/paint/present、RSS或FPS；不能据此声称所有场景更快或占更少内存。高频路径管理的收益驱动优化继续保留。
 
-最终Windows588/Linux589项通过，含严格all-features/all-targets、Blitz83、Taffy171、普通/AccessKit实窗及真实UIA。另执行fixture SSR全部2项，20套Chromium与stream transport本轮重新通过，stream隔离运行；原生峰值仍14tasks/77引擎节点。Android all-features/all-targets通过只证明编译。未改wire/HTML/引擎/布局或第三方依赖、锁、十包workspace/六包183文件vendor，无新增unsafe。HTTP/stream进程按PID及命令验证后关闭，8788/8789无监听。
+最终Windows588/Linux589项通过，含严格all-features/all-targets、Apace83、Takia171、普通/AccessKit实窗及真实UIA。另执行fixture SSR全部2项，20套Chromium与stream transport本轮重新通过，stream隔离运行；原生峰值仍14tasks/77引擎节点。Android all-features/all-targets通过只证明编译。未改wire/HTML/引擎/布局或第三方依赖、锁、十包workspace/六包183文件vendor，无新增unsafe。HTTP/stream进程按PID及命令验证后关闭，8788/8789无监听。
 
 保留诊断：新List测试局部labels遮蔽函数，已改名；common注册检查的collapsible_if严格lint已修复。新增浏览器断言在执行前修正为所属frame内查询，避免CSR页面中同名SSR静态控件被误认；没有因此移除身份/编辑状态断言。完整日志、原始288个性能样本、源码/二进制哈希与来源在D:/BuildCache/glory-semantic-ui/entry-evidence-2026-10-22.json；列表基线含时间表。
 
@@ -1400,7 +1400,7 @@ Blitz可选桥只在有有效Root/Navigate的虚拟Row wrapper声明ScrollIntoVi
 
 另用v26原未插桩二进制与完全相同入口源码的新版二进制交替测576样本，避免把计数器开销误算为应用收益。131,072源/256观察项中，20批各1,000写的字段路径background约1,730.1→1,026.1µs，选中项3,031.4→1,427.8µs；单写分别8.8→8.6、19.3→17.7µs。仍有5组中位数较慢，全部范围保留。32观察项高频选中写的当前字段路径1,436.9µs仍慢于同版粗路径600.1µs，不宣称字段总是胜出；投影、查找、版本维护成本继续存在。以上为Windows核心诊断，无布局/paint/present/FPS结论。
 
-最终Windows597/Linux598项通过，含严格all-features/all-targets、Blitz83/Taffy171、普通/AccessKit窗口与真实UIA；额外SSR fixture2项、重建后20套Chromium和stream transport通过，stream单独执行。字段browser真实核对1,000背景写的1重建/999命中和零input.value setter；集合browser核对两个根独立槽、Root目标复用、缺失写不改变有效缓存，输入身份/草稿/焦点/UTF-16选区继续保持。原生峰值14tasks/77引擎节点，Android仍只all-features/all-targets编译。helper按PID/命令验证关闭，8788/8789无监听。
+最终Windows597/Linux598项通过，含严格all-features/all-targets、Apace83/Takia171、普通/AccessKit窗口与真实UIA；额外SSR fixture2项、重建后20套Chromium和stream transport通过，stream单独执行。字段browser真实核对1,000背景写的1重建/999命中和零input.value setter；集合browser核对两个根独立槽、Root目标复用、缺失写不改变有效缓存，输入身份/草稿/焦点/UTF-16选区继续保持。原生峰值14tasks/77引擎节点，Android仍只all-features/all-targets编译。helper按PID/命令验证关闭，8788/8789无监听。
 
 依赖、全部Cargo manifests/locks、十包workspace、六包183文件vendor、renderer wire及引擎保持，无新增生产unsafe。全部构建/缓存/临时/前后源码与二进制在D:。混合写入旧版基线使用D盘最小三包源码快照，生产.rs逐项对照v26证据；未改当前源码来切换基线。未插桩入口先将备份CRLF恢复原LF后核对原始源码哈希，二进制也与v26记录匹配。日志/数据/来源/454源码哈希归档为D:/BuildCache/glory-semantic-ui/cache-evidence-2026-10-23.json；原/后、失败原型、全部慢组和缓冲未Box时样本均保留。
 
@@ -1419,7 +1419,7 @@ D盘独立同源probe用cfg引用改前/改后cache；usize/长字符串key、33
 
 保留代价：最终未插桩4096行数字key、100次轮转中位62.4806→66.1972ms，约慢6%，原始范围有重叠；另一较慢组为100次no-op的0.8→0.9µs。插桩版还有5个时间较慢组，均保留。第一版额外逐行HashMap查找写回order，4096轮转退化约20%；合并遍历后重新做全部最终测量。初版源码/二进制/样本在reconcile-initial，不能混入最终结果。分配汇总最初假定各进程计数恒定，发现部分组不同后改为记录中位数和完整范围；行为轨迹仍要求完全一致，没有筛掉慢样本。诊断allocator复用D盘System转发模块，unsafe不进入生产。
 
-最终完整check-semantic-ui.ps1 -Web -Window通过599项，Linux已验证D盘loop后check-semantic-linux.sh --window通过600项，含Blitz83、Taffy171、严格all-features/all-targets、X11/Wayland普通/AccessKit窗口和Windows真实UIA。原生峰值仍14任务/77引擎节点；WindowsUIA保留7个初始列表项，远跳约9千万行仍保留一个编辑pin并能Reveal返回。另执行独立fixture lib的两个SSR测试、20套Chromium及stream传输背压/断开清理，全部通过。最终生产Rust源码在这些验证间未再修改；报告/契约/列表基线及AGENTS同步。Android本批未重做设备或宿主验收，原先编译证据不等于移动实现完成。
+最终完整check-semantic-ui.ps1 -Web -Window通过599项，Linux已验证D盘loop后check-semantic-linux.sh --window通过600项，含Apace83、Takia171、严格all-features/all-targets、X11/Wayland普通/AccessKit窗口和Windows真实UIA。原生峰值仍14任务/77引擎节点；WindowsUIA保留7个初始列表项，远跳约9千万行仍保留一个编辑pin并能Reveal返回。另执行独立fixture lib的两个SSR测试、20套Chromium及stream传输背压/断开清理，全部通过。最终生产Rust源码在这些验证间未再修改；报告/契约/列表基线及AGENTS同步。Android本批未重做设备或宿主验收，原先编译证据不等于移动实现完成。
 
 诊断保留：首次Windows全量链接并发内存不足，降低CARGO_BUILD_JOBS=2后通过；下一次UIA在initial controls的Editor.SetFocus超时，未进入列表操作，报告accesskit-uia-1792690156902437.json保留。其他窗口测试结束后完整隔离重跑通过，真实UIA成功报告为accesskit-uia-1792690535536134.json；不据此断言初次聚焦失败的根因。Linux首命令相对路径及非登录PATH缺cargo的失败分别保留，使用脚本绝对路径和已验证cargo路径后通过。首次SSR bin命令执行0测试，另以--lib执行实际2项，不把空测试算通过覆盖。浏览器结果一次性传给Windows命令超过长度上限后，保留内存结果并分块写档，无需重跑或裁剪测试结果。
 
@@ -1428,19 +1428,19 @@ D盘独立同源probe用cfg引用改前/改后cache；usize/长字符串key、33
 整体目标继续保留：R0实际引擎样式/上下文/扩展审计与Portable stylesheet文本，实际OS IME、AT-SPI/读屏/完整文本选区，Android Activity/Surface/资源/IME/设备，R7 Deref/自定义容器/动态路径与专用结构增删发布、引擎细分及收益驱动style/paint缓存、旧源码/工具/入口清理。本批窗口协调优化不替代这些交付物。
 ## R0 受限 Sheet、共享 HTML CSS 与状态映射（2026-10-23）
 
-继续实施报告§8的样式输入边界。glory-style的可选css依赖固定cssparser0.38.0，增加不可变Sheet及Rule/Selector/Declaration视图，不引入UI DSL、VDOM或新的运行时。默认facade和SSR依赖图已实际检查，仍无parser/serde/DOM/native engine；开启CSS的WASM fixture也没有Blitz/Stylo/Taffy。root lock复用既有解析器版本并增加style依赖边；fixture lock新增可选图的解析记录，不能据此断言native引擎实际进入浏览器，实际tree输出分别保留。
+继续实施报告§8的样式输入边界。glory-style的可选css依赖固定cssparser0.38.0，增加不可变Sheet及Rule/Selector/Declaration视图，不引入UI DSL、VDOM或新的运行时。默认facade和SSR依赖图已实际检查，仍无parser/serde/DOM/native engine；开启CSS的WASM fixture也没有Apace/Stylo/Takia。root lock复用既有解析器版本并增加style依赖边；fixture lock新增可选图的解析记录，不能据此断言native引擎实际进入浏览器，实际tree输出分别保留。
 
 首批文本覆盖现有25类属性、overflow shorthand、class组合、子代/后代、hover/focus/enabled/disabled/checked；规则/声明顺序、重复声明和specificity保持。未知属性/selector/value/unit、at-rule（包括上游默认忽略的初始charset）、important、函数/变量等返回错误，绝不返回部分成功Sheet。数字域复用Style::validate。默认1MiB、4,096规则、8,192选择器、65,536项、32,768声明，单选择器128项硬限制；诊断为一基行和UTF-8字节列。六项集成覆盖全部类型化属性、顺序/转义/状态/层级、28类以上拒绝输入、profile拒绝原声明、全部预算及长selector边界，另有Sheet文档用例。
 
 glory-html/css提供共同sheet编译：每个compound用零specificity的Main guard排除内部part；Group透明。Check的class在label，禁用/启用/选中通过Main语义属性映射，原生property仍在input；focus仅将Check内部control的focus-within算作自身焦点，普通View聚焦后代不匹配自身focus。已提交props决定checked/enabled状态，宿主决定hover/focus。class中的原始<按CSS hex转义，可用于style raw-text而不做HTML实体逃逸。HTML格式升至3，full-shape/delta、SSR/WASM、stream End/markers和Python传输准入同步；没有旧格式别名或转换器。
 
-SSR Document的可选sheets在组件build前检查并按顺序输出，沿用nonce；Blitz set_sheet先完成全部目标profile检查，再替换author CSS并失效，失败不改原文档/visual revision。Style Profile的inline版本独立于HTML格式；本批没有扩大Sticky或AnchorAuto的原生承诺。解析/编译只在资产准备或显式替换发生，普通滚动和业务绑定继续生成原有属性/结构Patch，CSS cascade/layout仍由引擎处理。
+SSR Document的可选sheets在组件build前检查并按顺序输出，沿用nonce；Apace set_sheet先完成全部目标profile检查，再替换author CSS并失效，失败不改原文档/visual revision。Style Profile的inline版本独立于HTML格式；本批没有扩大Sticky或AnchorAuto的原生承诺。解析/编译只在资产准备或显式替换发生，普通滚动和业务绑定继续生成原有属性/结构Patch，CSS cascade/layout仍由引擎处理。
 
 新增原生验收发现并修复两处实际引擎问题。块/flex变成被祖先inline上下文吸收的内容后，旧layout_children/inline-root/匿名盒子未退休，使内部checkbox同时出现在旧/新容器；现在只清理过期构造状态并保留控件，直接引擎回归连续切换200次且匿名节点有界。原先FocusWithin匹配固定false；现维护当前元素祖先状态，切换/清空/移除时快照并失效相关路径，跨父节点移动仅懒捕获当前焦点路径并在mutator边界收口。同父重排和挂载新行不分配该路径，不建历史索引。直接回归覆盖移动、保持焦点、清空、删除与状态回收；Glory原生focus用例验证Check内部焦点、切换到Input和祖先View不误匹配。来源校验仍六包183文件，直接引擎85项，补丁/哈希与vendor说明同步。
 
 新增第21套浏览器用例与同一纯Rust CSS form。CSR和SSR接管实际核对class/child specificity、Group透明、继承、hover/focus、预输入/预选中、disabled/checked及反向UTF-16选区、身份和卸载。Native实际几何还验证同一状态规则、unsupported Sticky原子拒绝和替换CSS后不重挂载。HTML lowerer另验证顺序/guard/转义/目标拒绝，SSR验证多Sheet与nonce。
 
-最终完整Windows check-semantic-ui.ps1 -Web -Window通过613项，Linux已验证D盘loop后check-semantic-linux.sh --window通过614项，包括严格all-features/all-targets、Taffy171、Blitz85、X11/Wayland普通/AccessKit窗口及Windows真实UIA。原生仍峰值14任务/77引擎节点，巨大列表的窗口/焦点pin/测量/源读取回归继续通过。fixture lib两个SSR测试另执行；最终21套Chromium与stream传输顺序/背压/断开清理均通过，End marker实际为gly:v:3。控制/协议测试不替代OS IME、屏幕阅读器或Android设备准入；本批没有新的FPS/RSS结论。
+最终完整Windows check-semantic-ui.ps1 -Web -Window通过613项，Linux已验证D盘loop后check-semantic-linux.sh --window通过614项，包括严格all-features/all-targets、Takia171、Apace85、X11/Wayland普通/AccessKit窗口及Windows真实UIA。原生仍峰值14任务/77引擎节点，巨大列表的窗口/焦点pin/测量/源读取回归继续通过。fixture lib两个SSR测试另执行；最终21套Chromium与stream传输顺序/背压/断开清理均通过，End marker实际为gly:v:3。控制/协议测试不替代OS IME、屏幕阅读器或Android设备准入；本批没有新的FPS/RSS结论。
 
 诊断保留：初版按旧cssparser API编写，按固定0.38的单lifetime Parser、拥有错误及带SourceLocation的三元组修正。引擎直接复现和集成复现的layout_parent断言、focus样式20px而非60px的失败日志保留。最初直接引擎测试把没有UA尺寸的checkbox假定为正宽，修为显式14px后继续检查真实布局；其源问题的冲突父节点复现先于尺寸断言。聚焦清理测试修正为检查内部focus_node_id，因为公开getter无控件时回退到body；没有改该既有行为。两平台首轮新格式测试仍写死v2，已改为v3；classic stream结束marker及Python html_version断言同步，旧失败日志保留。新browser严格整数相等遇到缩放下约0.01px量化，改用既有flex矩阵相同0.03px有限容差，同时保留实测Rect；10/20px语义变化不能被容差掩盖。
 
@@ -1450,7 +1450,7 @@ SSR Document的可选sheets在组件build前检查并按顺序输出，沿用non
 
 ## R0 字体、空白/换行与装饰属性（2026-10-23）
 
-继续实施报告§8.12。新增Family有序回退列表、绝对分数字重、WhiteSpace四模式、独立边框宽度/颜色/None或Solid样式、统一px圆角与整体透明度。typed Style与Sheet共用33类属性、42类有限值；Support改为u64，并逐属性/值测试独立拒绝，包括32位边界之外的字段。HTML/RECORD profile升到3、Blitz升到4；HTML映射仍是格式3，无新增crate、依赖、feature或布局树。
+继续实施报告§8.12。新增Family有序回退列表、绝对分数字重、WhiteSpace四模式、独立边框宽度/颜色/None或Solid样式、统一px圆角与整体透明度。typed Style与Sheet共用33类属性、42类有限值；Support改为u64，并逐属性/值测试独立拒绝，包括32位边界之外的字段。HTML/RECORD profile升到3、Apace升到4；HTML映射仍是格式3，无新增crate、依赖、feature或布局树。
 
 命名字体与generic区分，Named恒序列化为CSS字符串，转义引号/反斜杠/控制符/原始<，避免改动声明或style raw-text边界。测试以包含注入片段、换行、反斜杠、中文和emoji的名称往返同一Sheet解析器，并保证只产生原声明。空列表/空名/NUL、非法数字、未支持generic/keyword/shorthand/多角/百分比圆角等报错。边框各项独立，撤销inline恢复级联；不因默认值填充而覆盖其他声明。
 
@@ -1460,7 +1460,7 @@ SSR Document的可选sheets在组件build前检查并按顺序输出，沿用non
 
 本批没有改变core与Cache/Heights实现，不重复CPU对照，也不声明FPS、RSS或全CSS提速。报告v31、契约、README、AGENTS与vendor说明同步；完整目标仍保留主题、更广文字/视觉语法、非HTML resolver及实际引擎/上下文/扩展审计，OS IME/AT-SPI/读屏/完整文本选区，Android宿主/资源/设备，R7 Deref/动态容器/结构增删/引擎细分与收益驱动缓存、旧源码/工具/入口退出。
 
-最终完整Windows check-semantic-ui.ps1 -Web -Window通过621项，Linux已核对D盘loop后的check-semantic-linux.sh --window通过622项，包含直接引擎86、Taffy171、严格all-features/all-targets与默认/paint组合、X11/Wayland普通/AccessKit窗口及Windows真实UIA。WASM workspace/fixture严格检查和实际重建均通过，fixture lib另有两个SSR测试。22套浏览器及stream顺序/背压/断开清理均通过。原有原生窗口仍峰值14任务/77引擎节点；实际UIA保留7个初始列表项及约9千万行处的编辑pin、Reveal返回、草稿和焦点，最终报告accesskit-uia-1792697229116314.json。
+最终完整Windows check-semantic-ui.ps1 -Web -Window通过621项，Linux已核对D盘loop后的check-semantic-linux.sh --window通过622项，包含直接引擎86、Takia171、严格all-features/all-targets与默认/paint组合、X11/Wayland普通/AccessKit窗口及Windows真实UIA。WASM workspace/fixture严格检查和实际重建均通过，fixture lib另有两个SSR测试。22套浏览器及stream顺序/背压/断开清理均通过。原有原生窗口仍峰值14任务/77引擎节点；实际UIA保留7个初始列表项及约9千万行处的编辑pin、Reveal返回、草稿和焦点，最终报告accesskit-uia-1792697229116314.json。
 
 浏览器文字列表峰值39活跃行、64条测量、120个语义slots、210个graph slots；上一行约20.006→80.025px时锚点约-7.005px保持不变。其文字包含行号，视口600px、overscan每侧4，因此预算按ceil(600/20)+2×4+2=40计算；最初误沿用24px旧fixture的35行预算导致测试失败，修正为独立窗口公式，未改实现或数据规模。装饰首测把已使用border宽度写死为2px，实际缩放下为1.96078px；现在同时精确核对CSSOM声明2px并按一个物理像素界定used值，其他确定几何继续0.03px容差。原始失败和实测值均保留。
 
@@ -1471,17 +1471,17 @@ SSR Document的可选sheets在组件build前检查并按顺序输出，沿用non
 ## 第三方依赖：迁移到组织 Git fork（2026-10-23）
 
 按用户明确要求，删除仓库内的第三方源码目录及旧来源校验器，停止本地副本维护。
-创建真正的GitHub forks glory-rs/blitz与glory-rs/taffy，并将已有修复提交推送到
-chris/glory-engine与chris/glory-layout。Glory固定Blitz完整提交
-d58b604a7a20a84e607d45ae6ce6c15a7b9d3dce；Blitz统一固定Taffy提交
+创建真正的GitHub forks glory-rs/apace与glory-rs/takia，并将已有修复提交推送到
+chris/glory-engine与chris/glory-layout。Glory固定Apace完整提交
+d58b604a7a20a84e607d45ae6ce6c15a7b9d3dce；Apace统一固定Takia提交
 dd7914fba2e6e0b5d8a2c8854d764a2ade817efd。上游基线、完整提交及测试参数由
 docs/engine-forks.json记录；维护方式见engine-forks.md。AGENTS明确禁止vendor。
 
 恢复六个上游package名字及正常仓库/workspace结构，Glory自己的适配器仍叫
-glory-blitz。只改组织fork的Git来源；无全局Cargo patch、子模块、移动branch
-依赖或应用端配置要求。两个消费锁文件同步更新；原四个Blitz包、Stylo连接和
-Taffy只解析到各自的一份Git类型身份，活动workspace仍十包。Web/SSR的实际
-normal/build依赖树不含Blitz/Taffy/Stylo/AccessKit/Dioxus。
+glory-apace。只改组织fork的Git来源；无全局Cargo patch、子模块、移动branch
+依赖或应用端配置要求。两个消费锁文件同步更新；原四个Apace包、Stylo连接和
+Takia只解析到各自的一份Git类型身份，活动workspace仍十包。Web/SSR的实际
+normal/build依赖树不含Apace/Takia/Stylo/AccessKit/Dioxus。
 
 迁移前校验通过六包183文件的历史来源记录；146个源码/资源文件逐字节迁入
 上游Git checkout，并再次对最终Git提交的blob核对SHA-256，全部一致。上游
@@ -1493,7 +1493,7 @@ FreeBSD独立库测试增加test-only Fontique fontconfig-dlopen依赖，保持�
 新的scripts/check-engine-forks.py核对Cargo metadata、两份消费锁、完整来源、
 重复身份及十包边界。--test在D:构建目录维护干净的正常Git checkout，以fork
 自己的固定锁运行测试，不修改Cargo源码缓存，也不作为Glory的path依赖。
-Windows/Linux gate均改用该入口。Blitz库86项、Taffy库185项通过；Taffy的
+Windows/Linux gate均改用该入口。Apace库86项、Takia库185项通过；Takia的
 上游manifest通过self dev-dependency开启parse，所以比旧规范化manifest的
 171项多出14项已有解析测试，不能理解成新增14项修复。
 
@@ -1850,9 +1850,9 @@ D:/BuildCache/glory-semantic-ui/queue-retire-evidence-2026-10-23.json。
 
 ## v36：固定聚合的原生引擎细分计时（2026-10-23）
 
-本批补 R7 的观测基础，不以计时器代替实际布局优化。Blitz fork 固定到
+本批补 R7 的观测基础，不以计时器代替实际布局优化。Apace fork 固定到
 bd2375bc010300fc734e73ef245208d4d242d0a3，保留包名、仓库结构、许可证；
-四个直接 Git 依赖、主/示例锁及 engine-forks.json 一起升级。Taffy 未改。
+四个直接 Git 依赖、主/示例锁及 engine-forks.json 一起升级。Takia 未改。
 独立 fork 测试流程新增 extra_tests 的 parallel-construct 配置。
 
 引擎 collector 默认 None；开启后固定 13 槽，以 Arc/Mutex 支持并行文本
@@ -1942,7 +1942,7 @@ Style .2005，PostConstruct .1269（TextShape .1080），BoxLayout .0828
 D:/BuildCache/glory-semantic-ui/engine-profile-on-off-post-gates/evidence.json。
 
 最终门禁：Windows -Web -Window 692项，Linux基础689项加X11/Wayland各
-shell/accesskit共4项，即693项；这些总数包含185项Taffy、91项Blitz与5项
+shell/accesskit共4项，即693项；这些总数包含185项Takia、91项Apace与5项
 parallel-construct profile测试。两端严格Clippy通过，WASM workspace/fixture
 严格检查与实际重建通过。Chromium 155的24套验收均无pageerror；profile
 验收读到31阶段，原生内部阶段为零。SSR fixture lib 4项、重建stream_fixture
@@ -1977,14 +1977,14 @@ row的实际Bounds并断言24/28/32px；修正版程序在旧/新源码中逐字
 位置/锚点后又布局，再因ScrollTo重复完整resolve。该切片4→2，不代表所有
 帧都有四次或三次；新行、字体/图片、宽度与锚点反馈必须按需要保留。
 
-Glory的唯一生产改动在blitz adapter：拆开布局失效与像素失效。瞬时ScrollTo
+Glory的唯一生产改动在apace adapter：拆开布局失效与像素失效。瞬时ScrollTo
 前仍resolve，写offset后引擎已经更新geometry generation；改变时推进visual
 revision、保留observation与ack，但不自动再标布局脏。立即refresh_hover，
 命中改变则回退完整失效，继续响应hover CSS尺寸变化。新测覆盖纯滚动盒/文本
 复用、变化坐标/像素版本/ack、空动作和后续CSS更新，以及滚动下新hover目标
 需要布局的情况。资源/动画/viewport/普通Patch及所有提交/查询屏障保持原路径。
 
-Blitz fork固定b40cdfc2c9b5a000759275b673e4ed8aadd68f78。inline style的Set/
+Apace fork固定b40cdfc2c9b5a000759275b673e4ed8aadd68f78。inline style的Set/
 Clear保留snapshot、父/祖先与selector/inherited restyle，仅不再预置ALL_DAMAGE，
 改用计算样式差异。自定义Widget继续保守完整失效，其他属性不变。新4项fork
 测试含offset/height不重塑、等价声明不塑形/断行、Clear回退、16种连续变化
@@ -2063,8 +2063,8 @@ TextShape/TextBreak均60，稳定后Paint/Draw均100。移除的是150次滚动�
 D:/BuildCache/glory-semantic-ui/feedback-isolated-seek-formal/evidence.json
 D:/BuildCache/glory-semantic-ui/feedback-isolated-scroll-formal/evidence.json
 
-最终Windows -Web -Window 702项、Linux --window 703项通过（含185 Taffy、
-95 Blitz、parallel profile5/style4及实际窗口）；严格Clippy、WASM workspace/
+最终Windows -Web -Window 702项、Linux --window 703项通过（含185 Takia、
+95 Apace、parallel profile5/style4及实际窗口）；严格Clippy、WASM workspace/
 fixture与实际重建通过，最终benchmark参数/断言更新后另跑example严格Clippy
 和全workspace格式检查。24套Chromium验收无pageerror，SSR fixture lib4项、
 重建stream_fixture及Shell/Patch/Patch/End、慢消费者/断开取消通过。Android
@@ -2097,12 +2097,12 @@ prefix的bit一致性。原始v37回归探针返回101，修复版返回0；这�
 正式前/后的共同部分包括该确定性修复与完全相同的profile.rs。前为保存的
 v36库/锁，只有measure.rs和profile.rs两文件更改；其余原始输入哈希保持。
 后为当前v37原生优化加v38修复。前fork bd2375bc010300fc734e73ef245208d4d242d0a3，
-后b40cdfc2c9b5a000759275b673e4ed8aadd68f78；Taffy和六包来源维护方式未变。
+后b40cdfc2c9b5a000759275b673e4ed8aadd68f78；Takia和六包来源维护方式未变。
 不能称这些数字为v38相对随机v37的纯FIFO速度差异。
 
 源在measurement-before-src，两个独立target为measurement-before-target和
 measurement-after-target。复制依赖构建缓存后，各target用cargo clean --profile
-release清理十个自身包，再独立cargo build --locked -p glory-blitz --features
+release清理十个自身包，再独立cargo build --locked -p glory-apace --features
 raster --example profile --release --message-format=json-render-diagnostics；
 metadata、编译日志和compiler-artifact的fresh=false/manifest/executable已核验。
 共同benchmark和measurement修复字节一致；只使用最后构建的两份二进制。
@@ -2181,7 +2181,7 @@ Break61不变，稳定后Paint/Draw各100。两种预算、一亿变高稳定后
 没有实分配一亿业务项。没有据此计算RSS/FPS，也没有真实wheel性能结论。
 
 最终Windows完整-Web -Window707项，Linux完整--window708项通过，含五项新
-测量测试、185 Taffy/95 Blitz及profile5/style4、真实Windows/X11/Wayland窗口
+测量测试、185 Takia/95 Apace及profile5/style4、真实Windows/X11/Wayland窗口
 和Windows UIA（accesskit-uia-1792732297945997.json）。严格全workspace/all-
 features/all-targets Clippy、WASM/fixture构建通过；最终benchmark区域调整后
 另跑Windows/WASM/Linux严格全target Clippy及格式检查。SSR fixture4项、24套
@@ -2232,14 +2232,14 @@ border 对应的尺寸；自动高度通过 style::FieldSizing::{Fixed,Content}�
 HTML full-shape/字段 Patch 差分 oracle 覆盖新增声明与重置。stream 使用相同样式串，
 不改变当前 HTML snapshot/stream wire 版本。
 
-Blitz style profile 升至 v5，明确拒绝 FieldSizing 两值，包含 App 创建/预检/更新、
+Apace style profile 升至 v5，明确拒绝 FieldSizing 两值，包含 App 创建/预检/更新、
 独立 direct apply、成功前缀/查询水位和 shell 拒绝后编辑恢复。固定行数沿用普通尺寸；
 本次不宣称原生自动高度。密码切换只修改 Purpose，选区/编辑器与已有 native 密码投影
 约定一致；未增加 OS IME 或屏幕阅读器语音的验收声明。
 
 验证入口：Sapid scripts/check.ps1 -Web -Native、tests/inputs.rs、
 examples/web/input-acceptance.js；Glory style/tests/sheet.rs、html/tests/sheet.rs、
-html/src/patch_tests.rs、blitz/tests/style_profile.rs。具体本次执行结果与适配器边界
+html/src/patch_tests.rs、apace/tests/style_profile.rs。具体本次执行结果与适配器边界
 记录在同级 Sapid docs/widget-inventory.json。
 
 
@@ -2260,7 +2260,7 @@ html/src/patch_tests.rs、blitz/tests/style_profile.rs。具体本次执行结�
 
 `examples/counter` 已替换旧 `web::widgets`、DOM 事件和 BrowserHolder。共享库
 中的 Counter 包含状态、语义事件及类型化样式；`src/web.rs` 只处理 WASM/DOM
-挂载及 WebApp 生命周期，`src/main.rs` 只处理 Blitz 桌面窗口/事件循环。
+挂载及 WebApp 生命周期，`src/main.rs` 只处理 Apace 桌面窗口/事件循环。
 移除旧 Salvo 资源服务器、Trunk 配置和 web-csr/web-ssr features；独立 workspace
 默认不选宿主，显式选择 web 或 desktop。保留 signed i32 数值行为，输入草稿
 允许暂态负号，Enter/按钮规范化文本，边界加减饱和。Owner Effect 在宿主 tick
@@ -2277,7 +2277,7 @@ glory-web 当前仍有 validate_children 的既有 dead_code warning。Windows �
 
 ### 2026-10-24：NativeSelect 有限原生选择协议与 HTML v4/classic v2
 
-新增真实 Props::Select、不可变有界 options/optgroups、独立选择 key/revision 补丁与事件；UI setter 从 live revision 分配，Memory guard 只交换 selection，HTML full-shape differential oracle 覆盖默认/Keep/Clear/相等写入。业务 value 与 key 分离，空 single 用内部禁用隐藏占位项，readonly 和 FormControl.value 对 Select 明确拒绝。Web 构造原生子节点并读写真实 selectedness；采用先验证全部子树再回放 dirty 状态。Blitz preflight/direct 明确拒绝并保留成功前缀/query 水位。
+新增真实 Props::Select、不可变有界 options/optgroups、独立选择 key/revision 补丁与事件；UI setter 从 live revision 分配，Memory guard 只交换 selection，HTML full-shape differential oracle 覆盖默认/Keep/Clear/相等写入。业务 value 与 key 分离，空 single 用内部禁用隐藏占位项，readonly 和 FormControl.value 对 Select 明确拒绝。Web 构造原生子节点并读写真实 selectedness；采用先验证全部子树再回放 dirty 状态。Apace preflight/direct 明确拒绝并保留成功前缀/query 水位。
 
 这是有意破坏的格式升级：HTML FORMAT_VERSION=4，classic stream start/patch/end envelope=2、边界 stream:2、End 回交 v4；资源 envelope 维持1。新增 typed options/selectedKeys wire，旧版先拒绝、不兼容。现有手写 choices/menu/hints、Glory semantic-web/snapshot/transport 的当前格式常量同步迁移。Graphic 的 svg/path 与两个显式 camelCase 属性共同进入当前有限格式。具体 API/预算/证据见 Sapid docs/native-select-implementation.md；浏览器最终结果在该文档记录。
 
@@ -2385,11 +2385,11 @@ None 项，重复更新按最终已提交值合并，退休世代不进入视图
 仍只支持 Salvo。项目内 CLI 新增显式 target、诊断与跨目标运行拒绝，以及含
 资产/哈希清单的桌面目录包；真实 Counter release 与复制后的资产定位均验证。
 
-Blitz shell 新增显式 AndroidApp 和外部事件循环入口，并开放 UIKit 编译路径。
+Apace shell 新增显式 AndroidApp 和外部事件循环入口，并开放 UIKit 编译路径。
 独立 mobile 示例复用 Counter，提供两种 Android ABI 的实际链接/签名 APK。
 Android 16 x86_64 的全新 D: AVD 已验证绘制、触摸、Gboard 数字键、后台恢复、
-旋转和同进程 Activity 重建。Winit Destroy/循环独占许可修复维护于真正组织
-fork，和 Blitz/锁文件/来源记录一起固定；没有 vendor 或新运行时 unsafe。
+旋转和同进程 Activity 重建。Wingy Destroy/循环独占许可修复维护于真正组织
+fork，和 Apace/锁文件/来源记录一起固定；没有 vendor 或新运行时 unsafe。
 唯一导出属性例外经用户明确授权，限制在示例 android_main。
 
 工作区全特性测试和 native 严格 Clippy、三个 fork 的独立测试、CLI 19 项测试和
@@ -2404,7 +2404,7 @@ iOS 签名/生命周期/输入及桌面安装器仍待补齐；不据此关闭�
 
 ## 2026-10-26：移动端嵌入式资产
 
-新增可选 glory-blitz/package 和 facade blitz-package。不可变 asset://app 字节、
+新增可选 glory-apace/package 和 facade apace-package。不可变 asset://app 字节、
 队列/期限、取消和 NetHandler::prepare 解码准入复用原有 Loader；HTTP/TLS、DNS
 及挂载文件移到桌面后端，assets 包含 package。包专用构建拒绝 origins/mounts，
 生产依赖图没有 reqwest/Rustls/cap-std；默认/HTML/SSR/WASM 不获取加载器。
@@ -2428,8 +2428,8 @@ Click/SetValue/真实键盘已验收。iOS 27 模拟器实际通过 CPU/CSS/PNG�
 pinyin marked text/候选/中文提交、中文与 emoji 缓冲区退格、组合取消/Clear、
 同进程恢复及旋转后继续输入；arm64 设备目标已实际链接，未签名安装。
 
-场景和 UIKit IME 改动在真实 glory-rs Winit/Blitz fork 内固定完整 SHA。新增 unsafe
-仅限用户明确授权的 Winit UIKit Objective-C UITextInput 协议桥接，Glory 运行时
+场景和 UIKit IME 改动在真实 glory-rs Wingy/Apace fork 内固定完整 SHA。新增 unsafe
+仅限用户明确授权的 Wingy UIKit Objective-C UITextInput 协议桥接，Glory 运行时
 无新增 unsafe。上下文是焦点编辑器的有限 UTF-8 片段，密码为空，preedit 不被确认
 回写覆盖；其他平台不隐式导出文本。完整文本选择手势/selection rects、VoiceOver、
 彩色 emoji 绘制、键盘避让、scene 重连及生产签名/公证仍独立待验收。
@@ -2448,17 +2448,17 @@ Brotli 和 WASM 分包仍独立待办。
 ## 2026-10-27：移动输入与 Unicode 程序选区
 
 共用输入选区改为校验当前值的 UTF-16 scalar 边界；文本/密码支持 CJK/emoji
-正反向选区，半代理对在入队前拒绝，Blitz shaped-cluster 内部位置明确 Unsupported。
+正反向选区，半代理对在入队前拒绝，Apace shaped-cluster 内部位置明确 Unsupported。
 原生选区替换/预编辑取消、revision、方向与失败后恢复有独立回归；CSR/SSR 夹具
 保留真实输入对象。详见 feature-gap report 当日记录及 semantic-web Unicode 夹具。
 
 iOS scene 宿主增加 docked keyboard safe-area 避让和独立的底部输入探针，十二项
 Swift 几何测试进入 Apple gate。实测发现按下时键盘移动编辑器、抬起时错误合成
-空白点击的问题；genuine Blitz fork 增加受限触摸处理和实际布局回归测试，关闭
+空白点击的问题；genuine Apace fork 增加受限触摸处理和实际布局回归测试，关闭
 修复可复现失败。完整场景重连、VoiceOver 和签名设备验收继续开放。
 
 Android 保留默认 NativeActivity，显式新增 GameActivity 4.4.0 选择与 Mac 打包脚本，
-不可同时启用两种 Activity。Winit 安全 Rust bridge 翻译真实 GameTextInput state，
+不可同时启用两种 Activity。Wingy 安全 Rust bridge 翻译真实 GameTextInput state，
 限制缓冲大小、校验 UTF-16/UTF-8 边界并在锁外调用 Android。用户同意许可后安装
 隔离 NDK/ARM 镜像；ARM64 模拟器真实 Gboard 拼音通过预编辑、取消恢复非空 Unicode
 选区、候选提交、汉字/emoji 删除、物理字符不重复以及同进程 Home/旋转。记录在
@@ -2468,7 +2468,7 @@ Android 保留默认 NativeActivity，显式新增 GameActivity 4.4.0 选择与 
 ## 2026-10-27：同进程 UIKit scene 重连
 
 Swift 应用宿主用当前 scene token 防止重复/过期生命周期通知。断开时解除原窗口
-关联并暂停 surface；后继 scene 重新挂接 Winit 持有的相同窗口，更新尺寸并恢复
+关联并暂停 surface；后继 scene 重新挂接 Wingy 持有的相同窗口，更新尺寸并恢复
 仍存活的弱 native responder。无第二个 Rust loop/document，无新增 unsafe。
 独立 simulator-only scene-probe 通过 UIKit 真正销毁/激活 session，纯 UIKit anchor
 仅负责保持测试进程存活；普通构建没有按钮或多场景配置。iPad 实测两轮重连保持
@@ -2478,7 +2478,7 @@ PID/window/value，软件键继续编辑、断开期间旋转、键盘和 safe-a
 
 ## 2026-10-27：显式 Android APK 资产能力
 
-`android-assets`/facade `blitz-android-assets` 在原 package Loader 上增加显式
+`android-assets`/facade `apace-android-assets` 在原 package Loader 上增加显式
 AssetManager 和 APK 前缀，命名空间为 asset://android/；不依赖 shell、全局
 AndroidApp 或新 unsafe。安全 NDK streaming API 与 mounted files 共用 blocking
 许可/计数和有界分块读取；逐块取消/deadline、实际 body budget、prepare 和文档
@@ -2491,7 +2491,7 @@ prepare 和 close；Counter 内存包为空时仍显示正确样式/图片。cap
 
 ## 2026-10-27：共用原生 HTTP(S) 与移动平台证书
 
-`network`/facade `blitz-network` 将旧 desktop HTTP worker 供 Android/iOS 共用；
+`network`/facade `apace-network` 将旧 desktop HTTP worker 供 Android/iOS 共用；
 desktop assets 在 network 上再开放文件挂载，package-only 不增加 HTTP/TLS。
 空 origins 不创建客户端；origin/redirect、body/deadline/cancel 和 prepare 契约
 保留。Android 的非空 origins 需要显式 AndroidTls，由安全 JNI Application 对象
@@ -2507,7 +2507,7 @@ Cargo/Gradle 版本、哈希和可选 INTERNET manifest 由构建脚本关联；
 
 ## 2026-10-27：有界权限 future 与宿主（未全部关闭）
 
-permissions/facade blitz-permissions 提供显式 PermissionDriver、query/request 和
+permissions/facade apace-permissions 提供显式 PermissionDriver、query/request 和
 Owner 可取消的本地 future；无 UI 状态跨线程，无自动权限请求。准入在外部调用前
 保留，driver 重入或 poll 时关闭不能绕过预算或发布已撤权结果。八个新回归通过，
 全工作区 978 项及 native/WASM 严格 Clippy 通过。
@@ -2521,7 +2521,7 @@ Swift 宿主已经编译及链接，但 Rust iOS 连接仍待应用级最小整�
 
 ## 2026-10-27：原生 Mixed checkbox
 
-Glory 固定真正 Blitz fork 251e4e288b287c77c59538425b09f25824c35821，增加独立
+Glory 固定真正 Apace fork 251e4e288b287c77c59538425b09f25824c35821，增加独立
 indeterminate property、`:indeterminate` 失效和 CPU 横杠；程序 checked 更新保留
 mixed，点击/标签/Space/AX 激活清除 mixed 并只发布一次 boolean change。模式更新和
 Clear 保留物理身份，AX 读取实际原生状态，禁用/只读不变。未引入新 unsafe。
@@ -2533,13 +2533,13 @@ radio、select、placeholder、菜单、富文本、文件/剪贴板及应用导
 
 ## 2026-10-27：原生 Radio 与当前 tree/form 分组
 
-固定 Blitz fork eb375a029330b6179d5276a41dda5643b6077a25，Radio 通过实际 checked
+固定 Apace fork eb375a029330b6179d5276a41dda5643b6077a25，Radio 通过实际 checked
 property 和当前非空 name/tree/form owner 互斥；同名 checkbox/其他表单/断开树保持
 独立。Click/标签/Space/AX 只给新目标一次 true，旧 peer 无 false，重复选中无值变化；
 受控 true 重申可恢复被拒绝的提案。批量插入、name/type/form、移动/挂起/重连和代次
 退休有真实引擎回归，不存历史组或扫描业务源。Auto Tab stop 和默认方向/Home/End
 复用当前宿主树；显式 Navigate/tab 策略仍由组件控制，readonly 不陷住焦点。
-全工作区 988 项、最终七项新适配器回归、native/WASM 严格 Clippy、Blitz 默认/并行
+全工作区 988 项、最终七项新适配器回归、native/WASM 严格 Clippy、Apace 默认/并行
 各 121 项及固定来源 gate 通过；Android/iOS 普通包
 和 radio-probe 构建通过，实际初始显示截图/JSON 在 `native-checks/radio/` 数据盘目录。
 框架事件和 AX 树/动作不代替真实物理输入或读屏；typeahead/select/菜单等继续开放。
@@ -2547,7 +2547,7 @@ property 和当前非空 name/tree/form owner 互斥；同名 checkbox/其他表
 
 ## 2026-10-27：原生 placeholder 的独立布局
 
-Glory 解除有限 Input placeholder 的原生拒绝；真正 Blitz fork 0811cfd9 提供懒惰
+Glory 解除有限 Input placeholder 的原生拒绝；真正 Apace fork 0811cfd9 提供懒惰
 提示布局和内容框裁剪，覆盖单行、多行及空密码输入。Set/Keep/Clear 保留真实值、
 property 屏障、编辑器身份、选区和预编辑；提示不进入密码、IME 或点击选区几何。
 `:placeholder-shown` 跟随当前值/组合状态，正常 selector snapshot 仍可刷新字体和
@@ -2564,7 +2564,7 @@ property 屏障、编辑器身份、选区和预编辑；提示不进入密码�
 
 ## 2026-10-27：原生组合框与 typeahead 连接，Select 继续开放
 
-Blitz 适配器接通四种 combobox refinement、共享 Choice/scalar Typeahead、mouse/pen
+Apace 适配器接通四种 combobox refinement、共享 Choice/scalar Typeahead、mouse/pen
 Pointer 与 App 派生 PointerWithin。Listbox 顶层保留触发器/输入焦点，Tree 顶层管理
 并恢复实际焦点；选项滚动只作用于匹配 listbox。组件继续拥有匹配与受控选择，
 没有全量业务源扫描、访问历史或新 unsafe。修复按钮选项点击/语义文本子节点点击
@@ -2587,7 +2587,7 @@ ContextPoint、当前模态边界和关闭后 ExitMenu 使用真实物理几何/
 使用仅补偿自身 scroll 的 border box。Sapid 在可见绑定后发出 Focus 与显式 reveal，
 关闭撤销旧焦点意图；Glory Focus 的 prevent-scroll 契约未改变。
 
-Blitz 固定 f7178424 修复程序滚动未取消触摸惯性，完整源身份和锁文件同步。
+Apace 固定 f7178424 修复程序滚动未取消触摸惯性，完整源身份和锁文件同步。
 Glory 1024、Sapid 1153、实际菜单消费端 8、既有选择控件消费端 5 项通过；四组
 浏览器验收 49 个报告通过。native/WASM 严格 Clippy、CLI 25 项及严格 Clippy、
 headless、fork 来源/测试、普通移动包及设备链接通过。两端探针仅声明 SDK 安装、
@@ -2597,7 +2597,7 @@ headless、fork 来源/测试、普通移动包及设备链接通过。两端探
 
 ## 2026-10-27：原生自由标签输入协议
 
-Blitz 原生 TagsInput 连接共享键盘、revisioned Tags 命令、UTF-16 原子粘贴和无正文
+Apace 原生 TagsInput 连接共享键盘、revisioned Tags 命令、UTF-16 原子粘贴和无正文
 预算拒绝。Sapid 原子 state/控制器未变，实际五项四主题消费者含 256 tags、成功值
 代理、受控拒绝/光标与 IME/表单 Return 已通过。AppKit 一次当前命令配对避免最后
 字符删除后移除标签，以及策略撤销后重复粘贴；软件标点和 Return 保留组合候选。

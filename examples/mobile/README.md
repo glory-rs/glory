@@ -6,12 +6,12 @@ event loop; no process-global AndroidApp or second reactive runtime is installed
 The standalone workspace depends on the existing facade and counter library,
 so the runtime workspace retains twelve packages.
 
-Android uses the shell's CPU renderer with explicitly selected Winit Activity glue.
+Android uses the shell's CPU renderer with explicitly selected Wingy Activity glue.
 NativeActivity remains the default; GameActivity adds real GameTextInput composition.
 `Shell::android(app)` requires the AndroidApp passed to this invocation's
 `android_main`. `Shell::from_event_loop` also accepts an explicitly configured
 event loop. iOS uses `Shell::new` on the application's UIKit main thread.
-The application selects `blitz-package` and embeds `assets/theme.css` and
+The application selects `apace-package` and embeds `assets/theme.css` and
 `assets/badge.png` as immutable `asset://app/` resources. Each document gets its
 own bounded Loader, including a recreated Android Activity. Its imported CSS
 positions and sizes the PNG badge; neither is supplied by a synchronous decode
@@ -80,7 +80,7 @@ application logs are retained alongside the result. These tests do not establish
 CJK composition, TalkBack, device permissions, AssetManager/network transport or real
 arm64-device support.
 
-The Winit fork retires the Activity loop on Destroy and holds an exclusive
+The Wingy fork retires the Activity loop on Destroy and holds an exclusive
 permit until that loop's fields drop. A new Activity can then create its own
 loop; overlapping loops remain rejected. Versions and fork-owned tests are in
 [engine-forks.json](../../docs/engine-forks.json).
@@ -126,7 +126,7 @@ APK signing before publishing `package-game-aarch64-debug/glory-counter.apk`.
 This checks ELF compatibility; a 4 KiB emulator does not prove 16 KiB runtime
 acceptance. Debug signing is not a production release.
 
-GameTextInput sends real UTF-16 selection/composition state to Winit. A bounded
+GameTextInput sends real UTF-16 selection/composition state to Wingy. A bounded
 safe-Rust translator produces validated preedit, commit, cancel and surrounding
 deletions; it refuses unsupported selection-only moves or autocorrection beyond
 the selected range. Android/JVM effects run after releasing the session lock.
@@ -137,7 +137,7 @@ acquire GameActivity composition support by sharing this example.
 ### APK assets through AssetManager
 
 `GLORY_ANDROID_FEATURES=android-assets sh examples/mobile/build-android-game.sh`
-selects the facade's `blitz-android-assets`. Gradle stages the same CSS/PNG files
+selects the facade's `apace-android-assets`. Gradle stages the same CSS/PNG files
 under `assets/glory/` in its data-volume output. The app binds the explicit
 `app.asset_manager()` with prefix `glory`, uses base URL `asset://android/` and
 leaves the embedded package empty. No fallback masks a failed APK read. This
@@ -172,7 +172,7 @@ ARM64 Android 16 emulator evidence is under the output directory above.
 
 ### Native HTTP(S) and platform certificates
 
-`network` selects facade `blitz-network`; it does not grant HTTP until an
+`network` selects facade `apace-network`; it does not grant HTTP until an
 application configures exact `LoadConfig::origins`. The worker is shared with
 desktop and uses native reqwest/Rustls sockets. Chain/hostname verification uses
 Android's certificate verifier or iOS Security.framework. Cleartext HTTP needs
@@ -232,7 +232,7 @@ establish runtime permission prompts, device radios/offline behavior or stores.
 
 `GLORY_ANDROID_FEATURES=permissions-probe sh examples/mobile/build-android-game.sh`
 builds the explicit six-permission acceptance view. It uses facade
-`blitz-permissions`, the safe JNI `AndroidPermissions` driver and an app-owned Java
+`apace-permissions`, the safe JNI `AndroidPermissions` driver and an app-owned Java
 host. Startup queries authorization only. Buttons request the corresponding OS
 permission; no camera/microphone/photo/location content is accessed. The cancel
 button revokes result delivery and does not promise to dismiss a system dialog.
@@ -295,18 +295,18 @@ has not resumed with confirmed access.
 
 `src/ios.rs`, `ios/Info.plist` and `ios/SceneDelegate.swift` define the UIKit
 application. With Xcode 27, UIScene adoption is mandatory: the app-owned Swift
-delegate forwards actual scene lifecycle callbacks to Winit, and Shell creates
-its surface after scene activation. The pinned Winit fork associates its existing
+delegate forwards actual scene lifecycle callbacks to Wingy, and Shell creates
+its surface after scene activation. The pinned Wingy fork associates its existing
 window with the connected UIWindowScene before making it visible. Inactivation
 releases the CPU surface; activation resumes the same semantic document and Loader.
-Disconnect detaches the Winit-owned window from its old scene. A later scene
+Disconnect detaches the Wingy-owned window from its old scene. A later scene
 reattaches that same window, resets the viewport and restores a still-live weak
 native first responder after activation. Only the current scene may publish
 lifecycle events; duplicate and stale callbacks cannot suspend a successor.
 This is a single-Glory-window, same-process contract. Process termination does
 not persist application state, and independent simultaneous Glory scenes are
 not supported by this example.
-No additional reactive runtime or unsafe code is introduced in Glory. The Winit
+No additional reactive runtime or unsafe code is introduced in Glory. The Wingy
 UIKit protocol bridge has the narrowly authorized exception recorded in AGENTS.md.
 
 On a Mac with full Xcode and the simulator Rust standard library:
@@ -356,7 +356,7 @@ Xcode 27's simulator UI is Device Hub (`Xcode.app/Contents/Applications/DeviceHu
 
 The UIKit fork now implements the required UITextInput selectors using one
 non-displayed UIKit text store per native view. UIKit owns its opaque positions,
-ranges and tokenizer; Glory/Blitz still own the visible editor and semantic state.
+ranges and tokenizer; Glory/Apace still own the visible editor and semantic state.
 Committed surrounding text is a UTF-8-boundary-safe excerpt under 4000 bytes,
 exported only by the focused editor. Password context is empty. Acknowledgements
 and purpose changes preserve active marked text; UTF-16 native selection offsets
@@ -387,7 +387,7 @@ cache so equal-value cancellation can restore the native store and selection.
 
 The app-owned Swift scene delegate observes docked keyboard frames only for its
 own key window and updates the root controller's additional safe-area inset.
-Winit's existing layout event refreshes the native viewport; no semantic model
+Wingy's existing layout event refreshes the native viewport; no semantic model
 translation or keyboard-sized padding is injected into Glory. Floating keyboards
 are ignored. `keyboard-probe` places an input near the bottom for real show/hide
 acceptance; select it separately from `ime-probe`. Twelve standalone Swift tests

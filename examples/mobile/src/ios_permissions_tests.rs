@@ -69,7 +69,7 @@ fn connection_validates_host_replies_and_integer_ids_and_closes_exactly_once() {
     STATE.with_borrow_mut(|s| s.reply = 0x105);
     assert_eq!(
         driver.poll(1).unwrap().unwrap().status,
-        glory::blitz::permissions::Status::Limited
+        glory::apace::permissions::Status::Limited
     );
     STATE.with_borrow_mut(|s| {
         s.reply = 0x108;

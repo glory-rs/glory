@@ -1,4 +1,5 @@
 [package]
+repository.workspace = true
 name = "glory-render"
 version.workspace = true
 edition.workspace = true
@@ -11,7 +12,7 @@ default = []
 conformance = []
 
 [dependencies]
-glory-style = { path = "../style", version = "0.3.1" }
+glory-style = { path = "../style", version = "0.6.0" }
 
 [lints]
 workspace = true

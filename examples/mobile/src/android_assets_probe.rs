@@ -1,5 +1,5 @@
 //! Opt-in actual AssetManager acceptance, run on the Activity's Rust thread.
-use glory::blitz::assets::{
+use glory::apace::assets::{
     AndroidAssets, Bytes, LoadConfig, LoadLimits, Loader, NetHandler, NetProvider, NetReady,
     Request, Url,
 };

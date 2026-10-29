@@ -37,21 +37,21 @@ PY
 export GLORY_ANDROID_TLS_VERSION="$tls_version"
 permission_host=$(python3 - "$GLORY_BUILD_ROOT/game-metadata.json" <<'PY'
 import json,sys
-m=json.load(open(sys.argv[1])); ids={p['id'] for p in m['packages'] if p['name']=='glory-blitz'}
+m=json.load(open(sys.argv[1])); ids={p['id'] for p in m['packages'] if p['name']=='glory-apace'}
 print('1' if any(n['id'] in ids and 'permissions' in n['features'] for n in m['resolve']['nodes']) else '0')
 PY
 )
 export GLORY_ANDROID_PERMISSION_HOST="$permission_host"
 clipboard_host=$(python3 - "$GLORY_BUILD_ROOT/game-metadata.json" <<'PY'
 import json,sys
-m=json.load(open(sys.argv[1])); ids={p['id'] for p in m['packages'] if p['name']=='glory-blitz'}
+m=json.load(open(sys.argv[1])); ids={p['id'] for p in m['packages'] if p['name']=='glory-apace'}
 print('1' if any(n['id'] in ids and 'clipboard' in n['features'] for n in m['resolve']['nodes']) else '0')
 PY
 )
 export GLORY_ANDROID_CLIPBOARD_HOST="$clipboard_host"
 files_host=$(python3 - "$GLORY_BUILD_ROOT/game-metadata.json" <<'PYFILES'
 import json,sys
-m=json.load(open(sys.argv[1])); ids={p['id'] for p in m['packages'] if p['name']=='glory-blitz'}
+m=json.load(open(sys.argv[1])); ids={p['id'] for p in m['packages'] if p['name']=='glory-apace'}
 print('1' if any(n['id'] in ids and 'files' in n['features'] for n in m['resolve']['nodes']) else '0')
 PYFILES
 )

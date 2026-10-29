@@ -47,9 +47,9 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'semantic formatting failed' }
     cargo test --locked --workspace --all-features
     if ($LASTEXITCODE -ne 0) { throw 'semantic tests failed' }
-    cargo test --locked -p glory-blitz --no-default-features --features package,raster --test package
+    cargo test --locked -p glory-apace --no-default-features --features package,raster --test package
     if ($LASTEXITCODE -ne 0) { throw 'package-only resource tests failed' }
-    $packageGraph = cargo tree --locked -p glory --no-default-features --features blitz-package --edges normal,build --prefix none
+    $packageGraph = cargo tree --locked -p glory --no-default-features --features apace-package --edges normal,build --prefix none
     if ($LASTEXITCODE -ne 0) { throw 'package dependency graph failed' }
     if ($packageGraph | Select-String '^(reqwest|rustls|rustls-platform-verifier|cap-std|cap-fs-ext) v') {
         throw 'package-only graph acquired desktop transport dependencies'
@@ -58,11 +58,11 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'semantic clippy failed' }
 
     if ($Window) {
-        cargo test --locked -p glory-blitz --features shell --lib real_windows -- --ignored --nocapture --test-threads=1
+        cargo test --locked -p glory-apace --features shell --lib real_windows -- --ignored --nocapture --test-threads=1
         if ($LASTEXITCODE -ne 0) { throw 'native window acceptance failed' }
-        cargo test --locked -p glory-blitz --features accesskit --lib real_windows -- --ignored --nocapture --test-threads=1
+        cargo test --locked -p glory-apace --features accesskit --lib real_windows -- --ignored --nocapture --test-threads=1
         if ($LASTEXITCODE -ne 0) { throw 'AccessKit native window acceptance failed' }
-        cargo test --locked -p glory-blitz --features accesskit --lib real_accesskit_windows_ui_automation -- --ignored --nocapture --test-threads=1
+        cargo test --locked -p glory-apace --features accesskit --lib real_accesskit_windows_ui_automation -- --ignored --nocapture --test-threads=1
         if ($LASTEXITCODE -ne 0) { throw 'Windows UI Automation acceptance failed' }
     }
 
@@ -92,7 +92,7 @@ try {
         if ($mobileGraph | Select-String '^(reqwest|rustls|rustls-platform-verifier|cap-std|cap-fs-ext) v') {
             throw 'offline mobile graph acquired desktop transport dependencies'
         }
-        cargo clippy --locked -p glory-blitz --no-default-features --features css,assets,raster,accesskit,android-native-activity --target aarch64-linux-android --no-deps -- -D warnings
+        cargo clippy --locked -p glory-apace --no-default-features --features css,assets,raster,accesskit,android-native-activity --target aarch64-linux-android --no-deps -- -D warnings
         if ($LASTEXITCODE -ne 0) { throw 'Android adapter Clippy failed' }
         & "$taskWorkspace/examples/mobile/build-android.ps1" -Target x86_64-linux-android
         & "$taskWorkspace/examples/mobile/build-android.ps1" -Target aarch64-linux-android

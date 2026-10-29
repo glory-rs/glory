@@ -55,7 +55,7 @@ import UIKit
 @MainActor
 private enum GlorySceneHost {
     static var lifecycle = GlorySceneLifecycle<ObjectIdentifier>()
-    // Winit owns the window strongly. These do not retain disconnected scenes
+    // Wingy owns the window strongly. These do not retain disconnected scenes
     // or create another native/semantic window, including after delegate deinit.
     static weak var window: UIWindow?
     static weak var responder: UIResponder?
@@ -66,7 +66,7 @@ private enum GlorySceneHost {
 
     static func capture(_ scene: UIWindowScene, rememberResponder: Bool = false) {
         if let native = scene.windows.first(where: {
-            NSStringFromClass(type(of: $0)) == "WinitUIWindow"
+            NSStringFromClass(type(of: $0)) == "WingyUIWindow"
         }) {
             if window !== native {
                 FileHandle.standardError.write(Data("Glory UIKit captured window=\(ObjectIdentifier(native))\n".utf8))
@@ -85,8 +85,8 @@ private enum GlorySceneHost {
     }
 }
 
-// A single application scene feeds Winit's existing lifecycle notifications.
-// Winit owns the UIWindow, semantic document and renderer. It associates that
+// A single application scene feeds Wingy's existing lifecycle notifications.
+// Wingy owns the UIWindow, semantic document and renderer. It associates that
 // window with the connected UIWindowScene before making the window visible.
 @objc(GlorySceneDelegate)
 final class GlorySceneDelegate: NSObject, UIWindowSceneDelegate {
@@ -147,7 +147,7 @@ final class GlorySceneDelegate: NSObject, UIWindowSceneDelegate {
                                        safeBottom: window.safeAreaInsets.bottom)
         if controller.additionalSafeAreaInsets.bottom != bottom {
             controller.additionalSafeAreaInsets.bottom = bottom
-            // Winit's layout callback publishes the same physical surface size
+            // Wingy's layout callback publishes the same physical surface size
             // with refreshed safe-area insets; only the content viewport shrinks.
             controller.view.setNeedsLayout()
             controller.view.layoutIfNeeded()

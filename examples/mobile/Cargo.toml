@@ -16,18 +16,18 @@ path = "src/ios.rs"
 
 [features]
 default = ["android-native-activity"]
-android-native-activity = ["glory/blitz-android-native-activity"]
-android-game-activity = ["glory/blitz-android-game-activity"]
-android-assets = ["glory/blitz-android-assets"]
+android-native-activity = ["glory/apace-android-native-activity"]
+android-game-activity = ["glory/apace-android-game-activity"]
+android-assets = ["glory/apace-android-assets"]
 android-assets-probe = ["android-assets"]
-network = ["glory/blitz-network", "dep:jni"]
+network = ["glory/apace-network", "dep:jni"]
 network-probe = ["network"]
-permissions = ["glory/blitz-permissions", "dep:jni"]
+permissions = ["glory/apace-permissions", "dep:jni"]
 permissions-probe = ["permissions", "dep:futures-timer"]
 permissions-host-probe = ["permissions"]
-files = ["glory/blitz-files", "dep:jni"]
+files = ["glory/apace-files", "dep:jni"]
 files-probe = ["files", "dep:futures-timer"]
-clipboard = ["glory/blitz-clipboard", "dep:jni"]
+clipboard = ["glory/apace-clipboard", "dep:jni"]
 clipboard-probe = ["clipboard", "dep:futures-timer"]
 ime-probe = []
 keyboard-probe = []
@@ -41,7 +41,7 @@ tags-probe = []
 
 [dependencies]
 counter = { path = "../counter" }
-glory = { path = "../../crates/glory", features = ["blitz-shell", "blitz-package"] }
+glory = { path = "../../crates/glory", features = ["apace-shell", "apace-package"] }
 
 [target.'cfg(target_os = "android")'.dependencies]
 jni = { version = "=0.22.4", default-features = false, optional = true }

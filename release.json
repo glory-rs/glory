@@ -1,0 +1,29 @@
+{
+  "repository": "glory-rs/glory",
+  "title": "Glory",
+  "tag_prefix": "v",
+  "allowed_prefixes": [
+    "glory"
+  ],
+  "packages": [
+    "glory-style",
+    "glory-render",
+    "glory-core",
+    "glory-resource",
+    "glory-i18n",
+    "glory-ui",
+    "glory-html",
+    "glory-web",
+    "glory-ssr",
+    "glory-apace",
+    "glory-view-macros",
+    "glory",
+    "glory-salvo",
+    "glory-cli"
+  ],
+  "extra_manifests": [
+    "tools/cli/Cargo.toml"
+  ],
+  "registry_verifier": "scripts/verify-registry.py",
+  "uniform_version": true
+}

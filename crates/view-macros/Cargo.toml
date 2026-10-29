@@ -1,4 +1,5 @@
 [package]
+repository.workspace = true
 name = "glory-view-macros"
 version.workspace = true
 edition.workspace = true

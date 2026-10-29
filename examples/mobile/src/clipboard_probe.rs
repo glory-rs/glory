@@ -1,5 +1,5 @@
 //! Owned emulator acceptance; no user clipboard body is logged or persisted.
-use glory::blitz::clipboard::{AndroidClipboard, ClipboardDriver, ClipboardError};
+use glory::apace::clipboard::{AndroidClipboard, ClipboardDriver, ClipboardError};
 use glory::prelude::*;
 use glory::render::{ClipboardOutcome, ClipboardText, Semantics};
 use jni::{JavaVM, jni_sig, jni_str, objects::JByteArray};

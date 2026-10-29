@@ -1,5 +1,5 @@
 //! Owned activity-result/provider acceptance, separate from system dialog input.
-use glory::blitz::{
+use glory::apace::{
     Renderer,
     files::{AndroidFiles, FilePicker, Files},
 };

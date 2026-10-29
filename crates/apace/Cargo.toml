@@ -1,0 +1,110 @@
+[package]
+repository.workspace = true
+name = "glory-apace"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Incremental Apace document host for Glory semantic UI"
+
+[features]
+default = []
+css = ["glory-html/css"]
+package = ["dep:tokio"]
+network = ["package", "tokio/net", "dep:reqwest", "dep:rustls", "dep:rustls-platform-verifier", "dep:jni"]
+assets = ["network", "dep:cap-std", "dep:cap-fs-ext", "dep:percent-encoding"]
+android-assets = ["package", "dep:ndk", "dep:percent-encoding"]
+permissions = ["dep:futures-timer", "dep:jni"]
+clipboard = ["dep:futures-timer", "dep:arboard", "dep:jni"]
+files = ["dep:futures-timer", "dep:tokio", "dep:rfd", "dep:mime_guess", "dep:libc", "dep:jni"]
+paint = ["dep:apace-paint", "dep:anyrender", "dep:kurbo", "dep:peniko", "apace-dom/custom-widget", "apace-paint/custom-widget"]
+raster = ["paint", "dep:anyrender_vello_cpu"]
+shell = ["paint", "dep:glory-core", "dep:glory-ui", "dep:apace-shell", "dep:wingy", "dep:keyboard-types", "dep:anyrender_vello_cpu", "dep:softbuffer_window_renderer"]
+android-native-activity = ["shell", "wingy/android-native-activity"]
+android-game-activity = ["shell", "wingy/android-game-activity", "apace-shell/android-game-activity"]
+accesskit = ["shell", "dep:accesskit", "dep:apace_accesskit"]
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+glory-html = { path = "../html", version = "0.6.0" }
+glory-render = { path = "../render", version = "0.6.0" }
+glory-core = { path = "../core", version = "0.6.0", optional = true }
+glory-ui = { path = "../ui", version = "0.6.0", optional = true }
+tokio = { version = "1.54.1", default-features = false, features = ["rt", "sync", "time", "macros"], optional = true }
+futures-timer = { version = "=3.0.3", optional = true }
+percent-encoding = { version = "2.3.2", optional = true }
+apace-dom = { version = "=0.3.0-beta.4", default-features = false, features = ["system-fonts", "complex-scripts"] }
+apace-traits = { version = "=0.3.0-beta.4", default-features = false }
+image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
+# Typed visibility returned by Apace's public computed-style API. Keep this
+# engine detail inside the adapter; glory-style remains the portable value crate.
+style = { package = "stylo", version = "=0.22.0", default-features = false }
+apace-paint = { version = "=0.3.0-beta.4", default-features = false, optional = true }
+anyrender = { version = "=0.14.0", optional = true }
+kurbo = { version = "=0.13.1", optional = true }
+peniko = { version = "=0.6.1", optional = true }
+anyrender_vello_cpu = { version = "=0.18.0", optional = true }
+
+[target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))'.dependencies]
+arboard = { version = "=3.6.1", default-features = false, features = ["wayland-data-control"], optional = true }
+rfd = { version = "=0.17.2", default-features = false, features = ["xdg-portal", "wayland"], optional = true }
+mime_guess = { version = "=2.0.5", optional = true }
+libc = { version = "=0.2.191", optional = true }
+accesskit = { version = "=0.25.1", optional = true }
+apace_accesskit = { version = "=0.2.1", optional = true }
+cap-std = { version = "=4.0.3", optional = true }
+cap-fs-ext = { version = "=4.0.3", optional = true }
+
+[target.'cfg(target_os = "android")'.dependencies]
+ndk = { version = "=0.9.0", default-features = false, optional = true }
+jni = { version = "=0.22.4", default-features = false, optional = true }
+
+[target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos", target_os = "android", target_os = "ios"))'.dependencies]
+reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider"], optional = true }
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"], optional = true }
+rustls-platform-verifier = { version = "0.7.1", optional = true }
+apace-shell = { version = "=0.3.0-beta.4", default-features = false, optional = true }
+wingy = { version = "=0.31.0", optional = true }
+keyboard-types = { version = "0.8.3", optional = true }
+softbuffer_window_renderer = { version = "=0.9.0", optional = true }
+
+[target.'cfg(any(target_os = "linux", target_os = "freebsd"))'.dependencies]
+# Resolve system fonts through runtime-loaded Fontconfig. Cross-checking from
+# Windows must not probe the host for a target-platform pkg-config installation.
+fontique = { version = "=0.12.0", default-features = false, features = ["fontconfig-dlopen"] }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+glory-web = { path = "../web", version = "0.6.0" }
+glory-core = { path = "../core", version = "0.6.0" }
+glory-render = { path = "../render", version = "0.6.0", features = ["conformance"] }
+glory-ui = { path = "../ui", version = "0.6.0" }
+png = "0.18.1"
+
+[target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))'.dev-dependencies]
+accesskit_consumer = "=0.39.1"
+rcgen = { version = "0.14.10", default-features = false, features = ["crypto", "ring"] }
+
+[[example]]
+name = "raster"
+required-features = ["raster"]
+
+[[example]]
+name = "profile"
+required-features = ["raster"]
+
+[[example]]
+name = "window"
+required-features = ["shell"]
+
+[[example]]
+name = "assets"
+required-features = ["assets", "shell"]
+
+[lints]
+workspace = true
+
+
+[[test]]
+name = "macos_window"
+path = "tests/macos_window.rs"
+harness = false
+required-features = ["shell"]

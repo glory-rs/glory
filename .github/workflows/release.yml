@@ -1,0 +1,51 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: glory-release
+  cancel-in-progress: false
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+  publish:
+    needs: checks
+    runs-on: windows-latest
+    timeout-minutes: 360
+    permissions:
+      contents: write
+      actions: read
+    env:
+      CARGO_HOME: D:/BuildCache/glory-release/cargo
+      CARGO_TARGET_DIR: D:/BuildCache/glory-release/target
+      RUSTUP_HOME: D:/BuildCache/glory-release/rustup
+      TEMP: D:/BuildCache/glory-release/tmp
+      TMP: D:/BuildCache/glory-release/tmp
+      PYTHONPYCACHEPREFIX: D:/BuildCache/glory-release/pycache
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_BUILD_JOBS: '2'
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.13'
+      - name: Prepare compiler and storage
+        run: |
+          New-Item -ItemType Directory -Force $env:CARGO_HOME,$env:CARGO_TARGET_DIR,$env:RUSTUP_HOME,$env:TEMP | Out-Null
+          rustup toolchain install 1.98.0 --profile minimal
+          if ($LASTEXITCODE) { throw 'Toolchain installation failed' }
+          rustup default 1.98.0
+      - name: Publish verified packages and GitHub release
+        run: |
+          python scripts/release.py --publish --tag $env:GITHUB_REF_NAME
+          if ($LASTEXITCODE) { throw 'Release failed' }

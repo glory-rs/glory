@@ -1,6 +1,6 @@
 # Cross-platform counter
 
-One semantic `Counter` component runs in a browser or a Blitz desktop window.
+One semantic `Counter` component runs in a browser or a Apace desktop window.
 Both hosts mount exactly the same component, including its state, event handlers
 and typed styles. No DOM event conversion or host-specific CSS is used by it.
 
@@ -22,7 +22,7 @@ the previous value; canonical echoes preserve the host's caret/composition. The
 Effect holds a weak Scope and a live node reference, with no host-specific code.
 
 This is a standalone example workspace. Its default features select no host.
-`web` enables the DOM host; `desktop` enables Blitz's desktop shell and AccessKit.
+`web` enables the DOM host; `desktop` enables Apace's desktop shell and AccessKit.
 The desktop entry targets Windows, Linux and macOS; Android still needs a mobile
 host. Platform device/OS input acceptance follows Glory's adapter support, not
 the fact that the shared component compiles.

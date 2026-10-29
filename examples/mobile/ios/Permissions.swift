@@ -115,7 +115,7 @@ private final class GloryPermissionsHost: NSObject, CLLocationManagerDelegate {
     private func activeWindow() -> Bool {
         UIApplication.shared.connectedScenes.contains { scene in
             guard scene.activationState == .foregroundActive, let windowScene = scene as? UIWindowScene else { return false }
-            return windowScene.windows.contains { !$0.isHidden && NSStringFromClass(type(of: $0)) == "WinitUIWindow" }
+            return windowScene.windows.contains { !$0.isHidden && NSStringFromClass(type(of: $0)) == "WingyUIWindow" }
         }
     }
     private func declared(_ kind: Int64) -> Bool {

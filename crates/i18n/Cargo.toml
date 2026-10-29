@@ -9,7 +9,7 @@ homepage = "https://glory.taidge.org"
 repository.workspace = true
 
 [dependencies]
-glory-core = { path = "../core", version = "0.3.1" }
+glory-core = { path = "../core", version = "0.6.0" }
 fluent-bundle = "=0.16.0"
 fluent-syntax = "=0.12.0"
 unic-langid = "=0.9.6"

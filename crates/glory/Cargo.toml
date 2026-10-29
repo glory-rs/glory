@@ -1,4 +1,5 @@
 [package]
+repository.workspace = true
 name = "glory"
 version.workspace = true
 edition.workspace = true
@@ -10,7 +11,7 @@ autotests = false
 [features]
 default = []
 dsl = ["web", "dep:glory-view-macros"]
-css = ["glory-style/css", "glory-html?/css", "glory-ssr?/css", "glory-blitz?/css"]
+css = ["glory-style/css", "glory-html?/css", "glory-ssr?/css", "glory-apace?/css"]
 html = ["dep:glory-html"]
 web = ["html", "dep:glory-web"]
 ssr = ["html", "dep:glory-ssr"]
@@ -18,35 +19,35 @@ hydrate = ["web", "glory-web/hydrate"]
 resources = ["dep:glory-resource", "glory-web?/resources", "glory-ssr?/resources"]
 i18n = ["dep:glory-i18n"]
 stream = ["ssr", "resources", "glory-ssr/stream", "glory-web?/stream"]
-blitz = ["html", "dep:glory-blitz"]
-blitz-package = ["blitz", "glory-blitz/package"]
-blitz-assets = ["blitz", "glory-blitz/assets"]
-blitz-network = ["blitz", "glory-blitz/network"]
-blitz-permissions = ["blitz", "glory-blitz/permissions"]
-blitz-clipboard = ["blitz", "glory-blitz/clipboard"]
-blitz-files = ["blitz", "glory-blitz/files"]
-blitz-android-assets = ["blitz", "glory-blitz/android-assets"]
-blitz-paint = ["blitz", "glory-blitz/paint"]
-blitz-raster = ["blitz-paint", "glory-blitz/raster"]
-blitz-shell = ["blitz-paint", "glory-blitz/shell"]
-blitz-android-native-activity = ["blitz-shell", "glory-blitz/android-native-activity"]
-blitz-android-game-activity = ["blitz-shell", "glory-blitz/android-game-activity"]
-blitz-accesskit = ["blitz-shell", "glory-blitz/accesskit"]
+apace = ["html", "dep:glory-apace"]
+apace-package = ["apace", "glory-apace/package"]
+apace-assets = ["apace", "glory-apace/assets"]
+apace-network = ["apace", "glory-apace/network"]
+apace-permissions = ["apace", "glory-apace/permissions"]
+apace-clipboard = ["apace", "glory-apace/clipboard"]
+apace-files = ["apace", "glory-apace/files"]
+apace-android-assets = ["apace", "glory-apace/android-assets"]
+apace-paint = ["apace", "glory-apace/paint"]
+apace-raster = ["apace-paint", "glory-apace/raster"]
+apace-shell = ["apace-paint", "glory-apace/shell"]
+apace-android-native-activity = ["apace-shell", "glory-apace/android-native-activity"]
+apace-android-game-activity = ["apace-shell", "glory-apace/android-game-activity"]
+apace-accesskit = ["apace-shell", "glory-apace/accesskit"]
 
 [dependencies]
-glory-view-macros = { path = "../view-macros", version = "0.3.1", optional = true }
-glory-core = { path = "../core", version = "0.3.1" }
-glory-ui = { path = "../ui", version = "0.3.1" }
-glory-render = { path = "../render", version = "0.3.1" }
-glory-style = { path = "../style", version = "0.3.1" }
-glory-html = { path = "../html", version = "0.3.1", optional = true }
-glory-web = { path = "../web", version = "0.3.1", optional = true }
-glory-ssr = { path = "../ssr", version = "0.3.1", optional = true }
-glory-resource = { path = "../resource", version = "0.3.1", optional = true }
-glory-i18n = { path = "../i18n", version = "0.3.1", optional = true }
+glory-view-macros = { path = "../view-macros", version = "0.6.0", optional = true }
+glory-core = { path = "../core", version = "0.6.0" }
+glory-ui = { path = "../ui", version = "0.6.0" }
+glory-render = { path = "../render", version = "0.6.0" }
+glory-style = { path = "../style", version = "0.6.0" }
+glory-html = { path = "../html", version = "0.6.0", optional = true }
+glory-web = { path = "../web", version = "0.6.0", optional = true }
+glory-ssr = { path = "../ssr", version = "0.6.0", optional = true }
+glory-resource = { path = "../resource", version = "0.6.0", optional = true }
+glory-i18n = { path = "../i18n", version = "0.6.0", optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-glory-blitz = { path = "../blitz", version = "0.3.1", optional = true }
+glory-apace = { path = "../apace", version = "0.6.0", optional = true }
 
 [lints]
 workspace = true
@@ -62,5 +63,5 @@ path = "tests/display_dsl.rs"
 required-features = ["dsl"]
 
 [[example]]
-name = "semantic_blitz"
-required-features = ["blitz"]
+name = "semantic_apace"
+required-features = ["apace"]

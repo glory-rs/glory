@@ -101,7 +101,7 @@ bin/glory                    WSL launcher
 ```
 
 For a published release the private package uses an exact dependency such as
-`glory-cli = "=0.3.1"`; during local development it uses a path to this package.
+`glory-cli = "=0.6.0"`; during local development it uses a path to this package.
 Git-based projects must pin the CLI and framework to the same complete commit.
 Ordinary commands never update those pins. Commit the shared Cargo.lock.
 

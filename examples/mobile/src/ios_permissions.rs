@@ -1,6 +1,6 @@
 //! Application-owned UIKit permission connection. No native object or pointer
 //! crosses this ABI; the Swift host validates integers and serializes on main.
-use glory::blitz::permissions::{
+use glory::apace::permissions::{
     Action, NativeStats, Permission, PermissionDriver, PermissionError, PermissionLimits,
     PermissionState, Permissions, bridge,
 };

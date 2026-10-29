@@ -1,5 +1,5 @@
 //! Mobile application host; the component remains shared with Web/desktop.
-use glory::blitz::{
+use glory::apace::{
     Config,
     assets::{Bytes, LoadConfig, Loader, Url},
     shell::WindowApp,
@@ -225,10 +225,10 @@ fn asset_window(
     #[cfg(all(feature = "files", target_os = "android"))]
     let file_driver = android_files()?;
     #[cfg(all(feature = "files", target_os = "android"))]
-    let files = glory::blitz::files::Files::new(file_driver.clone());
+    let files = glory::apace::files::Files::new(file_driver.clone());
     let window = WindowApp::with_config(Config {
         #[cfg(all(feature = "clipboard", target_os = "android"))]
-        clipboard: Some(glory::blitz::clipboard::Clipboard::new(clipboard.clone())),
+        clipboard: Some(glory::apace::clipboard::Clipboard::new(clipboard.clone())),
         #[cfg(all(feature = "files", target_os = "android"))]
         files: Some(files.clone()),
         base_url: Url::parse(base)?,
@@ -306,22 +306,22 @@ fn asset_window(
 // symbol. Runtime crates and the body remain safe Rust.
 #[allow(unsafe_code)]
 #[unsafe(no_mangle)]
-pub fn android_main(app: glory::blitz::shell::AndroidApp) {
+pub fn android_main(app: glory::apace::shell::AndroidApp) {
     if let Err(error) = run_android(app) {
         eprintln!("Glory mobile: {error}");
     }
 }
 
 #[cfg(target_os = "android")]
-fn run_android(app: glory::blitz::shell::AndroidApp) -> Result<(), Box<dyn std::error::Error>> {
-    use glory::blitz::shell::{Shell, WindowAttributes};
+fn run_android(app: glory::apace::shell::AndroidApp) -> Result<(), Box<dyn std::error::Error>> {
+    use glory::apace::shell::{Shell, WindowAttributes};
     #[cfg(feature = "network")]
     let tls = android_tls()?;
     #[cfg(all(
         feature = "android-assets",
         any(not(feature = "network-probe"), feature = "android-assets-probe")
     ))]
-    let assets = glory::blitz::assets::AndroidAssets::new(app.asset_manager(), "glory")?;
+    let assets = glory::apace::assets::AndroidAssets::new(app.asset_manager(), "glory")?;
     #[cfg(feature = "android-assets-probe")]
     android_assets_probe::run(assets.clone())?;
     eprintln!("Glory mobile: creating Activity event loop");
@@ -357,7 +357,7 @@ fn run_android(app: glory::blitz::shell::AndroidApp) -> Result<(), Box<dyn std::
 }
 
 #[cfg(all(target_os = "android", feature = "network"))]
-fn android_tls() -> Result<glory::blitz::assets::AndroidTls, Box<dyn std::error::Error>> {
+fn android_tls() -> Result<glory::apace::assets::AndroidTls, Box<dyn std::error::Error>> {
     #[cfg(feature = "network-probe")]
     use jni::objects::JObject;
     use jni::{JavaVM, jni_sig, jni_str};
@@ -367,9 +367,9 @@ fn android_tls() -> Result<glory::blitz::assets::AndroidTls, Box<dyn std::error:
     JavaVM::singleton()?.attach_current_thread(|env| -> Result<_, Box<dyn std::error::Error>> {
         #[cfg(feature = "network-probe")]
         {
-            assert!(glory::blitz::assets::AndroidTls::new(env, JObject::null()).is_err());
+            assert!(glory::apace::assets::AndroidTls::new(env, JObject::null()).is_err());
             let wrong = env.new_string("not an Application")?;
-            assert!(glory::blitz::assets::AndroidTls::new(env, wrong.into()).is_err());
+            assert!(glory::apace::assets::AndroidTls::new(env, wrong.into()).is_err());
             assert_eq!(
                 Loader::new(LoadConfig {
                     origins: vec![Url::parse("https://example.com/")?],
@@ -390,14 +390,14 @@ fn android_tls() -> Result<glory::blitz::assets::AndroidTls, Box<dyn std::error:
                 &[],
             )?
             .l()?;
-        Ok(glory::blitz::assets::AndroidTls::new(env, context)?)
+        Ok(glory::apace::assets::AndroidTls::new(env, context)?)
     })
 }
 
 #[cfg(all(feature = "permissions-probe", target_os = "android"))]
 fn android_permissions()
--> Result<glory::blitz::permissions::Permissions, Box<dyn std::error::Error>> {
-    use glory::blitz::permissions::{AndroidPermissions, PermissionLimits, Permissions};
+-> Result<glory::apace::permissions::Permissions, Box<dyn std::error::Error>> {
+    use glory::apace::permissions::{AndroidPermissions, PermissionLimits, Permissions};
     use jni::{JavaVM, jni_sig, jni_str};
     JavaVM::singleton()?.attach_current_thread(|env| -> Result<_, Box<dyn std::error::Error>> {
         let class = env.load_class(jni_str!("rs.glory.counter.GloryGameActivity"))?;
@@ -418,7 +418,7 @@ fn android_permissions()
 
 #[cfg(all(feature = "clipboard", target_os = "android"))]
 fn android_clipboard()
--> Result<Arc<glory::blitz::clipboard::AndroidClipboard>, Box<dyn std::error::Error>> {
+-> Result<Arc<glory::apace::clipboard::AndroidClipboard>, Box<dyn std::error::Error>> {
     use jni::{JavaVM, jni_sig, jni_str};
     JavaVM::singleton()?.attach_current_thread(|env| -> Result<_, Box<dyn std::error::Error>> {
         let class = env.load_class(jni_str!("rs.glory.counter.GloryGameActivity"))?;
@@ -430,14 +430,14 @@ fn android_clipboard()
                 &[],
             )?
             .l()?;
-        Ok(Arc::new(glory::blitz::clipboard::AndroidClipboard::new(
+        Ok(Arc::new(glory::apace::clipboard::AndroidClipboard::new(
             env, host,
         )?))
     })
 }
 
 #[cfg(all(feature = "files", target_os = "android"))]
-fn android_files() -> Result<Arc<glory::blitz::files::AndroidFiles>, Box<dyn std::error::Error>> {
+fn android_files() -> Result<Arc<glory::apace::files::AndroidFiles>, Box<dyn std::error::Error>> {
     use jni::{JavaVM, jni_sig, jni_str};
     JavaVM::singleton()?.attach_current_thread(|env| -> Result<_, Box<dyn std::error::Error>> {
         let class = env.load_class(jni_str!("rs.glory.counter.GloryGameActivity"))?;
@@ -449,7 +449,7 @@ fn android_files() -> Result<Arc<glory::blitz::files::AndroidFiles>, Box<dyn std
                 &[],
             )?
             .l()?;
-        let driver = glory::blitz::files::AndroidFiles::new(env, host)
+        let driver = glory::apace::files::AndroidFiles::new(env, host)
             .map_err(|error| std::io::Error::other(format!("Android file host: {error:?}")))?;
         Ok(Arc::new(driver))
     })
@@ -457,7 +457,7 @@ fn android_files() -> Result<Arc<glory::blitz::files::AndroidFiles>, Box<dyn std
 
 #[cfg(feature = "network-probe")]
 pub fn network_window(
-    #[cfg(target_os = "android")] tls: Option<glory::blitz::assets::AndroidTls>,
+    #[cfg(target_os = "android")] tls: Option<glory::apace::assets::AndroidTls>,
 ) -> std::result::Result<(WindowApp, Arc<Loader>), Box<dyn std::error::Error>> {
     let origin = option_env!("GLORY_MOBILE_NETWORK_ORIGIN")
         .ok_or("network-probe needs GLORY_MOBILE_NETWORK_ORIGIN at build time")?;

@@ -25,7 +25,7 @@ xcrun swiftc -module-cache-path "$GLORY_BUILD_ROOT/SwiftHostModules" \
 "$GLORY_BUILD_ROOT/permission-ledger-tests"
 for mode in "$@"; do
     case "$mode" in
-        --window) GLORY_MACOS_WINDOW=1 cargo test --locked -p glory-blitz --features shell,accesskit --test macos_window ;;
+        --window) GLORY_MACOS_WINDOW=1 cargo test --locked -p glory-apace --features shell,accesskit --test macos_window ;;
         --clipboard) sh scripts/check-macos-clipboard.sh ;;
         --ios) GLORY_BUILD_ROOT="$GLORY_BUILD_ROOT/ios" sh examples/mobile/build-ios.sh ;;
         --forks) "${GLORY_PYTHON:-python3}" scripts/check-engine-forks.py --test ;;

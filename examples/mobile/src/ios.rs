@@ -1,7 +1,7 @@
 //! UIKit event loop; iOS launches this executable from its application bundle.
 #[cfg(target_os = "ios")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use glory::blitz::shell::{Shell, WindowAttributes};
+    use glory::apace::shell::{Shell, WindowAttributes};
     let mut shell = Shell::new()?;
     #[cfg(not(feature = "network-probe"))]
     let (window, _loader) = glory_mobile_counter::counter_window()?;

@@ -1,57 +1,36 @@
 # 引擎依赖维护
 
-2026-10-29：发布前重新核对了 crates.io 下载包、源码提交和替换回归；
-见 [fork 与发布版本调查](engine-fork-release-investigation-2026-10-29.md)。
-当前发布包不能整体替换这些 fork；winit 的桌面源码与发布基线一致，
-可以另行验证桌面端的依赖收敛，移动端补丁仍需保留。
+2026-10-29：维护的 fork 使用独立发布名称，Glory 0.6.0 改用 crates.io 的精确版本。
+原生适配器为 `glory-apace`，门面模块为 `glory::apace`，功能开关以 `apace` 开头。
+Widget、Each、DSL、SSR、hydration 和 native 的接口保持同一套实现。
 
-2026-10-25：维护分支保留既有修复并升级 winit 至 0.31.0-beta.4，移除已不可达的
-IME 事件兜底并增加五类事件转换回归。当前完整提交见下表；依赖和开放 PR 的
-核对记录见 [dependency-update-2026-10-25.md](dependency-update-2026-10-25.md)。
-
-第三方源码修改在 glory-rs 组织的真正 GitHub fork 中维护。Glory 仓库不保留
-vendor、副本补丁树或子模块；应用无需添加全局 Cargo patch。
-
-| Fork | 上游基线 | Glory 固定提交 | 维护范围 |
+| 维护项目 | 原始上游 | 首次发布版本 | 维护范围 |
 |---|---|---|---|
-| [glory-rs/blitz](https://github.com/glory-rs/blitz) | `92b11f1b` / beta.4 | [ee125981](https://github.com/glory-rs/blitz/commit/ee125981e0e5a217e758be5c470df23cdd9e2fc3) | 资源生命周期、增量失效、焦点、密码显示、IME、阶段计时、inline 样式差分失效、隐藏子树销毁与移动缓存回收、真正的文档顶层、UIKit 键盘视口触摸保护、三态 checkbox、按 tree/form/name 分组的 radio checked property、独立 placeholder 布局/绘制、显式程序滚动取消旧触摸惯性、按地址撤销图片复用缓存/迟到结果、隐藏动画与 contents 盒退休，以及固定 Winit Activity 生命周期修复 |
-| [glory-rs/taffy](https://github.com/glory-rs/taffy) | `eb645069` / 0.15.0 | [dd7914fb](https://github.com/glory-rs/taffy/commit/dd7914fba2e6e0b5d8a2c8854d764a2ade817efd) | 小数 flex 因子的 gap 计算与回归测试 |
-| [glory-rs/winit](https://github.com/glory-rs/winit) | `d597ced7` / 0.31.0-beta.4 | [3b6f5a09](https://github.com/glory-rs/winit/commit/3b6f5a09697acb936567af64e53c915b0b1a2af9) | Android Destroy 退出当前事件循环，释放 Activity 循环独占许可后允许同进程重建；UIKit UITextInput、Android GameTextInput；保留上游包和锁定的测试依赖 |
+| [Apace](https://github.com/glory-rs/apace) | DioxusLabs/blitz | 0.3.0-beta.4 | 文档、资源、焦点、IME、布局/绘制失效、顶层、编辑器、动画和节点回收补丁 |
+| [Takia](https://github.com/glory-rs/takia) | DioxusLabs/taffy | 0.15.0 | 小数 flex 因子与 gap 计算补丁 |
+| [Wingy](https://github.com/glory-rs/wingy) | rust-windowing/winit | 0.31.0 | Android Activity 生命周期、GameTextInput 和 UIKit UITextInput 补丁 |
 
-恢复上游包名 blitz-dom/traits/paint/shell、stylo_taffy、taffy；Glory 自己的
-适配 crate 继续叫 glory-blitz。Blitz fork 的 workspace 统一固定同一个 Taffy
-Git revision，各包间保留上游正常的 workspace/path 依赖。因此没有修补前后
-类型混用，也不将第三方 crate 加入 Glory 的十二包 workspace。上游代码、许可证、
-仓库结构及 Git 历史保留在各自 fork。原有实现的 146 个源码/资源文件在迁移时
-逐字节核对；Cargo 规范化 manifest 改回上游 workspace manifest。
+支持包保留其原来的版本：`wingy-dpi` 0.1.2、`apace_accesskit` 0.2.1、
+`apace_debug_timer` 0.1.3。Apace 与 Glory 使用同一组 Takia/Wingy 类型。
+原始许可证、版权说明、Git 历史和上游来源保留；旧名称出现在历史报告中。
+补丁与官方发布包的差异见 [发布前调查](engine-fork-release-investigation-2026-10-29.md)。
 
-运行环境先按 AGENTS.md 将 CARGO_HOME、CARGO_TARGET_DIR 和临时目录设到 D:。
-`python scripts/check-engine-forks.py` 使用 Cargo metadata 和 Cargo.lock 检查
-实际来源、完整提交、重复类型身份及 workspace 边界；加 `--test` 会在 D: 构建
-目录的独立 Git checkout 中执行各 fork 固定锁的库测试，并确认 checkout 清洁。
-Windows/Linux semantic gate 均调用该检查。独立 checkout 是正常 Git 工作副本，
-不参与 Glory 的 path 依赖，也不修改 Cargo 管理的源码缓存。
-Blitz fork 的 Linux/FreeBSD 测试依赖启用 Fontique 的 fontconfig-dlopen，
-与适配器一致；运行时仍需 Fontconfig 和字体，不需要安装其开发头文件来跑库测试。
-`extra_tests` 还启用 `parallel-construct` 执行计时器测试，验证并行聚合、reset
-代次和真实文本构建。计时器只保留 13 个固定聚合值，不缓存节点、文本或帧。
-样式差分测试也在此配置执行：top/height 和等价声明复用文本，Clear 恢复
-stylesheet；16种连续样式变化与强制完整重建对照，属性选择器仍重算关联节点。
-inline style 保留 snapshot、selector/inherited restyle 与祖先标记，只去掉
-无条件 ALL_DAMAGE，交给 computed-style difference 分类；CustomWidget 继续
-保守完整失效。placeholder 修改同样由样式差异决定编辑器损伤；提示文字单独更新布局，不重写值或预编辑。其余属性修改仍保持原路径。
-默认不安装 collector；开启后使用引擎自身的单调时钟，Glory 在 resolve 返回
-后导入其固定快照，不跨线程传递 Glory 的本地响应式对象。
+各项目的 `main` 是维护分支。每日同步任务只更新 `upstream-main`：
+Apace/Takia 对应官方 main，Wingy 对应官方 master；不会自动覆盖或合并到 main。
+各库的 `RELEASING.md` 说明 tag 发布、验证门禁和凭据配置。
 
-修改流程：在 fork 上从维护提交建分支，提交并推送修复与测试；若修改 Taffy，
-先更新 Blitz fork 的统一依赖和测试锁，再更新 Glory 的四个 Blitz Git revision、
-主/示例 Cargo.lock 及 [engine-forks.json](engine-forks.json)，运行 fork 检查与
-Glory 的语义、原生几何/窗口回归。合入上游后也通过审查过的完整提交升级。
-不得改成浮动 branch、未提交本地 path、在应用端打 patch 或重新引入 vendor。
+`docs/engine-forks.json` 记录发布版本、完整源码提交与官方基线。
+`python scripts/check-engine-forks.py` 验证 Cargo metadata、lock checksum、
+注册表归档的 `.cargo_vcs_info.json`、单一类型身份和工作区边界。
+加 `--test` 会在规定缓存目录中的独立、清洁 Git checkout 上执行发布源码测试。
+这些 checkout 不作为应用 path 依赖，也不修改 Cargo 管理的缓存。
+Windows 的 Cargo home、target 和临时目录均使用 D:/BuildCache。
 
-这些 fork 的维护补丁尚未随对应包发布到 crates.io；同名版本的注册表包不含这些
-补丁，当前保证的是 Git 源构建。早期实施记录中的本地
-源码校验和命令仅为历史证据，当前复现以本页和检查脚本为准。
+后续修复先在对应维护仓库完成测试并发布新版本，再更新 Apace/Glory 的精确版本、
+lockfile 与来源记录。应用不需要全局 Cargo patch，也不引入 vendor。
+实际窗口、IME、无障碍和设备验收仍是独立门禁，不能用编译或模型测试代替。
+
+以下保留既有补丁的验证记录，历史提交和旧构建路径对应当时的源码。
 
 2026-10-24 的隐藏子树销毁回归来自 Sapid NavLink 的 Unmount 面板。销毁节点时
 按记录的 layout parent / out-of-flow containing block 清除布局、hoisted 和派生
@@ -79,7 +58,7 @@ URL 共享 fetch。只有实际消费、缓存命中或明确 admission/no-provi
 引擎独立进行 viewport 布局、最后绘制和逆序命中，modal backdrop 参与真实绘制；
 不使用 portal。当前 lease 上限为 1024，detach/drop 退休，connected move 保留。
 显式 `contain_scroll` 复用 wheel/touch/fling/editor 的原生滚动链。
-`native-top-layer-final-provenance.log` 的独立干净检出验证通过 Taffy185、Blitz113、
+`native-top-layer-final-provenance.log` 的独立干净检出验证通过 Takia185、Apace113、
 parallel/writing-mode114、既有 focused 及 CPU actual paint1；focused 与全库重叠，
 不合并为独立用例数。宿主焦点/AX/组件验收见 [native-top-layers.md](native-top-layers.md)。
 

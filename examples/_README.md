@@ -5,7 +5,7 @@ Checking the root workspace does not build them.
 
 The current entry points are:
 
-- [counter](counter/README.md): one semantic component shared by Web and Blitz
+- [counter](counter/README.md): one semantic component shared by Web and Apace
   desktop hosts, with controlled input, derived state and activation handlers.
   Its build script verifies that Cargo caches, targets and temporary files use D:.
 - [semantic-web](semantic-web/): the runnable semantic DOM/SSR/hydration/stream

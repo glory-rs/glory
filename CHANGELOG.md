@@ -1,12 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.6.0
 
 The optional XML display frontend now includes framework-owned keyed data and
 `Each`, conditional/content ranges, component children, `field!`, typed boolean
-class bindings, generated component Props and a display prelude. Handwritten
+class bindings, generated Widget builders and a display prelude. Handwritten
 and XML frontends share the sparse HTML runtime. The canonical rows benchmark
-uses this API; an independent standard HTML-table fixture lives in the sibling
+uses this API. Sapid and custom components implement the same Widget contract;
+Vary<Vec> and KeyedList share Each, including mixed HTML/Widget SSR, streaming,
+hydration and native hosts. The native engine uses published Apace, Takia and
+Wingy packages, with the adapter and features named apace. An independent
+standard HTML-table fixture lives in the sibling
 js-framework-benchmark checkout. See the display guide for supported browser
 capabilities and ownership contracts.
 
@@ -17,7 +21,7 @@ and reverted instance-record experiments are documented separately.
 
 Glory uses the breaking semantic UI architecture: Owner-scoped Cage/Bond/Vary,
 finite rendering contracts, handwritten builders, shared HTML mapping and
-separate Web, SSR, Salvo and Blitz hosts. Optional resources, CSS and i18n keep
+separate Web, SSR, Salvo and Apace hosts. Optional resources, CSS and i18n keep
 their documented dependency boundaries.
 
 The previous HTML runtime, global scheduler/context APIs, routing package,

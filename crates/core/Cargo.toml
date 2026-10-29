@@ -1,4 +1,5 @@
 [package]
+repository.workspace = true
 name = "glory-core"
 version.workspace = true
 edition.workspace = true
@@ -10,7 +11,7 @@ autotests = false
 autobenches = false
 
 [dependencies]
-glory-render = { path = "../render", version = "0.3.1" }
+glory-render = { path = "../render", version = "0.6.0" }
 
 [[test]]
 name = "runtime"
