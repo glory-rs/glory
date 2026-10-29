@@ -1,5 +1,10 @@
 # Glory / Leptos / Dioxus: current rows benchmark
 
+Latest published-commit run: [Widget and Each results](../docs/framework-benchmark-published-widget-each-2026-10-29.md)
+for Glory `dae6f2c`, Leptos 0.8.22 and Dioxus 0.7.10: four alternating rounds,
+1,296 samples, fresh release builds and data/identity/layout/pixel acceptance.
+The report retains the Leptos selection anomaly and the rejected concurrent-build run.
+
 The current keyed public API, completed checks and measurements are documented in
 [the implementation report](../docs/v2-display-completion-results-2026-10-29.md).
 Glory's XML and handwritten frontends share `model.rs`; application code no
