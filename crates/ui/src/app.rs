@@ -1821,6 +1821,12 @@ pub trait Widget: 'static {
     fn compose(&mut self, _scope: &glory_core::Scope) -> Result<Option<Box<dyn Widget>>> {
         Ok(None)
     }
+    /// A complete native host path can bypass composition and the semantic
+    /// fallback. The host must still call `mount_host` and check its result.
+    #[doc(hidden)]
+    fn native_host(&self) -> Option<std::any::TypeId> {
+        None
+    }
     /// Optional adapter fast path; ordinary widgets only implement `build`.
     #[doc(hidden)]
     fn mount_host(&mut self, _scope: &glory_core::Scope, _host: &mut dyn Any) -> Result<bool> {

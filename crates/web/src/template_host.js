@@ -98,7 +98,17 @@ export function submit(host, borrowed, strings) {
                 const roots = template.roots.map(node => node.cloneNode(true));
                 const targets = template.targets.map(([path, type]) => {
                     let node = roots[path[0]];
-                    for (let j = 1; j < path.length; j++) node = node.childNodes[path[j]];
+                    // Avoid materializing a live NodeList for every path step.
+                    // Keep indexed access for wide templates: repeatedly walking
+                    // a large sibling offset would make target lookup quadratic.
+                    for (let j = 1; j < path.length; j++) {
+                        const index = path[j];
+                        if (index > 3) node = node.childNodes[index];
+                        else {
+                            node = node.firstChild;
+                            for (let k = 0; k < index; k++) node = node.nextSibling;
+                        }
+                    }
                     if (!node || node.nodeType !== (type === 0 ? 3 : type === 4 ? 8 : 1)) throw Error('template target shape changed');
                     return node;
                 });

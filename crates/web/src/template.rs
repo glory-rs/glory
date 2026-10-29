@@ -46,8 +46,20 @@ fn error(value: impl std::fmt::Display) -> Error {
     Error(value.to_string())
 }
 type Handler = Rc<RefCell<Box<dyn FnMut()>>>;
+// Sparse-only apps do not retain a semantic renderer's methods or drop graph.
+trait Island {
+    fn flush(&self) -> Result<()>;
+}
+impl Island for crate::WebApp {
+    fn flush(&self) -> Result<()> {
+        if self.app().scope().is_alive() {
+            crate::WebApp::flush(self).map_err(error)?;
+        }
+        Ok(())
+    }
+}
 type PendingWidget =
-    Box<dyn FnOnce(web_sys::Element, Rc<Runtime>, InstanceId) -> Result<crate::WebApp>>;
+    Box<dyn FnOnce(web_sys::Element, Rc<Runtime>, InstanceId) -> Result<Rc<dyn Island>>>;
 struct Record {
     template: Arc<Compiled>,
     owner: InstanceId,
@@ -102,7 +114,7 @@ struct State {
     fault: RefCell<Option<Error>>,
     events: RefCell<VecDeque<(u32, u16)>>,
     records: RefCell<HashMap<u32, Record>>,
-    widgets: RefCell<HashMap<u32, Rc<crate::WebApp>>>,
+    widgets: RefCell<HashMap<u32, Rc<dyn Island>>>,
     pending_widgets: RefCell<HashMap<u32, PendingWidget>>,
     owners: RefCell<HashMap<InstanceId, u32>>,
     templates: RefCell<HashMap<usize, Rc<Declaration>>>,
@@ -255,7 +267,9 @@ impl App {
         self.0.pending_widgets.borrow_mut().insert(
             instance.id,
             Box::new(move |root, runtime, owner| {
-                crate::browser::launch_in_runtime(root, runtime, owner, widget).map_err(error)
+                crate::browser::launch_in_runtime(root, runtime, owner, widget)
+                    .map(|app| Rc::new(app) as Rc<dyn Island>)
+                    .map_err(error)
             }),
         );
         Ok(instance)
@@ -503,7 +517,7 @@ impl State {
                 let root = child_container(&self.host, id, 0).map_err(backend)?;
                 root.set_attribute("style", "display:contents")
                     .map_err(backend)?;
-                let guard = Rc::new(build(root, self.runtime.clone(), owner)?);
+                let guard = build(root, self.runtime.clone(), owner)?;
                 if owner.is_alive() && self.records.borrow().contains_key(&id) {
                     self.widgets.borrow_mut().insert(id, guard);
                 }
@@ -518,9 +532,7 @@ impl State {
             .collect();
         widgets.sort_unstable_by_key(|(id, _)| *id);
         for (_, widget) in widgets {
-            if widget.app().scope().is_alive() {
-                widget.flush().map_err(error)?;
-            }
+            widget.flush()?;
         }
         if !self.pending_widgets.borrow().is_empty() {
             self.bridge.wake();
@@ -535,7 +547,8 @@ impl State {
             return Ok(());
         }
         let mut texts = std::mem::take(&mut *self.texts.borrow_mut());
-        let mut words = Vec::with_capacity(256 * 8);
+        const COMMANDS_PER_PACKET: usize = 4096;
+        let mut words = Vec::with_capacity(commands.len().min(COMMANDS_PER_PACKET) * 8);
         let mut strings = String::new();
         let mut offset = 0;
         while offset < commands.len() {
@@ -544,7 +557,7 @@ impl State {
             let mut units = 0u32;
             let mut nodes = 0;
             let first = offset;
-            while offset < commands.len() && offset - first < 256 {
+            while offset < commands.len() && offset - first < COMMANDS_PER_PACKET {
                 let mut record = [0u32; 8];
                 match &commands[offset] {
                     Op::Create(id, template, _, count) => {

@@ -64,6 +64,7 @@ const result={schema:1,final:{path:final.file,bytes:final.bytes,sha256:final.sha
     return 'remaining bodies';
   }),
   webModules:group(functions.filter(f=>owner(f.name)==='glory_web'),f=>f.name.match(/glory_web::browser::([a-z_]+)::(?!<)/)?.[1]||'browser entry / Renderer'),
+  semanticBrowserBodies:functions.filter(f=>f.name.includes('glory_web::browser::')),
   regularExpressionSymbols:functions.filter(f=>/(?:^|[^\w])(?:regex|regex_automata|regex_syntax|aho_corasick|fancy_regex)::/.test(f.name)),
   data:{segments:final.data.length,bytes:final.data.reduce((n,b)=>n+b.length,0),asciiRunBytes:ascii.reduce((n,s)=>n+s.length,0),longestAsciiRuns:ascii.sort((a,b)=>b.length-a.length).slice(0,12).map(s=>({bytes:s.length,preview:s.slice(0,400)}))},
   largestFunctions:functions.slice(0,35)};

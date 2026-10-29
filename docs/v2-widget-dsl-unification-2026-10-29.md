@@ -6,6 +6,14 @@ widgets. The former display `Component`, `Component::Props`, `ComponentView`,
 configuration implementing `Widget`, rather than a second component interface.
 `#[component]` remains a function-authoring macro and generates a Widget builder.
 
+The sparse host now recognizes View's complete host path before type-erased
+composition, using the internal `Widget::native_host` hint. Ordinary widgets
+keep the default and implement `build` as before; Box forwards the same Widget
+contract. Semantic islands are stored behind an internal flush/lifetime
+interface, so a concrete raw-only app can drop unused browser-renderer code.
+The [rendering and size measurements](framework-benchmark-render-optimization-2026-10-29.md)
+cover the resulting artifacts, shared Each, node reuse and mixed-host checks.
+
 ## Consolidated implementation
 
 The legacy `html::template::{Node, Target, Template}` AST/compiler and `Source`

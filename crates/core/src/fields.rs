@@ -993,7 +993,7 @@ impl Context {
             last_flush: 0,
             flush_runs: 0,
             dependencies: Dependencies::new(),
-            subscribers: BTreeSet::new(),
+            subscribers: Subscribers::new(),
         };
         let key = graph.insert_node(owner, node)?;
         graph.fields.aliases.insert(key, id);

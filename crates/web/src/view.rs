@@ -357,6 +357,13 @@ impl<A: Actions> View<A> {
     }
 }
 impl<A: Actions + 'static> Widget for View<A> {
+    #[inline(always)]
+    fn native_host(&self) -> Option<std::any::TypeId> {
+        #[cfg(target_arch = "wasm32")]
+        return Some(std::any::TypeId::of::<DisplayMount>());
+        #[cfg(not(target_arch = "wasm32"))]
+        None
+    }
     fn build(&mut self, scope: &glory_ui::Scope) -> glory_ui::Result {
         self.validate(scope).map_err(portable::failure)?;
         let actions = self.actions.take().ok_or(glory_ui::Error::Gone)?;
@@ -392,6 +399,18 @@ pub fn mount(
     if !scope.is_alive() || scope.runtime() != app.runtime().id() {
         return Err(error("foreign or disposed widget scope"));
     }
+    let mut context = DisplayMount {
+        app: app.clone(),
+        result: None,
+    };
+    if widget.native_host() == Some(std::any::TypeId::of::<DisplayMount>()) {
+        if !widget.mount_host(scope, &mut context).map_err(error)? {
+            return Err(error("widget native host did not mount"));
+        }
+        return context
+            .result
+            .ok_or_else(|| error("widget host did not mount"))?;
+    }
     if widget.is_empty() {
         return mount(empty(), app, scope);
     }
@@ -400,10 +419,6 @@ pub fn mount(
     {
         return mount(child, app, scope);
     }
-    let mut context = DisplayMount {
-        app: app.clone(),
-        result: None,
-    };
     if widget.mount_host(scope, &mut context).map_err(error)? {
         return context
             .result

@@ -67,6 +67,9 @@ impl<W: Widget + ?Sized> Widget for Box<W> {
     fn compose(&mut self, scope: &glory_core::Scope) -> Result<Option<Box<dyn Widget>>> {
         (**self).compose(scope)
     }
+    fn native_host(&self) -> Option<std::any::TypeId> {
+        (**self).native_host()
+    }
     fn mount_host(
         &mut self,
         scope: &glory_core::Scope,

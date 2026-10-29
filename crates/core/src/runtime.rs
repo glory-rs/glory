@@ -12,7 +12,10 @@ use crate::arena::{Arena, Key};
 #[path = "dependencies.rs"]
 mod dependencies;
 use dependencies::Dependencies;
+#[path = "subscribers.rs"]
+mod subscribers;
 use glory_render::profile::{Phase, Profile};
+use subscribers::Subscribers;
 #[path = "fields.rs"]
 mod fields;
 #[path = "keyed.rs"]
@@ -158,7 +161,7 @@ struct Node {
     last_flush: u64,
     flush_runs: u32,
     dependencies: Dependencies,
-    subscribers: BTreeSet<Key>,
+    subscribers: Subscribers,
 }
 
 #[derive(Default)]
@@ -1068,7 +1071,7 @@ impl Owner {
             last_flush: 0,
             flush_runs: 0,
             dependencies: Dependencies::new(),
-            subscribers: BTreeSet::new(),
+            subscribers: Subscribers::new(),
         };
         let key = lookup(self.runtime)
             .expect("live runtime")
@@ -1139,7 +1142,7 @@ impl Owner {
             last_flush: 0,
             flush_runs: 0,
             dependencies: Dependencies::new(),
-            subscribers: BTreeSet::new(),
+            subscribers: Subscribers::new(),
         };
         let key = lookup(self.runtime)
             .expect("live runtime")
@@ -1650,7 +1653,7 @@ fn make_bond<T: 'static>(
         last_flush: 0,
         flush_runs: 0,
         dependencies: Dependencies::new(),
-        subscribers: BTreeSet::new(),
+        subscribers: Subscribers::new(),
     };
     let key = lookup(runtime)?.borrow_mut().insert_node(owner, node)?;
     Ok(Bond {

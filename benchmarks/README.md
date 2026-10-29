@@ -1,5 +1,11 @@
 # Glory / Leptos / Dioxus: current rows benchmark
 
+Latest local optimization: [creation, replacement, clearing and artifact attribution](../docs/framework-benchmark-render-optimization-2026-10-29.md).
+It compares the unchanged Widget/Each workload before/after and against Dioxus
+and Leptos, with wide-template, failure-prefix, reuse and mixed-host checks.
+`analyze-display-size.cjs` reports raw/compressed WASM sections and the actual
+JS import graph without rewriting measured artifacts.
+
 Latest published-commit run: [Widget and Each results](../docs/framework-benchmark-published-widget-each-2026-10-29.md)
 for Glory `dae6f2c`, Leptos 0.8.22 and Dioxus 0.7.10: four alternating rounds,
 1,296 samples, fresh release builds and data/identity/layout/pixel acceptance.

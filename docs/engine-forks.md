@@ -1,5 +1,10 @@
 # 引擎依赖维护
 
+2026-10-29：发布前重新核对了 crates.io 下载包、源码提交和替换回归；
+见 [fork 与发布版本调查](engine-fork-release-investigation-2026-10-29.md)。
+当前发布包不能整体替换这些 fork；winit 的桌面源码与发布基线一致，
+可以另行验证桌面端的依赖收敛，移动端补丁仍需保留。
+
 2026-10-25：维护分支保留既有修复并升级 winit 至 0.31.0-beta.4，移除已不可达的
 IME 事件兜底并增加五类事件转换回归。当前完整提交见下表；依赖和开放 PR 的
 核对记录见 [dependency-update-2026-10-25.md](dependency-update-2026-10-25.md)。
@@ -9,7 +14,7 @@ vendor、副本补丁树或子模块；应用无需添加全局 Cargo patch。
 
 | Fork | 上游基线 | Glory 固定提交 | 维护范围 |
 |---|---|---|---|
-| [glory-rs/blitz](https://github.com/glory-rs/blitz) | `92b11f1b` / beta.4 | [6a9ca05b](https://github.com/glory-rs/blitz/commit/6a9ca05b246ecec6a7844e18dc6d264eb8f076cf) | 资源生命周期、增量失效、焦点、密码显示、IME、阶段计时、inline 样式差分失效、隐藏子树销毁与移动缓存回收、真正的文档顶层、UIKit 键盘视口触摸保护、三态 checkbox、按 tree/form/name 分组的 radio checked property、独立 placeholder 布局/绘制、显式程序滚动取消旧触摸惯性、按地址撤销图片复用缓存/迟到结果和固定 Winit Activity 生命周期修复 |
+| [glory-rs/blitz](https://github.com/glory-rs/blitz) | `92b11f1b` / beta.4 | [ee125981](https://github.com/glory-rs/blitz/commit/ee125981e0e5a217e758be5c470df23cdd9e2fc3) | 资源生命周期、增量失效、焦点、密码显示、IME、阶段计时、inline 样式差分失效、隐藏子树销毁与移动缓存回收、真正的文档顶层、UIKit 键盘视口触摸保护、三态 checkbox、按 tree/form/name 分组的 radio checked property、独立 placeholder 布局/绘制、显式程序滚动取消旧触摸惯性、按地址撤销图片复用缓存/迟到结果、隐藏动画与 contents 盒退休，以及固定 Winit Activity 生命周期修复 |
 | [glory-rs/taffy](https://github.com/glory-rs/taffy) | `eb645069` / 0.15.0 | [dd7914fb](https://github.com/glory-rs/taffy/commit/dd7914fba2e6e0b5d8a2c8854d764a2ade817efd) | 小数 flex 因子的 gap 计算与回归测试 |
 | [glory-rs/winit](https://github.com/glory-rs/winit) | `d597ced7` / 0.31.0-beta.4 | [3b6f5a09](https://github.com/glory-rs/winit/commit/3b6f5a09697acb936567af64e53c915b0b1a2af9) | Android Destroy 退出当前事件循环，释放 Activity 循环独占许可后允许同进程重建；UIKit UITextInput、Android GameTextInput；保留上游包和锁定的测试依赖 |
 
@@ -44,7 +49,8 @@ inline style 保留 snapshot、selector/inherited restyle 与祖先标记，只�
 Glory 的语义、原生几何/窗口回归。合入上游后也通过审查过的完整提交升级。
 不得改成浮动 branch、未提交本地 path、在应用端打 patch 或重新引入 vendor。
 
-这些依赖尚未发布到 crates.io；当前保证的是 Git 源构建。早期实施记录中的本地
+这些 fork 的维护补丁尚未随对应包发布到 crates.io；同名版本的注册表包不含这些
+补丁，当前保证的是 Git 源构建。早期实施记录中的本地
 源码校验和命令仅为历史证据，当前复现以本页和检查脚本为准。
 
 2026-10-24 的隐藏子树销毁回归来自 Sapid NavLink 的 Unmount 面板。销毁节点时
