@@ -49,12 +49,12 @@ pub(crate) fn build<A: Actions>(
     let root = scope.create(descriptor)?;
     scope.place(root, scope.construction_parent(), None)?;
     let handlers = Rc::new(RefCell::new(BTreeMap::new()));
-    actions.apply(&mounting::Mount::ui(&Mount {
+    actions.apply(&Mount {
         frame,
         root,
         scope,
         handlers: handlers.clone(),
-    }))?;
+    })?;
     if !handlers.borrow().is_empty() {
         scope.on(root, EventKind::DisplayClick, move |event| {
             if let Event::DisplayClick(slot) = event

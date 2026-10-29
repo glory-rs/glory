@@ -10,6 +10,18 @@ Native applications use `glory::apace`, the `apace-*` features and
 glory = { version = "=0.6.0", default-features = false, features = ["dsl"] }
 ```
 
+For production applications, enable symbol stripping in the application's own
+workspace manifest. Cargo ignores release profiles declared by dependencies:
+
+```toml
+[profile.release]
+strip = "symbols"
+```
+
+The benchmark workspaces use matching release profiles. See the
+[strip and static-host analysis](docs/wasm-strip-static-host-2026-10-30.md) for
+measured sizes, retained Widget/Each behavior and reproducibility details.
+
 Glory is being rebuilt as a Rust semantic UI framework: handwritten builders,
 owned fine-grained reactivity, and replaceable rendering hosts. No UI DSL or
 virtual DOM is required.

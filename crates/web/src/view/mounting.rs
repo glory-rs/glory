@@ -1,405 +1,302 @@
-//! Backend adapters for one configuration/structural-control implementation.
+//! Statically selected host adapters for the shared Widget/content controllers.
 use super::*;
+
 type UiResult<T = ()> = glory_ui::Result<T>;
 
-/// Internal destination for named configuration actions, not a component API.
+/// Internal operations for named configuration actions, not a component API.
 #[doc(hidden)]
-pub struct Mount<'a> {
-    backend: Backend<'a>,
+pub trait Mount {
+    fn text<V: TextValue + 'static>(&self, field: Field, value: V) -> UiResult;
+    fn flag<V: BoolValue>(&self, field: Field, value: V) -> UiResult;
+    fn on(&self, click: Click, callback: impl FnMut() + 'static) -> UiResult;
+    fn child<C: Content>(&self, outlet: Outlet, content: C) -> UiResult;
 }
-enum Backend<'a> {
-    Ui(&'a portable::Mount<'a>),
-    #[cfg(target_arch = "wasm32")]
-    Sparse {
-        definition: &'a Compiled,
-        app: &'a crate::template::App,
-        scope: &'a Scope,
-        instance: &'a crate::template::Instance,
-    },
-}
-impl<'a> Mount<'a> {
-    pub(crate) fn ui(mount: &'a portable::Mount<'a>) -> Self {
-        Self {
-            backend: Backend::Ui(mount),
-        }
-    }
-    #[cfg(target_arch = "wasm32")]
-    pub(crate) fn sparse(
-        definition: &'a Compiled,
-        app: &'a crate::template::App,
-        scope: &'a Scope,
-        instance: &'a crate::template::Instance,
-    ) -> Self {
-        Self {
-            backend: Backend::Sparse {
-                definition,
-                app,
-                scope,
-                instance,
-            },
-        }
-    }
-    fn slot(&self, name: &str) -> UiResult<u16> {
-        match &self.backend {
-            Backend::Ui(m) => Ok(m.frame.slot(name)?.0),
-            #[cfg(target_arch = "wasm32")]
-            Backend::Sparse { definition, .. } => definition
-                .slot(name)
-                .map(|(slot, _)| slot)
-                .ok_or(glory_ui::Error::Gone),
-        }
-    }
-    pub(crate) fn text<V: TextValue + 'static>(&self, field: Field, mut value: V) -> UiResult {
-        let slot = self.slot(field.0)?;
-        match &self.backend {
-            Backend::Ui(m) => {
-                let frame = m.frame.clone();
-                if value.reactive_text() {
-                    let weak = m.scope.downgrade();
-                    m.scope.binding(move || {
-                        let result = value
-                            .read_text()
-                            .map_err(portable::failure)
-                            .and_then(|text| frame.text(slot, text).map_err(Into::into));
-                        if let Err(error) = result
-                            && let Some(scope) = weak.upgrade()
-                        {
-                            scope.report_error(error);
-                        }
-                    });
-                    Ok(())
-                } else {
-                    frame.text(
-                        slot,
-                        glory_core::untracked(|| value.read_text()).map_err(portable::failure)?,
-                    )?;
-                    Ok(())
+
+impl Mount for portable::Mount<'_> {
+    fn text<V: TextValue + 'static>(&self, field: Field, mut value: V) -> UiResult {
+        let slot = self.frame.slot(field.0)?.0;
+        if value.reactive_text() {
+            let frame = self.frame.clone();
+            let weak = self.scope.downgrade();
+            self.scope.binding(move || {
+                let result = value
+                    .read_text()
+                    .map_err(portable::failure)
+                    .and_then(|text| frame.text(slot, text).map_err(Into::into));
+                if let Err(error) = result
+                    && let Some(scope) = weak.upgrade()
+                {
+                    scope.report_error(error);
                 }
-            }
-            #[cfg(target_arch = "wasm32")]
-            Backend::Sparse {
-                scope, instance, ..
-            } => {
-                if value.reactive_text() {
-                    instance
-                        .try_bind_values(scope, [slot], move || Ok([value.read_text()?]))
-                        .map_err(portable::failure)
-                } else {
-                    instance
-                        .set(
-                            slot,
-                            glory_core::untracked(|| value.read_text())
-                                .map_err(portable::failure)?,
-                        )
-                        .map_err(portable::failure)
-                }
-            }
+            });
+            Ok(())
+        } else {
+            self.frame.text(
+                slot,
+                glory_core::untracked(|| value.read_text()).map_err(portable::failure)?,
+            )?;
+            Ok(())
         }
     }
-    pub(crate) fn flag<V: BoolValue>(&self, field: Field, mut value: V) -> UiResult {
-        let slot = self.slot(field.0)?;
-        match &self.backend {
-            Backend::Ui(m) => {
-                let frame = m.frame.clone();
-                if value.reactive() {
-                    let weak = m.scope.downgrade();
-                    m.scope.binding(move || {
-                        let result = value
-                            .read_bool()
-                            .map_err(portable::failure)
-                            .and_then(|flag| frame.flag(slot, flag).map_err(Into::into));
-                        if let Err(error) = result
-                            && let Some(scope) = weak.upgrade()
-                        {
-                            scope.report_error(error);
-                        }
-                    });
-                    Ok(())
-                } else {
-                    frame.flag(
-                        slot,
-                        glory_core::untracked(|| value.read_bool()).map_err(portable::failure)?,
-                    )?;
-                    Ok(())
+    fn flag<V: BoolValue>(&self, field: Field, mut value: V) -> UiResult {
+        let slot = self.frame.slot(field.0)?.0;
+        if value.reactive() {
+            let frame = self.frame.clone();
+            let weak = self.scope.downgrade();
+            self.scope.binding(move || {
+                let result = value
+                    .read_bool()
+                    .map_err(portable::failure)
+                    .and_then(|flag| frame.flag(slot, flag).map_err(Into::into));
+                if let Err(error) = result
+                    && let Some(scope) = weak.upgrade()
+                {
+                    scope.report_error(error);
                 }
-            }
-            #[cfg(target_arch = "wasm32")]
-            Backend::Sparse {
-                scope, instance, ..
-            } => {
-                if value.reactive() {
-                    instance
-                        .bind_flag(scope, slot, move || value.read_bool())
-                        .map_err(portable::failure)
-                } else {
-                    let next = value.read_bool().map_err(portable::failure)?;
-                    if next != instance.flag_initial(slot).map_err(portable::failure)? {
-                        instance.set_flag(slot, next).map_err(portable::failure)?;
-                    }
-                    Ok(())
-                }
-            }
+            });
+            Ok(())
+        } else {
+            self.frame.flag(
+                slot,
+                glory_core::untracked(|| value.read_bool()).map_err(portable::failure)?,
+            )?;
+            Ok(())
         }
     }
-    pub(crate) fn on(&self, click: Click, callback: impl FnMut() + 'static) -> UiResult {
-        let slot = self.slot(click.0)?;
-        match &self.backend {
-            Backend::Ui(m) => {
-                m.handlers.borrow_mut().insert(slot, Box::new(callback));
-                Ok(())
-            }
-            #[cfg(target_arch = "wasm32")]
-            Backend::Sparse { instance, .. } => {
-                instance.on_click(slot, callback).map_err(portable::failure)
-            }
-        }
+    fn on(&self, click: Click, callback: impl FnMut() + 'static) -> UiResult {
+        self.handlers
+            .borrow_mut()
+            .insert(self.frame.slot(click.0)?.0, Box::new(callback));
+        Ok(())
     }
-    pub(crate) fn child<C: Content>(&self, outlet: Outlet, content: C) -> UiResult {
-        match &self.backend {
-            Backend::Ui(m) => {
-                let scope = m.outlet(outlet)?;
-                content.install(&scope, &ContentMount::ui(&scope))
-            }
-            #[cfg(target_arch = "wasm32")]
-            Backend::Sparse {
-                app,
-                scope,
-                instance,
-                ..
-            } => {
-                let parent = instance
-                    .children(self.slot(outlet.0)?)
-                    .map_err(portable::failure)?;
-                content.install(scope, &ContentMount::sparse(app, scope, parent, instance))
-            }
-        }
+    fn child<C: Content>(&self, outlet: Outlet, content: C) -> UiResult {
+        let scope = self.outlet(outlet)?;
+        content.install(&scope, &UiContent(scope.downgrade()))
     }
 }
 
-/// Weak parent/host references shared by Each, Show, Content and lazy factories.
-#[doc(hidden)]
-#[derive(Clone)]
-pub struct ContentMount {
-    backend: Parent,
+#[cfg(target_arch = "wasm32")]
+pub(crate) struct SparseMount<'a> {
+    pub definition: &'a Compiled,
+    pub app: &'a crate::template::App,
+    pub scope: &'a Scope,
+    pub instance: &'a crate::template::Instance,
 }
-#[derive(Clone)]
-enum Parent {
-    Ui(glory_ui::WeakScope),
-    #[cfg(target_arch = "wasm32")]
-    Sparse {
-        app: crate::template::WeakApp,
-        owner: glory_core::InstanceId,
-        parent: crate::template::Children,
-        instance: crate::template::Instance,
-    },
-}
-pub(crate) enum Child {
-    Ui(glory_ui::Mounted),
-    #[cfg(target_arch = "wasm32")]
-    Sparse {
-        view: super::Mounted,
-        scope: Scope,
-    },
-}
-impl Child {
-    #[cfg(target_arch = "wasm32")]
-    fn ui(&self) -> Option<&glory_ui::Mounted> {
-        match self {
-            Self::Ui(child) => Some(child),
-            #[cfg(target_arch = "wasm32")]
-            _ => None,
-        }
+#[cfg(target_arch = "wasm32")]
+impl SparseMount<'_> {
+    fn slot(&self, name: &str) -> UiResult<u16> {
+        self.definition
+            .slot(name)
+            .map(|(slot, _)| slot)
+            .ok_or(glory_ui::Error::Gone)
     }
 }
-impl ContentMount {
-    pub(crate) fn ui(scope: &glory_ui::Scope) -> Self {
-        Self {
-            backend: Parent::Ui(scope.downgrade()),
+#[cfg(target_arch = "wasm32")]
+impl Mount for SparseMount<'_> {
+    fn text<V: TextValue + 'static>(&self, field: Field, mut value: V) -> UiResult {
+        let slot = self.slot(field.0)?;
+        if value.reactive_text() {
+            self.instance
+                .try_bind_values(self.scope, [slot], move || Ok([value.read_text()?]))
+                .map_err(portable::failure)
+        } else {
+            self.instance
+                .set(
+                    slot,
+                    glory_core::untracked(|| value.read_text()).map_err(portable::failure)?,
+                )
+                .map_err(portable::failure)
         }
     }
-    #[cfg(target_arch = "wasm32")]
-    fn sparse(
-        app: &crate::template::App,
-        scope: &Scope,
-        parent: crate::template::Children,
-        instance: &crate::template::Instance,
-    ) -> Self {
-        Self {
-            backend: Parent::Sparse {
-                app: app.downgrade(),
-                owner: scope.id(),
+    fn flag<V: BoolValue>(&self, field: Field, mut value: V) -> UiResult {
+        let slot = self.slot(field.0)?;
+        if value.reactive() {
+            self.instance
+                .bind_flag(self.scope, slot, move || value.read_bool())
+                .map_err(portable::failure)
+        } else {
+            let next = value.read_bool().map_err(portable::failure)?;
+            if next
+                != self
+                    .instance
+                    .flag_initial(slot)
+                    .map_err(portable::failure)?
+            {
+                self.instance
+                    .set_flag(slot, next)
+                    .map_err(portable::failure)?;
+            }
+            Ok(())
+        }
+    }
+    fn on(&self, click: Click, callback: impl FnMut() + 'static) -> UiResult {
+        self.instance
+            .on_click(self.slot(click.0)?, callback)
+            .map_err(portable::failure)
+    }
+    fn child<C: Content>(&self, outlet: Outlet, content: C) -> UiResult {
+        let parent = self
+            .instance
+            .children(self.slot(outlet.0)?)
+            .map_err(portable::failure)?;
+        content.install(
+            self.scope,
+            &SparseContent {
+                app: self.app.downgrade(),
+                owner: self.scope.id(),
                 parent,
-                instance: instance.clone(),
+                instance: self.instance.clone(),
             },
-        }
+        )
     }
-    pub(crate) fn mount<W: Widget>(&self, factory: impl FnOnce() -> W) -> UiResult<Child> {
-        match &self.backend {
-            Parent::Ui(parent) => Ok(Child::Ui(
-                parent
-                    .upgrade()
-                    .ok_or(glory_ui::Error::Gone)?
-                    .mount_with(factory)?,
-            )),
-            #[cfg(target_arch = "wasm32")]
-            Parent::Sparse { app, owner, .. } => {
-                let scope = owner.child_scope()?;
-                let view = super::mount(
-                    scope.enter(factory),
-                    &app.upgrade().map_err(portable::failure)?,
-                    &scope,
-                )
-                .map_err(portable::failure)?;
-                Ok(Child::Sparse { view, scope })
-            }
-        }
-    }
-    pub(crate) fn attach(&self, child: &Child) -> UiResult {
-        // UI construction already places roots; sparse construction is detached.
-        match child {
-            Child::Ui(_mounted) => Ok(()),
-            #[cfg(target_arch = "wasm32")]
-            Child::Sparse { .. } => self.place(child, None),
-        }
-    }
-    #[cfg(target_arch = "wasm32")]
-    pub(crate) fn place(&self, child: &Child, before: Option<&Child>) -> UiResult {
-        match (&self.backend, child) {
-            (Parent::Ui(_), Child::Ui(child)) => child.place_before(before.and_then(Child::ui)),
-            #[cfg(target_arch = "wasm32")]
-            (Parent::Sparse { parent, .. }, Child::Sparse { view, .. }) => view
-                .place(
-                    Some(parent),
-                    before.and_then(|before| match before {
-                        Child::Sparse { view, .. } => Some(view),
-                        _ => None,
-                    }),
-                )
-                .map_err(portable::failure),
-            #[cfg(target_arch = "wasm32")]
-            _ => Err(glory_ui::Error::Gone),
-        }
-    }
-    pub(crate) fn retain(&self, child: Child) -> UiResult {
-        match (&self.backend, child) {
-            (Parent::Ui(parent), child) => {
-                parent.upgrade().ok_or(glory_ui::Error::Gone)?.retain(child)
-            }
-            #[cfg(target_arch = "wasm32")]
-            (Parent::Sparse { instance, .. }, Child::Sparse { scope, .. }) => {
-                instance.retain_child(scope).map_err(portable::failure)
-            }
-            #[cfg(target_arch = "wasm32")]
-            _ => Err(glory_ui::Error::Gone),
-        }
-    }
-    pub(crate) fn report(&self, error: glory_ui::Error) {
-        match &self.backend {
-            Parent::Ui(parent) => {
-                if let Some(scope) = parent.upgrade() {
-                    scope.report_error(error);
-                }
-            }
-            #[cfg(target_arch = "wasm32")]
-            Parent::Sparse { instance, .. } => instance.fail(super::error(error)),
-        }
-    }
-    pub(crate) fn one<W: Widget>(&self, factory: impl FnOnce() -> W) -> UiResult {
-        let child = self.mount(factory)?;
+}
+
+/// Host-specific storage; Each/Show/Content keep one shared implementation.
+#[doc(hidden)]
+pub trait ContentMount: glory_ui::each::Mount {
+    type Child: 'static;
+    fn mount_widget<W: Widget>(&self, factory: impl FnOnce() -> W) -> UiResult<Self::Child>;
+    fn attach(&self, child: &Self::Child) -> UiResult;
+    fn retain(&self, child: Self::Child) -> UiResult;
+    fn report_error(&self, error: glory_ui::Error);
+    fn one<W: Widget>(&self, factory: impl FnOnce() -> W) -> UiResult {
+        let child = self.mount_widget(factory)?;
         self.attach(&child)?;
         self.retain(child)
     }
 }
 
-#[doc(hidden)]
-pub enum EachRow<O: glory_ui::each::Ownership> {
-    Ui(glory_ui::each::UiRow<O>),
-    #[cfg(target_arch = "wasm32")]
-    Sparse {
-        view: super::Mounted,
-        _scope: Scope,
-        _data: O::Sparse,
-    },
+#[derive(Clone)]
+pub(crate) struct UiContent(glory_ui::WeakScope);
+impl ContentMount for UiContent {
+    type Child = glory_ui::Mounted;
+    fn mount_widget<W: Widget>(&self, factory: impl FnOnce() -> W) -> UiResult<Self::Child> {
+        self.0
+            .upgrade()
+            .ok_or(glory_ui::Error::Gone)?
+            .mount_with(factory)
+    }
+    fn attach(&self, _: &Self::Child) -> UiResult {
+        Ok(())
+    }
+    fn retain(&self, child: Self::Child) -> UiResult {
+        self.0.upgrade().ok_or(glory_ui::Error::Gone)?.retain(child)
+    }
+    fn report_error(&self, error: glory_ui::Error) {
+        if let Some(scope) = self.0.upgrade() {
+            scope.report_error(error);
+        }
+    }
 }
-impl glory_ui::each::Mount for ContentMount {
-    type Row<O: glory_ui::each::Ownership> = EachRow<O>;
+impl glory_ui::each::Mount for UiContent {
+    type Row<O: glory_ui::each::Ownership> = glory_ui::each::UiRow<O>;
     fn mount<O: glory_ui::each::Ownership, W: Widget>(
         &self,
         factory: impl FnOnce(&Scope) -> W,
-    ) -> glory_ui::Result<EachRow<O>> {
-        match &self.backend {
-            Parent::Ui(parent) => {
-                let parent = parent.upgrade().ok_or(glory_ui::Error::Gone)?;
-                Ok(EachRow::Ui(glory_ui::each::Mount::mount::<O, _>(
-                    &glory_ui::each::UiMount::new(&parent),
-                    factory,
-                )?))
-            }
-            #[cfg(target_arch = "wasm32")]
-            Parent::Sparse { app, owner, .. } => {
-                let scope = owner.child_scope()?;
-                let data = O::sparse(&scope);
-                let widget = scope.enter(|| factory(O::sparse_parent(&scope, &data)));
-                let view = super::mount(widget, &app.upgrade().map_err(portable::failure)?, &scope)
-                    .map_err(portable::failure)?;
-                Ok(EachRow::Sparse {
-                    view,
-                    _scope: scope,
-                    _data: data,
-                })
-            }
-        }
+    ) -> UiResult<Self::Row<O>> {
+        let scope = self.0.upgrade().ok_or(glory_ui::Error::Gone)?;
+        glory_ui::each::Mount::mount::<O, W>(&glory_ui::each::UiMount::new(&scope), factory)
     }
     fn place<O: glory_ui::each::Ownership>(
         &self,
-        row: &EachRow<O>,
-        before: Option<&EachRow<O>>,
-    ) -> glory_ui::Result {
-        match (&self.backend, row) {
-            (Parent::Ui(parent), EachRow::Ui(row)) => {
-                let parent = parent.upgrade().ok_or(glory_ui::Error::Gone)?;
-                glory_ui::each::Mount::place(
-                    &glory_ui::each::UiMount::new(&parent),
-                    row,
-                    before.and_then(EachRow::ui),
-                )
-            }
-            #[cfg(target_arch = "wasm32")]
-            (Parent::Sparse { parent, .. }, EachRow::Sparse { view, .. }) => view
-                .place(Some(parent), before.and_then(EachRow::sparse))
-                .map_err(portable::failure),
-            #[cfg(target_arch = "wasm32")]
-            _ => Err(glory_ui::Error::Gone),
-        }
+        row: &Self::Row<O>,
+        before: Option<&Self::Row<O>>,
+    ) -> UiResult {
+        let scope = self.0.upgrade().ok_or(glory_ui::Error::Gone)?;
+        glory_ui::each::Mount::place(&glory_ui::each::UiMount::new(&scope), row, before)
     }
-    fn has_content<O: glory_ui::each::Ownership>(&self, row: &EachRow<O>) -> bool {
-        match (&self.backend, row) {
-            (Parent::Ui(parent), EachRow::Ui(row)) => parent.upgrade().is_some_and(|parent| {
-                glory_ui::each::Mount::has_content(&glory_ui::each::UiMount::new(&parent), row)
-            }),
-            #[cfg(target_arch = "wasm32")]
-            (Parent::Sparse { .. }, EachRow::Sparse { .. }) => true,
-            #[cfg(target_arch = "wasm32")]
-            _ => false,
-        }
+    fn has_content<O: glory_ui::each::Ownership>(&self, row: &Self::Row<O>) -> bool {
+        self.0.upgrade().is_some_and(|scope| {
+            glory_ui::each::Mount::has_content(&glory_ui::each::UiMount::new(&scope), row)
+        })
     }
     fn report(&self, error: glory_ui::Error) {
-        ContentMount::report(self, error);
+        self.report_error(error);
     }
 }
-impl<O: glory_ui::each::Ownership> EachRow<O> {
-    fn ui(&self) -> Option<&glory_ui::each::UiRow<O>> {
-        match self {
-            Self::Ui(row) => Some(row),
-            #[cfg(target_arch = "wasm32")]
-            _ => None,
-        }
+
+#[cfg(target_arch = "wasm32")]
+#[derive(Clone)]
+pub(crate) struct SparseContent {
+    app: crate::template::WeakApp,
+    owner: glory_core::InstanceId,
+    parent: crate::template::Children,
+    instance: crate::template::Instance,
+}
+#[cfg(target_arch = "wasm32")]
+pub(crate) struct SparseChild {
+    view: super::Mounted,
+    scope: Scope,
+}
+#[cfg(target_arch = "wasm32")]
+impl ContentMount for SparseContent {
+    type Child = SparseChild;
+    fn mount_widget<W: Widget>(&self, factory: impl FnOnce() -> W) -> UiResult<Self::Child> {
+        let scope = self.owner.child_scope()?;
+        let view = super::mount(
+            scope.enter(factory),
+            &self.app.upgrade().map_err(portable::failure)?,
+            &scope,
+        )
+        .map_err(portable::failure)?;
+        Ok(SparseChild { view, scope })
     }
-    #[cfg(target_arch = "wasm32")]
-    fn sparse(&self) -> Option<&super::Mounted> {
-        match self {
-            Self::Sparse { view, .. } => Some(view),
-            _ => None,
-        }
+    fn attach(&self, child: &Self::Child) -> UiResult {
+        child
+            .view
+            .place(Some(&self.parent), None)
+            .map_err(portable::failure)
+    }
+    fn retain(&self, child: Self::Child) -> UiResult {
+        self.instance
+            .retain_child(child.scope)
+            .map_err(portable::failure)
+    }
+    fn report_error(&self, error: glory_ui::Error) {
+        self.instance.fail(super::error(error));
+    }
+}
+#[cfg(target_arch = "wasm32")]
+pub(crate) struct SparseRow<O: glory_ui::each::Ownership> {
+    view: super::Mounted,
+    _scope: Scope,
+    _data: O::Sparse,
+}
+#[cfg(target_arch = "wasm32")]
+impl glory_ui::each::Mount for SparseContent {
+    type Row<O: glory_ui::each::Ownership> = SparseRow<O>;
+    fn mount<O: glory_ui::each::Ownership, W: Widget>(
+        &self,
+        factory: impl FnOnce(&Scope) -> W,
+    ) -> UiResult<Self::Row<O>> {
+        let scope = self.owner.child_scope()?;
+        let data = O::sparse(&scope);
+        let widget = scope.enter(|| factory(O::sparse_parent(&scope, &data)));
+        let view = super::mount(
+            widget,
+            &self.app.upgrade().map_err(portable::failure)?,
+            &scope,
+        )
+        .map_err(portable::failure)?;
+        Ok(SparseRow {
+            view,
+            _scope: scope,
+            _data: data,
+        })
+    }
+    fn place<O: glory_ui::each::Ownership>(
+        &self,
+        row: &Self::Row<O>,
+        before: Option<&Self::Row<O>>,
+    ) -> UiResult {
+        row.view
+            .place(Some(&self.parent), before.map(|row| &row.view))
+            .map_err(portable::failure)
+    }
+    fn has_content<O: glory_ui::each::Ownership>(&self, _: &Self::Row<O>) -> bool {
+        true
+    }
+    fn report(&self, error: glory_ui::Error) {
+        self.report_error(error);
     }
 }

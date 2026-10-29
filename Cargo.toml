@@ -33,6 +33,7 @@ categories = [
 codegen-units = 1
 lto = true
 opt-level = 'z'
+strip = "symbols"
 
 [workspace.lints.rust]
 # Glory's core does not need `unsafe`. The wasm-bindgen / web-sys path
