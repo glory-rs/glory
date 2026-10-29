@@ -163,15 +163,14 @@ mod browser {
                         text().content("second").class("branch-b"),
                     ))
                 }),
-                view().class("keyed").fill(each(
-                    order,
-                    |item| *item,
-                    |item, _| {
+                view()
+                    .class("keyed")
+                    .fill(each(order).key(|item| *item).children(|entry| {
+                        let item = entry.value;
                         input()
                             .name(item.map(|item| format!("key {item}")))
                             .value(item.map(|item| format!("item {item}")))
-                    },
-                )),
+                    })),
                 view().class("portal"),
                 widget(move |scope| {
                     let mounted = group()

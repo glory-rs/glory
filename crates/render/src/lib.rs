@@ -691,6 +691,8 @@ pub enum Event {
     },
     Reset,
     Activate,
+    /// An activation of an explicitly declared target in a display instance.
+    DisplayClick(u16),
     /// A request only: the application may keep controlled state open.
     Dismiss(DismissReason),
     /// Host preference, independent of an application's explicit appearance.
@@ -803,6 +805,7 @@ pub struct ScrollAck {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum EventKind {
+    DisplayClick,
     RichCommand,
     RichRejected,
     RichEdit,
@@ -847,6 +850,9 @@ pub enum EventKind {
     Resize,
     Anchor,
 }
+/// Finite event targets of one opaque display instance, not element identities.
+#[derive(Clone, Debug)]
+pub struct DisplayEvents(pub Vec<u16>);
 
 impl EventKind {
     /// Logical bubbling/ancestor observations can target Groups; direct physical
@@ -854,6 +860,14 @@ impl EventKind {
     /// can produce it (SSR records handlers for later browser adoption).
     pub fn validate_target<'a>(self, node: impl Into<DescriptorView<'a>>) -> Result<(), Error> {
         let node = node.into();
+        if self == Self::DisplayClick
+            && (!matches!(node.props, Props::Group)
+                || node.options.get::<DisplayEvents>().is_none())
+        {
+            return Err(Error::InvalidEvent(
+                "display activation requires a declared instance",
+            ));
+        }
         if matches!(
             self,
             Self::RichEdit | Self::RichSelection | Self::RichRejected | Self::RichCommand
@@ -1156,6 +1170,15 @@ impl Event {
     // One implementation for live descriptors and borrowed construction values;
     // conversion at the API boundary should not duplicate all event validation.
     fn validate_payload_view(&self, target: NodeId, node: DescriptorView<'_>) -> Result<(), Error> {
+        if let Self::DisplayClick(slot) = self
+            && (*slot >= 256
+                || !node
+                    .options
+                    .get::<DisplayEvents>()
+                    .is_some_and(|events| events.0.contains(slot)))
+        {
+            return Err(Error::InvalidEvent("undeclared display activation slot"));
+        }
         if let Self::RichRejected { revision } | Self::RichCommand { revision, .. } = self {
             let Props::RichEditor(editor) = node.props else {
                 return Err(Error::InvalidEvent("rich rejection requires its editor"));
@@ -1652,6 +1675,7 @@ impl Event {
             Self::Submit { .. } => EventKind::Submit,
             Self::Reset => EventKind::Reset,
             Self::Activate => EventKind::Activate,
+            Self::DisplayClick(_) => EventKind::DisplayClick,
             Self::Dismiss(_) => EventKind::Dismiss,
             Self::ColorSchemeChanged { .. } => EventKind::ColorSchemeChanged,
             Self::Keyboard { .. } => EventKind::Keyboard,
@@ -1765,6 +1789,11 @@ pub struct Receipt {
 /// after later commits. Capture results at that barrier, not from a newer tree.
 /// Errors may leave an applied prefix; adapters do not promise rollback.
 pub trait Render {
+    /// Commit adapter-owned display slots after semantic mutations and before
+    /// actions/queries. This does not allocate semantic element identities.
+    fn flush_display(&mut self) -> Result<(), Error> {
+        Ok(())
+    }
     /// Reject descriptor-local limitations before the App changes its logical
     /// tree or queues output. None checks creation; Some checks a patch against
     /// the supplied current descriptor, including earlier uncommitted changes.

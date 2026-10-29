@@ -72,6 +72,7 @@ softbuffer_window_renderer = { version = "=0.9.0", optional = true }
 fontique = { version = "=0.12.0", default-features = false, features = ["fontconfig-dlopen"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+glory-web = { path = "../web", version = "0.3.1" }
 glory-core = { path = "../core", version = "0.3.1" }
 glory-render = { path = "../render", version = "0.3.1", features = ["conformance"] }
 glory-ui = { path = "../ui", version = "0.3.1" }

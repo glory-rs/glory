@@ -43,6 +43,7 @@ fn mismatch(key: Option<u64>, reason: &'static str) -> HydrationError {
 }
 
 struct Candidate {
+    display: Option<super::display::Instance>,
     id: NodeId,
     key: u64,
     shape: Shape,
@@ -91,10 +92,31 @@ impl Validator<'_> {
         let children = model.children.clone();
         let shape = glory_html::shape_in(self.mapper.tree(), id)?;
         let mut parts = BTreeMap::new();
+        let mut display = None;
         let (first, last) = if shape.pieces.is_empty() {
             let first = self.comment(cursor, &format!("gly:s:{key}"), key)?;
-            for child in &children {
-                self.node(*child, cursor)?;
+            if let Some(glory_html::display::Placement::Root(frame)) = &shape.display {
+                let mut targets = vec![None; frame.compiled().slots.len()];
+                self.display_nodes(
+                    frame,
+                    key,
+                    &frame.tree(),
+                    &children,
+                    cursor,
+                    &mut Vec::new(),
+                    &mut targets,
+                )?;
+                display = Some(super::display::Instance {
+                    frame: frame.clone(),
+                    targets: targets
+                        .into_iter()
+                        .map(|node| node.ok_or_else(|| mismatch(Some(key), "display target")))
+                        .collect::<Result<_>>()?,
+                });
+            } else {
+                for child in &children {
+                    self.node(*child, cursor)?;
+                }
             }
             let last = self.comment(cursor, &format!("gly:e:{key}"), key)?;
             (first, last)
@@ -310,6 +332,7 @@ impl Validator<'_> {
             }
         }
         self.plan.entries.push(Candidate {
+            display,
             id,
             key,
             shape,
@@ -317,6 +340,116 @@ impl Validator<'_> {
             first,
             last,
         });
+        Ok(())
+    }
+    fn display_nodes(
+        &mut self,
+        frame: &Rc<glory_html::display::Frame>,
+        key: u64,
+        nodes: &[glory_html::display::Tree],
+        children: &[NodeId],
+        cursor: &mut Option<Node>,
+        path: &mut Vec<u16>,
+        targets: &mut [Option<Node>],
+    ) -> Result {
+        use glory_html::display::{Placement, Tree};
+        for (index, item) in nodes.iter().enumerate() {
+            path.push(index as u16);
+            let node = match item {
+                Tree::Text(expected) => {
+                    let marker = self.comment(cursor, "gly:dt", key)?;
+                    if let Some(node) = cursor
+                        .clone()
+                        .filter(|node| node.node_type() == Node::TEXT_NODE)
+                    {
+                        if node.node_value().as_deref() != Some(expected) {
+                            return Err(mismatch(Some(key), "display text"));
+                        }
+                        *cursor = node.next_sibling();
+                        node
+                    } else if expected.is_empty() {
+                        let node: Node = self.dom.document.create_text_node("").into();
+                        self.plan.empty.push(Empty {
+                            parent: marker.parent_node().expect("display text marker parent"),
+                            before: cursor.clone(),
+                            node: node.clone(),
+                        });
+                        node
+                    } else {
+                        return Err(mismatch(Some(key), "missing display text"));
+                    }
+                }
+                Tree::Element {
+                    tag,
+                    attrs,
+                    children: raw_children,
+                } => {
+                    let node = cursor
+                        .clone()
+                        .ok_or_else(|| mismatch(Some(key), "missing display element"))?;
+                    let element = node
+                        .dyn_ref::<Element>()
+                        .filter(|element| {
+                            element.local_name() == *tag
+                                && element.namespace_uri().as_deref()
+                                    == Some(glory_html::element_namespace(tag))
+                        })
+                        .ok_or_else(|| mismatch(Some(key), "display element tag"))?;
+                    if element.get_attribute_names().length() as usize != attrs.len()
+                        || attrs.iter().any(|(name, value)| {
+                            element.get_attribute(name).as_ref() != Some(value)
+                        })
+                    {
+                        return Err(mismatch(Some(key), "display attributes"));
+                    }
+                    let mut nested = node.first_child();
+                    self.display_nodes(
+                        frame,
+                        key,
+                        raw_children,
+                        children,
+                        &mut nested,
+                        path,
+                        targets,
+                    )?;
+                    if nested.is_some() {
+                        return Err(mismatch(Some(key), "extra display children"));
+                    }
+                    *cursor = node.next_sibling();
+                    node
+                }
+                Tree::Outlet(slot) => {
+                    let is_container = frame.compiled().slots[*slot as usize].kind
+                        == glory_html::template::Kind::Children;
+                    let mut marker = None;
+                    if is_container {
+                        marker =
+                            Some(self.comment(cursor, &format!("gly:slot:{key}:{slot}"), key)?);
+                    }
+                    for child in children {
+                        if matches!(self.mapper.tree().node(*child)?.descriptor.view().options.get::<Placement>(),Some(Placement::Outlet{frame:other,slot:other_slot}) if Rc::ptr_eq(frame,other)&&slot==other_slot)
+                        {
+                            self.node(*child, cursor)?;
+                        }
+                    }
+                    if let Some(marker) = marker {
+                        marker
+                    } else {
+                        self.comment(cursor, &format!("gly:slot:{key}:{slot}"), key)?
+                    }
+                }
+            };
+            for (slot, target_path) in frame.compiled().paths.iter().enumerate() {
+                if target_path == path
+                    && !(matches!(item, Tree::Outlet(_))
+                        && frame.compiled().slots[slot].kind
+                            == glory_html::template::Kind::Children)
+                {
+                    targets[slot] = Some(node.clone());
+                }
+            }
+            path.pop();
+        }
         Ok(())
     }
     fn piece(
@@ -588,6 +721,7 @@ pub fn hydrate_with<W: Widget>(root: Element, factory: impl FnOnce(&Scope) -> W)
             entry.parts,
             entry.first,
             entry.last,
+            entry.display,
         )?;
     }
     dom.adopt_files(&mut mapper.borrow_mut(), plan.file_adoptions)?;

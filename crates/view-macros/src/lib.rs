@@ -32,6 +32,7 @@ enum Node {
     Expr(Expr),
     Element {
         path: syn::Path,
+        factory: Option<Expr>,
         attrs: Vec<Attribute>,
         children: Vec<Node>,
         component: bool,
@@ -96,8 +97,18 @@ fn node(input: ParseStream<'_>, depth: usize) -> syn::Result<Node> {
         input.parse::<Token![>]>()?;
         return Ok(Node::Fragment(children));
     }
-    let tag = path(input)?;
-    let component = tag.segments.len() > 1
+    let factory = if input.peek(syn::token::Brace) {
+        Some(expression(input)?)
+    } else {
+        None
+    };
+    let tag = if let Some(factory) = &factory {
+        syn::parse_quote_spanned!(factory.span()=>__glory_factory)
+    } else {
+        path(input)?
+    };
+    let component = factory.is_some()
+        || tag.segments.len() > 1
         || tag
             .segments
             .last()
@@ -143,18 +154,21 @@ fn node(input: ParseStream<'_>, depth: usize) -> syn::Result<Node> {
         let children = nodes(input, depth + 1)?;
         input.parse::<Token![<]>()?;
         input.parse::<Token![/]>()?;
-        let closing = path(input)?;
-        if closing.to_token_stream().to_string() != tag.to_token_stream().to_string() {
-            return Err(syn::Error::new(
-                closing.span(),
-                "closing tag does not match opening tag",
-            ));
+        if factory.is_none() {
+            let closing = path(input)?;
+            if closing.to_token_stream().to_string() != tag.to_token_stream().to_string() {
+                return Err(syn::Error::new(
+                    closing.span(),
+                    "closing tag does not match opening tag",
+                ));
+            }
         }
         input.parse::<Token![>]>()?;
         children
     };
     Ok(Node::Element {
         path: tag,
+        factory,
         attrs,
         children,
         component,
@@ -186,6 +200,44 @@ struct Emitter {
     bytes: usize,
 }
 impl Emitter {
+    fn widget_sequence(&self, nodes: &[Node]) -> syn::Result<Option<Tokens>> {
+        if nodes.is_empty() {
+            return Ok(None);
+        }
+        let mut values = Vec::new();
+        for node in nodes {
+            match node {
+                Node::Element {
+                    path,
+                    factory,
+                    attrs,
+                    children,
+                    component: true,
+                    ..
+                } if !matches!(
+                    path.to_token_stream().to_string().as_str(),
+                    "Each" | "Show" | "Content"
+                ) =>
+                {
+                    values.push(self.component(path, factory.as_ref(), attrs, children)?);
+                }
+                Node::Fragment(children) => {
+                    let Some(value) = self.widget_sequence(children)? else {
+                        return Ok(None);
+                    };
+                    values.push(value);
+                }
+                _ => return Ok(None),
+            }
+        }
+        if values.len() == 1 {
+            return Ok(values.pop());
+        }
+        let api = &self.api;
+        Ok(Some(
+            quote!(#api::fragment(::std::vec![#(::std::boxed::Box::new(#values) as ::std::boxed::Box<dyn #api::Widget>),*])),
+        ))
+    }
     fn slot(&mut self, kind: &str) -> syn::Result<Tokens> {
         if self.slots >= 256 {
             return Err(syn::Error::new(
@@ -232,32 +284,71 @@ impl Emitter {
     fn component(
         &self,
         path: &syn::Path,
+        factory: Option<&Expr>,
         attrs: &[Attribute],
         children: &[Node],
     ) -> syn::Result<Tokens> {
         let api = &self.api;
-        let mut fields = Vec::new();
+        let mut setters = Vec::new();
+        let mut initial = factory
+            .map(|expr| quote!(#expr))
+            .unwrap_or_else(|| quote!(<#path as ::core::default::Default>::default()));
         for attr in attrs {
-            let ident = syn::parse_str::<Ident>(&attr.name).map_err(|_| {
-                syn::Error::new(attr.span, "component props must be Rust field names")
+            if attr.name == "init" {
+                if factory.is_some() {
+                    return Err(syn::Error::new(
+                        attr.span,
+                        "factory tags already specify their initializer",
+                    ));
+                }
+                let value = Self::value(&attr.value)?;
+                initial = quote!({let __glory_initial:#path=#value;__glory_initial});
+                continue;
+            }
+            let method = if attr.name == "children" {
+                "fill"
+            } else {
+                &attr.name
+            };
+            let ident = syn::parse_str::<Ident>(method).map_err(|_| {
+                syn::Error::new(
+                    attr.span,
+                    "widget properties must be Rust builder method names",
+                )
             })?;
+            if matches!(attr.value, Value::Flag) {
+                setters.push(quote_spanned!(attr.span=>.#ident()));
+                continue;
+            }
             let value = Self::value(&attr.value)?;
-            fields.push(quote_spanned!(attr.span=>#ident:#value));
+            setters.push(quote_spanned!(attr.span=>.#ident(#value)));
         }
         if !children.is_empty() {
-            if attrs.iter().any(|a| a.name == "children") {
+            if attrs
+                .iter()
+                .any(|a| matches!(a.name.as_str(), "children" | "fill"))
+            {
                 return Err(syn::Error::new(path.span(), "children supplied twice"));
             }
-            let nested = expand(
-                Input {
-                    api: api.clone(),
-                    nodes: children.to_vec(),
-                },
-                true,
-            )?;
-            fields.push(quote!(children:#api::child_content(#api::lazy(move || #nested))));
+            let nested = if let Some(widgets) = self.widget_sequence(children)? {
+                widgets
+            } else {
+                expand(
+                    Input {
+                        api: api.clone(),
+                        nodes: children.to_vec(),
+                    },
+                    true,
+                )?
+            };
+            setters.push(quote!(.fill(#api::defer(move || #nested))));
         }
-        Ok(quote!({type __GloryProps=<#path as #api::Component>::Props;__GloryProps{#(#fields),*}}))
+        let configured = quote!((#initial) #(#setters)*);
+        Ok(if factory.is_some() {
+            quote!(#api::defer(move || #configured))
+        } else {
+            configured
+        })
     }
     fn emit_nodes(
         &mut self,
@@ -317,6 +408,7 @@ impl Emitter {
             Node::Fragment(_) => unreachable!(),
             Node::Element {
                 path,
+                factory,
                 attrs,
                 children,
                 component,
@@ -347,7 +439,7 @@ impl Emitter {
                                 })
                         };
                         let allowed: &[&str] = match tag.as_str() {
-                            "Each" => &["each", "children"],
+                            "Each" => &["each", "key", "children", "seed"],
                             "Show" => &["when", "children", "fallback"],
                             _ => &["value"],
                         };
@@ -364,8 +456,25 @@ impl Emitter {
                                     ));
                                 }
                                 let source = get("each")?;
-                                let factory = get("children")?;
-                                quote!(#api::each(#source,#factory))
+                                let key = attrs
+                                    .iter()
+                                    .find(|a| a.name == "key")
+                                    .map(|a| Self::value(&a.value))
+                                    .transpose()?;
+                                let keyed = key.map(|key| quote!(.key(#key)));
+                                let seed = attrs.iter().any(|a| a.name == "seed");
+                                if seed && attrs.iter().any(|a| a.name == "children") {
+                                    return Err(syn::Error::new(
+                                        path.span(),
+                                        "Each accepts either children or seed",
+                                    ));
+                                }
+                                let factory = get(if seed { "seed" } else { "children" })?;
+                                if seed {
+                                    quote!(#api::each(#source)#keyed.seed(#factory))
+                                } else {
+                                    quote!(#api::each(#source)#keyed.children(#factory))
+                                }
                             }
                             "Show" => {
                                 let when = get("when")?;
@@ -402,17 +511,18 @@ impl Emitter {
                                         "Content uses value={view}",
                                     ));
                                 }
-                                get("value")?
+                                let value = get("value")?;
+                                quote!(#api::lazy({let __glory_content=#value;move || #api::fragment(__glory_content)}))
                             }
                         };
                         let outlet = self.slot("Outlet")?;
                         self.actions.push(quote!(.child(#outlet,#value)));
                         return Ok(quote!(#api::outlet(#outlet)));
                     }
-                    let props = self.component(path, attrs, children)?;
+                    let props = self.component(path, factory.as_ref(), attrs, children)?;
                     let outlet = self.slot("Outlet")?;
                     self.actions
-                        .push(quote!(.component::<#path>(#outlet,#props)));
+                        .push(quote!(.child(#outlet,#api::lazy({let __glory_widget=#props;move || __glory_widget}))));
                     return Ok(quote!(#api::outlet(#outlet)));
                 }
                 let tag = path.segments.last().unwrap().ident.to_string();
@@ -611,22 +721,8 @@ fn expand(input: Input, live: bool) -> syn::Result<Tokens> {
         count: 0,
         bytes: 0,
     };
-    if live
-        && input.nodes.len() == 1
-        && let Node::Element {
-            path,
-            attrs,
-            component: true,
-            children,
-            ..
-        } = &input.nodes[0]
-        && !matches!(
-            path.to_token_stream().to_string().as_str(),
-            "Each" | "Show" | "Content"
-        )
-    {
-        let props = emitter.component(path, attrs, children)?;
-        return Ok(quote!(#api::component::<#path>(#props)));
+    if live && let Some(widgets) = emitter.widget_sequence(&input.nodes)? {
+        return Ok(widgets);
     }
     let nodes = emitter.emit_nodes(&input.nodes, None, false)?;
     if nodes.is_empty() {

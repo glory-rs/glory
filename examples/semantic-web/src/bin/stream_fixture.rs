@@ -210,39 +210,40 @@ mod native {
         let mut body = if pressure {
             glory::ssr::stream_with(Resources::default(), Config::default(), |_, resources| {
                 let resources = resources.clone();
-                view().fill(each(
-                    (0_u64..24).collect::<Vec<_>>(),
-                    |id| *id,
-                    move |id, _| {
-                        let resources = resources.clone();
-                        let metrics = metrics.clone();
-                        widget(move |scope| {
-                            let id = id.get();
+                view().fill(
+                    each((0_u64..24).collect::<Vec<_>>())
+                        .key(|id| *id)
+                        .children(move |entry| {
+                            let id = entry.value;
+                            let resources = resources.clone();
                             let metrics = metrics.clone();
-                            let value = resources
-                                .bind(
-                                    scope.owner(),
-                                    &format!("pressure/{id}"),
-                                    "v1",
-                                    move || id,
-                                    move |_| {
-                                        let metrics = metrics.clone();
-                                        async move {
-                                            metrics.produced.fetch_add(1, Ordering::SeqCst);
-                                            Ok::<_, String>("x".repeat(256 * 1024))
-                                        }
-                                    },
-                                )
-                                .unwrap();
-                            text()
-                                .content(value.map(|state| match state {
-                                    ResourceState::Ready { value, .. } => value.to_string(),
-                                    _ => "pending".into(),
-                                }))
-                                .show_in(scope)
-                        })
-                    },
-                ))
+                            widget(move |scope| {
+                                let id = id.get();
+                                let metrics = metrics.clone();
+                                let value = resources
+                                    .bind(
+                                        scope.owner(),
+                                        &format!("pressure/{id}"),
+                                        "v1",
+                                        move || id,
+                                        move |_| {
+                                            let metrics = metrics.clone();
+                                            async move {
+                                                metrics.produced.fetch_add(1, Ordering::SeqCst);
+                                                Ok::<_, String>("x".repeat(256 * 1024))
+                                            }
+                                        },
+                                    )
+                                    .unwrap();
+                                text()
+                                    .content(value.map(|state| match state {
+                                        ResourceState::Ready { value, .. } => value.to_string(),
+                                        _ => "pending".into(),
+                                    }))
+                                    .show_in(scope)
+                            })
+                        }),
+                )
             })
         } else if page {
             let load: glory_semantic_web::streaming::Load = std::rc::Rc::new(move |id| {

@@ -12,11 +12,43 @@ const ROOT: AxId = AxId(0);
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 enum Key {
     Main(NodeId),
+    Display(NodeId, EngineId),
     Label(NodeId),
     TreeChildren(NodeId),
     SelectList(NodeId),
     SelectGroup(NodeId, usize),
     SelectOption(NodeId, usize),
+}
+
+// Template elements have physical/AX identities only. Semantic outlet ranges
+// rejoin the same traversal in their physical order.
+type Pending = (NodeId, AxId, Option<AxId>, Option<EngineId>);
+fn display_children(
+    state: &State,
+    owner: NodeId,
+    parent: AxId,
+    list: Option<AxId>,
+    physical: &[EngineId],
+) -> Result<Vec<Pending>, Error> {
+    let mut outlets = HashMap::new();
+    for child in &state.mapper.tree().node(owner)?.children {
+        let range = state.dom.range(*child)?;
+        outlets.insert(range.first, (*child, range.last));
+    }
+    let mut result = Vec::new();
+    let mut index = 0;
+    while let Some(node) = physical.get(index) {
+        if let Some((child, last)) = outlets.get(node) {
+            result.push((*child, parent, list, None));
+            while physical.get(index).is_some_and(|id| id != last) {
+                index += 1;
+            }
+        } else {
+            result.push((owner, parent, list, Some(*node)));
+        }
+        index += 1;
+    }
+    Ok(result)
 }
 
 struct Relations {
@@ -97,9 +129,9 @@ impl Tree {
             .roots()
             .iter()
             .rev()
-            .map(|id| (*id, ROOT, None))
+            .map(|id| (*id, ROOT, None, None))
             .collect();
-        while let Some((id, parent, list)) = pending.pop() {
+        while let Some((id, parent, list, raw)) = pending.pop() {
             let semantic = state.mapper.tree().node(id)?;
             if semantic.suspended
                 || !state.layers.ax_branch(state.mapper.tree(), id)
@@ -113,23 +145,135 @@ impl Tree {
                 continue;
             }
             let d = semantic.descriptor.view();
+            if let Some(physical) = raw {
+                let host = state
+                    .dom
+                    .doc
+                    .get_node(physical)
+                    .ok_or(Error::NodeGone(id))?;
+                if host.element_data().is_none() && !host.is_text_node() {
+                    continue;
+                }
+                if !host.flags.is_in_document()
+                    || host
+                        .primary_styles()
+                        .is_some_and(|s| s.clone_display().is_none())
+                {
+                    continue;
+                }
+                let children = host.children.clone();
+                let mut node = if let Some(element) = host.element_data() {
+                    if element.attr(blitz_dom::LocalName::from("aria-hidden")) == Some("true") {
+                        continue;
+                    }
+                    if host
+                        .primary_styles()
+                        .is_some_and(|s| s.clone_visibility() != Visibility::Visible)
+                    {
+                        pending.extend(
+                            display_children(state, id, parent, list, &children)?
+                                .into_iter()
+                                .rev(),
+                        );
+                        continue;
+                    }
+                    let tag = element.name.local.as_ref();
+                    let mut node = Node::new(match tag {
+                        "button" => AxRole::Button,
+                        "h1" => AxRole::Heading,
+                        "a" => AxRole::Link,
+                        "table" => AxRole::Table,
+                        "tr" => AxRole::Row,
+                        "td" => AxRole::Cell,
+                        _ => AxRole::GenericContainer,
+                    });
+                    if tag == "h1" {
+                        node.set_level(0);
+                    }
+                    if let Some(label) = element.attr(blitz_dom::LocalName::from("aria-label")) {
+                        node.set_label(label);
+                    } else if matches!(tag, "button" | "a" | "h1") {
+                        node.set_label(host.text_content());
+                    }
+                    if let Some((_, slot)) = state.dom.display_controls.get(&physical) {
+                        if element
+                            .attr(blitz_dom::LocalName::from("disabled"))
+                            .is_some()
+                            || !state.mapper.tree().enabled(id)
+                        {
+                            node.set_disabled();
+                        }
+                        if host.is_focussable() {
+                            node.add_action(AxAction::Focus);
+                        }
+                        if slot.is_some() {
+                            node.add_action(AxAction::Click);
+                        }
+                    }
+                    node
+                } else if host.is_text_node() {
+                    let text = host.text_content();
+                    if text.is_empty() {
+                        continue;
+                    }
+                    let mut node = Node::new(AxRole::Label);
+                    node.set_value(text);
+                    node
+                } else {
+                    continue;
+                };
+                // Blitz text nodes share their parent's inline layout; asking
+                // for a separate element box would panic in the pinned engine.
+                if host.element_data().is_some()
+                    && let Some(rect) = state.dom.doc.get_client_bounding_rect(physical)
+                {
+                    node.set_bounds(accesskit::Rect::new(
+                        rect.x,
+                        rect.y,
+                        rect.x + rect.width,
+                        rect.y + rect.height,
+                    ));
+                }
+                let key = Key::Display(id, physical);
+                let ax = self.id(key)?;
+                alive.insert(key);
+                nodes
+                    .get_mut(&parent)
+                    .expect("display AX parent")
+                    .push_child(ax);
+                nodes.insert(ax, node);
+                pending.extend(
+                    display_children(state, id, ax, list, &children)?
+                        .into_iter()
+                        .rev(),
+                );
+                continue;
+            }
             if !state.layers.allowed(state.mapper.tree(), id) {
                 pending.extend(
                     semantic
                         .children
                         .iter()
                         .rev()
-                        .map(|child| (*child, parent, list)),
+                        .map(|child| (*child, parent, list, None)),
                 );
                 continue;
             }
             if matches!(d.props, Props::Group) {
+                if state.dom.displays.contains_key(&id) {
+                    pending.extend(
+                        display_children(state, id, parent, list, &state.dom.nodes(id)?)?
+                            .into_iter()
+                            .rev(),
+                    );
+                    continue;
+                }
                 pending.extend(
                     semantic
                         .children
                         .iter()
                         .rev()
-                        .map(|child| (*child, parent, list)),
+                        .map(|child| (*child, parent, list, None)),
                 );
                 continue;
             }
@@ -156,7 +300,7 @@ impl Tree {
                         .children
                         .iter()
                         .rev()
-                        .map(|child| (*child, parent, list)),
+                        .map(|child| (*child, parent, list, None)),
                 );
                 continue;
             }
@@ -670,7 +814,7 @@ impl Tree {
                         .children
                         .iter()
                         .rev()
-                        .map(|child| (*child, ax_id, list)),
+                        .map(|child| (*child, ax_id, list, None)),
                 );
             }
         }
@@ -895,6 +1039,17 @@ impl Tree {
         let focus = state
             .focused
             .and_then(|id| self.ids.get(&Key::Main(id)).copied())
+            .or_else(|| {
+                state.dom.doc.get_focussed_node_id().and_then(|physical| {
+                    state
+                        .dom
+                        .display_controls
+                        .get(&physical)
+                        .and_then(|(owner, _)| {
+                            self.ids.get(&Key::Display(*owner, physical)).copied()
+                        })
+                })
+            })
             .unwrap_or(ROOT);
         let initial = full || self.previous.is_empty();
         let changed = nodes
@@ -919,6 +1074,65 @@ impl Tree {
             return Ok(false);
         }
         let key = self.reverse.get(&request.target_node).copied();
+        if let Some(Key::Display(owner, control)) = key {
+            if request.data.is_some()
+                || state
+                    .dom
+                    .display_controls
+                    .get(&control)
+                    .is_none_or(|(id, _)| *id != owner)
+                || !state.mapper.tree().active(owner)
+                || !state.mapper.tree().enabled(owner)
+                || !state.layers.allowed(state.mapper.tree(), owner)
+            {
+                return Ok(false);
+            }
+            state.dom.resolve();
+            if !state.dom.focus_visible(control)
+                || state
+                    .dom
+                    .doc
+                    .get_node(control)
+                    .and_then(|n| n.element_data())
+                    .is_none_or(|e| e.attr(blitz_dom::LocalName::from("disabled")).is_some())
+            {
+                return Ok(false);
+            }
+            match request.action {
+                AxAction::Focus => {
+                    if !focus_scope::allowed(state, owner) {
+                        return Ok(false);
+                    }
+                    if !state
+                        .dom
+                        .doc
+                        .get_node(control)
+                        .is_some_and(|node| node.is_focussable())
+                    {
+                        return Ok(false);
+                    }
+                    if state.dom.doc.set_focus_to(control) {
+                        state.dom.invalidate();
+                    }
+                }
+                AxAction::Click => {
+                    let Some((_, Some(slot))) = state.dom.display_controls.get(&control) else {
+                        return Ok(false);
+                    };
+                    if state
+                        .subscriptions
+                        .contains(&(owner, EventKind::DisplayClick))
+                    {
+                        state.inputs.push(Input::Event {
+                            node: owner,
+                            event: Event::DisplayClick(*slot),
+                        });
+                    }
+                }
+                _ => return Ok(false),
+            }
+            return Ok(true);
+        }
         if let Some(Key::SelectOption(id, index)) = key {
             let Some(select) = state.dom.ranges.get(&id).and_then(|r| r.select.as_ref()) else {
                 return Ok(false);

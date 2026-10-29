@@ -251,11 +251,10 @@ fn group_ranges_move_suspend_resume_and_dispose_offline_descendants() {
 fn keyed_reorders_keep_engine_inputs_and_do_not_replay_controlled_values() {
     let (app, renderer) = app();
     let keys = app.scope().cage(vec![1, 2, 3]);
-    app.mount(each(
-        keys,
-        |key| *key,
-        |key, _| input().value(key.map(|key| format!("row {key}"))),
-    ))
+    app.mount(each(keys).key(|key| *key).children(|entry| {
+        let key = entry.value;
+        input().value(key.map(|key| format!("row {key}")))
+    }))
     .unwrap();
     let parent = app.tree().roots()[0];
     let original = app.tree().node(parent).unwrap().children.clone();

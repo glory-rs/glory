@@ -4,6 +4,17 @@ module.exports=async function(page){
  const stats=()=>page.evaluate(()=>JSON.parse(window.app.structural_stats()));
  const live=s=>Object.fromEntries(Object.entries(s).filter(([k])=>!['structures','factories'].includes(k)));
  const baseline=await stats();
+ const vector=async n=>page.evaluate(n=>window.app.vector_action(n),n);
+ await page.locator('.vector-row').first().locator('.child-count').click();
+ await page.evaluate(async()=>{await new Promise(requestAnimationFrame);await new Promise(requestAnimationFrame);window.__vectorFirst=document.querySelector('.vector-row');});
+ await vector(0);
+ assert.deepEqual(await page.locator('.vector-key').allTextContents(),['2','1']);
+ assert.deepEqual(await page.locator('.vector-index').allTextContents(),['0','1']);
+ assert(await page.evaluate(()=>__vectorFirst===document.querySelectorAll('.vector-row')[1]));
+ assert.equal(await page.locator('.vector-row').last().locator('.child-count').textContent(),'1');
+ await vector(1);assert.equal(await page.locator('.vector-label').first().textContent(),'two!');
+ await vector(2);await vector(3);assert.equal(await page.locator('.vector-row').last().locator('.child-count').textContent(),'0');
+ await vector(0);await vector(1); // Restore row count/order; baseline graph must stay bounded.
  assert.deepEqual(await page.evaluate(()=>JSON.parse(window.app.structural_fault())),{failed:true,stopped:true,instances:0,records:0,nodes:0,owners:1,children:0});
  const prefix=await page.evaluate(()=>{const original=DOMTokenList.prototype.toggle;let calls=0;const order=[];DOMTokenList.prototype.toggle=function(...args){order.push(this.value);if(++calls===2)throw Error('flag prefix 2');return original.apply(this,args)};try{return {...JSON.parse(window.app.structural_flag_fault()),calls,order}}finally{DOMTokenList.prototype.toggle=original}});
  assert.deepEqual([prefix.failed,prefix.applied,prefix.nodes,prefix.owners,prefix.calls],[true,1,0,1,2]);

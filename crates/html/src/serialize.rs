@@ -32,8 +32,75 @@ pub fn serialize(tree: &Memory, key: impl Fn(NodeId) -> Option<u64>) -> Result<S
         let shape = crate::shape_in(tree, id)?;
         if shape.pieces.is_empty() {
             out.push_str(&format!("<!--gly:s:{key_value}-->"));
-            for child in &model.children {
-                node(tree, *child, key, out)?;
+            if let Some(crate::display::Placement::Root(frame)) = &shape.display {
+                for child in &model.children {
+                    if !matches!(tree.node(*child)?.descriptor.view().options.get::<crate::display::Placement>(),Some(crate::display::Placement::Outlet{frame:other,..}) if std::rc::Rc::ptr_eq(frame,other))
+                    {
+                        return Err(Error::InvalidPlacement("display child has no outlet"));
+                    }
+                }
+                fn display(
+                    nodes: &[crate::display::Tree],
+                    frame: &crate::display::Frame,
+                    parent: u64,
+                    out: &mut String,
+                    outlet: &mut dyn FnMut(u16, &mut String) -> Result<(), Error>,
+                ) -> Result<(), Error> {
+                    for item in nodes {
+                        match item {
+                            crate::display::Tree::Text(text) => {
+                                out.push_str("<!--gly:dt-->");
+                                out.push_str(&escape(text));
+                            }
+                            crate::display::Tree::Element {
+                                tag,
+                                attrs,
+                                children,
+                            } => {
+                                out.push('<');
+                                out.push_str(tag);
+                                for (name, value) in attrs {
+                                    out.push(' ');
+                                    out.push_str(name);
+                                    out.push_str("=\"");
+                                    out.push_str(&escape(value));
+                                    out.push('"');
+                                }
+                                out.push('>');
+                                display(children, frame, parent, out, outlet)?;
+                                out.push_str("</");
+                                out.push_str(tag);
+                                out.push('>');
+                            }
+                            crate::display::Tree::Outlet(slot) => {
+                                let marker = format!("<!--gly:slot:{parent}:{slot}-->");
+                                if frame.compiled().slots[*slot as usize].kind
+                                    == crate::template::Kind::Children
+                                {
+                                    out.push_str(&marker);
+                                    outlet(*slot, out)?;
+                                } else {
+                                    outlet(*slot, out)?;
+                                    out.push_str(&marker);
+                                }
+                            }
+                        }
+                    }
+                    Ok(())
+                }
+                display(&frame.tree(), frame, key_value, out, &mut |slot, out| {
+                    for child in &model.children {
+                        if matches!(tree.node(*child)?.descriptor.view().options.get::<crate::display::Placement>(),Some(crate::display::Placement::Outlet{frame:other,slot:other_slot}) if std::rc::Rc::ptr_eq(frame,other) && slot==*other_slot)
+                        {
+                            node(tree, *child, key, out)?;
+                        }
+                    }
+                    Ok(())
+                })?;
+            } else {
+                for child in &model.children {
+                    node(tree, *child, key, out)?;
+                }
             }
             out.push_str(&format!("<!--gly:e:{key_value}-->"));
         } else {

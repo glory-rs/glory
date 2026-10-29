@@ -116,10 +116,10 @@ pub fn widget(
                     text().class("stream-second").content(second.map(label))
                 })
                 .otherwise(|| text().class("stream-wait-second").content("waiting second")),
-                view().class("stream-keyed").fill(each(
-                    order,
-                    |key| *key,
-                    |item, _| {
+                view()
+                    .class("stream-keyed")
+                    .fill(each(order).key(|key| *key).children(|entry| {
+                        let item = entry.value;
                         glory::ui::widget(move |scope| {
                             let key = item.get();
                             let draft = scope.cage(format!("row {key}"));
@@ -133,8 +133,7 @@ pub fn widget(
                                 })
                                 .show_in(scope)
                         })
-                    },
-                )),
+                    })),
                 group().fill(glory::ui::widget(move |scope| {
                     let hidden = Rc::new(
                         group()

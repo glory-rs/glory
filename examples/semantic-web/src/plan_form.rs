@@ -35,49 +35,45 @@ pub fn ui(scope: &Scope) -> (impl Widget + use<>, State) {
     )
     .unwrap();
     let widget = view().class("plan-form").fill((
-        each(
-            rows,
-            |id| *id,
-            move |id, _| {
-                let (declaration, root, text, editor, check) = (
-                    declaration.clone(),
-                    root.clone(),
-                    text.clone(),
-                    editor.clone(),
-                    check.clone(),
-                );
-                widget(move |scope| {
-                    let id = id.get_untracked();
-                    let instance = scope.instantiate(&declaration)?;
-                    instance.class(&root, format!("plan-row plan-{id}"))?;
-                    instance.text(&text, caption)?;
-                    if id == 0 {
-                        instance.bind(&editor, value, |value| Patch::Value {
-                            value: Change::Set(value),
-                            revision: 0,
-                        })?;
-                        instance
-                            .bind(&check, checked, |value| Patch::Checked(Change::Set(value)))?;
-                        instance.on(&editor, EventKind::ValueChanged, move |event| {
-                            if let Event::ValueChanged { value: next, .. } = event {
-                                value.revise(|v| *v = next);
-                            }
-                        })?;
-                        instance.on(&check, EventKind::CheckedChanged, move |event| {
-                            if let Event::CheckedChanged(next) = event {
-                                checked.revise(|v| *v = next);
-                            }
-                        })?;
-                    } else {
-                        instance.bind(&editor, format!("other {id}"), |value| Patch::Value {
-                            value: Change::Set(value),
-                            revision: 0,
-                        })?;
-                    }
-                    Ok(())
-                })
-            },
-        ),
+        each(rows).key(|id| *id).children(move |entry| {
+            let id = entry.value;
+            let (declaration, root, text, editor, check) = (
+                declaration.clone(),
+                root.clone(),
+                text.clone(),
+                editor.clone(),
+                check.clone(),
+            );
+            widget(move |scope| {
+                let id = id.get_untracked();
+                let instance = scope.instantiate(&declaration)?;
+                instance.class(&root, format!("plan-row plan-{id}"))?;
+                instance.text(&text, caption)?;
+                if id == 0 {
+                    instance.bind(&editor, value, |value| Patch::Value {
+                        value: Change::Set(value),
+                        revision: 0,
+                    })?;
+                    instance.bind(&check, checked, |value| Patch::Checked(Change::Set(value)))?;
+                    instance.on(&editor, EventKind::ValueChanged, move |event| {
+                        if let Event::ValueChanged { value: next, .. } = event {
+                            value.revise(|v| *v = next);
+                        }
+                    })?;
+                    instance.on(&check, EventKind::CheckedChanged, move |event| {
+                        if let Event::CheckedChanged(next) = event {
+                            checked.revise(|v| *v = next);
+                        }
+                    })?;
+                } else {
+                    instance.bind(&editor, format!("other {id}"), |value| Patch::Value {
+                        value: Change::Set(value),
+                        revision: 0,
+                    })?;
+                }
+                Ok(())
+            })
+        }),
         widget(move |scope| {
             scope.instantiate(&fallback)?;
             scope.instantiate(&file_root)?;

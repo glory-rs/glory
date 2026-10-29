@@ -1,4 +1,5 @@
 //! Common HTML lowering. No UI/core runtime, DOM, HTTP or window dependencies.
+pub mod display;
 mod graphic;
 mod mapping;
 mod patch;
@@ -55,7 +56,7 @@ use std::collections::{BTreeMap, HashMap};
 pub use mapping::{preflight, shape, shape_in};
 pub use serialize::{escape, rich_document, select_options, serialize};
 pub use styles::style;
-pub const FORMAT_VERSION: u32 = 13;
+pub const FORMAT_VERSION: u32 = 14;
 /// Namespace is determined solely by the mapper's finite element vocabulary.
 pub fn element_namespace(tag: &str) -> &'static str {
     if matches!(tag, "svg" | "path") {
@@ -188,6 +189,7 @@ pub struct SelectOptions {
 }
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Shape {
+    pub display: Option<display::Placement>,
     /// Empty pieces describe a comment-delimited Group, not an element.
     pub pieces: Vec<Piece>,
     pub select_options: Option<SelectOptions>,
@@ -530,6 +532,113 @@ pub fn preflight_place(
     child: Subtree<'_>,
     parent: Option<NodeId>,
 ) -> Result<(), Error> {
+    let descriptor = match child {
+        Subtree::New(descriptor) => Some(descriptor),
+        Subtree::Existing(id) => Some(tree.node(id)?.descriptor.view()),
+        _ => None,
+    };
+    if let Some(parent) = parent
+        && let Some(display::Placement::Root(frame)) = tree
+            .node(parent)?
+            .descriptor
+            .view()
+            .options
+            .get::<display::Placement>()
+        && !matches!(descriptor.and_then(|d|d.options.get::<display::Placement>()),Some(display::Placement::Outlet{frame:child_frame,slot}) if std::rc::Rc::ptr_eq(frame,child_frame)&&frame.compiled().slots.get(*slot as usize).is_some_and(|slot|matches!(slot.kind,template::Kind::Children|template::Kind::Range)))
+    {
+        return Err(Error::InvalidPlacement(
+            "display root children require their declared outlet",
+        ));
+    }
+    if let Subtree::Plan(plan) = child
+        && plan.nodes().iter().any(|node| {
+            node.descriptor
+                .view()
+                .options
+                .get::<display::Placement>()
+                .is_some()
+        })
+    {
+        return Err(Error::InvalidProps(
+            "display instance state cannot be shared in a static Plan",
+        ));
+    }
+    let mut cursor = parent;
+    let mut raw_context = None;
+    while let Some(id) = cursor {
+        let node = tree.node(id)?;
+        let descriptor = node.descriptor.view();
+        if let Some(display::Placement::Outlet { frame, slot }) =
+            descriptor.options.get::<display::Placement>()
+        {
+            raw_context = frame.context(*slot);
+            break;
+        }
+        if let Some(tag) = mapping::physical_tag(descriptor)? {
+            if let Some(display::Placement::Root(frame)) = match child {
+                Subtree::New(descriptor) => descriptor.options.get::<display::Placement>(),
+                Subtree::Existing(id) => tree
+                    .node(id)?
+                    .descriptor
+                    .view()
+                    .options
+                    .get::<display::Placement>(),
+                _ => None,
+            } && !frame.accepts(tag)
+            {
+                return Err(Error::InvalidPlacement(
+                    "display template physical parent context",
+                ));
+            }
+            break;
+        }
+        cursor = node.parent;
+    }
+    if let Some(context) = raw_context {
+        let check = |descriptor: glory_render::DescriptorView<'_>| -> Result<(), Error> {
+            if let Some(display::Placement::Root(frame)) =
+                descriptor.options.get::<display::Placement>()
+            {
+                if !frame.accepts(context) {
+                    return Err(Error::InvalidPlacement(
+                        "display template root content context",
+                    ));
+                }
+            } else if let Some(tag) = mapping::physical_tag(descriptor)? {
+                let accepted = match context {
+                    "table" => matches!(tag, "tbody" | "thead" | "tfoot" | "caption" | "colgroup"),
+                    "tbody" => tag == "tr",
+                    "tr" => matches!(tag, "td" | "th"),
+                    _ => !matches!(tag, "tbody" | "thead" | "tfoot" | "tr" | "td" | "th"),
+                };
+                if !accepted {
+                    return Err(Error::InvalidPlacement("widget root content context"));
+                }
+            }
+            Ok(())
+        };
+        match child {
+            Subtree::New(descriptor) => check(descriptor)?,
+            Subtree::Existing(id) => {
+                let mut pending = vec![id];
+                while let Some(id) = pending.pop() {
+                    let node = tree.node(id)?;
+                    let descriptor = node.descriptor.view();
+                    check(descriptor)?;
+                    if mapping::physical_tag(descriptor)?.is_none()
+                        && descriptor.options.get::<display::Placement>().is_none()
+                    {
+                        pending.extend(node.children.iter().copied());
+                    }
+                }
+            }
+            Subtree::Plan(plan) => {
+                for node in plan.nodes().iter().filter(|node| node.parent.is_none()) {
+                    check(node.descriptor.view())?;
+                }
+            }
+        }
+    }
     if let Subtree::Existing(id) = child {
         tree.node(id)?;
     }
@@ -542,7 +651,9 @@ pub fn preflight_place(
         let node = tree.node(ancestor)?;
         button |= matches!(
             node.descriptor.view().props,
-            glory_render::Props::Button(_) | glory_render::Props::File(_)
+            glory_render::Props::Button(_)
+                | glory_render::Props::File(_)
+                | glory_render::Props::Link(_)
         );
         cursor = node.parent;
     }
@@ -552,6 +663,14 @@ pub fn preflight_place(
     // do not scan their subtree.
     if button || matches!(child, Subtree::Plan(_)) {
         let check = |descriptor: glory_render::DescriptorView<'_>| {
+            if let Some(display::Placement::Root(frame)) =
+                descriptor.options.get::<display::Placement>()
+                && !frame.phrasing()
+            {
+                return Err(Error::InvalidProps(
+                    "interactive widget display content must be text or spans without dynamic outlets",
+                ));
+            }
             if matches!(descriptor.props, glory_render::Props::Text(_))
                 && descriptor
                     .options

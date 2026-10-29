@@ -1,3 +1,5 @@
+> 历史实现记录：文中的 Component/Props/IntoView 接口已于 2026-10-29 被统一的 Widget 契约取代；旧 raw-template AST、Source 和独立编译器也已移除。当前 API 见 [统一 Widget DSL](v2-widget-dsl-unification-2026-10-29.md)。
+
 # v2 手写显示 API 与 XML DSL
 
 日期：2026-10-28。状态：手写 API 与首版 XML 前端均已实现，并完成真实浏览器等价验收。

@@ -39,6 +39,18 @@ limited to Salvo.
   same runtime; `Each`, `Show`, content ranges, component children and optional
   `#[component]` cover ordinary browser composition. See the
   [counter/list example](examples/display-web/src/bin/counter.rs).
+  Component tags now use the same `Widget` contract as Sapid and handwritten
+  widgets: `<sapid::Button label="Save"/>` calls its ordinary builder.
+  `#[component]` generates a Widget builder; there is no separate Component or
+  IntoView trait. See the [unified Widget DSL guide](docs/v2-widget-dsl-unification-2026-10-29.md).
+  Existing factories use `<{button(args)}/>`; mixed HTML/Widget trees work in
+  synchronous SSR snapshots, browser launch/hydration and the native Widget host.
+  Raw elements retain sparse template state. Incremental SSR shares template
+  declarations, streams slot and Widget edits, then hands the final DOM to hydration.
+  The legacy template AST/compiler and duplicate content controllers are retired;
+  both frontends share checked declarations, binding actions and keyed/branch logic.
+  [Unified Each](docs/v2-unified-each-2026-10-29.md) accepts vectors/Vary and
+  KeyedList through the same builder and DSL key/children/seed contract.
 - `glory-style`: explicit portable style values, separate from CSS engines.
   Ordered `Family` fallbacks, fractional font weights, `WhiteSpace`, border
   width/style/color, uniform `radius` and group `opacity` use the same mapping

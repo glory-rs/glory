@@ -5,27 +5,7 @@ pub trait BoolValue: sealed::Flag + 'static {
     fn reactive(&self) -> bool {
         true
     }
-    fn read_bool(&mut self) -> bool;
-    #[cfg(target_arch = "wasm32")]
-    fn install_bool(
-        mut self,
-        instance: &crate::template::Instance,
-        owner: &Scope,
-        slot: u16,
-    ) -> Result<()>
-    where
-        Self: Sized + 'static,
-    {
-        if self.reactive() {
-            instance.bind_flag(owner, slot, move || self.read_bool())
-        } else {
-            let next = self.read_bool();
-            if next != instance.flag_initial(slot)? {
-                instance.set_flag(slot, next)?;
-            }
-            Ok(())
-        }
-    }
+    fn read_bool(&mut self) -> Result<bool>;
 }
 impl sealed::Flag for bool {}
 impl BoolValue for bool {
@@ -35,8 +15,8 @@ impl BoolValue for bool {
     fn reactive(&self) -> bool {
         false
     }
-    fn read_bool(&mut self) -> bool {
-        *self
+    fn read_bool(&mut self) -> Result<bool> {
+        Ok(*self)
     }
 }
 macro_rules! flag_handle {
@@ -46,8 +26,8 @@ macro_rules! flag_handle {
             fn validate_bool(&self, r: RuntimeId) -> Result<()> {
                 TextValue::validate(self, r)
             }
-            fn read_bool(&mut self) -> bool {
-                self.get()
+            fn read_bool(&mut self) -> Result<bool> {
+                self.try_get().map_err(error)
             }
         }
     };
@@ -62,8 +42,8 @@ impl BoolValue for Vary<bool> {
     fn reactive(&self) -> bool {
         self.is_reactive()
     }
-    fn read_bool(&mut self) -> bool {
-        self.get()
+    fn read_bool(&mut self) -> Result<bool> {
+        self.try_get().map_err(error)
     }
 }
 impl<F: FnMut() -> bool + 'static> sealed::Flag for Computed<F> {}
@@ -71,7 +51,7 @@ impl<F: FnMut() -> bool + 'static> BoolValue for Computed<F> {
     fn validate_bool(&self, _: RuntimeId) -> Result<()> {
         Ok(())
     }
-    fn read_bool(&mut self) -> bool {
-        (self.0)()
+    fn read_bool(&mut self) -> Result<bool> {
+        Ok((self.0)())
     }
 }

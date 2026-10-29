@@ -1634,6 +1634,7 @@ dependencies = [
  "glory-html",
  "glory-render",
  "glory-ui",
+ "glory-web",
  "image",
  "jni",
  "keyboard-types",
@@ -1722,6 +1723,7 @@ dependencies = [
  "glory-render",
  "glory-resource",
  "glory-ui",
+ "glory-web",
  "serde_json",
 ]
 

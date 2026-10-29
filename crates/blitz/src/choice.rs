@@ -258,7 +258,12 @@ pub(super) fn pointer(
     }
     let related = related
         .and_then(|engine| state.dom.owner(engine))
-        .filter(|id| state.mapper.tree().active(*id));
+        .filter(|id| {
+            state.mapper.tree().active(*id)
+                && state.mapper.tree().node(*id).is_ok_and(|node| {
+                    !matches!(node.descriptor.view().props, glory_render::Props::Group)
+                })
+        });
     if related == Some(id) {
         return;
     }

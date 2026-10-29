@@ -3,7 +3,7 @@ use glory::display::*;
 const BODY: Outlet = Outlet::new("rows");
 #[path = "declarations.rs"]
 mod declarations;
-pub fn view(model: Model) -> impl IntoView {
+pub fn view(model: Model) -> impl Widget {
     let rows = model.rows;
     let row_model = model.clone();
     glory::display::view(&declarations::PANEL)
@@ -15,7 +15,7 @@ pub fn view(model: Model) -> impl IntoView {
         .on_click(declarations::SWAP, model.handler(5))
         .child(
             BODY,
-            each(rows, move |row| {
+            each(rows).children(move |row| {
                 let id = *row.key();
                 glory::display::view(&declarations::ROW)
                     .class_when(declarations::CLASS, computed(row_model.is_selected(id)))

@@ -74,7 +74,7 @@ const evidence={runs:[]},save=()=>fs.writeFileSync(path.join(output,'evidence.js
    await click('.toggle');assert.equal(await page.locator('.counter').count(),0);await click('.toggle');assert.equal(await page.locator('.counter>.value').textContent(),'0');
    await click('.clear');assert.equal(await page.locator('.total').textContent(),'0');assert.equal(await page.locator('.item').count(),0);assert.deepEqual(errors,[]);
    await page.screenshot({path:path.join(output,'counter.png')});evidence.counter={passed:true,component:true,each:true,field_edit:true,class_flag:true,branch_reset:true,identity:true,errors};save();await context.close();
-   console.log('Accepted ordinary counter/list example: launch, Props, children, Each, field edits, class flags and branch reset');
+   console.log('Accepted ordinary counter/list example: Widget launch, typed setters, children, Each, field edits, class flags and branch reset');
   }
   const rowRoute=process.env.GLORY_ROWS_SITE||'compat-row/site/glory';
   const rowSite=path.join(root,rowRoute);

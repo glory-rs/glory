@@ -1,287 +1,78 @@
-//! Structural content shared by handwritten configurations and XML lowering.
+//! One content/controller implementation, with physical mounting supplied by adapters.
+use super::mounting::ContentMount;
 use super::*;
-use glory_core::{KeyedEntry, KeyedList};
-use std::hash::Hash;
 
 pub trait Content: sealed::Content {
     fn validate(&self, scope: &Scope) -> Result<()>;
-    #[cfg(target_arch = "wasm32")]
-    fn install(
-        self,
-        app: &crate::template::App,
-        scope: &Scope,
-        parent: &crate::template::Children,
-        instance: &crate::template::Instance,
-    ) -> Result<()>;
+    #[doc(hidden)]
+    fn install(self, scope: &Scope, parent: &ContentMount) -> glory_ui::Result;
 }
-impl<A: Actions> sealed::Content for View<A> {}
-impl<A: Actions> Content for View<A> {
-    fn validate(&self, s: &Scope) -> Result<()> {
-        self.validate(s)
-    }
-    #[cfg(target_arch = "wasm32")]
-    fn install(
-        self,
-        a: &crate::template::App,
-        s: &Scope,
-        p: &crate::template::Children,
-        i: &crate::template::Instance,
-    ) -> Result<()> {
-        let child = s.child();
-        let view = child.enter(|| self.mount(a, &child))?;
-        view.place(Some(p), None)?;
-        i.retain_child(child)
-    }
-}
-impl<C: Component> sealed::Content for ComponentView<C> {}
-impl<C: Component> Content for ComponentView<C> {
+impl sealed::Content for glory_ui::Children {}
+impl Content for glory_ui::Children {
     fn validate(&self, _: &Scope) -> Result<()> {
         Ok(())
     }
-    #[cfg(target_arch = "wasm32")]
-    fn install(
-        self,
-        a: &crate::template::App,
-        s: &Scope,
-        p: &crate::template::Children,
-        i: &crate::template::Instance,
-    ) -> Result<()> {
-        let child = s.child();
-        let view = self.mount(a, &child)?;
-        view.place(Some(p), None)?;
-        i.retain_child(child)
-    }
-}
-impl<V: Content> sealed::Content for Option<V> {}
-impl<V: Content> Content for Option<V> {
-    fn validate(&self, s: &Scope) -> Result<()> {
-        self.as_ref().map_or(Ok(()), |v| v.validate(s))
-    }
-    #[cfg(target_arch = "wasm32")]
-    fn install(
-        self,
-        a: &crate::template::App,
-        s: &Scope,
-        p: &crate::template::Children,
-        i: &crate::template::Instance,
-    ) -> Result<()> {
-        self.map_or(Ok(()), |v| v.install(a, s, p, i))
-    }
-}
-impl<V: Content> sealed::Content for Vec<V> {}
-impl<V: Content> Content for Vec<V> {
-    fn validate(&self, s: &Scope) -> Result<()> {
-        for v in self {
-            v.validate(s)?
-        }
-        Ok(())
-    }
-    #[cfg(target_arch = "wasm32")]
-    fn install(
-        self,
-        a: &crate::template::App,
-        s: &Scope,
-        p: &crate::template::Children,
-        i: &crate::template::Instance,
-    ) -> Result<()> {
-        for v in self {
-            v.install(a, s, p, i)?
+    fn install(self, _: &Scope, parent: &ContentMount) -> glory_ui::Result {
+        for child in self.into_widgets() {
+            parent.one(move || child)?;
         }
         Ok(())
     }
 }
-
-/// Type-erased, single-use component children, independent of HTML node types.
-pub struct ChildContent {
-    validate: Box<dyn Fn(&Scope) -> Result<()>>,
-    #[cfg(target_arch = "wasm32")]
-    mount: Box<
-        dyn FnOnce(
-            &crate::template::App,
-            &Scope,
-            &crate::template::Children,
-            &crate::template::Instance,
-        ) -> Result<()>,
-    >,
+impl<A: Actions + 'static> sealed::Content for View<A> {}
+impl<A: Actions + 'static> Content for View<A> {
+    fn validate(&self, scope: &Scope) -> Result<()> {
+        self.validate(scope)
+    }
+    fn install(self, _: &Scope, parent: &ContentMount) -> glory_ui::Result {
+        parent.one(move || self)
+    }
 }
-pub fn child_content<C: Content + 'static>(content: C) -> ChildContent {
-    #[cfg(target_arch = "wasm32")]
-    {
-        let content = std::rc::Rc::new(std::cell::RefCell::new(Some(content)));
-        let validation = content.clone();
-        ChildContent {
-            validate: Box::new(move |s| {
-                validation
-                    .borrow()
-                    .as_ref()
-                    .ok_or_else(|| error("children already consumed"))?
-                    .validate(s)
-            }),
-            mount: Box::new(move |a, s, p, i| {
-                content
-                    .borrow_mut()
-                    .take()
-                    .ok_or_else(|| error("children already consumed"))?
-                    .install(a, s, p, i)
-            }),
+impl<C: Content> sealed::Content for Option<C> {}
+impl<C: Content> Content for Option<C> {
+    fn validate(&self, scope: &Scope) -> Result<()> {
+        self.as_ref()
+            .map_or(Ok(()), |content| content.validate(scope))
+    }
+    fn install(self, scope: &Scope, parent: &ContentMount) -> glory_ui::Result {
+        self.map_or(Ok(()), |content| content.install(scope, parent))
+    }
+}
+impl<C: Content> sealed::Content for Vec<C> {}
+impl<C: Content> Content for Vec<C> {
+    fn validate(&self, scope: &Scope) -> Result<()> {
+        for content in self {
+            content.validate(scope)?;
         }
+        Ok(())
     }
-    #[cfg(not(target_arch = "wasm32"))]
-    {
-        ChildContent {
-            validate: Box::new(move |s| content.validate(s)),
+    fn install(self, scope: &Scope, parent: &ContentMount) -> glory_ui::Result {
+        for content in self {
+            content.install(scope, parent)?;
         }
+        Ok(())
     }
 }
-impl sealed::Content for ChildContent {}
-impl Content for ChildContent {
-    fn validate(&self, s: &Scope) -> Result<()> {
-        (self.validate)(s)
-    }
-    #[cfg(target_arch = "wasm32")]
-    fn install(
-        self,
-        a: &crate::template::App,
-        s: &Scope,
-        p: &crate::template::Children,
-        i: &crate::template::Instance,
-    ) -> Result<()> {
-        (self.mount)(a, s, p, i)
-    }
-}
-
-pub struct Each<K: 'static, T: 'static, F> {
-    source: KeyedList<K, T>,
-    #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
-    factory: F,
-}
-pub fn each<K, T, F, V>(source: KeyedList<K, T>, factory: F) -> Each<K, T, F>
+impl<S, F, W> sealed::Content for glory_ui::Each<S, F>
 where
-    K: Clone + Eq + Hash + 'static,
-    T: 'static,
-    F: FnMut(KeyedEntry<K, T>) -> V + 'static,
-    V: IntoView,
+    S: glory_ui::each::source::Source,
+    F: FnMut(S::Row) -> W + 'static,
+    W: Widget,
 {
-    Each { source, factory }
 }
-impl<K, T, F> sealed::Content for Each<K, T, F> {}
-impl<K, T, F, V> Content for Each<K, T, F>
+impl<S, F, W> Content for glory_ui::Each<S, F>
 where
-    K: Clone + Eq + Hash + 'static,
-    T: 'static,
-    F: FnMut(KeyedEntry<K, T>) -> V + 'static,
-    V: IntoView,
+    S: glory_ui::each::source::Source,
+    F: FnMut(S::Row) -> W + 'static,
+    W: Widget,
 {
-    fn validate(&self, s: &Scope) -> Result<()> {
-        if self.source.runtime() != s.runtime() || !self.source.is_alive() {
-            return Err(error("foreign or disposed list"));
-        }
-        Ok(())
+    fn validate(&self, scope: &Scope) -> Result<()> {
+        glory_ui::Each::validate(self, scope).map_err(error)
     }
-    #[cfg(target_arch = "wasm32")]
-    fn install(
-        self,
-        a: &crate::template::App,
-        s: &Scope,
-        p: &crate::template::Children,
-        i: &crate::template::Instance,
-    ) -> Result<()> {
-        use glory_ui::list::{Cache, RowHost};
-        struct Row {
-            view: Mounted,
-            _scope: Scope,
-        }
-        struct Host<K: 'static, T: 'static, F> {
-            source: KeyedList<K, T>,
-            tokens: Vec<glory_core::RowToken<K>>,
-            factory: F,
-            app: crate::template::WeakApp,
-            owner: glory_core::InstanceId,
-            parent: crate::template::Children,
-            fault: Option<Error>,
-        }
-        impl<K, T, F, V> RowHost for Host<K, T, F>
-        where
-            K: Clone + Eq + Hash + 'static,
-            T: 'static,
-            F: FnMut(KeyedEntry<K, T>) -> V + 'static,
-            V: IntoView,
-        {
-            type Key = u64;
-            type Row = Option<Row>;
-            fn key(&mut self, index: usize) -> u64 {
-                self.tokens[index].id()
-            }
-            fn mount(&mut self, index: usize, _: &u64) -> Option<Row> {
-                if self.fault.is_some() {
-                    return None;
-                }
-                let result = (|| {
-                    let scope = self.owner.child_scope().map_err(error)?;
-                    let entry = self.source.entry(&self.tokens[index]).map_err(error)?;
-                    let view = scope
-                        .enter(|| (self.factory)(entry))
-                        .mount(&self.app.upgrade()?, &scope)?;
-                    Ok(Row {
-                        view,
-                        _scope: scope,
-                    })
-                })();
-                match result {
-                    Ok(row) => Some(row),
-                    Err(e) => {
-                        self.fault = Some(e);
-                        None
-                    }
-                }
-            }
-            fn update(&mut self, _: usize, _: &u64, _: &mut Option<Row>) {}
-            fn has_content(&self, row: &Option<Row>) -> bool {
-                row.is_some()
-            }
-            fn place(&mut self, row: &Option<Row>, before: Option<&Option<Row>>) {
-                if self.fault.is_none()
-                    && let Some(row) = row
-                    && let Err(e) = row.view.place(
-                        Some(&self.parent),
-                        before.and_then(|r| r.as_ref().map(|r| &r.view)),
-                    )
-                {
-                    self.fault = Some(e)
-                }
-            }
-            fn dispose(&mut self, row: Option<Row>) {
-                drop(row)
-            }
-        }
-        let source = self.source;
-        let mut host = Host {
-            source,
-            tokens: Vec::new(),
-            factory: self.factory,
-            app: a.downgrade(),
-            owner: s.id(),
-            parent: p.clone(),
-            fault: None,
-        };
-        let mut cache = Cache::default();
-        let mut revision = 0u64;
-        let instance = i.clone();
-        s.structural(move || {
-            host.tokens = source.with_order(<[_]>::to_vec);
-            revision = revision.checked_add(1).expect("list revision exhausted");
-            if let Err(e) = cache.reconcile(0..host.tokens.len(), revision, &mut host) {
-                host.fault = Some(error(e))
-            }
-            if let Some(e) = host.fault.take() {
-                instance.fail(e)
-            }
-        });
-        Ok(())
+    fn install(self, scope: &Scope, parent: &ContentMount) -> glory_ui::Result {
+        glory_ui::Each::install(self, scope, parent.clone())
     }
 }
-
-#[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
 pub struct Show<C, F, G> {
     condition: C,
     yes: F,
@@ -292,8 +83,8 @@ where
     C: FnMut() -> bool + 'static,
     F: FnMut() -> V + 'static,
     G: FnMut() -> W + 'static,
-    V: IntoView,
-    W: IntoView,
+    V: Widget,
+    W: Widget,
 {
     Show { condition, yes, no }
 }
@@ -303,102 +94,57 @@ where
     C: FnMut() -> bool + 'static,
     F: FnMut() -> V + 'static,
     G: FnMut() -> W + 'static,
-    V: IntoView,
-    W: IntoView,
+    V: Widget,
+    W: Widget,
 {
     fn validate(&self, _: &Scope) -> Result<()> {
         Ok(())
     }
-    #[cfg(target_arch = "wasm32")]
-    fn install(
-        mut self,
-        a: &crate::template::App,
-        s: &Scope,
-        p: &crate::template::Children,
-        i: &crate::template::Instance,
-    ) -> Result<()> {
-        let app = a.downgrade();
-        let owner = s.id();
-        let parent = p.clone();
-        let instance = i.clone();
-        let mut active = None;
-        let mut current: Option<Scope> = None;
-        s.structural(move || {
-            let next = (self.condition)();
-            if active == Some(next) {
-                return;
-            }
-            drop(current.take());
-            let result = (|| {
-                let scope = owner.child_scope().map_err(error)?;
-                let app = app.upgrade()?;
-                let view = if next {
-                    scope.enter(&mut self.yes).mount(&app, &scope)?
+    fn install(mut self, scope: &Scope, parent: &ContentMount) -> glory_ui::Result {
+        let parent = parent.clone();
+        let mut branch = glory_ui::branch::Branch::default();
+        scope.structural(move || {
+            let result = branch.update((self.condition)(), |selected| {
+                let child = if selected {
+                    parent.mount(&mut self.yes)?
                 } else {
-                    scope.enter(&mut self.no).mount(&app, &scope)?
+                    parent.mount(&mut self.no)?
                 };
-                view.place(Some(&parent), None)?;
-                current = Some(scope);
-                active = Some(next);
-                Ok(())
-            })();
-            if let Err(e) = result {
-                instance.fail(e)
+                parent.attach(&child)?;
+                Ok::<_, glory_ui::Error>(Some(child))
+            });
+            if let Err(error) = result {
+                parent.report(error);
             }
         });
         Ok(())
     }
 }
-
 static RANGE: Template = Template::new(&[glory_html::view::outlet(Outlet::new("content"))]);
-pub fn content<C: Content>(value: C) -> impl IntoView {
+pub fn content<C: Content + 'static>(value: C) -> impl Widget {
     view(&RANGE).child(Outlet::new("content"), value)
 }
-pub fn empty() -> impl IntoView {
+pub fn empty() -> impl Widget {
     content(None::<View>)
 }
 pub struct Lazy<F>(F);
 pub fn lazy<F, V>(factory: F) -> Lazy<F>
 where
     F: FnOnce() -> V,
-    V: IntoView,
+    V: Widget,
 {
     Lazy(factory)
 }
 impl<F> sealed::Content for Lazy<F> {}
 impl<F, V> Content for Lazy<F>
 where
-    F: FnOnce() -> V,
-    V: IntoView,
+    F: FnOnce() -> V + 'static,
+    V: Widget,
 {
     fn validate(&self, _: &Scope) -> Result<()> {
         Ok(())
     }
-    #[cfg(target_arch = "wasm32")]
-    fn install(
-        self,
-        a: &crate::template::App,
-        s: &Scope,
-        p: &crate::template::Children,
-        i: &crate::template::Instance,
-    ) -> Result<()> {
-        let child = s.child();
-        let view = child.enter(self.0).mount(a, &child)?;
-        view.place(Some(p), None)?;
-        i.retain_child(child)
-    }
-}
-impl<V: Content> sealed::View for Option<V> {}
-impl<V: Content> IntoView for Option<V> {
-    #[cfg(target_arch = "wasm32")]
-    fn mount(self, a: &crate::template::App, s: &Scope) -> Result<Mounted> {
-        content(self).mount(a, s)
-    }
-}
-impl<V: Content> sealed::View for Vec<V> {}
-impl<V: Content> IntoView for Vec<V> {
-    #[cfg(target_arch = "wasm32")]
-    fn mount(self, a: &crate::template::App, s: &Scope) -> Result<Mounted> {
-        content(self).mount(a, s)
+    fn install(self, _: &Scope, parent: &ContentMount) -> glory_ui::Result {
+        parent.one(self.0)
     }
 }

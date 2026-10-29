@@ -370,27 +370,24 @@ fn structural_phases_precede_props_and_each_reuses_row_state_on_reorder() {
         std::collections::HashMap::<u64, Cage<usize>>::new(),
     ));
     let state = counters.clone();
-    app.mount(each(
-        items,
-        |item| item.id,
-        move |item, index| {
-            calls.set(calls.get() + 1);
-            let state = state.clone();
-            widget(move |scope| {
-                let count = scope.cage(0);
-                state.borrow_mut().insert(item.with(|item| item.id), count);
-                view()
-                    .fill((
-                        text().content(item.map(|item| item.label.clone())),
-                        text().content(index.map(|index| format!("index:{index}"))),
-                        button()
-                            .label("row")
-                            .on(activate, move |_| count.revise(|v| *v += 1)),
-                    ))
-                    .show_in(scope)
-            })
-        },
-    ))
+    app.mount(each(items).key(|item| item.id).children(move |entry| {
+        let (item, index) = (entry.value, entry.index);
+        calls.set(calls.get() + 1);
+        let state = state.clone();
+        widget(move |scope| {
+            let count = scope.cage(0);
+            state.borrow_mut().insert(item.with(|item| item.id), count);
+            view()
+                .fill((
+                    text().content(item.map(|item| item.label.clone())),
+                    text().content(index.map(|index| format!("index:{index}"))),
+                    button()
+                        .label("row")
+                        .on(activate, move |_| count.revise(|v| *v += 1)),
+                ))
+                .show_in(scope)
+        })
+    }))
     .unwrap();
     let one = find(
         &app,
@@ -574,23 +571,20 @@ fn app_drop_invalidates_external_scope_clones_and_drops_resources() {
 fn keyed_empty_and_multi_root_components_keep_rendered_order() {
     let app = App::memory();
     let source = app.scope().cage(vec![1_i32, 0, 2]);
-    app.mount(each(
-        source,
-        |value| *value,
-        |item, _| {
-            widget(move |scope| {
-                if item.get() != 0 {
-                    text()
-                        .content(item.map(|item| format!("{item}:a")))
-                        .show_in(scope)?;
-                    text()
-                        .content(item.map(|item| format!("{item}:b")))
-                        .show_in(scope)?;
-                }
-                Ok(())
-            })
-        },
-    ))
+    app.mount(each(source).key(|value| *value).children(|entry| {
+        let item = entry.value;
+        widget(move |scope| {
+            if item.get() != 0 {
+                text()
+                    .content(item.map(|item| format!("{item}:a")))
+                    .show_in(scope)?;
+                text()
+                    .content(item.map(|item| format!("{item}:b")))
+                    .show_in(scope)?;
+            }
+            Ok(())
+        })
+    }))
     .unwrap();
     let labels = || {
         let tree = app.tree();

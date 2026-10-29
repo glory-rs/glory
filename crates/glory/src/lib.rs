@@ -47,10 +47,11 @@ pub mod display {
     pub use crate::{component, field, template, view};
     pub use glory_core::{Bond, Cage, KeyedEntry, KeyedList, ListError, Runtime, Scope, Vary};
     pub use glory_html::view::*;
+    pub use glory_ui::{Widget, defer, fragment};
     #[cfg(feature = "web")]
     pub use glory_web::view::{
-        BoolValue, ChildContent, Component, Content, Each, Error, IntoView, Result, TextValue,
-        View, child_content, component, computed, content, each, empty, lazy, show, view,
+        BoolValue, Content, Each, Error, Result, TextValue, View, computed, content, each, empty,
+        lazy, show, view,
     };
     #[cfg(all(feature = "web", target_arch = "wasm32"))]
     pub use glory_web::{
@@ -66,17 +67,33 @@ pub mod display {
             Click, Field, Outlet, Template, attr, bind_attr, button, children, class, div, element,
             field, on_click, outlet, span, text, toggle_class,
         };
+        pub use glory_ui::{Widget, defer, fragment};
         #[cfg(feature = "web")]
         pub use glory_web::view::{
-            BoolValue, ChildContent, Component, Content, Each, Error, IntoView, Result, TextValue,
-            View, child_content, component, computed, content, each, empty, lazy, show, view,
+            BoolValue, Content, Each, Error, Result, TextValue, View, computed, content, each,
+            empty, lazy, show, view,
         };
         #[cfg(all(feature = "web", target_arch = "wasm32"))]
         pub use glory_web::{template::App, view::Mounted};
     }
 }
 #[cfg(feature = "dsl")]
-pub use glory_view_macros::{component, expand_field as __field};
+/// Generate a typed builder implementing the same Widget trait as handwritten controls.
+///
+/// ```
+/// #[glory::component]
+/// fn Named(label: String) -> impl glory::Widget { glory::ui::button().label(label) }
+/// glory::App::memory().mount(glory::view! { <Named label={String::from("Save")}/> }).unwrap();
+/// ```
+/// Required properties must be supplied before the value implements Widget:
+/// ```compile_fail
+/// #[glory::component]
+/// fn Named(label: String) -> impl glory::Widget { glory::ui::button().label(label) }
+/// glory::App::memory().mount(glory::view! { <Named/> }).unwrap();
+/// ```
+pub use glory_view_macros::component;
+#[cfg(feature = "dsl")]
+pub use glory_view_macros::expand_field as __field;
 #[cfg(feature = "dsl")]
 #[doc(hidden)]
 pub use glory_view_macros::{expand_template as __template, expand_view as __view};
@@ -106,7 +123,7 @@ pub mod prelude {
         NavigationPanel, NavigationPanelCommand, Orientation, Plan, PlanInstance, PlanPart,
         Purpose, RangeCommand, RangeValue, Result, Role, Scope, ScrollAxes, ScrollCommand,
         ScrollMetrics, ScrollMovement, SelectionDirection, SemanticId, Semantics, SliderValue,
-        SpinValue, TextKind, TextSelection, Widget, button, check, col, each, each_seed, group,
-        image, input, link, list, plan, row, text, view, when, widget,
+        SpinValue, TextKind, TextSelection, Widget, button, check, col, each, group, image, input,
+        link, list, plan, row, text, view, when, widget,
     };
 }

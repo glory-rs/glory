@@ -8,16 +8,16 @@ mod browser {
         label: String,
     }
     #[g::component(g)]
-    fn Counter(scope: &Scope, initial: usize) -> impl IntoView {
+    fn Counter(scope: &Scope, initial: usize) -> impl Widget {
         let count = scope.cage(initial);
         g::view! {<div class="counter"><span class="value">{count}</span><button class="increment" on:click={move||count.revise(|n|*n+=1)}>"+"</button></div>}
     }
     #[g::component(g)]
-    fn Card(children: ChildContent) -> impl IntoView {
+    fn Card(children: g::ui::Children) -> impl Widget {
         g::view! {<div class="card"><Content value={children}/></div>}
     }
     #[g::component(g)]
-    fn Demo(scope: &Scope) -> impl IntoView {
+    fn Demo(scope: &Scope) -> impl Widget {
         let items = scope
             .keyed_list(Vec::<Item>::new(), |item| item.id)
             .unwrap();
@@ -46,9 +46,7 @@ mod browser {
     }
     thread_local! {static APP:RefCell<Option<App>>=const{RefCell::new(None)};}
     pub fn main() {
-        APP.with(|slot| {
-            *slot.borrow_mut() = Some(App::launch::<Demo>("main", DemoProps {}).unwrap())
-        });
+        APP.with(|slot| *slot.borrow_mut() = Some(App::launch("main", Demo::default()).unwrap()));
     }
 }
 fn main() {

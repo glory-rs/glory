@@ -8,6 +8,7 @@ pub(super) struct Open {
     pub id: NodeId,
     pub config: Layer,
     pub previous: Option<NodeId>,
+    previous_control: Option<EngineId>,
     previous_scope: Option<NodeId>,
     restore: bool,
     outside_pending: bool,
@@ -130,21 +131,8 @@ pub(super) fn eligible(state: &State, id: NodeId) -> bool {
         })
 }
 
-fn first_focus(state: &State, root: NodeId) -> Option<NodeId> {
-    let mut pending = vec![root];
-    while let Some(id) = pending.pop() {
-        let Ok(node) = state.mapper.tree().node(id) else {
-            continue;
-        };
-        if !visible(state.mapper.tree(), id) {
-            continue;
-        }
-        if eligible(state, id) {
-            return Some(id);
-        }
-        pending.extend(node.children.iter().rev());
-    }
-    None
+fn first_focus(state: &State, root: NodeId) -> Option<display::FocusTarget> {
+    display::focus_candidates(state, root).into_iter().next()
 }
 
 fn handoff_previous(
@@ -227,10 +215,11 @@ pub(super) fn sync(state: &mut State, mutations: &[Mutation]) -> Result<(), Erro
             .and_then(|name| state.mapper.tree().named(name))
             .filter(|id| eligible(state, *id));
         if let Some(id) = requested
+            .and_then(|id| display::focus_target(state, id))
             .or_else(|| first_focus(state, scope))
-            .or(Some(scope))
+            .or_else(|| display::focus_target(state, scope))
         {
-            let _ = state.focus(id);
+            display::focus(state, id);
         }
     }
     repair_focus(state);
@@ -416,6 +405,18 @@ fn sync_inner(
             .find(|entry| inside(tree, previous, entry.id))
             .map(|entry| entry.id)
     });
+    let previous_control = state
+        .dom
+        .doc
+        .get_focussed_node_id()
+        .filter(|control| state.dom.owner(*control) == previous)
+        .or_else(|| {
+            closed
+                .iter()
+                .rev()
+                .find(|entry| entry.previous == previous)
+                .and_then(|entry| entry.previous_control)
+        });
     let mut opened = Vec::new();
     for (id, config) in wanted {
         let restore = config.focus == glory_render::LayerFocus::Manage;
@@ -423,6 +424,7 @@ fn sync_inner(
             id,
             config,
             previous,
+            previous_control,
             previous_scope,
             restore,
             outside_pending: false,
@@ -443,6 +445,9 @@ fn sync_inner(
                     .and_then(|name| tree.named(name))
                     .or(closed.previous);
                 entry.previous_scope = closed.previous_scope;
+                entry.previous_control = closed
+                    .previous_control
+                    .filter(|control| state.dom.owner(*control) == entry.previous);
             }
         }
     }
@@ -647,7 +652,14 @@ fn sync_inner(
         && let Some(id) = target
         && visible(tree, id)
         && tree.enabled(id)
-        && let Ok(control) = state.dom.control(id)
+        && let Some(control) = state.dom.control(id).ok().or_else(|| {
+            closed
+                .iter()
+                .rev()
+                .filter(|entry| entry.previous == Some(id))
+                .find_map(|entry| entry.previous_control)
+                .filter(|control| state.dom.owner(*control) == Some(id))
+        })
         && state.dom.focus_visible(control)
         && state.dom.doc.set_focus_to(control)
     {
@@ -675,20 +687,13 @@ pub(super) fn repair_focus(state: &mut State) {
     else {
         return;
     };
-    let current = state
-        .dom
-        .doc
-        .get_focussed_node_id()
-        .and_then(|id| state.dom.owner(id));
-    if current.is_some_and(|id| eligible(state, id)) {
+    let current = display::current_focus(state);
+    if current.is_some_and(|target| display::eligible(state, target)) {
         return;
     }
-    if let Some(id) = first_focus(state, scope).or(Some(scope))
-        && let Ok(control) = state.dom.control(id)
-        && state.dom.focus_visible(control)
-        && state.dom.doc.set_focus_to(control)
+    if let Some(target) = first_focus(state, scope).or_else(|| display::focus_target(state, scope))
     {
-        state.dom.invalidate();
+        display::focus(state, target);
     }
 }
 
@@ -885,6 +890,7 @@ mod handoff_tests {
             id,
             config: Layer::default(),
             previous,
+            previous_control: None,
             previous_scope,
             restore: true,
             outside_pending: false,

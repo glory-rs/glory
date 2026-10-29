@@ -16,6 +16,8 @@ use std::sync::Arc;
 #[cfg(feature = "clipboard")]
 #[path = "clipboard_io.rs"]
 mod clipboard_io;
+#[path = "display.rs"]
+mod display;
 #[cfg(feature = "files")]
 #[path = "files_io.rs"]
 mod files_io;
@@ -224,6 +226,7 @@ fn invariant(message: &'static str) -> Error {
 }
 
 struct Range {
+    display_outlet: Option<(Rc<glory_html::display::Frame>, u16)>,
     select: Option<native_select::Control>,
     image: Option<ImageObserver>,
     first: EngineId,
@@ -266,6 +269,11 @@ impl Range {
     }
 }
 struct Dom {
+    display_queue: Rc<glory_html::display::Queue>,
+    displays: HashMap<NodeId, display::Instance>,
+    display_controls: HashMap<EngineId, (NodeId, Option<u16>)>,
+    #[cfg(feature = "shell")]
+    display_space: Option<EngineId>,
     open_select: Option<NodeId>,
     translations: translation::Translations,
     collapses: collapse::Collapses,
@@ -370,6 +378,11 @@ impl Dom {
             (body, css, translation_sheet)
         };
         Self {
+            display_queue: Rc::new(glory_html::display::Queue::default()),
+            displays: HashMap::new(),
+            display_controls: HashMap::new(),
+            #[cfg(feature = "shell")]
+            display_space: None,
             translations: translation::Translations::new(translation_sheet, config.motion),
             collapses: collapse::Collapses::default(),
             #[cfg(feature = "paint")]
@@ -422,6 +435,7 @@ impl Dom {
         Ok(parent.children[start..=end].to_vec())
     }
     fn create(&mut self, id: NodeId, shape: Shape) -> Result<(), Error> {
+        let display_placement = shape.display.clone();
         let image = shape
             .pieces
             .iter()
@@ -507,6 +521,12 @@ impl Dom {
         self.ranges.insert(
             id,
             Range {
+                display_outlet: match &display_placement {
+                    Some(glory_html::display::Placement::Outlet { frame, slot }) => {
+                        Some((frame.clone(), *slot))
+                    }
+                    _ => None,
+                },
                 select,
                 image,
                 first,
@@ -526,6 +546,9 @@ impl Dom {
                 park,
             },
         );
+        if let Some(glory_html::display::Placement::Root(frame)) = display_placement {
+            self.create_display(id, frame)?;
+        }
         self.reflect(id)?;
         Ok(())
     }
@@ -729,7 +752,27 @@ impl Dom {
         let nodes = self.nodes(id)?;
         let (parent, end) = if let Some(parent) = parent {
             let range = self.range(parent)?;
-            if range.parts.is_empty() {
+            if let Some((frame, slot)) = &self.range(id)?.display_outlet {
+                let display = self
+                    .displays
+                    .get(&parent)
+                    .ok_or(Error::InvalidPlacement("display parent"))?;
+                if !Rc::ptr_eq(frame, &display.frame) {
+                    return Err(Error::InvalidPlacement("foreign display outlet"));
+                }
+                let target = display.targets[*slot as usize];
+                match frame.compiled().slots[*slot as usize].kind {
+                    glory_html::template::Kind::Children => (target, None),
+                    glory_html::template::Kind::Range => (
+                        self.doc
+                            .get_node(target)
+                            .and_then(|node| node.parent)
+                            .ok_or(Error::InvalidPlacement("display outlet parent"))?,
+                        Some(target),
+                    ),
+                    _ => return Err(Error::InvalidPlacement("display outlet kind")),
+                }
+            } else if range.parts.is_empty() {
                 (
                     self.doc
                         .get_node(range.last)
@@ -796,6 +839,15 @@ impl Dom {
         // Suspended children are no longer physically under their logical parent.
         // Explicitly reclaim every range, including empty/offline Group parks.
         for child in subtree {
+            if let Some(display) = self.displays.remove(&child) {
+                for control in display.controls {
+                    self.display_controls.remove(&control);
+                    #[cfg(feature = "shell")]
+                    if self.display_space == Some(control) {
+                        self.display_space = None;
+                    }
+                }
+            }
             #[cfg(feature = "paint")]
             self.motion.remove(child);
             if let Some(range) = self.ranges.remove(&child) {
@@ -892,6 +944,9 @@ impl Dom {
     }
     fn owner(&self, mut physical: EngineId) -> Option<NodeId> {
         loop {
+            if let Some((id, _)) = self.display_controls.get(&physical) {
+                return Some(*id);
+            }
             if let Some(id) = self
                 .controls
                 .get(&physical)
@@ -1266,11 +1321,20 @@ impl State {
         layers::repair_focus(self);
         focus_scope::repair(self);
         let physical = self.dom.doc.get_focussed_node_id();
-        let next = physical.and_then(|node| self.dom.owner(node));
-        if let Some(next) = next
-            && (!self.mapper.tree().active(next)
+        #[cfg(feature = "shell")]
+        if self.dom.display_space.is_some() && self.dom.display_space != physical {
+            self.dom.display_space = None;
+        }
+        let owner = physical.and_then(|node| self.dom.owner(node));
+        let next = owner.filter(|id| {
+            self.mapper.tree().node(*id).is_ok_and(|node| {
+                !matches!(node.descriptor.view().props, glory_render::Props::Group)
+            })
+        });
+        if let Some(owner) = owner
+            && (!self.mapper.tree().active(owner)
                 || physical.is_some_and(|node| !self.dom.focus_visible(node))
-                || !self.mapper.tree().enabled(next))
+                || !self.mapper.tree().enabled(owner))
         {
             self.dom.doc.clear_focus();
             self.dom.invalidate();
@@ -1506,6 +1570,9 @@ impl Renderer {
     }
 }
 impl Render for Renderer {
+    fn flush_display(&mut self) -> Result<(), Error> {
+        self.0.borrow_mut().dom.flush_display()
+    }
     fn preflight(
         &self,
         node: glory_render::DescriptorView<'_>,

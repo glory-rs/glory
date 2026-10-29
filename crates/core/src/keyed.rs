@@ -172,6 +172,12 @@ impl<K: Clone + Eq + Hash + 'static, T: 'static> KeyedList<K, T> {
     pub fn with_order<R>(self, read: impl FnOnce(&[RowToken<K>]) -> R) -> R {
         self.order.with(|v| read(v))
     }
+    pub fn try_with_order<R>(
+        self,
+        read: impl FnOnce(&[RowToken<K>]) -> R,
+    ) -> Result<R, AccessError> {
+        self.order.try_with(|v| read(v))
+    }
     pub fn entry(self, token: &RowToken<K>) -> Result<KeyedEntry<K, T>, AccessError> {
         if token.source != (self.values.handle.runtime, self.values.handle.key) {
             return Err(AccessError::WrongRuntime);

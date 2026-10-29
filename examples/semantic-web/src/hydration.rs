@@ -80,15 +80,14 @@ pub fn ui(scope: &Scope) -> (glory::ui::View, State) {
             .on(activate, move |_| count.revise(|count| *count += 1)),
         link().class("h-link").target("#fixture").label("link"),
         image().class("h-image").source("").alt("fixture"),
-        view().class("h-keyed").fill(each(
-            order,
-            |value| *value,
-            |item, _| {
+        view()
+            .class("h-keyed")
+            .fill(each(order).key(|value| *value).children(|entry| {
+                let item = entry.value;
                 input()
                     .name(item.map(|item| format!("hydrate key {item}")))
                     .value(item.map(|item| format!("item {item}")))
-            },
-        )),
+            })),
         when(show, || {
             group().fill((
                 text().class("h-branch").content("branch"),

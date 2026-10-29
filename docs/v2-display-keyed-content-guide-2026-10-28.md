@@ -1,6 +1,9 @@
+2026-10-29 更新：组件统一为 `Widget`；两种 Each 也已合并为同一个 API，见
+[统一 Each](v2-unified-each-2026-10-29.md)及 [Widget 说明](v2-widget-dsl-unification-2026-10-29.md)。
+
 # v2 keyed 数据、Each 和组件内容
 
-这是新的浏览器显示 API，与旧语义 Widget 层分别使用命名空间。
+显示模板使用独立命名空间，Widget 和 Each 接口与标准宿主共享。
 只写 XML 时启用 `glory/dsl`，使用 `glory::display::prelude::*`；
 手写模式启用 `glory/web` 即可，不引入 DSL 编译器。
 
@@ -9,8 +12,10 @@
 公开概念统一为 `Each`：XML `<Each>`、手写 `each(...)`、配置类型 `display::Each`。
 内置 DSL 不提供 `For` 别名。Leptos 的 `<For>` 是参考来源，不是 Glory 的公开名称。
 
-`ui::Each` 是现有语义 Widget 适配器；`display::Each` 是直接显示模板的适配器。
-两者复用 keyed Cache 协调算法，但数据、挂载和记录模型不同。
+`ui::Each` 与 `display::Each` 现在导出同一个 Widget 和控制器，直接接受
+Vec/Cage/Bond/Vary 及 KeyedList。向量使用 `each(source).key(key).children(factory)`；
+KeyedList 使用 `each(source).children(factory)`，沿用其成员身份。
+协调器和 keyed Cache 只有一份；数据源与物理宿主使用各自的轻量适配。
 使用命名空间区分，避免同时 glob 导入旧 `glory::prelude::*` 与新 display prelude。
 原始 HTML 不隐式创建高层 Button/View Widget。
 
@@ -67,7 +72,7 @@ const LABEL: Field = Field::new("label");
 static PANEL: Template = Template::new(&[div(&[children(BODY)], &[])]);
 static ROW: Template = Template::new(&[span(&[], &[field(LABEL)])]);
 
-let result = view(&PANEL).child(BODY, each(rows, |row| {
+let result = view(&PANEL).child(BODY, each(rows).children(|row| {
     view(&ROW).bind(LABEL, row.field("label", |r| &r.label, |r| &mut r.label))
 }));
 ```
@@ -123,7 +128,7 @@ Show 离开分支时退休该分支，重新进入创建新状态；兄弟组件
 
 ```rust,ignore
 #[component]
-fn Counter(scope: &Scope, initial: usize) -> impl IntoView {
+fn Counter(scope: &Scope, initial: usize) -> impl Widget {
     let count = scope.cage(initial);
     view! {
         <div>
@@ -133,18 +138,18 @@ fn Counter(scope: &Scope, initial: usize) -> impl IntoView {
     }
 }
 #[component]
-fn Card(children: ChildContent) -> impl IntoView {
+fn Card(children: glory::ui::Children) -> impl Widget {
     view! { <div><Content value={children}/></div> }
 }
 // view! { <Card><Counter initial={0}/></Card> }
-let app = App::launch::<Counter>("main", CounterProps { initial: 0 })?;
+let app = App::launch("main", Counter::default().initial(0))?;
 // 保留 app，直到需要关闭该显示根。
 ```
 
-宏生成组件标记、具体 Props 和 Component 实现；参数名和类型仍由 Rust 检查。
-首个 `scope: &Scope` 是注入参数，不进入 Props；显式写错 Scope 类型会编译失败。
+宏生成带类型状态的 Widget builder；参数名、类型及必填参数仍由 Rust 检查。
+首个 `scope: &Scope` 是注入参数，不进入 builder；显式写错 Scope 类型会编译失败。
 Cargo 重命名后使用 `#[g::component(g)]`，函数式宏自动通过 `$crate` 支持重命名。
-目前组件宏要求同步函数和具体 Props 类型；泛型/impl Trait Props、默认参数等尚不支持。
+目前组件宏要求同步函数和具体属性类型；泛型/impl Trait 属性、默认参数等尚不支持。
 普通 Rust 函数仍可以直接返回 View，不需要全部注册为组件。
 
 [普通应用示例](../examples/display-web/src/bin/counter.rs)包含计数器、Each、字段编辑、
@@ -167,9 +172,12 @@ JS 执行失败只确认成功前缀，停止后缀；恢复边界是关闭并�
 
 具名显示模板当前支持 div/span/button/a/h1/table/tbody/tr/td、文本、受限静态属性（包括 id）、
 class/title/aria-label 动态属性、class 开关和无参数 click。模板内部的表格内容层级也会校验。
-旧 raw-template 探针声明仍保留其更窄的标签范围。Source 保持封闭，不能用任意 wire 绕过 profile。
-SSR/hydration、Blitz 适配、完整事件/property 与受控输入/IME 没有在本轮迁移。
-浏览器新 API 与原有跨平台语义 Widget 能力不能混为一谈。
+旧 raw-template AST、编译器和 Source 已移除；探针、手写 API 与 DSL 使用同一个
+`html::view::Template` 及缓存编译结果，不能用任意 wire 绕过 profile。
+标准 Widget 宿主已接通混合树 SSR、hydration、增量流和 Blitz；浏览器专用的
+`display::App` 保留稀疏路径。配置执行、Each/Show 和内容控制也已共享，具体区别与验证见
+[统一 Widget DSL](v2-widget-dsl-unification-2026-10-29.md)。完整 HTML 事件/property
+与设备级 IME 不在这个有限 profile 的承诺内。
 
 [实施计划](v2-display-completion-plan-2026-10-28.md)与本轮最终验证/性能记录分别维护；
 旧报告中的测试数和计时只属于各自冻结版本。

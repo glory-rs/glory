@@ -122,6 +122,8 @@ enum Boundary {
     Range(Node, Node),
 }
 pub(super) struct Entry {
+    pub display: RefCell<Option<super::display::Instance>>,
+    pub placement: Option<glory_html::display::Placement>,
     pub(super) rich: RefCell<Option<Box<super::rich::Editing>>>,
     pub(super) collapse: RefCell<Option<Box<super::collapse::Observer>>>,
     pub(super) image: RefCell<Option<Box<super::images::Observer>>>,
@@ -151,6 +153,8 @@ impl Entry {
         composing: bool,
     ) -> Rc<Self> {
         Rc::new(Self {
+            display: RefCell::new(None),
+            placement: shape.display.clone(),
             rich: RefCell::new(None),
             collapse: RefCell::new(None),
             image: RefCell::new(None),
@@ -320,6 +324,7 @@ pub(super) struct Dom {
     pub root: Element,
     pub frame: Rc<Frame>,
     pub entries: RefCell<glory_render::NodeMap<Rc<Entry>>>,
+    pub display_queue: Rc<glory_html::display::Queue>,
     templates: Templates,
     plans: plans::Plans,
     pub inputs: RefCell<Vec<Input>>,
@@ -361,6 +366,7 @@ impl Dom {
             root,
             frame,
             entries: RefCell::new(glory_render::NodeMap::default()),
+            display_queue: Rc::new(glory_html::display::Queue::default()),
             templates: Templates::default(),
             plans: plans::Plans::default(),
             inputs: RefCell::new(Vec::new()),
@@ -404,6 +410,7 @@ impl Dom {
         parts: BTreeMap<Part, Node>,
         first: Node,
         last: Node,
+        display: Option<super::display::Instance>,
     ) -> Result<(), Error> {
         let composing = shape
             .control
@@ -429,6 +436,10 @@ impl Dom {
             Boundary::Part(shape.root_part()?)
         };
         let entry = Entry::new(shape, parts.into(), boundary, parent, None, composing);
+        if let Some(display) = display {
+            display.bind(self, id)?;
+            *entry.display.borrow_mut() = Some(display);
+        }
         if entry.edit == EditKind::Text {
             entry.value()?;
         }
@@ -719,6 +730,20 @@ impl Dom {
                 .map_err(backend)?;
         }
         let entry = self.make_entry(&shape, parts, fragment)?;
+        if let Some(glory_html::display::Placement::Root(frame)) = &shape.display {
+            let display = super::display::Instance::create(
+                &self.document,
+                frame.clone(),
+                key,
+                &entry
+                    .first()
+                    .parent_node()
+                    .ok_or(Error::InvalidPlacement("display range"))?,
+                Some(entry.last()),
+            )?;
+            display.bind(self, id)?;
+            *entry.display.borrow_mut() = Some(display);
+        }
         if entry.edit == EditKind::Rich {
             self.rich_live.borrow_mut().insert(id);
         }
@@ -798,7 +823,16 @@ impl Dom {
         let semantic_parent = parent;
         let (parent, end) = if let Some(parent) = parent {
             let parent = self.entry(parent)?;
-            if let Some(part) = parent.children {
+            if let Some(glory_html::display::Placement::Outlet { frame, slot }) = &entry.placement {
+                let display = parent.display.borrow();
+                let display = display
+                    .as_ref()
+                    .ok_or(Error::InvalidPlacement("display parent"))?;
+                if !Rc::ptr_eq(frame, &display.frame) {
+                    return Err(Error::InvalidPlacement("foreign display outlet"));
+                }
+                display.destination(*slot)?
+            } else if let Some(part) = parent.children {
                 (parent.part(part)?, None)
             } else if parent.parts.is_empty() {
                 (

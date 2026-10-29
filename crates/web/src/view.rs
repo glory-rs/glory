@@ -1,17 +1,19 @@
-//! Declarative, short-lived view configuration. Browser mounting is wasm-only.
+//! Declarative template configuration implementing the portable Widget contract.
+//! Direct sparse display::App mounting is browser-only.
 use glory_core::{Bond, Cage, RuntimeId, Scope, Vary};
 pub use glory_html::view::{Click, Field, Outlet, Template};
-use glory_html::{
-    template::Kind,
-    view::{Compiled, Source},
-};
+use glory_html::{template::Kind, view::Compiled};
+pub use glory_ui::Widget;
 use std::fmt::Display;
 mod content;
 mod flags;
-pub use content::{
-    ChildContent, Content, Each, Show, child_content, content, each, empty, lazy, show,
-};
+#[doc(hidden)]
+pub mod mounting;
+#[doc(hidden)]
+pub mod portable;
+pub use content::{Content, Show, content, empty, lazy, show};
 pub use flags::BoolValue;
+pub use glory_ui::{Each, EachBuilder, each};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Error(pub String);
@@ -34,22 +36,23 @@ fn error(value: impl Display) -> Error {
 mod sealed {
     pub trait Actions {}
     pub trait Text {}
-    pub trait View {}
     pub trait Content {}
     pub trait Flag {}
 }
 /// Sources are explicit: values initialize once, handles and Computed observe.
 pub trait TextValue: sealed::Text {
     fn validate(&self, runtime: RuntimeId) -> Result<()>;
-    #[cfg(target_arch = "wasm32")]
-    fn install(self, instance: &crate::template::Instance, owner: &Scope, slot: u16) -> Result<()>;
+    fn read_text(&mut self) -> Result<String>;
+    fn reactive_text(&self) -> bool {
+        false
+    }
 }
 macro_rules! scalar {
     ($($ty:ty),*)=>{$(impl sealed::Text for $ty {}
     impl TextValue for $ty {
+        fn read_text(&mut self)->Result<String>{Ok(self.to_string())}
         fn validate(&self,_runtime:RuntimeId)->Result<()>{Ok(())}
-        #[cfg(target_arch="wasm32")]
-        fn install(self,instance:&crate::template::Instance,_owner:&Scope,slot:u16)->Result<()>{instance.set(slot,self.to_string())}
+
     })*};
 }
 scalar!(
@@ -57,61 +60,46 @@ scalar!(
 );
 impl sealed::Text for String {}
 impl TextValue for String {
+    fn read_text(&mut self) -> Result<String> {
+        Ok(self.clone())
+    }
     fn validate(&self, _runtime: RuntimeId) -> Result<()> {
         if self.len() > 65536 {
             Err(error("field payload budget"))
         } else {
             Ok(())
         }
-    }
-    #[cfg(target_arch = "wasm32")]
-    fn install(
-        self,
-        instance: &crate::template::Instance,
-        _owner: &Scope,
-        slot: u16,
-    ) -> Result<()> {
-        instance.set(slot, self)
     }
 }
 impl sealed::Text for &str {}
 impl TextValue for &str {
+    fn read_text(&mut self) -> Result<String> {
+        Ok(self.to_string())
+    }
     fn validate(&self, _runtime: RuntimeId) -> Result<()> {
         if self.len() > 65536 {
             Err(error("field payload budget"))
         } else {
             Ok(())
         }
-    }
-    #[cfg(target_arch = "wasm32")]
-    fn install(
-        self,
-        instance: &crate::template::Instance,
-        _owner: &Scope,
-        slot: u16,
-    ) -> Result<()> {
-        instance.set(slot, self.to_owned())
     }
 }
 macro_rules! handle {
     ($ty:ident) => {
         impl<T: Display + 'static> sealed::Text for $ty<T> {}
         impl<T: Display + 'static> TextValue for $ty<T> {
+            fn read_text(&mut self) -> Result<String> {
+                self.try_with(ToString::to_string).map_err(error)
+            }
+            fn reactive_text(&self) -> bool {
+                true
+            }
             fn validate(&self, runtime: RuntimeId) -> Result<()> {
                 if self.runtime() != runtime || !self.is_alive() {
                     Err(error("foreign or disposed reactive input"))
                 } else {
                     Ok(())
                 }
-            }
-            #[cfg(target_arch = "wasm32")]
-            fn install(
-                self,
-                instance: &crate::template::Instance,
-                owner: &Scope,
-                slot: u16,
-            ) -> Result<()> {
-                instance.bind_values(owner, [slot], move || [self.with(ToString::to_string)])
             }
         }
     };
@@ -120,19 +108,17 @@ handle!(Cage);
 handle!(Bond);
 impl<T: Display + 'static> sealed::Text for Vary<T> {}
 impl<T: Display + 'static> TextValue for Vary<T> {
+    fn read_text(&mut self) -> Result<String> {
+        self.try_with(ToString::to_string).map_err(error)
+    }
+    fn reactive_text(&self) -> bool {
+        self.is_reactive()
+    }
     fn validate(&self, runtime: RuntimeId) -> Result<()> {
         match self {
             Self::Value(_) => Ok(()),
             Self::Cage(v) => v.validate(runtime),
             Self::Bond(v) => v.validate(runtime),
-        }
-    }
-    #[cfg(target_arch = "wasm32")]
-    fn install(self, instance: &crate::template::Instance, owner: &Scope, slot: u16) -> Result<()> {
-        match self {
-            Self::Value(value) => instance.set(slot, value.to_string()),
-            Self::Cage(v) => v.install(instance, owner, slot),
-            Self::Bond(v) => v.install(instance, owner, slot),
         }
     }
 }
@@ -155,28 +141,25 @@ where
     F: FnMut() -> T + 'static,
     T: Display,
 {
+    fn read_text(&mut self) -> Result<String> {
+        Ok((self.0)().to_string())
+    }
+    fn reactive_text(&self) -> bool {
+        true
+    }
     fn validate(&self, _runtime: RuntimeId) -> Result<()> {
         Ok(())
-    }
-    #[cfg(target_arch = "wasm32")]
-    fn install(
-        mut self,
-        instance: &crate::template::Instance,
-        owner: &Scope,
-        slot: u16,
-    ) -> Result<()> {
-        instance.bind_values(owner, [slot], move || [(self.0)().to_string()])
     }
 }
 
 pub struct View<A = ()> {
     template: &'static Template,
-    actions: A,
+    actions: Option<A>,
 }
 pub fn view(template: &'static Template) -> View {
     View {
         template,
-        actions: (),
+        actions: Some(()),
     }
 }
 #[doc(hidden)]
@@ -189,12 +172,6 @@ pub struct On<F> {
     click: Click,
     #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
     callback: F,
-}
-#[doc(hidden)]
-pub struct Child<C: Component> {
-    outlet: Outlet,
-    #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
-    props: C::Props,
 }
 #[doc(hidden)]
 pub struct ChildValue<C> {
@@ -210,19 +187,22 @@ impl<A> View<A> {
     pub fn class_when<V: BoolValue>(self, field: Field, value: V) -> View<(A, Toggle<V>)> {
         View {
             template: self.template,
-            actions: (self.actions, Toggle { field, value }),
+            actions: Some((self.actions.expect("unbuilt view"), Toggle { field, value })),
         }
     }
     pub fn child<C: Content>(self, outlet: Outlet, content: C) -> View<(A, ChildValue<C>)> {
         View {
             template: self.template,
-            actions: (self.actions, ChildValue { outlet, content }),
+            actions: Some((
+                self.actions.expect("unbuilt view"),
+                ChildValue { outlet, content },
+            )),
         }
     }
     pub fn bind<V: TextValue>(self, field: Field, value: V) -> View<(A, Bind<V>)> {
         View {
             template: self.template,
-            actions: (self.actions, Bind { field, value }),
+            actions: Some((self.actions.expect("unbuilt view"), Bind { field, value })),
         }
     }
     pub fn watch<F, T>(self, field: Field, read: F) -> View<(A, Bind<Computed<F>>)>
@@ -235,13 +215,7 @@ impl<A> View<A> {
     pub fn on_click<F: FnMut() + 'static>(self, click: Click, callback: F) -> View<(A, On<F>)> {
         View {
             template: self.template,
-            actions: (self.actions, On { click, callback }),
-        }
-    }
-    pub fn component<C: Component>(self, outlet: Outlet, props: C::Props) -> View<(A, Child<C>)> {
-        View {
-            template: self.template,
-            actions: (self.actions, Child { outlet, props }),
+            actions: Some((self.actions.expect("unbuilt view"), On { click, callback })),
         }
     }
     pub fn template(&self) -> &'static Template {
@@ -270,28 +244,14 @@ fn resolve(
 #[doc(hidden)]
 pub trait Actions: sealed::Actions {
     fn validate(&self, definition: &Compiled, scope: &Scope, seen: &mut Vec<u16>) -> Result<()>;
-    #[cfg(target_arch = "wasm32")]
-    fn apply(
-        self,
-        definition: &Compiled,
-        app: &crate::template::App,
-        scope: &Scope,
-        instance: &crate::template::Instance,
-    ) -> Result<()>;
+    fn apply(self, mount: &mounting::Mount<'_>) -> glory_ui::Result;
 }
 impl sealed::Actions for () {}
 impl Actions for () {
     fn validate(&self, _: &Compiled, _: &Scope, _: &mut Vec<u16>) -> Result<()> {
         Ok(())
     }
-    #[cfg(target_arch = "wasm32")]
-    fn apply(
-        self,
-        _: &Compiled,
-        _: &crate::template::App,
-        _: &Scope,
-        _: &crate::template::Instance,
-    ) -> Result<()> {
+    fn apply(self, _: &mounting::Mount<'_>) -> glory_ui::Result {
         Ok(())
     }
 }
@@ -301,20 +261,13 @@ impl<A: Actions, B: Actions> Actions for (A, B) {
         self.0.validate(d, s, seen)?;
         self.1.validate(d, s, seen)
     }
-    #[cfg(target_arch = "wasm32")]
-    fn apply(
-        self,
-        d: &Compiled,
-        a: &crate::template::App,
-        s: &Scope,
-        i: &crate::template::Instance,
-    ) -> Result<()> {
-        self.0.apply(d, a, s, i)?;
-        self.1.apply(d, a, s, i)
+    fn apply(self, m: &mounting::Mount<'_>) -> glory_ui::Result {
+        self.0.apply(m)?;
+        self.1.apply(m)
     }
 }
 impl<V: TextValue> sealed::Actions for Bind<V> {}
-impl<V: TextValue> Actions for Bind<V> {
+impl<V: TextValue + 'static> Actions for Bind<V> {
     fn validate(&self, d: &Compiled, s: &Scope, seen: &mut Vec<u16>) -> Result<()> {
         resolve(
             d,
@@ -324,15 +277,8 @@ impl<V: TextValue> Actions for Bind<V> {
         )?;
         self.value.validate(s.runtime())
     }
-    #[cfg(target_arch = "wasm32")]
-    fn apply(
-        self,
-        d: &Compiled,
-        _: &crate::template::App,
-        s: &Scope,
-        i: &crate::template::Instance,
-    ) -> Result<()> {
-        self.value.install(i, s, d.slot(self.field.0).unwrap().0)
+    fn apply(self, m: &mounting::Mount<'_>) -> glory_ui::Result {
+        m.text(self.field, self.value)
     }
 }
 impl<F: FnMut() + 'static> sealed::Actions for On<F> {}
@@ -341,52 +287,8 @@ impl<F: FnMut() + 'static> Actions for On<F> {
         resolve(d, self.click.0, |k| k == Kind::Click, seen)?;
         Ok(())
     }
-    #[cfg(target_arch = "wasm32")]
-    fn apply(
-        self,
-        d: &Compiled,
-        _: &crate::template::App,
-        _: &Scope,
-        i: &crate::template::Instance,
-    ) -> Result<()> {
-        i.on_click(d.slot(self.click.0).unwrap().0, self.callback)
-    }
-}
-/// Components explicitly declare Props; lowercase elements never enter this path.
-pub trait Component {
-    type Props;
-    fn view(scope: &Scope, props: Self::Props) -> impl IntoView;
-}
-pub struct ComponentView<C: Component> {
-    #[cfg_attr(not(target_arch = "wasm32"), allow(dead_code))]
-    props: C::Props,
-}
-pub fn component<C: Component>(props: C::Props) -> ComponentView<C> {
-    ComponentView { props }
-}
-impl<C: Component> sealed::Actions for Child<C> {}
-impl<C: Component> Actions for Child<C> {
-    fn validate(&self, d: &Compiled, _: &Scope, seen: &mut Vec<u16>) -> Result<()> {
-        resolve(
-            d,
-            self.outlet.0,
-            |k| matches!(k, Kind::Children | Kind::Range),
-            seen,
-        )?;
-        Ok(())
-    }
-    #[cfg(target_arch = "wasm32")]
-    fn apply(
-        self,
-        d: &Compiled,
-        a: &crate::template::App,
-        s: &Scope,
-        i: &crate::template::Instance,
-    ) -> Result<()> {
-        let child = s.child();
-        let mounted = component::<C>(self.props).mount(a, &child)?;
-        mounted.place(Some(&i.children(d.slot(self.outlet.0).unwrap().0)?), None)?;
-        i.retain_child(child)
+    fn apply(self, m: &mounting::Mount<'_>) -> glory_ui::Result {
+        m.on(self.click, self.callback)
     }
 }
 impl<C: Content> sealed::Actions for ChildValue<C> {}
@@ -400,16 +302,8 @@ impl<C: Content> Actions for ChildValue<C> {
         )?;
         self.content.validate(s)
     }
-    #[cfg(target_arch = "wasm32")]
-    fn apply(
-        self,
-        d: &Compiled,
-        a: &crate::template::App,
-        s: &Scope,
-        i: &crate::template::Instance,
-    ) -> Result<()> {
-        self.content
-            .install(a, s, &i.children(d.slot(self.outlet.0).unwrap().0)?, i)
+    fn apply(self, m: &mounting::Mount<'_>) -> glory_ui::Result {
+        m.child(self.outlet, self.content)
     }
 }
 impl<V: BoolValue> sealed::Actions for Toggle<V> {}
@@ -418,59 +312,105 @@ impl<V: BoolValue> Actions for Toggle<V> {
         resolve(d, self.field.0, |k| matches!(k, Kind::Class(..)), seen)?;
         self.value.validate_bool(s.runtime())
     }
-    #[cfg(target_arch = "wasm32")]
-    fn apply(
-        self,
-        d: &Compiled,
-        _: &crate::template::App,
-        s: &Scope,
-        i: &crate::template::Instance,
-    ) -> Result<()> {
-        self.value
-            .install_bool(i, s, d.slot(self.field.0).unwrap().0)
+    fn apply(self, m: &mounting::Mount<'_>) -> glory_ui::Result {
+        m.flag(self.field, self.value)
     }
 }
-pub trait IntoView: sealed::View {
-    #[cfg(target_arch = "wasm32")]
-    fn mount(self, app: &crate::template::App, scope: &Scope) -> Result<Mounted>;
-}
-impl<A: Actions> sealed::View for View<A> {}
 impl<A: Actions> View<A> {
-    /// Structural/source validation is also available to native compiler tests.
+    #[cfg(target_arch = "wasm32")]
+    pub fn mount(self, app: &crate::template::App, scope: &Scope) -> Result<Mounted>
+    where
+        A: 'static,
+    {
+        mount(self, app, scope)
+    }
     pub fn validate(&self, scope: &Scope) -> Result<()> {
         if !scope.is_alive() {
             return Err(error("disposed view scope"));
         }
-        let definition = self.template.compile()?;
-        self.actions.validate(&definition, scope, &mut Vec::new())
+        let definition = self.template.cached()?;
+        self.actions
+            .as_ref()
+            .ok_or_else(|| error("view already built"))?
+            .validate(&definition, scope, &mut Vec::new())
     }
-}
-impl<A: Actions> IntoView for View<A> {
     #[cfg(target_arch = "wasm32")]
-    fn mount(self, app: &crate::template::App, scope: &Scope) -> Result<Mounted> {
+    fn mount_direct(&mut self, app: &crate::template::App, scope: &Scope) -> Result<Mounted> {
         if !scope.is_alive() || scope.runtime() != app.runtime().id() {
             return Err(error("foreign or disposed view scope"));
         }
         let definition = app.prepare(self.template)?;
-        self.actions.validate(&definition, scope, &mut Vec::new())?;
+        self.validate(scope)?;
+        let actions = self
+            .actions
+            .take()
+            .ok_or_else(|| error("view already built"))?;
         let instance = app.mount(scope, self.template)?;
-        if let Err(e) = self.actions.apply(&definition, app, scope, &instance) {
+        if let Err(e) = actions
+            .apply(&mounting::Mount::sparse(&definition, app, scope, &instance))
+            .map_err(error)
+        {
             instance.fail(e.clone());
             return Err(e);
         }
         Ok(Mounted { instance })
     }
 }
-impl<C: Component> sealed::View for ComponentView<C> {}
-impl<C: Component> IntoView for ComponentView<C> {
-    #[cfg(target_arch = "wasm32")]
-    fn mount(self, app: &crate::template::App, scope: &Scope) -> Result<Mounted> {
-        app.ensure_live()?;
-        if !scope.is_alive() || scope.runtime() != app.runtime().id() {
-            return Err(error("foreign or disposed view scope"));
-        }
-        scope.enter(|| C::view(scope, self.props)).mount(app, scope)
+impl<A: Actions + 'static> Widget for View<A> {
+    fn build(&mut self, scope: &glory_ui::Scope) -> glory_ui::Result {
+        self.validate(scope).map_err(portable::failure)?;
+        let actions = self.actions.take().ok_or(glory_ui::Error::Gone)?;
+        portable::build(self.template, actions, scope)
     }
+    fn mount_host(
+        &mut self,
+        scope: &Scope,
+        host: &mut dyn std::any::Any,
+    ) -> glory_ui::Result<bool> {
+        #[cfg(target_arch = "wasm32")]
+        if let Some(context) = host.downcast_mut::<DisplayMount>() {
+            context.result = Some(self.mount_direct(&context.app, scope));
+            return Ok(true);
+        }
+        let _ = (scope, host);
+        Ok(false)
+    }
+}
+#[cfg(target_arch = "wasm32")]
+struct DisplayMount {
+    app: crate::template::App,
+    result: Option<Result<Mounted>>,
+}
+/// Mount any Widget; raw views retain their sparse template fast path.
+#[cfg(target_arch = "wasm32")]
+pub fn mount(
+    mut widget: impl Widget,
+    app: &crate::template::App,
+    scope: &Scope,
+) -> Result<Mounted> {
+    app.ensure_live()?;
+    if !scope.is_alive() || scope.runtime() != app.runtime().id() {
+        return Err(error("foreign or disposed widget scope"));
+    }
+    if widget.is_empty() {
+        return mount(empty(), app, scope);
+    }
+    if let Some(child) =
+        glory_core::untracked(|| scope.enter(|| widget.compose(scope))).map_err(error)?
+    {
+        return mount(child, app, scope);
+    }
+    let mut context = DisplayMount {
+        app: app.clone(),
+        result: None,
+    };
+    if widget.mount_host(scope, &mut context).map_err(error)? {
+        return context
+            .result
+            .ok_or_else(|| error("widget host did not mount"))?;
+    }
+    app.mount_widget(scope, widget)
+        .map(|instance| Mounted { instance })
 }
 #[cfg(target_arch = "wasm32")]
 #[derive(Clone)]

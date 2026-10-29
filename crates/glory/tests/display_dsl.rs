@@ -1,6 +1,45 @@
 use glory as renamed;
 use glory::display::*;
 
+#[cfg(all(feature = "stream", not(target_arch = "wasm32")))]
+#[test]
+fn incremental_stream_accepts_raw_templates_with_widget_outlets() {
+    use std::{
+        future::Future,
+        pin::pin,
+        task::{Context, Poll, Waker},
+    };
+    let mut stream = glory::ssr::stream_with(
+        glory::resources::Resources::default(),
+        glory::ssr::stream::Config::default(),
+        |_, _| renamed::view! {<div>"raw"<{glory::ui::button()} label="widget"/></div>},
+    )
+    .unwrap();
+    let Poll::Ready(Some(Ok(frame))) =
+        pin!(stream.next_frame()).poll(&mut Context::from_waker(Waker::noop()))
+    else {
+        panic!("shell")
+    };
+    assert!(
+        frame.body().contains("raw")
+            && frame.body().contains("widget")
+            && frame.body().contains("gly:slot:")
+    );
+    let html = frame
+        .to_html(&glory::ssr::stream::Bootstrap {
+            root_id: "root".into(),
+            data_id: "data".into(),
+            script_url: "/stream.js".into(),
+            nonce: None,
+        })
+        .unwrap();
+    assert!(
+        html.contains("\"display\"")
+            && html.contains("\"declaration\"")
+            && html.contains("\"outlet\"")
+    );
+}
+
 const LABEL: Field = Field::new("label");
 const CLASS: Field = Field::new("class");
 const CLICK: Click = Click::new("click");
@@ -91,20 +130,14 @@ fn configuration_rejects_wrong_kind_duplicates_foreign_and_disposed_inputs() {
     assert!(view(&HAND).bind(LABEL, retired).validate(&scope).is_err());
     assert_eq!(runtime.stats().nodes, 0);
 }
-struct Counter;
-struct CounterProps {
-    initial: i32,
-}
-impl Component for Counter {
-    type Props = CounterProps;
-    fn view(scope: &Scope, props: Self::Props) -> impl IntoView {
-        let count = scope.cage(props.initial);
-        renamed::view! {<span>{count}</span>}
-    }
+#[renamed::component(renamed)]
+fn Counter(scope: &Scope, initial: i32) -> impl Widget {
+    let count = scope.cage(initial);
+    renamed::view! {<span>{count}</span>}
 }
 #[test]
-fn components_have_an_explicit_props_contract_and_a_real_outlet_without_a_wrapper_element() {
-    fn is_view(_: impl IntoView) {}
+fn widget_tags_preserve_sparse_templates_and_real_outlets() {
+    fn is_view(_: impl Widget) {}
     is_view(renamed::view! {<Counter initial={3}/>});
     let nested = renamed::view! {<div>"before"<Counter initial={4}/><span>"after"</span></div>};
     let definition = nested.template().compile().unwrap();
@@ -141,11 +174,11 @@ fn rust_blocks_can_prepare_owned_captures_and_return_a_reactive_closure() {
 }
 
 #[renamed::component(renamed)]
-fn Panel(children: ChildContent) -> impl IntoView {
+fn Panel(children: glory::ui::Children) -> impl Widget {
     renamed::view! {<div><Content value={children}/></div>}
 }
 #[renamed::component(renamed)]
-fn Simple(scope: &Scope, initial: i32) -> impl IntoView {
+fn Simple(scope: &Scope, initial: i32) -> impl Widget {
     let value = scope.cage(initial);
     renamed::view! {<span>{value}</span>}
 }
@@ -168,7 +201,7 @@ fn structural_content_components_and_fields_share_the_public_api() {
             </Show>
         </Panel>
     };
-    fn is_view(_: impl IntoView) {}
+    fn is_view(_: impl Widget) {}
     is_view(config);
     struct Data {
         label: String,
@@ -186,7 +219,7 @@ fn structural_content_components_and_fields_share_the_public_api() {
         view(&HAND)
             .child(
                 BODY,
-                each(other, |v| renamed::view! {<span>{*v.key()}</span>})
+                each(other).children(|v| renamed::view! {<span>{*v.key()}</span>})
             )
             .validate(&scope)
             .is_err()

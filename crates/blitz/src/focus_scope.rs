@@ -1,12 +1,13 @@
 //! Current nonmodal focus policy, independent of engine top-layer boxes/AX.
 use super::*;
-use glory_render::{FocusMode, FocusScopeConfig};
+use display::{FocusTarget, eligible, focus};
+use glory_render::FocusScopeConfig;
 
 #[derive(Clone)]
 struct Open {
     id: NodeId,
     config: FocusScopeConfig,
-    previous: Option<NodeId>,
+    previous: Option<FocusTarget>,
     previous_scope: Option<NodeId>,
     focused: bool,
 }
@@ -35,12 +36,8 @@ impl Scopes {
         self.0.is_empty()
     }
 }
-fn current(state: &State) -> Option<NodeId> {
-    state
-        .dom
-        .doc
-        .get_focussed_node_id()
-        .and_then(|id| state.dom.owner(id))
+fn current(state: &State) -> Option<FocusTarget> {
+    display::current_focus(state)
 }
 fn inside(state: &State, id: NodeId, scope: NodeId) -> bool {
     layers::inside(state.mapper.tree(), id, scope)
@@ -54,42 +51,18 @@ fn inside(state: &State, id: NodeId, scope: NodeId) -> bool {
                     .is_some_and(|anchor| layers::inside(state.mapper.tree(), anchor, scope))
         })
 }
-fn candidates(state: &State, root: NodeId) -> Vec<NodeId> {
-    let mut pending = vec![root];
-    let mut values = Vec::new();
-    // Shared admission guarantees at most 4096 current semantic nodes. Hidden
-    // and separately suspended descendants are included in that budget.
-    while let Some(id) = pending.pop() {
-        let Ok(node) = state.mapper.tree().node(id) else {
-            continue;
-        };
-        if !layers::visible(state.mapper.tree(), id) {
-            continue;
-        }
-        let focus = node.descriptor.view().focus;
-        if !matches!(focus, FocusMode::Programmatic) && layers::eligible(state, id) {
-            values.push(id);
-        }
-        pending.extend(node.children.iter().rev().copied());
-    }
-    values
+fn candidates(state: &State, root: NodeId) -> Vec<FocusTarget> {
+    display::focus_candidates(state, root)
 }
-fn first(state: &State, open: &Open) -> NodeId {
+fn first(state: &State, open: &Open) -> FocusTarget {
     open.config
         .initial_focus
         .as_ref()
         .and_then(|name| state.mapper.tree().named(name))
         .filter(|id| inside(state, *id, open.id) && layers::eligible(state, *id))
+        .and_then(|id| display::focus_target(state, id))
         .or_else(|| candidates(state, open.id).into_iter().next())
-        .unwrap_or(open.id)
-}
-fn focus(state: &mut State, id: NodeId) {
-    if let Ok(control) = state.dom.control(id)
-        && state.dom.focus_visible(control)
-        && state.dom.doc.set_focus_to(control)
-    {
-        state.dom.invalidate();
-    }
+        .unwrap_or_else(|| display::focus_target(state, open.id).expect("focus scope control"))
 }
 pub(super) fn allowed(state: &State, id: NodeId) -> bool {
     state
@@ -173,12 +146,13 @@ pub(super) fn sync(state: &mut State) {
                 open.config
                     .return_focus
                     .as_ref()
-                    .and_then(|name| state.mapper.tree().named(name)),
+                    .and_then(|name| state.mapper.tree().named(name))
+                    .and_then(|id| display::focus_target(state, id)),
                 open.previous,
             ]
         })
         .flatten()
-        .find(|id| layers::eligible(state, *id));
+        .find(|target| eligible(state, *target));
     for (id, config) in declarations {
         if scopes.iter().any(|open| open.id == id) {
             continue;
@@ -187,7 +161,7 @@ pub(super) fn sync(state: &mut State) {
         let previous_scope = scopes
             .iter()
             .rev()
-            .find(|open| previous.is_some_and(|id| inside(state, id, open.id)))
+            .find(|open| previous.is_some_and(|target| inside(state, target.owner, open.id)))
             .map(|open| open.id);
         let open = Open {
             id,
@@ -229,8 +203,9 @@ pub(super) fn repair(state: &mut State) {
         .find(|open| open.config.contain_focus && live(state, open))
         .cloned();
     if let Some(open) = scope
-        && (open.focused || active != state.focused)
-        && !active.is_some_and(|id| inside(state, id, open.id) && layers::eligible(state, id))
+        && (open.focused || active.map(|target| target.owner) != state.focused)
+        && !active
+            .is_some_and(|target| inside(state, target.owner, open.id) && eligible(state, target))
     {
         focus(state, first(state, &open));
     }
@@ -239,7 +214,7 @@ pub(super) fn repair(state: &mut State) {
         .focus_scopes
         .0
         .iter()
-        .map(|open| active.is_some_and(|id| inside(state, id, open.id)))
+        .map(|open| active.is_some_and(|target| inside(state, target.owner, open.id)))
         .collect::<Vec<_>>();
     for (open, focused) in state.focus_scopes.0.iter_mut().zip(focused) {
         open.focused = focused;
@@ -295,13 +270,15 @@ pub(super) fn receive(
         .0
         .iter()
         .rev()
-        .find(|open| live(state, open) && active.is_some_and(|id| inside(state, id, open.id)))
+        .find(|open| {
+            live(state, open) && active.is_some_and(|target| inside(state, target.owner, open.id))
+        })
         .cloned()
     else {
         return false;
     };
     // Anchored popups retain their own keyboard protocol.
-    if active.is_some_and(|id| !layers::inside(state.mapper.tree(), id, open.id)) {
+    if active.is_some_and(|target| !layers::inside(state.mapper.tree(), target.owner, open.id)) {
         return false;
     }
     let values = candidates(state, open.id);
@@ -319,7 +296,10 @@ pub(super) fn receive(
         true
     } else if open.config.contain_focus {
         if values.is_empty() {
-            focus(state, open.id);
+            focus(
+                state,
+                display::focus_target(state, open.id).expect("focus scope control"),
+            );
         }
         true
     } else {

@@ -3,10 +3,14 @@
 The public value/Cage/Bond input wrapper is named `Vary`; use the enum and its
 new name directly, without retaining a compatibility alias for the former name.
 
-Display list naming is `Each` / `each(...)` / XML `<Each>`. The existing
-`ui::Each` is the semantic Widget adapter; `display::Each` is the sparse display
-adapter. They share keyed reconciliation, not their complete row/host model.
-Use namespaces to distinguish these layers; do not add a built-in `For` alias.
+List naming is `Each` / `each(...)` / XML `<Each>`. `ui::Each` and
+`display::Each` export the same Widget and source-generic controller. Use
+`each(source).key(key).children(factory)` for Vec/Cage/Bond/Vary, or
+`each(keyed_list).children(factory)` with existing member identities. DSL Each
+uses the same key/children/seed contract. No index-key fallback, old arity aliases,
+`each_seed` function or built-in `For` alias. See
+`docs/v2-unified-each-2026-10-29.md`. Keep keyed rows non-Clone and zero-mirror;
+vector rows retain reactive value/index handles and seed mode omits their cost.
 
 For the completed keyed/content API and retained performance changes, read
 `docs/v2-display-completion-results-2026-10-29.md`. Consecutive display moves
@@ -38,9 +42,9 @@ and its existing APIs, not a requirement to reify every raw template element.
 No new unsafe code, vendoring, implicit I/O grants or unverified platform
 acceptance is authorized by this display-layer change.
 
-The first experimental direct path now lives in `glory_html::template` and
-`glory_web::template` (wasm32). See
-`docs/v2-html-template-prototype-results-2026-10-28.md` for its measured
+The direct path uses checked `glory_html::view::Template` declarations and
+`glory_web::template` (wasm32). Its first experimental measurements are in
+`docs/v2-html-template-prototype-results-2026-10-28.md`, recording its measured
 div/span/button profile, Scope ownership, fault/teardown rules and boundaries.
 It creates no per-HTML-element UI/Mapper Memory or semantic Entry. The canonical
 `benchmarks/glory` fixture now uses the XML display DSL with the same keyed Cache;
@@ -54,10 +58,18 @@ the handwritten named-slot API are now implemented; follow
 provides `view!`/`template!` through `glory-view-macros`; default runtime graphs
 must not acquire that compiler. Raw data lives in html::view, configurations in
 web::view, facade exports in glory::display. Both frontends use the same sparse
-host. Components require explicit Component::Props and own only their actual
-component Scope. Keep Source sealed so unchecked wire data cannot bypass the
-display profile. SSR/hydration/native and controlled editor migration remain;
-neither this prototype nor its smaller WASM proves full semantic API equivalence.
+host. The user unified component authoring on 2026-10-29: `Widget` is the sole
+component contract; `#[component]` generates a typed Widget builder, not a
+second Component/Props trait. View configurations implement Widget and retain
+the sparse display fast path. See `docs/v2-widget-dsl-unification-2026-10-29.md`.
+All template entry points use the checked, cached `html::view::Template`
+compiler; the legacy template AST and `Source` adapter are retired. Standard Widget hosts now support mixed-tree synchronous SSR,
+hydration and native physical templates; the direct display::App stays browser
+only. Raw nodes still have no per-element semantic Memory. Controlled editors
+use Widget slots. Incremental streams now share template declarations and emit
+typed display-slot patches alongside semantic edits. Keep dirty-editor/focus,
+template retirement and End outlet-marker rekey/adoption checks. Follow the unification guide's current acceptance and
+finite target boundaries; smaller WASM does not prove full semantic equivalence.
 
 The keyed/content guide `docs/v2-display-keyed-content-guide-2026-10-28.md`
 describes the current public API: KeyedList with generational member identities,

@@ -7,6 +7,8 @@ use std::cell::Cell;
 mod alerts;
 #[path = "accessibility_current_tests.rs"]
 mod current;
+#[path = "accessibility_display_tests.rs"]
+mod display;
 #[path = "accessibility_document_tests.rs"]
 mod document;
 #[path = "accessibility_hint_tests.rs"]

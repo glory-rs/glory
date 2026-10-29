@@ -3,12 +3,12 @@ use quote::{format_ident, quote};
 use syn::{FnArg, ItemFn, Pat, Type, spanned::Spanned};
 
 pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
-    let facade = if args.is_empty() {
+    let facade: syn::Path = if args.is_empty() {
         syn::parse_quote!(::glory)
     } else {
-        syn::parse2::<syn::Path>(args)?
+        syn::parse2(args)?
     };
-    let api = quote!(#facade::display);
+    let api = quote!(#facade::ui);
     let function = syn::parse2::<ItemFn>(item)?;
     let signature = &function.sig;
     if !signature.generics.params.is_empty()
@@ -21,18 +21,18 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
     {
         return Err(syn::Error::new(
             signature.span(),
-            "component requires a synchronous function with concrete Props types",
+            "component requires a synchronous function with concrete property types",
         ));
     }
     let name = &signature.ident;
-    let props = format_ident!("{name}Props");
     let visibility = &function.vis;
     let attrs = &function.attrs;
     let body = &function.block;
     let mut fields = Vec::new();
-    let mut names = Vec::new();
+    let mut types = Vec::new();
+    let mut mutable = Vec::new();
     let mut scope = format_ident!("_scope");
-    let mut scope_type = None;
+    let mut scope_type = quote!(&#facade::core::Scope);
     for (index, arg) in signature.inputs.iter().enumerate() {
         let FnArg::Typed(arg) = arg else {
             return Err(syn::Error::new(arg.span(), "component cannot have self"));
@@ -40,13 +40,13 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
         let Pat::Ident(pattern) = arg.pat.as_ref() else {
             return Err(syn::Error::new(
                 arg.pat.span(),
-                "component props require named parameters",
+                "properties require named parameters",
             ));
         };
         if pattern.by_ref.is_some() || pattern.subpat.is_some() {
             return Err(syn::Error::new(
                 pattern.span(),
-                "component props require plain parameter names",
+                "properties require plain parameter names",
             ));
         }
         let ident = &pattern.ident;
@@ -57,28 +57,94 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
                 return Err(syn::Error::new(ty.span(), "injected scope must be &Scope"));
             }
             scope = ident.clone();
-            scope_type = Some(ty);
+            scope_type = quote!(#ty);
             continue;
         }
         if matches!(ty.as_ref(), Type::ImplTrait(_)) {
             return Err(syn::Error::new(
                 ty.span(),
-                "component Props require a concrete type; use ChildContent for children",
+                "properties require a concrete type; use ui::Children for children",
             ));
         }
-        fields.push(quote!(pub #ident:#ty));
-        names.push((ident, pattern.mutability));
+        fields.push(ident.clone());
+        types.push(ty.clone());
+        mutable.push(pattern.mutability);
     }
-    let take = names
+    let generics: Vec<_> = (0..fields.len())
+        .map(|n| format_ident!("__GloryP{n}"))
+        .collect();
+    let defaults = generics.iter().map(|g| quote!(#g=#api::Missing));
+    let declaration = if generics.is_empty() {
+        quote!()
+    } else {
+        quote!(<#(#defaults),*>)
+    };
+    let parameters = if generics.is_empty() {
+        quote!()
+    } else {
+        quote!(<#(#generics),*>)
+    };
+    let ready = if types.is_empty() {
+        quote!()
+    } else {
+        quote!(<#(#types),*>)
+    };
+    let stored = fields
         .iter()
-        .map(|(name, mutable)| quote!(let #mutable #name=props.#name;));
-    let check_scope = scope_type.map(|ty| quote!(let #scope:#ty=#scope;));
+        .zip(&generics)
+        .map(|(f, g)| quote!(#f: ::core::option::Option<#g>));
+    let empty = fields.iter().map(|f| quote!(#f:None));
+    let take = fields
+        .iter()
+        .map(|f| quote!(let #f=self.#f.take().ok_or(#api::Error::Gone)?;));
+    let output = &signature.output;
+    let arguments = fields
+        .iter()
+        .zip(&types)
+        .zip(&mutable)
+        .map(|((field, ty), mutable)| quote!(#mutable #field:#ty));
+    let setters = fields
+        .iter()
+        .zip(&types)
+        .enumerate()
+        .map(|(index, (field, ty))| {
+            let method = if field == "children" {
+                format_ident!("fill")
+            } else {
+                field.clone()
+            };
+            let mut result = generics.iter().map(|g| quote!(#g)).collect::<Vec<_>>();
+            result[index] = quote!(#ty);
+            let result = quote!(<#(#result),*>);
+            let values = fields.iter().enumerate().map(|(n, f)| {
+                if n == index {
+                    quote!(#f:Some(value))
+                } else {
+                    quote!(#f:self.#f)
+                }
+            });
+            let (argument, convert) = if field == "children" {
+                (
+                    quote!(value:impl #api::IntoChildren),
+                    quote!(let value=#api::IntoChildren::into_children(value);),
+                )
+            } else {
+                (quote!(value:#ty), quote!())
+            };
+            quote!(pub fn #method(self,#argument)->#name #result {#convert #name{#(#values),*}})
+        });
     Ok(quote! {
-        #(#attrs)* #visibility struct #name;
-        #visibility struct #props {#(#fields),*}
-        impl #api::Component for #name {
-            type Props=#props;
-            fn view(#scope:&#api::Scope,props:Self::Props)->impl #api::IntoView {#check_scope #(#take)* #body}
+        #(#attrs)* #visibility struct #name #declaration {#(#stored),*}
+        impl ::core::default::Default for #name {fn default()->Self {Self{#(#empty),*}}}
+        impl #parameters #name #parameters {#(#setters)*}
+        impl #api::Widget for #name #ready {
+            fn compose(&mut self,#scope:&#facade::core::Scope)->#api::Result<::core::option::Option<::std::boxed::Box<dyn #api::Widget>>> {
+                #(#take)*
+                Ok(Some(Box::new(Self::__glory_body(#scope,#(#fields),*))))
+            }
+        }
+        impl #name #ready {
+            fn __glory_body(#scope:#scope_type,#(#arguments),*) #output #body
         }
     })
 }

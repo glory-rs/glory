@@ -1,6 +1,6 @@
 use crate::model::Model;
 use glory::display::*;
-pub fn view(model: Model) -> impl IntoView {
+pub fn view(model: Model) -> impl Widget {
     let row_model = model.clone();
     view! {
         <>

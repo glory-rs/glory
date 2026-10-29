@@ -1,6 +1,6 @@
 //! Shared display data and named slots used by handwritten code and XML macros.
 use crate::template::{Error, Kind};
-use std::{any::Any, fmt::Write};
+use std::fmt::Write;
 
 macro_rules! part {
     ($name:ident) => {
@@ -38,11 +38,23 @@ pub enum Node {
 }
 #[derive(Debug)]
 pub struct Template {
-    pub roots: &'static [Node],
+    roots: &'static [Node],
+    compiled: std::sync::OnceLock<Result<std::sync::Arc<Compiled>, Error>>,
 }
 impl Template {
+    pub fn roots(&self) -> &'static [Node] {
+        self.roots
+    }
     pub const fn new(roots: &'static [Node]) -> Self {
-        Self { roots }
+        Self {
+            roots,
+            compiled: std::sync::OnceLock::new(),
+        }
+    }
+    pub fn cached(&self) -> Result<std::sync::Arc<Compiled>, Error> {
+        self.compiled
+            .get_or_init(|| self.compile().map(std::sync::Arc::new))
+            .clone()
     }
 }
 pub const fn element(
@@ -99,35 +111,12 @@ pub struct Slot {
     pub kind: Kind,
 }
 /// Compiled once per shared declaration, never once per static element instance.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Compiled {
     pub wire: String,
     pub slots: Vec<Slot>,
     pub node_count: usize,
-}
-mod sealed {
-    pub trait Source {}
-}
-impl sealed::Source for Template {}
-impl sealed::Source for crate::template::Template {}
-pub trait Source: Any + sealed::Source {
-    fn compile(&self) -> Result<Compiled, Error>;
-}
-impl Source for crate::template::Template {
-    fn compile(&self) -> Result<Compiled, Error> {
-        Ok(Compiled {
-            wire: self.wire()?,
-            node_count: self.validate()?,
-            slots: self
-                .targets
-                .iter()
-                .map(|t| Slot {
-                    name: None,
-                    kind: t.kind,
-                })
-                .collect(),
-        })
-    }
+    pub paths: Vec<Vec<u16>>,
 }
 fn string(out: &mut String, value: &str) {
     out.push('"');
@@ -152,8 +141,8 @@ impl Compiled {
             .map(|(i, s)| (i as u16, s.kind))
     }
 }
-impl Source for Template {
-    fn compile(&self) -> Result<Compiled, Error> {
+impl Template {
+    pub fn compile(&self) -> Result<Compiled, Error> {
         struct Compiler {
             roots: String,
             targets: Vec<(Vec<u16>, Slot)>,
@@ -305,10 +294,9 @@ impl Source for Template {
                                     Attribute::Children(value) => {
                                         if !matches!(*tag, "div" | "tbody" | "td")
                                             || names.contains(&"children")
-                                            || !children.is_empty()
                                         {
                                             return Err(Error(
-                                                "children outlet requires an empty div",
+                                                "children outlet requires a div, tbody or td",
                                             ));
                                         }
                                         names.push("children");
@@ -397,6 +385,7 @@ impl Source for Template {
         Ok(Compiled {
             wire,
             node_count: c.nodes,
+            paths: c.targets.iter().map(|(path, _)| path.clone()).collect(),
             slots: c.targets.into_iter().map(|(_, s)| s).collect(),
         })
     }
@@ -415,13 +404,26 @@ mod tests {
             &[class("a"), bind_attr("class", Field::new("class"))],
             &[],
         )]);
-        static CHILDREN: Template =
-            Template::new(&[div(&[children(Outlet::new("body"))], &[text("wrong")])]);
+        static CHILDREN: Template = Template::new(&[button(&[children(Outlet::new("body"))], &[])]);
         static ROOT: Template = Template::new(&[outlet(Outlet::new("root"))]);
         for template in [&DUPLICATE, &ATTR, &CHILDREN] {
             assert!(template.compile().is_err());
         }
         assert_eq!(ROOT.compile().unwrap().node_count, 2);
+    }
+    #[test]
+    fn named_children_append_after_static_content_in_the_shared_declaration() {
+        static TEMPLATE: Template = Template::new(&[div(
+            &[children(Outlet::new("body"))],
+            &[text("static prefix")],
+        )]);
+        let compiled = TEMPLATE.cached().unwrap();
+        assert_eq!(compiled.node_count, 2);
+        assert_eq!(compiled.slots[0].kind, Kind::Children);
+        assert!(std::sync::Arc::ptr_eq(
+            &compiled,
+            &TEMPLATE.cached().unwrap()
+        ));
     }
     #[test]
     fn named_slot_metadata_is_shared_declaration_data_and_limits_count_physical_nodes() {

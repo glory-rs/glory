@@ -250,6 +250,35 @@ impl Element {
 }
 
 pub struct Children(Vec<Box<dyn Widget>>);
+/// A movable widget fragment without a semantic wrapper node.
+pub struct Fragment(Children);
+pub fn fragment(children: impl IntoChildren) -> Fragment {
+    Fragment(children.into_children())
+}
+impl Widget for Fragment {
+    fn is_empty(&self) -> bool {
+        self.0.0.is_empty()
+    }
+    fn compose(&mut self, _: &glory_core::Scope) -> Result<Option<Box<dyn Widget>>> {
+        if self.0.0.len() == 1 {
+            Ok(self.0.0.pop())
+        } else {
+            Ok(None)
+        }
+    }
+    fn build(&mut self, scope: &Scope) -> Result {
+        for child in std::mem::take(&mut self.0.0) {
+            child.show_in(scope)?;
+        }
+        Ok(())
+    }
+}
+impl Children {
+    #[doc(hidden)]
+    pub fn into_widgets(self) -> Vec<Box<dyn Widget>> {
+        self.0
+    }
+}
 impl IntoChildren for Children {
     fn into_children(self) -> Children {
         self
@@ -305,6 +334,11 @@ macro_rules! element {
         pub fn $factory() -> $name {
             $name {
                 inner: Element::new($props),
+            }
+        }
+        impl Default for $name {
+            fn default() -> Self {
+                $factory()
             }
         }
         impl Widget for $name {

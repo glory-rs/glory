@@ -1,5 +1,6 @@
 mod clipboard;
 mod collapse;
+pub(crate) mod display;
 mod dom;
 mod events;
 mod file_document;
@@ -104,6 +105,16 @@ impl Renderer {
     }
 }
 impl Render for Renderer {
+    fn flush_display(&mut self) -> Result<(), Error> {
+        for id in self.dom.display_queue.take() {
+            if let Ok(entry) = self.dom.entry(id)
+                && let Some(display) = entry.display.borrow().as_ref()
+            {
+                display.flush()?;
+            }
+        }
+        Ok(())
+    }
     fn preflight(
         &self,
         node: glory_render::DescriptorView<'_>,
@@ -594,6 +605,9 @@ pub struct WebApp {
     frame: Rc<Frame>,
 }
 impl WebApp {
+    pub(crate) fn flush(&self) -> glory_ui::Result {
+        self.app.pump().map(|_| ())
+    }
     /// Use this app's browser Performance clock, never std::time::Instant on WASM.
     pub fn enable_profile(&self) -> Result<Profile, Error> {
         let profile = self.frame.profile()?;
@@ -632,11 +646,37 @@ pub fn launch_with<W: Widget>(
     let frame = Frame::new(window);
     let dom = Dom::new(document, root, frame.clone())?;
     let app = Rc::new(App::with_host(frame.clone(), |runtime| {
-        Renderer::new(runtime, dom)
+        Renderer::new(runtime, dom.clone())
     }));
     frame.attach(&app);
     let guard = WebApp { app, frame };
     guard.app.mount_with(|| factory(guard.app.scope()))?;
+    Ok(guard)
+}
+pub(crate) fn launch_in_runtime(
+    root: Element,
+    runtime: Rc<glory_core::Runtime>,
+    parent: glory_core::InstanceId,
+    widget: impl Widget,
+) -> glory_ui::Result<WebApp> {
+    if root.has_child_nodes() || root.has_attribute("data-gly-app") {
+        return Err(Error::InvalidProps("web mount requires an empty, unclaimed element").into());
+    }
+    let document = root
+        .owner_document()
+        .ok_or(Error::Unsupported("mount has no document"))?;
+    let window = document
+        .default_view()
+        .ok_or(Error::Unsupported("document has no window"))?;
+    base_style(&document)?;
+    let frame = Frame::new(window);
+    let dom = Dom::new(document, root, frame.clone())?;
+    let app = Rc::new(App::in_owner(runtime, parent, |id| {
+        Renderer::new(id, dom.clone())
+    })?);
+    frame.attach(&app);
+    let guard = WebApp { app, frame };
+    guard.app.mount(widget)?;
     Ok(guard)
 }
 fn base_style(document: &web_sys::Document) -> Result<(), Error> {

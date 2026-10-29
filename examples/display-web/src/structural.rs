@@ -10,12 +10,12 @@ struct Row {
     label: String,
 }
 #[g::component(g)]
-fn Child(scope: &Scope, initial: usize) -> impl IntoView {
+fn Child(scope: &Scope, initial: usize) -> impl Widget {
     let count = scope.cage(initial);
     g::view! {<button type="button" class="child-count" on:click={move||count.revise(|v|*v+=1)}>{count}</button>}
 }
 #[g::component(g)]
-fn Frame(children: ChildContent) -> impl IntoView {
+fn Frame(children: g::ui::Children) -> impl Widget {
     g::view! {<div class="frame"><Content value={children}/></div>}
 }
 struct Demo {
@@ -23,6 +23,7 @@ struct Demo {
     rows: KeyedList<usize, Row>,
     flag: Cage<bool>,
     factories: Rc<Cell<usize>>,
+    vector: Cage<Vec<(usize, String)>>,
 }
 thread_local! {static DEMO:RefCell<Option<Demo>>=const{RefCell::new(None)};}
 fn rows(ids: &[usize]) -> Vec<Row> {
@@ -40,6 +41,7 @@ pub fn main() {
     let flag = scope.cage(false);
     let factories = Rc::new(Cell::new(0));
     let calls = factories.clone();
+    let vector = scope.cage(vec![(1usize, "one".to_owned()), (2, "two".to_owned())]);
     let config = g::view! {
         <div class="structure" class:enabled={flag}>
             <span class="initial" class:initial={flag}>"marker"</span>
@@ -53,6 +55,10 @@ pub fn main() {
             }}/></div>
             <Show when={move || flag.get()}><Frame><Child initial={9}/></Frame></Show>
             <div class="stable"><Child initial={99}/></div>
+            <div class="vector"><Each each={vector} key={|row|row.0} children={move |row| {
+                let id=*row.key(); let label=row.field("label",|row|&row.1,|row|&mut row.1);
+                g::view!{<div class="vector-row"><span class="vector-key">{id}</span><span class="vector-label">{label}</span><span class="vector-index">{row.index}</span><Child initial={0}/></div>}
+            }}/></div>
         </div>
     };
     app.render(config).unwrap();
@@ -62,6 +68,7 @@ pub fn main() {
             rows: source,
             flag,
             factories,
+            vector,
         })
     });
 }
@@ -83,10 +90,36 @@ pub fn structural_action(action: usize) {
             5 => d.rows.extend(rows(&[3])).unwrap(),
             6 => d.rows.clear().unwrap(),
             7 => d.flag.revise(|v| *v = !*v),
-            8 => d.rows.replace((1..=300).map(|id|Row{id,label:format!("{}{id}","🙂汉".repeat(1000))}).collect()).unwrap(),
+            8 => d
+                .rows
+                .replace(
+                    (1..=300)
+                        .map(|id| Row {
+                            id,
+                            label: format!("{}{id}", "🙂汉".repeat(1000)),
+                        })
+                        .collect(),
+                )
+                .unwrap(),
             _ => unreachable!(),
         }
         d.app.flush().unwrap();
+    });
+}
+#[wasm_bindgen]
+pub fn vector_action(action: usize) {
+    DEMO.with(|demo| {
+        let demo = demo.borrow();
+        let demo = demo.as_ref().unwrap();
+        demo.vector.revise(|rows| match action {
+            0 => rows.swap(0, 1),
+            1 => rows[0].1.push('!'),
+            2 => rows.retain(|row| row.0 != 1),
+            3 => rows.push((1, "fresh".into())),
+            4 => rows.clear(),
+            _ => unreachable!(),
+        });
+        demo.app.flush().unwrap();
     });
 }
 #[wasm_bindgen]

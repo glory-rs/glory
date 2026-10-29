@@ -188,6 +188,9 @@ impl Render for Renderer {
     ) -> Result<(), glory_render::Error> {
         glory_html::preflight(node, patch)
     }
+    fn flush_display(&mut self) -> Result<(), glory_render::Error> {
+        self.edits.borrow_mut().flush_display()
+    }
     fn preflight_place(
         &self,
         tree: &glory_render::memory::Memory,
@@ -302,7 +305,7 @@ pub fn stream_with<W: Widget>(
         ids.sort_by_key(|id| model.key(*id));
         let nodes = ids.into_iter().map(|id| {
             let node = model.tree().node(id)?;
-            Ok(json!({"key":model.key(id).expect("key").to_string(),"shape":edits::shape(glory_html::shape_in(model.tree(),id)?),"parent":node.parent.and_then(|id|model.key(id)).map(|key|key.to_string()),"children":node.children.iter().map(|id|model.key(*id).expect("key").to_string()).collect::<Vec<_>>(),"placed":node.placed,"suspended":node.suspended}))
+            Ok(json!({"key":model.key(id).expect("key").to_string(),"shape":edits.borrow_mut().shape(glory_html::shape_in(model.tree(),id)?)?,"parent":node.parent.and_then(|id|model.key(id)).map(|key|key.to_string()),"children":node.children.iter().map(|id|model.key(*id).expect("key").to_string()).collect::<Vec<_>>(),"placed":node.placed,"suspended":node.suspended}))
         }).collect::<Result<Vec<_>,glory_render::Error>>()?;
         serde_json::to_string(&nodes)?
     };

@@ -249,7 +249,8 @@ pub(crate) struct Session {
     action_buffer: crate::buffer::Pool<Action>,
     listener_buffer: crate::buffer::Pool<(NodeId, EventKind, bool)>,
     input_buffer: crate::buffer::Pool<Input>,
-    pub runtime: Runtime,
+    pub runtime: Rc<Runtime>,
+    host_context: RefCell<Option<Rc<dyn Any>>>,
     present: RefCell<Present>,
     renderer: RefCell<Box<dyn Render>>,
     faulted: Cell<bool>,
@@ -261,14 +262,22 @@ pub(crate) struct Session {
 
 impl Session {
     fn new<R: Render + 'static>(
-        runtime: Runtime,
+        runtime: Rc<Runtime>,
         factory: impl FnOnce(RuntimeId) -> R,
     ) -> Rc<Self> {
         let id = runtime.id();
+        Self::with_presentation(runtime, id, factory)
+    }
+    fn with_presentation<R: Render + 'static>(
+        runtime: Rc<Runtime>,
+        id: RuntimeId,
+        factory: impl FnOnce(RuntimeId) -> R,
+    ) -> Rc<Self> {
         let renderer: Box<dyn Render> = Box::new(factory(id));
         let style_profile = renderer.style_profile();
         Rc::new(Self {
             runtime,
+            host_context: RefCell::new(None),
             present: RefCell::new(Present {
                 tree: Memory::new(id),
                 ids: NodeIds::new(id),
@@ -553,6 +562,10 @@ impl Session {
                 .into());
             }
             self.applied.set(receipt.applied);
+        }
+        if let Err(error) = self.renderer.borrow_mut().flush_display() {
+            self.faulted.set(true);
+            return Err(error.into());
         }
         let mut actions = self.action_buffer.take();
         std::mem::swap(&mut *actions, &mut self.present.borrow_mut().actions);
@@ -1193,10 +1206,24 @@ impl Scope {
     pub fn mount_with<W: Widget>(&self, factory: impl FnOnce() -> W) -> Result<Mounted> {
         self.mount_at(self.0.parent, factory)
     }
+    #[doc(hidden)]
+    pub fn mount_scoped<W: Widget>(
+        &self,
+        factory: impl FnOnce(&glory_core::Scope) -> W,
+    ) -> Result<Mounted> {
+        self.mount_scoped_at(self.0.parent, factory)
+    }
     fn mount_at<W: Widget>(
         &self,
         parent: Option<NodeId>,
         factory: impl FnOnce() -> W,
+    ) -> Result<Mounted> {
+        self.mount_scoped_at(parent, |_| factory())
+    }
+    fn mount_scoped_at<W: Widget>(
+        &self,
+        parent: Option<NodeId>,
+        factory: impl FnOnce(&glory_core::Scope) -> W,
     ) -> Result<Mounted> {
         let _span = self
             .session()?
@@ -1206,7 +1233,7 @@ impl Scope {
         let scope = Self::new(self.0.core.child(), &self.session()?, parent)?;
         let widget = glory_core::untracked(|| {
             scope.owner().enter(|| {
-                let mut widget = factory();
+                let mut widget = factory(&scope);
                 widget.build(&scope)?;
                 Ok::<_, Error>(widget)
             })
@@ -1321,6 +1348,21 @@ impl Scope {
         self.session()?;
         self.0.resources.borrow_mut().push(Box::new(resource));
         Ok(())
+    }
+    /// Adapter-owned construction context. UI state never contains physical nodes.
+    #[doc(hidden)]
+    pub fn host_context<T: Any>(&self) -> Result<Rc<T>> {
+        self.session()?
+            .host_context
+            .borrow()
+            .as_ref()
+            .cloned()
+            .and_then(|value| value.downcast::<T>().ok())
+            .ok_or_else(|| RenderError::Unsupported("widget host context").into())
+    }
+    #[doc(hidden)]
+    pub fn construction_parent(&self) -> Option<NodeId> {
+        self.0.parent
     }
     pub fn create(&self, mut descriptor: Descriptor) -> Result<NodeId> {
         descriptor.normalize_input()?;
@@ -1755,11 +1797,35 @@ impl std::ops::Deref for Scope {
 
 /// A widget is built once; dynamic props/control flow install owned bindings.
 pub trait Widget: 'static {
+    /// Lets adapters represent empty optional/fragment content as a range.
+    #[doc(hidden)]
+    fn is_empty(&self) -> bool {
+        false
+    }
     #[doc(hidden)]
     fn static_plan(&mut self) -> Result<crate::Plan> {
         Err(RenderError::Unsupported("dynamic widget cannot be a static plan").into())
     }
-    fn build(&mut self, scope: &Scope) -> Result;
+    fn build(&mut self, scope: &Scope) -> Result {
+        if self.is_empty() {
+            return Ok(());
+        }
+        let mut child = self
+            .compose(scope)?
+            .ok_or(RenderError::Unsupported("widget build"))?;
+        child.build(scope)?;
+        scope.retain(child)
+    }
+    /// Function widgets compose once inside their owner, on every host.
+    #[doc(hidden)]
+    fn compose(&mut self, _scope: &glory_core::Scope) -> Result<Option<Box<dyn Widget>>> {
+        Ok(None)
+    }
+    /// Optional adapter fast path; ordinary widgets only implement `build`.
+    #[doc(hidden)]
+    fn mount_host(&mut self, _scope: &glory_core::Scope, _host: &mut dyn Any) -> Result<bool> {
+        Ok(false)
+    }
     fn mount(self, parent: &Scope) -> Result<Mounted>
     where
         Self: Sized,
@@ -1916,9 +1982,42 @@ impl App {
         runtime: Runtime,
         factory: impl FnOnce(RuntimeId) -> R,
     ) -> Self {
-        let session = Session::new(runtime, factory);
+        let session = Session::new(Rc::new(runtime), factory);
         let root = Scope::new(session.runtime.scope(), &session, None).expect("new UI scope");
         Self { root, session }
+    }
+    /// Join an adapter-owned runtime under an existing owner.
+    #[doc(hidden)]
+    pub fn in_runtime<R: Render + 'static>(
+        runtime: Rc<Runtime>,
+        parent: &glory_core::Scope,
+        factory: impl FnOnce(RuntimeId) -> R,
+    ) -> Result<Self> {
+        Self::in_owner(runtime, parent.id(), factory)
+    }
+    #[doc(hidden)]
+    pub fn in_owner<R: Render + 'static>(
+        runtime: Rc<Runtime>,
+        parent: InstanceId,
+        factory: impl FnOnce(RuntimeId) -> R,
+    ) -> Result<Self> {
+        if runtime.id() != parent.runtime() || !parent.is_alive() {
+            return Err(Error::Gone);
+        }
+        // Distinct interpreters must never issue aliasing NodeIds even when
+        // their reactive sources belong to the same graph.
+        let session = Session::with_presentation(runtime, RuntimeId::new(), factory);
+        let root = Scope::new(parent.child_scope()?, &session, None)?;
+        Ok(Self { root, session })
+    }
+    #[doc(hidden)]
+    pub fn shared_runtime(&self) -> Rc<Runtime> {
+        self.session.runtime.clone()
+    }
+    #[doc(hidden)]
+    pub fn set_host_context<T: Any>(&self, context: Rc<T>) {
+        let previous = self.session.host_context.borrow_mut().replace(context);
+        drop(previous);
     }
     pub fn memory() -> Self {
         Self::new(Memory::new)

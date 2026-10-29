@@ -25,7 +25,7 @@
       const rich=element.getAttribute('data-gly-kind')==='rich-editor';
       const root = element.closest('[data-gly-stream-pending],[data-gly-stream-state="ready"],[data-gly-rich-preload]');
       if (!root || !rich&&!['INPUT', 'TEXTAREA', 'SELECT'].includes(element.tagName)) return;
-      if (root.hasAttribute('data-gly-root') && !event.type.startsWith('composition')) return;
+      if (root.hasAttribute('data-gly-app') && !event.type.startsWith('composition')) return;
       const state = note(element);
       if (event.type === 'compositionstart') state.composing = true;
       else if (event.type === 'compositionend') { state.composing = false; state.dirty.add(rich?'richDocument':'value'); }
@@ -137,11 +137,13 @@
     };
     class Controller {
       constructor(root, initial) {
-        if (!(root instanceof Element) || root.namespaceURI !== 'http://www.w3.org/1999/xhtml' || !root.isConnected || controllers.has(root) || root.hasAttribute('data-gly-root') || !root.hasAttribute('data-gly-stream-pending')) fail('root already claimed or unavailable');
-        if (initial.version !== 2 || initial.html_version !== 13 || initial.kind !== 'start' || initial.sequence !== 0 || !Array.isArray(initial.nodes) || initial.nodes.length > MAX_NODES) fail('start envelope');
+        if (!(root instanceof Element) || root.namespaceURI !== 'http://www.w3.org/1999/xhtml' || !root.isConnected || controllers.has(root) || root.hasAttribute('data-gly-app') || !root.hasAttribute('data-gly-stream-pending')) fail('root already claimed or unavailable');
+        if (initial.version !== 2 || initial.html_version !== 14 || initial.kind !== 'start' || initial.sequence !== 0 || !Array.isArray(initial.nodes) || initial.nodes.length > MAX_NODES) fail('start envelope');
         if (typeof initial.data_id !== 'string' || !initial.data_id || initial.data_id === root.id) fail('data id');
         this.root = root; this.dataId = initial.data_id; this.entries = new Map(); this.layers = new Set(); this.composing = new Set(); this.sequence = 1; this.phase = 'active'; this.peak = 0;
         this.translations = new Map(); this.translationFrame = null; this.translationMedia = null;
+        this.initializing=true;
+        this.declarations = new Map();
         this.first = root.firstChild; this.last = root.lastChild;
         if (this.first?.nodeValue !== 'gly:stream:2' || this.last?.nodeValue !== 'gly:/stream:2') fail('pending boundaries');
         const parts = new Map(), comments = new Map();
@@ -165,6 +167,7 @@
           entry.first = physical ? parts.get(`${id}/${physical}`) : comments.get(`gly:s:${id}`);
           entry.last = physical ? parts.get(`${id}/${physical}`) : comments.get(`gly:e:${id}`);
           entry.existing = !!entry.first;
+          this.prepareDisplay(entry);
           if (entry.existing) {
             if (!entry.last || entry.first.parentNode !== entry.last.parentNode) fail('initial range');
             for (const piece of entry.shape.pieces) {
@@ -194,6 +197,8 @@
           if (entry.parts.main?.hasAttribute('data-gly-layer')) this.layers.add(id);
           this.trackTranslation(entry);
         }
+        const displayEmpties=[];
+        for(const entry of this.entries.values())if(entry.existing&&entry.display)this.displayParts(entry,true,displayEmpties);
         // Build only detached missing trees. Never replay Place/value setters
         // over the already parsed visible shell.
         const arranged = new Set();
@@ -202,7 +207,7 @@
           for (const id of entry.children) {
             const child = this.entry(id); if (child.parent !== entry.key) fail('initial parent');
             if (child.existing && !entry.existing) fail('visible child of hidden parent');
-            if (!child.existing && !entry.existing && child.placed && !child.suspended) this.move(child, ...this.container(entry));
+            if (!child.existing && !entry.existing && child.placed && !child.suspended) this.move(child, ...this.container(entry,child));
             arrange(child);
           }
         };
@@ -213,14 +218,16 @@
           if (active !== entry.existing) fail('initial visibility');
           for (const node of Object.values(entry.parts)) if (node instanceof Element && notes.get(node)?.composing) this.composing.add(node);
           if (!entry.existing) continue;
-          const [parent] = this.container(entry.parent === null ? null : this.entry(entry.parent));
+          const [parent] = this.container(entry.parent === null ? null : this.entry(entry.parent),entry);
           if (entry.first.parentNode !== parent || !entry.placed || entry.suspended) fail('visible placement');
         }
+        for(const [parent,node,before]of displayEmpties)parent.insertBefore(node,before);
         this.syncInert();
         this.peak = this.entries.size; controllers.set(root, this);
-        this.observer = new MutationObserver(() => { if (this.phase === 'ready' && (!root.isConnected || root.hasAttribute('data-gly-root'))) { this.releaseTranslations(); this.observer?.disconnect(); } else if (!root.isConnected) this.cancel(); });
-        this.observer.observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-gly-root'] });
+        this.observer = new MutationObserver(() => { if (this.phase === 'ready' && (!root.isConnected || root.hasAttribute('data-gly-app'))) { this.releaseTranslations(); this.observer?.disconnect(); } else if (!root.isConnected) this.cancel(); });
+        this.observer.observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-gly-app'] });
         root.dataset.glyStreamState = 'active';
+        this.initializing=false;this.scheduleTranslations();
       }
       entry(id) { const entry = this.entries.get(key(id)); if (!entry) fail(`missing node ${id}`); return entry; }
       trackTranslation(entry) {
@@ -234,7 +241,7 @@
         this.scheduleTranslations();
       }
       scheduleTranslations() {
-        if(!this.translations.size)return;
+        if(this.initializing||!this.translations.size)return;
         if(!this.translationMedia){this.translationMedia=matchMedia('(prefers-reduced-motion: reduce)');this.translationChanged=()=>this.scheduleTranslations();this.translationMedia.addEventListener('change',this.translationChanged);}
         if(this.translationFrame!==null)return;
         this.translationFrame=requestAnimationFrame(()=>{this.translationFrame=null;try{this.readTranslations();}catch(error){this.phase='failed';this.release();throw error;}});
@@ -365,7 +372,103 @@
           if (['value', 'checked', 'indeterminate', 'selectedKeys','richDocument'].includes(name) && !same(get(element,name), expected)) note(element).dirty.add(name);
         }
       }
+      displayDefinition(wire) {
+        if(typeof wire!=='string'||new TextEncoder().encode(wire).length>262144)fail('display declaration bytes');
+        const source=JSON.parse(wire);if(!Array.isArray(source)||source.length!==2||!Array.isArray(source[0])||!source[0].length||!Array.isArray(source[1])||source[1].length>256)fail('display declaration');
+        const paths=new Map(),slots=[],normalize=text=>text.replace(/\r\n?/g,'\n').replace(/\0/g,'\ufffd');let count=0,bytes=0;
+        const text=value=>{if(typeof value!=='string')fail('display string');bytes+=new TextEncoder().encode(value).length;if(bytes>65536)fail('display static bytes');return normalize(value);};
+        const context=(parent,tag)=>['div','span','button','a','h1','table','tbody','tr','td'].includes(tag)&&
+          (parent==='table'?tag==='tbody':parent==='tbody'?tag==='tr':parent==='tr'?tag==='td':['span','button','a','h1'].includes(parent)?tag==='span':!parent||!['tbody','tr','td'].includes(tag));
+        const walk=(raw,path,parent,interactive)=>{
+          if(++count>256||path.length>65||!Array.isArray(raw))fail('display node budget');
+          let node={kind:raw[0],slots:[]};
+          if(raw[0]===0&&raw.length===2){node.text=text(raw[1]);if(['table','tbody','tr'].includes(parent)&&node.text.trim())fail('display table text');}
+          else if(raw[0]===2&&raw.length===1){if(parent&&!['div','tbody','td'].includes(parent))fail('display range context');}
+          else if(raw[0]===1&&raw.length===4&&context(parent,raw[1])&&!(interactive&&['button','a'].includes(raw[1]))&&Array.isArray(raw[2])&&Array.isArray(raw[3])){
+            node.tag=raw[1];node.attrs=Object.create(null);
+            for(const pair of raw[2]){if(!Array.isArray(pair)||pair.length!==2||typeof pair[0]!=='string'||!/^[a-z-]+$/.test(pair[0])||!(['id','class','role','title','disabled','type'].includes(pair[0])||pair[0].startsWith('aria-'))||Object.hasOwn(node.attrs,pair[0]))fail('display attribute');
+              const [name,value]=pair;if(name==='disabled'&&node.tag!=='button'||name==='type'&&(node.tag!=='button'||value!=='button'))fail('display button attribute');node.attrs[name]=text(value);bytes+=name.length;
+            }
+            node.children=raw[3].map((child,index)=>walk(child,[...path,index],node.tag,interactive||node.tag==='button'));
+          }else fail('display node');
+          paths.set(path.join('/'),node);return node;
+        };
+        const roots=source[0].map((node,index)=>walk(node,[index],null,false));const seen=new Set();
+        for(const [index,raw]of source[1].entries()){
+          if(!Array.isArray(raw)||raw.length!==3||!Array.isArray(raw[0])||!raw[0].length||raw[0].length>65||raw[0].some(value=>!Number.isInteger(value)||value<0||value>255)||!Number.isInteger(raw[1])||raw[1]<0||raw[1]>5)fail('display slot');
+          const [path,kind,name]=raw,node=paths.get(path.join('/'));if(!node)fail('display target path');
+          if(kind===0&&(node.kind!==0||node.text!==''||name!==null)||kind===4&&(node.kind!==2||name!==null)||[1,2,3,5].includes(kind)&&node.kind!==1)fail('display slot target');
+          if(kind===1&&(!['class','title','aria-label'].includes(name)||Object.hasOwn(node.attrs,name))||[2,3].includes(kind)&&name!==null)fail('display slot attribute');
+          if(kind===3&&!['div','tbody','td'].includes(node.tag)||kind===5&&(typeof name!=='string'||!/^[A-Za-z0-9_-]{1,128}$/.test(name)))fail('display content/class slot');
+          const signature=`${path.join('/')}/${kind}/${name}`;if(seen.has(signature))fail('duplicate display slot');seen.add(signature);
+          if(kind===1&&name==='class'&&node.slots.some(slot=>slots[slot].kind===5)||kind===5&&node.slots.some(slot=>slots[slot].kind===1&&slots[slot].name==='class'))fail('ambiguous display class');
+          node.slots.push(index);slots.push({kind,name,node});
+          if(kind===5)bytes+=name.length;if(bytes>65536)fail('display static bytes');
+        }
+        for(const node of paths.values())if(node.kind===2&&node.slots.length!==1)fail('unbound display range');
+        if(bytes>65536)fail('display static bytes');return {roots,slots,references:0};
+      }
+      displayValue(slot,value) {
+        if(!slot)fail('unknown display slot');
+        if([0,1].includes(slot.kind)){if(typeof value!=='string'||/[\0\r]/.test(value)||new TextEncoder().encode(value).length>65536)fail('display field value');}
+        else if(slot.kind===5){if(typeof value!=='boolean')fail('display class value');}
+        else if(value!==null)fail('display structural value');
+      }
+      prepareDisplay(entry) {
+        const display=entry.shape.display;if(display===undefined)return;
+        if(!display||entry.shape.pieces.length||entry.shape.children!==null||entry.shape.control!==null)fail('display shape');
+        if(display.kind==='outlet'){key(display.owner);if(!Number.isInteger(display.slot)||display.slot<0||display.slot>=256)fail('display outlet');return;}
+        if(display.kind!=='root')fail('display kind');const id=key(display.declaration);let definition=this.declarations.get(id);
+        if(display.wire!==null){if(definition)fail('duplicate display declaration');definition=this.displayDefinition(display.wire);}
+        if(!definition||!Array.isArray(display.values)||display.values.length!==definition.slots.length)fail('display initial values');
+        display.values.forEach((value,slot)=>this.displayValue(definition.slots[slot],value));
+        definition.references++;this.declarations.set(id,definition);
+        entry.display={id,definition,values:display.values.slice(),targets:[],markers:[]};
+        // Static AST/slot metadata is retained once per live declaration.
+        entry.shape.display={kind:'root'};
+      }
+      displayParts(entry,adopt,empties) {
+        const display=entry.display,{definition,values}=display;
+        const comment=(expected,parent,end,cursor)=>{
+          if(!adopt){const node=document.createComment(expected);parent.insertBefore(node,end);return node;}
+          const node=cursor.node;if(node?.nodeType!==Node.COMMENT_NODE||node.nodeValue!==expected)fail('display comment');cursor.node=node.nextSibling;return node;
+        };
+        const outlet=(slot,parent,end,cursor)=>{
+          const container=definition.slots[slot].kind===3;let marker;
+          if(container)marker=comment(`gly:slot:${entry.key}:${slot}`,parent,end,cursor);
+          if(adopt)for(const id of entry.children){const child=this.entry(id),config=child.shape.display;if(config?.kind==='outlet'&&config.owner===entry.key&&config.slot===slot&&child.placed&&!child.suspended){if(cursor.node!==child.first||child.last.parentNode!==parent)fail('display outlet range');cursor.node=child.last.nextSibling;}}
+          if(!container)marker=comment(`gly:slot:${entry.key}:${slot}`,parent,end,cursor);
+          display.markers[slot]=marker;return marker;
+        };
+        const walk=(nodes,parent,end,cursor)=>{for(const plan of nodes){let node;
+          if(plan.kind===2){node=outlet(plan.slots[0],parent,end,cursor);}
+          else if(plan.kind===0){comment('gly:dt',parent,end,cursor);const slot=plan.slots[0],text=slot===undefined?plan.text:values[slot];
+            if(!adopt){node=document.createTextNode(text);parent.insertBefore(node,end);}
+            else if(cursor.node?.nodeType===Node.TEXT_NODE){node=cursor.node;if(node.nodeValue!==text)fail('display text');cursor.node=node.nextSibling;}
+            else if(text===''){node=document.createTextNode('');empties.push([parent,node,cursor.node]);}else fail('display missing text');
+          }else{
+            const attrs={...plan.attrs};for(const slot of plan.slots){const config=definition.slots[slot];
+              if(config.kind===1)attrs[config.name]=values[slot];else if(config.kind===2)attrs['data-gly-dclick']=String(slot);
+              else if(config.kind===5){const current=attrs.class||'',parts=current.split(/[\t\n\f\r ]+/).filter(Boolean),present=parts.includes(config.name);attrs.class=present===values[slot]?current:[...parts.filter(value=>value!==config.name),...(values[slot]?[config.name]:[])].join(' ');}
+            }
+            if(!adopt){node=document.createElement(plan.tag);for(const[name,value]of Object.entries(attrs))node.setAttribute(name,value);parent.insertBefore(node,end);}
+            else{node=cursor.node;if(!(node instanceof Element)||node.localName!==plan.tag||node.namespaceURI!=='http://www.w3.org/1999/xhtml'||node.attributes.length!==Object.keys(attrs).length||Object.entries(attrs).some(([name,value])=>node.getAttribute(name)!==value))fail('display element');cursor.node=node.nextSibling;}
+            const nested={node:node.firstChild};walk(plan.children,node,null,nested);
+            for(const slot of plan.slots)if(definition.slots[slot].kind===3)outlet(slot,node,null,nested);
+            if(adopt&&nested.node!==null)fail('display extra children');
+          }
+          for(const slot of plan.slots)display.targets[slot]=node;
+        }};
+        const cursor={node:entry.first.nextSibling};walk(definition.roots,entry.first.parentNode,entry.last,cursor);
+        if(adopt&&cursor.node!==entry.last)fail('display extra roots');
+      }
+      patchDisplay(entry,changes) {
+        const display=entry.display;if(!display||!Array.isArray(changes)||changes.length>256)fail('display patch');const seen=new Set();
+        for(const change of changes){if(!Array.isArray(change)||change.length!==2||!Number.isInteger(change[0])||seen.has(change[0]))fail('display patch slot');seen.add(change[0]);const slot=display.definition.slots[change[0]];if(!slot||![0,1,5].includes(slot.kind))fail('display patch kind');this.displayValue(slot,change[1]);}
+        for(const[index,value]of changes){const slot=display.definition.slots[index],node=display.targets[index];if(slot.kind===0)node.nodeValue=value;else if(slot.kind===1)node.setAttribute(slot.name,value);else node.classList.toggle(slot.name,value);display.values[index]=value;}
+      }
       createParts(entry) {
+        if(!entry.display)this.prepareDisplay(entry);
         for (const piece of entry.shape.pieces) {
           let node;
           const parent = piece.parent === null ? entry.fragment : entry.parts[piece.parent];
@@ -383,10 +486,19 @@
         }
         if (!entry.shape.pieces.length) entry.fragment.append(document.createComment(`gly:s:${entry.key}`), document.createComment(`gly:e:${entry.key}`));
         entry.first = entry.fragment.firstChild; entry.last = entry.fragment.lastChild;
+        if(entry.display)this.displayParts(entry,false,[]);
         this.trackTranslation(entry);
       }
-      container(entry) {
+      container(entry,child) {
+        if(child?.shape.display?.kind==='outlet'&&entry?.key!==child.shape.display.owner)fail('foreign display outlet');
         if (entry === null) return [this.root, this.last];
+        if(entry.display){
+          const outlet=child?.shape.display;if(outlet?.kind!=='outlet'||outlet.owner!==entry.key)fail('display outlet owner');
+          const slot=entry.display.definition.slots[outlet.slot],target=entry.display.targets[outlet.slot];
+          if(!target||![3,4].includes(slot?.kind))fail('display outlet target');
+          return slot.kind===3?[target,null]:[target.parentNode,target];
+        }
+        if(child?.shape.display?.kind==='outlet')fail('outlet without display parent');
         if (entry.shape.children) return [entry.parts[entry.shape.children], null];
         if (!entry.shape.pieces.length) return [entry.last.parentNode, entry.last];
         fail('no child slot');
@@ -450,13 +562,16 @@
           } else {
             const entry = this.entry(op.key);
             if (op.op === 'patch') this.patch(entry, op.edits);
+            else if(op.op==='display')this.patchDisplay(entry,op.values);
             else if (op.op === 'place') {
               const parent = op.parent === null ? null : this.entry(op.parent), before = op.before === null ? null : this.entry(op.before);
               if (before && (before === entry || before.parent !== op.parent)) fail('before parent');
               for (let ancestor = parent; ancestor; ancestor = ancestor.parent === null ? null : this.entry(ancestor.parent)) if (ancestor === entry) fail('placement cycle');
               this.unlink(entry); entry.parent = op.parent; entry.placed = true; entry.suspended = false;
               if (parent) { const at = before ? parent.children.indexOf(before.key) : parent.children.length; parent.children.splice(at, 0, entry.key); }
-              const [container, end] = this.container(parent); this.move(entry, container, before ? before.first : end);
+              const [container, end] = this.container(parent,entry);
+              if(before&&before.first.parentNode!==container)fail('foreign physical insertion anchor');
+              this.move(entry, container, before ? before.first : end);
               if (entry.savedFocus && document.activeElement === document.body) restoreFocus(entry.savedFocus); entry.savedFocus = null;
             } else if (op.op === 'suspend') {
               const nodes = this.range(entry), saved = focusState();
@@ -467,7 +582,7 @@
               const actual = new Set(); const collect = node => { actual.add(node.key); for (const id of node.children) collect(this.entry(id)); }; collect(entry);
               if (!Array.isArray(op.subtree) || op.subtree.length !== actual.size || op.subtree.some(id => !actual.has(key(id)))) fail('dispose subtree');
               this.unlink(entry); for (const node of this.range(entry)) node.remove();
-              for (const id of actual) { for (const node of Object.values(this.entry(id).parts)) this.composing.delete(node); this.entries.delete(id); this.layers.delete(id); const motion=this.translations.get(id);motion?.animation?.cancel();this.translations.delete(id); }
+              for (const id of actual) { const retired=this.entry(id);for (const node of Object.values(retired.parts)) this.composing.delete(node);if(retired.display&&!--retired.display.definition.references)this.declarations.delete(retired.display.id); this.entries.delete(id); this.layers.delete(id); const motion=this.translations.get(id);motion?.animation?.cancel();this.translations.delete(id); }
             } else fail('operation');
           }
         }
@@ -475,7 +590,7 @@
         this.root.dispatchEvent(new CustomEvent('glory:stream-patch', { detail: { sequence: frame.sequence, nodes: this.entries.size } }));
       }
       validateEnd(frame) {
-        if (frame.html_version !== 13 || !Array.isArray(frame.rekey) || frame.rekey.length !== this.entries.size) fail('end keys/version');
+        if (frame.html_version !== 14 || !Array.isArray(frame.rekey) || frame.rekey.length !== this.entries.size) fail('end keys/version');
         const old = new Set(), next = new Set();
         for (const pair of frame.rekey) { if (!Array.isArray(pair) || pair.length !== 2 || old.has(key(pair[0])) || next.has(key(pair[1])) || !this.entries.has(pair[0])) fail('rekey'); old.add(pair[0]); next.add(pair[1]); }
         if (document.getElementById(this.dataId) || !frame.resources || frame.resources.version !== 1 || !Array.isArray(frame.resources.records) || frame.resources.records.length > 4096) fail('resource envelope/data id');
@@ -501,13 +616,14 @@
           for (const node of Object.values(entry.parts)) if (node instanceof Element) node.setAttribute('data-gly-key', next);
           if (entry.marker) entry.marker.nodeValue = `gly:t:${next}`;
           if (!entry.shape.pieces.length) { entry.first.nodeValue = `gly:s:${next}`; entry.last.nodeValue = `gly:e:${next}`; }
+          if(entry.display)entry.display.markers.forEach((marker,slot)=>{marker.nodeValue=`gly:slot:${next}:${slot}`;});
         }
         const data = document.createElement('script'); data.id = this.dataId; data.type = 'application/json'; data.setAttribute('data-gly-resources', '1'); data.textContent = JSON.stringify(frame.resources);
-        this.root.after(data); this.first.nodeValue = 'gly:v:13'; this.last.nodeValue = 'gly:/v:13';
+        this.root.after(data); this.first.nodeValue = 'gly:v:14'; this.last.nodeValue = 'gly:/v:14';
         this.phase = 'ready'; this.root.removeAttribute('data-gly-stream-pending'); this.root.dataset.glyStreamState = 'ready';
         this.release(); this.root.dispatchEvent(new CustomEvent('glory:stream-ready', { detail: { dataId: this.dataId, peak: this.peak } }));
       }
-      release() { controllers.delete(this.root); if(this.phase!=='ready'||!this.translations.size){this.observer?.disconnect();this.releaseTranslations();} if (this.eof) document.removeEventListener('DOMContentLoaded', this.eof); this.eof = null; this.entries.clear(); this.layers.clear(); this.composing.clear(); this.pendingEnd = null; }
+      release() { controllers.delete(this.root); if(this.phase!=='ready'||!this.translations.size){this.observer?.disconnect();this.releaseTranslations();} if (this.eof) document.removeEventListener('DOMContentLoaded', this.eof); this.eof = null; this.entries.clear(); this.declarations.clear();this.layers.clear(); this.composing.clear(); this.pendingEnd = null; }
       cancel() { if (!['active'].includes(this.phase)) return; this.phase = 'cancelled'; this.root.dataset.glyStreamState = 'cancelled'; this.release(); }
     }
     globalThis.GloryStream = Object.freeze({

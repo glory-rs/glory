@@ -8,20 +8,16 @@ fn seeds_keep_local_state_on_reorder_but_reinsertion_constructs_a_fresh_owner() 
     let items = app.scope().cage(vec![(1, "one"), (2, "two")]);
     let handles = Rc::new(RefCell::new(Vec::new()));
     let made = handles.clone();
-    app.mount(each_seed(
-        items,
-        |item| item.0,
-        move |(key, seed)| {
-            // A map constructed by the factory belongs to the row, too.
-            let owned = items.map(move |_| key);
-            let made = made.clone();
-            widget(move |scope| {
-                let local = scope.cage(seed.to_owned());
-                made.borrow_mut().push((key, local, owned));
-                text().content(local).show_in(scope)
-            })
-        },
-    ))
+    app.mount(each(items).key(|item| item.0).seed(move |(key, seed)| {
+        // A map constructed by the factory belongs to the row, too.
+        let owned = items.map(move |_| key);
+        let made = made.clone();
+        widget(move |scope| {
+            let local = scope.cage(seed.to_owned());
+            made.borrow_mut().push((key, local, owned));
+            text().content(local).show_in(scope)
+        })
+    }))
     .unwrap();
     let initial = app.runtime_stats();
     let one = handles.borrow()[0].1;
@@ -69,18 +65,17 @@ fn seed_rows_omit_exactly_two_sources_and_one_data_owner_per_key() {
         let app = App::memory();
         let rows = vec![1usize, 2, 3];
         if seed {
-            app.mount(each_seed(
-                rows,
-                |id| *id,
-                |id| text().content(id.to_string()),
-            ))
+            app.mount(
+                each(rows)
+                    .key(|id| *id)
+                    .seed(|id| text().content(id.to_string())),
+            )
             .unwrap();
         } else {
-            app.mount(each(
-                rows,
-                |id| *id,
-                |id, _| text().content(id.get_untracked().to_string()),
-            ))
+            app.mount(each(rows).key(|id| *id).children(|entry| {
+                let id = entry.value;
+                text().content(id.get_untracked().to_string())
+            }))
             .unwrap();
         }
         (app.runtime_stats().nodes, app.runtime_stats().owners)
@@ -89,4 +84,22 @@ fn seed_rows_omit_exactly_two_sources_and_one_data_owner_per_key() {
     let seed = counts(true);
     assert_eq!(full.0 - seed.0, 6);
     assert_eq!(full.1 - seed.1, 3);
+}
+
+#[test]
+fn keyed_members_support_the_same_initial_value_mode() {
+    let app = App::memory();
+    let source = app.scope().keyed_list(vec![1usize, 2], |id| *id).unwrap();
+    let calls = Rc::new(std::cell::Cell::new(0));
+    let captured = calls.clone();
+    app.mount(each(source).seed(move |id| {
+        captured.set(captured.get() + 1);
+        text().content(id.to_string())
+    }))
+    .unwrap();
+    source.swap(0, 1).unwrap();
+    app.flush().unwrap();
+    assert_eq!(calls.get(), 2);
+    app.clear().unwrap();
+    assert_eq!(app.stats().nodes, 0);
 }

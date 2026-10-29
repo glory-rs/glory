@@ -31,6 +31,12 @@ export function defineTemplate(host, wire) {
     host.templates.push({ roots: prototype, targets, rangeRoots });
     return id;
 }
+export function childContainer(host, id, slot) {
+    const instance = host.instances.get(id);
+    if (host.closed || !instance || instance.template.targets[slot]?.[1] !== 3)
+        throw Error('not a live widget container');
+    return instance.targets[slot];
+}
 function rangeNodes(instance) {
     if (!instance.spans) return instance.roots;
     const nodes = [];

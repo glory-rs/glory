@@ -375,6 +375,12 @@ fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_ren
         .dyn_ref::<Element>()
         .cloned()
         .or_else(|| node.parent_element());
+    if name == "click"
+        && let Some(element) = element.as_ref()
+        && super::display::click(dom, element)?
+    {
+        return Ok(());
+    }
     let origin = element.as_ref().and_then(|element| target(dom, element));
     // An unfocused document sends keyboard input to body. Only the first app
     // owns that empty-document context; a focused sibling app stays isolated.

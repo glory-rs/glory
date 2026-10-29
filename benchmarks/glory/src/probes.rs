@@ -1,5 +1,5 @@
 //! Acceptance-only exports are excluded from measured artifacts.
-use glory::html::template::{Kind, Node, Target, Template};
+use glory::html::view::{Field, Node, Outlet, Template, children as outlet_children};
 use glory::web::template::App;
 use wasm_bindgen::prelude::*;
 
@@ -9,43 +9,19 @@ const fn children<const N: usize>() -> [Node; N] {
         attrs: &[],
         children: &[],
     }; N];
-    values[0] = Node::Text("");
+    values[0] = Node::Field(Field::new("value"));
     values
 }
-static SMALL: Template = Template {
-    roots: &[Node::Element {
-        tag: "div",
-        attrs: &[],
-        children: &children::<1>(),
-    }],
-    targets: &[
-        Target {
-            path: &[0, 0],
-            kind: Kind::Text,
-        },
-        Target {
-            path: &[0],
-            kind: Kind::Children,
-        },
-    ],
-};
-static LARGE: Template = Template {
-    roots: &[Node::Element {
-        tag: "div",
-        attrs: &[],
-        children: &children::<200>(),
-    }],
-    targets: &[
-        Target {
-            path: &[0, 0],
-            kind: Kind::Text,
-        },
-        Target {
-            path: &[0],
-            kind: Kind::Children,
-        },
-    ],
-};
+static SMALL: Template = Template::new(&[Node::Element {
+    tag: "div",
+    attrs: &[outlet_children(Outlet::new("children"))],
+    children: &children::<1>(),
+}]);
+static LARGE: Template = Template::new(&[Node::Element {
+    tag: "div",
+    attrs: &[outlet_children(Outlet::new("children"))],
+    children: &children::<200>(),
+}]);
 #[wasm_bindgen]
 pub fn probe_templates() -> String {
     let doc = web_sys::window().unwrap().document().unwrap();
@@ -55,16 +31,19 @@ pub fn probe_templates() -> String {
         let app = App::new(root.clone()).unwrap();
         let owner = app.scope();
         assert!(App::new(root.clone()).is_err());
+        let definition = template.cached().unwrap();
+        let text = definition.slot("value").unwrap().0;
+        let outlet = definition.slot("children").unwrap().0;
         let instance = app.mount(&owner, template).unwrap();
         assert!(app.mount(&owner, template).is_err());
         instance.place(None, None).unwrap();
         let value = owner.cage("数据🙂𠮷\n\"\\".to_owned());
-        instance.bind(&owner, 0, value).unwrap();
-        assert!(instance.set(1, "wrong".into()).is_err());
-        assert!(instance.set(0, "x".repeat(65537)).is_err());
+        instance.bind(&owner, text, value).unwrap();
+        assert!(instance.set(outlet, "wrong".into()).is_err());
+        assert!(instance.set(text, "x".repeat(65537)).is_err());
         assert!(
             instance
-                .bind_values(&owner, [0, 0], || ["a".into(), "b".into()])
+                .bind_values(&owner, [text, text], || ["a".into(), "b".into()])
                 .is_err()
         );
         app.flush().unwrap();
@@ -91,30 +70,30 @@ pub fn probe_templates() -> String {
         let other = App::new(other_root).unwrap();
         let foreign = other.scope();
         assert!(app.mount(&foreign, template).is_err());
-        assert!(instance.bind(&foreign, 0, "constant").is_err());
+        assert!(instance.bind(&foreign, text, "constant").is_err());
         let foreign_instance = other.mount(&foreign, &SMALL).unwrap();
         assert!(
             foreign_instance
-                .place(Some(&instance.children(1).unwrap()), None)
+                .place(Some(&instance.children(outlet).unwrap()), None)
                 .is_err()
         );
         assert!(instance.place(None, Some(&foreign_instance)).is_err());
         let child = owner.child();
         let row = app.mount(&child, &SMALL).unwrap();
         assert!(row.place(None, None).is_err());
-        row.place(Some(&instance.children(1).unwrap()), None)
+        row.place(Some(&instance.children(outlet).unwrap()), None)
             .unwrap();
-        row.set(0, "child".into()).unwrap();
+        row.set(text, "child".into()).unwrap();
         app.flush().unwrap();
         assert_eq!(app.stats().instances, 2);
         drop(child);
         app.flush().unwrap();
         assert_eq!(app.stats().instances, 1);
-        assert!(row.set(0, "stale".into()).is_err());
+        assert!(row.set(text, "stale".into()).is_err());
         for _ in 0..32 {
             let child = owner.child();
             let row = app.mount(&child, &SMALL).unwrap();
-            row.place(Some(&instance.children(1).unwrap()), None)
+            row.place(Some(&instance.children(outlet).unwrap()), None)
                 .unwrap();
             app.flush().unwrap();
             drop(child);
@@ -126,7 +105,7 @@ pub fn probe_templates() -> String {
         assert_eq!(app.stats().records, 0);
         assert_eq!(app.runtime().stats().nodes, 0);
         assert!(root.first_child().is_none());
-        assert!(instance.set(0, "stale".into()).is_err());
+        assert!(instance.set(text, "stale".into()).is_err());
         let weak = app.downgrade();
         drop(app);
         assert!(weak.upgrade().is_err());

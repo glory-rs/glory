@@ -4,13 +4,13 @@ pub use crate::view::{Error, Result};
 use glory_core::{BindingId, Host, HostError, InstanceId, LocalFuture, Runtime, Scope, Vary};
 use glory_html::{
     template::Kind,
-    view::{Compiled, Source},
+    view::{Compiled, Template},
 };
 use std::{
-    any::TypeId,
     cell::{Cell, RefCell},
     collections::{HashMap, VecDeque},
     rc::{Rc, Weak},
+    sync::Arc,
     time::Duration,
 };
 use wasm_bindgen::{JsCast, JsValue, closure::Closure, prelude::wasm_bindgen};
@@ -32,6 +32,12 @@ extern "C" {
     ) -> std::result::Result<js_sys::Array, JsValue>;
     #[wasm_bindgen(catch, js_name = destroyHost)]
     fn destroy_host(host: &JsValue) -> std::result::Result<(), JsValue>;
+    #[wasm_bindgen(catch, js_name = childContainer)]
+    fn child_container(
+        host: &JsValue,
+        id: u32,
+        slot: u16,
+    ) -> std::result::Result<web_sys::Element, JsValue>;
 }
 fn backend(value: JsValue) -> Error {
     Error(format!("template host: {value:?}"))
@@ -40,8 +46,10 @@ fn error(value: impl std::fmt::Display) -> Error {
     Error(value.to_string())
 }
 type Handler = Rc<RefCell<Box<dyn FnMut()>>>;
+type PendingWidget =
+    Box<dyn FnOnce(web_sys::Element, Rc<Runtime>, InstanceId) -> Result<crate::WebApp>>;
 struct Record {
-    template: Rc<Compiled>,
+    template: Arc<Compiled>,
     owner: InstanceId,
     owner_parent: Option<InstanceId>,
     parent: Option<(u32, u16)>,
@@ -52,7 +60,7 @@ struct Record {
     children: Vec<Scope>,
 }
 struct Declaration {
-    data: Rc<Compiled>,
+    data: Arc<Compiled>,
     host_id: Cell<Option<u32>>,
 }
 enum Op {
@@ -84,7 +92,8 @@ impl Host for Bridge {
     }
 }
 struct State {
-    runtime: Runtime,
+    runtime: Rc<Runtime>,
+    bridge: Rc<Bridge>,
     scope: Rc<Scope>,
     host: JsValue,
     ingress: RefCell<Option<Closure<dyn FnMut(u32, u32)>>>,
@@ -93,8 +102,10 @@ struct State {
     fault: RefCell<Option<Error>>,
     events: RefCell<VecDeque<(u32, u16)>>,
     records: RefCell<HashMap<u32, Record>>,
+    widgets: RefCell<HashMap<u32, Rc<crate::WebApp>>>,
+    pending_widgets: RefCell<HashMap<u32, PendingWidget>>,
     owners: RefCell<HashMap<InstanceId, u32>>,
-    templates: RefCell<HashMap<(TypeId, usize), Rc<Declaration>>>,
+    templates: RefCell<HashMap<usize, Rc<Declaration>>>,
     next: Cell<u32>,
     commands: RefCell<Vec<Op>>,
     texts: RefCell<String>,
@@ -135,12 +146,15 @@ impl App {
             .ok_or_else(|| error(format!("missing display root: {id}")))?;
         Self::new(root)
     }
-    pub fn launch<C: crate::view::Component>(id: &str, props: C::Props) -> Result<Self> {
+    pub fn launch(id: &str, widget: impl glory_ui::Widget) -> Result<Self> {
         let app = Self::at_id(id)?;
-        app.render(crate::view::component::<C>(props))?;
+        app.render(widget)?;
         Ok(app)
     }
     pub fn new(root: web_sys::Element) -> Result<Self> {
+        Self::create(root)
+    }
+    fn create(root: web_sys::Element) -> Result<Self> {
         let window = web_sys::window().ok_or_else(|| error("missing Window"))?;
         let clock = window
             .performance()
@@ -149,7 +163,7 @@ impl App {
             state: RefCell::new(Weak::new()),
             clock,
         });
-        let runtime = Runtime::with_host(bridge.clone());
+        let runtime = Rc::new(Runtime::with_host(bridge.clone()));
         let scope = Rc::new(runtime.scope());
         let ingress_state: Rc<RefCell<Weak<State>>> = Rc::new(RefCell::new(Weak::new()));
         let slot = ingress_state.clone();
@@ -169,6 +183,7 @@ impl App {
         let host = create_host(&root, ingress.as_ref().unchecked_ref()).map_err(backend)?;
         let state = Rc::new(State {
             runtime,
+            bridge: bridge.clone(),
             scope,
             host,
             ingress: RefCell::new(Some(ingress)),
@@ -177,6 +192,8 @@ impl App {
             fault: RefCell::new(None),
             events: RefCell::new(VecDeque::new()),
             records: RefCell::new(HashMap::new()),
+            widgets: RefCell::new(HashMap::new()),
+            pending_widgets: RefCell::new(HashMap::new()),
             owners: RefCell::new(HashMap::new()),
             templates: RefCell::new(HashMap::new()),
             next: Cell::new(1),
@@ -212,19 +229,35 @@ impl App {
             applied: self.0.applied.get(),
         }
     }
-    pub fn mount(&self, owner: &Scope, template: &'static dyn Source) -> Result<Instance> {
+    pub fn mount(&self, owner: &Scope, template: &'static Template) -> Result<Instance> {
         self.0.mount(owner, template)
     }
-    pub(crate) fn prepare(&self, template: &'static dyn Source) -> Result<Rc<Compiled>> {
+    pub(crate) fn prepare(&self, template: &'static Template) -> Result<Arc<Compiled>> {
         Ok(self.0.declaration(template)?.data.clone())
     }
     pub(crate) fn ensure_live(&self) -> Result<()> {
         self.0.check()
     }
-    pub fn render(&self, view: impl crate::view::IntoView) -> Result<crate::view::Mounted> {
-        let instance = view.mount(self, &self.0.scope)?;
+    pub fn render(&self, view: impl glory_ui::Widget) -> Result<crate::view::Mounted> {
+        let instance = crate::view::mount(view, self, &self.0.scope)?;
         instance.place(None, None)?;
         self.flush()?;
+        Ok(instance)
+    }
+    pub(crate) fn mount_widget(
+        &self,
+        owner: &Scope,
+        widget: impl glory_ui::Widget,
+    ) -> Result<Instance> {
+        use glory_html::view::{Outlet, Template, children, div};
+        static ISLAND: Template = Template::new(&[div(&[children(Outlet::new("widget"))], &[])]);
+        let instance = self.mount(owner, &ISLAND)?;
+        self.0.pending_widgets.borrow_mut().insert(
+            instance.id,
+            Box::new(move |root, runtime, owner| {
+                crate::browser::launch_in_runtime(root, runtime, owner, widget).map_err(error)
+            }),
+        );
         Ok(instance)
     }
     pub fn close(&self) -> Result<()> {
@@ -279,6 +312,9 @@ impl State {
             return Err(error("template command budget"));
         }
         commands.push(op);
+        if !self.flushing.get() {
+            self.bridge.wake();
+        }
         Ok(())
     }
     fn queue_text(&self, id: u32, slot: u16, value: &str) -> Result<()> {
@@ -303,14 +339,14 @@ impl State {
             texts.len(),
             value.encode_utf16().count() as u32,
         ));
+        if !self.flushing.get() {
+            self.bridge.wake();
+        }
         Ok(())
     }
-    fn declaration(&self, template: &'static dyn Source) -> Result<Rc<Declaration>> {
+    fn declaration(&self, template: &'static Template) -> Result<Rc<Declaration>> {
         self.check()?;
-        let key = (
-            template.type_id(),
-            template as *const dyn Source as *const () as usize,
-        );
+        let key = template as *const Template as usize;
         if let Some(known) = self.templates.borrow().get(&key) {
             return Ok(known.clone());
         }
@@ -318,13 +354,13 @@ impl State {
             return Err(error("template declaration budget"));
         }
         let declaration = Rc::new(Declaration {
-            data: Rc::new(template.compile().map_err(error)?),
+            data: template.cached().map_err(error)?,
             host_id: Cell::new(None),
         });
         self.templates.borrow_mut().insert(key, declaration.clone());
         Ok(declaration)
     }
-    fn mount(self: &Rc<Self>, owner: &Scope, template: &'static dyn Source) -> Result<Instance> {
+    fn mount(self: &Rc<Self>, owner: &Scope, template: &'static Template) -> Result<Instance> {
         self.check()?;
         if owner.runtime() != self.runtime.id() || !owner.is_alive() {
             return Err(error("foreign/dead template owner"));
@@ -361,7 +397,11 @@ impl State {
             Record {
                 template,
                 owner: owner.id(),
-                owner_parent: owner.parent(),
+                owner_parent: if owner.id() == self.scope.id() {
+                    None
+                } else {
+                    owner.parent()
+                },
                 parent: None,
                 placed: false,
                 handlers: HashMap::new(),
@@ -386,6 +426,10 @@ impl State {
     }
     fn retire(&self, id: u32) {
         let record = self.records.borrow_mut().remove(&id);
+        let pending = self.pending_widgets.borrow_mut().remove(&id);
+        let widget = self.widgets.borrow_mut().remove(&id);
+        drop(pending);
+        drop(widget);
         if let Some(record) = record {
             self.owners.borrow_mut().remove(&record.owner);
             if !self.closed.get()
@@ -439,6 +483,48 @@ impl State {
             }
         }
         self.runtime.flush().map_err(error)?;
+        if self.widgets.borrow().is_empty() && self.pending_widgets.borrow().is_empty() {
+            return self.flush_host();
+        }
+        self.flush_host()?;
+        // Only actual Widget islands enter these indices; raw-row updates
+        // never scan the template instance table.
+        loop {
+            let mut pending: Vec<_> = self.pending_widgets.borrow_mut().drain().collect();
+            if pending.is_empty() {
+                break;
+            }
+            pending.sort_unstable_by_key(|(id, _)| *id);
+            for (id, build) in pending {
+                let owner = self.records.borrow().get(&id).map(|r| r.owner);
+                let Some(owner) = owner.filter(|owner| owner.is_alive()) else {
+                    continue;
+                };
+                let root = child_container(&self.host, id, 0).map_err(backend)?;
+                root.set_attribute("style", "display:contents")
+                    .map_err(backend)?;
+                let guard = Rc::new(build(root, self.runtime.clone(), owner)?);
+                if owner.is_alive() && self.records.borrow().contains_key(&id) {
+                    self.widgets.borrow_mut().insert(id, guard);
+                }
+            }
+            self.flush_host()?;
+        }
+        let mut widgets: Vec<_> = self
+            .widgets
+            .borrow()
+            .iter()
+            .map(|(&id, widget)| (id, widget.clone()))
+            .collect();
+        widgets.sort_unstable_by_key(|(id, _)| *id);
+        for (_, widget) in widgets {
+            if widget.app().scope().is_alive() {
+                widget.flush().map_err(error)?;
+            }
+        }
+        if !self.pending_widgets.borrow().is_empty() {
+            self.bridge.wake();
+        }
         self.check()?;
         self.flush_host()
     }
@@ -556,6 +642,10 @@ impl State {
         self.scope.owner().dispose();
         let records = std::mem::take(&mut *self.records.borrow_mut());
         drop(records);
+        let pending = std::mem::take(&mut *self.pending_widgets.borrow_mut());
+        let widgets = std::mem::take(&mut *self.widgets.borrow_mut());
+        drop(pending);
+        drop(widgets);
         self.owners.borrow_mut().clear();
         drop(std::mem::take(&mut *self.commands.borrow_mut()));
         drop(std::mem::take(&mut *self.texts.borrow_mut()));
@@ -594,7 +684,7 @@ impl Instance {
         &self,
         owner: &Scope,
         slot: u16,
-        mut read: impl FnMut() -> bool + 'static,
+        mut read: impl FnMut() -> Result<bool> + 'static,
     ) -> Result<()> {
         let mut previous = self.flag_initial(slot)?;
         let state = self.state()?;
@@ -608,7 +698,13 @@ impl Instance {
         }
         let instance = self.clone();
         let binding = owner.binding(move || {
-            let next = read();
+            let next = match read() {
+                Ok(next) => next,
+                Err(error) => {
+                    instance.fail(error);
+                    return;
+                }
+            };
             if next != previous {
                 if let Err(e) = instance.set_flag(slot, next) {
                     instance.fail(e);
@@ -795,6 +891,14 @@ impl Instance {
         slots: [u16; N],
         mut read: impl FnMut() -> [String; N] + 'static,
     ) -> Result<()> {
+        self.try_bind_values(owner, slots, move || Ok(read()))
+    }
+    pub(crate) fn try_bind_values<const N: usize>(
+        &self,
+        owner: &Scope,
+        slots: [u16; N],
+        mut read: impl FnMut() -> Result<[String; N]> + 'static,
+    ) -> Result<()> {
         let state = self.state()?;
         let valid = state.records.borrow().get(&self.id).is_some_and(|r| {
             r.owner == owner.id()
@@ -813,7 +917,13 @@ impl Instance {
         let instance = self.clone();
         let mut previous: Option<[String; N]> = None;
         let binding = owner.binding(move || {
-            let values = read();
+            let values = match read() {
+                Ok(values) => values,
+                Err(error) => {
+                    instance.fail(error);
+                    return;
+                }
+            };
             for (i, value) in values.iter().enumerate() {
                 if previous.as_ref().is_none_or(|old| old[i] != *value)
                     && let Err(e) = instance.set_text(slots[i], value)

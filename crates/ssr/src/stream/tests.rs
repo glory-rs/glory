@@ -18,6 +18,8 @@ mod clipboard;
 mod collapse;
 #[path = "command_tests.rs"]
 mod command;
+#[path = "display_tests.rs"]
+mod display;
 #[path = "document_tests.rs"]
 mod document;
 #[path = "drag_capture_tests.rs"]

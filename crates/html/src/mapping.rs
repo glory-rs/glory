@@ -269,13 +269,42 @@ pub fn preflight<'a>(
 pub fn shape<'a>(descriptor: impl Into<glory_render::DescriptorView<'a>>) -> Result<Shape, Error> {
     shape_view(descriptor.into())
 }
+pub(crate) fn physical_tag(
+    node: glory_render::DescriptorView<'_>,
+) -> Result<Option<&'static str>, Error> {
+    Ok(Some(match node.props {
+        Props::Group => return Ok(None),
+        Props::View => view_tag(node.role, node.field_part(), node.document_part()),
+        Props::Text(text) => text_tag(text.kind, node.options.get::<HtmlTextOptions>())?,
+        Props::Button(_) | Props::File(_) => "button",
+        Props::Input(input) => {
+            if input.multiline {
+                "textarea"
+            } else {
+                "input"
+            }
+        }
+        Props::Select(_) => "select",
+        Props::RichEditor(_) => "div",
+        Props::Check(_) => "label",
+        Props::Image(_) => "img",
+        Props::Graphic(_) => "svg",
+        Props::Link(_) => "a",
+    }))
+}
 
 // Keep the finite lowering shared by owned, live and declared descriptors.
 // The public conversion boundary must not monomorphize this complete mapper.
 fn shape_view(descriptor: glory_render::DescriptorView<'_>) -> Result<Shape, Error> {
     descriptor.validate()?;
     if matches!(descriptor.props, Props::Group) {
-        return Ok(Shape::default());
+        return Ok(Shape {
+            display: descriptor
+                .options
+                .get::<crate::display::Placement>()
+                .cloned(),
+            ..Shape::default()
+        });
     }
     let tag = match &descriptor.props {
         Props::View => view_tag(

@@ -1,8 +1,18 @@
 use std::collections::HashMap;
 
+use glory_html::display::{Frame, Placement, Queue, Value as SlotValue};
 use glory_html::{Edit, Kind, Op, Property, Shape, Sink};
 use glory_render::{Error, NodeId};
 use serde_json::{Value, json};
+use std::rc::Rc;
+
+// Declaration identities are request-local wire keys, never pointer/Runtime IDs.
+// Keep only declarations referenced by live (including suspended) instances.
+struct Declaration {
+    key: u64,
+    references: usize,
+    sent: bool,
+}
 
 pub(super) struct Edits {
     keys: HashMap<NodeId, u64>,
@@ -10,6 +20,10 @@ pub(super) struct Edits {
     pub recording: bool,
     bytes: usize,
     limit: usize,
+    queue: Rc<Queue>,
+    frames: HashMap<NodeId, Rc<Frame>>,
+    owners: HashMap<*const Frame, NodeId>,
+    declarations: HashMap<usize, Declaration>,
 }
 impl Edits {
     pub fn new(limit: usize) -> Self {
@@ -19,6 +33,10 @@ impl Edits {
             recording: false,
             bytes: 0,
             limit,
+            queue: Rc::default(),
+            frames: HashMap::new(),
+            owners: HashMap::new(),
+            declarations: HashMap::new(),
         }
     }
     pub fn take(&mut self) -> Vec<Value> {
@@ -26,6 +44,10 @@ impl Edits {
         std::mem::take(&mut self.values)
     }
     pub fn clear(&mut self) {
+        self.frames.clear();
+        self.owners.clear();
+        self.declarations.clear();
+        self.queue.take();
         self.keys = HashMap::new();
         self.values = Vec::new();
         self.bytes = 0;
@@ -33,8 +55,88 @@ impl Edits {
     pub fn ids(&self) -> Vec<NodeId> {
         self.keys.keys().copied().collect()
     }
+    #[cfg(test)]
+    pub(super) fn display_stats(&self) -> (usize, usize) {
+        (self.frames.len(), self.declarations.len())
+    }
     fn key(&self, id: NodeId) -> Result<u64, Error> {
         self.keys.get(&id).copied().ok_or(Error::NodeGone(id))
+    }
+    fn register(&mut self, id: NodeId, key: u64, shape: &Shape) {
+        if let Some(Placement::Root(frame)) = &shape.display {
+            self.declarations
+                .entry(frame.compiled() as *const _ as usize)
+                .or_insert(Declaration {
+                    key,
+                    references: 0,
+                    sent: false,
+                })
+                .references += 1;
+            self.owners.insert(Rc::as_ptr(frame), id);
+            self.frames.insert(id, frame.clone());
+            frame.bind(&self.queue, id);
+        }
+    }
+    pub fn shape(&mut self, node: Shape) -> Result<Value, Error> {
+        let placement = node.display.clone();
+        let mut value = shape(node);
+        if let Some(placement) = placement {
+            value["display"] = match placement {
+                Placement::Root(frame) => {
+                    let declaration = self
+                        .declarations
+                        .get_mut(&(frame.compiled() as *const _ as usize))
+                        .ok_or(Error::InvalidProps("unregistered stream template"))?;
+                    let wire = (!declaration.sent).then(|| frame.compiled().wire.as_str());
+                    declaration.sent = true;
+                    let values = (0..frame.compiled().slots.len())
+                        .map(|slot| frame.value(slot as u16).map(slot_value))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    json!({"kind":"root","declaration":declaration.key.to_string(),"wire":wire,"values":values})
+                }
+                Placement::Outlet { frame, slot } => {
+                    json!({"kind":"outlet","owner":self.key(*self.owners.get(&Rc::as_ptr(&frame)).ok_or(Error::InvalidPlacement("missing stream template owner"))?)?.to_string(),"slot":slot})
+                }
+            };
+        }
+        Ok(value)
+    }
+    fn push(&mut self, value: Value) -> Result<(), Error> {
+        let bytes = serde_json::to_vec(&value)
+            .map_err(|error| Error::Backend(error.to_string()))?
+            .len();
+        self.bytes = self
+            .bytes
+            .checked_add(bytes + 1)
+            .ok_or(Error::InvalidProps("stream edit size exhausted"))?;
+        if self.bytes > self.limit {
+            return Err(Error::InvalidProps("stream edit chunk byte limit"));
+        }
+        self.values.push(value);
+        Ok(())
+    }
+    pub fn flush_display(&mut self) -> Result<(), Error> {
+        for id in self.queue.take() {
+            let Some(frame) = self.frames.get(&id) else {
+                continue;
+            };
+            let changes = frame.take_changes();
+            if self.recording && !changes.is_empty() {
+                let values: Vec<_> = changes
+                    .into_iter()
+                    .map(|(slot, value)| json!([slot, slot_value(value)]))
+                    .collect();
+                self.push(json!({"op":"display","key":self.key(id)?.to_string(),"values":values}))?;
+            }
+        }
+        Ok(())
+    }
+}
+fn slot_value(value: SlotValue) -> Value {
+    match value {
+        SlotValue::Text(text) => json!(text),
+        SlotValue::Flag(flag) => json!(flag),
+        SlotValue::None => Value::Null,
     }
 }
 fn property(value: Property) -> Value {
@@ -93,8 +195,12 @@ impl Sink for Edits {
                 shape: node,
             } => {
                 self.keys.insert(id, key);
-                self.recording
-                    .then(|| json!({"op":"create","key":key.to_string(),"shape":shape(node)}))
+                self.register(id, key, &node);
+                if self.recording {
+                    Some(json!({"op":"create","key":key.to_string(),"shape":self.shape(node)?}))
+                } else {
+                    None
+                }
             }
             Op::Patch { id, edits } => {
                 if !self.recording {
@@ -135,7 +241,21 @@ impl Sink for Edits {
                 let key = self.key(id)?;
                 let removed: Vec<_> = subtree
                     .into_iter()
-                    .filter_map(|id| self.keys.remove(&id))
+                    .filter_map(|id| {
+                        if let Some(frame) = self.frames.remove(&id) {
+                            self.owners.remove(&Rc::as_ptr(&frame));
+                            let address = frame.compiled() as *const _ as usize;
+                            let declaration = self
+                                .declarations
+                                .get_mut(&address)
+                                .expect("live declaration");
+                            declaration.references -= 1;
+                            if declaration.references == 0 {
+                                self.declarations.remove(&address);
+                            }
+                        }
+                        self.keys.remove(&id)
+                    })
                     .map(|key| key.to_string())
                     .collect();
                 self.recording
@@ -143,17 +263,7 @@ impl Sink for Edits {
             }
         };
         if let Some(value) = value {
-            let bytes = serde_json::to_vec(&value)
-                .map_err(|error| Error::Backend(error.to_string()))?
-                .len();
-            self.bytes = self
-                .bytes
-                .checked_add(bytes + 1)
-                .ok_or(Error::InvalidProps("stream edit size exhausted"))?;
-            if self.bytes > self.limit {
-                return Err(Error::InvalidProps("stream edit chunk byte limit"));
-            }
-            self.values.push(value);
+            self.push(value)?;
         }
         Ok(())
     }

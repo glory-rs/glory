@@ -353,6 +353,10 @@ impl EventHandler for Events {
             event_state.prevent_default();
             return;
         }
+        if display::receive(&mut state, event.target, &event.data) {
+            event_state.prevent_default();
+            return;
+        }
         // The event chain starts at the target. Do not copy the whole node map
         // for each input: work is proportional to event ancestry, not list size.
         let node = chain
@@ -365,7 +369,12 @@ impl EventHandler for Events {
                     .or_else(|| state.dom.owners.get(node))
                     .copied()
             })
-            .or_else(|| state.dom.owner(event.target));
+            .or_else(|| state.dom.owner(event.target))
+            .filter(|id| {
+                state.mapper.tree().node(*id).is_ok_and(|node| {
+                    !matches!(node.descriptor.view().props, glory_render::Props::Group)
+                })
+            });
         if let Some(node) = node {
             if choice::prevent_pointer_focus(&state, node, &event.data) {
                 event_state.prevent_default();
@@ -822,7 +831,12 @@ fn drag_input(state: &mut State, target: EngineId, event: &DomEventData) -> bool
 }
 
 fn keyboard(state: &mut State, target: EngineId, key: &BlitzKeyEvent) -> bool {
-    let owner = state.dom.owner(target);
+    let owner =
+        state.dom.owner(target).filter(|id| {
+            state.mapper.tree().node(*id).is_ok_and(|node| {
+                !matches!(node.descriptor.view().props, glory_render::Props::Group)
+            })
+        });
     if owner.is_some_and(|id| {
         state
             .mapper

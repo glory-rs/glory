@@ -43,35 +43,28 @@ mod browser {
             ),
         ],
     )]);
-    struct Counter;
-    struct CounterProps {
-        initial: i32,
-        shared: Cage<i32>,
-    }
-    impl Component for Counter {
-        type Props = CounterProps;
-        fn view(scope: &Scope, props: Self::Props) -> impl IntoView {
-            let count = scope.cage(props.initial);
-            // This implicit map must belong to the component, not its source.
-            let shared = props.shared.map(|value| format!("shared {value}"));
-            #[cfg(feature = "hand")]
-            {
-                view(&COUNTER)
-                    .bind(COUNT, count)
-                    .watch(DOUBLE, move || count.get() * 2)
-                    .bind(SHARED, shared)
-                    .on_click(INC, move || count.revise(|n| *n += 1))
-            }
-            #[cfg(not(feature = "hand"))]
-            {
-                g::view! {
-                    <div class="counter">
-                        <span class="value">{count}</span>
-                        <span class="double">{move || count.get()*2}</span>
-                        <span class="shared">{shared}</span>
-                        <button type="button" class="increment" on:click={move || count.revise(|n|*n+=1)}>"+"</button>
-                    </div>
-                }
+    #[g::component(g)]
+    fn Counter(scope: &Scope, initial: i32, shared: Cage<i32>) -> impl Widget {
+        let count = scope.cage(initial);
+        // This implicit map must belong to the component, not its source.
+        let shared = shared.map(|value| format!("shared {value}"));
+        #[cfg(feature = "hand")]
+        {
+            view(&COUNTER)
+                .bind(COUNT, count)
+                .watch(DOUBLE, move || count.get() * 2)
+                .bind(SHARED, shared)
+                .on_click(INC, move || count.revise(|n| *n += 1))
+        }
+        #[cfg(not(feature = "hand"))]
+        {
+            g::view! {
+                <div class="counter">
+                    <span class="value">{count}</span>
+                    <span class="double">{move || count.get()*2}</span>
+                    <span class="shared">{shared}</span>
+                    <button type="button" class="increment" on:click={move || count.revise(|n|*n+=1)}>"+"</button>
+                </div>
             }
         }
     }
@@ -145,12 +138,9 @@ mod browser {
             .on_click(INC, move || count.revise(|n| *n += 1))
             .on_click(TOGGLE, move || selected.revise(|n| *n = !*n))
             .on_click(ALT, move || alt.revise(|n| *n += 1))
-            .component::<Counter>(
+            .child(
                 CHILD,
-                CounterProps {
-                    initial: 10,
-                    shared: count,
-                },
+                lazy(move || Counter::default().initial(10).shared(count)),
             );
         #[cfg(not(feature = "hand"))]
         let config = g::view! {
@@ -220,11 +210,11 @@ mod browser {
             let demo = slot.as_mut().unwrap();
             for index in 0..count {
                 let scope = demo.scope.child();
-                let mounted = component::<Counter>(CounterProps {
-                    initial: index as i32,
-                    shared: demo.count,
-                })
-                .mount(&demo.app, &scope)
+                let mounted = g::web::view::mount(
+                    Counter::default().initial(index as i32).shared(demo.count),
+                    &demo.app,
+                    &scope,
+                )
                 .unwrap();
                 mounted.place(Some(&demo.rows), None).unwrap();
                 demo.owned.push((scope, mounted));
@@ -265,9 +255,17 @@ mod browser {
 }
 #[cfg(target_arch = "wasm32")]
 mod structural;
+#[cfg(target_arch = "wasm32")]
+mod unified;
 fn main() {
+    #[cfg(target_arch = "wasm32")]
+    std::panic::set_hook(Box::new(|info| {
+        web_sys::console::error_1(&info.to_string().into())
+    }));
     #[cfg(target_arch = "wasm32")]
     browser::main();
     #[cfg(target_arch = "wasm32")]
     structural::main();
+    #[cfg(target_arch = "wasm32")]
+    unified::main();
 }
