@@ -8,6 +8,8 @@ pub use glory_i18n as i18n;
 pub use glory_render as render;
 #[cfg(feature = "resources")]
 pub use glory_resource as resources;
+#[cfg(feature = "routing")]
+pub use glory_routing as routing;
 #[cfg(feature = "ssr")]
 pub use glory_ssr as ssr;
 pub use glory_style as style;

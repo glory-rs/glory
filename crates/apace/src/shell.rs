@@ -120,6 +120,12 @@ pub struct WindowApp {
     executor: Rc<Executor>,
     revision: Cell<u64>,
     error: Option<glory_ui::Error>,
+    #[cfg(feature = "routing")]
+    route: RefCell<Option<glory_routing::RouterHandle>>,
+    #[cfg(feature = "routing")]
+    navigation: RefCell<std::collections::VecDeque<glory_routing::native::NativeEvent>>,
+    #[cfg(feature = "routing")]
+    navigation_result: RefCell<Option<glory_routing::Result<glory_routing::Navigation>>>,
     #[cfg(all(
         feature = "accesskit",
         not(any(target_os = "android", target_os = "ios"))
@@ -160,6 +166,12 @@ impl WindowApp {
             executor,
             revision: Cell::new(0),
             error: None,
+            #[cfg(feature = "routing")]
+            route: RefCell::new(None),
+            #[cfg(feature = "routing")]
+            navigation: RefCell::new(std::collections::VecDeque::new()),
+            #[cfg(feature = "routing")]
+            navigation_result: RefCell::new(None),
             #[cfg(all(
                 feature = "accesskit",
                 not(any(target_os = "android", target_os = "ios"))
@@ -177,6 +189,45 @@ impl WindowApp {
     }
     pub fn renderer(&self) -> &Renderer {
         &self.renderer
+    }
+    /// Bind this window to a Router from its own Runtime. Platform callbacks
+    /// enqueue input; guards and Widget work run later during observe().
+    #[cfg(feature = "routing")]
+    pub fn attach_router(&self, router: glory_routing::RouterHandle) -> glory_routing::Result {
+        if router.runtime()? != self.app.runtime().id() {
+            return Err(glory_routing::Error::WrongRuntime);
+        }
+        *self.route.borrow_mut() = Some(router);
+        self.navigation.borrow_mut().clear();
+        Ok(())
+    }
+    #[cfg(feature = "routing")]
+    pub fn queue_navigation(
+        &self,
+        event: glory_routing::native::NativeEvent,
+    ) -> glory_routing::Result {
+        if self
+            .route
+            .borrow()
+            .as_ref()
+            .is_none_or(|router| !router.is_alive())
+        {
+            return Err(glory_routing::Error::Gone);
+        }
+        let mut queue = self.navigation.borrow_mut();
+        if queue.len() >= 32 {
+            return Err(glory_routing::Error::Busy);
+        }
+        queue.push_back(event);
+        drop(queue);
+        glory_core::Host::wake(self.executor.as_ref());
+        Ok(())
+    }
+    #[cfg(feature = "routing")]
+    pub fn take_navigation_result(
+        &self,
+    ) -> Option<glory_routing::Result<glory_routing::Navigation>> {
+        self.navigation_result.borrow_mut().take()
     }
     #[cfg(all(
         feature = "files",
@@ -198,6 +249,17 @@ impl WindowApp {
     /// and settle semantic work. The caller supplies its event-loop waker; this
     /// does not create an OS window or confirm that pixels were displayed.
     pub fn observe(&self, context: &Context<'_>) -> glory_ui::Result<bool> {
+        #[cfg(feature = "routing")]
+        {
+            let router = self.route.borrow().clone();
+            let events = std::mem::take(&mut *self.navigation.borrow_mut());
+            if let Some(router) = router {
+                let mut navigation = glory_routing::native::NativeNavigation::new(router);
+                for event in events {
+                    *self.navigation_result.borrow_mut() = Some(navigation.dispatch(event));
+                }
+            }
+        }
         self.renderer.observe_resources(context.waker());
         self.executor.observe(context.waker());
         self.executor.dirty();
@@ -233,6 +295,26 @@ impl Document for WindowApp {
         }))
     }
     fn handle_ui_event(&mut self, mut event: UiEvent) {
+        #[cfg(feature = "routing")]
+        if let UiEvent::KeyDown(key) = &event {
+            let delta = match key.key {
+                Key::Named(NamedKey::BrowserBack) => Some(-1),
+                Key::Named(NamedKey::BrowserForward) => Some(1),
+                _ => None,
+            };
+            let router = self.route.borrow().clone();
+            if let (Some(delta), Some(router)) = (delta, router)
+                && router.can_traverse(delta) == Ok(Some(true))
+            {
+                let input = if delta < 0 {
+                    glory_routing::native::NativeEvent::Back
+                } else {
+                    glory_routing::native::NativeEvent::Forward
+                };
+                let _ = self.queue_navigation(input);
+                return;
+            }
+        }
         if matches!(&event, UiEvent::Ime(ApaceImeEvent::Commit(text)) if text == "\n")
             && tags::software_enter(&self.renderer.0.borrow())
         {

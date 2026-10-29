@@ -26,6 +26,16 @@ try {
         throw "Unexpected build directory: $actualTarget"
     }
     Write-Output "Verified target: $actualTarget"
+    $routingGraph = cargo tree --locked -p glory-routing --no-default-features --edges normal,build --prefix none
+    if ($LASTEXITCODE -ne 0) { throw 'routing dependency graph failed' }
+    if ($routingGraph | Select-String '^(glory-ui|glory-html|glory-web|glory-ssr|glory-apace|salvo|serde|serde_json|wasm-bindgen) v') {
+        throw 'default routing graph acquired UI, DOM, HTTP or serialization dependencies'
+    }
+    $facadeGraph = cargo tree --locked -p glory --no-default-features --edges normal,build --prefix none
+    if ($LASTEXITCODE -ne 0) { throw 'minimal facade dependency graph failed' }
+    if ($facadeGraph | Select-String '^(glory-routing|url) v') {
+        throw 'minimal facade acquired optional routing dependencies'
+    }
     $toolMetadata = cargo metadata --locked --manifest-path tools/cli/Cargo.toml --no-deps --format-version 1 | ConvertFrom-Json
     if ($LASTEXITCODE -ne 0 -or [IO.Path]::GetFullPath($toolMetadata.target_directory) -ne $expectedTarget) { throw 'Unexpected CLI target directory' }
     cargo fmt --manifest-path tools/cli/Cargo.toml -- --check
