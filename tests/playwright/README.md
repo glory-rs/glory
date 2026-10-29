@@ -7,26 +7,27 @@ server-function, hot-reload and LiveView projects have been removed.
 Install once:
 
 ```powershell
-npm --prefix tests/playwright install --package-lock=false
-npm --prefix tests/playwright exec playwright install chromium
+cd tests/playwright
+npm install --package-lock=false
+npm exec -- playwright install chromium
 ```
 
-List projects:
+Run the following commands from `tests/playwright`. List projects:
 
 ```powershell
-npm --prefix tests/playwright run list
+npm run list
 ```
 
 Run a project by pointing it at a running app:
 
 ```powershell
 $env:GLORY_COUNTER_URL = "http://127.0.0.1:8080"
-npm --prefix tests/playwright run test:counter
+npm run test:counter
 ```
 
 The `counter` project targets the migrated semantic counter. Start it with
-`./examples/counter/build.ps1 -Platform web -Run` (see that example's README for
-the matching wasm-bindgen CLI), then set `GLORY_COUNTER_URL` to
+`./examples/counter/build.ps1 -Platform web -Run` from the repository root (see
+that example's README for the matching wasm-bindgen CLI), then set `GLORY_COUNTER_URL` to
 `http://127.0.0.1:8790`. The dedicated counter CI workflow builds its current WASM
 entry and runs this project. The broader semantic browser acceptance suite is
 in `examples/semantic-web`, driven by `scripts/test-semantic-browser.cjs`.

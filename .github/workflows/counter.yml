@@ -53,10 +53,11 @@ jobs:
           ./examples/counter/build.ps1 -Platform web -BuildRoot D:/BuildCache/glory-counter-ci
       - name: Browser acceptance
         shell: pwsh
+        working-directory: tests/playwright
         run: |
-          npm --prefix tests/playwright install --package-lock=false
+          npm install --package-lock=false
           if ($LASTEXITCODE -ne 0) { throw 'Playwright installation failed' }
-          npm --prefix tests/playwright exec -- playwright install chromium
+          npm exec -- playwright install chromium
           if ($LASTEXITCODE -ne 0) { throw 'Chromium installation failed' }
           $server = Start-Process python -ArgumentList @('-m', 'http.server', '8790', '--bind', '127.0.0.1', '--directory', 'D:/BuildCache/glory-counter-ci/web-debug') -WindowStyle Hidden -PassThru
           try {
@@ -67,7 +68,7 @@ jobs:
             }
             if (-not $ready) { throw 'Counter server did not start' }
             $env:GLORY_COUNTER_URL = 'http://127.0.0.1:8790'
-            npm --prefix tests/playwright run test:counter -- --output D:/BuildCache/glory-counter-ci/playwright
+            npm run test:counter -- --output D:/BuildCache/glory-counter-ci/playwright
             if ($LASTEXITCODE -ne 0) { throw 'Counter browser acceptance failed' }
           }
           finally { Stop-Process -Id $server.Id -ErrorAction SilentlyContinue }
