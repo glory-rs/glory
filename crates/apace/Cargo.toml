@@ -32,7 +32,7 @@ glory-render = { path = "../render", version = "0.6.0" }
 glory-core = { path = "../core", version = "0.6.0", optional = true }
 glory-ui = { path = "../ui", version = "0.6.0", optional = true }
 tokio = { version = "1.54.1", default-features = false, features = ["rt", "sync", "time", "macros"], optional = true }
-futures-timer = { version = "=3.0.3", optional = true }
+futures-timer = { version = "=3.0.4", optional = true }
 percent-encoding = { version = "2.3.2", optional = true }
 apace-dom = { version = "=0.3.0-beta.4", default-features = false, features = ["system-fonts", "complex-scripts"] }
 apace-traits = { version = "=0.3.0-beta.4", default-features = false }
