@@ -1,4 +1,4 @@
-param([switch]$Bench, [switch]$Web, [switch]$Window, [switch]$Android, [string]$AndroidSerial)
+param([switch]$Bench, [switch]$Web, [switch]$Window, [switch]$Android, [switch]$Audit, [string]$AndroidSerial)
 
 $ErrorActionPreference = 'Stop'
 if ($AndroidSerial -and -not $Android) { throw '-AndroidSerial requires -Android' }
@@ -6,7 +6,7 @@ if ($AndroidSerial -and $AndroidSerial -notmatch '^emulator-\d+$') { throw '-And
 $taskBuildRoot = 'D:/BuildCache/glory-semantic-ui'
 $taskWorkspace = Split-Path -Parent $PSScriptRoot
 $savedEnvironment = @{}
-foreach ($name in @('CARGO_HOME', 'CARGO_TARGET_DIR', 'TEMP', 'TMP', 'CARGO_PROFILE_BENCH_OPT_LEVEL', 'PYTHONPYCACHEPREFIX', 'ANDROID_USER_HOME')) {
+foreach ($name in @('CARGO_HOME', 'CARGO_TARGET_DIR', 'TEMP', 'TMP', 'CARGO_PROFILE_BENCH_OPT_LEVEL', 'PYTHONPYCACHEPREFIX', 'ANDROID_USER_HOME', 'GLORY_DSL_BUILD_ROOT')) {
     $savedEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
 }
 
@@ -26,6 +26,12 @@ try {
         throw "Unexpected build directory: $actualTarget"
     }
     Write-Output "Verified target: $actualTarget"
+    python scripts/check-current-docs.py
+    if ($LASTEXITCODE -ne 0) { throw 'current documentation consistency failed' }
+    if ($Audit) {
+        python scripts/check-dependencies.py --out "$taskBuildRoot/dependency-audit"
+        if ($LASTEXITCODE -ne 0) { throw 'dependency audit failed' }
+    }
     $routingGraph = cargo tree --locked -p glory-routing --no-default-features --edges normal,build --prefix none
     if ($LASTEXITCODE -ne 0) { throw 'routing dependency graph failed' }
     if ($routingGraph | Select-String '^(glory-ui|glory-html|glory-web|glory-ssr|glory-apace|salvo|serde|serde_json|wasm-bindgen) v') {
@@ -84,6 +90,9 @@ try {
         cargo clippy --locked --manifest-path examples/semantic-web/Cargo.toml --target wasm32-unknown-unknown --all-targets -- -D warnings
         if ($LASTEXITCODE -ne 0) { throw 'Web fixture clippy failed' }
         & "$PSScriptRoot/build-semantic-web.ps1"
+        $env:GLORY_DSL_BUILD_ROOT = "$taskBuildRoot/dsl-diagnostics"
+        python scripts/check-display-diagnostics.py
+        if ($LASTEXITCODE -ne 0) { throw 'downstream DSL diagnostics failed' }
     }
 
     if ($Bench) {

@@ -106,8 +106,9 @@ limited to Salvo.
   have no name/focus target. Metadata updates preserve editor values/selection.
 - `glory`: a facade over those packages.
 - `glory-html`: common HTML mapping, typed incremental edits and serialization.
-  HTML format v3 includes semantic enabled/disabled/checked attributes on main
-  mapping nodes; stylesheet states work for Check's internal control as well.
+  The wire format is versioned by [`FORMAT_VERSION`](crates/html/src/lib.rs).
+  Semantic enabled/disabled/checked attributes exist on main mapping nodes;
+  stylesheet states work for Check's internal control as well.
 - `glory-web`: wasm32 DOM interpreter, RAF host, input/composition handling,
   real geometry/selection queries and windowed browser scrolling.
 - `glory-ssr`: synchronous snapshots and document output using the same mapper;
@@ -324,7 +325,8 @@ metadata does not validate arbitrary stylesheets or promise identical engines.
 Maximum sizes use `Limit::{None, Px, Percent}`. `max_width(Limit::None)` removes
 a stylesheet cap; leaving `max_width` absent lets that stylesheet apply. Preferred
 and minimum sizes continue to use `Length`, including `Auto`.
-Apace publishes its own `STYLE_PROFILE` (apace v3): typed sticky positioning and
+Apace publishes its own [`STYLE_PROFILE`](crates/apace/src/document.rs), separately
+from the HTML wire format and HTML style profile. Typed sticky positioning and
 automatic scroll anchoring return an explicit unsupported error until the pinned
 engine implements their geometry. Disabling anchoring remains supported for
 Glory's virtual lists. Raw author CSS retains the selected engine's coverage.

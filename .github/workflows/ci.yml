@@ -10,6 +10,8 @@ permissions:
   contents: read
 
 jobs:
+  quality:
+    uses: ./.github/workflows/quality.yml
   semantic-ui:
     runs-on: windows-latest
     timeout-minutes: 90
