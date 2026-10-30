@@ -47,7 +47,7 @@ peniko = { version = "=0.6.1", optional = true }
 anyrender_vello_cpu = { version = "=0.18.0", optional = true }
 
 [target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))'.dependencies]
-arboard = { version = "=3.6.1", default-features = false, features = ["wayland-data-control"], optional = true }
+arboard = { version = "=3.7.0", default-features = false, features = ["wayland-data-control"], optional = true }
 rfd = { version = "=0.17.2", default-features = false, features = ["xdg-portal", "wayland"], optional = true }
 mime_guess = { version = "=2.0.5", optional = true }
 libc = { version = "=0.2.191", optional = true }
