@@ -14,7 +14,7 @@ pub fn expand(args: TokenStream, item: TokenStream) -> syn::Result<TokenStream> 
     if !signature.generics.params.is_empty()
         || signature.generics.where_clause.is_some()
         || signature.asyncness.is_some()
-        || signature.unsafety.is_some()
+        || !matches!(signature.safety, syn::Safety::Default)
         || signature.constness.is_some()
         || signature.abi.is_some()
         || signature.variadic.is_some()
