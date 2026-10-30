@@ -218,8 +218,39 @@ pub enum ImageStatus {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct LinkProps {
+    /// Relative URL or an http, https, mailto or tel URL. Custom schemes are
+    /// rejected; applications handle custom navigation through explicit host
+    /// callbacks rather than putting executable or platform URLs in href.
     pub target: String,
     pub label: String,
+}
+
+impl LinkProps {
+    pub fn validate(&self) -> Result<(), Error> {
+        validate_link_target(&self.target)
+    }
+}
+
+/// Validate before URL values reach any host. Percent-encoded colons remain
+/// relative path data; a scheme is possible only before the first /, ? or #.
+fn validate_link_target(target: &str) -> Result<(), Error> {
+    let invalid =
+        || Error::InvalidProps("link target requires a relative or http/https/mailto/tel URL");
+    if target
+        .chars()
+        .any(|ch| ch.is_control() || ch.is_whitespace())
+    {
+        return Err(invalid());
+    }
+    let prefix = target.split(['/', '?', '#']).next().unwrap_or_default();
+    if let Some((scheme, _)) = prefix.split_once(':')
+        && !["http", "https", "mailto", "tel"]
+            .iter()
+            .any(|allowed| scheme.eq_ignore_ascii_case(allowed))
+    {
+        return Err(invalid());
+    }
+    Ok(())
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]

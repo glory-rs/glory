@@ -21,7 +21,7 @@ pub use definition::{
 pub use error::{Error, Result};
 pub use history::{Entry, EntryKey, History, MemoryHistory, ScrollMemory, Traversal};
 #[cfg(feature = "widgets")]
-pub use link::link;
+pub use link::{link, link_with};
 pub use location::{Limits, Location, Query, Target};
 pub use params::{Params, RouteParams};
 pub use request::{RequestHistory, RequestLocation, RequestResolution};

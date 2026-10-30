@@ -248,6 +248,19 @@ impl RouterHandle {
     pub fn has_async_guards(&self) -> Result<bool> {
         Ok(!self.control()?.async_guards.borrow().is_empty())
     }
+    /// Register an async guard from a host factory that receives a weak handle.
+    /// The Router's Owner retains it. Installing a new guard revokes any work
+    /// prepared under the previous guard set before publishing the new policy.
+    pub fn async_guard(&self, guard: impl Fn(GuardContext) -> GuardFuture + 'static) -> Result {
+        let control = self.writable_control()?;
+        if control.busy.replace(true) {
+            return Err(Error::Busy);
+        }
+        let _busy = Busy(&control.busy);
+        control.cancel();
+        control.async_guards.borrow_mut().push(Rc::new(guard));
+        Ok(())
+    }
     pub fn location(&self, owner: &Owner) -> Result<Bond<Location>> {
         if !owner.is_alive() {
             return Err(Error::Gone);

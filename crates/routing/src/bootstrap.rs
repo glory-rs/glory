@@ -36,7 +36,7 @@ impl Bootstrap {
     }
     pub fn to_payload(&self) -> String {
         let mut lines = vec![
-            "glory-routing/1".to_owned(),
+            "glory-routing/2".to_owned(),
             self.schema.clone(),
             encode(&self.location.to_string()),
         ];
@@ -48,7 +48,7 @@ impl Bootstrap {
             return Err(Error::OverLimit("route bootstrap"));
         }
         let mut lines = payload.lines();
-        if lines.next() != Some("glory-routing/1") {
+        if lines.next() != Some("glory-routing/2") {
             return Err(Error::HydrationMismatch);
         }
         let schema = lines

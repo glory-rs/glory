@@ -16,8 +16,35 @@ struct Queue {
     dirty: bool,
     waker: Option<Waker>,
     notified: bool,
+    #[cfg(test)]
+    compact_inspected: usize,
 }
 impl Queue {
+    // Membership is removed immediately; stale numeric FIFO entries are bounded
+    // and compacted amortized, without rescanning the queue for every cancel.
+    fn compact(&mut self) {
+        if self.queued.is_empty() {
+            self.ready.clear();
+        } else if self.ready.len() > self.queued.len().saturating_mul(2).saturating_add(64) {
+            #[cfg(test)]
+            {
+                self.compact_inspected += self.ready.len();
+            }
+            self.ready.retain(|id| self.queued.contains(id));
+        }
+    }
+    fn pop(&mut self) -> Option<usize> {
+        let id = loop {
+            let Some(id) = self.ready.pop_front() else {
+                break None;
+            };
+            if self.queued.remove(&id) {
+                break Some(id);
+            }
+        };
+        self.compact();
+        id
+    }
     fn signal(&mut self) -> Option<Waker> {
         if self.notified {
             return None;
@@ -46,8 +73,9 @@ impl Notify {
     fn remove(&self, id: usize) {
         let mut queue = self.0.lock().expect("local task queue");
         queue.live.remove(&id);
-        queue.queued.remove(&id);
-        queue.ready.retain(|entry| *entry != id);
+        if queue.queued.remove(&id) {
+            queue.compact();
+        }
     }
 }
 struct TaskWake {
@@ -101,7 +129,7 @@ impl Executor {
     }
     pub fn work(&self) -> bool {
         let queue = self.notify.0.lock().expect("local task queue");
-        !queue.ready.is_empty() || queue.dirty
+        !queue.queued.is_empty() || queue.dirty
     }
     pub fn len(&self) -> usize {
         self.tasks.borrow().len()
@@ -112,11 +140,7 @@ impl Executor {
     pub fn poll_one(&self) -> bool {
         let id = {
             let mut queue = self.notify.0.lock().expect("local task queue");
-            let id = queue.ready.pop_front();
-            if let Some(id) = id {
-                queue.queued.remove(&id);
-            }
-            id
+            queue.pop()
         };
         let Some(id) = id else { return false };
         let entry = self.tasks.borrow().get(&id).cloned();
@@ -230,6 +254,50 @@ mod tests {
         }
         fn wake_by_ref(self: &Arc<Self>) {
             self.0.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+    #[test]
+    fn mass_cancellation_compacts_linearly_and_preserves_live_fifo() {
+        for count in [128usize, 1024, 4096] {
+            let executor = Executor::new(count);
+            let order = Rc::new(RefCell::new(Vec::new()));
+            let mut cancellations = Vec::new();
+            for id in 0..count {
+                let order = order.clone();
+                cancellations.push(
+                    executor
+                        .spawn(Box::pin(async move {
+                            order.borrow_mut().push(id);
+                        }))
+                        .unwrap(),
+                );
+            }
+            // Match the former retain-on-every-cancel implementation's actual
+            // queue visits, for the same cancellation sequence.
+            let mut reference: VecDeque<_> = (0..count).collect();
+            let mut old_inspected = 0;
+            for (id, cancel) in cancellations.into_iter().enumerate() {
+                if id % 3 != 0 {
+                    old_inspected += reference.len();
+                    reference.retain(|entry| *entry != id);
+                    cancel();
+                }
+                let queue = executor.notify.0.lock().unwrap();
+                assert!(queue.ready.len() <= 2 * queue.queued.len() + 64);
+            }
+            while executor.poll_one() {}
+            assert_eq!(*order.borrow(), reference.into_iter().collect::<Vec<_>>());
+            let queue = executor.notify.0.lock().unwrap();
+            eprintln!(
+                "{count} queued tasks: old inspected={old_inspected}, compact inspected={}",
+                queue.compact_inspected
+            );
+            assert!(queue.compact_inspected < count * 3);
+            assert!(queue.compact_inspected < old_inspected);
+            assert!(queue.ready.is_empty());
+            assert!(queue.queued.is_empty());
+            drop(queue);
+            assert!(!executor.work());
         }
     }
     #[test]

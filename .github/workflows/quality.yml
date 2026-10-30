@@ -1,0 +1,109 @@
+name: quality-and-compatibility
+on:
+  workflow_call:
+  schedule:
+    - cron: '17 2 * * 1'
+  workflow_dispatch:
+    inputs:
+      apple:
+        description: Run the prepared Apple data-volume host
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  dependencies:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    env:
+      CARGO_HOME: D:/BuildCache/glory-quality/cargo
+      CARGO_TARGET_DIR: D:/BuildCache/glory-quality/target
+      RUSTUP_HOME: D:/BuildCache/glory-quality/rustup
+      TEMP: D:/BuildCache/glory-quality/tmp
+      TMP: D:/BuildCache/glory-quality/tmp
+      PYTHONPYCACHEPREFIX: D:/BuildCache/glory-quality/pycache
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.13'
+      - name: Install pinned auditor and verify target
+        run: |
+          New-Item -ItemType Directory -Force $env:CARGO_HOME,$env:CARGO_TARGET_DIR,$env:RUSTUP_HOME,$env:TEMP | Out-Null
+          rustup toolchain install 1.98.0 --profile minimal
+          if ($LASTEXITCODE) { throw 'Rust installation failed' }
+          rustup default 1.98.0
+          $meta = cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json
+          if ($LASTEXITCODE -or [IO.Path]::GetFullPath($meta.target_directory) -ne [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)) { throw 'Unexpected target' }
+          cargo install cargo-audit --version 0.22.2 --locked --root D:/BuildCache/glory-quality/tools
+          if ($LASTEXITCODE) { throw 'Auditor installation failed' }
+      - name: Audit maintained lockfiles
+        run: python scripts/check-dependencies.py --audit-bin D:/BuildCache/glory-quality/tools/bin/cargo-audit.exe --out D:/BuildCache/glory-quality/evidence
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        if: always()
+        with:
+          name: dependency-audit
+          path: D:/BuildCache/glory-quality/evidence
+  msrv:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      CARGO_HOME: D:/BuildCache/glory-msrv/cargo
+      CARGO_TARGET_DIR: D:/BuildCache/glory-msrv/target
+      RUSTUP_HOME: D:/BuildCache/glory-msrv/rustup
+      TEMP: D:/BuildCache/glory-msrv/tmp
+      TMP: D:/BuildCache/glory-msrv/tmp
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Verify Rust 1.94 workspace and independent CLI
+        run: |
+          New-Item -ItemType Directory -Force $env:CARGO_HOME,$env:CARGO_TARGET_DIR,$env:RUSTUP_HOME,$env:TEMP | Out-Null
+          rustup toolchain install 1.94.0 --profile minimal
+          if ($LASTEXITCODE) { throw 'Rust installation failed' }
+          rustup default 1.94.0
+          $meta = cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json
+          if ($LASTEXITCODE -or [IO.Path]::GetFullPath($meta.target_directory) -ne [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)) { throw 'Unexpected target' }
+          cargo check --locked --workspace --all-features
+          if ($LASTEXITCODE) { throw 'Workspace MSRV failed' }
+          cargo check --locked --manifest-path tools/cli/Cargo.toml --all-targets
+          if ($LASTEXITCODE) { throw 'CLI MSRV failed' }
+          cargo test --locked -p glory-core -p glory-routing --all-features
+          if ($LASTEXITCODE) { throw 'Core/routing MSRV tests failed' }
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Prepare isolated remote runner storage
+        run: |
+          export CARGO_HOME="$RUNNER_TEMP/glory-quality/cargo"
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/glory-quality/target"
+          export RUSTUP_HOME="$RUNNER_TEMP/glory-quality/rustup"
+          export TMPDIR="$RUNNER_TEMP/glory-quality/tmp"
+          for name in CARGO_HOME CARGO_TARGET_DIR RUSTUP_HOME TMPDIR; do
+            printf '%s=%s\n' "$name" "${!name}" >> "$GITHUB_ENV"
+          done
+          mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR" "$RUSTUP_HOME" "$TMPDIR"
+          rustup toolchain install 1.98.0 --profile minimal --component clippy
+          rustup default 1.98.0
+          cargo metadata --locked --no-deps --format-version 1 > "$TMPDIR/metadata.json"
+          python3 -c 'import json,os,pathlib; assert pathlib.Path(json.load(open(os.environ["TMPDIR"]+"/metadata.json"))["target_directory"]).resolve() == pathlib.Path(os.environ["CARGO_TARGET_DIR"]).resolve()'
+      - name: Portable runtime tests and native adapter compilation
+        run: |
+          cargo test --locked -p glory-style -p glory-render -p glory-core -p glory-resource -p glory-i18n -p glory-routing -p glory-ui -p glory-html -p glory-ssr -p glory-view-macros --all-features
+          cargo clippy --locked -p glory-style -p glory-render -p glory-core -p glory-resource -p glory-i18n -p glory-routing -p glory-ui -p glory-html -p glory-ssr -p glory-view-macros --all-features --all-targets -- -D warnings
+          cargo check --locked -p glory-apace --no-default-features --features raster
+  apple:
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.apple }}
+    runs-on: [self-hosted, macOS, ARM64, glory-data-cache]
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Full prepared Apple host gate
+        run: sh scripts/check-semantic-apple.sh --forks

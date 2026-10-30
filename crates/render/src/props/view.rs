@@ -190,6 +190,9 @@ impl<'a> DescriptorView<'a> {
         if input && let Props::Select(select) = self.props {
             select.validate()?;
         }
+        if input && let Props::Link(link) = self.props {
+            link.validate()?;
+        }
         if input && let Props::Graphic(graphic) = self.props {
             graphic.validate()?;
         }

@@ -2071,6 +2071,21 @@ impl App {
     pub fn flush(&self) -> Result {
         self.session.flush()
     }
+    /// Adapter diagnostic after flushing the shared Runtime. This does not
+    /// poll I/O or imply that a frame has been displayed. Host input readiness
+    /// is tracked separately by the adapter.
+    #[doc(hidden)]
+    pub fn has_pending_presentation(&self) -> bool {
+        let present = self.session.present.borrow();
+        !present.commands.is_empty()
+            || !present.actions.is_empty()
+            || !present.listeners.is_empty()
+            || !self.session.cancelled_queries.borrow().is_empty()
+            || self.session.error.borrow().is_some()
+            || self.session.faulted.get()
+            || present.tree.needs_observe()
+            || self.session.renderer.borrow().needs_observe()
+    }
     pub fn dispatch(&self, node: NodeId, event: Event) -> Result<bool> {
         if matches!(event, Event::Clipboard { .. } | Event::Files(_)) {
             return Err(RenderError::InvalidEvent(
