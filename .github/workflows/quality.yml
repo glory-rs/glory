@@ -36,6 +36,8 @@ jobs:
           rustup toolchain install 1.98.0 --profile minimal
           if ($LASTEXITCODE) { throw 'Rust installation failed' }
           rustup default 1.98.0
+          python scripts/library_lockfiles.py
+          if ($LASTEXITCODE) { throw 'Library dependency resolution failed' }
           $meta = cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json
           if ($LASTEXITCODE -or [IO.Path]::GetFullPath($meta.target_directory) -ne [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)) { throw 'Unexpected target' }
           cargo install cargo-audit --version 0.22.2 --locked --root D:/BuildCache/glory-quality/tools
@@ -67,6 +69,8 @@ jobs:
           rustup toolchain install 1.94.0 --profile minimal
           if ($LASTEXITCODE) { throw 'Rust installation failed' }
           rustup default 1.94.0
+          python scripts/library_lockfiles.py
+          if ($LASTEXITCODE) { throw 'Library dependency resolution failed' }
           $meta = cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json
           if ($LASTEXITCODE -or [IO.Path]::GetFullPath($meta.target_directory) -ne [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)) { throw 'Unexpected target' }
           cargo check --locked --workspace --all-features
@@ -92,6 +96,7 @@ jobs:
           mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR" "$RUSTUP_HOME" "$TMPDIR"
           rustup toolchain install 1.98.0 --profile minimal --component clippy
           rustup default 1.98.0
+          python3 scripts/library_lockfiles.py
           cargo metadata --locked --no-deps --format-version 1 > "$TMPDIR/metadata.json"
           python3 -c 'import json,os,pathlib; assert pathlib.Path(json.load(open(os.environ["TMPDIR"]+"/metadata.json"))["target_directory"]).resolve() == pathlib.Path(os.environ["CARGO_TARGET_DIR"]).resolve()'
       - name: Portable runtime tests and native adapter compilation

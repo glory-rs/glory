@@ -265,3 +265,12 @@ core 不依赖 DOM/HTTP，html 做纯映射，宿主负责物理树；可选资�
 首批性能数据建议覆盖：单条与分批追加、满 ready 队列取消、共同前缀路由表、混合控件岛单字段更新，以及单选广播。每项同时观察实际工作量和用户可见延迟，避免用代码行数、分配减少或个别最好结果代替完整收益。
 
 上述阶段顺序为首轮评审建议。修复后的实际实现、证据和保留边界见开头的修复状态；后续优先完成远端平台门禁运行、上游停止维护依赖跟进，以及 selector 在完整业务负载中的收益与成本测量。
+
+## PR 复核及库锁策略（2026-10-30）
+
+- [#53](https://github.com/glory-rs/glory/pull/53) 的质量修复及远端门禁通过，已合并；[#48](https://github.com/glory-rs/glory/pull/48) futures-timer 与 [#49](https://github.com/glory-rs/glory/pull/49) arboard 升级的既有 CI 通过，已合并。
+- 合并后的全应用图检查发现 mobile 示例另外精确固定 futures-timer 3.0.3；现同步至 3.0.4 并更新其应用锁，同时为九个维护中的应用/基准图增加 `--locked --all-features` metadata 门禁。
+- [#50](https://github.com/glory-rs/glory/pull/50) 暂不合并：Syn 3 已移除宏实现使用的 `Signature.unsafety`，semantic-ui 编译报 E0609。参见[失败运行](https://github.com/glory-rs/glory/actions/runs/40895989648)。
+- [#51](https://github.com/glory-rs/glory/pull/51) 暂不合并：accesskit 更新仅覆盖根锁，counter 的应用锁仍解析 0.25.1，与清单的 `=0.25.2` 冲突。参见[失败运行](https://github.com/glory-rs/glory/actions/runs/40979514275)。
+- 根运行时 workspace 和独立 `tools/cli` 均为库，不再提交 Cargo.lock。应用、示例和基准锁继续提交；审计产物另存本次解析的准确锁文件。检查入口先生成缺失库锁，再以 `--locked` 执行后续步骤，不覆盖已有本地锁。
+- 无锁首次解析必须尊重 Rust 1.94 声明：采用 `resolver.incompatible-rust-versions="fallback"`，避免默认解析选择要求 Rust 1.95 的 mime-infer 4.1.0 / multra 1.2.0。九个维护中应用图的完整 metadata 已在本地通过。
