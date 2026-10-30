@@ -195,3 +195,50 @@ fn repeated_replacement_reuses_slots_and_append_preserves_old_field_consumers() 
     assert_eq!(list.len_untracked(), 0);
     assert_eq!(rt.stats().fields, 0);
 }
+
+#[test]
+fn single_member_appends_clone_only_incoming_keys_and_reject_duplicates_atomically() {
+    use std::hash::{Hash, Hasher};
+    struct Key(usize, Rc<Cell<usize>>);
+    impl Clone for Key {
+        fn clone(&self) -> Self {
+            self.1.set(self.1.get() + 1);
+            Self(self.0, self.1.clone())
+        }
+    }
+    impl PartialEq for Key {
+        fn eq(&self, other: &Self) -> bool {
+            self.0 == other.0
+        }
+    }
+    impl Eq for Key {}
+    impl Hash for Key {
+        fn hash<H: Hasher>(&self, state: &mut H) {
+            self.0.hash(state);
+        }
+    }
+    let runtime = Runtime::new();
+    let owner = runtime.owner();
+    let clones = Rc::new(Cell::new(0));
+    let count = clones.clone();
+    let list = owner
+        .keyed_list(Vec::<usize>::new(), move |id| Key(*id, count.clone()))
+        .unwrap();
+    const COUNT: usize = 4096;
+    for id in 0..COUNT {
+        list.extend(vec![id]).unwrap();
+    }
+    eprintln!(
+        "single-member append key clones: {} for {COUNT} members",
+        clones.get()
+    );
+    assert!(
+        clones.get() <= COUNT * 3,
+        "existing keys must not be cloned on append"
+    );
+    let before = runtime.stats().source_writes;
+    assert_eq!(list.extend(vec![COUNT, 0]), Err(ListError::DuplicateKey));
+    assert_eq!(runtime.stats().source_writes, before);
+    assert_eq!(list.len_untracked(), COUNT);
+    assert!(list.find(&Key(COUNT, clones)).unwrap().is_none());
+}

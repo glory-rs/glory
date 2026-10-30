@@ -231,19 +231,20 @@ impl<K: Clone + Eq + Hash + 'static, T: 'static> KeyedList<K, T> {
         values: Vec<T>,
         replace: bool,
     ) -> Result<(Vec<(K, Option<u64>, T)>, KeyFn<K, T>), ListError> {
-        let (key, old) = self
-            .meta
-            .try_with_untracked(|m| (m.key.clone(), m.keys.clone()))?;
+        let key = self.meta.try_with_untracked(|m| m.key.clone())?;
         let mut seen = HashSet::with_capacity(values.len());
         let mut result = Vec::with_capacity(values.len());
         for value in values {
             let k = fields::project(|| Ok(key(&value)))?;
-            if !fields::project(
-                || Ok(seen.insert(k.clone()) && (replace || !old.contains_key(&k))),
-            )? {
+            if !fields::project(|| Ok(seen.insert(k.clone())))? {
                 return Err(ListError::DuplicateKey);
             }
-            let previous = fields::project(|| Ok(old.get(&k).copied()))?;
+            let previous = self
+                .meta
+                .try_with_untracked(|m| fields::project(|| Ok(m.keys.get(&k).copied())))??;
+            if !replace && previous.is_some() {
+                return Err(ListError::DuplicateKey);
+            }
             result.push((k, previous, value));
         }
         Ok((result, key))
@@ -296,24 +297,31 @@ impl<K: Clone + Eq + Hash + 'static, T: 'static> KeyedList<K, T> {
             self.check()?;
             return Ok(());
         }
-        let (incoming, key) = self.prepare(values, false)?;
+        let (incoming, _) = self.prepare(values, false)?;
         self.check()?;
-        let mut keys = self.meta.try_with_untracked(|m| m.keys.clone())?;
         let source = (self.values.handle.runtime, self.values.handle.key);
         let order = fields::append_members(self.values, |arena| {
             let mut order = Vec::with_capacity(incoming.len());
             for (k, _, value) in incoming {
                 let id = arena.insert(value).packed();
-                keys.insert(k.clone(), id);
                 order.push(RowToken { key: k, id, source });
             }
             order
         })?;
-        let old_meta = self
-            .meta
-            .try_revise(|m| std::mem::replace(m, Meta { key, keys }))?;
+        // Validation above reads only incoming keys. Extend the live index in
+        // place rather than cloning every previous key for each small append.
+        // Hash/Eq/Clone execute without a graph borrow and under the same pure
+        // key contract as preparation; no observer runs between publications.
+        self.meta.try_revise(|m| {
+            fields::project(|| {
+                m.keys.reserve(order.len());
+                for token in &order {
+                    m.keys.insert(token.key.clone(), token.id);
+                }
+                Ok(())
+            })
+        })??;
         self.order.try_revise(|v| v.extend(order))?;
-        drop(old_meta);
         Ok(())
     }
     pub fn swap(self, a: usize, b: usize) -> Result<(), AccessError> {
