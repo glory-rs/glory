@@ -94,6 +94,9 @@ impl Frame {
             self.schedule();
         }
     }
+    pub fn has_pending_turn(&self) -> bool {
+        self.pending.get().is_some() || self.processing.get() || self.again.get()
+    }
     pub fn stop(&self) {
         self.stopped.set(true);
         if let Some(id) = self.pending.take() {
