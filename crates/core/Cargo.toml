@@ -41,6 +41,10 @@ path = "tests/collections.rs"
 name = "keyed"
 path = "tests/keyed.rs"
 
+[[test]]
+name = "selector"
+path = "tests/selector.rs"
+
 [[bench]]
 name = "collections"
 path = "benches/collections.rs"

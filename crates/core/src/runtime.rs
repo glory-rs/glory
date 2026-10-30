@@ -21,6 +21,9 @@ mod fields;
 #[path = "keyed.rs"]
 mod keyed;
 pub use keyed::{KeyedEntry, KeyedList, ListError, RowToken};
+#[path = "selector.rs"]
+mod selector;
+pub use selector::{Selected, Selector, SelectorStats};
 
 pub type LocalFuture = Pin<Box<dyn Future<Output = ()>>>;
 type Cancel = Box<dyn FnOnce()>;
@@ -1068,29 +1071,7 @@ impl Owner {
     }
 
     pub fn cage<T: 'static>(&self, value: T) -> Cage<T> {
-        allow_creation().expect("state creation is not allowed in a pure computation");
-        let node = Node {
-            owner: self.key,
-            compute: Compute::Source,
-            value: Some(Rc::new(RefCell::new(Box::new(value)))),
-            version: 1,
-            status: Status::Clean,
-            rerun: false,
-            propagated: false,
-            queued: false,
-            last_flush: 0,
-            flush_runs: 0,
-            dependencies: Dependencies::new(),
-            subscribers: Subscribers::new(),
-        };
-        let key = lookup(self.runtime)
-            .expect("live runtime")
-            .borrow_mut()
-            .insert_node(self.key, node)
-            .expect("live owner");
-        Cage {
-            handle: Handle::new(self.runtime, key),
-        }
+        make_cage(self.runtime, self.key, value).expect("create state under a live non-pure Owner")
     }
 
     /// Synchronous, untracked pure computation under this live Owner.
@@ -1176,6 +1157,28 @@ impl Owner {
     ) -> Result<TaskToken, AccessError> {
         self.handle().spawn(future)
     }
+}
+
+fn make_cage<T: 'static>(runtime: RuntimeId, owner: Key, value: T) -> Result<Cage<T>, AccessError> {
+    allow_creation()?;
+    let node = Node {
+        owner,
+        compute: Compute::Source,
+        value: Some(Rc::new(RefCell::new(Box::new(value)))),
+        version: 1,
+        status: Status::Clean,
+        rerun: false,
+        propagated: false,
+        queued: false,
+        last_flush: 0,
+        flush_runs: 0,
+        dependencies: Dependencies::new(),
+        subscribers: Subscribers::new(),
+    };
+    let key = lookup(runtime)?.borrow_mut().insert_node(owner, node)?;
+    Ok(Cage {
+        handle: Handle::new(runtime, key),
+    })
 }
 impl OwnerHandle {
     fn task(self) -> Task {
