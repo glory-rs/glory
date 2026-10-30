@@ -1605,6 +1605,7 @@ dependencies = [
  "glory-i18n",
  "glory-render",
  "glory-resource",
+ "glory-routing",
  "glory-ssr",
  "glory-style",
  "glory-ui",
@@ -1633,6 +1634,7 @@ dependencies = [
  "glory-core",
  "glory-html",
  "glory-render",
+ "glory-routing",
  "glory-ui",
  "glory-web",
  "image",
@@ -1698,12 +1700,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "glory-routing"
+version = "0.6.0"
+dependencies = [
+ "glory-core",
+ "glory-render",
+ "glory-ssr",
+ "glory-ui",
+ "percent-encoding",
+ "url",
+]
+
+[[package]]
 name = "glory-salvo"
 version = "0.6.0"
 dependencies = [
  "futures-core",
  "futures-util",
  "glory",
+ "glory-render",
+ "glory-routing",
  "glory-ssr",
  "glory-ui",
  "glory-web",
@@ -1761,6 +1777,7 @@ dependencies = [
  "glory-html",
  "glory-render",
  "glory-resource",
+ "glory-routing",
  "glory-ui",
  "js-sys",
  "wasm-bindgen",

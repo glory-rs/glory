@@ -55,6 +55,11 @@ limited to Salvo.
 
 ## Available now
 
+- Optional [`routing`](crates/routing): shared URL matching, typed targets,
+  owned navigation, nested Widget outlets, retained layouts, Memory/Browser
+  history, native return preparation, SSR outcomes and hydration seeds.
+  Hosts are selected separately; see the [portable example](examples/routing).
+
 - The opt-in [XML display API](docs/v2-display-keyed-content-guide-2026-10-28.md)
   extracts shared HTML templates and binds Cage/Bond/Vary fields. Raw HTML
   elements need no semantic Widget object. Handwritten configurations use the

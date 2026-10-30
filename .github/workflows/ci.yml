@@ -83,6 +83,19 @@ jobs:
           finally {
             Stop-Process -Id $web.Id,$stream.Id -ErrorAction SilentlyContinue
           }
+      - name: Portable routing browser acceptance
+        run: |
+          $env:GLORY_PLAYWRIGHT = 'D:/BuildCache/glory-semantic-ui/browser/node_modules/playwright'
+          $env:GLORY_ROUTING_SITE = 'D:/BuildCache/glory-routing/site'
+          New-Item -ItemType Directory -Force $env:GLORY_ROUTING_SITE | Out-Null
+          cargo build --locked --manifest-path examples/routing/Cargo.toml --features web --lib --target wasm32-unknown-unknown
+          if ($LASTEXITCODE) { throw 'Routing WASM build failed' }
+          wasm-bindgen "$env:CARGO_TARGET_DIR/wasm32-unknown-unknown/debug/glory_routing_demo.wasm" --target web --out-dir $env:GLORY_ROUTING_SITE
+          if ($LASTEXITCODE) { throw 'Routing bindings failed' }
+          cargo run --locked --manifest-path examples/routing/Cargo.toml --features ssr --bin routing-ssr -- $env:GLORY_ROUTING_SITE
+          if ($LASTEXITCODE) { throw 'Routing SSR fixture failed' }
+          node examples/routing/browser.cjs > D:/BuildCache/glory-semantic-ui/browser-validation/routing.json
+          if ($LASTEXITCODE) { throw 'Routing browser acceptance failed' }
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:

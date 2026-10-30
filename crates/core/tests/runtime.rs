@@ -1353,8 +1353,17 @@ fn pure_owner_compute_is_untracked_without_graph_nodes_and_restores_context_afte
     observed.revise(|n| *n += 1);
     runtime.flush().unwrap();
     assert_eq!(calls.get(), 2);
+    assert_eq!(owner.check_write(), Ok(()));
+    let before_check = runtime.stats();
+    assert_eq!(owner.check_write(), Ok(()));
+    assert_eq!(runtime.stats().source_writes, before_check.source_writes);
+    assert_eq!(runtime.stats().queued, before_check.queued);
     owner
         .compute(|| {
+            assert_eq!(
+                owner.check_write(),
+                Err(glory_core::AccessError::WriteDuringCompute)
+            );
             assert_eq!(
                 hidden.try_revise(|n| *n += 1),
                 Err(glory_core::AccessError::WriteDuringCompute)
@@ -1368,8 +1377,10 @@ fn pure_owner_compute_is_untracked_without_graph_nodes_and_restores_context_afte
         .is_err()
     );
     hidden.revise(|n| *n += 1);
+    assert_eq!(owner.check_write(), Ok(()));
     assert_eq!(runtime.stats().nodes, nodes);
     owner.dispose();
+    assert_eq!(owner.check_write(), Err(glory_core::AccessError::Disposed));
     let called = Cell::new(false);
     assert_eq!(
         owner.compute(|| called.set(true)),

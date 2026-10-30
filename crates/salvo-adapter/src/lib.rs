@@ -2,6 +2,8 @@
 #![cfg(not(target_arch = "wasm32"))]
 
 pub use glory_ssr as ssr;
+#[cfg(feature = "routing")]
+pub mod routing;
 use glory_ui::{Scope, Widget};
 use salvo::Response;
 use salvo::http::{HeaderValue, StatusCode, header};

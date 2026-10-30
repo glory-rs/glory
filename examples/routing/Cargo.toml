@@ -1,0 +1,33 @@
+[package]
+name = "glory-routing-demo"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+web = ["glory/web", "glory/hydrate", "dep:wasm-bindgen", "dep:web-sys"]
+ssr = ["glory/ssr"]
+native = ["glory/apace-shell"]
+
+[[bin]]
+name = "routing-ssr"
+path = "src/ssr.rs"
+required-features = ["ssr"]
+
+[[bin]]
+name = "routing-native"
+path = "src/native.rs"
+required-features = ["native"]
+
+[dependencies]
+glory = { path = "../../crates/glory", default-features = false, features = ["routing"] }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = { version = "=0.2.129", optional = true }
+web-sys = { version = "=0.3.106", optional = true, features = ["Window", "Document", "Element", "console"] }

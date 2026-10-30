@@ -11,6 +11,8 @@ mod plan_fields_tests;
 #[cfg(all(test, not(target_arch = "wasm32")))]
 #[path = "browser/plan_parts.rs"]
 mod plan_parts_tests;
+#[cfg(all(feature = "routing", target_arch = "wasm32"))]
+pub mod routing;
 #[cfg(any(target_arch = "wasm32", test))]
 mod semantic_changes;
 /// Experimental direct HTML template/slot runtime (limited non-editor profile).

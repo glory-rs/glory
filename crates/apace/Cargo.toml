@@ -9,6 +9,7 @@ description = "Incremental Apace document host for Glory semantic UI"
 
 [features]
 default = []
+routing = ["dep:glory-routing", "glory-routing/widgets"]
 css = ["glory-html/css"]
 package = ["dep:tokio"]
 network = ["package", "tokio/net", "dep:reqwest", "dep:rustls", "dep:rustls-platform-verifier", "dep:jni"]
@@ -25,6 +26,7 @@ android-game-activity = ["shell", "wingy/android-game-activity", "apace-shell/an
 accesskit = ["shell", "dep:accesskit", "dep:apace_accesskit"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+glory-routing = { path = "../routing", version = "0.6.0", optional = true }
 glory-html = { path = "../html", version = "0.6.0" }
 glory-render = { path = "../render", version = "0.6.0" }
 glory-core = { path = "../core", version = "0.6.0", optional = true }
