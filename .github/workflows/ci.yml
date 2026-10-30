@@ -45,6 +45,8 @@ jobs:
           if ($LASTEXITCODE) { throw 'Rust installation failed' }
           rustup default 1.98.0
           if ($LASTEXITCODE) { throw 'Rust selection failed' }
+          python scripts/library_lockfiles.py
+          if ($LASTEXITCODE) { throw 'Library dependency resolution failed' }
           $meta = cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json
           if ($LASTEXITCODE -or [IO.Path]::GetFullPath($meta.target_directory) -ne [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)) { throw 'Unexpected Cargo target' }
           cargo install wasm-bindgen-cli --version 0.2.129 --locked --root D:/BuildCache/glory-semantic-ui/tools
@@ -58,6 +60,24 @@ jobs:
           if ($LASTEXITCODE) { throw 'Release plan failed' }
           python scripts/release.py --check-package glory-style
           if ($LASTEXITCODE) { throw 'Archive contents failed' }
+      - name: Prepare pinned Sapid dependency for application graphs
+        run: |
+          $sapidRoot = Join-Path (Split-Path -Parent $env:GITHUB_WORKSPACE) 'sapid'
+          if (Test-Path -LiteralPath $sapidRoot) { throw 'Sapid checkout already exists' }
+          git init $sapidRoot
+          if ($LASTEXITCODE) { throw 'Sapid init failed' }
+          git -C $sapidRoot remote add origin https://github.com/sapid-ui/sapid.git
+          if ($LASTEXITCODE) { throw 'Sapid remote failed' }
+          git -C $sapidRoot fetch --depth 1 origin 9d3b297b3fafacb3a59b11cddb7d3c9e833aaca9
+          if ($LASTEXITCODE) { throw 'Pinned Sapid fetch failed' }
+          git -C $sapidRoot checkout --detach 9d3b297b3fafacb3a59b11cddb7d3c9e833aaca9
+          if ($LASTEXITCODE) { throw 'Pinned Sapid checkout failed' }
+      - name: Verify maintained application lockfiles
+        run: |
+          foreach ($directory in @('examples/counter','examples/display-web','examples/mobile','examples/routing','examples/semantic-web','benchmarks/glory','benchmarks/role-patches','benchmarks/wasm-size','benchmarks/scenarios/glory')) {
+            cargo metadata --locked --all-features --format-version 1 --manifest-path "$directory/Cargo.toml" > "$env:TEMP/application-metadata.json"
+            if ($LASTEXITCODE) { throw "Application lock is stale: $directory" }
+          }
       - name: Test active workspace, engines, Windows hosts and WASM
         run: ./scripts/check-semantic-ui.ps1 -Web -Window
       - name: Install browser driver and build streaming fixture

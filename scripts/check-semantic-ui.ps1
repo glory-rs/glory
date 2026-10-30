@@ -18,6 +18,8 @@ try {
     $env:TMP = $env:TEMP
     $env:PYTHONPYCACHEPREFIX = "$taskBuildRoot/pycache"
     New-Item -ItemType Directory -Force -Path $env:CARGO_HOME, $env:TEMP | Out-Null
+    python scripts/library_lockfiles.py
+    if ($LASTEXITCODE -ne 0) { throw 'Library dependency resolution failed' }
     $metadata = cargo metadata --no-deps --format-version 1 | ConvertFrom-Json
     if ($LASTEXITCODE -ne 0) { throw 'cargo metadata failed' }
     $actualTarget = [IO.Path]::GetFullPath($metadata.target_directory)

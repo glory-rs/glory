@@ -25,6 +25,8 @@ jobs:
           if ($LASTEXITCODE) { throw 'Rust installation failed' }
           rustup default 1.98.0
           if ($LASTEXITCODE) { throw 'Rust selection failed' }
+          python scripts/library_lockfiles.py
+          if ($LASTEXITCODE) { throw 'Library dependency resolution failed' }
           $meta = cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json
           if ($LASTEXITCODE -or [IO.Path]::GetFullPath($meta.target_directory) -ne [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)) { throw 'Unexpected Cargo target' }
           cargo fmt --all -- --check

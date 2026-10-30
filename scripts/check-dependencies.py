@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import shutil
+from library_lockfiles import ensure_library_lockfiles
 
 ROOT = Path(__file__).resolve().parents[1]
 # Peer comparison fixtures are frozen measurement inputs, not shipped apps.
@@ -24,6 +26,7 @@ def main():
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--no-fetch", action="store_true")
     args = parser.parse_args()
+    ensure_library_lockfiles()
     cargo_home = Path(os.environ["CARGO_HOME"]).resolve()
     database = cargo_home / "advisory-db"
     args.out.mkdir(parents=True, exist_ok=True)
@@ -31,6 +34,10 @@ def main():
     summaries = []
     failed = False
     for index, relative in enumerate(LOCKFILES):
+        # Preserve the exact generated library graph alongside the audit result.
+        snapshot = args.out / "lockfiles" / relative
+        snapshot.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(ROOT / relative, snapshot)
         flags = ["--no-fetch"] if args.no_fetch or index else []
         result = subprocess.run(
             [*command, "--db", str(database), "--file", str(ROOT / relative),

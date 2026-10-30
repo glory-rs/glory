@@ -395,6 +395,15 @@ The connection-thread HTTP implementation is a fixture, not a production server.
 
 ## Checks
 
+The runtime workspace and `tools/cli` contain libraries; their `Cargo.lock`
+files are generated locally and ignored by Git. Check scripts and CI resolve
+missing library locks once, respecting the declared Rust version, then use
+`--locked` for the rest of that run.
+To prepare a fresh checkout manually, run `python scripts/library_lockfiles.py`
+with Cargo home, target and temporary directories configured for your host.
+Application, example and benchmark locks remain committed. Dependency audit
+artifacts include the exact resolved locks used by the run.
+
 On Windows PowerShell:
 
 ```powershell

@@ -78,6 +78,7 @@ The package is not yet published. With Cargo home, target and temporary paths
 set under `D:/BuildCache`, the bootstrap example can configure an application:
 
 ```powershell
+python scripts/library_lockfiles.py
 cargo run --locked --manifest-path tools/cli/Cargo.toml --example bootstrap -- init --manifest-path examples/counter/Cargo.toml --cli-path tools/cli
 ```
 
@@ -211,6 +212,7 @@ Set all Cargo/cache/temp paths on D: and verify `cargo metadata`'s target first.
 Then run:
 
 ```powershell
+python scripts/library_lockfiles.py
 cargo fmt --manifest-path tools/cli/Cargo.toml -- --check
 cargo test --locked --manifest-path tools/cli/Cargo.toml
 cargo clippy --locked --manifest-path tools/cli/Cargo.toml --all-targets -- -D warnings
