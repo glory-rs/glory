@@ -4,13 +4,18 @@ version = "0.0.0"
 edition = "2021"
 publish = false
 
+rust-version = "1.95"
+
+license = "Apache-2.0"
+
 [dependencies]
 leptos = { version = "=0.8.22", features = ["csr"] }
-wasm-bindgen = { version = "=0.2.129", features = ["enable-interning"] }
-web-sys = { version = "=0.3.106", features = ["Window", "Document", "Element", "HtmlElement"] }
+wasm-bindgen = { version = "=0.2.130", features = ["enable-interning"] }
+web-sys = { version = "=0.3.107", features = ["Window", "Document", "Element", "HtmlElement"] }
 
 [workspace]
 
+resolver = "3"
 [package.metadata.benchmark]
 contract = "semantic-rows-v1"
 

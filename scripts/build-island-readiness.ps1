@@ -1,6 +1,6 @@
 param(
     [string]$BuildRoot = 'D:/BuildCache/glory-semantic-ui',
-    [string]$Bindgen = 'D:/BuildCache/glory-v2-dioxus-20261028/tools/wasm-bindgen-0.2.129-x86_64-pc-windows-msvc/wasm-bindgen.exe',
+    [string]$Bindgen = 'D:/BuildCache/glory-v2-dioxus-20261028/tools/wasm-bindgen-0.2.130-x86_64-pc-windows-msvc/wasm-bindgen.exe',
     [switch]$Verify
 )
 $ErrorActionPreference = 'Stop'
@@ -22,7 +22,7 @@ try {
     if ($LASTEXITCODE -ne 0 -or [IO.Path]::GetFullPath($metadata.target_directory) -ne [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)) { throw 'Unexpected Cargo target' }
     cargo build --locked --manifest-path $manifest --bin island-readiness --target wasm32-unknown-unknown
     if ($LASTEXITCODE -ne 0) { throw 'Island WASM fixture failed' }
-    if ((& $Bindgen --version).Trim() -ne 'wasm-bindgen 0.2.129') { throw 'Expected wasm-bindgen 0.2.129' }
+    if ((& $Bindgen --version).Trim() -ne 'wasm-bindgen 0.2.130') { throw 'Expected wasm-bindgen 0.2.130' }
     & $Bindgen "$env:CARGO_TARGET_DIR/wasm32-unknown-unknown/debug/island-readiness.wasm" --target web --out-dir $env:GLORY_ISLAND_SITE --out-name app
     if ($LASTEXITCODE -ne 0) { throw 'Island bindgen failed' }
     if ($Verify) {

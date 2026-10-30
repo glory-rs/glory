@@ -663,18 +663,20 @@ retired feature aliases or count compilation as proof of platform acceptance.
   must not decode into or wake a closed document.
 - Never vendor third-party code in this repository. Maintain upstream-derived
   code in glory-rs/apace, glory-rs/takia and glory-rs/wingy, retaining provenance,
-  licenses and copyright notices. The user authorized these new crate namespaces
-  and registry publication on 2026-10-29. Use exact published crate versions;
-  do not use moving branch dependencies or application-level global patches.
-- Engine/layout packages use published Apace and Takia versions, with release
-  source revisions recorded in docs/engine-forks.json. They stay outside the runtime
-  workspace. Run python scripts/check-engine-forks.py --test to verify Cargo's
-  resolved sources/lock and run fork-owned tests in separate clean Git checkouts
-  under the approved per-host build root. Do not edit Cargo's managed Git checkouts. Update the
-  version, lockfiles and provenance record together after a fork release.
-  The additional twelve dpi/Wingy platform packages share the published Wingy
-  family in that record; Apace uses the same exact registry versions.
-  Its Android Activity lifetime tests run from the clean fork with --test.
+  licenses and copyright notices. The 2026-10-30 coordinated development versions
+  are explicitly unpublished: Glory/Sapid 0.6.1, Apace 0.3.0, Takia 0.15.1,
+  Wingy 0.31.1. Use exact requirements with sibling source paths, as recorded in
+  docs/engine-forks.json; do not add global Cargo patches. Future publication
+  requires a separate user instruction and the existing publication guards.
+- Engine/layout/platform packages stay outside the runtime workspace and share
+  one type identity. Run python scripts/check-engine-forks.py --test to verify
+  their exact versions, sibling paths and baseline ancestry and execute fork-owned
+  tests. Development checks use the actual working sources and do not claim
+  registry checksum or immutable release evidence. Do not edit Cargo's managed
+  Git checkouts. Keep all five repositories adjacent; retain historical release
+  provenance in the record. Rust 1.95 is the MSRV and workspace resolver is 3.
+  All library/example/benchmark locks are ignored; scripts/library_lockfiles.py
+  prepares missing local locks once before --locked checks. Website is separate.
   Existing upstream unsafe is unchanged; local resource additions use safe Rust.
   Do not reformat unrelated third-party files with the workspace line length.
   Initial free space already includes gaps;

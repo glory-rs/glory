@@ -4,8 +4,13 @@ version = "0.0.0"
 edition = "2024"
 publish = false
 
+rust-version = "1.95"
+
+license = "Apache-2.0"
+
 [workspace]
 
+resolver = "3"
 [lib]
 crate-type = ["rlib", "cdylib"]
 
@@ -14,7 +19,7 @@ glory-html = { path = "../../crates/html" }
 glory-render = { path = "../../crates/render" }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen = "=0.2.129"
+wasm-bindgen = "=0.2.130"
 
 [profile.release]
 opt-level = 3

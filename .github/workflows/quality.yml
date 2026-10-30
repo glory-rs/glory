@@ -27,6 +27,12 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out coordinated development engines
+        shell: bash
+        run: |
+          if [ ! -d ../apace/.git ]; then git clone --filter=blob:none https://github.com/glory-rs/apace ../apace; fi
+          if [ ! -d ../takia/.git ]; then git clone --filter=blob:none https://github.com/glory-rs/takia ../takia; fi
+          if [ ! -d ../wingy/.git ]; then git clone --filter=blob:none https://github.com/glory-rs/wingy ../wingy; fi
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
         with:
           python-version: '3.13'
@@ -63,12 +69,18 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - name: Verify Rust 1.94 workspace and independent CLI
+      - name: Check out coordinated development engines
+        shell: bash
+        run: |
+          if [ ! -d ../apace/.git ]; then git clone --filter=blob:none https://github.com/glory-rs/apace ../apace; fi
+          if [ ! -d ../takia/.git ]; then git clone --filter=blob:none https://github.com/glory-rs/takia ../takia; fi
+          if [ ! -d ../wingy/.git ]; then git clone --filter=blob:none https://github.com/glory-rs/wingy ../wingy; fi
+      - name: Verify Rust 1.95 workspace and independent CLI
         run: |
           New-Item -ItemType Directory -Force $env:CARGO_HOME,$env:CARGO_TARGET_DIR,$env:RUSTUP_HOME,$env:TEMP | Out-Null
-          rustup toolchain install 1.94.0 --profile minimal
+          rustup toolchain install 1.95.0 --profile minimal
           if ($LASTEXITCODE) { throw 'Rust installation failed' }
-          rustup default 1.94.0
+          rustup default 1.95.0
           python scripts/library_lockfiles.py
           if ($LASTEXITCODE) { throw 'Library dependency resolution failed' }
           $meta = cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json
@@ -84,6 +96,12 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out coordinated development engines
+        shell: bash
+        run: |
+          if [ ! -d ../apace/.git ]; then git clone --filter=blob:none https://github.com/glory-rs/apace ../apace; fi
+          if [ ! -d ../takia/.git ]; then git clone --filter=blob:none https://github.com/glory-rs/takia ../takia; fi
+          if [ ! -d ../wingy/.git ]; then git clone --filter=blob:none https://github.com/glory-rs/wingy ../wingy; fi
       - name: Prepare isolated remote runner storage
         run: |
           export CARGO_HOME="$RUNNER_TEMP/glory-quality/cargo"
@@ -110,5 +128,11 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Check out coordinated development engines
+        shell: bash
+        run: |
+          if [ ! -d ../apace/.git ]; then git clone --filter=blob:none https://github.com/glory-rs/apace ../apace; fi
+          if [ ! -d ../takia/.git ]; then git clone --filter=blob:none https://github.com/glory-rs/takia ../takia; fi
+          if [ ! -d ../wingy/.git ]; then git clone --filter=blob:none https://github.com/glory-rs/wingy ../wingy; fi
       - name: Full prepared Apple host gate
         run: sh scripts/check-semantic-apple.sh --forks

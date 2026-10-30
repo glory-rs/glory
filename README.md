@@ -1,13 +1,15 @@
 # Glory
 
-Version 0.6.0 uses the published Apace, Takia and Wingy engine families.
+Version 0.6.1 is an unpublished development version using the sibling Apace 0.3.0,
+Takia 0.15.1 and Wingy 0.31.1 source repositories. Keep these repositories in
+the same parent directory. Rust 1.95 or later is required.
 Native applications use `glory::apace`, the `apace-*` features and
 `glory-apace`. See [release instructions](RELEASING.md) and
 [engine provenance](docs/engine-forks.md).
 
 ```toml
 [dependencies]
-glory = { version = "=0.6.0", default-features = false, features = ["dsl"] }
+glory = { path = "../glory/crates/glory", version = "=0.6.1", default-features = false, features = ["dsl"] }
 ```
 
 For production applications, enable symbol stripping in the application's own
@@ -434,8 +436,12 @@ can exercise larger caches, whose eviction may change later estimated windows.
 The active workspace is explicitly selected in Cargo.toml. Standalone examples
 and benchmarks require their own documented build and acceptance commands.
 
-Rust 1.94 or later is declared. Current verification uses Rust 1.98; foundation
+Rust 1.95 or later is declared. Current verification uses Rust 1.98; foundation
 checks also cover wasm32-unknown-unknown, aarch64-linux-android and
 x86_64-unknown-linux-gnu. Actual platform UI validation is tracked separately.
 
 The [Glory/Sapid WASM size baseline](docs/wasm-size-baseline.md) measures minimal apps, unused features and actual widget use, with browser checks and a regression gate.
+
+## License
+
+Licensed under Apache-2.0. See [LICENSE](LICENSE), [NOTICE](NOTICE), and [licensing details](docs/licensing.md) for historical and third-party notices.

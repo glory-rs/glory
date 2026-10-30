@@ -20,6 +20,12 @@ jobs:
         shell: pwsh
         run: New-Item -ItemType Directory -Force $env:CARGO_HOME, $env:CARGO_TARGET_DIR, $env:TEMP | Out-Null
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Check out coordinated development engines
+        shell: bash
+        run: |
+          if [ ! -d ../apace/.git ]; then git clone --filter=blob:none https://github.com/glory-rs/apace ../apace; fi
+          if [ ! -d ../takia/.git ]; then git clone --filter=blob:none https://github.com/glory-rs/takia ../takia; fi
+          if [ ! -d ../wingy/.git ]; then git clone --filter=blob:none https://github.com/glory-rs/wingy ../wingy; fi
       - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           targets: wasm32-unknown-unknown
@@ -33,6 +39,8 @@ jobs:
       - name: Verify Cargo target and shared component
         shell: pwsh
         run: |
+          python scripts/library_lockfiles.py
+          if ($LASTEXITCODE) { throw 'Library dependency resolution failed' }
           $metadata = cargo metadata --locked --manifest-path examples/counter/Cargo.toml --no-deps --format-version 1 | ConvertFrom-Json
           if ($LASTEXITCODE -ne 0) { throw 'cargo metadata failed' }
           if ([IO.Path]::GetFullPath($metadata.target_directory) -ne [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)) { throw 'Unexpected Cargo target directory' }

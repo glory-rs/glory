@@ -4,13 +4,18 @@ version = "0.0.0"
 edition = "2024"
 publish = false
 
+rust-version = "1.95"
+
+license = "Apache-2.0"
+
 [dependencies]
 glory = { path = "../../../crates/glory", default-features = false, features = ["web"] }
-wasm-bindgen = { version = "=0.2.129", features = ["enable-interning"] }
-web-sys = { version = "=0.3.106", features = ["Window", "Document", "Element"] }
+wasm-bindgen = { version = "=0.2.130", features = ["enable-interning"] }
+web-sys = { version = "=0.3.107", features = ["Window", "Document", "Element"] }
 
 [workspace]
 
+resolver = "3"
 [profile.release]
 opt-level = 3
 debug = false

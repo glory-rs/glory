@@ -4,8 +4,12 @@ version = "0.0.1"
 edition = "2024"
 publish = false
 
+rust-version = "1.95"
+
+license = "Apache-2.0"
+
 [workspace]
-resolver = "2"
+resolver = "3"
 members = ["tools/glory"]
 default-members = ["."]
 
@@ -26,5 +30,5 @@ required-features = ["desktop"]
 glory = { path = "../../crates/glory", default-features = false }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-wasm-bindgen = { version = "=0.2.129", optional = true }
-web-sys = { version = "=0.3.106", optional = true, features = ["Window", "Document", "Element"] }
+wasm-bindgen = { version = "=0.2.130", optional = true }
+web-sys = { version = "=0.3.107", optional = true, features = ["Window", "Document", "Element"] }

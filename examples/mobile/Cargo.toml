@@ -1,11 +1,15 @@
 [package]
 name = "glory-mobile-counter"
-version = "0.0.0"
+version = "0.6.1"
 edition = "2024"
 publish = false
 
+rust-version = "1.95"
+
+license = "Apache-2.0"
+
 [workspace]
-resolver = "2"
+resolver = "3"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

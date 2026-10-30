@@ -1,6 +1,6 @@
 param(
  [string]$BuildRoot='D:/BuildCache/glory-dsl-20261028',
- [string]$Bindgen='D:/BuildCache/glory-v2-dioxus-20261028/tools/wasm-bindgen-0.2.129-x86_64-pc-windows-msvc/wasm-bindgen.exe',
+ [string]$Bindgen='D:/BuildCache/glory-v2-dioxus-20261028/tools/wasm-bindgen-0.2.130-x86_64-pc-windows-msvc/wasm-bindgen.exe',
  [switch]$Hand,
  [ValidateSet('display-web','counter')][string]$Bin='display-web'
 )
@@ -29,7 +29,7 @@ try {
  $wasm=@($artifact.filenames|Where-Object{$_.EndsWith('.wasm')})
  if($wasm.Count -ne 1 -or -not [IO.Path]::GetFullPath($wasm[0]).StartsWith([IO.Path]::GetFullPath($env:CARGO_TARGET_DIR))){throw 'Wrong WASM path'}
  $site="$BuildRoot/$variant/site";New-Item -ItemType Directory -Force -Path $site|Out-Null
- if((& $Bindgen --version).Trim() -ne 'wasm-bindgen 0.2.129'){throw 'Expected pinned bindgen 0.2.129'}
+ if((& $Bindgen --version).Trim() -ne 'wasm-bindgen 0.2.130'){throw 'Expected pinned bindgen 0.2.130'}
  & $Bindgen $wasm[0] --target web --out-dir $site --out-name app
  if($LASTEXITCODE -ne 0){throw 'Bindgen failed'}
  Copy-Item -LiteralPath "$PSScriptRoot/../examples/display-web/index.html" -Destination "$site/index.html"

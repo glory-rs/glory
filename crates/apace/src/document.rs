@@ -2,7 +2,9 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::rc::Rc;
 
-use apace_dom::{BaseDocument, DocumentConfig, NodeId as EngineId, QualName, ScrollBehavior};
+use apace_dom::{
+    BaseDocument, CopyStyleGetters, DocumentConfig, NodeId as EngineId, QualName, ScrollBehavior,
+};
 use apace_traits::shell::Viewport;
 use glory_html::{Edit, EditKind, Kind, Mapper, Op, Part, Property, Shape, Sink};
 use glory_render::normalize_text;

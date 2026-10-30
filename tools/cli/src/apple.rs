@@ -128,9 +128,8 @@ mod tests {
                 .contains("_CodeSignature/CodeResources")
         }));
         for entry in manifest["files"].as_array().unwrap() {
-            use sha2::{Digest, Sha256};
             let bytes = fs::read(moved.join(entry["path"].as_str().unwrap())).unwrap();
-            assert_eq!(entry["sha256"], format!("{:x}", Sha256::digest(bytes)));
+            assert_eq!(entry["sha256"], crate::project::sha256(bytes));
         }
     }
 

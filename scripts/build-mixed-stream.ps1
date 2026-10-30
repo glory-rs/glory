@@ -1,6 +1,6 @@
 param(
  [string]$BuildRoot='D:/BuildCache/glory-semantic-ui',
- [string]$Bindgen='D:/BuildCache/glory-v2-dioxus-20261028/tools/wasm-bindgen-0.2.129-x86_64-pc-windows-msvc/wasm-bindgen.exe',
+ [string]$Bindgen='D:/BuildCache/glory-v2-dioxus-20261028/tools/wasm-bindgen-0.2.130-x86_64-pc-windows-msvc/wasm-bindgen.exe',
  [switch]$Verify
 )
 $ErrorActionPreference='Stop'
@@ -19,7 +19,7 @@ try {
  if($LASTEXITCODE -ne 0){throw 'Stream server build failed'}
  cargo build --locked --manifest-path $manifest --bin mixed-stream-web --target wasm32-unknown-unknown
  if($LASTEXITCODE -ne 0){throw 'Stream hydration build failed'}
- if((& $Bindgen --version).Trim() -ne 'wasm-bindgen 0.2.129'){throw 'Expected pinned bindgen 0.2.129'}
+ if((& $Bindgen --version).Trim() -ne 'wasm-bindgen 0.2.130'){throw 'Expected pinned bindgen 0.2.130'}
  & $Bindgen "$env:CARGO_TARGET_DIR/wasm32-unknown-unknown/debug/mixed-stream-web.wasm" --target web --out-dir $site --out-name app
  if($LASTEXITCODE -ne 0){throw 'Bindgen failed'}
  if($Verify){$env:GLORY_MIXED_STREAM_SITE=$site;$env:GLORY_MIXED_STREAM_BIN="$env:CARGO_TARGET_DIR/debug/mixed-stream-ssr.exe";node "$PSScriptRoot/../examples/display-web/mixed-stream-acceptance.cjs";if($LASTEXITCODE -ne 0){throw 'Mixed stream acceptance failed'}}

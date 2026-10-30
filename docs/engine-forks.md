@@ -1,33 +1,20 @@
 # 引擎依赖维护
 
-2026-10-29：维护的 fork 使用独立发布名称，Glory 0.6.0 改用 crates.io 的精确版本。
-原生适配器为 `glory-apace`，门面模块为 `glory::apace`，功能开关以 `apace` 开头。
-Widget、Each、DSL、SSR、hydration 和 native 的接口保持同一套实现。
+2026-10-30：Glory 0.6.1 开发源码使用同级维护仓库，尚未发布。
+精确版本为 Apace 0.3.0、Takia 0.15.1、Wingy 0.31.1；支持包为
+`apace_accesskit` 0.2.2、`apace_debug_timer` 0.1.4、`wingy-dpi` 0.1.3。
+请将 apace、takia、wingy 与 glory 放在同一父目录，Sapid 也放在该目录。
+Apace 的 Stylo 继续使用固定 Git 修订，保留本次上游合并所需的接口；不另建发布分支。
 
-| 维护项目 | 原始上游 | 首次发布版本 | 维护范围 |
-|---|---|---|---|
-| [Apace](https://github.com/glory-rs/apace) | DioxusLabs/blitz | 0.3.0-beta.4 | 文档、资源、焦点、IME、布局/绘制失效、顶层、编辑器、动画和节点回收补丁 |
-| [Takia](https://github.com/glory-rs/takia) | DioxusLabs/taffy | 0.15.0 | 小数 flex 因子与 gap 计算补丁 |
-| [Wingy](https://github.com/glory-rs/wingy) | rust-windowing/winit | 0.31.0 | Android Activity 生命周期、GameTextInput 和 UIKit UITextInput 补丁 |
+`docs/engine-forks.json` 记录当前开发版本、合并基线、上游来源及此前发布记录。
+`python scripts/check-engine-forks.py` 校验精确版本、本地源码路径、单一类型身份和工作区边界。
+`--test` 在这些开发源码上执行测试；开发模式不会宣称已验证注册表归档。
+后续发布必须重新固定发布来源并完成原有注册表、校验和及发布门禁，本次不执行发布。
+原始版权、许可证和第三方来源保留，无 vendor 或全局 Cargo patch。
 
-支持包保留其原来的版本：`wingy-dpi` 0.1.2、`apace_accesskit` 0.2.1、
-`apace_debug_timer` 0.1.3。Apace 与 Glory 使用同一组 Takia/Wingy 类型。
-原始许可证、版权说明、Git 历史和上游来源保留；旧名称出现在历史报告中。
-补丁与官方发布包的差异见 [发布前调查](engine-fork-release-investigation-2026-10-29.md)。
-
-各项目的 `main` 是维护分支。每日同步任务只更新 `upstream-main`：
-Apace/Takia 对应官方 main，Wingy 对应官方 master；不会自动覆盖或合并到 main。
-各库的 `RELEASING.md` 说明 tag 发布、验证门禁和凭据配置。
-
-`docs/engine-forks.json` 记录发布版本、完整源码提交与官方基线。
-`python scripts/check-engine-forks.py` 验证 Cargo metadata、lock checksum、
-注册表归档的 `.cargo_vcs_info.json`、单一类型身份和工作区边界。
-加 `--test` 会在规定缓存目录中的独立、清洁 Git checkout 上执行发布源码测试。
-这些 checkout 不作为应用 path 依赖，也不修改 Cargo 管理的缓存。
-Windows 的 Cargo home、target 和临时目录均使用 D:/BuildCache。
-
-后续修复先在对应维护仓库完成测试并发布新版本，再更新 Apace/Glory 的精确版本、
-lockfile 与来源记录。应用不需要全局 Cargo patch，也不引入 vendor。
+所有库、示例和基准的 Cargo.lock 均不纳入 Git；website 独立保留锁文件。
+设置 Cargo 构建环境后运行 `python scripts/library_lockfiles.py`，首次生成缺失的锁，
+后续 `--locked` 检查复用该解析。Windows 的 Cargo home、target 和临时目录使用 D:/BuildCache。
 实际窗口、IME、无障碍和设备验收仍是独立门禁，不能用编译或模型测试代替。
 
 以下保留既有补丁的验证记录，历史提交和旧构建路径对应当时的源码。

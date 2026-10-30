@@ -4,5 +4,9 @@ version = "0.0.0"
 edition = "2024"
 publish = false
 
+rust-version = "1.95"
+
+license = "Apache-2.0"
+
 [dependencies.glory-cli]
 path = "../../../../tools/cli"

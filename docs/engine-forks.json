@@ -1,12 +1,12 @@
 {
-  "schema": 2,
+  "schema": 3,
   "forks": [
     {
       "name": "takia",
       "git": "https://github.com/glory-rs/takia",
-      "rev": "0c50389d3d73a1d1fc83435fc7f6adf3d90d013a",
+      "rev": "c79a14b54ea632462a15624acf9e7daf792bcd13",
       "upstream": "https://github.com/DioxusLabs/taffy",
-      "upstream_rev": "eb6450694f33e2b7413e40677f230ff63f0fc194",
+      "upstream_rev": "c6421c1cb20df5845e83285d3ce63c716f52186c",
       "packages": [
         "takia"
       ],
@@ -15,14 +15,19 @@
         "takia",
         "--lib"
       ],
-      "version": "0.15.0"
+      "version": "0.15.1",
+      "previous_release": {
+        "version": "0.15.0",
+        "rev": "0c50389d3d73a1d1fc83435fc7f6adf3d90d013a"
+      },
+      "path": "../takia"
     },
     {
       "name": "apace",
       "git": "https://github.com/glory-rs/apace",
-      "rev": "c68c948a86bea6ff6c5afcffdb466f3d4760c73d",
+      "rev": "9b765df484897e5329736d93bc7d80b2bd0694b4",
       "upstream": "https://github.com/DioxusLabs/blitz",
-      "upstream_rev": "92b11f1bd8ab7975411328b0406a95a09445b4e7",
+      "upstream_rev": "e5929f9e2af42f8fdc10cea315b502d3937b1350",
       "packages": [
         "apace-dom",
         "apace-traits",
@@ -133,11 +138,20 @@
           "android-game-activity"
         ]
       ],
-      "version": "0.3.0-beta.4",
+      "version": "0.3.0",
       "versions": {
-        "apace_debug_timer": "0.1.3",
-        "apace_accesskit": "0.2.1"
-      }
+        "apace_debug_timer": "0.1.4",
+        "apace_accesskit": "0.2.2"
+      },
+      "previous_release": {
+        "version": "0.3.0-beta.4",
+        "rev": "c68c948a86bea6ff6c5afcffdb466f3d4760c73d",
+        "versions": {
+          "apace_debug_timer": "0.1.3",
+          "apace_accesskit": "0.2.1"
+        }
+      },
+      "path": "../apace"
     },
     {
       "extra_tests": [
@@ -163,7 +177,7 @@
         "wingy-win32",
         "wingy-x11"
       ],
-      "rev": "0b646ece50572ecdbd89d2a18d9eac5d07e194d5",
+      "rev": "b80608744193df808d71dd9eaf9ff02627351f03",
       "upstream": "https://github.com/rust-windowing/winit",
       "upstream_rev": "d597ced770f3263f66ab901cc27bf7984e314465",
       "rustc_tests": [
@@ -208,13 +222,23 @@
           "game-activity"
         ]
       ],
-      "version": "0.31.0",
+      "version": "0.31.1",
       "versions": {
-        "wingy-dpi": "0.1.2"
+        "wingy-dpi": "0.1.3"
       },
-      "revisions": {
-        "wingy-dpi": "c89f50bfb0cd4f7e963f8bb990e2c78c52738e3d"
-      }
+      "previous_release": {
+        "version": "0.31.0",
+        "rev": "0b646ece50572ecdbd89d2a18d9eac5d07e194d5",
+        "versions": {
+          "wingy-dpi": "0.1.2"
+        },
+        "revisions": {
+          "wingy-dpi": "c89f50bfb0cd4f7e963f8bb990e2c78c52738e3d"
+        }
+      },
+      "path": "../wingy"
     }
-  ]
+  ],
+  "source_mode": "sibling-development",
+  "publication": "Versions are prepared for coordinated development only; no release is published."
 }

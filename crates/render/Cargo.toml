@@ -2,6 +2,7 @@
 repository.workspace = true
 name = "glory-render"
 version.workspace = true
+authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -12,7 +13,7 @@ default = []
 conformance = []
 
 [dependencies]
-glory-style = { path = "../style", version = "0.6.0" }
+glory-style = { path = "../style", version = "0.6.1" }
 
 [lints]
 workspace = true

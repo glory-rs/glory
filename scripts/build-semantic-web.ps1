@@ -28,7 +28,7 @@ try {
     if (-not [string]::Equals($actual, [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR), [StringComparison]::OrdinalIgnoreCase)) { throw "Unexpected build directory: $actual" }
     Write-Output "Verified target: $actual"
     $bindgenVersion = & $Bindgen --version
-    if ($LASTEXITCODE -ne 0 -or $bindgenVersion.Trim() -ne 'wasm-bindgen 0.2.129') { throw 'This fixture requires wasm-bindgen-cli 0.2.129 (same as the pinned library).' }
+    if ($LASTEXITCODE -ne 0 -or $bindgenVersion.Trim() -ne 'wasm-bindgen 0.2.130') { throw 'This fixture requires wasm-bindgen-cli 0.2.130 (same as the pinned library).' }
     cargo build --locked --manifest-path examples/semantic-web/Cargo.toml --lib --target wasm32-unknown-unknown
     if ($LASTEXITCODE -ne 0) { throw 'Web fixture build failed' }
     & $Bindgen "$taskBuildRoot/target/wasm32-unknown-unknown/debug/glory_semantic_web.wasm" --target web --out-dir "$taskBuildRoot/web-demo"

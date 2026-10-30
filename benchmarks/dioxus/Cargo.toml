@@ -4,6 +4,10 @@ version = "0.0.0"
 edition = "2021"
 publish = false
 
+rust-version = "1.95"
+
+license = "Apache-2.0"
+
 [dependencies]
 # default-features off to drop `devtools`/`logger` (they try to reach the `dx`
 # dev-server runtime and prevent mounting under a plain trunk build) and
@@ -12,10 +16,11 @@ publish = false
 dioxus = { version = "=0.7.10", default-features = false, features = [
   "web", "launch", "macro", "html", "signals", "hooks",
 ] }
-wasm-bindgen = { version = "=0.2.129", features = ["enable-interning"] }
+wasm-bindgen = { version = "=0.2.130", features = ["enable-interning"] }
 
 [workspace]
 
+resolver = "3"
 [package.metadata.benchmark]
 contract = "semantic-rows-v1"
 

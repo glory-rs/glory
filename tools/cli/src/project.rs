@@ -47,10 +47,7 @@ pub struct Paths {
 
 impl Paths {
     pub fn new(manifest: &Path, requested: Option<&Path>) -> Result<Self> {
-        let digest = format!(
-            "{:x}",
-            Sha256::digest(manifest.as_os_str().to_string_lossy().as_bytes())
-        );
+        let digest = sha256(manifest.as_os_str().to_string_lossy().as_bytes());
         let default = if cfg!(windows) {
             PathBuf::from("D:/BuildCache/glory-projects")
         } else if cfg!(target_os = "macos") {
@@ -849,6 +846,25 @@ mod tests {
             compatible_dependencies(&metadata, "app")
                 .unwrap_err()
                 .contains("incompatible")
+        );
+    }
+}
+
+/// Keep project identities and artifact digests stable across SHA-2 API versions.
+pub(crate) fn sha256(bytes: impl AsRef<[u8]>) -> String {
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+#[cfg(test)]
+mod digest_tests {
+    #[test]
+    fn sha256_matches_the_standard_abc_vector() {
+        assert_eq!(
+            super::sha256(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
         );
     }
 }

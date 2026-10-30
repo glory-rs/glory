@@ -2,7 +2,7 @@ param(
  [ValidateSet('glory','leptos','dioxus')][string[]]$Frameworks=@('glory','leptos','dioxus'),
  [string]$BuildRoot='D:/BuildCache/glory-display-completion-20261028/js-framework',
  [string]$BenchmarkRoot="$PSScriptRoot/../../js-framework-benchmark",
- [string]$Bindgen='D:/BuildCache/glory-v2-dioxus-20261028/tools/wasm-bindgen-0.2.129-x86_64-pc-windows-msvc/wasm-bindgen.exe'
+ [string]$Bindgen='D:/BuildCache/glory-v2-dioxus-20261028/tools/wasm-bindgen-0.2.130-x86_64-pc-windows-msvc/wasm-bindgen.exe'
 )
 $ErrorActionPreference='Stop'
 $BuildRoot=[IO.Path]::GetFullPath($BuildRoot)
@@ -13,7 +13,7 @@ foreach($key in @('CARGO_HOME','CARGO_TARGET_DIR','TEMP','TMP','CARGO_BUILD_JOBS
 try {
  $env:CARGO_HOME='D:/BuildCache/glory-semantic-ui/cargo';$env:TEMP="$BuildRoot/tmp";$env:TMP=$env:TEMP;$env:CARGO_BUILD_JOBS='2'
  New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null
- if((& $Bindgen --version).Trim() -ne 'wasm-bindgen 0.2.129'){throw 'Wrong bindgen CLI'}
+ if((& $Bindgen --version).Trim() -ne 'wasm-bindgen 0.2.130'){throw 'Wrong bindgen CLI'}
  foreach($framework in $Frameworks){
   $source="$BenchmarkRoot/frameworks/keyed/$framework";$manifest="$source/Cargo.toml"
   $env:CARGO_TARGET_DIR="$BuildRoot/$framework/target"

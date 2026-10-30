@@ -4,17 +4,22 @@ version = "0.0.0"
 edition = "2024"
 publish = false
 
+rust-version = "1.95"
+
+license = "Apache-2.0"
+
 [features]
 handwritten = []
 acceptance = []
 
 [dependencies]
 glory = { path = "../../crates/glory", default-features = false, features = ["dsl"] }
-wasm-bindgen = { version = "=0.2.129", features = ["enable-interning"] }
-web-sys = { version = "=0.3.106", features = ["Window", "Document", "Element"] }
+wasm-bindgen = { version = "=0.2.130", features = ["enable-interning"] }
+web-sys = { version = "=0.3.107", features = ["Window", "Document", "Element"] }
 
 [workspace]
 
+resolver = "3"
 [package.metadata.benchmark]
 contract = "semantic-rows-v1"
 display-profile = "html-display-keyed-v2"

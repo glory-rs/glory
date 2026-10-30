@@ -2,7 +2,7 @@ use crate::Result;
 use crate::args::Args;
 use crate::project::{Platform, Project};
 use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -404,7 +404,7 @@ fn hash_files(root: &Path, directory: &Path, files: &mut Vec<Value>) -> Result<(
                 .map_err(|e| e.to_string())?
                 .to_string_lossy()
                 .replace('\\', "/");
-            files.push(json!({ "path": relative, "bytes": bytes.len(), "sha256": format!("{:x}", Sha256::digest(&bytes)) }));
+            files.push(json!({ "path": relative, "bytes": bytes.len(), "sha256": crate::project::sha256(&bytes) }));
         }
     }
     Ok(())
@@ -442,7 +442,7 @@ mod tests {
         for file in files {
             let bytes = fs::read(stage.join(file["path"].as_str().unwrap())).unwrap();
             assert_eq!(file["bytes"], bytes.len());
-            assert_eq!(file["sha256"], format!("{:x}", Sha256::digest(bytes)));
+            assert_eq!(file["sha256"], crate::project::sha256(bytes));
         }
         let foreign = scratch
             .0

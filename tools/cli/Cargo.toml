@@ -1,24 +1,24 @@
 [package]
 name = "glory-cli"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2024"
-rust-version = "1.94"
-license = "MIT OR Apache-2.0"
+rust-version = "1.95"
+license = "Apache-2.0"
 repository = "https://github.com/glory-rs/glory"
 description = "Project-local build and development tools for Glory semantic applications"
 readme = "README.md"
 
 [workspace]
-resolver = "2"
+resolver = "3"
 
 [dependencies]
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
-toml_edit = "0.25"
-sha2 = "0.10.9"
+toml_edit = "0.25.17"
+sha2 = "0.11.1"
 notify = "8.2.1"
-ctrlc = "3.5"
-flate2 = { version = "1.1", default-features = false, features = ["rust_backend"] }
+ctrlc = "3.5.2"
+flate2 = { version = "1.1.10", default-features = false, features = ["rust_backend"] }
 
 [lints.rust]
 unsafe_code = "forbid"

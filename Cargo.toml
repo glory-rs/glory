@@ -3,25 +3,23 @@
 # See docs/semantic-ui-implementation.md for implementation and platform scope.
 members = ["crates/style", "crates/render", "crates/core", "crates/resource", "crates/i18n", "crates/routing", "crates/ui", "crates/html", "crates/web", "crates/ssr", "crates/apace", "crates/glory", "crates/salvo-adapter", "crates/view-macros"]
 exclude = ["examples", "benchmarks", "tools/cli"]
-resolver = "2"
+resolver = "3"
 
 [workspace.package]
-version = "0.6.0"
-authors = ["Chrislearn Young <chris@acroidea.com>"]
+version = "0.6.1"
+authors = ["Chris Young <chris@veco.id>"]
 edition = "2024"
-# MSRV policy: track the highest minimum required by supported workspace
-# dependencies. The active Salvo 1.0 integration requires Rust 1.94; bumping this value is a
-# SemVer-minor change for Glory itself.
-rust-version = "1.94"
+# Minimum supported Rust version for the coordinated 0.6.1 development series.
+rust-version = "1.95"
 description = """
 Glory is a Rust semantic UI framework with replaceable rendering hosts.
 """
-homepage = "https://glory.rs"
+homepage = "https://glory.taidge.org"
 repository = "https://github.com/glory-rs/glory"
 documentation = "https://docs.rs/glory/"
 readme = "./README.md"
 keywords = ["http", "async", "web", "framework", "server"]
-license = "MIT OR Apache-2.0"
+license = "Apache-2.0"
 categories = [
   "web-programming::http-server",
   "web-programming::websocket",
