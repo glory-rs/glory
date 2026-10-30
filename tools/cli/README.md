@@ -8,7 +8,8 @@ workspace package runs independently of application source compilation.
 
 This tool targets the current semantic architecture. It has no dependency on
 Glory's runtime crates and is an independent host-only tooling workspace.
-The root workspace still contains the same twelve runtime/adapter packages.
+The active runtime/adapter and compiler package set is defined by the root
+workspace's Cargo metadata; this independent tooling workspace is excluded.
 
 ## Final design
 
@@ -41,6 +42,10 @@ this implementation does not add an RSX compiler or a binary hot-patching system
   restart. Rebuilds are debounced; failed native builds keep the old process.
   Each native generation runs a separate executable copy so Windows can link
   the next build. Ctrl+C stops/reaps the owned process. Restarts reset app state.
+  Web requests must use `localhost` or the listening loopback IP and the actual
+  listener port in `Host`; foreign or duplicate authorities are rejected before
+  files or compiler diagnostics are read. HTTP/1.1 requires Host, while HTTP/1.0
+  may omit it. Only origin-form request targets are accepted.
 - `check`: Cargo check plus strict Clippy for the selected application/host.
 - `fmt [--check]`: the application's ordinary rustfmt.
 - `bundle`: release Web directory or desktop/server executable/assets plus a

@@ -5,7 +5,7 @@ use crate::project::{Platform, Project};
 use notify::{RecursiveMode, Watcher};
 use serde_json::json;
 use std::io::{Read, Write};
-use std::net::{TcpListener, TcpStream};
+use std::net::{IpAddr, SocketAddr, TcpListener, TcpStream};
 use std::path::{Component, Path, PathBuf};
 use std::sync::{
     Arc,
@@ -178,9 +178,17 @@ fn respond(
             );
         }
     };
-    let mut words = request.lines().next().unwrap_or("").split_whitespace();
-    let method = words.next().unwrap_or("");
-    let url = words.next().unwrap_or("");
+    let Some((method, url)) =
+        local_request(request, stream.local_addr().map_err(|e| e.to_string())?)
+    else {
+        return reply(
+            stream,
+            "400 Bad Request",
+            "text/plain",
+            b"invalid request authority",
+            false,
+        );
+    };
     let head = method == "HEAD";
     if !matches!(method, "GET" | "HEAD") {
         return reply(
@@ -283,6 +291,95 @@ fn respond(
     reply_encoded(stream, "200 OK", kind, &body, head, gzip)
 }
 
+// Loopback binding alone does not prevent a browser using an attacker-controlled
+// DNS name. Check the HTTP authority before serving files or development state.
+fn local_request(request: &str, address: SocketAddr) -> Option<(&str, &str)> {
+    if !address.ip().is_loopback() {
+        return None;
+    }
+    let (headers, _) = request.split_once("\r\n\r\n")?;
+    let mut lines = headers.split("\r\n");
+    let mut words = lines.next()?.split(' ');
+    let (method, target, version) = (words.next()?, words.next()?, words.next()?);
+    if method.is_empty()
+        || !method
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&byte))
+        || !target.starts_with('/')
+        || target
+            .bytes()
+            .any(|byte| byte.is_ascii_control() || byte == b' ')
+        || !matches!(version, "HTTP/1.0" | "HTTP/1.1")
+        || words.next().is_some()
+    {
+        return None;
+    }
+    let mut host = None;
+    for line in lines {
+        let (name, value) = line.split_once(':')?;
+        if name.is_empty()
+            || !name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || b"!#$%&'*+-.^_`|~".contains(&byte))
+            || value
+                .bytes()
+                .any(|byte| byte.is_ascii_control() && byte != b'\t')
+        {
+            return None;
+        }
+        if name.eq_ignore_ascii_case("host") {
+            if host.is_some() {
+                return None;
+            }
+            host = Some(value.trim_matches([' ', '\t']));
+        }
+    }
+    match host {
+        Some(host) if local_authority(host, address) => Some((method, target)),
+        None if version == "HTTP/1.0" => Some((method, target)),
+        _ => None,
+    }
+}
+
+fn local_authority(authority: &str, address: SocketAddr) -> bool {
+    let (host, port) = if let Some(rest) = authority.strip_prefix('[') {
+        let Some((host, suffix)) = rest.split_once(']') else {
+            return false;
+        };
+        let port = if suffix.is_empty() {
+            None
+        } else {
+            suffix.strip_prefix(':')
+        };
+        if !suffix.is_empty() && port.is_none() {
+            return false;
+        }
+        // Brackets are only valid around an IPv6 literal.
+        if host.parse::<std::net::Ipv6Addr>().is_err() {
+            return false;
+        }
+        (host, port)
+    } else {
+        match authority.split_once(':') {
+            Some((host, port)) => (host, Some(port)),
+            None => (authority, None),
+        }
+    };
+    let port = match port {
+        Some(value) if !value.is_empty() && value.bytes().all(|byte| byte.is_ascii_digit()) => {
+            match value.parse::<u16>() {
+                Ok(port) => port,
+                Err(_) => return false,
+            }
+        }
+        None => 80,
+        _ => return false,
+    };
+    port == address.port()
+        && (host.eq_ignore_ascii_case("localhost")
+            || host.parse::<IpAddr>().is_ok_and(|ip| ip == address.ip()))
+}
+
 fn reply(stream: &mut TcpStream, status: &str, kind: &str, body: &[u8], head: bool) -> Result<()> {
     reply_encoded(stream, status, kind, body, head, false)
 }
@@ -371,6 +468,9 @@ mod tests {
     fn request(root: &Path, request: &[u8], reload: bool) -> Vec<u8> {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
+        let request = String::from_utf8(request.to_vec())
+            .unwrap()
+            .replace("{port}", &address.port().to_string());
         let root = root.to_path_buf();
         let worker = std::thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
@@ -379,7 +479,7 @@ mod tests {
         });
         let mut client = TcpStream::connect(address).unwrap();
         std::thread::sleep(Duration::from_millis(20));
-        client.write_all(request).unwrap();
+        client.write_all(request.as_bytes()).unwrap();
         let mut bytes = Vec::new();
         client.read_to_end(&mut bytes).unwrap();
         worker.join().unwrap();
@@ -392,7 +492,11 @@ mod tests {
         let html = "<html><body>app</body></html>";
         root.write("index.html", html);
         root.write("app.wasm", "wasm-bytes");
-        let response = request(&root.0, b"GET / HTTP/1.1\r\nHost: localhost\r\n\r\n", true);
+        let response = request(
+            &root.0,
+            b"GET / HTTP/1.1\r\nHost: localhost:{port}\r\n\r\n",
+            true,
+        );
         assert!(
             String::from_utf8(response)
                 .unwrap()
@@ -404,7 +508,7 @@ mod tests {
         );
         let response = request(
             &root.0,
-            b"HEAD /app.wasm HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            b"HEAD /app.wasm HTTP/1.1\r\nHost: localhost:{port}\r\n\r\n",
             false,
         );
         let response = String::from_utf8(response).unwrap();
@@ -412,7 +516,7 @@ mod tests {
         assert!(response.ends_with("\r\n\r\n"));
         let response = request(
             &root.0,
-            b"GET /__glory_dev/state HTTP/1.1\r\nHost: localhost\r\n\r\n",
+            b"GET /__glory_dev/state HTTP/1.1\r\nHost: localhost:{port}\r\n\r\n",
             true,
         );
         let response = String::from_utf8(response).unwrap();
@@ -432,7 +536,7 @@ mod tests {
         let compressed = std::fs::read(root.0.join("index.html.gz")).unwrap();
         let response = request(
             &root.0,
-            b"GET / HTTP/1.1\r\nAccept-Encoding: br, gzip\r\n\r\n",
+            b"GET / HTTP/1.1\r\nHost: localhost:{port}\r\nAccept-Encoding: br, gzip\r\n\r\n",
             false,
         );
         let split = response.windows(4).position(|p| p == b"\r\n\r\n").unwrap() + 4;
@@ -443,7 +547,7 @@ mod tests {
         assert_eq!(&response[split..], compressed);
         let response = request(
             &root.0,
-            b"HEAD / HTTP/1.1\r\nAccept-Encoding: gzip\r\n\r\n",
+            b"HEAD / HTTP/1.1\r\nHost: localhost:{port}\r\nAccept-Encoding: gzip\r\n\r\n",
             false,
         );
         let response = String::from_utf8(response).unwrap();
@@ -457,7 +561,7 @@ mod tests {
         ] {
             let response = request(
                 &root.0,
-                format!("GET / HTTP/1.1\r\n{headers}\r\n").as_bytes(),
+                format!("GET / HTTP/1.1\r\nHost: localhost:{{port}}\r\n{headers}\r\n").as_bytes(),
                 reload,
             );
             let response = String::from_utf8(response).unwrap();
@@ -474,9 +578,94 @@ mod tests {
         }
         let response = request(
             &root.0,
-            b"GET /app.wasm HTTP/1.1\r\nAccept-Encoding: *;q=0\r\n\r\n",
+            b"GET /app.wasm HTTP/1.1\r\nHost: localhost:{port}\r\nAccept-Encoding: *;q=0\r\n\r\n",
             false,
         );
         assert!(response.starts_with(b"HTTP/1.1 406 Not Acceptable\r\n"));
+    }
+
+    #[test]
+    fn http_authority_requires_the_listening_loopback_and_port() {
+        let address = "127.0.0.1:8080".parse().unwrap();
+        for host in ["localhost:8080", "LOCALHOST:8080", "127.0.0.1:8080"] {
+            assert!(
+                local_request(&format!("GET / HTTP/1.1\r\nHost: {host}\r\n\r\n"), address)
+                    .is_some(),
+                "{host}"
+            );
+        }
+        for headers in [
+            "",
+            "Host: attacker.test:8080\r\n",
+            "Host: localhost\r\n",
+            "Host: localhost:80\r\n",
+            "Host: 127.0.0.2:8080\r\n",
+            "Host: [::1]:8080\r\n",
+            "Host: localhost:8080@evil.test\r\n",
+            "Host: localhost:8080/path\r\n",
+            "Host: localhost:+8080\r\n",
+            "Host: localhost:8080,evil.test\r\n",
+            "Host: localhost.:8080\r\n",
+            "Host: localhost:8080\r\nhOsT: localhost:8080\r\n",
+            "Host : localhost:8080\r\n",
+            " Host: localhost:8080\r\n",
+            "Host: localhost:8080\r\n folded\r\n",
+        ] {
+            assert!(
+                local_request(&format!("GET / HTTP/1.1\r\n{headers}\r\n"), address).is_none(),
+                "{headers:?}"
+            );
+        }
+        assert!(local_request("GET / HTTP/1.0\r\n\r\n", address).is_some());
+        assert!(
+            local_request(
+                "GET / HTTP/1.1\r\nHost: localhost\r\n\r\n",
+                "127.0.0.1:80".parse().unwrap()
+            )
+            .is_some()
+        );
+        assert!(
+            local_request(
+                "GET / HTTP/1.1\r\nHost: [::1]:8080\r\n\r\n",
+                "[::1]:8080".parse().unwrap()
+            )
+            .is_some()
+        );
+        for line in [
+            "GET http://localhost:8080/ HTTP/1.1",
+            "GET / HTTP/2",
+            "GET / HTTP/1.1 extra",
+            "GET  / HTTP/1.1",
+        ] {
+            assert!(
+                local_request(&format!("{line}\r\nHost: localhost:8080\r\n\r\n"), address)
+                    .is_none()
+            );
+        }
+    }
+
+    #[test]
+    fn foreign_or_missing_host_cannot_read_files_or_compiler_state() {
+        let root = crate::test_support::Scratch::new();
+        root.write("index.html", "private application source");
+        for path in ["/", "/__glory_dev/state", "/__glory_dev/reload.js"] {
+            for host in [
+                "",
+                "Host: attacker.test:{port}\r\n",
+                "Host: localhost:{port}\r\nHost: localhost:{port}\r\n",
+            ] {
+                let response = request(
+                    &root.0,
+                    format!("GET {path} HTTP/1.1\r\n{host}\r\n").as_bytes(),
+                    true,
+                );
+                assert!(response.starts_with(b"HTTP/1.1 400 Bad Request\r\n"));
+                let response = String::from_utf8(response).unwrap();
+                assert!(
+                    !response.contains("compiler error")
+                        && !response.contains("private application source")
+                );
+            }
+        }
     }
 }

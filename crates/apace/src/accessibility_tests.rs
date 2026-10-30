@@ -441,7 +441,7 @@ fn semantic_roles_labels_passwords_and_list_totals_form_a_valid_consumer_tree() 
             check().label("Check label").checked(true),
             image().source("").alt("Image label"),
             image().source("").decorative(),
-            link().target("glory://next").label("Link label"),
+            link().target("/next").label("Link label"),
             view()
                 .role(Role::List)
                 .fill(view().role(Role::ListItem).item(Some(ItemPosition {
@@ -476,10 +476,7 @@ fn semantic_roles_labels_passwords_and_list_totals_form_a_valid_consumer_tree() 
     );
     assert_eq!(all.iter().filter(|n| n.role() == AxRole::Image).count(), 1);
     find(AxRole::Image, "Image label");
-    assert_eq!(
-        find(AxRole::Link, "Link label").data().url(),
-        Some("glory://next")
-    );
+    assert_eq!(find(AxRole::Link, "Link label").data().url(), Some("/next"));
     assert_eq!(
         all.iter()
             .find(|n| n.role() == AxRole::List)
