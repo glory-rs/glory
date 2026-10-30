@@ -3,6 +3,7 @@ set -eu
 repo=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 . "$repo/scripts/apple-env.sh"
 cd "$repo"
+python3 scripts/library_lockfiles.py
 cargo metadata --locked --no-deps --format-version 1 > "$GLORY_BUILD_ROOT/metadata.json"
 python3 - "$GLORY_BUILD_ROOT/metadata.json" <<'PY'
 import json,os,pathlib,sys

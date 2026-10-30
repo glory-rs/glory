@@ -2,6 +2,33 @@ use glory_render::{Change, Descriptor, Patch, Props, Role};
 use glory_ui::{App, TextKind, Widget, button, check, group, image, input, link, text, view};
 
 #[test]
+fn ssr_links_reject_executable_targets_before_output_and_recover_after_patch() {
+    assert!(glory_ssr::render(link().target("javascript:alert(1)")).is_err());
+    let mut renderer = None;
+    let app = App::new(|runtime| {
+        let output = glory_ssr::Renderer::new(runtime);
+        renderer = Some(output.clone());
+        output
+    });
+    let renderer = renderer.unwrap();
+    let mounted = link().target("/safe").mount(app.scope()).unwrap();
+    let id = mounted.roots()[0];
+    app.flush().unwrap();
+    let before = renderer.html().unwrap();
+    assert!(
+        app.scope()
+            .patch(id, Patch::Target(Change::Set("data:text/html,bad".into())))
+            .is_err()
+    );
+    assert_eq!(renderer.html().unwrap(), before);
+    app.scope()
+        .patch(id, Patch::Target(Change::Set("#recovered".into())))
+        .unwrap();
+    app.flush().unwrap();
+    assert!(renderer.html().unwrap().contains("href=\"#recovered\""));
+}
+
+#[test]
 fn ssr_names_roles_and_clear_preserve_intrinsic_content_and_explicit_group_roles() {
     let html = glory_ssr::render(
         group().fill((

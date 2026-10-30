@@ -493,6 +493,11 @@ impl Storage {
             if graphic && let Props::Graphic(graphic) = self.view().props {
                 graphic.validate()?;
             }
+            if matches!(inverse, Patch::Target(change) if !matches!(change, Change::Keep))
+                && let Props::Link(link) = self.view().props
+            {
+                link.validate()?;
+            }
             let multiline_changed = matches!((self.view().props, &inverse), (Props::Input(input), Patch::Multiline(Change::Set(old))) if input.multiline != *old);
             if value || source || multiline_changed {
                 normalize_input(self.props_mut())?;

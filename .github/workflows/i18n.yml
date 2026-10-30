@@ -28,6 +28,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Rust selection failed' }
       - name: Verify target, behavior and opt-in dependency boundary
         run: |
+          python scripts/library_lockfiles.py
+          if ($LASTEXITCODE) { throw 'Library dependency resolution failed' }
           $meta = cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json
           if ($LASTEXITCODE -ne 0 -or [IO.Path]::GetFullPath($meta.target_directory) -ne [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)) { throw 'Unexpected Cargo target' }
           cargo fmt -p glory-i18n -- --check

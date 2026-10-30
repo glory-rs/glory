@@ -23,6 +23,7 @@ pub enum Error {
     WriteDuringCompute,
     Gone,
     AsyncRequired,
+    Execution(glory_core::AccessError),
     Superseded,
     HydrationMismatch,
 }
@@ -36,6 +37,10 @@ impl From<glory_core::AccessError> for Error {
     fn from(error: glory_core::AccessError) -> Self {
         match error {
             glory_core::AccessError::WriteDuringCompute => Self::WriteDuringCompute,
+            glory_core::AccessError::WrongRuntime => Self::WrongRuntime,
+            error @ (glory_core::AccessError::NoHost | glory_core::AccessError::Host(_)) => {
+                Self::Execution(error)
+            }
             _ => Self::Gone,
         }
     }

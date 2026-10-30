@@ -2,6 +2,10 @@
 
 Start here when evaluating or extending Glory:
 
+- [Project quality review and fixes](project-quality-review-2026-10-30.md):
+  security, routing, performance and engineering findings, implementation
+  status, reproducible checks and remaining acceptance boundaries.
+
 - [Routing implementation and acceptance](routing-implementation-2026-10-30.md):
   portable routing, retained Widget branches, Web/native/SSR integration,
   default dependency boundaries and verified versus deferred platform behavior.

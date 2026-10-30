@@ -8,7 +8,7 @@ use glory_html::{
 };
 use std::{
     cell::{Cell, RefCell},
-    collections::{HashMap, VecDeque},
+    collections::{BTreeMap, HashMap, VecDeque},
     rc::{Rc, Weak},
     sync::Arc,
     time::Duration,
@@ -48,9 +48,17 @@ fn error(value: impl std::fmt::Display) -> Error {
 type Handler = Rc<RefCell<Box<dyn FnMut()>>>;
 // Sparse-only apps do not retain a semantic renderer's methods or drop graph.
 trait Island {
+    fn needs_flush(&self) -> bool;
+    fn needs_presentation(&self) -> bool;
     fn flush(&self) -> Result<()>;
 }
 impl Island for crate::WebApp {
+    fn needs_flush(&self) -> bool {
+        self.app().scope().is_alive() && crate::WebApp::needs_flush(self)
+    }
+    fn needs_presentation(&self) -> bool {
+        self.app().scope().is_alive() && self.app().has_pending_presentation()
+    }
     fn flush(&self) -> Result<()> {
         if self.app().scope().is_alive() {
             crate::WebApp::flush(self).map_err(error)?;
@@ -114,7 +122,8 @@ struct State {
     fault: RefCell<Option<Error>>,
     events: RefCell<VecDeque<(u32, u16)>>,
     records: RefCell<HashMap<u32, Record>>,
-    widgets: RefCell<HashMap<u32, Rc<dyn Island>>>,
+    widgets: RefCell<BTreeMap<u32, Rc<dyn Island>>>,
+    island_flushes: Cell<u64>,
     pending_widgets: RefCell<HashMap<u32, PendingWidget>>,
     owners: RefCell<HashMap<InstanceId, u32>>,
     templates: RefCell<HashMap<usize, Rc<Declaration>>>,
@@ -148,6 +157,9 @@ pub struct Stats {
     pub records: usize,
     pub templates: usize,
     pub applied: u64,
+    pub islands: usize,
+    /// Actual island pump calls, excluding idle readiness checks.
+    pub island_flushes: u64,
 }
 
 impl App {
@@ -204,7 +216,8 @@ impl App {
             fault: RefCell::new(None),
             events: RefCell::new(VecDeque::new()),
             records: RefCell::new(HashMap::new()),
-            widgets: RefCell::new(HashMap::new()),
+            widgets: RefCell::new(BTreeMap::new()),
+            island_flushes: Cell::new(0),
             pending_widgets: RefCell::new(HashMap::new()),
             owners: RefCell::new(HashMap::new()),
             templates: RefCell::new(HashMap::new()),
@@ -239,6 +252,8 @@ impl App {
             records: self.0.records.borrow().len(),
             templates: self.0.templates.borrow().len(),
             applied: self.0.applied.get(),
+            islands: self.0.widgets.borrow().len(),
+            island_flushes: self.0.island_flushes.get(),
         }
     }
     pub fn mount(&self, owner: &Scope, template: &'static Template) -> Result<Instance> {
@@ -524,15 +539,37 @@ impl State {
             }
             self.flush_host()?;
         }
-        let mut widgets: Vec<_> = self
-            .widgets
-            .borrow()
-            .iter()
-            .map(|(&id, widget)| (id, widget.clone()))
-            .collect();
-        widgets.sort_unstable_by_key(|(id, _)| *id);
-        for (_, widget) in widgets {
-            widget.flush()?;
+        // Keep deterministic ID order without sorting or cloning idle islands.
+        // Readiness is O(live islands); only pending presentations/host turns
+        // enter the snapshot, so retirement/reentry cannot invalidate iteration.
+        for pass in 0..glory_ui::App::DEFAULT_SETTLE_PASSES {
+            let widgets: Vec<_> = self
+                .widgets
+                .borrow()
+                .values()
+                .filter(|widget| {
+                    if pass == 0 {
+                        widget.needs_flush()
+                    } else {
+                        widget.needs_presentation()
+                    }
+                })
+                .cloned()
+                .collect();
+            if widgets.is_empty() {
+                break;
+            }
+            for widget in widgets {
+                self.island_flushes
+                    .set(self.island_flushes.get().saturating_add(1));
+                widget.flush()?;
+            }
+            // A host event can dirty an island that was idle at the snapshot.
+            // Commit that presentation before returning. An outstanding RAF
+            // is considered only on the first pass; it is not another input.
+            if pass + 1 == glory_ui::App::DEFAULT_SETTLE_PASSES {
+                self.bridge.wake();
+            }
         }
         if !self.pending_widgets.borrow().is_empty() {
             self.bridge.wake();

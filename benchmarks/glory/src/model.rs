@@ -6,13 +6,16 @@ use std::{cell::RefCell, rc::Rc};
 pub struct Model {
     pub rows: KeyedList<usize, Row>,
     pub selected: Cage<Option<usize>>,
+    selection: glory::core::Selector<usize>,
     generator: Rc<RefCell<Generator>>,
 }
 impl Model {
     pub fn new(scope: &Scope) -> Self {
+        let selected = scope.cage(None);
         Self {
             rows: scope.keyed_list(Vec::new(), |row: &Row| row.id).unwrap(),
-            selected: scope.cage(None),
+            selected,
+            selection: scope.selector(selected).unwrap(),
             generator: Rc::new(RefCell::new(Generator::default())),
         }
     }
@@ -64,7 +67,7 @@ impl Model {
         }
     }
     pub fn is_selected(&self, id: usize) -> impl FnMut() -> bool + 'static + use<> {
-        let selected = self.selected;
-        move || selected.get() == Some(id)
+        let selected = self.selection.selected(id);
+        move || selected.get()
     }
 }
