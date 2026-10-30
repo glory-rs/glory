@@ -18,7 +18,8 @@ node browser.cjs
 The browser script starts its own loopback server and uses the repository's
 installed Playwright. Set GLORY_CHROME to an existing Chrome executable if needed.
 It checks CSR/SSR adoption, dirty editor identity/selection, query/hash, history,
-duplicate-URL scroll restoration, raw anchors, fallback and cleanup.
+duplicate-URL scroll restoration, cancellation of superseded anchor retries,
+CSR initial fragments with delayed WASM, raw anchors, fallback and cleanup.
 
 ```powershell
 cargo run --locked --features native --bin routing-native

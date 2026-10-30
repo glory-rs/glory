@@ -86,6 +86,7 @@ impl Router {
         if !parent.is_alive() {
             return Err(Error::Gone);
         }
+        parent.owner().check_write()?;
         let entry = history.current()?;
         let canonical = routes.canonical(&entry.location);
         let (plan, error) = plan(&routes, &canonical)?;
@@ -199,11 +200,16 @@ impl RouterHandle {
             .filter(|control| control.scope.is_alive())
             .ok_or(Error::Gone)
     }
+    fn writable_control(&self) -> Result<Rc<Control>> {
+        let control = self.control()?;
+        control.scope.owner().check_write()?;
+        Ok(control)
+    }
     pub fn is_alive(&self) -> bool {
         self.control().is_ok()
     }
     pub fn cancel_pending(&self) -> Result {
-        self.control()?.cancel();
+        self.writable_control()?.cancel();
         Ok(())
     }
     /// Tracked inside reactive computations; use current() for untracked reads.
@@ -275,7 +281,7 @@ impl RouterHandle {
         self.traverse(1)
     }
     pub fn traverse(&self, delta: i32) -> Result<Navigation> {
-        let control = self.control()?;
+        let control = self.writable_control()?;
         match control.history.preview(delta)? {
             Traversal::Boundary => Ok(Navigation::Boundary),
             Traversal::Known(entry) => self
@@ -300,7 +306,7 @@ impl RouterHandle {
         }
     }
     pub fn prepare(&self, location: Location, kind: NavigationKind) -> Result<PreparedNavigation> {
-        let control = self.control()?;
+        let control = self.writable_control()?;
         if !control.async_guards.borrow().is_empty() {
             return Err(Error::AsyncRequired);
         }
@@ -376,7 +382,7 @@ impl RouterHandle {
     /// Call from the host's queued event/frame boundary, not a native listener.
     /// The external address is already committed; refusal becomes an error view.
     pub fn observe(&self, entry: Entry) -> Result<Navigation> {
-        let control = self.control()?;
+        let control = self.writable_control()?;
         if control.busy.replace(true) {
             return Err(Error::Busy);
         }
@@ -424,7 +430,7 @@ impl RouterHandle {
             .commit()
     }
     pub async fn observe_async(&self, entry: Entry) -> Result<Navigation> {
-        let control = self.control()?;
+        let control = self.writable_control()?;
         control.cancel();
         if control.current()?.entry == entry {
             return Ok(Navigation::Noop);
@@ -455,7 +461,7 @@ impl RouterHandle {
         location: Location,
         kind: NavigationKind,
     ) -> Result<PreparedNavigation> {
-        let control = self.control()?;
+        let control = self.writable_control()?;
         if control.busy.get() {
             return Err(Error::Busy);
         }
@@ -553,7 +559,7 @@ impl PreparedNavigation {
         &self.location
     }
     pub fn commit(self) -> Result<Navigation> {
-        let control = self.router.control()?;
+        let control = self.router.writable_control()?;
         if !control.is_current(&self.flight) || control.current()?.revision != self.revision {
             return Err(Error::StaleNavigation);
         }

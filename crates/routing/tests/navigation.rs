@@ -173,6 +173,169 @@ fn host_failure_does_not_publish_and_distinct_routers_do_not_share_state() {
     assert_eq!(a.handle().current().unwrap().location(), &location("/"));
 }
 #[test]
+fn pure_navigation_does_not_touch_history_guards_or_prepared_work() {
+    let runtime = Runtime::new();
+    let scope = runtime.scope();
+    let history = Rc::new(MemoryHistory::new(location("/")));
+    let router = Router::new(&scope, routes(), history.clone()).unwrap();
+    let handle = router.handle();
+    handle.push(location("/current")).unwrap();
+    let guard_calls = Rc::new(Cell::new(0));
+    let calls = guard_calls.clone();
+    router.guard(move |_| {
+        calls.set(calls.get() + 1);
+        Ok(Decision::Allow)
+    });
+    let prepared = handle
+        .prepare(location("/prepared"), NavigationKind::Push)
+        .unwrap();
+    let before = handle.current().unwrap();
+    let reject = |operation: &dyn Fn() -> Result<Navigation>| {
+        assert_eq!(
+            scope.owner().compute(operation).unwrap(),
+            Err(Error::WriteDuringCompute)
+        );
+        assert_eq!(history.current().unwrap(), before.entry);
+        assert_eq!(history.len(), 2);
+        assert_eq!(handle.current().unwrap().revision, before.revision);
+        assert_eq!(guard_calls.get(), 1);
+    };
+    reject(&|| handle.push(location("/next")));
+    reject(&|| handle.push_entry(location("/current")));
+    reject(&|| handle.replace(location("/next")));
+    reject(&|| handle.back());
+    reject(&|| handle.forward());
+    reject(&|| handle.revalidate());
+    reject(&|| handle.observe(before.entry.clone()));
+    reject(&|| handle.cancel_pending().map(|()| Navigation::Noop));
+    reject(&|| {
+        handle
+            .prepare(location("/other"), NavigationKind::Push)
+            .map(|_| Navigation::Noop)
+    });
+    // A rejected pure operation must not supersede work prepared outside it.
+    prepared.commit().unwrap();
+    let prepared = handle
+        .prepare(location("/commit"), NavigationKind::Push)
+        .unwrap();
+    assert_eq!(
+        scope.owner().compute(|| prepared.commit()).unwrap(),
+        Err(Error::WriteDuringCompute)
+    );
+    assert_eq!(history.current().unwrap().location, location("/prepared"));
+    let callback = handle.clone();
+    let derived = scope.bond(move || callback.push(location("/derived")));
+    assert_eq!(derived.get(), Err(Error::WriteDuringCompute));
+    handle.push(location("/after")).unwrap();
+    assert_eq!(history.current().unwrap().location, location("/after"));
+}
+
+#[test]
+fn pure_host_traversal_and_initial_canonicalization_never_write_the_provider() {
+    struct HostHistory {
+        memory: MemoryHistory,
+        traversals: Cell<usize>,
+    }
+    impl History for HostHistory {
+        fn current(&self) -> Result<Entry> {
+            self.memory.current()
+        }
+        fn push(&self, location: &Location) -> Result<Entry> {
+            self.memory.push(location)
+        }
+        fn replace(&self, location: &Location) -> Result<Entry> {
+            self.memory.replace(location)
+        }
+        fn preview(&self, _: i32) -> Result<Traversal> {
+            Ok(Traversal::Host)
+        }
+        fn traverse(&self, _: i32) -> Result<Option<Entry>> {
+            self.traversals.set(self.traversals.get() + 1);
+            Ok(None)
+        }
+    }
+    let runtime = Runtime::new();
+    let scope = runtime.scope();
+    let history = Rc::new(HostHistory {
+        memory: MemoryHistory::new(location("/initial/")),
+        traversals: Cell::new(0),
+    });
+    let definitions = Routes::builder()
+        .slash_policy(SlashPolicy::RedirectWithoutSlash)
+        .root(RouteDef::new(RouteKey::<Params>::new("page"), "*path"))
+        .finish()
+        .unwrap();
+    let rejected = scope
+        .owner()
+        .compute(|| Router::new(&scope, definitions, history.clone()))
+        .unwrap();
+    assert!(matches!(rejected, Err(Error::WriteDuringCompute)));
+    assert_eq!(history.current().unwrap().location, location("/initial/"));
+    let router = Router::new(&scope, routes(), history.clone()).unwrap();
+    assert_eq!(
+        scope.owner().compute(|| router.handle().back()).unwrap(),
+        Err(Error::WriteDuringCompute)
+    );
+    assert_eq!(history.traversals.get(), 0);
+    assert_eq!(router.handle().back().unwrap(), Navigation::Accepted);
+    assert_eq!(history.traversals.get(), 1);
+}
+
+#[test]
+fn pure_async_navigation_is_rejected_before_guard_creation_or_cancellation() {
+    use std::{
+        future::Future,
+        pin::pin,
+        task::{Context, Poll, Waker},
+    };
+    let runtime = Runtime::new();
+    let scope = runtime.scope();
+    let history = Rc::new(MemoryHistory::new(location("/")));
+    let router = Router::new(&scope, routes(), history.clone()).unwrap();
+    let guard_calls = Rc::new(Cell::new(0));
+    let calls = guard_calls.clone();
+    router.async_guard(move |ctx| {
+        calls.set(calls.get() + 1);
+        Box::pin(async move {
+            if ctx.location.path() == "/slow" {
+                std::future::pending().await
+            } else {
+                Ok(Decision::Allow)
+            }
+        })
+    });
+    let handle = router.handle();
+    let mut slow = pin!(handle.push_async(location("/slow")));
+    let mut cx = Context::from_waker(Waker::noop());
+    assert!(slow.as_mut().poll(&mut cx).is_pending());
+    for observed in [false, true] {
+        let mut future: std::pin::Pin<Box<dyn Future<Output = Result<Navigation>> + '_>> =
+            if observed {
+                Box::pin(handle.observe_async(history.current().unwrap()))
+            } else {
+                Box::pin(handle.push_async(location("/next")))
+            };
+        let polled = scope
+            .owner()
+            .compute(|| future.as_mut().poll(&mut cx))
+            .unwrap();
+        assert_eq!(polled, Poll::Ready(Err(Error::WriteDuringCompute)));
+        assert_eq!(guard_calls.get(), 1);
+        assert!(slow.as_mut().poll(&mut cx).is_pending());
+    }
+    assert_eq!(history.len(), 1);
+    let mut fast = pin!(handle.push_async(location("/after")));
+    assert_eq!(
+        fast.as_mut().poll(&mut cx),
+        Poll::Ready(Ok(Navigation::Committed))
+    );
+    assert_eq!(
+        slow.as_mut().poll(&mut cx),
+        Poll::Ready(Err(Error::Superseded))
+    );
+}
+
+#[test]
 fn superseding_async_navigation_wakes_and_disposes_guard_owned_work() {
     use std::{
         future::Future,

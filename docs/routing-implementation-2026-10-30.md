@@ -25,10 +25,10 @@ Routes 保存可跨请求共享的纯声明和 codec 函数指针，RouteViews �
 
 | 检查 | 结果与证据范围 |
 | --- | --- |
-| routing Rust 测试 | 20 项通过：编码/优先级/相对目标/base、状态、guards、取消、历史、嵌套生命周期与 bootstrap |
-| Salvo 路由测试 | 2 项通过：真实 Response 状态/响应头/HEAD、拒绝与 redirect 不运行工厂 |
+| routing Rust 测试 | 23 项通过：编码/优先级/相对目标/base、状态、guards、取消、历史、嵌套生命周期与 bootstrap；纯计算拒绝导航且不改动历史或取消已有任务 |
+| Salvo 路由测试 | 3 项通过：真实 Response 状态/响应头/HEAD、拒绝与 redirect 不运行工厂；Denied(404) 在 GET/HEAD 均不渲染匹配页面 |
 | Apace 路由测试 | 2 项通过：实际原生文档内容、布局保留、取消返回；WindowApp 输入在 observe 才提交 |
-| Chrome 浏览器 | 3 个完整场景通过：CSR、SSR hydration、WASM 前 URL 改变；涵盖输入身份/脏值/选区、query/hash、返回、重复 URL 滚动、raw anchor、fallback、清理 |
+| Chrome 浏览器 | 4 个完整场景通过：CSR、SSR hydration、WASM 前 URL 改变、延迟 WASM 的 CSR 首屏 fragment；涵盖输入身份/脏值/选区、query/hash、返回、重复 URL 滚动、过期锚点恢复取消、raw anchor、fallback、清理 |
 | canonical 工作区脚本 | CLI、引擎来源/测试、工作区全 feature 测试、package-only 检查及严格 Clippy 通过 |
 | 最终源码检查 | routing 默认 graph 严格 Clippy；工作区 Windows 和 wasm32 全 feature/target 严格 Clippy 通过 |
 | 示例 | browser WASM、SSR generator 和 native binary 编译检查通过；复用同一个 page Widget 工厂 |
@@ -37,6 +37,8 @@ Routes 保存可跨请求共享的纯声明和 codec 函数指针，RouteViews �
 本地日志和浏览器报告位于 `D:/BuildCache/glory-routing`。重跑入口为 `scripts/check-semantic-ui.ps1`，以及 [示例 README](../examples/routing/README.md) 的浏览器构建和验收命令。最终 URL 边界完善后，已补跑 routing、Salvo、Apace 目标测试及 Windows/WASM 全工作区 Clippy。
 
 浏览器用例等待真实导航提交再继续，符合 Glory 将原生点击排队到帧边界处理的约定；同页面 id 不能单独作为点击已处理的证据。
+
+PR #52 复核后的修正：Salvo 按实际错误区分未知路由与 Denied(404)，拒绝结果不进入页面工厂。核心 Owner 提供无发布的 check_write，导航各入口在 guards、取消或 History 写入前检查纯计算限制，并返回 WriteDuringCompute。浏览器滚动任务绑定已提交 revision，新导航及用户输入取消旧 RAF；CSR 首屏挂载后补做 fragment 定位，hydration 保留原有滚动策略。回归日志位于 `D:/BuildCache/glory-routing/review-52/fix-*`。
 
 ## 后续边界
 

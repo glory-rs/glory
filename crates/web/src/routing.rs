@@ -175,6 +175,7 @@ impl BrowserHistory {
             revision: Cell::new(initial.revision),
             intent: Cell::new(0),
             restore_intent: Cell::new(0),
+            restore_revision: Cell::new(initial.revision),
             attempts: Cell::new(0),
             traversing: Cell::new(false),
             previous,
@@ -223,6 +224,7 @@ impl BrowserHistory {
             lease.listen(window.clone(), name, move |_| {
                 if let Some(driver) = weak.upgrade() {
                     driver.intent.set(driver.intent.get().wrapping_add(1));
+                    driver.cancel_restore();
                 }
             })?;
         }
@@ -241,6 +243,7 @@ impl BrowserHistory {
                 return;
             };
             if driver.revision.replace(snapshot.revision) != snapshot.revision {
+                driver.cancel_restore();
                 driver.traversing.set(matches!(
                     snapshot.kind,
                     glory_routing::NavigationKind::Observed
@@ -254,9 +257,7 @@ impl BrowserHistory {
                     .is_some_and(|previous| previous.location.path() == snapshot.location().path());
                 if !same_path || snapshot.location().fragment().is_some() || driver.traversing.get()
                 {
-                    driver.restore_intent.set(driver.intent.get());
-                    driver.attempts.set(0);
-                    driver.schedule_restore();
+                    driver.start_restore(snapshot.revision);
                 }
             }
         });
@@ -321,6 +322,7 @@ struct Driver {
     revision: Cell<u64>,
     intent: Cell<u64>,
     restore_intent: Cell<u64>,
+    restore_revision: Cell<u64>,
     attempts: Cell<u8>,
     traversing: Cell<bool>,
     previous: web_sys::ScrollRestoration,
@@ -334,6 +336,9 @@ impl Driver {
         if self.queue.borrow().len() >= 32 {
             self.pending_error.borrow_mut().get_or_insert(Error::Busy);
             return;
+        }
+        if !matches!(input, Input::Wake) {
+            self.cancel_restore();
         }
         self.queue.borrow_mut().push_back(input);
         if self.pending.get().is_none()
@@ -461,10 +466,19 @@ impl Driver {
         event.prevent_default();
         self.enqueue(Input::Push(location));
     }
-    fn schedule_restore(&self) {
+    fn cancel_restore(&self) {
         if let Some(id) = self.restoring.take() {
             let _ = self.provider.window.cancel_animation_frame(id);
         }
+    }
+    fn start_restore(&self, revision: u64) {
+        self.restore_revision.set(revision);
+        self.restore_intent.set(self.intent.get());
+        self.attempts.set(0);
+        self.schedule_restore();
+    }
+    fn schedule_restore(&self) {
+        self.cancel_restore();
         if let Some(callback) = self.restore.borrow().as_ref() {
             match self
                 .provider
@@ -483,6 +497,9 @@ impl Driver {
         let Ok(snapshot) = self.router.current() else {
             return;
         };
+        if snapshot.revision != self.restore_revision.get() {
+            return;
+        }
         let window = &self.provider.window;
         if self.traversing.get()
             && let Some(key) = &snapshot.entry.key
@@ -666,8 +683,13 @@ fn mount<W: glory_ui::Widget>(
     adopting.initial.borrow_mut().take();
     let router = captured.borrow_mut().take().ok_or(Error::Gone)?;
     let lease = provider.attach(app.app().scope(), root, router.clone(), on_error)?;
-    if provider.current()? != router.current()?.entry {
+    let snapshot = router.current()?;
+    if provider.current()? != snapshot.entry {
         lease.notify_location();
+    } else if initial.is_none() && snapshot.location().fragment().is_some() {
+        // CSR may create the anchor after the browser's initial fragment lookup.
+        // Hydration keeps the document's existing scroll position instead.
+        lease.driver.start_restore(snapshot.revision);
     }
     app.app().scope().on_cleanup(move || drop(lease))?;
     Ok(RoutingApp { app, router })

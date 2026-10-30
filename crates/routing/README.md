@@ -64,6 +64,9 @@ Superseding navigation disposes the pending guard Owner and wakes its waiter.
 Sync APIs report AsyncRequired when async guards are installed. Redirects are
 bounded and loop checked. Reentrant sync navigation returns Busy; applications
 can queue another intent for their next host turn.
+Navigation in a pure computation returns WriteDuringCompute before invoking
+guards, cancelling pending work or changing history. Use an event/effect or the
+host's observation boundary to navigate.
 
 ## Web
 
@@ -77,9 +80,11 @@ downloads, external links and links outside mount base keep browser behavior.
 Third-party direct pushState/replaceState calls need BrowserLease::notify_location.
 
 Window scrolling is bounded, keyed by EntryKey and restored after the UI turn.
-Initial hydration preserves scroll and dirty editors. Anchor lookup retries for
-at most eight RAFs; later input/navigation cancels restoration. Arbitrary nested
-scroll containers and virtual-list business-anchor registration remain future work.
+CSR handles the initial URL fragment after mounting; hydration preserves scroll
+and dirty editors. Anchor lookup retries for at most eight RAFs and is bound to
+the committed navigation revision; later input/navigation cancels restoration.
+Arbitrary nested scroll containers and virtual-list business-anchor registration
+remain future work.
 
 One top-level provider owns a Window. Plain-object history state retains other
 fields; primitive/array state is rejected rather than overwritten. Custom state

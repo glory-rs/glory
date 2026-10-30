@@ -78,6 +78,18 @@ const server = http.createServer((req, res) => {
       await page.waitForFunction(() => window.scrollY >= 690 && window.scrollY <= 710);
       await page.goBack();
       await page.waitForFunction(() => window.scrollY >= 390 && window.scrollY <= 410);
+      const cancelledRestore = await page.evaluate(async () => {
+        window.demo.navigate('/page/2#missing-anchor', false, false);
+        await new Promise(requestAnimationFrame);
+        window.demo.navigate('/page/2?tab=cancel', false, false);
+        // Let both the old anchor retry and the new navigation's effects run.
+        for (let frame = 0; frame < 12; frame++) await new Promise(requestAnimationFrame);
+        return { y: window.scrollY, search: location.search, hash: location.hash };
+      });
+      assert.equal(cancelledRestore.search, '?tab=cancel');
+      assert.equal(cancelledRestore.hash, '');
+      assert.ok(cancelledRestore.y >= 390 && cancelledRestore.y <= 410,
+        `superseded anchor restoration changed scroll to ${cancelledRestore.y}`);
       await page.evaluate(() => {
         const anchor = document.createElement('a'); anchor.href = '/page/3'; anchor.dataset.gloryRoute = ''; anchor.textContent = 'raw route'; document.querySelector('#app').append(anchor);
       });
@@ -88,9 +100,25 @@ const server = http.createServer((req, res) => {
       await page.evaluate(() => window.demo.stop());
       assert.equal(await page.evaluate(() => window.history.scrollRestoration), 'auto');
       assert.deepEqual(errors, []);
-      checks.push(`${late ? 'SSR with changed pre-WASM URL' : ssr ? 'SSR hydration' : 'CSR'}: layout identity, dirty editor, query/hash, history, duplicate URL scroll, raw anchor, fallback, teardown`);
+      checks.push(`${late ? 'SSR with changed pre-WASM URL' : ssr ? 'SSR hydration' : 'CSR'}: layout identity, dirty editor, query/hash, history, duplicate URL scroll, cancelled anchor restoration, raw anchor, fallback, teardown`);
       await page.close();
     }
+    const page = await browser.newPage();
+    const errors = [];
+    page.on('pageerror', error => errors.push(error.message));
+    await page.route('**/assets/glory_routing_demo.js', async route => {
+      // The native fragment lookup runs before CSR has created the anchor.
+      assert.equal(await page.locator('#details').count(), 0);
+      await new Promise(resolve => setTimeout(resolve, 250));
+      await route.continue();
+    });
+    await page.goto(`${base}/page/1#details`);
+    await page.waitForFunction(() => window.ready);
+    await page.waitForFunction(() => window.scrollY > 1000);
+    assert.equal(await page.locator('#details').count(), 1);
+    assert.deepEqual(errors, []);
+    checks.push('CSR initial fragment: delayed WASM still scrolls to the mounted anchor');
+    await page.close();
     console.log(JSON.stringify({ checks, passed: checks.length }, null, 2));
   } finally { await browser.close(); server.close(); }
 })().catch(error => { console.error(error); server.close(); process.exitCode = 1; });

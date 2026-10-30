@@ -30,7 +30,7 @@ pub fn render_response_with<W: Widget>(
         return Ok(response);
     }
     if (status != StatusCode::OK && status != StatusCode::NOT_FOUND)
-        || request.error == Some(glory_routing::Error::OutsideBase)
+        || !matches!(request.error, None | Some(glory_routing::Error::NoMatch))
     {
         let mut response = crate::html_response(format!(
             "<!doctype html><title>{}</title><p>{}</p>",

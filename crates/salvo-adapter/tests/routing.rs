@@ -93,3 +93,37 @@ fn redirects_and_denials_do_not_invoke_the_page_factory() {
     .unwrap();
     assert_eq!(response.status_code, Some(StatusCode::FORBIDDEN));
 }
+
+#[tokio::test]
+async fn not_found_denials_never_render_the_matched_page_for_get_or_head() {
+    for head in [false, true] {
+        for via_error in [false, true] {
+            let routes = routes();
+            let request = glory_salvo::routing::RequestLocation::parse("/")
+                .unwrap()
+                .resolve_with(&routes, |_, _| {
+                    if via_error {
+                        Err(glory_routing::Error::Denied(404))
+                    } else {
+                        Ok(glory_salvo::routing::Decision::Denied(404))
+                    }
+                });
+            let mut response =
+                glory_salvo::routing::render_response_with(routes, request, head, |_, _| {
+                    panic!("Denied(404) must not invoke the matched page factory");
+                    #[allow(unreachable_code)]
+                    text().content("private page content")
+                })
+                .unwrap();
+            assert_eq!(response.status_code, Some(StatusCode::NOT_FOUND));
+            let bytes = response.take_body().collect().await.unwrap().to_bytes();
+            if head {
+                assert!(bytes.is_empty());
+            } else {
+                let body = String::from_utf8(bytes.to_vec()).unwrap();
+                assert!(body.contains("Not Found"));
+                assert!(!body.contains("private page content"));
+            }
+        }
+    }
+}

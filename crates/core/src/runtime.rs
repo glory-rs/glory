@@ -1026,6 +1026,16 @@ impl Owner {
     pub fn is_alive(&self) -> bool {
         lookup(self.runtime).is_ok_and(|state| state.borrow().owners.get(self.key).is_some())
     }
+    /// Check liveness and mutation permission before an adapter changes host
+    /// state. This publishes nothing and does not reserve a later source write.
+    pub fn check_write(&self) -> Result<(), AccessError> {
+        allow_creation()?;
+        let state = lookup(self.runtime)?;
+        if state.borrow().owners.get(self.key).is_none() {
+            return Err(AccessError::Disposed);
+        }
+        Ok(())
+    }
     pub fn child(&self) -> Self {
         make_owner(
             self.runtime,

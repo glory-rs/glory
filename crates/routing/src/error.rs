@@ -20,6 +20,7 @@ pub enum Error {
     Unsupported(&'static str),
     StaleNavigation,
     Busy,
+    WriteDuringCompute,
     Gone,
     AsyncRequired,
     Superseded,
@@ -32,7 +33,10 @@ impl fmt::Display for Error {
 }
 impl std::error::Error for Error {}
 impl From<glory_core::AccessError> for Error {
-    fn from(_: glory_core::AccessError) -> Self {
-        Self::Gone
+    fn from(error: glory_core::AccessError) -> Self {
+        match error {
+            glory_core::AccessError::WriteDuringCompute => Self::WriteDuringCompute,
+            _ => Self::Gone,
+        }
     }
 }
