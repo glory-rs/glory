@@ -5,11 +5,11 @@ from pathlib import Path
 import subprocess
 
 repo = Path(__file__).resolve().parent.parent
-root = Path(os.environ.get("GLORY_DSL_BUILD_ROOT", "D:/BuildCache/glory-dsl-20261028"))
+root = Path(os.environ.get("GLORY_DSL_BUILD_ROOT", "D:/BuildCache/glory-dsl-20261028")).resolve()
 project = root / "diagnostics-project"
 (project / "src").mkdir(parents=True, exist_ok=True)
 (root / "tmp").mkdir(exist_ok=True)
-env = dict(os.environ, CARGO_HOME="D:/BuildCache/glory-semantic-ui/cargo",
+env = dict(os.environ, CARGO_HOME=os.environ.get("CARGO_HOME", "D:/BuildCache/glory-semantic-ui/cargo"),
            CARGO_TARGET_DIR=str(root / "check-target"), TEMP=str(root / "tmp"), TMP=str(root / "tmp"))
 (project / "Cargo.toml").write_text(
     '[package]\nname="display-diagnostics"\nversion="0.0.0"\nedition="2024"\n'
@@ -58,6 +58,8 @@ cases = [
 metadata = subprocess.run(["cargo", "metadata", "--manifest-path", str(project / "Cargo.toml"),
                            "--no-deps", "--format-version", "1"], env=env, capture_output=True, text=True, check=True)
 assert Path(json.loads(metadata.stdout)["target_directory"]).resolve() == (root / "check-target").resolve()
+# Fetch once for a fresh CI cache; individual diagnostic cases stay offline.
+subprocess.run(["cargo", "fetch", "--manifest-path", str(project / "Cargo.toml")], env=env, check=True)
 results = []
 for name, source, expected in cases:
     (project / "src/main.rs").write_text(source, encoding="utf-8")

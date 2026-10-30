@@ -1,0 +1,5672 @@
+{
+  "date": "2026-10-30",
+  "status": "complete",
+  "base_glory_commit": "1ffe33d9cd0d22861d3ba7a133e14259317e366d",
+  "candidate": "unpublished working tree patch",
+  "rust": "1.98.0",
+  "wasm_bindgen": "0.2.129",
+  "binaryen_postprocessing": false,
+  "profile": {
+    "opt-level": 3,
+    "debug": false,
+    "lto": true,
+    "codegen-units": 1,
+    "panic": "abort",
+    "strip": "symbols",
+    "incremental": false
+  },
+  "source_sha256": {
+    "Cargo.toml": "37808677c5382031da129d9e15f03f81437922849c7845f5b0ac1e0fc1e24267",
+    "crates/web/src/template.rs": "9e8838dfb74ff279aa1cf9993944f38f75019113c601095e0e92548a84ea41ee",
+    "crates/web/src/view.rs": "793dde4753475cbb7725d3926e3884a1af883afa9578f54e66437f0824ae936a",
+    "crates/web/src/view/content.rs": "ca759a3427dbf1d81f50ca7ed7d0ff2f3a38cdf635704b05c7fef131c87f5f60",
+    "crates/web/src/view/mounting.rs": "b09d677436ea9927e2cbd494c06d5fab5d4372d35e76aa7c3bf820eef794277d",
+    "crates/web/src/view/portable.rs": "ec73ec0f497a040da7a878624007019437d0bfbf1ba69e2578232a317dc08c45"
+  },
+  "strip_baseline": {
+    "wasm": {
+      "bytes": 730150,
+      "gzip": 246437,
+      "brotli": 184821,
+      "sha256": "4c3ee304878d31693f220f97086681c85f538b2ae9df46e7d0567f51fc99ea4e"
+    },
+    "withoutCustomSections": {
+      "bytes": 729699,
+      "gzip": 246188,
+      "brotli": 184610
+    },
+    "javascript": {
+      "bytes": 27576,
+      "gzip": 7381,
+      "brotli": 6396,
+      "emittedBytes": 34481
+    },
+    "sections": [
+      {
+        "id": 1,
+        "payloadBytes": 326,
+        "encodedBytes": 329,
+        "sha256": "f597999e8d760e4edc67502dfac86636e985580fc572549edb40d7e62729c4c0"
+      },
+      {
+        "id": 2,
+        "payloadBytes": 1702,
+        "encodedBytes": 1705,
+        "sha256": "6ed14ed34c0a536c269ab500f0d443dec9ac08a4757949c146d306881f4d066f"
+      },
+      {
+        "id": 3,
+        "payloadBytes": 821,
+        "encodedBytes": 824,
+        "sha256": "31ff222bf073c67c4aab9e8eb6cf38e3a66929f015967540fec2cb55fc3f7195"
+      },
+      {
+        "id": 4,
+        "payloadBytes": 7,
+        "encodedBytes": 9,
+        "sha256": "b29e1c7ee6d448fc905c572b3957f53a73ed3dc549de416803084d20d3bd8d12"
+      },
+      {
+        "id": 5,
+        "payloadBytes": 3,
+        "encodedBytes": 5,
+        "sha256": "f0b84402ff5181a6f998d07e5832d16de5bd3ea4e32e542da814690a734e0950"
+      },
+      {
+        "id": 6,
+        "payloadBytes": 25,
+        "encodedBytes": 27,
+        "sha256": "e0b0834602bac48426516e5d7e7616599df8aed9dd1448c31164fed60ebcd7f2"
+      },
+      {
+        "id": 7,
+        "payloadBytes": 266,
+        "encodedBytes": 269,
+        "sha256": "f72bb55e6f4d3ff9f6fb5092c8bc920feb578cc38fb29346205588a757111d89"
+      },
+      {
+        "id": 9,
+        "payloadBytes": 373,
+        "encodedBytes": 376,
+        "sha256": "f2dafb58c182d67bc5c53aeb5fd4671ebfcff434d9d48eacc3731509de979e36"
+      },
+      {
+        "id": 10,
+        "payloadBytes": 683879,
+        "encodedBytes": 683883,
+        "sha256": "cf61f5b35276c0c2347267458b91f04d04fbab107f42c5ba0d84accc7b19254c"
+      },
+      {
+        "id": 11,
+        "payloadBytes": 42260,
+        "encodedBytes": 42264,
+        "sha256": "5fece2c374b1d620f17b7624e290688aa9cd03f59884fe24f67aef0de5d1d11a"
+      },
+      {
+        "id": 0,
+        "payloadBytes": 374,
+        "encodedBytes": 377,
+        "sha256": "97e67ad38005b2333b4ac7b5d8cb4954f25518a0ffe04354801f7d8d4a0a6dfb",
+        "name": "name"
+      },
+      {
+        "id": 0,
+        "payloadBytes": 72,
+        "encodedBytes": 74,
+        "sha256": "ffb35865466d19f272a1d6031ee54d052b5ef8a39da1b40bfbef5e107cbf4ea3",
+        "name": "producers"
+      }
+    ],
+    "data_bytes": 42240
+  },
+  "static_host": {
+    "wasm": {
+      "bytes": 410368,
+      "gzip": 143054,
+      "brotli": 109237,
+      "sha256": "0ded1d143cd0d4943b009a91bfeccef945ec0cef0f82b0b93d0fce39644557cf"
+    },
+    "withoutCustomSections": {
+      "bytes": 409917,
+      "gzip": 142832,
+      "brotli": 108916
+    },
+    "javascript": {
+      "bytes": 27576,
+      "gzip": 7383,
+      "brotli": 6397,
+      "emittedBytes": 34481
+    },
+    "sections": [
+      {
+        "id": 1,
+        "payloadBytes": 310,
+        "encodedBytes": 313,
+        "sha256": "332cf2e9fc65503c5c30be2580a17457738f56158acb8f97e035f903bd17cf77"
+      },
+      {
+        "id": 2,
+        "payloadBytes": 1702,
+        "encodedBytes": 1705,
+        "sha256": "6ed14ed34c0a536c269ab500f0d443dec9ac08a4757949c146d306881f4d066f"
+      },
+      {
+        "id": 3,
+        "payloadBytes": 554,
+        "encodedBytes": 557,
+        "sha256": "cdd7554abf4eaa40729da2689ab0c54aa18fdc9e88a14428c37aa9572f8ff000"
+      },
+      {
+        "id": 4,
+        "payloadBytes": 7,
+        "encodedBytes": 9,
+        "sha256": "12d3ed9bb9440132e2edb5da12cb348b3f899e57b7ddb9a520534c1bc225ce0c"
+      },
+      {
+        "id": 5,
+        "payloadBytes": 3,
+        "encodedBytes": 5,
+        "sha256": "f0b84402ff5181a6f998d07e5832d16de5bd3ea4e32e542da814690a734e0950"
+      },
+      {
+        "id": 6,
+        "payloadBytes": 25,
+        "encodedBytes": 27,
+        "sha256": "930cb9b8c71d5ade81f77140b25ab68dcf49feeff0769fe9e542c220fb4d8cd4"
+      },
+      {
+        "id": 7,
+        "payloadBytes": 266,
+        "encodedBytes": 269,
+        "sha256": "b7a889356c3ec8b9327fec240c0f1b6e74ede21a96f4615012799bfa4b24f79e"
+      },
+      {
+        "id": 9,
+        "payloadBytes": 328,
+        "encodedBytes": 331,
+        "sha256": "306f1b557b47dadef12bfad032c699f0af45f723a3f09d27502d1a55d0634435"
+      },
+      {
+        "id": 10,
+        "payloadBytes": 383421,
+        "encodedBytes": 383425,
+        "sha256": "d32ee55aea6a386f96c372253a01a7b8283d93f0898d04e13d48cdb6a84b6155"
+      },
+      {
+        "id": 11,
+        "payloadBytes": 23264,
+        "encodedBytes": 23268,
+        "sha256": "2f7b0664e06597d5f3ce250e1be2f06690c54e445d8cd63e3b12340858682a89"
+      },
+      {
+        "id": 0,
+        "payloadBytes": 374,
+        "encodedBytes": 377,
+        "sha256": "d82303027018379e27a6a8ed3fe9e5ffb31b30cd67232c77401d8f75236aa897",
+        "name": "name"
+      },
+      {
+        "id": 0,
+        "payloadBytes": 72,
+        "encodedBytes": 74,
+        "sha256": "ffb35865466d19f272a1d6031ee54d052b5ef8a39da1b40bfbef5e107cbf4ea3",
+        "name": "producers"
+      }
+    ],
+    "data_bytes": 23244
+  },
+  "optimized": {
+    "wasm": {
+      "bytes": 410368,
+      "gzip": 143054,
+      "brotli": 109237,
+      "sha256": "0ded1d143cd0d4943b009a91bfeccef945ec0cef0f82b0b93d0fce39644557cf"
+    },
+    "withoutCustomSections": {
+      "bytes": 409917,
+      "gzip": 142832,
+      "brotli": 108916
+    },
+    "javascript": {
+      "bytes": 27576,
+      "gzip": 7383,
+      "brotli": 6397,
+      "emittedBytes": 34481
+    },
+    "sections": [
+      {
+        "id": 1,
+        "payloadBytes": 310,
+        "encodedBytes": 313,
+        "sha256": "332cf2e9fc65503c5c30be2580a17457738f56158acb8f97e035f903bd17cf77"
+      },
+      {
+        "id": 2,
+        "payloadBytes": 1702,
+        "encodedBytes": 1705,
+        "sha256": "6ed14ed34c0a536c269ab500f0d443dec9ac08a4757949c146d306881f4d066f"
+      },
+      {
+        "id": 3,
+        "payloadBytes": 554,
+        "encodedBytes": 557,
+        "sha256": "cdd7554abf4eaa40729da2689ab0c54aa18fdc9e88a14428c37aa9572f8ff000"
+      },
+      {
+        "id": 4,
+        "payloadBytes": 7,
+        "encodedBytes": 9,
+        "sha256": "12d3ed9bb9440132e2edb5da12cb348b3f899e57b7ddb9a520534c1bc225ce0c"
+      },
+      {
+        "id": 5,
+        "payloadBytes": 3,
+        "encodedBytes": 5,
+        "sha256": "f0b84402ff5181a6f998d07e5832d16de5bd3ea4e32e542da814690a734e0950"
+      },
+      {
+        "id": 6,
+        "payloadBytes": 25,
+        "encodedBytes": 27,
+        "sha256": "930cb9b8c71d5ade81f77140b25ab68dcf49feeff0769fe9e542c220fb4d8cd4"
+      },
+      {
+        "id": 7,
+        "payloadBytes": 266,
+        "encodedBytes": 269,
+        "sha256": "b7a889356c3ec8b9327fec240c0f1b6e74ede21a96f4615012799bfa4b24f79e"
+      },
+      {
+        "id": 9,
+        "payloadBytes": 328,
+        "encodedBytes": 331,
+        "sha256": "306f1b557b47dadef12bfad032c699f0af45f723a3f09d27502d1a55d0634435"
+      },
+      {
+        "id": 10,
+        "payloadBytes": 383421,
+        "encodedBytes": 383425,
+        "sha256": "d32ee55aea6a386f96c372253a01a7b8283d93f0898d04e13d48cdb6a84b6155"
+      },
+      {
+        "id": 11,
+        "payloadBytes": 23264,
+        "encodedBytes": 23268,
+        "sha256": "2f7b0664e06597d5f3ce250e1be2f06690c54e445d8cd63e3b12340858682a89"
+      },
+      {
+        "id": 0,
+        "payloadBytes": 374,
+        "encodedBytes": 377,
+        "sha256": "d82303027018379e27a6a8ed3fe9e5ffb31b30cd67232c77401d8f75236aa897",
+        "name": "name"
+      },
+      {
+        "id": 0,
+        "payloadBytes": 72,
+        "encodedBytes": 74,
+        "sha256": "ffb35865466d19f272a1d6031ee54d052b5ef8a39da1b40bfbef5e107cbf4ea3",
+        "name": "producers"
+      }
+    ],
+    "data_bytes": 23244
+  },
+  "dioxus": {
+    "wasm": {
+      "bytes": 381616,
+      "gzip": 139075,
+      "brotli": 107849,
+      "sha256": "3710721f3d32c109834beb8f69421d6116b4d70afbb23d29158511d78556dfce"
+    },
+    "withoutCustomSections": {
+      "bytes": 381112,
+      "gzip": 138835,
+      "brotli": 107738
+    },
+    "javascript": {
+      "bytes": 50549,
+      "gzip": 10884,
+      "brotli": 9481,
+      "emittedBytes": 52241
+    },
+    "sections": [
+      {
+        "id": 1,
+        "payloadBytes": 274,
+        "encodedBytes": 277,
+        "sha256": "fa09c379601d069876bb4c2821538d2988085a1a0751983eff1e8cf46457aa45"
+      },
+      {
+        "id": 2,
+        "payloadBytes": 3584,
+        "encodedBytes": 3587,
+        "sha256": "5c4e894e24fe050ec3e5445ebdacc508f64857d2405e93574475b37fc5c14d25"
+      },
+      {
+        "id": 3,
+        "payloadBytes": 689,
+        "encodedBytes": 692,
+        "sha256": "4b447cad15fecd5726e84b4e1e353ae7b9a1f8111d9918be185ffb0b8231712d"
+      },
+      {
+        "id": 4,
+        "payloadBytes": 7,
+        "encodedBytes": 9,
+        "sha256": "cd0d1afabc2e2296074aaa0058ad8037ae8dd018fab9fd1d3ebdb47269c00e67"
+      },
+      {
+        "id": 5,
+        "payloadBytes": 3,
+        "encodedBytes": 5,
+        "sha256": "f0b84402ff5181a6f998d07e5832d16de5bd3ea4e32e542da814690a734e0950"
+      },
+      {
+        "id": 6,
+        "payloadBytes": 25,
+        "encodedBytes": 27,
+        "sha256": "d057bbaaecf8f8c833f1eea01e7afcb4b05a366ff419032f50b66dfde4393ecd"
+      },
+      {
+        "id": 7,
+        "payloadBytes": 288,
+        "encodedBytes": 291,
+        "sha256": "187b972900b43f85eeab7651db500500ff3cce52efe5e8710742b0a921b2e5af"
+      },
+      {
+        "id": 9,
+        "payloadBytes": 643,
+        "encodedBytes": 646,
+        "sha256": "97d22215c164ff3dba56d7c1794bc4fc56c479cdf5af71f196e9404b42517bf7"
+      },
+      {
+        "id": 10,
+        "payloadBytes": 341511,
+        "encodedBytes": 341515,
+        "sha256": "befd1cb8e30c6ff5df79c77bac99a35cd41927a3dab48eaa17dc0e1cd7729511"
+      },
+      {
+        "id": 11,
+        "payloadBytes": 34051,
+        "encodedBytes": 34055,
+        "sha256": "989a9d920d06eaf986bba154420f5247cb65700339e8f009274ab3eecc86353a"
+      },
+      {
+        "id": 0,
+        "payloadBytes": 427,
+        "encodedBytes": 430,
+        "sha256": "e1ea5cc100a00498672d0290d9c430b8786c0b4b3cc2608c54a7077fe8545189",
+        "name": "name"
+      },
+      {
+        "id": 0,
+        "payloadBytes": 72,
+        "encodedBytes": 74,
+        "sha256": "ffb35865466d19f272a1d6031ee54d052b5ef8a39da1b40bfbef5e107cbf4ea3",
+        "name": "producers"
+      }
+    ],
+    "data_bytes": 34032
+  },
+  "mixed_application": {
+    "released": {
+      "wasm": {
+        "bytes": 2233423,
+        "gzip": 740051,
+        "brotli": 523927,
+        "sha256": "cf52a13def02c8ec6e020e2324eb90efa764907962f3d870acac8586d4d2b57f"
+      },
+      "withoutCustomSections": {
+        "bytes": 2232404,
+        "gzip": 739729,
+        "brotli": 523365
+      },
+      "javascript": {
+        "bytes": 82773,
+        "gzip": 15430,
+        "brotli": 13040,
+        "emittedBytes": 82773
+      },
+      "sections": [
+        {
+          "id": 1,
+          "payloadBytes": 595,
+          "encodedBytes": 598,
+          "sha256": "e3d389d7423d938ebdb94fa9bc1a360639963b455e08833498b26a545f54268c"
+        },
+        {
+          "id": 2,
+          "payloadBytes": 11900,
+          "encodedBytes": 11903,
+          "sha256": "9f9e6e7256793f3ef11baf0e3ab10f37f718145876f0010145a1385e81427db8"
+        },
+        {
+          "id": 3,
+          "payloadBytes": 1952,
+          "encodedBytes": 1955,
+          "sha256": "f42c116bd820728a516029346b0fda027364608d448cbfd19102dc01138893e3"
+        },
+        {
+          "id": 4,
+          "payloadBytes": 7,
+          "encodedBytes": 9,
+          "sha256": "034d708ab8cfa5ca5c194d85dc38ac039943cb26ec1a9b1cbcd17f2aa0bcf98a"
+        },
+        {
+          "id": 5,
+          "payloadBytes": 3,
+          "encodedBytes": 5,
+          "sha256": "e3c4e8c4be74ea7897d60436685f5014a88654a4f415f7e08b959984bf15f5d0"
+        },
+        {
+          "id": 6,
+          "payloadBytes": 25,
+          "encodedBytes": 27,
+          "sha256": "93a694a9f56ad6d83991de9372ffcd5fe1dbdbf450df29f3de272bea134343c3"
+        },
+        {
+          "id": 7,
+          "payloadBytes": 452,
+          "encodedBytes": 455,
+          "sha256": "c6db1adbb0d9c73c246aa6d0bb956025102e30abe90d409284055fca38fc2897"
+        },
+        {
+          "id": 9,
+          "payloadBytes": 899,
+          "encodedBytes": 902,
+          "sha256": "bb9518313c2b03a541c509d482ebb9a8a1bd439e5957e0bdce13908b010d0aaf"
+        },
+        {
+          "id": 10,
+          "payloadBytes": 2109581,
+          "encodedBytes": 2109586,
+          "sha256": "b118956e4d6ec07f934c1cfba22b6942379f32d7024114cdb0f0bb5520d38544"
+        },
+        {
+          "id": 11,
+          "payloadBytes": 106952,
+          "encodedBytes": 106956,
+          "sha256": "f8d92a5d9972f767e97c90fe0dcd1339f5ec45aae39919541bd046ebbc12eba4"
+        },
+        {
+          "id": 0,
+          "payloadBytes": 942,
+          "encodedBytes": 945,
+          "sha256": "529e9d44be6188037e9efbf835bc1efba1afff4b900976343fc1503a58c9b8ef",
+          "name": "name"
+        },
+        {
+          "id": 0,
+          "payloadBytes": 72,
+          "encodedBytes": 74,
+          "sha256": "ffb35865466d19f272a1d6031ee54d052b5ef8a39da1b40bfbef5e107cbf4ea3",
+          "name": "producers"
+        }
+      ],
+      "data_bytes": 106932
+    },
+    "optimized": {
+      "wasm": {
+        "bytes": 2168427,
+        "gzip": 723281,
+        "brotli": 517180,
+        "sha256": "b06c87056484ea4b72bfbefe5dce49ce53268652763751cbf541a7951f264de6"
+      },
+      "withoutCustomSections": {
+        "bytes": 2167408,
+        "gzip": 722960,
+        "brotli": 516650
+      },
+      "javascript": {
+        "bytes": 82773,
+        "gzip": 15427,
+        "brotli": 13040,
+        "emittedBytes": 82773
+      },
+      "sections": [
+        {
+          "id": 1,
+          "payloadBytes": 595,
+          "encodedBytes": 598,
+          "sha256": "e3d389d7423d938ebdb94fa9bc1a360639963b455e08833498b26a545f54268c"
+        },
+        {
+          "id": 2,
+          "payloadBytes": 11900,
+          "encodedBytes": 11903,
+          "sha256": "9f9e6e7256793f3ef11baf0e3ab10f37f718145876f0010145a1385e81427db8"
+        },
+        {
+          "id": 3,
+          "payloadBytes": 1857,
+          "encodedBytes": 1860,
+          "sha256": "0bcbc63846aa9adc52b441df44f9edbdd5224e863fd138c7b66cd627ee2b263d"
+        },
+        {
+          "id": 4,
+          "payloadBytes": 7,
+          "encodedBytes": 9,
+          "sha256": "7c69cc20c1dcbb07e7f524140eb20b11b8db5cf4cdeb3378232d194d7ec8da71"
+        },
+        {
+          "id": 5,
+          "payloadBytes": 3,
+          "encodedBytes": 5,
+          "sha256": "e3c4e8c4be74ea7897d60436685f5014a88654a4f415f7e08b959984bf15f5d0"
+        },
+        {
+          "id": 6,
+          "payloadBytes": 25,
+          "encodedBytes": 27,
+          "sha256": "27046cf98c124f49d6743920e1a5a82ee4565e0c1be6295924b3c20ee0651d3a"
+        },
+        {
+          "id": 7,
+          "payloadBytes": 452,
+          "encodedBytes": 455,
+          "sha256": "2696ea601510eed7a408d8f6dc7673aee142a27e9fee0a8db6ead9b890844c1f"
+        },
+        {
+          "id": 9,
+          "payloadBytes": 855,
+          "encodedBytes": 858,
+          "sha256": "87b236e104239d3ea055c7ddc14a9ae1254349cd557925144d84b0437a4a92e4"
+        },
+        {
+          "id": 10,
+          "payloadBytes": 2043885,
+          "encodedBytes": 2043889,
+          "sha256": "dbeecc0ea4176295b5bdb988fdd63d396c55775e68f64f7ef564b14ab992e8c2"
+        },
+        {
+          "id": 11,
+          "payloadBytes": 103736,
+          "encodedBytes": 103740,
+          "sha256": "5ca1258ac65c5f6cf0b0c9aaafd69cd4b2bf6b0d7dbcb0698d4b21534da3269d"
+        },
+        {
+          "id": 0,
+          "payloadBytes": 942,
+          "encodedBytes": 945,
+          "sha256": "a81126b3fd6b617ff503c2647b077f707be4b053a3522836debe38eb1b24c459",
+          "name": "name"
+        },
+        {
+          "id": 0,
+          "payloadBytes": 72,
+          "encodedBytes": 74,
+          "sha256": "ffb35865466d19f272a1d6031ee54d052b5ef8a39da1b40bfbef5e107cbf4ea3",
+          "name": "producers"
+        }
+      ],
+      "data_bytes": 103716
+    }
+  },
+  "attribution_note": "Actual code/data sections use the measured strip artifacts. Named auxiliary builds are separately recorded; their non-custom hashes differ, so symbol groupings are qualitative whole-function body attribution, not exact exclusive crate sizes of the measured binaries.",
+  "verification": {
+    "workspace_tests": {
+      "passed": 1131,
+      "ignored": 2,
+      "failed": 0
+    },
+    "clippy_native_all_targets_all_features": true,
+    "clippy_wasm_all_targets_all_features": true,
+    "handwritten_and_dsl_dom_identity_gc_faults": true,
+    "counter_example": true,
+    "mixed_csr_hydration": true,
+    "mixed_incremental_stream_hydration": true,
+    "sapid_native_mixed_dsl": {
+      "passed": 2
+    }
+  },
+  "raw_evidence_root": "D:/BuildCache/glory-strip-size-20261030",
+  "rejected_cold_helper_trial": {
+    "wasm": {
+      "bytes": 407440,
+      "gzip": 141331,
+      "brotli": 108332,
+      "sha256": "b8077f43dff73f0f7389c71303c862000b985aea09aea440d77f018bc5059983"
+    },
+    "withoutCustomSections": {
+      "bytes": 406989,
+      "gzip": 141112,
+      "brotli": 108111
+    },
+    "javascript": {
+      "bytes": 27576,
+      "gzip": 7382,
+      "brotli": 6395,
+      "emittedBytes": 34481
+    },
+    "sections": [
+      {
+        "id": 1,
+        "payloadBytes": 310,
+        "encodedBytes": 313,
+        "sha256": "332cf2e9fc65503c5c30be2580a17457738f56158acb8f97e035f903bd17cf77"
+      },
+      {
+        "id": 2,
+        "payloadBytes": 1702,
+        "encodedBytes": 1705,
+        "sha256": "9bec5cd5b034b02a3cd61d88538d30aaac2327898793de241f6c95f80d5c82f0"
+      },
+      {
+        "id": 3,
+        "payloadBytes": 543,
+        "encodedBytes": 546,
+        "sha256": "c0d1906ce7d99080c320af25a177b633a8b93bc313d69ebe87b7d323c7fb79e4"
+      },
+      {
+        "id": 4,
+        "payloadBytes": 7,
+        "encodedBytes": 9,
+        "sha256": "63d2fd59d8f4b4f48b234a270aed8f122a96238537107aebe4f8dd93fbea7e3f"
+      },
+      {
+        "id": 5,
+        "payloadBytes": 3,
+        "encodedBytes": 5,
+        "sha256": "f0b84402ff5181a6f998d07e5832d16de5bd3ea4e32e542da814690a734e0950"
+      },
+      {
+        "id": 6,
+        "payloadBytes": 25,
+        "encodedBytes": 27,
+        "sha256": "248ce06c5b0d34a2d6dc6d6b3802cfb39c6eaf415fb7a3990f2c15811cef8085"
+      },
+      {
+        "id": 7,
+        "payloadBytes": 266,
+        "encodedBytes": 269,
+        "sha256": "8db12c555888e23c453f8ac81c47670531a0a266dd7035589eabf591e638146d"
+      },
+      {
+        "id": 9,
+        "payloadBytes": 322,
+        "encodedBytes": 325,
+        "sha256": "12770b6f637e592b73e3d25c2906c632d5715c4eb520041468dd18fca19a5378"
+      },
+      {
+        "id": 10,
+        "payloadBytes": 380566,
+        "encodedBytes": 380570,
+        "sha256": "6f16ab9edf74edd14a0955322880cb79089a4da136b44b59dd13c6dcec052647"
+      },
+      {
+        "id": 11,
+        "payloadBytes": 23208,
+        "encodedBytes": 23212,
+        "sha256": "455f2f36adb1f6d8fe378f6cc7595d78338b916f40e65a34817783408fb8151b"
+      },
+      {
+        "id": 0,
+        "payloadBytes": 374,
+        "encodedBytes": 377,
+        "sha256": "1ee29f77cde7216132011f7d3249265f159f31cdfded29905e2687688e16a01a",
+        "name": "name"
+      },
+      {
+        "id": 0,
+        "payloadBytes": 72,
+        "encodedBytes": 74,
+        "sha256": "ffb35865466d19f272a1d6031ee54d052b5ef8a39da1b40bfbef5e107cbf4ea3",
+        "name": "producers"
+      }
+    ],
+    "data_bytes": 23188
+  },
+  "retained_variant": "static_host; cold helper attributes reverted",
+  "clear_ablation": {
+    "rounds": [
+      {
+        "round": "round-1",
+        "variants": {
+          "glory-v0.6.0-keyed": {
+            "mean": 56.053333333333335,
+            "median": 49.8,
+            "samples": [
+              79.7,
+              39.2,
+              51.5,
+              54.2,
+              45.5,
+              39.3,
+              42.4,
+              49.8,
+              47.3,
+              61.2,
+              60.5,
+              101.5,
+              38.3,
+              89.9,
+              40.5
+            ],
+            "total_mean": 65.20666666666666
+          },
+          "strip-baseline-v0.6.0-keyed": {
+            "mean": 56.92,
+            "median": 56.5,
+            "samples": [
+              61.6,
+              49.2,
+              66.3,
+              61.9,
+              37.8,
+              75.4,
+              55.2,
+              63.5,
+              84.3,
+              33.5,
+              34.5,
+              77.6,
+              56.5,
+              52.4,
+              44.1
+            ],
+            "total_mean": 66.92666666666666
+          },
+          "typed-host-v0.6.0-keyed": {
+            "mean": 55.733333333333334,
+            "median": 57.5,
+            "samples": [
+              58.7,
+              40.6,
+              62.3,
+              43.2,
+              69.2,
+              29,
+              72.2,
+              61.9,
+              57.5,
+              36.4,
+              56.3,
+              68,
+              89.3,
+              48.7,
+              42.7
+            ],
+            "total_mean": 62.986666666666665
+          }
+        }
+      },
+      {
+        "round": "round-2",
+        "variants": {
+          "glory-v0.6.0-keyed": {
+            "mean": 50.27333333333333,
+            "median": 42.7,
+            "samples": [
+              46.8,
+              34.2,
+              42.7,
+              45.2,
+              37.5,
+              79.3,
+              55.9,
+              41.7,
+              35.3,
+              50.9,
+              105.2,
+              38.1,
+              34.2,
+              66.2,
+              40.9
+            ],
+            "total_mean": 62.946666666666665
+          },
+          "strip-baseline-v0.6.0-keyed": {
+            "mean": 51.79333333333334,
+            "median": 44.4,
+            "samples": [
+              39.7,
+              40.3,
+              41.3,
+              85.9,
+              67.6,
+              42.7,
+              73.5,
+              51.9,
+              42.5,
+              36.6,
+              44.4,
+              35.5,
+              56.5,
+              48.6,
+              69.9
+            ],
+            "total_mean": 59.906666666666666
+          },
+          "typed-host-v0.6.0-keyed": {
+            "mean": 46.1,
+            "median": 41.1,
+            "samples": [
+              35.7,
+              32.6,
+              34.4,
+              72.7,
+              38.1,
+              35.9,
+              56,
+              33.1,
+              59.5,
+              45.8,
+              41.1,
+              43.7,
+              35.2,
+              61.1,
+              66.6
+            ],
+            "total_mean": 55.81333333333333
+          }
+        }
+      },
+      {
+        "round": "round-3",
+        "variants": {
+          "glory-v0.6.0-keyed": {
+            "mean": 56.67333333333333,
+            "median": 59.3,
+            "samples": [
+              46.9,
+              79.3,
+              59.3,
+              63,
+              33.3,
+              34.5,
+              86.5,
+              47.3,
+              67.3,
+              67.8,
+              37.9,
+              47.9,
+              63.2,
+              60.1,
+              55.8
+            ],
+            "total_mean": 65.98
+          },
+          "strip-baseline-v0.6.0-keyed": {
+            "mean": 57.17333333333333,
+            "median": 60.5,
+            "samples": [
+              60.5,
+              38.3,
+              61.6,
+              82.3,
+              73.2,
+              51.6,
+              64.3,
+              75.6,
+              37.6,
+              64.1,
+              70.2,
+              49.9,
+              36,
+              52.9,
+              39.5
+            ],
+            "total_mean": 66.44
+          },
+          "typed-host-v0.6.0-keyed": {
+            "mean": 54.22666666666667,
+            "median": 53.7,
+            "samples": [
+              38.3,
+              42,
+              59,
+              82.2,
+              45.6,
+              36.5,
+              36.2,
+              46.4,
+              53.7,
+              72.5,
+              57.4,
+              89.5,
+              38.5,
+              54.3,
+              61.3
+            ],
+            "total_mean": 63.46
+          }
+        }
+      }
+    ],
+    "pooled": {
+      "glory-v0.6.0-keyed": {
+        "samples": 45,
+        "mean": 54.333333333333336,
+        "median": 47.9,
+        "stdev": 18.212595541647445
+      },
+      "strip-baseline-v0.6.0-keyed": {
+        "samples": 45,
+        "mean": 55.29555555555555,
+        "median": 52.9,
+        "stdev": 15.165435514466255
+      },
+      "typed-host-v0.6.0-keyed": {
+        "samples": 45,
+        "mean": 52.02,
+        "median": 48.7,
+        "stdev": 15.6205517304491
+      }
+    }
+  },
+  "measurement_environment": {
+    "chrome": "155.0.8059.86",
+    "platform": "Windows; same machine for paired comparisons",
+    "runner_commit": "4015e28829e45679e3ea13cbfc1558a03bc64479",
+    "framework_inputs": "Frozen 2026-10-29 standard HTML table, Glory0.6.0 baseline and Dioxus0.7.10",
+    "port": 8798,
+    "cpu_default_samples": 15,
+    "selection_default_samples": 25,
+    "memory_size_default_samples": 1,
+    "sample_dropping": false,
+    "throttles": "upstream defaults unchanged"
+  },
+  "rejected_trial_full_cohort": {
+    "result_files": 45,
+    "rows": {
+      "01_run1k": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 46.586666666666666,
+              "median": 44.5,
+              "samples": [
+                56.8,
+                51,
+                46.1,
+                44.2,
+                44.5,
+                43.2,
+                47.8,
+                44.1,
+                47,
+                45.9,
+                58.8,
+                41.7,
+                42.9,
+                40.4,
+                44.4
+              ]
+            },
+            "script": {
+              "mean": 8.253333333333334,
+              "median": 7.8,
+              "samples": [
+                8.4,
+                9.2,
+                7.8,
+                7.8,
+                7.8,
+                7.4,
+                10.4,
+                8.6,
+                7.5,
+                8.1,
+                10.5,
+                7.5,
+                7.7,
+                7.8,
+                7.3
+              ]
+            },
+            "paint": {
+              "mean": 36.27333333333333,
+              "median": 35.6,
+              "samples": [
+                46.6,
+                40.9,
+                37.1,
+                35,
+                35.4,
+                34.3,
+                36,
+                34.2,
+                38.1,
+                36.3,
+                35.6,
+                33.1,
+                34.3,
+                31.6,
+                35.6
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 45.60666666666667,
+              "median": 43.2,
+              "samples": [
+                46.9,
+                46.2,
+                43.2,
+                45.5,
+                42.1,
+                74,
+                39.6,
+                44.7,
+                50.6,
+                44.2,
+                41.7,
+                41.1,
+                41.9,
+                40.9,
+                41.5
+              ]
+            },
+            "script": {
+              "mean": 7.62,
+              "median": 7.7,
+              "samples": [
+                8.9,
+                7.7,
+                7.7,
+                8.7,
+                8.2,
+                7.1,
+                6.2,
+                7.1,
+                10.2,
+                7.9,
+                6.9,
+                6.5,
+                8.1,
+                6.6,
+                6.5
+              ]
+            },
+            "paint": {
+              "mean": 35.0,
+              "median": 34.7,
+              "samples": [
+                36.5,
+                37.3,
+                34.7,
+                35.9,
+                33.3,
+                34.8,
+                32.6,
+                36.7,
+                39.5,
+                35.2,
+                34.1,
+                33.4,
+                33.1,
+                33.6,
+                34.3
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 45.43333333333333,
+              "median": 46.1,
+              "samples": [
+                43,
+                47.1,
+                42.4,
+                41.9,
+                39.3,
+                46.9,
+                44.9,
+                47.9,
+                46.1,
+                47.4,
+                49.1,
+                46.1,
+                41.2,
+                51.1,
+                47.1
+              ]
+            },
+            "script": {
+              "mean": 8.486666666666666,
+              "median": 8.4,
+              "samples": [
+                8.3,
+                8.2,
+                8.5,
+                7.6,
+                6.8,
+                10.1,
+                8.9,
+                9.6,
+                10.4,
+                7.6,
+                8.5,
+                8.2,
+                7.3,
+                8.4,
+                8.9
+              ]
+            },
+            "paint": {
+              "mean": 35.98,
+              "median": 35.4,
+              "samples": [
+                33.9,
+                37.9,
+                32.8,
+                33.7,
+                31.8,
+                35.4,
+                35.1,
+                37.2,
+                35,
+                38.9,
+                39.3,
+                37,
+                33.1,
+                41.7,
+                36.9
+              ]
+            }
+          }
+        }
+      },
+      "02_replace1k": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 53.4,
+              "median": 53.1,
+              "samples": [
+                54.7,
+                51.1,
+                53.1,
+                48.7,
+                51.9,
+                50.4,
+                52,
+                53.7,
+                51.2,
+                56,
+                55.3,
+                50.8,
+                53.3,
+                53.7,
+                65.1
+              ]
+            },
+            "script": {
+              "mean": 15.073333333333334,
+              "median": 14.7,
+              "samples": [
+                16.1,
+                13.6,
+                13.8,
+                13.9,
+                14.7,
+                13.9,
+                15.7,
+                15.3,
+                15.6,
+                15.2,
+                15.4,
+                14.3,
+                13.2,
+                14.6,
+                20.8
+              ]
+            },
+            "paint": {
+              "mean": 36.95333333333333,
+              "median": 36.7,
+              "samples": [
+                36.7,
+                36.4,
+                37.9,
+                33.8,
+                35.3,
+                35.6,
+                34.9,
+                37.3,
+                34.4,
+                39.8,
+                37.9,
+                35.5,
+                38.6,
+                37.5,
+                42.7
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 53.21333333333333,
+              "median": 51,
+              "samples": [
+                56.1,
+                47.1,
+                55.8,
+                60.7,
+                51.2,
+                55.3,
+                48.1,
+                51,
+                47.9,
+                50.2,
+                78.7,
+                46.7,
+                53.3,
+                48.4,
+                47.7
+              ]
+            },
+            "script": {
+              "mean": 13.526666666666667,
+              "median": 13.6,
+              "samples": [
+                15.3,
+                12.5,
+                13.8,
+                16.9,
+                14,
+                13.1,
+                11.8,
+                13.6,
+                12.4,
+                14,
+                14.6,
+                11.6,
+                14.6,
+                11.4,
+                13.3
+              ]
+            },
+            "paint": {
+              "mean": 38.67333333333333,
+              "median": 36.2,
+              "samples": [
+                39.8,
+                33.6,
+                40.7,
+                42.9,
+                36.2,
+                40.8,
+                35.5,
+                36.6,
+                34.5,
+                35.3,
+                62.9,
+                34.3,
+                37.7,
+                36,
+                33.3
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 51.4,
+              "median": 50.6,
+              "samples": [
+                49.8,
+                48.8,
+                50.6,
+                51.1,
+                49.2,
+                55.7,
+                62.2,
+                50.3,
+                43.4,
+                51.8,
+                46.5,
+                59.9,
+                51.1,
+                52.2,
+                48.4
+              ]
+            },
+            "script": {
+              "mean": 13.82,
+              "median": 12.9,
+              "samples": [
+                12.6,
+                12.7,
+                14.8,
+                12.7,
+                11.4,
+                15.9,
+                19.2,
+                12.9,
+                12.4,
+                14,
+                12.4,
+                15.6,
+                14.5,
+                12.8,
+                13.4
+              ]
+            },
+            "paint": {
+              "mean": 36.48,
+              "median": 36.4,
+              "samples": [
+                36.4,
+                34.8,
+                35,
+                37.4,
+                36.8,
+                38.8,
+                41.5,
+                36.5,
+                30.1,
+                36.3,
+                32.9,
+                42.9,
+                35,
+                38.6,
+                34.2
+              ]
+            }
+          }
+        }
+      },
+      "03_update10th1k_x16": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 61.666666666666664,
+              "median": 59.7,
+              "samples": [
+                78.1,
+                40.1,
+                74,
+                52.4,
+                85.1,
+                81.4,
+                76.6,
+                46.3,
+                35.5,
+                59.7,
+                79,
+                74.6,
+                44.4,
+                49.2,
+                48.6
+              ]
+            },
+            "script": {
+              "mean": 6.0200000000000005,
+              "median": 5.3,
+              "samples": [
+                8.7,
+                4.2,
+                6.4,
+                6.2,
+                7.8,
+                9.9,
+                4,
+                5.1,
+                3.2,
+                9.9,
+                5.2,
+                7.5,
+                3.7,
+                3.2,
+                5.3
+              ]
+            },
+            "paint": {
+              "mean": 47.17333333333333,
+              "median": 40.1,
+              "samples": [
+                59.3,
+                32.2,
+                59.1,
+                40.1,
+                69.7,
+                63.9,
+                63.9,
+                39.4,
+                29.6,
+                46.2,
+                39.8,
+                61.9,
+                37.7,
+                25.1,
+                39.7
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 61.57333333333333,
+              "median": 61.6,
+              "samples": [
+                70,
+                46.1,
+                53,
+                61.6,
+                59.9,
+                45.6,
+                94.5,
+                32.7,
+                87.3,
+                39.9,
+                73.2,
+                67.3,
+                70.4,
+                74.5,
+                47.6
+              ]
+            },
+            "script": {
+              "mean": 5.733333333333333,
+              "median": 5.2,
+              "samples": [
+                9.3,
+                3.4,
+                4.1,
+                7.7,
+                5.2,
+                4.7,
+                3.8,
+                3.2,
+                4.6,
+                3.6,
+                8.9,
+                8.5,
+                6,
+                6.5,
+                6.5
+              ]
+            },
+            "paint": {
+              "mean": 46.00666666666667,
+              "median": 44.3,
+              "samples": [
+                53.4,
+                38.4,
+                43.6,
+                49.1,
+                44.3,
+                37.4,
+                29.5,
+                27,
+                74.3,
+                32.2,
+                56.4,
+                53.8,
+                58.3,
+                56.5,
+                35.9
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 57.74666666666667,
+              "median": 58.8,
+              "samples": [
+                54.4,
+                69.2,
+                58.7,
+                79.9,
+                62.1,
+                30.2,
+                58.8,
+                79.2,
+                37.3,
+                58.8,
+                46.7,
+                71.5,
+                52.9,
+                46.9,
+                59.6
+              ]
+            },
+            "script": {
+              "mean": 6.2,
+              "median": 5.9,
+              "samples": [
+                4.5,
+                7.1,
+                7.3,
+                8.5,
+                5,
+                2.8,
+                5.1,
+                7.1,
+                3.4,
+                4,
+                5.9,
+                7.5,
+                9.5,
+                3.7,
+                11.6
+              ]
+            },
+            "paint": {
+              "mean": 45.373333333333335,
+              "median": 46.4,
+              "samples": [
+                46,
+                54.3,
+                47.4,
+                61.1,
+                51.7,
+                23.5,
+                48.7,
+                62.2,
+                30.7,
+                46.4,
+                36.5,
+                53.1,
+                35.2,
+                39.6,
+                44.2
+              ]
+            }
+          }
+        }
+      },
+      "04_select1k": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 27.06,
+              "median": 24,
+              "samples": [
+                32.3,
+                18.7,
+                23.5,
+                20.7,
+                29.4,
+                26,
+                23.6,
+                24.6,
+                46.7,
+                19.3,
+                21.9,
+                25.3,
+                15.2,
+                65.9,
+                24,
+                36.1,
+                28.4,
+                20.9,
+                22.1,
+                21.6,
+                25.2,
+                21.7,
+                30.2,
+                35.5,
+                17.7
+              ]
+            },
+            "script": {
+              "mean": 2.06,
+              "median": 1.8,
+              "samples": [
+                3.9,
+                1.8,
+                1.8,
+                2.8,
+                1,
+                1.6,
+                2,
+                1.8,
+                1.8,
+                2,
+                1.8,
+                3.2,
+                2,
+                2.4,
+                1.4,
+                1.6,
+                2.6,
+                1.8,
+                3,
+                2,
+                2,
+                1.8,
+                1.8,
+                1.8,
+                1.8
+              ]
+            },
+            "paint": {
+              "mean": 12.296,
+              "median": 10.9,
+              "samples": [
+                23.9,
+                6.4,
+                8.7,
+                12.2,
+                9.8,
+                11.8,
+                9.5,
+                8.6,
+                19.6,
+                9,
+                8.9,
+                11.3,
+                11.3,
+                12.2,
+                8.3,
+                19.9,
+                16.3,
+                7.6,
+                16.5,
+                7.2,
+                9.1,
+                9.7,
+                15.3,
+                23.4,
+                10.9
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 32.136,
+              "median": 25.7,
+              "samples": [
+                22.2,
+                26.1,
+                24,
+                43.8,
+                19.5,
+                34.8,
+                23.6,
+                85.2,
+                27.5,
+                57.1,
+                26.4,
+                13.3,
+                24,
+                35.4,
+                29.1,
+                17.1,
+                33.5,
+                25.7,
+                45.6,
+                23.3,
+                24.1,
+                85.2,
+                25.4,
+                14,
+                17.5
+              ]
+            },
+            "script": {
+              "mean": 3.88,
+              "median": 3.1,
+              "samples": [
+                3.2,
+                3,
+                3,
+                1.8,
+                3.8,
+                3,
+                6.5,
+                2.6,
+                7.9,
+                6.1,
+                2.4,
+                3.1,
+                2.6,
+                7.9,
+                3.3,
+                3.8,
+                6.5,
+                2.6,
+                3.2,
+                3,
+                3,
+                2.6,
+                3,
+                3.3,
+                5.8
+              ]
+            },
+            "paint": {
+              "mean": 13.424,
+              "median": 10.1,
+              "samples": [
+                6.7,
+                9.8,
+                6.9,
+                23.5,
+                8.2,
+                17.4,
+                10.6,
+                24.6,
+                15.1,
+                31.8,
+                10.1,
+                7.8,
+                8.3,
+                21,
+                9,
+                10.9,
+                22,
+                9.6,
+                12.7,
+                9.6,
+                7.8,
+                23.7,
+                11.7,
+                8.1,
+                8.7
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 26.58,
+              "median": 25,
+              "samples": [
+                23.2,
+                27.8,
+                24.2,
+                20.8,
+                13.1,
+                38,
+                22.3,
+                49.9,
+                24.6,
+                31.4,
+                25.4,
+                21,
+                31.4,
+                25.6,
+                24.4,
+                22,
+                21.3,
+                30.6,
+                25,
+                25,
+                14.9,
+                28.3,
+                28.1,
+                37.4,
+                28.8
+              ]
+            },
+            "script": {
+              "mean": 4.54,
+              "median": 4,
+              "samples": [
+                3.7,
+                7.9,
+                4.2,
+                2.8,
+                3.8,
+                7.3,
+                4,
+                6.9,
+                2.8,
+                4.9,
+                6.1,
+                3.2,
+                3.9,
+                6.1,
+                2.7,
+                2.6,
+                7.1,
+                4.3,
+                3.6,
+                3.4,
+                4.4,
+                3.4,
+                5.7,
+                6.1,
+                2.6
+              ]
+            },
+            "paint": {
+              "mean": 15.064,
+              "median": 14.8,
+              "samples": [
+                12.1,
+                16.6,
+                16.7,
+                9.1,
+                7.7,
+                22.6,
+                10.3,
+                33.9,
+                7.9,
+                22.4,
+                7.8,
+                14.8,
+                24.1,
+                14.4,
+                7.7,
+                17,
+                10.3,
+                21.3,
+                15.6,
+                7,
+                7.6,
+                13.1,
+                15.9,
+                24.4,
+                16.3
+              ]
+            }
+          }
+        }
+      },
+      "05_swap1k": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 69.32,
+              "median": 70,
+              "samples": [
+                76.1,
+                80.7,
+                79.8,
+                41.5,
+                45.7,
+                53.2,
+                70,
+                109.6,
+                60.7,
+                95.2,
+                94.1,
+                48.5,
+                48.7,
+                55.1,
+                80.9
+              ]
+            },
+            "script": {
+              "mean": 5.8133333333333335,
+              "median": 5.5,
+              "samples": [
+                9.3,
+                8.1,
+                6.3,
+                4,
+                4,
+                6.3,
+                4.6,
+                5.5,
+                4.4,
+                7.9,
+                5.5,
+                4.4,
+                3.8,
+                4.8,
+                8.3
+              ]
+            },
+            "paint": {
+              "mean": 53.660000000000004,
+              "median": 49.4,
+              "samples": [
+                58.7,
+                66.5,
+                61.3,
+                34.3,
+                37.6,
+                41.9,
+                59.4,
+                44.2,
+                49.4,
+                78.4,
+                78.9,
+                40.9,
+                40.5,
+                46.1,
+                66.8
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 57.02,
+              "median": 56.2,
+              "samples": [
+                71.5,
+                35.8,
+                71.7,
+                50.8,
+                58.2,
+                36.2,
+                51.6,
+                67.4,
+                76.3,
+                45.6,
+                48,
+                56.2,
+                66.8,
+                75.1,
+                44.1
+              ]
+            },
+            "script": {
+              "mean": 3.4266666666666667,
+              "median": 3.2,
+              "samples": [
+                4.1,
+                2.6,
+                5.3,
+                4.2,
+                4.1,
+                2.4,
+                3.4,
+                5.1,
+                3.2,
+                2.6,
+                3,
+                3.2,
+                3,
+                3.2,
+                2
+              ]
+            },
+            "paint": {
+              "mean": 47.11333333333334,
+              "median": 49.1,
+              "samples": [
+                60.1,
+                30.2,
+                58.7,
+                42.7,
+                50.4,
+                30.5,
+                41.9,
+                54,
+                64.9,
+                38.4,
+                41.1,
+                49.1,
+                55.1,
+                65.2,
+                24.4
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 52.13333333333333,
+              "median": 45.1,
+              "samples": [
+                72.6,
+                68.3,
+                44,
+                45.1,
+                53.5,
+                50.6,
+                44.1,
+                39.7,
+                36.2,
+                42.2,
+                78.1,
+                33.8,
+                43.1,
+                54.9,
+                75.8
+              ]
+            },
+            "script": {
+              "mean": 3.453333333333333,
+              "median": 2.8,
+              "samples": [
+                6.3,
+                4.1,
+                2.8,
+                2.6,
+                4,
+                2.8,
+                2.6,
+                3.5,
+                2.8,
+                2.8,
+                5.9,
+                2.4,
+                2.8,
+                3,
+                3.4
+              ]
+            },
+            "paint": {
+              "mean": 44.46666666666667,
+              "median": 38.1,
+              "samples": [
+                59.1,
+                58.9,
+                36.3,
+                36.9,
+                46.5,
+                43.5,
+                38.1,
+                33.6,
+                31.1,
+                36.1,
+                67.1,
+                28.7,
+                36.7,
+                47.9,
+                66.5
+              ]
+            }
+          }
+        }
+      },
+      "06_remove-one-1k": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 41.02,
+              "median": 39.4,
+              "samples": [
+                46.2,
+                31.6,
+                40,
+                45.1,
+                49.3,
+                44.7,
+                82.7,
+                35.7,
+                32.5,
+                29.8,
+                38.7,
+                30,
+                40.4,
+                29.2,
+                39.4
+              ]
+            },
+            "script": {
+              "mean": 2.46,
+              "median": 2.4,
+              "samples": [
+                2.4,
+                1.6,
+                2.6,
+                1.6,
+                4.3,
+                2.8,
+                1.9,
+                2.4,
+                2,
+                1.8,
+                2.2,
+                3,
+                3.8,
+                1.8,
+                2.7
+              ]
+            },
+            "paint": {
+              "mean": 32.76,
+              "median": 34.1,
+              "samples": [
+                40.9,
+                24.2,
+                34.4,
+                40.1,
+                43,
+                39.6,
+                39.8,
+                30.9,
+                25,
+                23.3,
+                34.1,
+                24.6,
+                34.1,
+                23.3,
+                34.1
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 35.4,
+              "median": 33,
+              "samples": [
+                31.1,
+                46.7,
+                37.1,
+                30,
+                33,
+                31.2,
+                28.3,
+                30.2,
+                53,
+                36.8,
+                33.7,
+                45.4,
+                35.9,
+                29.2,
+                29.4
+              ]
+            },
+            "script": {
+              "mean": 1.4133333333333333,
+              "median": 1.2,
+              "samples": [
+                1.2,
+                1.4,
+                1.1,
+                1.4,
+                1.4,
+                1.4,
+                1.2,
+                1.1,
+                3.4,
+                1.2,
+                1.2,
+                2.1,
+                1.1,
+                1,
+                1
+              ]
+            },
+            "paint": {
+              "mean": 28.426666666666666,
+              "median": 27.3,
+              "samples": [
+                19.2,
+                42.4,
+                28.9,
+                22.3,
+                27.3,
+                22.7,
+                23.7,
+                19.9,
+                46.4,
+                30.3,
+                28.7,
+                40.4,
+                27.4,
+                22.2,
+                24.6
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 36.6,
+              "median": 32.3,
+              "samples": [
+                79.5,
+                35,
+                29.9,
+                29.3,
+                28.4,
+                38.2,
+                31.7,
+                28.8,
+                27.7,
+                30.4,
+                39.7,
+                32.4,
+                32.3,
+                32.4,
+                53.3
+              ]
+            },
+            "script": {
+              "mean": 1.3866666666666667,
+              "median": 1.3,
+              "samples": [
+                1.2,
+                1.3,
+                0.8,
+                1.4,
+                1.3,
+                1.4,
+                1.2,
+                1.6,
+                1.2,
+                1.2,
+                2.5,
+                1.3,
+                1.2,
+                1.2,
+                2
+              ]
+            },
+            "paint": {
+              "mean": 26.14,
+              "median": 23.7,
+              "samples": [
+                28.6,
+                26.4,
+                18.3,
+                22.2,
+                21.3,
+                27.8,
+                26.2,
+                21.7,
+                23.7,
+                27,
+                34.8,
+                21.7,
+                21.1,
+                23.7,
+                47.6
+              ]
+            }
+          }
+        }
+      },
+      "07_create10k": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 539.4,
+              "median": 540.4,
+              "samples": [
+                578.1,
+                551.9,
+                508.1,
+                531.9,
+                533.2,
+                546.3,
+                541.9,
+                554.1,
+                497.4,
+                510.7,
+                569.5,
+                540.4,
+                524.9,
+                525.7,
+                576.9
+              ]
+            },
+            "script": {
+              "mean": 99.04666666666667,
+              "median": 98.9,
+              "samples": [
+                103.5,
+                100.5,
+                103.2,
+                96.7,
+                94,
+                95.9,
+                97.4,
+                98.8,
+                99.6,
+                95.7,
+                103.1,
+                97.3,
+                101.1,
+                98.9,
+                100
+              ]
+            },
+            "paint": {
+              "mean": 430.1933333333333,
+              "median": 432.9,
+              "samples": [
+                466.3,
+                439.7,
+                394.7,
+                427.6,
+                427.5,
+                440.6,
+                434.9,
+                443.6,
+                389.2,
+                405,
+                455.5,
+                432.9,
+                415,
+                415.7,
+                464.7
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 517.2733333333333,
+              "median": 517.8,
+              "samples": [
+                521.3,
+                509.3,
+                549.5,
+                521.8,
+                501.4,
+                530.4,
+                500.2,
+                505.7,
+                527.3,
+                517.8,
+                506.8,
+                532.1,
+                498.5,
+                533.6,
+                503.4
+              ]
+            },
+            "script": {
+              "mean": 89.04,
+              "median": 88.7,
+              "samples": [
+                88.3,
+                82.9,
+                100.6,
+                90.2,
+                88.5,
+                88,
+                88.8,
+                87.3,
+                88.8,
+                88.7,
+                94.8,
+                94.9,
+                74.8,
+                91.7,
+                87.3
+              ]
+            },
+            "paint": {
+              "mean": 418.66,
+              "median": 420.1,
+              "samples": [
+                422,
+                417.5,
+                439.5,
+                422.9,
+                403.6,
+                431.4,
+                402,
+                409.2,
+                426.8,
+                420.1,
+                403.6,
+                426,
+                415,
+                433.1,
+                407.2
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 514.52,
+              "median": 508.4,
+              "samples": [
+                542.2,
+                505.1,
+                518.4,
+                542.1,
+                490.9,
+                487.9,
+                543,
+                489.4,
+                533.1,
+                508.4,
+                490,
+                503.1,
+                552,
+                494.3,
+                517.9
+              ]
+            },
+            "script": {
+              "mean": 92.01333333333334,
+              "median": 91.1,
+              "samples": [
+                95.3,
+                91.6,
+                90.5,
+                97.4,
+                89.7,
+                86.7,
+                90.7,
+                93.6,
+                91.1,
+                91,
+                93.2,
+                90.5,
+                97.1,
+                89.6,
+                92.2
+              ]
+            },
+            "paint": {
+              "mean": 413.50666666666666,
+              "median": 407.7,
+              "samples": [
+                438.3,
+                404.9,
+                418.6,
+                435.1,
+                392.1,
+                392.5,
+                443.2,
+                386.6,
+                432.4,
+                407.7,
+                388.3,
+                404.4,
+                446.8,
+                395.3,
+                416.4
+              ]
+            }
+          }
+        }
+      },
+      "08_create1k-after1k_x2": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 57.34,
+              "median": 56.7,
+              "samples": [
+                54.3,
+                56.7,
+                56.3,
+                51.7,
+                52.1,
+                52.6,
+                55.6,
+                56.8,
+                58.1,
+                70,
+                62.1,
+                57.6,
+                64.8,
+                58.3,
+                53.1
+              ]
+            },
+            "script": {
+              "mean": 9.973333333333333,
+              "median": 9.4,
+              "samples": [
+                8.8,
+                9.4,
+                9.3,
+                9,
+                8.9,
+                9.3,
+                11.3,
+                9.6,
+                11.6,
+                12.5,
+                9.7,
+                11.3,
+                10.8,
+                9.4,
+                8.7
+              ]
+            },
+            "paint": {
+              "mean": 44.89333333333333,
+              "median": 44.6,
+              "samples": [
+                43.5,
+                45.4,
+                45,
+                41.2,
+                41.4,
+                41.9,
+                42.8,
+                45.9,
+                44.6,
+                45.2,
+                50.8,
+                44.2,
+                51.9,
+                46.9,
+                42.7
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 58.96,
+              "median": 57.6,
+              "samples": [
+                57.6,
+                55.2,
+                55,
+                67.8,
+                66.5,
+                63.2,
+                59.7,
+                53.9,
+                56.1,
+                55.8,
+                60.3,
+                57,
+                53.8,
+                64.4,
+                58.1
+              ]
+            },
+            "script": {
+              "mean": 9.313333333333333,
+              "median": 9.3,
+              "samples": [
+                8.7,
+                9.5,
+                8.7,
+                8.2,
+                9.2,
+                9.3,
+                9.7,
+                8.5,
+                9.7,
+                8.8,
+                11.1,
+                9.6,
+                9.8,
+                9.1,
+                9.8
+              ]
+            },
+            "paint": {
+              "mean": 46.913333333333334,
+              "median": 45.7,
+              "samples": [
+                46.7,
+                43.8,
+                44.4,
+                45.7,
+                55,
+                51.8,
+                47.8,
+                43.7,
+                44.6,
+                45.3,
+                47.3,
+                45.4,
+                42.4,
+                52.9,
+                46.9
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 56.68666666666667,
+              "median": 55.1,
+              "samples": [
+                55.1,
+                61.1,
+                55,
+                58.9,
+                62.5,
+                59.2,
+                53,
+                58.5,
+                54,
+                54,
+                53.9,
+                57.2,
+                53.4,
+                63.6,
+                50.9
+              ]
+            },
+            "script": {
+              "mean": 9.3,
+              "median": 9,
+              "samples": [
+                8.4,
+                9,
+                9.6,
+                9.5,
+                8.6,
+                11,
+                8.9,
+                11.1,
+                9.1,
+                8,
+                8.8,
+                8.9,
+                8.1,
+                11.1,
+                9.4
+              ]
+            },
+            "paint": {
+              "mean": 45.4,
+              "median": 44.8,
+              "samples": [
+                44.8,
+                49.6,
+                43.7,
+                47.2,
+                52.5,
+                46.1,
+                42.6,
+                45.4,
+                43,
+                43.9,
+                43.1,
+                46.2,
+                43.3,
+                49.7,
+                39.9
+              ]
+            }
+          }
+        }
+      },
+      "09_clear1k_x8": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 61.98,
+              "median": 63.3,
+              "samples": [
+                84.2,
+                44.7,
+                68,
+                89.8,
+                45.3,
+                42.5,
+                44,
+                84.6,
+                64.3,
+                39.1,
+                55.8,
+                63.3,
+                77.5,
+                70.7,
+                55.9
+              ]
+            },
+            "script": {
+              "mean": 53.373333333333335,
+              "median": 54.3,
+              "samples": [
+                74.2,
+                36.5,
+                55.1,
+                80,
+                40,
+                36.4,
+                37.5,
+                73.5,
+                59.7,
+                33.6,
+                45.1,
+                54.3,
+                65.1,
+                64.7,
+                44.9
+              ]
+            },
+            "paint": {
+              "mean": 5.52,
+              "median": 6.2,
+              "samples": [
+                6.3,
+                4.8,
+                7,
+                6.2,
+                3.3,
+                4.2,
+                4.6,
+                7.1,
+                3.7,
+                3.6,
+                6.5,
+                6.6,
+                7.8,
+                3.6,
+                7.5
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 67.53333333333333,
+              "median": 73.5,
+              "samples": [
+                42.4,
+                43.6,
+                35.1,
+                43.3,
+                77.8,
+                44,
+                73.5,
+                115.1,
+                86.8,
+                102.8,
+                77.4,
+                41.3,
+                50.5,
+                87.9,
+                91.5
+              ]
+            },
+            "script": {
+              "mean": 57.65333333333333,
+              "median": 65.5,
+              "samples": [
+                35,
+                38.3,
+                29.4,
+                37.8,
+                68.3,
+                37.5,
+                67.6,
+                99,
+                77.7,
+                87.8,
+                66.2,
+                35.1,
+                44.3,
+                75.3,
+                65.5
+              ]
+            },
+            "paint": {
+              "mean": 6.24,
+              "median": 4.2,
+              "samples": [
+                3.6,
+                3.7,
+                3.4,
+                3.3,
+                3.5,
+                4.8,
+                4.2,
+                8.7,
+                5.1,
+                8.1,
+                7.3,
+                3.6,
+                3.9,
+                6.3,
+                24.1
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 57.553333333333335,
+              "median": 54,
+              "samples": [
+                60.4,
+                46.8,
+                38.7,
+                41,
+                60.3,
+                38.3,
+                96.4,
+                72.2,
+                54.8,
+                79.3,
+                37.4,
+                54,
+                79.3,
+                51.4,
+                53
+              ]
+            },
+            "script": {
+              "mean": 49.20666666666666,
+              "median": 46.1,
+              "samples": [
+                52.5,
+                39.1,
+                33,
+                36.1,
+                38.1,
+                30.4,
+                88.5,
+                62.1,
+                46.1,
+                70.6,
+                31.4,
+                46.9,
+                70.2,
+                45.2,
+                47.9
+              ]
+            },
+            "paint": {
+              "mean": 4.526666666666666,
+              "median": 4.4,
+              "samples": [
+                4.4,
+                5.5,
+                3.6,
+                3.3,
+                7.2,
+                4,
+                5,
+                5.2,
+                5.3,
+                5.1,
+                2.9,
+                3.7,
+                5.4,
+                4,
+                3.3
+              ]
+            }
+          }
+        }
+      },
+      "21_ready-memory": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "memory",
+          "values": {
+            "DEFAULT": {
+              "mean": 1.9060163497924805,
+              "median": 1.9060163497924805,
+              "samples": [
+                1.9060163497924805
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "memory",
+          "values": {
+            "DEFAULT": {
+              "mean": 1.8646440505981445,
+              "median": 1.8646440505981445,
+              "samples": [
+                1.8646440505981445
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "memory",
+          "values": {
+            "DEFAULT": {
+              "mean": 1.743764877319336,
+              "median": 1.743764877319336,
+              "samples": [
+                1.743764877319336
+              ]
+            }
+          }
+        }
+      },
+      "22_run-memory": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "memory",
+          "values": {
+            "DEFAULT": {
+              "mean": 6.1630048751831055,
+              "median": 6.1630048751831055,
+              "samples": [
+                6.1630048751831055
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "memory",
+          "values": {
+            "DEFAULT": {
+              "mean": 5.817063331604004,
+              "median": 5.817063331604004,
+              "samples": [
+                5.817063331604004
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "memory",
+          "values": {
+            "DEFAULT": {
+              "mean": 5.804817199707031,
+              "median": 5.804817199707031,
+              "samples": [
+                5.804817199707031
+              ]
+            }
+          }
+        }
+      },
+      "25_run-clear-memory": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "memory",
+          "values": {
+            "DEFAULT": {
+              "mean": 6.899428367614746,
+              "median": 6.899428367614746,
+              "samples": [
+                6.899428367614746
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "memory",
+          "values": {
+            "DEFAULT": {
+              "mean": 4.458792686462402,
+              "median": 4.458792686462402,
+              "samples": [
+                4.458792686462402
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "memory",
+          "values": {
+            "DEFAULT": {
+              "mean": 4.304267883300781,
+              "median": 4.304267883300781,
+              "samples": [
+                4.304267883300781
+              ]
+            }
+          }
+        }
+      },
+      "41_size-uncompressed": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "size",
+          "values": {
+            "DEFAULT": {
+              "mean": 422.3,
+              "median": 422.3,
+              "samples": [
+                422.3
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "size",
+          "values": {
+            "DEFAULT": {
+              "mean": 425.1,
+              "median": 425.1,
+              "samples": [
+                425.1
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "size",
+          "values": {
+            "DEFAULT": {
+              "mean": 740.2,
+              "median": 740.2,
+              "samples": [
+                740.2
+              ]
+            }
+          }
+        }
+      },
+      "42_size-compressed": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "size",
+          "values": {
+            "DEFAULT": {
+              "mean": 114.8,
+              "median": 114.8,
+              "samples": [
+                114.8
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "size",
+          "values": {
+            "DEFAULT": {
+              "mean": 112.3,
+              "median": 112.3,
+              "samples": [
+                112.3
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "size",
+          "values": {
+            "DEFAULT": {
+              "mean": 187,
+              "median": 187,
+              "samples": [
+                187
+              ]
+            }
+          }
+        }
+      },
+      "43_first-paint": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "size",
+          "values": {
+            "DEFAULT": {
+              "mean": 691.3,
+              "median": 691.3,
+              "samples": [
+                691.3
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "size",
+          "values": {
+            "DEFAULT": {
+              "mean": 703.1,
+              "median": 703.1,
+              "samples": [
+                703.1
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "size",
+          "values": {
+            "DEFAULT": {
+              "mean": 1121.9,
+              "median": 1121.9,
+              "samples": [
+                1121.9
+              ]
+            }
+          }
+        }
+      }
+    }
+  },
+  "retained_full_cohort": {
+    "result_files": 45,
+    "rows": {
+      "01_run1k": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 45.626666666666665,
+              "median": 45.4,
+              "stddev": 1.7123361930693504,
+              "samples": [
+                44.5,
+                43.7,
+                43.5,
+                44.6,
+                45.7,
+                47.3,
+                44.1,
+                44.6,
+                49.5,
+                47.6,
+                47.3,
+                44.3,
+                45.4,
+                46.5,
+                45.8
+              ]
+            },
+            "script": {
+              "mean": 8.186666666666666,
+              "median": 8.1,
+              "stddev": 0.6610237370566817,
+              "samples": [
+                7.2,
+                8.7,
+                7.7,
+                8.9,
+                7.7,
+                7.5,
+                8.1,
+                8.2,
+                8.3,
+                9.3,
+                8.5,
+                7.3,
+                8.1,
+                8,
+                9.3
+              ]
+            },
+            "paint": {
+              "mean": 36.3,
+              "median": 35.7,
+              "stddev": 1.6470753300493408,
+              "samples": [
+                35.7,
+                34.3,
+                35,
+                34.9,
+                36.9,
+                38.8,
+                34.8,
+                35,
+                40.2,
+                37,
+                37.6,
+                35.6,
+                36,
+                37.2,
+                35.5
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 45.80666666666666,
+              "median": 46.1,
+              "stddev": 2.578334641548595,
+              "samples": [
+                43.1,
+                44.5,
+                49.6,
+                42.4,
+                41.5,
+                46.1,
+                47.8,
+                48.3,
+                47.6,
+                45.7,
+                45.2,
+                49.4,
+                42.5,
+                46.4,
+                47
+              ]
+            },
+            "script": {
+              "mean": 8.020000000000001,
+              "median": 7.7,
+              "stddev": 1.0903472579215958,
+              "samples": [
+                7.5,
+                7.6,
+                9.5,
+                6.7,
+                7,
+                7,
+                7.7,
+                9.6,
+                8.8,
+                6.6,
+                8.4,
+                10,
+                8.4,
+                7.2,
+                8.3
+              ]
+            },
+            "paint": {
+              "mean": 36.76,
+              "median": 37.6,
+              "stddev": 2.016290795353828,
+              "samples": [
+                33.7,
+                36.1,
+                39.1,
+                34.8,
+                33.7,
+                38.2,
+                39,
+                37.6,
+                37.4,
+                38,
+                35.8,
+                38.6,
+                33.4,
+                38.1,
+                37.9
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 44.81333333333334,
+              "median": 45.3,
+              "stddev": 2.2582757855960653,
+              "samples": [
+                43.7,
+                41.6,
+                44.9,
+                45.7,
+                46.6,
+                44,
+                40.3,
+                45.5,
+                42.2,
+                49.2,
+                44.4,
+                45.3,
+                47,
+                46.5,
+                45.3
+              ]
+            },
+            "script": {
+              "mean": 7.646666666666667,
+              "median": 7.6,
+              "stddev": 0.7927048330753085,
+              "samples": [
+                8,
+                5.8,
+                7.4,
+                7.9,
+                8.6,
+                7.1,
+                7.1,
+                7.5,
+                7.5,
+                9.4,
+                7.7,
+                7.6,
+                7.2,
+                8.2,
+                7.7
+              ]
+            },
+            "paint": {
+              "mean": 36.24666666666667,
+              "median": 36.7,
+              "stddev": 1.6864445552982876,
+              "samples": [
+                35,
+                35.1,
+                36.1,
+                37,
+                37.1,
+                36,
+                32.3,
+                36.7,
+                34,
+                38.7,
+                36,
+                36.7,
+                38.9,
+                37.3,
+                36.8
+              ]
+            }
+          }
+        }
+      },
+      "02_replace1k": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 52.57333333333333,
+              "median": 53,
+              "stddev": 4.328719155109225,
+              "samples": [
+                51.8,
+                45.2,
+                57.3,
+                52.2,
+                55.8,
+                53.4,
+                57.9,
+                53.9,
+                53,
+                52.9,
+                59.1,
+                53,
+                43.5,
+                51,
+                48.6
+              ]
+            },
+            "script": {
+              "mean": 14.973333333333333,
+              "median": 14.9,
+              "stddev": 1.6773561963768486,
+              "samples": [
+                14.8,
+                12.3,
+                18.7,
+                15,
+                16.1,
+                14.8,
+                16.5,
+                15.1,
+                13.1,
+                15,
+                17.1,
+                14.8,
+                12.8,
+                14.9,
+                13.6
+              ]
+            },
+            "paint": {
+              "mean": 36.21333333333334,
+              "median": 36.7,
+              "stddev": 2.682713622612816,
+              "samples": [
+                35.7,
+                32.2,
+                36.7,
+                35.9,
+                37.9,
+                37.2,
+                39.5,
+                37.2,
+                38.6,
+                36.4,
+                39.9,
+                37.1,
+                29.7,
+                35.2,
+                34
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 51.38666666666667,
+              "median": 50.4,
+              "stddev": 5.452766881746061,
+              "samples": [
+                52.7,
+                45.3,
+                50.8,
+                44.4,
+                58,
+                49.4,
+                66.1,
+                49.7,
+                48,
+                56.1,
+                46.9,
+                49,
+                51.8,
+                50.4,
+                52.2
+              ]
+            },
+            "script": {
+              "mean": 13.72,
+              "median": 13,
+              "stddev": 1.6389020715100702,
+              "samples": [
+                14.5,
+                12.2,
+                12.4,
+                12.8,
+                16.3,
+                14.4,
+                14.2,
+                15.1,
+                12,
+                17.7,
+                12.8,
+                13,
+                12.5,
+                12.9,
+                13
+              ]
+            },
+            "paint": {
+              "mean": 35.440000000000005,
+              "median": 35.1,
+              "stddev": 2.8075917489142586,
+              "samples": [
+                37.3,
+                32.1,
+                37.5,
+                30.5,
+                40.8,
+                33.9,
+                32.8,
+                33.6,
+                34.7,
+                37.3,
+                33.1,
+                35.1,
+                38.1,
+                36.6,
+                38.2
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 51.54,
+              "median": 50.7,
+              "stddev": 3.789609855531682,
+              "samples": [
+                46.5,
+                54,
+                56.3,
+                52.2,
+                48.5,
+                56,
+                50.3,
+                47.9,
+                53.7,
+                57.6,
+                46.1,
+                49.7,
+                55.5,
+                48.1,
+                50.7
+              ]
+            },
+            "script": {
+              "mean": 13.98,
+              "median": 13.8,
+              "stddev": 1.222526657611779,
+              "samples": [
+                13.4,
+                15,
+                14,
+                12.1,
+                13.1,
+                15.2,
+                13.8,
+                13,
+                14.6,
+                16.4,
+                12.3,
+                14.8,
+                15.4,
+                13.5,
+                13.1
+              ]
+            },
+            "paint": {
+              "mean": 36.379999999999995,
+              "median": 36.4,
+              "stddev": 2.9049711087818313,
+              "samples": [
+                31.7,
+                37.7,
+                40.9,
+                39,
+                34.7,
+                38.8,
+                35.6,
+                34,
+                37.9,
+                39.9,
+                32.5,
+                34,
+                39.2,
+                33.4,
+                36.4
+              ]
+            }
+          }
+        }
+      },
+      "03_update10th1k_x16": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 55.626666666666665,
+              "median": 57.4,
+              "stddev": 15.392041852234954,
+              "samples": [
+                45.5,
+                57.4,
+                38.2,
+                28.4,
+                65.7,
+                50.6,
+                72.9,
+                65.7,
+                46,
+                82.5,
+                67.6,
+                36.6,
+                45.9,
+                62.4,
+                69
+              ]
+            },
+            "script": {
+              "mean": 5.459999999999999,
+              "median": 4.8,
+              "stddev": 1.8802735363315017,
+              "samples": [
+                4.4,
+                4,
+                4.8,
+                3.1,
+                5.6,
+                7.8,
+                4.2,
+                10.1,
+                5.9,
+                7.5,
+                3.8,
+                4.4,
+                4.1,
+                6.7,
+                5.5
+              ]
+            },
+            "paint": {
+              "mean": 44.14000000000001,
+              "median": 47,
+              "stddev": 12.902701821158013,
+              "samples": [
+                36.4,
+                47,
+                30.3,
+                21.8,
+                49.8,
+                38.3,
+                64.7,
+                49.6,
+                35.1,
+                65.2,
+                55.3,
+                28.8,
+                37.4,
+                47.8,
+                54.6
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 60.766666666666666,
+              "median": 60.7,
+              "stddev": 23.958823804503385,
+              "samples": [
+                53.7,
+                45.7,
+                68.5,
+                49.2,
+                134.9,
+                66.6,
+                39,
+                60.7,
+                63.2,
+                32.4,
+                60.5,
+                74.7,
+                37.3,
+                62.1,
+                63
+              ]
+            },
+            "script": {
+              "mean": 5.413333333333333,
+              "median": 5.2,
+              "stddev": 1.4100996249843314,
+              "samples": [
+                5.6,
+                4.7,
+                6.5,
+                5.9,
+                3.4,
+                6.7,
+                4.4,
+                4.6,
+                5,
+                3.7,
+                6.1,
+                9.1,
+                5.2,
+                5.9,
+                4.4
+              ]
+            },
+            "paint": {
+              "mean": 42.89999999999999,
+              "median": 48.1,
+              "stddev": 10.502380682492898,
+              "samples": [
+                42.1,
+                35.9,
+                54.3,
+                37.1,
+                32.9,
+                51.7,
+                31.1,
+                49.9,
+                53.4,
+                25.7,
+                48.2,
+                55.4,
+                26.3,
+                48.1,
+                51.4
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 59.17999999999999,
+              "median": 51.3,
+              "stddev": 23.00432257517828,
+              "samples": [
+                43.8,
+                125.3,
+                42.5,
+                80.8,
+                41.2,
+                66.4,
+                68.2,
+                55,
+                48.1,
+                69.8,
+                51.3,
+                35.3,
+                73.5,
+                43.3,
+                43.2
+              ]
+            },
+            "script": {
+              "mean": 5.119999999999999,
+              "median": 4.8,
+              "stddev": 1.488143618261164,
+              "samples": [
+                4.1,
+                4.8,
+                3.6,
+                9.1,
+                4.8,
+                7.5,
+                5.5,
+                5.1,
+                3.8,
+                4.7,
+                6,
+                3.8,
+                5.2,
+                4,
+                4.8
+              ]
+            },
+            "paint": {
+              "mean": 45.42,
+              "median": 41.8,
+              "stddev": 11.903612896931756,
+              "samples": [
+                35.5,
+                61,
+                34.9,
+                62,
+                33.2,
+                53.1,
+                51.6,
+                45.9,
+                41.8,
+                62.7,
+                40.1,
+                28.3,
+                59.4,
+                36.4,
+                35.4
+              ]
+            }
+          }
+        }
+      },
+      "04_select1k": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 25.108,
+              "median": 23.5,
+              "stddev": 6.500187176792167,
+              "samples": [
+                28.5,
+                25.7,
+                32.8,
+                13.7,
+                25.6,
+                22,
+                14.9,
+                23,
+                26.6,
+                23,
+                21.4,
+                20.1,
+                24.7,
+                31.2,
+                40.6,
+                22.4,
+                22.7,
+                42.9,
+                24.2,
+                24.8,
+                20.8,
+                22.5,
+                22.5,
+                27.6,
+                23.5
+              ]
+            },
+            "script": {
+              "mean": 2.124,
+              "median": 1.9,
+              "stddev": 0.5925087903707983,
+              "samples": [
+                1.8,
+                3.4,
+                2,
+                2,
+                1.6,
+                3.6,
+                1.8,
+                1.8,
+                2.8,
+                2.2,
+                2.2,
+                2.4,
+                1.6,
+                3.4,
+                1.8,
+                2,
+                1.8,
+                1.6,
+                1.9,
+                1.6,
+                2,
+                2.6,
+                1.6,
+                1.8,
+                1.8
+              ]
+            },
+            "paint": {
+              "mean": 13.623999999999999,
+              "median": 12.3,
+              "stddev": 5.349087149536202,
+              "samples": [
+                13.9,
+                12.4,
+                17.2,
+                9.7,
+                9.9,
+                15.7,
+                11.3,
+                7.3,
+                20.5,
+                10.1,
+                16.9,
+                9.2,
+                9.7,
+                24.2,
+                24.9,
+                18.3,
+                8.6,
+                22.9,
+                10.2,
+                9.2,
+                17.1,
+                12.3,
+                7.2,
+                13.7,
+                8.2
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 28.147999999999996,
+              "median": 27.2,
+              "stddev": 6.875567855336266,
+              "samples": [
+                34.1,
+                36.7,
+                25.4,
+                46.3,
+                21,
+                26.7,
+                17.3,
+                24.7,
+                36.5,
+                27.4,
+                28.1,
+                25,
+                36.5,
+                32.9,
+                29.4,
+                35.7,
+                14.5,
+                27.2,
+                25.2,
+                23,
+                22.2,
+                24.5,
+                29.3,
+                26.7,
+                27.4
+              ]
+            },
+            "script": {
+              "mean": 4.18,
+              "median": 4.2,
+              "stddev": 1.336662510384228,
+              "samples": [
+                2.8,
+                4.8,
+                3.2,
+                5.9,
+                4.2,
+                5.7,
+                4.4,
+                3.3,
+                2.8,
+                3.2,
+                5,
+                7.1,
+                4.6,
+                2.6,
+                2.2,
+                6.1,
+                2.8,
+                4.3,
+                2.8,
+                3.4,
+                6.5,
+                3.9,
+                4.6,
+                4.9,
+                3.4
+              ]
+            },
+            "paint": {
+              "mean": 14.500000000000002,
+              "median": 13,
+              "stddev": 5.7232712091367235,
+              "samples": [
+                9.4,
+                18.8,
+                7.3,
+                28.6,
+                7.8,
+                9.7,
+                10.6,
+                8.7,
+                22.2,
+                7.9,
+                17.3,
+                14.1,
+                18.4,
+                15.4,
+                10.9,
+                23.5,
+                8.8,
+                18,
+                10.9,
+                13,
+                12.9,
+                17.8,
+                21.8,
+                18,
+                10.7
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 25.616,
+              "median": 25.4,
+              "stddev": 5.892557452696861,
+              "samples": [
+                40.3,
+                22.2,
+                21,
+                25.8,
+                24.9,
+                14.2,
+                20.6,
+                23.8,
+                25,
+                30.6,
+                37.4,
+                27.3,
+                27.9,
+                23.1,
+                23.8,
+                26.7,
+                28.9,
+                12.5,
+                24.9,
+                26.8,
+                29.2,
+                28.9,
+                20.6,
+                25.4,
+                28.6
+              ]
+            },
+            "script": {
+              "mean": 4.316,
+              "median": 3.8,
+              "stddev": 1.6357159492609548,
+              "samples": [
+                3,
+                5.7,
+                6.7,
+                3.8,
+                3.4,
+                3.5,
+                4.6,
+                4,
+                9.5,
+                2.7,
+                2.6,
+                6.5,
+                2.4,
+                4.5,
+                3.2,
+                3.1,
+                4.4,
+                3.4,
+                4.5,
+                3.8,
+                6.3,
+                2.8,
+                4.4,
+                3.6,
+                5.5
+              ]
+            },
+            "paint": {
+              "mean": 13.432,
+              "median": 12.5,
+              "stddev": 5.160968901282006,
+              "samples": [
+                28,
+                13.3,
+                10,
+                8.5,
+                6.2,
+                8.7,
+                12.4,
+                17.3,
+                12.5,
+                15.4,
+                19.4,
+                17.3,
+                8.1,
+                11.9,
+                10.5,
+                7.3,
+                19.9,
+                6.9,
+                17.8,
+                15.3,
+                16.6,
+                13.5,
+                8.5,
+                12.1,
+                18.4
+              ]
+            }
+          }
+        }
+      },
+      "05_swap1k": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 65.76666666666667,
+              "median": 67.2,
+              "stddev": 14.390903211337893,
+              "samples": [
+                86.4,
+                49.3,
+                78.9,
+                77,
+                56.4,
+                50.6,
+                79.1,
+                67.2,
+                85.6,
+                51.2,
+                45.5,
+                72.6,
+                48.3,
+                71.9,
+                66.5
+              ]
+            },
+            "script": {
+              "mean": 6.12,
+              "median": 6.4,
+              "stddev": 1.5825837824808606,
+              "samples": [
+                5.5,
+                4.6,
+                7.5,
+                6.7,
+                6.8,
+                4.3,
+                6.5,
+                4.8,
+                8.7,
+                6.4,
+                4.2,
+                9.1,
+                4.2,
+                5.4,
+                7.1
+              ]
+            },
+            "paint": {
+              "mean": 53.833333333333336,
+              "median": 56.9,
+              "stddev": 11.71206134514249,
+              "samples": [
+                69.6,
+                39.6,
+                63.4,
+                65,
+                46.7,
+                42.3,
+                65.7,
+                56.9,
+                69,
+                39.9,
+                37.6,
+                58.4,
+                40.4,
+                59.3,
+                53.7
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 56.933333333333344,
+              "median": 55.1,
+              "stddev": 15.353299629845354,
+              "samples": [
+                62.7,
+                45.2,
+                63.7,
+                46.5,
+                57.9,
+                83.2,
+                55.1,
+                45.2,
+                36.3,
+                63.7,
+                40.9,
+                75,
+                86.2,
+                45.6,
+                46.8
+              ]
+            },
+            "script": {
+              "mean": 4.386666666666667,
+              "median": 3.4,
+              "stddev": 2.175469298028972,
+              "samples": [
+                7.3,
+                3.8,
+                6.9,
+                2.6,
+                4.9,
+                8.1,
+                2.8,
+                2.8,
+                2.4,
+                2.6,
+                2.6,
+                6.5,
+                7.1,
+                2,
+                3.4
+              ]
+            },
+            "paint": {
+              "mean": 47.60666666666666,
+              "median": 48.4,
+              "stddev": 12.302059448184547,
+              "samples": [
+                49.6,
+                37,
+                53.8,
+                39.8,
+                49.4,
+                69.4,
+                48.4,
+                37.7,
+                30.8,
+                56.2,
+                35.1,
+                58.8,
+                70.5,
+                40.9,
+                36.7
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 53.64666666666667,
+              "median": 48.7,
+              "stddev": 13.1350603167176,
+              "samples": [
+                46.2,
+                41.7,
+                47.9,
+                70.7,
+                48.7,
+                34.7,
+                46,
+                56,
+                61.2,
+                58.4,
+                45.7,
+                39.1,
+                80.1,
+                73.4,
+                54.9
+              ]
+            },
+            "script": {
+              "mean": 3.2666666666666657,
+              "median": 3.2,
+              "stddev": 0.8845230083954585,
+              "samples": [
+                3.2,
+                2.6,
+                3.4,
+                2.4,
+                4,
+                2.4,
+                2.2,
+                5.3,
+                3,
+                3.4,
+                2.6,
+                2.8,
+                3.5,
+                3.4,
+                4.8
+              ]
+            },
+            "paint": {
+              "mean": 45.71333333333334,
+              "median": 41.5,
+              "stddev": 11.796783258079095,
+              "samples": [
+                38.9,
+                35.6,
+                41,
+                62.7,
+                41.5,
+                29.8,
+                38.8,
+                44.5,
+                50.7,
+                49.8,
+                39.7,
+                33.3,
+                71.5,
+                62.2,
+                45.7
+              ]
+            }
+          }
+        }
+      },
+      "06_remove-one-1k": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 33.826666666666675,
+              "median": 32.6,
+              "stddev": 5.952006464410211,
+              "samples": [
+                37.3,
+                34.6,
+                32.6,
+                50.9,
+                27.4,
+                32,
+                28.6,
+                40.8,
+                30.2,
+                33.1,
+                32.7,
+                37.1,
+                30.8,
+                29.6,
+                29.7
+              ]
+            },
+            "script": {
+              "mean": 2.2933333333333334,
+              "median": 2.2,
+              "stddev": 0.49780470448713504,
+              "samples": [
+                2.4,
+                2.8,
+                2.6,
+                3.6,
+                1.8,
+                1.6,
+                1.9,
+                2.3,
+                2.2,
+                2,
+                2.4,
+                2,
+                2.2,
+                1.9,
+                2.7
+              ]
+            },
+            "paint": {
+              "mean": 28.16,
+              "median": 27.2,
+              "stddev": 5.929803658517828,
+              "samples": [
+                32.2,
+                29.8,
+                28,
+                44.4,
+                23.6,
+                24.2,
+                23.3,
+                35.9,
+                23.6,
+                27.9,
+                27.2,
+                31.1,
+                24,
+                23.3,
+                23.9
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 34.79333333333333,
+              "median": 34.1,
+              "stddev": 7.487176338501018,
+              "samples": [
+                46.2,
+                25.6,
+                37.1,
+                35.7,
+                36.8,
+                29.3,
+                50.9,
+                36.7,
+                29.5,
+                30.9,
+                44.4,
+                29.3,
+                27.6,
+                34.1,
+                27.8
+              ]
+            },
+            "script": {
+              "mean": 1.3866666666666667,
+              "median": 1.2,
+              "stddev": 0.38147583085145703,
+              "samples": [
+                1.1,
+                1,
+                1,
+                1,
+                2.3,
+                1.4,
+                1.2,
+                1.2,
+                1.4,
+                1.6,
+                1.5,
+                1.2,
+                1.7,
+                2,
+                1.2
+              ]
+            },
+            "paint": {
+              "mean": 29.800000000000004,
+              "median": 29.3,
+              "stddev": 7.511705151675901,
+              "samples": [
+                40.6,
+                19.7,
+                30.2,
+                32.8,
+                31.9,
+                25.5,
+                45.6,
+                29.3,
+                23.5,
+                27.1,
+                40.6,
+                23.1,
+                23.6,
+                30.2,
+                23.3
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 37.866666666666674,
+              "median": 33.8,
+              "stddev": 13.262119345105047,
+              "samples": [
+                30.7,
+                44.5,
+                71.3,
+                36.1,
+                35.6,
+                30,
+                66.5,
+                33.8,
+                29.7,
+                30.5,
+                34.6,
+                35.1,
+                27.2,
+                31.8,
+                30.6
+              ]
+            },
+            "script": {
+              "mean": 1.4533333333333334,
+              "median": 1.4,
+              "stddev": 0.3739111175259754,
+              "samples": [
+                1.7,
+                2.4,
+                1.2,
+                1.3,
+                1,
+                1.2,
+                1.4,
+                1.4,
+                1.2,
+                1.6,
+                2.1,
+                1.1,
+                1.4,
+                1.4,
+                1.4
+              ]
+            },
+            "paint": {
+              "mean": 27.36,
+              "median": 25.4,
+              "stddev": 4.862068930580303,
+              "samples": [
+                24.4,
+                39.7,
+                23.4,
+                32,
+                31.7,
+                25.2,
+                22,
+                29.8,
+                21.5,
+                27.3,
+                30.9,
+                28.9,
+                23.8,
+                25.4,
+                24.4
+              ]
+            }
+          }
+        }
+      },
+      "07_create10k": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 551.7533333333334,
+              "median": 547.6,
+              "stddev": 23.09801681860113,
+              "samples": [
+                562.1,
+                553.8,
+                550.3,
+                524.2,
+                600.4,
+                547.6,
+                542.7,
+                597.9,
+                539.8,
+                542.6,
+                549.7,
+                534.3,
+                520.9,
+                570.7,
+                539.3
+              ]
+            },
+            "script": {
+              "mean": 102.2,
+              "median": 101.6,
+              "stddev": 3.184785258515421,
+              "samples": [
+                101.6,
+                100.5,
+                104.2,
+                102.4,
+                108.6,
+                99.1,
+                100.7,
+                105.6,
+                100,
+                106.4,
+                104.6,
+                97.4,
+                98.4,
+                100.3,
+                103.2
+              ]
+            },
+            "paint": {
+              "mean": 437.9266666666666,
+              "median": 435.3,
+              "stddev": 21.076543043551194,
+              "samples": [
+                451.8,
+                443,
+                436.4,
+                411.8,
+                479.4,
+                439.7,
+                430.5,
+                480.9,
+                428.2,
+                416.7,
+                435.3,
+                428.1,
+                411.1,
+                450.7,
+                425.3
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 519.4533333333334,
+              "median": 526.4,
+              "stddev": 26.364664302993184,
+              "samples": [
+                537.8,
+                495.4,
+                561.4,
+                560.3,
+                483.7,
+                516.4,
+                539.6,
+                502.6,
+                528.4,
+                526.4,
+                470,
+                527.8,
+                534.8,
+                499.8,
+                507.4
+              ]
+            },
+            "script": {
+              "mean": 92.63333333333334,
+              "median": 92.1,
+              "stddev": 4.899514067255864,
+              "samples": [
+                90.9,
+                95.4,
+                98.6,
+                94.6,
+                92.1,
+                89.7,
+                92.4,
+                88,
+                94.1,
+                105.9,
+                88.2,
+                91.9,
+                87.1,
+                87.5,
+                93.1
+              ]
+            },
+            "paint": {
+              "mean": 417.88,
+              "median": 417.4,
+              "stddev": 24.520492887145874,
+              "samples": [
+                438.7,
+                391.7,
+                453.9,
+                455,
+                383.9,
+                417.4,
+                438.2,
+                405.5,
+                424.9,
+                412.1,
+                373.5,
+                426.2,
+                438.3,
+                403.2,
+                405.7
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 524.64,
+              "median": 522,
+              "stddev": 26.339020482926085,
+              "samples": [
+                571.3,
+                517.8,
+                489.1,
+                499,
+                552,
+                495.7,
+                544.9,
+                534.9,
+                489.4,
+                543.7,
+                536.5,
+                496.8,
+                521.4,
+                555.1,
+                522
+              ]
+            },
+            "script": {
+              "mean": 92.64000000000001,
+              "median": 91.6,
+              "stddev": 3.818526267703662,
+              "samples": [
+                96,
+                91.8,
+                91.6,
+                91.4,
+                96.2,
+                90.6,
+                96.2,
+                98.3,
+                89.5,
+                88.2,
+                88.2,
+                93.5,
+                89.4,
+                88.8,
+                99.9
+              ]
+            },
+            "paint": {
+              "mean": 423.31999999999994,
+              "median": 423.7,
+              "stddev": 25.009261141767915,
+              "samples": [
+                466.5,
+                416.5,
+                390.3,
+                398.5,
+                445.5,
+                396.5,
+                438.4,
+                427.6,
+                392.6,
+                446.5,
+                439,
+                396.7,
+                423.7,
+                457.4,
+                414.1
+              ]
+            }
+          }
+        }
+      },
+      "08_create1k-after1k_x2": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 57.419999999999995,
+              "median": 55.5,
+              "stddev": 5.563298096838394,
+              "samples": [
+                74.6,
+                56.3,
+                55.7,
+                57.6,
+                54.7,
+                55.3,
+                54.8,
+                59.2,
+                52,
+                55.5,
+                55.4,
+                63.3,
+                54.8,
+                59.9,
+                52.2
+              ]
+            },
+            "script": {
+              "mean": 9.826666666666666,
+              "median": 9.6,
+              "stddev": 0.6922702472575974,
+              "samples": [
+                9.5,
+                9.8,
+                9.5,
+                10.7,
+                9.6,
+                10.1,
+                9.5,
+                9.7,
+                9.4,
+                11.1,
+                9.5,
+                11.3,
+                9.1,
+                9.7,
+                8.9
+              ]
+            },
+            "paint": {
+              "mean": 44.31333333333334,
+              "median": 43.6,
+              "stddev": 2.483334931287438,
+              "samples": [
+                42.3,
+                44.4,
+                43.6,
+                44.8,
+                43.4,
+                43.7,
+                43.3,
+                47.6,
+                41.2,
+                42.8,
+                44.1,
+                50.1,
+                43.6,
+                48.2,
+                41.6
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 57.09999999999999,
+              "median": 56.4,
+              "stddev": 3.1059850059430185,
+              "samples": [
+                55.5,
+                52.5,
+                56.3,
+                52.5,
+                63.3,
+                56.4,
+                58.4,
+                57.8,
+                61.9,
+                57.8,
+                56.7,
+                55.7,
+                54.5,
+                56.2,
+                61
+              ]
+            },
+            "script": {
+              "mean": 9.606666666666664,
+              "median": 9.6,
+              "stddev": 0.7704049646282205,
+              "samples": [
+                10.5,
+                9.2,
+                9.9,
+                9.4,
+                11.1,
+                8.5,
+                8.8,
+                10.9,
+                9.8,
+                9.4,
+                8.7,
+                9.8,
+                9.6,
+                9.6,
+                8.9
+              ]
+            },
+            "paint": {
+              "mean": 45.40666666666667,
+              "median": 45,
+              "stddev": 2.752782142453253,
+              "samples": [
+                43.5,
+                41.7,
+                44.5,
+                41.1,
+                49.4,
+                45.1,
+                47.7,
+                45,
+                50.1,
+                45.8,
+                46.1,
+                43.7,
+                43.6,
+                44.2,
+                49.6
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 54.18,
+              "median": 53.6,
+              "stddev": 3.9549607186057214,
+              "samples": [
+                60.6,
+                48.5,
+                58.8,
+                51.4,
+                60.6,
+                53,
+                53.6,
+                54.3,
+                58.8,
+                48.4,
+                51.6,
+                51.2,
+                52.6,
+                54.3,
+                55
+              ]
+            },
+            "script": {
+              "mean": 9.233333333333333,
+              "median": 9.1,
+              "stddev": 0.6542898731412846,
+              "samples": [
+                9.9,
+                8.4,
+                10.4,
+                9,
+                9.6,
+                8.3,
+                9.4,
+                8.6,
+                10.3,
+                9,
+                8.8,
+                8.7,
+                9.8,
+                9.1,
+                9.2
+              ]
+            },
+            "paint": {
+              "mean": 43.12,
+              "median": 42.9,
+              "stddev": 3.283116985862238,
+              "samples": [
+                48.5,
+                38.8,
+                46.2,
+                40.5,
+                48.8,
+                42.9,
+                42.3,
+                43.6,
+                46.6,
+                37.8,
+                41.3,
+                40.7,
+                41.3,
+                43.9,
+                43.6
+              ]
+            }
+          }
+        }
+      },
+      "09_clear1k_x8": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 51.95333333333334,
+              "median": 51.7,
+              "stddev": 14.356574734080484,
+              "samples": [
+                51.7,
+                57,
+                70,
+                35.2,
+                69.9,
+                57.1,
+                41.7,
+                39.1,
+                67.7,
+                75,
+                36.8,
+                29,
+                55.8,
+                42.9,
+                50.4
+              ]
+            },
+            "script": {
+              "mean": 44.5,
+              "median": 44.3,
+              "stddev": 12.957237359869579,
+              "samples": [
+                44.3,
+                51.1,
+                59.9,
+                28.7,
+                62.4,
+                48.6,
+                35.7,
+                30.4,
+                58.6,
+                65.5,
+                31.3,
+                26.5,
+                45.9,
+                36.8,
+                41.8
+              ]
+            },
+            "paint": {
+              "mean": 4.7266666666666675,
+              "median": 5,
+              "stddev": 1.2914369995510908,
+              "samples": [
+                5.6,
+                4,
+                6.7,
+                3.4,
+                4.2,
+                6.7,
+                3.9,
+                5.4,
+                5.3,
+                5.6,
+                3.5,
+                1.9,
+                5.3,
+                4.4,
+                5
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 62.95333333333333,
+              "median": 66,
+              "stddev": 17.274748981705997,
+              "samples": [
+                43.6,
+                68.3,
+                71.4,
+                52.2,
+                40.4,
+                46,
+                85.3,
+                83.9,
+                47.9,
+                80.1,
+                66.5,
+                92,
+                41.7,
+                59,
+                66
+              ]
+            },
+            "script": {
+              "mean": 54.53333333333334,
+              "median": 59.2,
+              "stddev": 16.52749512896904,
+              "samples": [
+                39.1,
+                61.4,
+                65.1,
+                43.3,
+                33.9,
+                38.8,
+                76.9,
+                68.7,
+                34.5,
+                64.9,
+                61,
+                85.2,
+                34.4,
+                51.6,
+                59.2
+              ]
+            },
+            "paint": {
+              "mean": 4.513333333333334,
+              "median": 3.8,
+              "stddev": 1.5770074130936675,
+              "samples": [
+                2.6,
+                4,
+                3.8,
+                5.1,
+                3.3,
+                4.3,
+                4.4,
+                7.3,
+                7.4,
+                7.4,
+                3.6,
+                3.4,
+                3.8,
+                3.7,
+                3.6
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "cpu",
+          "values": {
+            "total": {
+              "mean": 60.226666666666674,
+              "median": 62.1,
+              "stddev": 15.630257591637843,
+              "samples": [
+                64.8,
+                52,
+                38,
+                41.9,
+                83.9,
+                66.7,
+                45.2,
+                73.7,
+                71.3,
+                83.6,
+                62.1,
+                39.1,
+                56.3,
+                75.6,
+                49.2
+              ]
+            },
+            "script": {
+              "mean": 52.513333333333335,
+              "median": 54.6,
+              "stddev": 13.970267748056262,
+              "samples": [
+                58.2,
+                44.7,
+                33.2,
+                36.6,
+                77.7,
+                54.6,
+                40.7,
+                60.3,
+                65.4,
+                73.4,
+                55.2,
+                33.9,
+                46.6,
+                63.1,
+                44.1
+              ]
+            },
+            "paint": {
+              "mean": 4.546666666666667,
+              "median": 4,
+              "stddev": 1.611506246017179,
+              "samples": [
+                3.4,
+                4.6,
+                3.4,
+                3.8,
+                4,
+                8.5,
+                2.9,
+                6.3,
+                3.5,
+                6.2,
+                4.7,
+                3.5,
+                4.4,
+                6.3,
+                2.7
+              ]
+            }
+          }
+        }
+      },
+      "21_ready-memory": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "memory",
+          "values": {
+            "DEFAULT": {
+              "mean": 1.9068784713745117,
+              "median": 1.9068784713745117,
+              "stddev": null,
+              "samples": [
+                1.9068784713745117
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "memory",
+          "values": {
+            "DEFAULT": {
+              "mean": 1.7944326400756836,
+              "median": 1.7944326400756836,
+              "stddev": null,
+              "samples": [
+                1.7944326400756836
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "memory",
+          "values": {
+            "DEFAULT": {
+              "mean": 1.7419404983520508,
+              "median": 1.7419404983520508,
+              "stddev": null,
+              "samples": [
+                1.7419404983520508
+              ]
+            }
+          }
+        }
+      },
+      "22_run-memory": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "memory",
+          "values": {
+            "DEFAULT": {
+              "mean": 6.28465461730957,
+              "median": 6.28465461730957,
+              "stddev": null,
+              "samples": [
+                6.28465461730957
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "memory",
+          "values": {
+            "DEFAULT": {
+              "mean": 5.740845680236816,
+              "median": 5.740845680236816,
+              "stddev": null,
+              "samples": [
+                5.740845680236816
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "memory",
+          "values": {
+            "DEFAULT": {
+              "mean": 5.810924530029297,
+              "median": 5.810924530029297,
+              "stddev": null,
+              "samples": [
+                5.810924530029297
+              ]
+            }
+          }
+        }
+      },
+      "25_run-clear-memory": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "memory",
+          "values": {
+            "DEFAULT": {
+              "mean": 6.898337364196777,
+              "median": 6.898337364196777,
+              "stddev": null,
+              "samples": [
+                6.898337364196777
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "memory",
+          "values": {
+            "DEFAULT": {
+              "mean": 4.3702192306518555,
+              "median": 4.3702192306518555,
+              "stddev": null,
+              "samples": [
+                4.3702192306518555
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "memory",
+          "values": {
+            "DEFAULT": {
+              "mean": 4.392549514770508,
+              "median": 4.392549514770508,
+              "stddev": null,
+              "samples": [
+                4.392549514770508
+              ]
+            }
+          }
+        }
+      },
+      "41_size-uncompressed": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "size",
+          "values": {
+            "DEFAULT": {
+              "mean": 422.3,
+              "median": 422.3,
+              "stddev": null,
+              "samples": [
+                422.3
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "size",
+          "values": {
+            "DEFAULT": {
+              "mean": 427.9,
+              "median": 427.9,
+              "stddev": null,
+              "samples": [
+                427.9
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "size",
+          "values": {
+            "DEFAULT": {
+              "mean": 740.2,
+              "median": 740.2,
+              "stddev": null,
+              "samples": [
+                740.2
+              ]
+            }
+          }
+        }
+      },
+      "42_size-compressed": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "size",
+          "values": {
+            "DEFAULT": {
+              "mean": 114.8,
+              "median": 114.8,
+              "stddev": null,
+              "samples": [
+                114.8
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "size",
+          "values": {
+            "DEFAULT": {
+              "mean": 113.2,
+              "median": 113.2,
+              "stddev": null,
+              "samples": [
+                113.2
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "size",
+          "values": {
+            "DEFAULT": {
+              "mean": 187,
+              "median": 187,
+              "stddev": null,
+              "samples": [
+                187
+              ]
+            }
+          }
+        }
+      },
+      "43_first-paint": {
+        "dioxus-v0.7.10-keyed": {
+          "type": "size",
+          "values": {
+            "DEFAULT": {
+              "mean": 655.4,
+              "median": 655.4,
+              "stddev": null,
+              "samples": [
+                655.4
+              ]
+            }
+          }
+        },
+        "glory-v0.6.0-keyed": {
+          "type": "size",
+          "values": {
+            "DEFAULT": {
+              "mean": 716.1,
+              "median": 716.1,
+              "stddev": null,
+              "samples": [
+                716.1
+              ]
+            }
+          }
+        },
+        "strip-baseline-v0.6.0-keyed": {
+          "type": "size",
+          "values": {
+            "DEFAULT": {
+              "mean": 1095.3,
+              "median": 1095.3,
+              "stddev": null,
+              "samples": [
+                1095.3
+              ]
+            }
+          }
+        }
+      }
+    },
+    "build_observations": 259,
+    "overlapping_build_observations": 0
+  },
+  "retained_cohort_metadata": {
+    "root": "D:\\BuildCache\\glory-strip-size-20261030\\source\\js-framework-benchmark",
+    "frameworks": [
+      "strip-baseline",
+      "glory",
+      "dioxus"
+    ],
+    "chrome": "C:/Program Files/Google/Chrome/Application/chrome.exe",
+    "port": 8798,
+    "started": "2026-10-29T19:25:18.466667+00:00",
+    "runner_origin": "Frozen 2026-10-29 standard comparison, commit4015e288; unchanged src+dist",
+    "configuration": "Unmodified upstream defaults: 15 CPU/25 selection samples, 1 memory/size sample; default throttles; no sample dropping",
+    "variants": {
+      "strip-baseline": "Released0.6.0 runtime, identical strip profile, before typed host optimization",
+      "glory": "Working-tree typed host; cold helper trial reverted",
+      "dioxus": "Frozen0.7.10 peer"
+    },
+    "isKeyed.js_exit": 0,
+    "benchmarkRunner.js_exit": 1,
+    "ended": "2026-10-29T19:42:17.725079+00:00",
+    "result_files": 45,
+    "retries": [
+      {
+        "framework": "strip-baseline",
+        "case": "03_update10th1k_x16",
+        "attempt": 1,
+        "exit_code": 0,
+        "archive": "D:\\BuildCache\\glory-strip-size-20261030\\standard-retained\\retries\\strip-baseline-03_update10th1k_x16-1"
+      }
+    ],
+    "completed": "2026-10-29T19:43:41.100057+00:00"
+  },
+  "swap_confirmation": {
+    "rounds": [
+      {
+        "round": "round-1",
+        "variants": {
+          "glory-v0.6.0-keyed": {
+            "mean": 3.7266666666666666,
+            "median": 2.9,
+            "samples": [
+              5.8,
+              3,
+              4.4,
+              3.7,
+              2.6,
+              2.4,
+              6.1,
+              6.4,
+              2.2,
+              6.9,
+              2.6,
+              2.2,
+              2.4,
+              2.3,
+              2.9
+            ],
+            "total_mean": 56.78666666666666
+          },
+          "strip-baseline-v0.6.0-keyed": {
+            "mean": 3.7800000000000002,
+            "median": 3.4,
+            "samples": [
+              3.6,
+              2.6,
+              5.9,
+              3.4,
+              2.4,
+              8.9,
+              2.4,
+              3.8,
+              3,
+              2.4,
+              2.6,
+              4.9,
+              3.6,
+              3.2,
+              4
+            ],
+            "total_mean": 55.946666666666665
+          }
+        }
+      },
+      {
+        "round": "round-2",
+        "variants": {
+          "glory-v0.6.0-keyed": {
+            "mean": 3.62,
+            "median": 3.6,
+            "samples": [
+              7.1,
+              3.2,
+              3.6,
+              4.1,
+              2.6,
+              2.4,
+              2.8,
+              4,
+              5,
+              2.8,
+              3.8,
+              3.9,
+              3.8,
+              2.6,
+              2.6
+            ],
+            "total_mean": 58.57333333333334
+          },
+          "strip-baseline-v0.6.0-keyed": {
+            "mean": 3.6466666666666665,
+            "median": 3.2,
+            "samples": [
+              7.1,
+              2.3,
+              3.8,
+              3.2,
+              2.2,
+              2.4,
+              3.5,
+              3.6,
+              7.1,
+              2.6,
+              2.8,
+              3.4,
+              2,
+              2.4,
+              6.3
+            ],
+            "total_mean": 54.36
+          }
+        }
+      },
+      {
+        "round": "round-3",
+        "variants": {
+          "glory-v0.6.0-keyed": {
+            "mean": 4.193333333333333,
+            "median": 3.2,
+            "samples": [
+              6.3,
+              2.8,
+              3.2,
+              2.2,
+              2.8,
+              2.8,
+              5.8,
+              8.7,
+              5.9,
+              5.5,
+              2.2,
+              3.4,
+              6.9,
+              2,
+              2.4
+            ],
+            "total_mean": 60.75333333333333
+          },
+          "strip-baseline-v0.6.0-keyed": {
+            "mean": 3.2466666666666666,
+            "median": 2.7,
+            "samples": [
+              3,
+              2.6,
+              3.4,
+              4,
+              2.6,
+              2.6,
+              2.6,
+              2.6,
+              2.7,
+              4.1,
+              2.6,
+              2.4,
+              4.6,
+              3,
+              5.9
+            ],
+            "total_mean": 53.526666666666664
+          }
+        }
+      },
+      {
+        "round": "round-4",
+        "variants": {
+          "glory-v0.6.0-keyed": {
+            "mean": 3.533333333333333,
+            "median": 3,
+            "samples": [
+              1.8,
+              7,
+              3.2,
+              3.4,
+              3.2,
+              2.4,
+              2.8,
+              3.2,
+              2.8,
+              2.6,
+              6.5,
+              3,
+              2.6,
+              3,
+              5.5
+            ],
+            "total_mean": 54.53999999999999
+          },
+          "strip-baseline-v0.6.0-keyed": {
+            "mean": 3.4333333333333336,
+            "median": 3,
+            "samples": [
+              4.9,
+              2.4,
+              2.2,
+              3.7,
+              3.6,
+              6.5,
+              3,
+              3.4,
+              3.7,
+              2.4,
+              2.2,
+              3,
+              5.3,
+              2.4,
+              2.8
+            ],
+            "total_mean": 47.900000000000006
+          }
+        }
+      }
+    ],
+    "pooled": {
+      "glory-v0.6.0-keyed": {
+        "samples": 60,
+        "mean": 3.7683333333333335,
+        "median": 3.1,
+        "stdev": 1.6546279900058305
+      },
+      "strip-baseline-v0.6.0-keyed": {
+        "samples": 60,
+        "mean": 3.526666666666667,
+        "median": 3.0,
+        "stdev": 1.443614421814238
+      }
+    },
+    "build_observations": 57,
+    "overlapping_build_observations": 0
+  },
+  "performance_conclusion": "Full 45-result cohort complete. Four swap confirmation rounds: retained mean3.7683ms vs baseline3.5267ms (60 samples each); original34% difference not stable, pooled mean remains6.85% higher. Three clear ablation rounds: retained52.02ms vs baseline55.2956ms (45 each); final full cohort clear is3.85% higher. No universal speedup or zero-regression claim."
+}

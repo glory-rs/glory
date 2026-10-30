@@ -5,14 +5,14 @@ use super::*;
 pub trait Content: sealed::Content {
     fn validate(&self, scope: &Scope) -> Result<()>;
     #[doc(hidden)]
-    fn install(self, scope: &Scope, parent: &ContentMount) -> glory_ui::Result;
+    fn install(self, scope: &Scope, parent: &impl ContentMount) -> glory_ui::Result;
 }
 impl sealed::Content for glory_ui::Children {}
 impl Content for glory_ui::Children {
     fn validate(&self, _: &Scope) -> Result<()> {
         Ok(())
     }
-    fn install(self, _: &Scope, parent: &ContentMount) -> glory_ui::Result {
+    fn install(self, _: &Scope, parent: &impl ContentMount) -> glory_ui::Result {
         for child in self.into_widgets() {
             parent.one(move || child)?;
         }
@@ -24,7 +24,7 @@ impl<A: Actions + 'static> Content for View<A> {
     fn validate(&self, scope: &Scope) -> Result<()> {
         self.validate(scope)
     }
-    fn install(self, _: &Scope, parent: &ContentMount) -> glory_ui::Result {
+    fn install(self, _: &Scope, parent: &impl ContentMount) -> glory_ui::Result {
         parent.one(move || self)
     }
 }
@@ -34,7 +34,7 @@ impl<C: Content> Content for Option<C> {
         self.as_ref()
             .map_or(Ok(()), |content| content.validate(scope))
     }
-    fn install(self, scope: &Scope, parent: &ContentMount) -> glory_ui::Result {
+    fn install(self, scope: &Scope, parent: &impl ContentMount) -> glory_ui::Result {
         self.map_or(Ok(()), |content| content.install(scope, parent))
     }
 }
@@ -46,7 +46,7 @@ impl<C: Content> Content for Vec<C> {
         }
         Ok(())
     }
-    fn install(self, scope: &Scope, parent: &ContentMount) -> glory_ui::Result {
+    fn install(self, scope: &Scope, parent: &impl ContentMount) -> glory_ui::Result {
         for content in self {
             content.install(scope, parent)?;
         }
@@ -69,7 +69,7 @@ where
     fn validate(&self, scope: &Scope) -> Result<()> {
         glory_ui::Each::validate(self, scope).map_err(error)
     }
-    fn install(self, scope: &Scope, parent: &ContentMount) -> glory_ui::Result {
+    fn install(self, scope: &Scope, parent: &impl ContentMount) -> glory_ui::Result {
         glory_ui::Each::install(self, scope, parent.clone())
     }
 }
@@ -100,21 +100,21 @@ where
     fn validate(&self, _: &Scope) -> Result<()> {
         Ok(())
     }
-    fn install(mut self, scope: &Scope, parent: &ContentMount) -> glory_ui::Result {
+    fn install(mut self, scope: &Scope, parent: &impl ContentMount) -> glory_ui::Result {
         let parent = parent.clone();
         let mut branch = glory_ui::branch::Branch::default();
         scope.structural(move || {
             let result = branch.update((self.condition)(), |selected| {
                 let child = if selected {
-                    parent.mount(&mut self.yes)?
+                    parent.mount_widget(&mut self.yes)?
                 } else {
-                    parent.mount(&mut self.no)?
+                    parent.mount_widget(&mut self.no)?
                 };
                 parent.attach(&child)?;
                 Ok::<_, glory_ui::Error>(Some(child))
             });
             if let Err(error) = result {
-                parent.report(error);
+                parent.report_error(error);
             }
         });
         Ok(())
@@ -144,7 +144,7 @@ where
     fn validate(&self, _: &Scope) -> Result<()> {
         Ok(())
     }
-    fn install(self, _: &Scope, parent: &ContentMount) -> glory_ui::Result {
+    fn install(self, _: &Scope, parent: &impl ContentMount) -> glory_ui::Result {
         parent.one(self.0)
     }
 }

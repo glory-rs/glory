@@ -14,6 +14,11 @@ interface, so a concrete raw-only app can drop unused browser-renderer code.
 The [rendering and size measurements](framework-benchmark-render-optimization-2026-10-29.md)
 cover the resulting artifacts, shared Each, node reuse and mixed-host checks.
 
+Configuration actions and content installation select their internal host type
+statically. Each/Show still use the same controller and Widget contract, while
+raw-only programs can eliminate unused semantic mounting paths. Mixed apps keep
+the necessary adapters. See the [2026-10-30 size and acceptance report](wasm-strip-static-host-2026-10-30.md).
+
 ## Consolidated implementation
 
 The legacy `html::template::{Node, Target, Template}` AST/compiler and `Source`

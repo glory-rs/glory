@@ -8,6 +8,38 @@ use glory_core::{AccessError, Resource, ResourceState};
 use glory_ui::{Widget, group, list, text, view, when, widget};
 
 use super::*;
+
+#[test]
+fn stream_links_reject_executable_targets_and_keep_safe_shell_output() {
+    use glory_render::{Change, Descriptor, LinkProps, Patch, Props};
+    let mut stream = stream_with(Resources::default(), Config::default(), |_, _| {
+        widget(|scope| {
+            assert!(
+                scope
+                    .create(Descriptor::new(Props::Link(LinkProps {
+                        target: "javascript:alert(1)".into(),
+                        label: "bad".into()
+                    })))
+                    .is_err()
+            );
+            let id = scope.create(Descriptor::new(Props::Link(LinkProps {
+                target: "/safe".into(),
+                label: "Open".into(),
+            })))?;
+            assert!(
+                scope
+                    .patch(id, Patch::Target(Change::Set("data:text/html,bad".into())))
+                    .is_err()
+            );
+            scope.patch(id, Patch::Target(Change::Set("#recovered".into())))
+        })
+    })
+    .unwrap();
+    let shell = frame(&mut stream);
+    assert!(shell.body().contains("href=\"#recovered\""));
+    assert!(!shell.body().contains("javascript:") && !shell.body().contains("data:text/html"));
+    assert!(matches!(frame(&mut stream).kind, FrameKind::End));
+}
 #[path = "anchor_tests.rs"]
 mod anchor;
 #[path = "choice_tests.rs"]

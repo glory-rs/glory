@@ -2,6 +2,20 @@
 
 Start here when evaluating or extending Glory:
 
+- [Project quality review and fixes](project-quality-review-2026-10-30.md):
+  security, routing, performance and engineering findings, implementation
+  status, reproducible checks and remaining acceptance boundaries.
+
+- [Routing implementation and acceptance](routing-implementation-2026-10-30.md):
+  portable routing, retained Widget branches, Web/native/SSR integration,
+  default dependency boundaries and verified versus deferred platform behavior.
+
+- [Routing architecture proposal](routing-architecture-2026-10-30.md):
+  legacy routing behavior, current Widget/Owner integration, typed routes,
+  nested layout retention, history providers, SSR and staged acceptance.
+  The broader roadmap; [current APIs and boundaries](../crates/routing/README.md)
+  describe the implemented core and Web/native/SSR integrations.
+
 - [Keyed API implementation and complete benchmark evidence](v2-display-completion-results-2026-10-29.md):
   delivered interfaces, full Rust/browser checks, alternating self-suite measurements,
   the separate standard table suite and remaining performance/capability limits.

@@ -6,6 +6,10 @@
     any(target_os = "windows", target_os = "linux", target_os = "macos")
 ))]
 pub use ::accesskit;
+/// Native routing uses the same renderer-independent history and gesture
+/// protocol. System event delivery belongs to the application/OS adapter.
+#[cfg(all(feature = "routing", not(target_arch = "wasm32")))]
+pub use glory_routing::native as routing;
 #[cfg(not(target_arch = "wasm32"))]
 mod document;
 #[cfg(not(target_arch = "wasm32"))]

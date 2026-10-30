@@ -8,6 +8,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tomllib
+from library_lockfiles import ensure_library_lockfiles
 
 
 def run(*args, **kwargs):
@@ -69,6 +70,7 @@ def main():
         parser.error("--android requires --test")
     paths = build_environment()
     root = Path(__file__).resolve().parents[1]
+    ensure_library_lockfiles(root)
     record = json.loads((root / "docs/engine-forks.json").read_text(encoding="utf-8"))
     metadata = json.loads(output("cargo", "metadata", "--locked", "--all-features", "--format-version", "1", "--manifest-path", str(root / "Cargo.toml")))
     assert Path(metadata["target_directory"]).resolve() == paths["CARGO_TARGET_DIR"]
@@ -76,7 +78,7 @@ def main():
     member_names = {package["name"] for package in metadata["packages"] if package["id"] in members}
     assert member_names == {
         "glory", "glory-style", "glory-render", "glory-core", "glory-resource",
-        "glory-i18n", "glory-ui", "glory-html", "glory-web", "glory-ssr", "glory-apace",
+        "glory-i18n", "glory-routing", "glory-ui", "glory-html", "glory-web", "glory-ssr", "glory-apace",
         "glory-salvo", "glory-view-macros",
     }, member_names
     compiler = next(package for package in metadata["packages"] if package["name"] == "glory-view-macros")

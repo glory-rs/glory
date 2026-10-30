@@ -9,6 +9,7 @@ description = "Incremental Apace document host for Glory semantic UI"
 
 [features]
 default = []
+routing = ["dep:glory-routing", "glory-routing/widgets"]
 css = ["glory-html/css"]
 package = ["dep:tokio"]
 network = ["package", "tokio/net", "dep:reqwest", "dep:rustls", "dep:rustls-platform-verifier", "dep:jni"]
@@ -25,12 +26,13 @@ android-game-activity = ["shell", "wingy/android-game-activity", "apace-shell/an
 accesskit = ["shell", "dep:accesskit", "dep:apace_accesskit"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+glory-routing = { path = "../routing", version = "0.6.0", optional = true }
 glory-html = { path = "../html", version = "0.6.0" }
 glory-render = { path = "../render", version = "0.6.0" }
 glory-core = { path = "../core", version = "0.6.0", optional = true }
 glory-ui = { path = "../ui", version = "0.6.0", optional = true }
 tokio = { version = "1.54.1", default-features = false, features = ["rt", "sync", "time", "macros"], optional = true }
-futures-timer = { version = "=3.0.3", optional = true }
+futures-timer = { version = "=3.0.4", optional = true }
 percent-encoding = { version = "2.3.2", optional = true }
 apace-dom = { version = "=0.3.0-beta.4", default-features = false, features = ["system-fonts", "complex-scripts"] }
 apace-traits = { version = "=0.3.0-beta.4", default-features = false }
@@ -45,7 +47,7 @@ peniko = { version = "=0.6.1", optional = true }
 anyrender_vello_cpu = { version = "=0.18.0", optional = true }
 
 [target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))'.dependencies]
-arboard = { version = "=3.6.1", default-features = false, features = ["wayland-data-control"], optional = true }
+arboard = { version = "=3.7.0", default-features = false, features = ["wayland-data-control"], optional = true }
 rfd = { version = "=0.17.2", default-features = false, features = ["xdg-portal", "wayland"], optional = true }
 mime_guess = { version = "=2.0.5", optional = true }
 libc = { version = "=0.2.191", optional = true }

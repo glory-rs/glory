@@ -11,6 +11,80 @@ impl Sink for Record {
 }
 
 #[test]
+fn unsafe_link_targets_never_reach_html_edits_and_safe_updates_recover() {
+    let runtime = RuntimeId::new();
+    let id = NodeIds::new(runtime).allocate();
+    let mut mapper = Mapper::new(runtime);
+    let mut sink = Record::default();
+    let link = |target: &str| {
+        Descriptor::new(Props::Link(LinkProps {
+            target: target.into(),
+            label: "Open".into(),
+        }))
+    };
+    assert!(
+        mapper
+            .apply(
+                &[Mutation::Create {
+                    id,
+                    node: Box::new(link("javascript:alert(1)"))
+                }],
+                &mut sink
+            )
+            .is_err()
+    );
+    assert!(sink.0.is_empty());
+    mapper
+        .apply(
+            &[
+                Mutation::Create {
+                    id,
+                    node: Box::new(link("/safe")),
+                },
+                Mutation::Place {
+                    id,
+                    parent: None,
+                    before: None,
+                },
+            ],
+            &mut sink,
+        )
+        .unwrap();
+    let before = mapper.html().unwrap();
+    let receipt = mapper.receipt();
+    let edits = sink.0.len();
+    assert!(
+        mapper
+            .apply(
+                &[Mutation::Patch {
+                    id,
+                    patch: Patch::Target(Change::Set("javascript:alert(1)".into()))
+                }],
+                &mut sink
+            )
+            .is_err()
+    );
+    assert_eq!(mapper.html().unwrap(), before);
+    assert_eq!(mapper.receipt(), receipt);
+    assert_eq!(sink.0.len(), edits);
+    mapper
+        .apply(
+            &[Mutation::Patch {
+                id,
+                patch: Patch::Target(Change::Set("mailto:hello@example.test".into())),
+            }],
+            &mut sink,
+        )
+        .unwrap();
+    assert!(
+        mapper
+            .html()
+            .unwrap()
+            .contains("href=\"mailto:hello@example.test\"")
+    );
+}
+
+#[test]
 fn every_field_delta_matches_full_shape_difference_including_resets_and_normalization() {
     let mut bases = vec![
         Props::RichEditor(RichEditorProps {

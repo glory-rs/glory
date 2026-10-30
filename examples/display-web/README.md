@@ -62,3 +62,19 @@ editors/focus, keyed tables, template suspension, declaration retirement, invali
 slot payloads and pending-response cancellation. The Node driver owns and closes
 its HTTP server, Chrome process and server children; evidence goes to the D-drive
 `mixed-stream-site` directory.
+
+`../../scripts/build-island-readiness.ps1 -Verify` builds the dedicated Widget
+island fixture and runs real Chrome acceptance at 1/32/64 live islands.
+The driver checks raw updates, shared and local reactive updates, pending host
+input, real editing, dirty query barriers, teardown and recreation. It writes
+fixed pump counts and seven debug timing samples to
+`D:/BuildCache/glory-semantic-ui/island-readiness-site/island-readiness-evidence.json`.
+`GLORY_ISLAND_COUNTS` may select a smaller comma-separated matrix. These local
+debug timings do not establish a release speedup; readiness still scans every
+live island, while `island_flushes` counts only actual display-host pump calls.
+The existing shared document coordinator admits at most 64 live WebApps,
+including Widget islands and other WebApps. The test checks typed rejection of
+an additional host, actual rejection of a 65th island, and complete cleanup after
+that failure. 100/1000 islands in one document remain unsupported; the attempted
+100-island failure is retained as `island-readiness-failed-100.json` beside the
+passing evidence.

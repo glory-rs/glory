@@ -18,6 +18,7 @@ ssr = ["html", "dep:glory-ssr"]
 hydrate = ["web", "glory-web/hydrate"]
 resources = ["dep:glory-resource", "glory-web?/resources", "glory-ssr?/resources"]
 i18n = ["dep:glory-i18n"]
+routing = ["dep:glory-routing", "glory-routing/widgets", "glory-web?/routing", "glory-apace?/routing"]
 stream = ["ssr", "resources", "glory-ssr/stream", "glory-web?/stream"]
 apace = ["html", "dep:glory-apace"]
 apace-package = ["apace", "glory-apace/package"]
@@ -35,6 +36,7 @@ apace-android-game-activity = ["apace-shell", "glory-apace/android-game-activity
 apace-accesskit = ["apace-shell", "glory-apace/accesskit"]
 
 [dependencies]
+glory-routing = { path = "../routing", version = "0.6.0", optional = true }
 glory-view-macros = { path = "../view-macros", version = "0.6.0", optional = true }
 glory-core = { path = "../core", version = "0.6.0" }
 glory-ui = { path = "../ui", version = "0.6.0" }

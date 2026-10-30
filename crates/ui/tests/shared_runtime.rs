@@ -1,6 +1,6 @@
 use glory_core::Runtime;
 use glory_render::{Change, Patch, memory::Memory};
-use glory_ui::{App, button};
+use glory_ui::{App, Widget, button};
 use std::rc::Rc;
 
 #[test]
@@ -30,6 +30,32 @@ fn shared_graph_has_disjoint_presentation_ids_and_independent_owned_teardown() {
     assert_eq!(runtime.stats().nodes, 1);
     owner.owner().dispose();
     assert_eq!(runtime.stats().nodes, 0);
+}
+
+#[test]
+fn shared_runtime_only_marks_the_presentation_changed_by_a_binding() {
+    let runtime = Rc::new(Runtime::new());
+    let owner = runtime.scope();
+    let label = owner.cage("initial".to_owned());
+    let first = App::in_runtime(runtime.clone(), &owner, Memory::new).unwrap();
+    let second = App::in_runtime(runtime.clone(), &owner, Memory::new).unwrap();
+    first.mount(button().label(label)).unwrap();
+    second.mount(button().label("static")).unwrap();
+    assert!(!first.has_pending_presentation());
+    assert!(!second.has_pending_presentation());
+    label.revise(|label| *label = "changed".into());
+    runtime.flush().unwrap();
+    assert!(first.has_pending_presentation());
+    assert!(!second.has_pending_presentation());
+    first.pump().unwrap();
+    assert!(!first.has_pending_presentation());
+    let mounted = button().mount(first.scope()).unwrap();
+    assert!(first.has_pending_presentation());
+    first.flush().unwrap();
+    drop(mounted);
+    assert!(first.has_pending_presentation());
+    first.flush().unwrap();
+    assert!(!first.has_pending_presentation());
 }
 
 #[test]

@@ -80,17 +80,24 @@ js-framework-benchmark; do not mix its scores with the self-suite's div workload
 
 ## Active architecture
 
+The optional routing system now lives in `crates/routing` and uses the current
+Runtime/Widget contracts. Read `crates/routing/README.md` for delivered behavior
+and `docs/routing-architecture-2026-10-30.md` for the broader roadmap. Keep its
+default graph free of UI, DOM, HTTP and serde; widgets and hosts opt in. Do not
+restore the old Truck, Graff/stuffs or Aviator implementation. Native navigation
+is renderer-independent; device deep-link/gesture acceptance remains separate.
+
 The user authorized the breaking semantic rewrite in
 `docs/semantic-ui-rendering-architecture-report-2026-10-21.md`. Follow that
 report and `docs/semantic-ui-implementation.md`; do not preserve the former
 HTML API/feature/wire format through compatibility aliases.
 
-The active workspace currently contains style, render, core, resource, i18n, ui,
+The active workspace currently contains style, render, core, resource, i18n, routing, ui,
 html, web, ssr, apace, glory and salvo-adapter. The opt-in i18n package was authorized after
 the semantic rewrite; see `crates/i18n/README.md` for its boundaries.
 Truck, the old core runtime, routing, CLI/macros/serverfn/hot-reload and the old
 desktop/native/liveview/tui adapters and examples have been removed. Only the
-12 active runtime packages, the new opt-in view-macros compiler, and migrated examples/benchmarks are supported. The
+13 active runtime packages, the new opt-in view-macros compiler, and migrated examples/benchmarks are supported. The
 new `tools/cli` is a separate library-only host tooling workspace, explicitly
 authorized after the cleanup. It must not depend on runtime crates or enter
 the facade/default/HTML/SSR/WASM runtime graphs. Applications own a tiny private

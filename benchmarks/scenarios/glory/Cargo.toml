@@ -13,5 +13,9 @@ web-sys = { version = "=0.3.106", features = ["Window", "Document", "Element"] }
 
 [profile.release]
 opt-level = 3
+debug = false
 lto = true
 codegen-units = 1
+panic = "abort"
+strip = "symbols"
+incremental = false

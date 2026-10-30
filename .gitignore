@@ -5,12 +5,11 @@ debug.log
 *.log
 /**/dist
 **/Cargo.lock
-!/Cargo.lock
-!/tools/cli/Cargo.lock
 !/examples/semantic-web/Cargo.lock
 !/examples/display-web/Cargo.lock
 !/examples/counter/Cargo.lock
 !/examples/mobile/Cargo.lock
+!/examples/routing/Cargo.lock
 !/benchmarks/glory/Cargo.lock
 !/benchmarks/wasm-size/Cargo.lock
 !/benchmarks/role-patches/Cargo.lock

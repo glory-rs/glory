@@ -40,6 +40,7 @@ export XDG_CACHE_HOME="$glory_build_root/cache"
 export PYTHONPYCACHEPREFIX="$glory_build_root/pycache"
 mkdir -p "$CARGO_HOME" "$CARGO_TARGET_DIR" "$TMPDIR" "$XDG_CACHE_HOME" "$glory_artifacts"
 cd "$glory_workspace"
+python3 scripts/library_lockfiles.py
 cargo metadata --no-deps --format-version 1 > "$glory_artifacts/metadata-linux.json"
 python3 -c 'import json,os,sys; p=json.load(open(sys.argv[1]))["target_directory"]; assert os.path.realpath(p)==os.path.realpath(os.environ["CARGO_TARGET_DIR"]),p; print("Verified target:",p)' "$glory_artifacts/metadata-linux.json"
 python3 scripts/check-engine-forks.py --test

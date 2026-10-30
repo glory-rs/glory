@@ -16,6 +16,6 @@ pub use glory_render::RuntimeId;
 pub use resource::{Resource, ResourceSeed, ResourceState};
 pub use runtime::{
     AccessError, BindingId, Bond, Cage, GraphStats, Host, HostError, InstanceId, KeyedEntry,
-    KeyedList, ListError, LocalFuture, Owner, RowToken, Runtime, RuntimeStats, Scope, Task,
-    TaskToken, Vary, untracked,
+    KeyedList, ListError, LocalFuture, Owner, RowToken, Runtime, RuntimeStats, Scope, Selected,
+    Selector, SelectorStats, Task, TaskToken, Vary, untracked,
 };

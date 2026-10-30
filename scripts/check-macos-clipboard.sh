@@ -3,6 +3,7 @@ set -eu
 repo=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 . "$repo/scripts/apple-env.sh"
 cd "$repo"
+python3 scripts/library_lockfiles.py
 cargo test --locked -p glory-apace --features clipboard --lib --no-run --message-format=json > "$GLORY_BUILD_ROOT/clipboard-test-build.jsonl"
 binary=$(python3 - "$GLORY_BUILD_ROOT/clipboard-test-build.jsonl" <<'PY'
 import json,sys

@@ -10,6 +10,18 @@ Native applications use `glory::apace`, the `apace-*` features and
 glory = { version = "=0.6.0", default-features = false, features = ["dsl"] }
 ```
 
+For production applications, enable symbol stripping in the application's own
+workspace manifest. Cargo ignores release profiles declared by dependencies:
+
+```toml
+[profile.release]
+strip = "symbols"
+```
+
+The benchmark workspaces use matching release profiles. See the
+[strip and static-host analysis](docs/wasm-strip-static-host-2026-10-30.md) for
+measured sizes, retained Widget/Each behavior and reproducibility details.
+
 Glory is being rebuilt as a Rust semantic UI framework: handwritten builders,
 owned fine-grained reactivity, and replaceable rendering hosts. No UI DSL or
 virtual DOM is required.
@@ -42,6 +54,11 @@ for the remaining platform and application gaps. SSR framework integration stays
 limited to Salvo.
 
 ## Available now
+
+- Optional [`routing`](crates/routing): shared URL matching, typed targets,
+  owned navigation, nested Widget outlets, retained layouts, Memory/Browser
+  history, native return preparation, SSR outcomes and hydration seeds.
+  Hosts are selected separately; see the [portable example](examples/routing).
 
 - The opt-in [XML display API](docs/v2-display-keyed-content-guide-2026-10-28.md)
   extracts shared HTML templates and binds Cage/Bond/Vary fields. Raw HTML
@@ -89,8 +106,9 @@ limited to Salvo.
   have no name/focus target. Metadata updates preserve editor values/selection.
 - `glory`: a facade over those packages.
 - `glory-html`: common HTML mapping, typed incremental edits and serialization.
-  HTML format v3 includes semantic enabled/disabled/checked attributes on main
-  mapping nodes; stylesheet states work for Check's internal control as well.
+  The wire format is versioned by [`FORMAT_VERSION`](crates/html/src/lib.rs).
+  Semantic enabled/disabled/checked attributes exist on main mapping nodes;
+  stylesheet states work for Check's internal control as well.
 - `glory-web`: wasm32 DOM interpreter, RAF host, input/composition handling,
   real geometry/selection queries and windowed browser scrolling.
 - `glory-ssr`: synchronous snapshots and document output using the same mapper;
@@ -307,7 +325,8 @@ metadata does not validate arbitrary stylesheets or promise identical engines.
 Maximum sizes use `Limit::{None, Px, Percent}`. `max_width(Limit::None)` removes
 a stylesheet cap; leaving `max_width` absent lets that stylesheet apply. Preferred
 and minimum sizes continue to use `Length`, including `Auto`.
-Apace publishes its own `STYLE_PROFILE` (apace v3): typed sticky positioning and
+Apace publishes its own [`STYLE_PROFILE`](crates/apace/src/document.rs), separately
+from the HTML wire format and HTML style profile. Typed sticky positioning and
 automatic scroll anchoring return an explicit unsupported error until the pinned
 engine implements their geometry. Disabling anchoring remains supported for
 Glory's virtual lists. Raw author CSS retains the selected engine's coverage.
@@ -375,6 +394,15 @@ composition across bootstrap and adoption, range reuse, CSP and list scrolling.
 The connection-thread HTTP implementation is a fixture, not a production server.
 
 ## Checks
+
+The runtime workspace and `tools/cli` contain libraries; their `Cargo.lock`
+files are generated locally and ignored by Git. Check scripts and CI resolve
+missing library locks once, respecting the declared Rust version, then use
+`--locked` for the rest of that run.
+To prepare a fresh checkout manually, run `python scripts/library_lockfiles.py`
+with Cargo home, target and temporary directories configured for your host.
+Application, example and benchmark locks remain committed. Dependency audit
+artifacts include the exact resolved locks used by the run.
 
 On Windows PowerShell:
 

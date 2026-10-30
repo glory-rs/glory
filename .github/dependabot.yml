@@ -5,7 +5,18 @@
 
 version: 2
 updates:
-  - package-ecosystem: "cargo" # See documentation for possible values
-    directory: "/" # Location of package manifests
+  - package-ecosystem: "cargo"
+    directories:
+      - "/"
+      - "/tools/cli"
+      - "/examples/counter"
+      - "/examples/display-web"
+      - "/examples/mobile"
+      - "/examples/routing"
+      - "/examples/semantic-web"
+      - "/benchmarks/glory"
+      - "/benchmarks/role-patches"
+      - "/benchmarks/wasm-size"
+      - "/benchmarks/scenarios/glory"
     schedule:
       interval: "daily"

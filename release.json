@@ -13,6 +13,7 @@
     "glory-i18n",
     "glory-ui",
     "glory-html",
+    "glory-routing",
     "glory-web",
     "glory-ssr",
     "glory-apace",

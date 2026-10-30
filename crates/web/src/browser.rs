@@ -605,6 +605,9 @@ pub struct WebApp {
     frame: Rc<Frame>,
 }
 impl WebApp {
+    pub(crate) fn needs_flush(&self) -> bool {
+        self.app.has_pending_presentation() || self.frame.has_pending_turn()
+    }
     pub(crate) fn flush(&self) -> glory_ui::Result {
         self.app.pump().map(|_| ())
     }

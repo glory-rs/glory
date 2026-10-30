@@ -244,14 +244,14 @@ fn resolve(
 #[doc(hidden)]
 pub trait Actions: sealed::Actions {
     fn validate(&self, definition: &Compiled, scope: &Scope, seen: &mut Vec<u16>) -> Result<()>;
-    fn apply(self, mount: &mounting::Mount<'_>) -> glory_ui::Result;
+    fn apply(self, mount: &impl mounting::Mount) -> glory_ui::Result;
 }
 impl sealed::Actions for () {}
 impl Actions for () {
     fn validate(&self, _: &Compiled, _: &Scope, _: &mut Vec<u16>) -> Result<()> {
         Ok(())
     }
-    fn apply(self, _: &mounting::Mount<'_>) -> glory_ui::Result {
+    fn apply(self, _: &impl mounting::Mount) -> glory_ui::Result {
         Ok(())
     }
 }
@@ -261,7 +261,7 @@ impl<A: Actions, B: Actions> Actions for (A, B) {
         self.0.validate(d, s, seen)?;
         self.1.validate(d, s, seen)
     }
-    fn apply(self, m: &mounting::Mount<'_>) -> glory_ui::Result {
+    fn apply(self, m: &impl mounting::Mount) -> glory_ui::Result {
         self.0.apply(m)?;
         self.1.apply(m)
     }
@@ -277,7 +277,7 @@ impl<V: TextValue + 'static> Actions for Bind<V> {
         )?;
         self.value.validate(s.runtime())
     }
-    fn apply(self, m: &mounting::Mount<'_>) -> glory_ui::Result {
+    fn apply(self, m: &impl mounting::Mount) -> glory_ui::Result {
         m.text(self.field, self.value)
     }
 }
@@ -287,7 +287,7 @@ impl<F: FnMut() + 'static> Actions for On<F> {
         resolve(d, self.click.0, |k| k == Kind::Click, seen)?;
         Ok(())
     }
-    fn apply(self, m: &mounting::Mount<'_>) -> glory_ui::Result {
+    fn apply(self, m: &impl mounting::Mount) -> glory_ui::Result {
         m.on(self.click, self.callback)
     }
 }
@@ -302,7 +302,7 @@ impl<C: Content> Actions for ChildValue<C> {
         )?;
         self.content.validate(s)
     }
-    fn apply(self, m: &mounting::Mount<'_>) -> glory_ui::Result {
+    fn apply(self, m: &impl mounting::Mount) -> glory_ui::Result {
         m.child(self.outlet, self.content)
     }
 }
@@ -312,7 +312,7 @@ impl<V: BoolValue> Actions for Toggle<V> {
         resolve(d, self.field.0, |k| matches!(k, Kind::Class(..)), seen)?;
         self.value.validate_bool(s.runtime())
     }
-    fn apply(self, m: &mounting::Mount<'_>) -> glory_ui::Result {
+    fn apply(self, m: &impl mounting::Mount) -> glory_ui::Result {
         m.flag(self.field, self.value)
     }
 }
@@ -347,7 +347,12 @@ impl<A: Actions> View<A> {
             .ok_or_else(|| error("view already built"))?;
         let instance = app.mount(scope, self.template)?;
         if let Err(e) = actions
-            .apply(&mounting::Mount::sparse(&definition, app, scope, &instance))
+            .apply(&mounting::SparseMount {
+                definition: &definition,
+                app,
+                scope,
+                instance: &instance,
+            })
             .map_err(error)
         {
             instance.fail(e.clone());

@@ -1,0 +1,164 @@
+{
+  "date": "2026-10-30",
+  "baseline": "cd750c8c4f159119fbf5fede688166b42ad95073",
+  "canonical_gate": {
+    "command": "scripts/check-semantic-ui.ps1 -Web -Window -Bench -Audit",
+    "exit_code": 0,
+    "log": "D:/BuildCache/glory-semantic-ui/quality-fix-gate-final.log"
+  },
+  "chromium": {
+    "version": "155.0.8059.86",
+    "suites": 31,
+    "passed": 31,
+    "transport_exit_code": 0
+  },
+  "msrv": "Rust 1.94 workspace all-features, core/routing tests and independent CLI passed",
+  "audit": {
+    "lockfiles": 11,
+    "failed": 0
+  },
+  "actionlint": "1.7.12 passed (shellcheck/pyflakes disabled)",
+  "remaining": [
+    "Linux remote CI not executed locally",
+    "Apple runner opt-in; device and reader acceptance separate",
+    "4 unmaintained transitive dependency warnings",
+    "64 live WebApps per document; O(W) island readiness",
+    "Selector adds graph nodes and WASM; composed notification boundary is flush"
+  ],
+  "evidence_scope": "Executed locally on Windows. Raw machine logs and binary artifacts are retained locally; Linux/Apple remote CI is not claimed as executed.",
+  "performance_work": {
+    "keyed": {
+      "new_key_clones": 8192,
+      "baseline_source": "D:/BuildCache/glory-semantic-ui/performance-before-20261030/crates/core/src/keyed.rs",
+      "method": "same instrumented Clone key test, old source in isolated workspace",
+      "members": 4096,
+      "old_key_clones": 16781312
+    },
+    "baseline_revision": "cd750c8c4f159119fbf5fede688166b42ad95073",
+    "date": "2026-10-30",
+    "executor": {
+      "method": "same cancellation sequence; old retain loop executed as reference oracle; excludes normal pop and BTreeSet work",
+      "queued_tasks": 4096,
+      "old_retain_inspected": 7456995,
+      "new_compaction_inspected": 5329
+    },
+    "selector": {
+      "method": "both actual graphs executed in one deterministic test",
+      "tradeoff": "one bool notification source and cleanup per live key/Owner; Weak read-ahead index bounded by live channels actually read before publication; dedicated Selected<K> direct reads current source",
+      "new_marked": 3,
+      "old_executed": 4096,
+      "new_executed": 2,
+      "live_consumers": 4096,
+      "correctness": "notification baseline uses last-published selection; flush merges read-ahead with old/new exactly once, including net-zero batches; cached Bond propagation remains flush-published"
+    },
+    "latest_browser_evidence": "D:/BuildCache/glory-semantic-ui/selector-browser-20261030/browser-evidence-read-ahead/evidence.json"
+  },
+  "selector_browser": {
+    "scope": "F08 only: same frozen current framework, baseline restores shared-source Model; unthrottled diagnostic ScriptDuration, no overall suite or statistical-significance claim",
+    "sizes": {
+      "before": {
+        "app_bg.wasm": {
+          "bytes": 417312,
+          "gzip_bytes": 147226,
+          "sha256": "2f4d6e9fd75e61ce77953217bcea946ed06889820fff12a2dbc1efa262643f86"
+        },
+        "app.js": {
+          "bytes": 19187,
+          "gzip_bytes": 4815,
+          "sha256": "e79452bcdfe9adb2405ed7ff2355b69bfeb9edbdbe796ac30f879e66d9874f11"
+        },
+        "runtime_js": [
+          {
+            "path": "app.js",
+            "bytes": 19187
+          },
+          {
+            "path": "snippets\\glory-web-b6fc729524edcce7\\inline0.js",
+            "bytes": 6525
+          },
+          {
+            "path": "snippets\\glory-web-b6fc729524edcce7\\inline1.js",
+            "bytes": 380
+          },
+          {
+            "path": "snippets\\glory-web-b6fc729524edcce7\\src\\template_host.js",
+            "bytes": 8769
+          }
+        ],
+        "runtime_js_bytes": 34861
+      },
+      "after": {
+        "app_bg.wasm": {
+          "bytes": 456516,
+          "gzip_bytes": 157700,
+          "sha256": "addf89cb8fe687cafb9e5c450f79a5e1c45f215ab1f1eaf70aa2df3d54e3a5b9"
+        },
+        "app.js": {
+          "bytes": 19187,
+          "gzip_bytes": 4815,
+          "sha256": "fe0c498de212d84403a9b1268b0171d91b98410b823d9dfab097d28e673b548e"
+        },
+        "runtime_js": [
+          {
+            "path": "app.js",
+            "bytes": 19187
+          },
+          {
+            "path": "snippets\\glory-web-b6fc729524edcce7\\inline0.js",
+            "bytes": 6525
+          },
+          {
+            "path": "snippets\\glory-web-b6fc729524edcce7\\inline1.js",
+            "bytes": 380
+          },
+          {
+            "path": "snippets\\glory-web-b6fc729524edcce7\\src\\template_host.js",
+            "bytes": 8769
+          }
+        ],
+        "runtime_js_bytes": 34861
+      }
+    },
+    "summary": {
+      "before": {
+        "samples": 24,
+        "script_ms": 0.3409999999999993,
+        "wall_ms": 25.849999994039536,
+        "rounds": [
+          0.3320000000000007,
+          0.3910000000000007
+        ]
+      },
+      "after": {
+        "samples": 24,
+        "script_ms": 0.13149999999999967,
+        "wall_ms": 26.150000005960464,
+        "rounds": [
+          0.1285000000000019,
+          0.1454999999999998
+        ]
+      }
+    },
+    "pixels_equal": true
+  },
+  "routing_browser": {
+    "browser": "155.0.8059.86",
+    "checks": [
+      "CSR: layout identity, dirty editor, query/hash, history, duplicate URL scroll, cancelled anchor restoration, raw anchor, fallback, teardown",
+      "SSR hydration: layout identity, dirty editor, query/hash, history, duplicate URL scroll, cancelled anchor restoration, raw anchor, fallback, teardown",
+      "SSR with changed pre-WASM URL: layout identity, dirty editor, query/hash, history, duplicate URL scroll, cancelled anchor restoration, raw anchor, fallback, teardown",
+      "CSR portable link_with async guards: real click, pending, supersede, block, commit, retained editor, Owner cancellation and no late reply",
+      "SSR adoption portable link_with async guards: real click, pending, supersede, block, commit, retained editor, Owner cancellation and no late reply",
+      "CSR initial fragment: delayed WASM still scrolls to the mounted anchor"
+    ],
+    "passed": 6
+  },
+  "island_browser": {
+    "passed": true,
+    "checks": [
+      "1/32/64 live islands: raw field updates pump zero idle islands; shared and single-island presentations commit synchronously",
+      "pending host input, real Chrome editing, dirty Bounds query barriers, two disposal/restoration cycles and final owner/DOM release pass"
+    ],
+    "boundaries": "The existing DocumentLayers budget permits 64 live WebApps per Document, including Widget islands and other WebApps; a 65th island is rejected. 100/1000 islands in one Document are unsupported (the attempted 100-island failure is retained separately). Readiness still scans O(live islands); island_flushes counts actual explicit display-host pumps, not independent RAF callbacks. Debug elapsed times are local observations, not release throughput or a before/after speedup."
+  }
+}

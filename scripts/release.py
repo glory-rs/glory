@@ -14,6 +14,7 @@ import time
 import tomllib
 import urllib.error
 import urllib.request
+from library_lockfiles import ensure_library_lockfiles
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -140,6 +141,7 @@ def main():
         if options.publish or options.check_package not in owned:
             raise SystemExit("Archive checks require an owned package and cannot publish")
         package = owned[options.check_package]
+        ensure_library_lockfiles(ROOT)
         run("cargo", "package", "--locked", "--no-verify", "--manifest-path", package["manifest_path"], "-p", package["name"])
         validate_archive(target / "package" / f"{package['name']}-{package['version']}.crate",
                          run("git", "rev-parse", "HEAD", capture=True))
@@ -167,6 +169,7 @@ def main():
         if not set(plan.get("required_release_jobs", [])).issubset(succeeded):
             raise SystemExit("Required platform validation jobs have not all succeeded")
     artifacts = []
+    ensure_library_lockfiles(ROOT)
     release_packages = []
     output = target / "release" / tag
     output.mkdir(parents=True, exist_ok=True)
