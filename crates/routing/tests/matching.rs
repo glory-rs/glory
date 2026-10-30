@@ -1,5 +1,86 @@
 use glory_routing::*;
 
+#[test]
+fn full_size_route_tables_use_path_candidates_with_the_original_step_budget() {
+    // Route identities are static declarations. This bounded test allocation is
+    // shared by both tables rather than a production cache of visited URLs.
+    let names = (0..4096)
+        .map(|index| &*Box::leak(format!("page{index}").into_boxed_str()))
+        .collect::<Vec<&'static str>>();
+    for prefix in ["", ":locale/"] {
+        let mut builder = Routes::builder().limits(Limits {
+            match_steps: 8,
+            ..Limits::default()
+        });
+        for (index, name) in names.iter().enumerate() {
+            builder = builder.root(RouteDef::new(
+                RouteKey::<Params>::new(name),
+                format!("{prefix}section{index}/:id"),
+            ));
+        }
+        let routes = builder.finish().unwrap();
+        let head = if prefix.is_empty() { "" } else { "/en" };
+        for index in [0, 2048, 4095] {
+            let plan = routes
+                .resolve(&Location::parse(&format!("{head}/section{index}/42")).unwrap())
+                .unwrap();
+            assert_eq!(plan.chain[0].id.0, names[index]);
+            assert_eq!(plan.chain[0].params.required::<u32>("id"), Ok(42));
+            assert_eq!(
+                plan.chain[0].params.optional::<String>("locale").unwrap(),
+                (!prefix.is_empty()).then(|| "en".into())
+            );
+        }
+        assert!(matches!(
+            routes.resolve(&Location::parse(&format!("{head}/missing/42")).unwrap()),
+            Err(Error::NoMatch)
+        ));
+    }
+}
+
+#[test]
+fn indexed_optional_branches_keep_greedy_captures_and_static_param_rest_priority() {
+    const OPTIONAL: RouteKey<Params> = RouteKey::new("optional");
+    const PAGE: RouteKey<Params> = RouteKey::new("page");
+    const FIXED: RouteKey<Params> = RouteKey::new("fixed");
+    const PARAM: RouteKey<Params> = RouteKey::new("param");
+    const REST_KEY: RouteKey<Params> = RouteKey::new("rest-indexed");
+    let routes = Routes::builder()
+        .root(RouteDef::layout(OPTIONAL, ":locale?").child(RouteDef::new(PAGE, "docs/:id?")))
+        .root(RouteDef::new(FIXED, "docs/new"))
+        .root(RouteDef::new(PARAM, "docs/:id"))
+        .root(RouteDef::new(REST_KEY, "*rest"))
+        .finish()
+        .unwrap();
+    for (path, expected) in [
+        ("/docs", PAGE.id()),
+        ("/en/docs", PAGE.id()),
+        ("/en/docs/42", PAGE.id()),
+        ("/docs/new", FIXED.id()),
+        ("/docs/42", PARAM.id()),
+        ("/missing/a", REST_KEY.id()),
+    ] {
+        let plan = routes.resolve(&Location::parse(path).unwrap()).unwrap();
+        assert_eq!(plan.chain.last().unwrap().id, expected, "{path}");
+    }
+    let plan = routes
+        .resolve(&Location::parse("/en/docs/42").unwrap())
+        .unwrap();
+    assert_eq!(
+        plan.params(OPTIONAL)
+            .unwrap()
+            .required::<String>("locale")
+            .unwrap(),
+        "en"
+    );
+    assert_eq!(plan.params(PAGE).unwrap().required::<u32>("id"), Ok(42));
+    let plain = routes.resolve(&Location::parse("/docs").unwrap()).unwrap();
+    assert_eq!(
+        plain.params(OPTIONAL).unwrap().optional::<String>("locale"),
+        Ok(None)
+    );
+}
+
 const ROOT: RouteKey<()> = RouteKey::new("root");
 const HOME: RouteKey<()> = RouteKey::new("home");
 const USER: RouteKey<User> = RouteKey::new("user");

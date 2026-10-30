@@ -2,7 +2,7 @@ use crate::location::{decode, encode};
 use crate::{Error, Limits, Location, Params, Result, RouteParams};
 use std::{
     any::{Any, TypeId},
-    collections::BTreeSet,
+    collections::{BTreeMap, BTreeSet},
     marker::PhantomData,
     rc::Rc,
     sync::Arc,
@@ -98,6 +98,8 @@ struct Node {
     names: BTreeSet<String>,
     pattern: Vec<Segment>,
     trailing: bool,
+    parent: Option<usize>,
+    layout: bool,
 }
 struct Leaf {
     chain: Vec<usize>,
@@ -110,6 +112,89 @@ struct Table {
     base: String,
     limits: Limits,
     slash: SlashPolicy,
+    index: MatchIndex,
+}
+
+/// Candidate lookup shares path prefixes, including unnamed parameter edges.
+/// Capturing and precedence remain in match_parts, so indexing cannot change
+/// greedy optional captures, ties, or which typed decoder reports an error.
+#[derive(Default)]
+struct IndexNode {
+    fixed: BTreeMap<String, usize>,
+    param: Option<usize>,
+    optional: Option<usize>,
+    end: Vec<usize>,
+    rest: Vec<usize>,
+}
+struct MatchIndex(Vec<IndexNode>);
+impl MatchIndex {
+    fn new() -> Self {
+        Self(vec![IndexNode::default()])
+    }
+    fn insert(&mut self, pattern: &[Segment], leaf: usize) {
+        let mut cursor = 0;
+        for part in pattern {
+            let existing = match part {
+                Segment::Static(value) => self.0[cursor].fixed.get(value).copied(),
+                Segment::Param(_) => self.0[cursor].param,
+                Segment::Optional(_) => self.0[cursor].optional,
+                Segment::Rest(_) => {
+                    self.0[cursor].rest.push(leaf);
+                    return;
+                }
+            };
+            cursor = if let Some(next) = existing {
+                next
+            } else {
+                let next = self.0.len();
+                self.0.push(IndexNode::default());
+                match part {
+                    Segment::Static(value) => {
+                        self.0[cursor].fixed.insert(value.clone(), next);
+                    }
+                    Segment::Param(_) => self.0[cursor].param = Some(next),
+                    Segment::Optional(_) => self.0[cursor].optional = Some(next),
+                    Segment::Rest(_) => unreachable!(),
+                }
+                next
+            };
+        }
+        self.0[cursor].end.push(leaf);
+    }
+    fn candidates(&self, values: &[String], steps: &mut usize, limit: usize) -> Result<Vec<usize>> {
+        let mut pending = vec![(0, 0)];
+        let mut visited = BTreeSet::new();
+        let mut candidates = Vec::new();
+        while let Some((cursor, position)) = pending.pop() {
+            step(steps, limit)?;
+            if !visited.insert((cursor, position)) {
+                continue;
+            }
+            let node = &self.0[cursor];
+            candidates.extend_from_slice(&node.rest);
+            if position == values.len() {
+                candidates.extend_from_slice(&node.end);
+            } else {
+                if let Some(next) = node.fixed.get(&values[position]) {
+                    pending.push((*next, position + 1));
+                }
+                if let Some(next) = node.param {
+                    pending.push((next, position + 1));
+                }
+                if let Some(next) = node.optional {
+                    pending.push((next, position + 1));
+                }
+            }
+            if let Some(next) = node.optional {
+                pending.push((next, position));
+            }
+        }
+        // A leaf can be reached through several optional omissions. Its greedy
+        // matcher runs once, in declaration order to retain the previous ties.
+        candidates.sort_unstable();
+        candidates.dedup();
+        Ok(candidates)
+    }
 }
 #[derive(Clone)]
 pub struct Routes(Arc<Table>);
@@ -168,6 +253,7 @@ impl RoutesBuilder {
             base,
             limits: self.limits,
             slash: self.slash,
+            index: MatchIndex::new(),
         };
         let mut ids = BTreeSet::new();
         for root in self.roots {
@@ -197,6 +283,9 @@ impl RoutesBuilder {
             if !signatures.insert((signature, trailing)) {
                 return Err(Error::Definition("ambiguous route patterns".into()));
             }
+        }
+        for (index, leaf) in table.leaves.iter().enumerate() {
+            table.index.insert(&leaf.pattern, index);
         }
         Ok(Routes(Arc::new(table)))
     }
@@ -280,6 +369,7 @@ fn compile(
         return Err(Error::OverLimit("pattern segments"));
     }
     let trailing = def.pattern.ends_with('/') && !full.is_empty();
+    let parent = chain.last().copied();
     chain.push(table.nodes.len());
     table.nodes.push(Node {
         id: def.id,
@@ -288,6 +378,8 @@ fn compile(
         names: names.clone(),
         pattern: full.clone(),
         trailing,
+        parent,
+        layout: def.layout,
     });
     if def.children.is_empty() {
         if def.layout {
@@ -367,20 +459,50 @@ impl Routes {
     /// when changing a codec without changing its path pattern. Not a MAC.
     pub fn schema(&self, codec_schema: &str) -> String {
         let mut hash = 0xcbf29ce484222325u64;
-        let mut add = |value: &str| {
-            for byte in value.as_bytes().iter().copied().chain([0]) {
+        let mut add = |value: &[u8]| {
+            // Length framing is independent of Debug formatting and cannot
+            // confuse adjacent fields with embedded delimiters.
+            for byte in (value.len() as u64)
+                .to_le_bytes()
+                .into_iter()
+                .chain(value.iter().copied())
+            {
                 hash ^= u64::from(byte);
                 hash = hash.wrapping_mul(0x100000001b3);
             }
         };
-        add(codec_schema);
-        add(&self.0.base);
-        add(&format!("{:?}", self.0.slash));
-        for leaf in &self.0.leaves {
-            for index in &leaf.chain {
-                add(self.0.nodes[*index].id.0);
+        add(b"glory-routing/schema/2");
+        add(codec_schema.as_bytes());
+        add(self.0.base.as_bytes());
+        add(&[match self.0.slash {
+            SlashPolicy::Strict => 0,
+            SlashPolicy::Ignore => 1,
+            SlashPolicy::RedirectToSlash => 2,
+            SlashPolicy::RedirectWithoutSlash => 3,
+        }]);
+        add(&(self.0.nodes.len() as u64).to_le_bytes());
+        for node in &self.0.nodes {
+            add(node.id.0.as_bytes());
+            add(&node
+                .parent
+                .map_or(0, |parent| parent as u64 + 1)
+                .to_le_bytes());
+            add(&[u8::from(node.layout), u8::from(node.trailing)]);
+            add(&(node.pattern.len() as u64).to_le_bytes());
+            for part in &node.pattern {
+                let (tag, value) = match part {
+                    Segment::Static(value) => (0, value),
+                    Segment::Param(value) => (1, value),
+                    Segment::Optional(value) => (2, value),
+                    Segment::Rest(value) => (3, value),
+                };
+                add(&[tag]);
+                add(value.as_bytes());
             }
-            add(&format!("{:?}/{}", leaf.pattern, leaf.trailing));
+            add(&(node.names.len() as u64).to_le_bytes());
+            for name in &node.names {
+                add(name.as_bytes());
+            }
         }
         format!("{hash:016x}")
     }
@@ -415,7 +537,12 @@ impl Routes {
         let trailing = path.ends_with('/') && !values.is_empty();
         let mut steps = 0;
         let mut best: Option<(&Leaf, Params, Vec<u8>, Omissions)> = None;
-        for leaf in &self.0.leaves {
+        let candidates = self
+            .0
+            .index
+            .candidates(&values, &mut steps, self.0.limits.match_steps)?;
+        for candidate in candidates {
+            let leaf = &self.0.leaves[candidate];
             if self.0.slash == SlashPolicy::Strict && trailing != leaf.trailing {
                 continue;
             }
@@ -626,6 +753,13 @@ struct Omissions {
     optional: usize,
 }
 type Captured = Option<(Params, Vec<u8>, Omissions)>;
+fn step(steps: &mut usize, limit: usize) -> Result {
+    if *steps >= limit {
+        return Err(Error::OverLimit("matching steps"));
+    }
+    *steps += 1;
+    Ok(())
+}
 fn match_parts(
     parts: &[Segment],
     values: &[String],
@@ -635,10 +769,7 @@ fn match_parts(
     steps: &mut usize,
     limit: usize,
 ) -> Result<Captured> {
-    *steps += 1;
-    if *steps > limit {
-        return Err(Error::OverLimit("matching steps"));
-    }
+    step(steps, limit)?;
     let Some((first, rest)) = parts.split_first() else {
         return Ok(values.is_empty().then_some((params, ranks, penalty)));
     };
@@ -700,6 +831,73 @@ fn match_parts(
             }
             ranks.push(4);
             match_parts(rest, tail, params, ranks, penalty, steps, limit)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn indexed_candidates_agree_with_exhaustive_matching_for_overlapping_paths() {
+        let mut builder = Routes::builder();
+        for (name, path) in [
+            ("fixed", "a/fixed"),
+            ("fixed-slash", "a/fixed/"),
+            ("one-param", "a/:value"),
+            ("first-param", ":lead/b"),
+            ("two-params", ":lead/:middle/c"),
+            ("optional", "a/:tail?"),
+            ("rest", "a/*rest"),
+            ("all", "*all"),
+            ("encoded", "a%2Fb/leaf"),
+        ] {
+            builder = builder.root(RouteDef::new(RouteKey::<Params>::new(name), path));
+        }
+        let routes = builder
+            .root(
+                RouteDef::layout(RouteKey::<Params>::new("optional-parent"), ":head?").child(
+                    RouteDef::new(RouteKey::<Params>::new("optional-child"), ":tail?"),
+                ),
+            )
+            .finish()
+            .unwrap();
+        let mut paths = vec![String::new()];
+        let mut frontier = vec![String::new()];
+        for _ in 0..4 {
+            frontier = frontier
+                .iter()
+                .flat_map(|prefix| {
+                    ["a", "b", "c", "fixed", "a%2Fb"].map(|part| format!("{prefix}/{part}"))
+                })
+                .collect();
+            paths.extend(frontier.iter().cloned());
+        }
+        for path in paths {
+            let location = Location::parse(if path.is_empty() { "/" } else { &path }).unwrap();
+            let values = location.segments().unwrap();
+            let indexed = routes.0.index.candidates(&values, &mut 0, 4096).unwrap();
+            let exhaustive = routes
+                .0
+                .leaves
+                .iter()
+                .enumerate()
+                .filter_map(|(index, leaf)| {
+                    match_parts(
+                        &leaf.pattern,
+                        &values,
+                        Params::default(),
+                        Vec::new(),
+                        Omissions::default(),
+                        &mut 0,
+                        usize::MAX,
+                    )
+                    .unwrap()
+                    .map(|_| index)
+                })
+                .collect::<Vec<_>>();
+            assert_eq!(indexed, exhaustive, "{location}");
         }
     }
 }

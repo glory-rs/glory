@@ -388,3 +388,45 @@ fn superseding_async_navigation_wakes_and_disposes_guard_owned_work() {
     );
     assert_eq!(handle.current().unwrap().location(), &location("/fast"));
 }
+
+#[test]
+fn weak_handle_guard_registration_validates_write_permission_and_revokes_prepared_work() {
+    let runtime = Runtime::new();
+    let scope = runtime.scope();
+    let history = Rc::new(MemoryHistory::new(location("/")));
+    let router = Router::new(&scope, routes(), history.clone()).unwrap();
+    let handle = router.handle();
+    router.guard(|ctx| {
+        assert_eq!(
+            ctx.router
+                .async_guard(|_| Box::pin(async { Ok(Decision::Allow) })),
+            Err(Error::Busy)
+        );
+        Ok(Decision::Allow)
+    });
+    let prepared = handle
+        .prepare(location("/next"), NavigationKind::Push)
+        .unwrap();
+    assert_eq!(
+        scope
+            .owner()
+            .compute(|| handle.async_guard(|_| { Box::pin(async { Ok(Decision::Allow) }) }))
+            .unwrap(),
+        Err(Error::WriteDuringCompute)
+    );
+    assert_eq!(handle.has_async_guards(), Ok(false));
+    prepared.commit().unwrap();
+    let prepared = handle
+        .prepare(location("/stale"), NavigationKind::Push)
+        .unwrap();
+    handle
+        .async_guard(|_| Box::pin(async { Ok(Decision::Allow) }))
+        .unwrap();
+    assert_eq!(prepared.commit(), Err(Error::StaleNavigation));
+    assert_eq!(history.current().unwrap().location, location("/next"));
+    scope.owner().dispose();
+    assert_eq!(
+        handle.async_guard(|_| Box::pin(async { Ok(Decision::Allow) })),
+        Err(Error::Gone)
+    );
+}

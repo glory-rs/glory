@@ -34,3 +34,48 @@ fn inert_bounded_seed_validates_schema_branch_and_fragment_independently_of_dom(
         "/missing"
     );
 }
+
+#[test]
+fn declaration_identity_includes_each_nodes_consumed_path_and_parameter_ownership() {
+    const ROOT: RouteKey<Params> = RouteKey::new("root");
+    const PAGE: RouteKey<Params> = RouteKey::new("page");
+    let server = Routes::builder()
+        .root(RouteDef::layout(ROOT, "").child(RouteDef::new(PAGE, ":id")))
+        .finish()
+        .unwrap();
+    let client = Routes::builder()
+        .root(RouteDef::layout(ROOT, ":id").child(RouteDef::new(PAGE, "")))
+        .finish()
+        .unwrap();
+    let location = Location::parse("/42").unwrap();
+    assert!(
+        server.resolve(&location).unwrap().chain[0]
+            .params
+            .0
+            .is_empty()
+    );
+    assert_eq!(
+        client.resolve(&location).unwrap().chain[0]
+            .params
+            .required::<u32>("id"),
+        Ok(42)
+    );
+    assert_ne!(server.schema("codec-v1"), client.schema("codec-v1"));
+    let seed = Bootstrap::new(&server, location, "codec-v1").unwrap();
+    assert_eq!(
+        seed.validate(&client, "codec-v1"),
+        Err(Error::HydrationMismatch)
+    );
+    let payload = seed.to_payload();
+    assert!(payload.starts_with("glory-routing/2\n"));
+    assert!(matches!(
+        Bootstrap::from_payload(&payload.replacen("glory-routing/2", "glory-routing/1", 1)),
+        Err(Error::HydrationMismatch)
+    ));
+    assert_eq!(
+        Bootstrap::from_payload(&payload)
+            .unwrap()
+            .validate(&server, "codec-v1"),
+        seed.validate(&server, "codec-v1")
+    );
+}

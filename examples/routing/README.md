@@ -20,6 +20,9 @@ installed Playwright. Set GLORY_CHROME to an existing Chrome executable if neede
 It checks CSR/SSR adoption, dirty editor identity/selection, query/hash, history,
 duplicate-URL scroll restoration, cancellation of superseded anchor retries,
 CSR initial fragments with delayed WASM, raw anchors, fallback and cleanup.
+It also installs explicit allow/block/pending async guards after CSR and SSR
+adoption, then clicks the Rust `link_with` controls to verify supersession,
+retained editors and cancellation without a late callback on teardown.
 
 ```powershell
 cargo run --locked --features native --bin routing-native

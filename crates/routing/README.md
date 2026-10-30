@@ -31,6 +31,11 @@ Params. Patterns support static segments, `:id`, final `:id?`, final `*rest`,
 index routes and pathless layouts. Declaration paths are relative to their
 parent. Static matches win; equivalent patterns are rejected. An invalid typed
 parameter reports BadParams instead of silently falling into a catch-all.
+Matching uses a shared segment index to select candidates before capture and
+precedence checks. Static, parameter and optional edges share prefixes; a large
+table of unrelated routes does not consume the per-request matching budget.
+Index exploration and candidate capture both count toward `Limits::match_steps`,
+so heavily overlapping optional/dynamic routes still have a finite work limit.
 Internal navigation cannot leave mount base. ctx.resolve resolves child/parent,
 query and fragment references against the node's consumed path. is_active_path
 supports exact or descendant matching without confusing adjacent path prefixes.
@@ -60,6 +65,9 @@ the App fault contract instead of attempting DOM/history rollback.
 
 Guards return Allow, Redirect, Block or Denied. Async guards use push_async,
 replace_async, observe_async or prepare_async on an explicit local executor.
+Host factories that receive a RouterHandle can register an async guard with
+`handle.async_guard(guard)?`; this validates mutation permission and cancels work
+prepared under the previous guard set before installing the new guard.
 Superseding navigation disposes the pending guard Owner and wakes its waiter.
 Sync APIs report AsyncRequired when async guards are installed. Redirects are
 bounded and loop checked. Reentrant sync navigation returns Busy; applications
@@ -74,8 +82,16 @@ glory::web::routing::launch_with owns BrowserHistory listeners with its WebApp.
 hydrate_with validates a Bootstrap and adopts the server's initial route before
 processing a newer browser address. Use the same page factories on both sides.
 
-routing::link(router, location, on_result) composes the portable Link and keeps
-a real href. Raw anchors opt in with data-glory-route. Modifier clicks,
+`routing::link_with(scope, router, location, on_result)?` composes the portable
+Link and keeps a real href. It runs synchronous guards immediately and queues
+asynchronous guards through that Scope's explicitly installed task Host. The
+result callback receives completion, refusal, supersession or execution errors;
+retiring the supplied Owner or releasing the Link handler cancels pending work
+without a reply. A missing/limited Host returns `Error::Execution` to the callback
+before guards or history run. Use a mounted Widget's Scope for this lifetime.
+The synchronous `routing::link(router, location, on_result)` helper remains
+available and returns `AsyncRequired` when asynchronous guards are installed.
+Raw anchors opt in with data-glory-route. Modifier clicks,
 downloads, external links and links outside mount base keep browser behavior.
 Third-party direct pushState/replaceState calls need BrowserLease::notify_location.
 
@@ -129,6 +145,10 @@ Bootstrap includes the application codec version, declaration identity, location
 and branch IDs. Its bounded ASCII payload contains no '<', credentials, Scope
 IDs or arbitrary Rust data. A mismatch returns HydrationMismatch and preserves
 SSR DOM. HTTP supplies no fragment; publish the browser hash after adoption.
+The v2 schema identity covers each node's parent, consumed path, parameter
+ownership, layout/leaf kind and trailing-slash declaration using length-framed
+encoding. The payload version is `glory-routing/2`; older payloads are rejected.
+Applications still bump the codec version when parameter codec behavior changes.
 The schema identity is a consistency check, not an authentication MAC.
 
 Route Widgets can use the existing SSR/resource/stream hosts. Dedicated stream

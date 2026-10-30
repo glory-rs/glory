@@ -103,6 +103,58 @@ const server = http.createServer((req, res) => {
       checks.push(`${late ? 'SSR with changed pre-WASM URL' : ssr ? 'SSR hydration' : 'CSR'}: layout identity, dirty editor, query/hash, history, duplicate URL scroll, cancelled anchor restoration, raw anchor, fallback, teardown`);
       await page.close();
     }
+    for (const ssr of [false, true]) {
+      const page = await browser.newPage();
+      const errors = [];
+      page.on('pageerror', error => errors.push(error.message));
+      page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+      await page.goto(`${base}/page/1${ssr ? '?ssr=1' : ''}`);
+      await page.waitForFunction(() => window.ready);
+      await page.locator('.shell-editor').fill('async draft');
+      await page.evaluate(() => {
+        window.asyncInput = document.querySelector('.shell-editor');
+        window.demo.async_guard_mode(2);
+      });
+      // These are the Rust portable link_with controls, without a raw-anchor
+      // opt-in. A native href reload would lose this exact input and the log.
+      const two = page.getByRole('link', { name: 'Two', exact: true });
+      const one = page.getByRole('link', { name: 'One', exact: true });
+      assert.equal(await two.getAttribute('data-glory-route'), null);
+      await two.click();
+      await page.waitForFunction(() => window.demo.guard_calls() === 1);
+      assert.equal(await page.evaluate(() => location.pathname), '/page/1');
+      assert.equal(await page.evaluate(() => window.demo.link_results()), '');
+      await page.evaluate(() => window.demo.async_guard_mode(0));
+      await two.click();
+      await page.waitForFunction(() => location.pathname === '/page/2'
+        && document.querySelector('.route-value')?.textContent.includes('id=2')
+        && window.demo.link_results().split('\n').length === 2);
+      assert.deepEqual(await page.evaluate(() => window.demo.link_results().split('\n').sort()),
+        ['Err(Superseded)', 'Ok(Committed)']);
+      await page.evaluate(() => window.demo.async_guard_mode(1));
+      await one.click();
+      await page.waitForFunction(() => window.demo.link_results().endsWith('Err(Blocked)'));
+      assert.equal(await page.evaluate(() => location.pathname), '/page/2');
+      await page.evaluate(() => window.demo.async_guard_mode(0));
+      await one.click();
+      await page.waitForFunction(() => location.pathname === '/page/1'
+        && document.querySelector('.route-value')?.textContent.includes('id=1')
+        && window.demo.link_results().split('\n').length === 4);
+      assert.equal(await page.evaluate(() => document.querySelector('.shell-editor') === window.asyncInput), true);
+      assert.equal(await page.locator('.shell-editor').inputValue(), 'async draft');
+      await page.evaluate(() => window.demo.async_guard_mode(2));
+      await two.click();
+      await page.waitForFunction(() => window.demo.guard_calls() === 5);
+      const beforeStop = await page.evaluate(() => window.demo.link_results());
+      await page.evaluate(() => window.demo.stop());
+      await page.waitForFunction(() => window.demo.guard_drops() === 5);
+      assert.equal(await page.evaluate(() => window.demo.link_results()), beforeStop);
+      assert.equal(await page.evaluate(() => location.pathname), '/page/1');
+      assert.equal(await page.evaluate(() => history.scrollRestoration), 'auto');
+      assert.deepEqual(errors, []);
+      checks.push(`${ssr ? 'SSR adoption' : 'CSR'} portable link_with async guards: real click, pending, supersede, block, commit, retained editor, Owner cancellation and no late reply`);
+      await page.close();
+    }
     const page = await browser.newPage();
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -119,6 +171,6 @@ const server = http.createServer((req, res) => {
     assert.deepEqual(errors, []);
     checks.push('CSR initial fragment: delayed WASM still scrolls to the mounted anchor');
     await page.close();
-    console.log(JSON.stringify({ checks, passed: checks.length }, null, 2));
+    console.log(JSON.stringify({ browser: await browser.version(), site: path.resolve(directory), checks, passed: checks.length }, null, 2));
   } finally { await browser.close(); server.close(); }
 })().catch(error => { console.error(error); server.close(); process.exitCode = 1; });
