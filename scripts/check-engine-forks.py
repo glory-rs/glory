@@ -85,7 +85,7 @@ def main():
     assert member_names == {
         "glory", "glory-style", "glory-render", "glory-core", "glory-resource",
         "glory-i18n", "glory-routing", "glory-ui", "glory-html", "glory-web", "glory-ssr", "glory-apace",
-        "glory-salvo", "glory-view-macros",
+        "glory-salvo", "glory-view-macros", "glory-wry",
     }, member_names
     compiler = next(package for package in metadata["packages"] if package["name"] == "glory-view-macros")
     assert any("proc-macro" in target["kind"] for target in compiler["targets"])
