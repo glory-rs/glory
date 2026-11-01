@@ -136,6 +136,10 @@ OS integration support vary by adapter; compilation alone does not establish
 platform acceptance. Device installation, store distribution and screen-reader
 speech remain separate verification tracks.
 
+The HTML wire version is defined by [`FORMAT_VERSION`](crates/html/src/lib.rs).
+Apace's typed style support is defined separately by
+[`STYLE_PROFILE`](crates/apace/src/document.rs); these are independent contracts.
+
 ## Build on the core
 
 | Area | What Glory provides | Start here |

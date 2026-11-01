@@ -1,0 +1,13 @@
+name: Release native Stylo prerequisite
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  stylo:
+    uses: glory-rs/stylo/.github/workflows/glory-release.yml@ec62d42fcaa124ad927ab974aade120d82ce50a2
+    with:
+      commit: ec62d42fcaa124ad927ab974aade120d82ce50a2
+      tag: glory-stylo-v0.22.0
+    secrets:
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
