@@ -10,6 +10,9 @@ cargo run --manifest-path examples/counter/Cargo.toml --bin counter-wry --featur
 `desktop`/`counter-desktop` continue selecting Apace. `desktop-wry`/`counter-wry`
 select the independent `glory-wry` backend; desktop logic does not use WASM.
 
+The project-local CLI explicitly selects `counter-desktop` by default, since
+the package now contains both desktop binaries.
+
 To select it for project-local CLI build/bundle commands, configure the existing
 desktop host with `bin = "counter-wry"` and `features = ["desktop-wry"]` in
 `package.metadata.glory.desktop`. Native packaging remains owned by `glory-cli`.

@@ -22,6 +22,9 @@ web = ["glory/web", "dep:wasm-bindgen", "dep:web-sys"]
 desktop = ["glory/apace-accesskit"]
 desktop-wry = ["glory/wry"]
 
+[package.metadata.glory.desktop]
+bin = "counter-desktop"
+
 [[bin]]
 name = "counter-desktop"
 path = "src/main.rs"
