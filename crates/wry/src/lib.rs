@@ -122,7 +122,7 @@ impl Renderer {
     pub fn new(runtime: RuntimeId) -> Self {
         static NEXT: AtomicU64 = AtomicU64::new(1);
         let document = NEXT
-            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |v| v.checked_add(1))
+            .try_update(Ordering::Relaxed, Ordering::Relaxed, |v| v.checked_add(1))
             .expect("Wry document identities exhausted");
         Self(Rc::new(RefCell::new(State {
             mapper: Mapper::new(runtime),

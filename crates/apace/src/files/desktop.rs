@@ -56,7 +56,7 @@ impl FileReader for Opened {
         let reads = self.reads.clone();
         Box::pin(async move {
             reads
-                .fetch_update(Ordering::AcqRel, Ordering::Acquire, |v| {
+                .try_update(Ordering::AcqRel, Ordering::Acquire, |v| {
                     (v < 4).then_some(v + 1)
                 })
                 .map_err(|_| FileRejection::Busy)?;

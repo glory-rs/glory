@@ -121,7 +121,7 @@ impl Inner {
     }
     fn id(&self) -> Result<i64, FileRejection> {
         self.next
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |n| n.checked_add(1))
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |n| n.checked_add(1))
             .map_err(|_| FileRejection::Failed)
     }
 }

@@ -137,7 +137,7 @@ impl Future for Job {
                 let id = self
                     .inner
                     .next
-                    .fetch_update(Ordering::AcqRel, Ordering::Acquire, |n| n.checked_add(1))
+                    .try_update(Ordering::AcqRel, Ordering::Acquire, |n| n.checked_add(1))
                     .map_err(|_| ClipboardError::Failed)?;
                 self.id = Some(id);
                 let status = self.inner.call(|env, host| {
