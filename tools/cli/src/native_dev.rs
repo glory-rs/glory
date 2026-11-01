@@ -4,7 +4,6 @@ use crate::{Result, args::Args, build, process::Running, project::Project};
 use std::{
     fs,
     path::PathBuf,
-    process::Command,
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -36,10 +35,8 @@ impl Prepared {
         fs::copy(&executable, &prepared.executable).map_err(|e| e.to_string())?;
         Ok(prepared)
     }
-    fn start(&self, project: &Project) -> Result<Running> {
-        let mut command = Command::new(&self.executable);
-        command.current_dir(&project.root);
-        project.paths.apply(&mut command);
+    fn start(&self, project: &Project, args: &Args) -> Result<Running> {
+        let mut command = project.app_command(&self.executable, args);
         Running::spawn(&mut command)
     }
 }
@@ -63,7 +60,7 @@ pub(crate) fn serve(mut project: Project, mut args: Args) -> Result<()> {
     let mut watcher = crate::serve::watch(&project, changed.clone())?;
     // Declaration order drops the process before removing its executable copy.
     let mut prepared = Prepared::build(&project, &args)?;
-    let mut running = prepared.start(&project)?;
+    let mut running = prepared.start(&project, &args)?;
     let mut exited = false;
     let mut last_event = None;
     println!("Native development: restart after successful changes (Ctrl+C to stop)");
@@ -86,7 +83,7 @@ pub(crate) fn serve(mut project: Project, mut args: Args) -> Result<()> {
                     let next_watcher = crate::serve::watch(&current, changed.clone())?;
                     running.stop();
                     // If spawning fails, retain and restart the previous binary.
-                    match next.start(&current) {
+                    match next.start(&current, &args) {
                         Ok(child) => {
                             running = child;
                             prepared = next;
@@ -96,7 +93,7 @@ pub(crate) fn serve(mut project: Project, mut args: Args) -> Result<()> {
                             println!("Native rebuild complete; application restarted");
                         }
                         Err(error) => {
-                            running = prepared.start(&project)?;
+                            running = prepared.start(&project, &args)?;
                             exited = false;
                             eprintln!("{error}; previous application restarted");
                         }

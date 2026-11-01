@@ -37,6 +37,8 @@ report = root/'application.json'
 
 def source(generation):
     return '''fn main() {
+    assert_eq!(std::env::args().skip(1).collect::<Vec<_>>(),
+        ["--example-option", "value with spaces", "--offline"]);
     let _ = glory::style::Style::default();
     std::fs::write(std::env::var_os("GLORY_NATIVE_WATCH_REPORT").unwrap(),
         format!("{{\\"pid\\":{},\\"generation\\":GEN}}",std::process::id())).unwrap();
@@ -64,7 +66,8 @@ def current():
 
 with logpath.open('w') as log:
     process = subprocess.Popen([str(args.runner.resolve()),'serve','--platform','desktop',
-        '--manifest-path',str(manifest),'--build-root',str(root/'build')],env=environment,stdout=log,stderr=log)
+        '--manifest-path',str(manifest),'--build-root',str(root/'build'),
+        '--','--example-option','value with spaces','--offline'],env=environment,stdout=log,stderr=log)
     try:
         wait_for(lambda: current().get('generation')==1,'initial application')
         first=current()
@@ -83,7 +86,8 @@ with logpath.open('w') as log:
         except ProcessLookupError: pass
         else: raise AssertionError('Ctrl+C leaked the owned application')
         (root/'result.json').write_text(json.dumps(dict(initial=first,restarted=second,
-            failed_build_kept_process=True,stop_reaped_process=True),indent=2)+'\n')
+            failed_build_kept_process=True,stop_reaped_process=True,
+            arguments_preserved_on_restart=True),indent=2)+'\n')
     finally:
         if process.poll() is None:
             process.send_signal(signal.SIGINT)

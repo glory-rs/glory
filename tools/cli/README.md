@@ -36,6 +36,9 @@ this implementation does not add an RSX compiler or a binary hot-patching system
 - `doctor`: verify the selected application, framework version/source, Rust host
   and actual Cargo target. It reports the required wasm-bindgen version.
 - `print`: JSON build plan, selected package/host/features and resolved paths.
+  Includes the exact Cargo build argv, working directory and environment
+  overrides used by `build`; inherited environment and Cargo configuration still
+  apply. Arguments are a JSON array, suitable for direct process invocation.
 - `build`: Web WASM + matching wasm-bindgen + HTML/assets, or a native binary.
 - `run`: run a desktop/server binary, or serve Web without watching.
 - `serve`: loopback Web server with refresh, or desktop/server watch with process
@@ -54,6 +57,9 @@ this implementation does not add an RSX compiler or a binary hot-patching system
   `Contents/Resources` and hashes of the final signature. Other installers and
   mobile packages require separate tooling.
 - `init`: create a private tool package, project Cargo alias and bin launchers.
+- `completions bash|zsh|fish|powershell`: print a shell completion script without
+  loading a project. Completions target `glory` and the project bin launchers;
+  they do not replace your shell's existing `cargo` completion.
 
 Use `--help` for options. Rust hot-patching, RSX, a second UI lifecycle, automatic
 global updates, remote deployment and application state preservation on reload
@@ -165,6 +171,34 @@ comments and existing CLI pins, and keeps the host tool outside default applicat
 members. A virtual workspace with one default application can infer its selection;
 use `--package` when there are several.
 
+`--bin NAME` overrides a desktop/server entry and includes that binary's required
+features. `--features LIST` (alias `-F`) adds comma/space-separated features to
+the configured or inferred host selection; repeat it to add more. These options
+apply to metadata resolution, builds, checks and watch rebuilds alike.
+`--no-default-features` disables Cargo defaults while retaining those explicitly
+selected host features. With `check --bin NAME`, only that binary is checked;
+ordinary `check` still checks all application targets. `check --release` uses
+the release profile for both Cargo check and Clippy.
+
+```sh
+./bin/glory print --platform desktop --bin counter-wry --features glory/css
+./bin/glory run --platform server --no-default-features -- --port 9000 'a value with spaces'
+./bin/glory serve --platform desktop --bin counter-wry -- --example-option value
+eval "$(./bin/glory completions bash)"
+# Zsh: source <(./bin/glory completions zsh), after compinit
+# Fish: ./bin/glory completions fish | source
+# PowerShell: ./bin/glory.ps1 completions powershell | Out-String | Invoke-Expression
+```
+
+Arguments after `--` belong to the native application and survive every watch
+restart. They are passed directly, without shell evaluation. Web rejects native
+binary selection and application arguments. Completion candidates include
+commands/options and platform/shell values; package, feature, binary and target
+names remain application-specific and are not dynamically queried.
+
+See the [Dioxus comparison and gap decisions](../../docs/cli-comparison-2026-11-02.md)
+for the implemented scope and deferred work.
+
 ## Isolation and scope
 
 On Windows caches use `D:/BuildCache/glory-projects/<project-path-hash>`. WSL uses
@@ -180,7 +214,22 @@ Other native Unix cache layouts have not been implemented or accepted.
 The matching wasm-bindgen CLI is installed into a version/host-specific project
 directory on the first Web build. `--offline` prohibits installation; `--bindgen`
 accepts an explicit executable only after an exact version check. There is no
-implicit PATH lookup for wasm-bindgen. Binaryen optimization is not yet provided.
+implicit PATH lookup for wasm-bindgen.
+
+Optional release Web optimization uses an explicitly supplied Binaryen executable
+and exact numeric version; no optimizer is downloaded or found through PATH:
+
+```sh
+./bin/glory build --platform web --release --wasm-opt /path/to/wasm-opt --wasm-opt-version 133
+./bin/glory bundle --platform web --wasm-opt /path/to/wasm-opt --wasm-opt-version 133
+./bin/glory doctor --platform web --wasm-opt /path/to/wasm-opt --wasm-opt-version 133
+```
+
+Optimization uses `-Oz`, strips debug information and runs on wasm-bindgen's
+staged modules before assets, compression and hashing. A version mismatch or
+optimizer failure fails the build and preserves accepted output. The bundle
+manifest records the optimizer version and selected Cargo features. Builds
+without these options retain their existing behavior.
 
 The dev server listens on loopback and serves generated output only. Its external
 refresh script polls a same-origin development endpoint; release output contains

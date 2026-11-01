@@ -277,6 +277,15 @@ impl Project {
             Platform::Desktop => config.desktop,
             Platform::Server => config.server,
         };
+        if platform == Platform::Web && (args.bin.is_some() || !args.app_args.is_empty()) {
+            return Err("Web uses a library entry and accepts no application arguments".into());
+        }
+        if platform != Platform::Web && args.wasm_opt.is_some() {
+            return Err("--wasm-opt is only supported for Web".into());
+        }
+        if let Some(bin) = &args.bin {
+            host.bin = Some(bin.clone());
+        }
         if platform != Platform::Web {
             let bins: Vec<_> = targets
                 .iter()
@@ -295,16 +304,22 @@ impl Project {
             } else {
                 None
             }
-            .ok_or(
-                "set the selected platform's bin in package.metadata.glory (no unique binary)",
-            )?;
+            .ok_or("no matching unique binary; use --bin NAME or set the selected platform's bin in package.metadata.glory")?;
             host.bin = target["name"].as_str().map(str::to_owned);
-            if host.features.is_empty() {
-                host.features = strings(&target["required-features"]);
+            for feature in strings(&target["required-features"]) {
+                if !host.features.contains(&feature) {
+                    host.features.push(feature);
+                }
             }
         } else if host.features.is_empty() && selected["features"].get("web").is_some() {
             host.features.push("web".into());
         }
+        for feature in &args.features {
+            if !host.features.contains(feature) {
+                host.features.push(feature.clone());
+            }
+        }
+        host.no_default_features |= args.no_default_features;
         let rust = capture(Command::new("rustc").arg("-vV").current_dir(&root))?;
         let rust = String::from_utf8_lossy(&rust.stdout);
         let rust_host = rust
@@ -417,24 +432,82 @@ impl Project {
         Ok(())
     }
 
-    pub fn plan(&self, args: &Args) -> Value {
-        json!({ "cli_version": env!("CARGO_PKG_VERSION"), "manifest": self.manifest,
+    pub fn plan(&self, args: &Args) -> Result<Value> {
+        let command = self.build_command(args);
+        let text = |value: &std::ffi::OsStr| {
+            value
+                .to_str()
+                .map(str::to_owned)
+                .ok_or_else(|| "JSON command output requires UTF-8 paths".to_owned())
+        };
+        let arguments = command.get_args().map(text).collect::<Result<Vec<_>>>()?;
+        let environment = command
+            .get_envs()
+            .filter_map(|(key, value)| value.map(|value| (key, value)))
+            .map(|(key, value)| Ok((text(key)?, text(value)?)))
+            .collect::<Result<std::collections::BTreeMap<_, _>>>()?;
+        let bindgen = args
+            .bindgen
+            .as_deref()
+            .map(|path| text(path.as_os_str()))
+            .transpose()?;
+        let wasm_opt = args
+            .wasm_opt
+            .as_deref()
+            .map(|path| text(path.as_os_str()))
+            .transpose()?;
+        Ok(
+            json!({ "cli_version": env!("CARGO_PKG_VERSION"), "manifest": self.manifest,
             "package": self.name(), "platform": self.platform, "features": self.host.features, "rust_host": self.rust_host,
-            "bin": self.host.bin, "target": self.target(), "release": args.release,
+            "bin": self.host.bin, "target": self.target(), "release": args.release || args.command == crate::args::Command::Bundle,
+            "no_default_features": self.host.no_default_features,
+            "cargo_command": { "program": text(command.get_program())?, "args": arguments,
+                "cwd": command.get_current_dir(), "env": environment },
             "build_root": self.paths.root, "cargo_home": self.paths.cargo_home,
             "target_directory": self.paths.target, "temporary_directory": self.paths.temp,
-            "wasm_bindgen_version": self.bindgen_version, "bindgen_override": args.bindgen })
+            "wasm_bindgen_version": self.bindgen_version, "bindgen_override": bindgen,
+            "wasm_opt": wasm_opt, "wasm_opt_version": args.wasm_opt_version }),
+        )
+    }
+
+    // This exact command drives both `print` and execution. No shell interpolation.
+    pub fn build_command(&self, args: &Args) -> Command {
+        let mut command = self.cargo();
+        command.args([
+            "build",
+            "--locked",
+            "--message-format=json-render-diagnostics",
+            "--target",
+            self.target(),
+        ]);
+        self.selection(&mut command, true, args);
+        if args.release || args.command == crate::args::Command::Bundle {
+            command.arg("--release");
+        }
+        if self.platform == Platform::Web {
+            command.arg("--lib");
+        } else if let Some(bin) = &self.host.bin {
+            command.arg("--bin").arg(bin);
+        }
+        command
+    }
+
+    pub fn app_command(&self, executable: &Path, args: &Args) -> Command {
+        let mut command = Command::new(executable);
+        command.current_dir(&self.root).args(&args.app_args);
+        self.paths.apply(&mut command);
+        command
     }
 
     pub fn print(&self, args: &Args) -> Result<()> {
         println!(
             "{}",
-            serde_json::to_string_pretty(&self.plan(args)).map_err(|e| e.to_string())?
+            serde_json::to_string_pretty(&self.plan(args)?).map_err(|e| e.to_string())?
         );
         Ok(())
     }
 
-    pub fn doctor(&self) -> Result<()> {
+    pub fn doctor(&self, args: &Args) -> Result<()> {
         let rust = capture(
             Command::new("rustc")
                 .arg("--version")
@@ -487,6 +560,13 @@ impl Project {
                 "Required wasm-bindgen: {version} (project-local installation on first Web build)"
             );
         }
+        if let Some(path) = crate::wasm_opt::verify(self, args)? {
+            println!(
+                "Verified wasm-opt: {} (version {})",
+                path.display(),
+                args.wasm_opt_version.as_deref().unwrap()
+            );
+        }
         println!("Framework version and Cargo target verified; no global Glory CLI is used.");
         Ok(())
     }
@@ -494,14 +574,16 @@ impl Project {
     pub fn check(&self, args: &Args) -> Result<()> {
         for subcommand in ["check", "clippy"] {
             let mut command = self.cargo();
-            command.args([
-                subcommand,
-                "--locked",
-                "--all-targets",
-                "--target",
-                self.target(),
-            ]);
+            command.args([subcommand, "--locked", "--target", self.target()]);
+            if let Some(bin) = &args.bin {
+                command.args(["--bin", bin]);
+            } else {
+                command.arg("--all-targets");
+            }
             self.selection(&mut command, true, args);
+            if args.release {
+                command.arg("--release");
+            }
             if subcommand == "clippy" {
                 command.args(["--", "-D", "warnings"]);
             }
@@ -719,6 +801,113 @@ mod tests {
     use super::*;
 
     #[test]
+    fn real_cargo_overrides_print_replay_and_native_arguments_share_one_selection() {
+        let scratch = crate::test_support::Scratch::new();
+        // A tiny versioned stub keeps this host-tool suite independent of the
+        // runtime workspace, including when testing a packaged CLI source.
+        scratch.write(
+            "framework/Cargo.toml",
+            &format!(
+                "[package]\nname = \"glory-core\"\nversion = {:?}\nedition = \"2024\"\n",
+                env!("CARGO_PKG_VERSION")
+            ),
+        );
+        scratch.write("framework/src/lib.rs", "");
+        scratch.write(
+            "Cargo.toml",
+            r#"[package]
+name = "selection-fixture"
+version = "0.0.0"
+edition = "2024"
+[workspace]
+[features]
+default = ["unwanted"]
+unwanted = []
+entry = []
+extra = []
+[dependencies]
+glory-core = { path = "framework" }
+[package.metadata.glory.desktop]
+bin = "other"
+[[bin]]
+name = "chosen"
+path = "chosen.rs"
+required-features = ["entry"]
+[[bin]]
+name = "other"
+path = "other.rs"
+"#,
+        );
+        scratch.write(
+            "other.rs",
+            "compile_error!(\"wrong binary selected\"); fn main() {}\n",
+        );
+        scratch.write(
+            "chosen.rs",
+            r#"
+#[cfg(feature = "unwanted")]
+compile_error!("defaults were not disabled");
+#[cfg(not(feature = "extra"))]
+compile_error!("extra feature was not selected");
+fn main() {
+    let mut args = std::env::args().skip(1);
+    std::fs::write(args.next().unwrap(), args.collect::<Vec<_>>().join("\n")).unwrap();
+}
+"#,
+        );
+        let manifest = scratch.0.join("Cargo.toml");
+        let output = scratch.0.join("arguments.txt");
+        let args = Args::parse([
+            "run".into(),
+            "--offline".into(),
+            "--bin".into(),
+            "chosen".into(),
+            "--features".into(),
+            "extra".into(),
+            "--no-default-features".into(),
+            "--build-root".into(),
+            scratch.0.join("build").into_os_string(),
+            "--".into(),
+            output.clone().into_os_string(),
+            "a value with spaces".into(),
+            "$(literal); --offline".into(),
+        ])
+        .unwrap();
+        let paths = Paths::new(&manifest, args.build_root.as_deref()).unwrap();
+        let mut lock = cargo(&scratch.0, &paths);
+        lock.args(["generate-lockfile", "--offline", "--manifest-path"])
+            .arg(&manifest);
+        capture(&mut lock).unwrap();
+        let before = std::fs::read(scratch.0.join("Cargo.lock")).unwrap();
+        let project = Project::load(&manifest, &args).unwrap();
+        assert_eq!(project.host.features, ["entry", "extra"]);
+        assert!(project.host.no_default_features);
+        let plan = project.plan(&args).unwrap();
+        let description = &plan["cargo_command"];
+        let mut replay = Command::new(description["program"].as_str().unwrap());
+        replay
+            .current_dir(description["cwd"].as_str().unwrap())
+            .args(
+                description["args"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|arg| arg.as_str().unwrap()),
+            );
+        for (key, value) in description["env"].as_object().unwrap() {
+            replay.env(key, value.as_str().unwrap());
+        }
+        project.capture(&mut replay).unwrap();
+        crate::build::run(&project, &args).unwrap();
+        project.check(&args).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(output).unwrap(),
+            "a value with spaces\n$(literal); --offline"
+        );
+        assert_eq!(std::fs::read(scratch.0.join("Cargo.lock")).unwrap(), before);
+    }
+
+    #[test]
     fn native_targets_are_explicit_and_mobile_is_not_misreported_as_desktop() {
         let host = "x86_64-pc-windows-msvc";
         assert_eq!(resolve_target(Platform::Desktop, None, host).unwrap(), host);
@@ -766,8 +955,14 @@ mod tests {
         let args = Args::parse(["print".into()]).unwrap();
         assert!(project.ensure_runnable().is_ok());
         project.build_target = "aarch64-apple-darwin".into();
-        assert_eq!(project.plan(&args)["target"], "aarch64-apple-darwin");
-        assert_eq!(project.plan(&args)["rust_host"], "x86_64-pc-windows-msvc");
+        assert_eq!(
+            project.plan(&args).unwrap()["target"],
+            "aarch64-apple-darwin"
+        );
+        assert_eq!(
+            project.plan(&args).unwrap()["rust_host"],
+            "x86_64-pc-windows-msvc"
+        );
         assert!(
             project
                 .ensure_runnable()

@@ -15,29 +15,8 @@ pub struct Built {
 }
 
 pub fn build(project: &Project, args: &Args) -> Result<Built> {
-    let mut command = project.cargo();
-    command.args([
-        "build",
-        "--locked",
-        "--message-format=json-render-diagnostics",
-        "--target",
-        project.target(),
-    ]);
-    project.selection(&mut command, true, args);
-    if args.release {
-        command.arg("--release");
-    }
-    if project.platform == Platform::Web {
-        command.arg("--lib");
-    } else {
-        command.arg("--bin").arg(
-            project
-                .host
-                .bin
-                .as_ref()
-                .ok_or("native platform has no bin")?,
-        );
-    }
+    let optimizer = crate::wasm_opt::verify(project, args)?;
+    let mut command = project.build_command(args);
     let output = project.capture(&mut command)?;
     eprint!("{}", String::from_utf8_lossy(&output.stderr));
     let artifact = artifact(
@@ -68,6 +47,9 @@ pub fn build(project: &Project, args: &Args) -> Result<Built> {
             .arg(&stage);
         project.paths.apply(&mut command);
         project.status(&mut command)?;
+        if let Some(optimizer) = &optimizer {
+            crate::wasm_opt::optimize(project, optimizer, &stage)?;
+        }
         for asset in &project.host.assets {
             copy_asset(&project.root, asset, &stage)?;
         }
@@ -211,9 +193,8 @@ pub fn run(project: &Project, args: &Args) -> Result<()> {
         return crate::serve::serve(project.clone(), args);
     }
     let built = build(project, args)?;
-    let mut command = Command::new(built.executable.ok_or("no executable was built")?);
-    command.current_dir(&project.root);
-    project.paths.apply(&mut command);
+    let mut command =
+        project.app_command(&built.executable.ok_or("no executable was built")?, args);
     project.status(&mut command)
 }
 
@@ -383,7 +364,7 @@ pub(crate) fn write_manifest(project: &Project, directory: &Path, args: &Args) -
     let mut files = Vec::new();
     hash_files(directory, directory, &mut files)?;
     files.sort_by(|left, right| left["path"].as_str().cmp(&right["path"].as_str()));
-    let manifest = json!({ "format": 1, "cli_version": env!("CARGO_PKG_VERSION"), "package": project.name(), "platform": project.platform, "target": project.target(), "rust_host": project.rust_host, "release": args.release, "wasm_bindgen": project.bindgen_version, "files": files });
+    let manifest = json!({ "format": 1, "cli_version": env!("CARGO_PKG_VERSION"), "package": project.name(), "platform": project.platform, "target": project.target(), "rust_host": project.rust_host, "release": args.release, "features": project.host.features, "no_default_features": project.host.no_default_features, "wasm_bindgen": project.bindgen_version, "wasm_opt_version": args.wasm_opt_version, "files": files });
     fs::write(
         directory.join("glory-build.json"),
         serde_json::to_vec_pretty(&manifest).map_err(|e| e.to_string())?,

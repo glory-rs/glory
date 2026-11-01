@@ -14,7 +14,10 @@ try {
     $env:CARGO_TARGET_DIR = "$build/tools-target"
     $env:TEMP = "$build/tmp"; $env:TMP = $env:TEMP
     $offline = @()
-    if ($Arguments -contains '--offline') { $offline = @('--offline') }
+    foreach ($argument in $Arguments) {
+        if ($argument -eq '--') { break }
+        if ($argument -eq '--offline') { $offline = @('--offline') }
+    }
     foreach ($path in @($env:CARGO_HOME,$env:CARGO_TARGET_DIR,$env:TEMP)) {
         $ancestor = [IO.Path]::GetFullPath($path)
         while ($ancestor) {

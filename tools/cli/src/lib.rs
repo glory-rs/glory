@@ -3,6 +3,7 @@
 mod apple;
 mod args;
 mod build;
+mod completions;
 mod compression;
 mod native_dev;
 mod process;
@@ -11,6 +12,7 @@ mod scaffold;
 mod serve;
 #[cfg(test)]
 mod test_support;
+mod wasm_opt;
 
 use std::path::Path;
 use std::process::ExitCode;
@@ -50,9 +52,16 @@ fn execute(manifest: &Path, args: args::Args) -> Result<()> {
     if args.command == args::Command::Init {
         return scaffold::init(manifest, args.force, args.cli_path.as_deref());
     }
+    if args.command == args::Command::Completions {
+        println!(
+            "{}",
+            completions::script(args.shell.as_deref().ok_or("missing completion shell")?)?
+        );
+        return Ok(());
+    }
     let project = project::Project::load(manifest, &args)?;
     match args.command {
-        args::Command::Doctor => project.doctor(),
+        args::Command::Doctor => project.doctor(&args),
         args::Command::Print => project.print(&args),
         args::Command::Build => build::build(&project, &args).map(|_| ()),
         args::Command::Bundle => build::bundle(&project, &args),

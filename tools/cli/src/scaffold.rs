@@ -247,7 +247,10 @@ try {
     $env:CARGO_TARGET_DIR = "$build/tools-target"
     $env:TEMP = "$build/tmp"; $env:TMP = $env:TEMP
     $offline = @()
-    if ($Arguments -contains '--offline') { $offline = @('--offline') }
+    foreach ($argument in $Arguments) {
+        if ($argument -eq '--') { break }
+        if ($argument -eq '--offline') { $offline = @('--offline') }
+    }
     foreach ($path in @($env:CARGO_HOME,$env:CARGO_TARGET_DIR,$env:TEMP)) {
         $ancestor = [IO.Path]::GetFullPath($path)
         while ($ancestor) {
@@ -315,7 +318,10 @@ for key in ('CARGO_HOME','CARGO_TARGET_DIR','TMPDIR','PYTHONPYCACHEPREFIX'):
 PYCACHE
 cd "$project"
 offline=
-for argument in "$@"; do if [ "$argument" = --offline ]; then offline=--offline; fi; done
+for argument in "$@"; do
+    [ "$argument" != -- ] || break
+    if [ "$argument" = --offline ]; then offline=--offline; fi
+done
 cargo metadata $offline --no-deps --format-version 1 --manifest-path tools/glory/Cargo.toml > "$GLORY_BUILD_ROOT/tool-metadata.json"
 # Ask Cargo to verify the real target before compiling the launcher.
 actual=$(sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p' "$GLORY_BUILD_ROOT/tool-metadata.json")
