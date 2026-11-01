@@ -18,16 +18,13 @@ target=Path(os.environ['CARGO_TARGET_DIR']).resolve()
 if os.name=='nt' and not target.as_posix().lower().startswith('d:/buildcache/'):
     raise SystemExit('Registry consumer artifacts must stay under D:/BuildCache')
 directory=Path(tempfile.mkdtemp(prefix='registry-consumer-',dir=target.parent))
-is_sapid=plan['repository']=='sapid-ui/sapid'
 manifest=tomllib.loads((root/'Cargo.toml').read_text(encoding='utf-8'))
 version=manifest.get('workspace',{}).get('package',{}).get('version') or manifest['package']['version']
-glory_version=manifest['dependencies']['glory']['version'] if is_sapid else '='+version
+glory_version='='+version
 dependencies='glory = { version = "'+glory_version+'", default-features = false, features = ["dsl", "ssr", "stream", "apace-raster"] }\n'
-if is_sapid:
-    dependencies+='sapid = "='+version+'"\n'
 (directory/'Cargo.toml').write_text('[package]\nname = "registry-consumer"\nversion = "0.0.0"\nedition = "2024"\npublish = false\n'
     '[workspace]\n[features]\ndefault = ["stream"]\nstream = []\n[dependencies]\n'+dependencies,encoding='utf-8')
-sources=['tests/dsl.rs','examples/fixtures/dsl_demo.rs'] if is_sapid else ['crates/glory/tests/display_dsl.rs']
+sources=['crates/glory/tests/display_dsl.rs']
 hashes={}
 for relative in sources:
     source=root/relative

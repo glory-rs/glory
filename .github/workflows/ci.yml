@@ -60,7 +60,7 @@ jobs:
           'D:/BuildCache/glory-semantic-ui/tools/bin' >> $env:GITHUB_PATH
       - name: Validate release tooling and plan
         run: |
-          python -m unittest discover -s scripts -p test_release.py
+          python -m unittest discover -s scripts -p 'test_*.py'
           if ($LASTEXITCODE) { throw 'Release tooling tests failed' }
       - name: Validate publication sources on release tags
         if: startsWith(github.ref, 'refs/tags/v')
@@ -69,18 +69,6 @@ jobs:
           if ($LASTEXITCODE) { throw 'Release plan failed' }
           python scripts/release.py --check-package glory-style
           if ($LASTEXITCODE) { throw 'Archive contents failed' }
-      - name: Prepare coordinated Sapid dependency for application graphs
-        run: |
-          $sapidRoot = Join-Path (Split-Path -Parent $env:GITHUB_WORKSPACE) 'sapid'
-          if (Test-Path -LiteralPath $sapidRoot) { throw 'Sapid checkout already exists' }
-          git init $sapidRoot
-          if ($LASTEXITCODE) { throw 'Sapid init failed' }
-          git -C $sapidRoot remote add origin https://github.com/sapid-ui/sapid.git
-          if ($LASTEXITCODE) { throw 'Sapid remote failed' }
-          git -C $sapidRoot fetch --depth 1 origin main
-          if ($LASTEXITCODE) { throw 'Pinned Sapid fetch failed' }
-          git -C $sapidRoot checkout --detach FETCH_HEAD
-          if ($LASTEXITCODE) { throw 'Pinned Sapid checkout failed' }
       - name: Verify maintained application lockfiles
         run: |
           foreach ($directory in @('examples/counter','examples/display-web','examples/mobile','examples/routing','examples/semantic-web','benchmarks/glory','benchmarks/role-patches','benchmarks/wasm-size','benchmarks/scenarios/glory')) {

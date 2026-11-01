@@ -22,42 +22,6 @@ fn ui(scope: &glory::Scope) -> impl glory::Widget + use<> {
             .label(count.map(|n| format!("Count {n}")))
             .on(activate, move |_| count.revise(|n| *n += 1));
     }
-    #[cfg(feature = "sapid-button")]
-    {
-        let count = scope.cage(0_u32);
-        return sapid::button()
-            .label(count.map(|n| format!("Count {n}")))
-            .on_press(move || count.revise(|n| *n += 1));
-    }
-    #[cfg(feature = "use-code")]
-    return sapid::code_highlight()
-        .source("fn main() { let answer = 42; }")
-        .language(sapid::CodeLanguage::Rust);
-    #[cfg(feature = "use-json")]
-    return sapid::json_viewer("sample")
-        .source("{\"answer\":42,\"items\":[true,false]}")
-        .tree_navigation(true);
-    #[cfg(feature = "use-dates")]
-    {
-        let date = sapid::CivilDate::parse_iso("2024-02-29").unwrap();
-        return sapid::date_input("sample", sapid::DatesProvider::new(date))
-            .default_value(Some(date));
-    }
-    #[cfg(feature = "use-files")]
-    return sapid::file_button().label("Choose file");
-    #[cfg(feature = "use-chat")]
-    return sapid::chat::suggestion("sample").label("Explain this code");
-    #[cfg(feature = "use-editor")]
-    return sapid::rich_text_editor().name("Article").toolbar(false);
-    #[cfg(feature = "use-charts")]
-    {
-        use sapid::charts::*;
-        let data = ChartData {
-            categories: vec![ChartCategory::new("a", "A"), ChartCategory::new("b", "B")],
-            series: vec![ChartSeries::new("sample", "Sample", [Some(2.0), Some(5.0)])],
-        };
-        return line_chart("sample").data(data);
-    }
     #[cfg(feature = "use-i18n")]
     {
         use glory::i18n::{Args, Catalog, I18n};
@@ -95,14 +59,6 @@ fn ui(scope: &glory::Scope) -> impl glory::Widget + use<> {
     #[cfg(not(any(
         feature = "minimal",
         feature = "button",
-        feature = "sapid-button",
-        feature = "use-code",
-        feature = "use-json",
-        feature = "use-dates",
-        feature = "use-files",
-        feature = "use-chat",
-        feature = "use-editor",
-        feature = "use-charts",
         feature = "use-i18n",
         feature = "use-resources"
     )))]

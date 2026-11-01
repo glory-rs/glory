@@ -26,7 +26,7 @@ node benchmarks/role-patches/compare.cjs $root
 ```
 
 `compare.cjs` expects the existing D-drive Binaryen 132.0.0 installation at
-`D:/BuildCache/sapid/wasm-size/tools/node_modules/binaryen`, Playwright under
+`D:/BuildCache/glory/wasm-size/tools/node_modules/binaryen`, Playwright under
 `tests/playwright/node_modules/playwright`, and installed Chrome. Both native
 and WASM use opt-level 3, LTO and one codegen unit; WASM additionally uses
 wasm-bindgen 0.2.129 and the same Binaryen `-Oz` flags. The script owns its

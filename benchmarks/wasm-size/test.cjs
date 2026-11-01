@@ -12,7 +12,7 @@ for(const item of candidate.cases) {
   if(item.optimized.bytes>20000)item.optimized.bytes-=10000;
   if(item.optimized.brotli>20000)item.optimized.brotli-=10000;
 }
-const unused=candidate.cases.find(item=>item.name==='sapid-json-unused');
+const unused=candidate.cases.find(item=>item.name==='glory-css-unused');
 unused.optimized.bytes+=2048;unused.optimized.brotli+=1024;
 const regression=compare(candidate,baseline).failures.find(item=>item.name===unused.name);
 assert.ok(regression);

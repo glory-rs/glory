@@ -1,6 +1,9 @@
 //! The same DSL/Widget tree runs in a live server stream and final hydration.
 use g::{Cage, Widget, core::KeyedList, ui::Scope};
-use sapid::{Button, TextField};
+#[path = "controls.rs"]
+mod controls;
+#[allow(unused_imports)]
+use controls::*;
 use std::{cell::Cell, rc::Rc};
 pub struct Model {
     pub count: Cage<usize>,
@@ -94,7 +97,7 @@ fn container(count: Cage<usize>) -> impl Widget {
     g::display::view(&CONTAINER).child(BODY,g::display::lazy(move||g::view!{<><span class="named-value">{count}</span><Button label="named widget"/></>}))
 }
 fn opaque(count: Cage<usize>) -> impl Widget {
-    sapid::button()
+    g::ui::button()
         .class("factory")
         .label("factory")
         .on_press(move || count.revise(|value| *value += 1))
@@ -107,7 +110,7 @@ impl Widget for Suspended {
     fn build(&mut self, scope: &Scope) -> g::ui::Result {
         let count = self.count;
         let hidden = self.hidden;
-        let mounted=scope.mount_with(move||g::view!{<div class="suspended"><span>{count}</span><TextField class="suspended-editor" default_value="suspended draft"/></div>})?;
+        let mounted=scope.mount_with(move||g::view!{<div class="suspended"><span>{count}</span><Input class="suspended-editor" value="suspended draft"/></div>})?;
         scope.structural(move || {
             if hidden.get() {
                 mounted.suspend().unwrap();
@@ -130,15 +133,15 @@ pub fn view(model: &Model) -> impl Widget + use<> {
         <span class="value" title={count.map(|value|format!("value {value}"))}>{""}{count}{"tail"}</span>
         <button class="raw" on:click={move||count.revise(|value|*value+=1)}>"raw"</button>
         <{opaque(count)}/>
-        <TextField class="editor" value={input} on_value_change={move|next|input.revise(|value|*value=next)}/>
+        <Input class="editor" value={input} on_value_change={move|next|input.revise(|value|*value=next)}/>
         <{container(count)}/>
         <Show when={move||visible.get()}><div class="branch"><button class="branch-raw" on:click={let probe=Probe(drops.clone());move||{let _=&probe;count.revise(|value|*value+=1);}}>"branch"</button><Button label="branch widget"/></div></Show>
         <Suspended init={Suspended{hidden,count}}/>
-        <div class="rows"><Each each={rows} children={move|row|{let id=*row.key();g::view!{<div class="row"><span>{id}</span><TextField class={format!("row-{id}")} default_value={format!("row {id}")}/></div>}}}/></div>
+        <div class="rows"><Each each={rows} children={move|row|{let id=*row.key();g::view!{<div class="row"><span>{id}</span><Input class={format!("row-{id}")} value={format!("row {id}")}/></div>}}}/></div>
         <table><tbody><Each each={rows} children={move|row|{let id=*row.key();g::view!{<tr><td><span>{id}</span><Button label="cell widget"/></td></tr>}}}/></tbody></table>
         <div class="vector"><Each each={vector} key={|row|row.0} children={move|row|{
             let id=*row.key();let label=row.field("label",|row|&row.1,|row|&mut row.1);
-            g::view!{<div class="vector-row"><span class="vector-label">{label}</span><span class="vector-index">{row.index}</span><TextField class={format!("vector-{id}")} default_value={format!("vector {id}")}/></div>}
+            g::view!{<div class="vector-row"><span class="vector-label">{label}</span><span class="vector-index">{row.index}</span><Input class={format!("vector-{id}")} value={format!("vector {id}")}/></div>}
         }}/></div>
     </div>}
 }

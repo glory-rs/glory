@@ -80,6 +80,13 @@ js-framework-benchmark; do not mix its scores with the self-suite's div workload
 
 ## Active architecture
 
+Glory must not depend on downstream component repositories in runtime, tooling,
+tests, examples, benchmarks, registry verification or default CI. Keep consumer
+compatibility suites in the consumer repository. Use the explicit maintained
+workspace list in scripts/library_lockfiles.py; never discover every independent
+Cargo workspace automatically. Path dependencies outside this repository are
+limited to the declared rendering engines in docs/engine-forks.json.
+
 The optional routing system now lives in `crates/routing` and uses the current
 Runtime/Widget contracts. Read `crates/routing/README.md` for delivered behavior
 and `docs/routing-architecture-2026-10-30.md` for the broader roadmap. Keep its

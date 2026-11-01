@@ -31,13 +31,15 @@ jobs:
           if ($LASTEXITCODE) { throw 'Rust installation failed' }
           rustup default 1.98.0
           if ($LASTEXITCODE) { throw 'Rust selection failed' }
-          python scripts/library_lockfiles.py
+          python scripts/library_lockfiles.py --manifest-path Cargo.toml --manifest-path tools/cli/Cargo.toml --manifest-path examples/counter/Cargo.toml --manifest-path examples/display-web/Cargo.toml --manifest-path examples/semantic-web/Cargo.toml --manifest-path examples/routing/Cargo.toml
           if ($LASTEXITCODE) { throw 'Library dependency resolution failed' }
           $meta = cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json
           if ($LASTEXITCODE -or [IO.Path]::GetFullPath($meta.target_directory) -ne [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)) { throw 'Unexpected Cargo target' }
           cargo fmt --all -- --check
           if ($LASTEXITCODE) { throw 'Workspace formatting failed' }
-          foreach ($manifest in @('tools/cli/Cargo.toml','examples/counter/Cargo.toml','examples/semantic-web/Cargo.toml','examples/routing/Cargo.toml')) {
+          python -m unittest discover -s scripts -p test_library_lockfiles.py
+          if ($LASTEXITCODE) { throw 'Upstream dependency boundary failed' }
+          foreach ($manifest in @('tools/cli/Cargo.toml','examples/counter/Cargo.toml','examples/display-web/Cargo.toml','examples/semantic-web/Cargo.toml','examples/routing/Cargo.toml')) {
             cargo fmt --manifest-path $manifest -- --check
             if ($LASTEXITCODE) { throw "Formatting failed: $manifest" }
           }
