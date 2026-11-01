@@ -97,6 +97,17 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Web fixture formatting failed' }
         cargo clippy --locked --manifest-path examples/semantic-web/Cargo.toml --target wasm32-unknown-unknown --all-targets -- -D warnings
         if ($LASTEXITCODE -ne 0) { throw 'Web fixture clippy failed' }
+        foreach ($manifest in @('benchmarks/scenarios/glory/Cargo.toml', 'benchmarks/wasm-size/Cargo.toml')) {
+            cargo fmt --manifest-path $manifest -- --check
+            if ($LASTEXITCODE -ne 0) { throw "Benchmark formatting failed: $manifest" }
+            cargo clippy --locked --manifest-path $manifest --target wasm32-unknown-unknown --all-targets -- -D warnings
+            if ($LASTEXITCODE -ne 0) { throw "Benchmark clippy failed: $manifest" }
+        }
+        # Size probes select one scenario at a time; --all-features combines incompatible views.
+        foreach ($feature in @('base', 'button', 'minimal', 'all-glory', 'use-css', 'use-hydrate', 'use-resources', 'use-i18n', 'use-ssr', 'use-stream', 'embed-stream-script')) {
+            cargo clippy --locked --manifest-path benchmarks/wasm-size/Cargo.toml --target wasm32-unknown-unknown --all-targets --features $feature -- -D warnings
+            if ($LASTEXITCODE -ne 0) { throw "WASM size probe clippy failed: $feature" }
+        }
         & "$PSScriptRoot/build-semantic-web.ps1"
         $env:GLORY_DSL_BUILD_ROOT = "$taskBuildRoot/dsl-diagnostics"
         python scripts/check-display-diagnostics.py

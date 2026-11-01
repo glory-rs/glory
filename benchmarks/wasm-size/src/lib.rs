@@ -18,9 +18,9 @@ fn ui(scope: &glory::Scope) -> impl glory::Widget + use<> {
     #[cfg(feature = "button")]
     {
         let count = scope.cage(0_u32);
-        return button()
+        button()
             .label(count.map(|n| format!("Count {n}")))
-            .on(activate, move |_| count.revise(|n| *n += 1));
+            .on(activate, move |_| count.revise(|n| *n += 1))
     }
     #[cfg(feature = "use-i18n")]
     {
@@ -36,7 +36,7 @@ fn ui(scope: &glory::Scope) -> impl glory::Widget + use<> {
                 args
             })
             .unwrap();
-        return text().content(scope.bond(move || message.get().unwrap_or_default()));
+        text().content(scope.bond(move || message.get().unwrap_or_default()))
     }
     #[cfg(feature = "use-resources")]
     {
@@ -51,10 +51,10 @@ fn ui(scope: &glory::Scope) -> impl glory::Widget + use<> {
             )
             .unwrap();
         scope.retain(resources).unwrap();
-        return text().content(value.map(|state| match state {
+        text().content(value.map(|state| match state {
             ResourceState::Ready { value, .. } => value.to_string(),
             _ => "pending".into(),
-        }));
+        }))
     }
     #[cfg(not(any(
         feature = "minimal",

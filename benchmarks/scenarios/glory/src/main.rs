@@ -123,15 +123,15 @@ fn main() {
                     .content_fn(move || model::money(total.get())),
                 view()
                     .class("viewport")
-                    .fill(view().role(Role::Table).class("quotes").fill(each(
-                        rows,
-                        |q| q.index,
-                        move |quote, _| {
+                    .fill(view().role(Role::Table).class("quotes").fill(
+                        each(rows).key(|q| q.index).children(move |quote| {
                             let registry = registry.clone();
                             let declaration = declaration.clone();
-                            widget(move |scope| row(scope, quote, registry.clone(), &declaration))
-                        },
-                    ))),
+                            widget(move |scope| {
+                                row(scope, quote.value, registry.clone(), &declaration)
+                            })
+                        }),
+                    )),
             ))
         },
     )
