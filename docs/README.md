@@ -2,6 +2,9 @@
 
 Start here when evaluating or extending Glory:
 
+- [Runtime and host guide](runtime-and-hosts.md): detailed reactive-state,
+  widget, list, hydration and streaming examples moved from the project README.
+
 - [Upstream build boundary](upstream-build-boundary.md): owned workspace scopes,
   independent CI and consumer compatibility ownership.
 

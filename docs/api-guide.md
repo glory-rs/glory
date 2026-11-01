@@ -9,6 +9,9 @@ Start with the [cross-platform counter](../examples/counter/README.md) and its
 through Web or Apace; host-specific startup stays in the outer entry points.
 A small headless example is [semantic_counter.rs](../crates/glory/examples/semantic_counter.rs).
 
+The [runtime and host guide](runtime-and-hosts.md) expands these entry points
+with code and ownership rules for state, lists, resources, hydration and streaming.
+
 ## State and ownership
 
 Construct state through a live Scope or Owner. Reads inside a Binding, Bond or
