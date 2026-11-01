@@ -2,6 +2,9 @@
 
 Start here when evaluating or extending Glory:
 
+- [Native Wry backend](../crates/wry/README.md): native Rust logic, incremental
+  IPC WebView updates, desktop shell, transport contract and current acceptance.
+
 - [Project quality review and fixes](project-quality-review-2026-10-30.md):
   security, routing, performance and engineering findings, implementation
   status, reproducible checks and remaining acceptance boundaries.

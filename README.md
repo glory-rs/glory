@@ -113,6 +113,11 @@ limited to Salvo.
   stylesheet states work for Check's internal control as well.
 - `glory-web`: wasm32 DOM interpreter, RAF host, input/composition handling,
   real geometry/selection queries and windowed browser scrolling.
+- [`glory-wry`](crates/wry/README.md): native Rust state and tasks with an
+  IPC-driven system WebView, optional Wry/Tao desktop shell, incremental HTML
+  edits and asynchronous physical queries. Enable `wry`; run
+  `cargo run -p glory --example semantic_wry --features wry`.
+  It coexists with Apace; its README records current support and acceptance.
 - `glory-ssr`: synchronous snapshots and document output using the same mapper;
   versioned fragments can be adopted with the optional `hydrate` feature.
 - `glory-ssr/stream`: native pull-driven shell/edit/end frames with owned request

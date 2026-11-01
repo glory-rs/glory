@@ -1,7 +1,21 @@
 # Cross-platform counter
 
-One semantic `Counter` component runs in a browser or a Apace desktop window.
-Both hosts mount exactly the same component, including its state, event handlers
+The same Counter can also run in native Rust with the system WebView. Set the
+repository's approved build/cache environment, then run from the repository root:
+
+```sh
+cargo run --manifest-path examples/counter/Cargo.toml --bin counter-wry --features desktop-wry
+```
+
+`desktop`/`counter-desktop` continue selecting Apace. `desktop-wry`/`counter-wry`
+select the independent `glory-wry` backend; desktop logic does not use WASM.
+
+To select it for project-local CLI build/bundle commands, configure the existing
+desktop host with `bin = "counter-wry"` and `features = ["desktop-wry"]` in
+`package.metadata.glory.desktop`. Native packaging remains owned by `glory-cli`.
+
+One semantic `Counter` component runs in a browser, an Apace desktop window, or a Wry system WebView.
+All hosts mount exactly the same component, including its state, event handlers
 and typed styles. No DOM event conversion or host-specific CSS is used by it.
 
 - `src/lib.rs`: shared `Widget`, Owner-owned text `Cage` with a derived integer, semantic
