@@ -1,4 +1,4 @@
-//! Protocol display/input fixture; actual widget policy is tested with Sapid.
+//! Protocol display/input fixture; component-specific policy is tested by consumer repositories.
 use glory::prelude::*;
 use glory::render::{EventKind, Semantics, TagSeparators, TagsCommand};
 

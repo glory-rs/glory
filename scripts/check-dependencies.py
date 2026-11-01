@@ -6,18 +6,11 @@ from pathlib import Path
 import subprocess
 import sys
 import shutil
-from library_lockfiles import ensure_library_lockfiles
+from library_lockfiles import LIBRARY_MANIFESTS, ensure_library_lockfiles
 
 ROOT = Path(__file__).resolve().parents[1]
 # Peer comparison fixtures are frozen measurement inputs, not shipped apps.
-LOCKFILES = [
-    "Cargo.lock", "tools/cli/Cargo.lock",
-    "examples/counter/Cargo.lock", "examples/display-web/Cargo.lock",
-    "examples/mobile/Cargo.lock", "examples/routing/Cargo.lock",
-    "examples/semantic-web/Cargo.lock", "benchmarks/glory/Cargo.lock",
-    "benchmarks/role-patches/Cargo.lock", "benchmarks/wasm-size/Cargo.lock",
-    "benchmarks/scenarios/glory/Cargo.lock",
-]
+LOCKFILES = [str(Path(manifest).with_name("Cargo.lock")).replace("\\", "/") for manifest in LIBRARY_MANIFESTS]
 
 
 def main():

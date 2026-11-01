@@ -39,7 +39,7 @@ jobs:
       - name: Verify Cargo target and shared component
         shell: pwsh
         run: |
-          python scripts/library_lockfiles.py
+          python scripts/library_lockfiles.py --manifest-path examples/counter/Cargo.toml
           if ($LASTEXITCODE) { throw 'Library dependency resolution failed' }
           $metadata = cargo metadata --locked --manifest-path examples/counter/Cargo.toml --no-deps --format-version 1 | ConvertFrom-Json
           if ($LASTEXITCODE -ne 0) { throw 'cargo metadata failed' }

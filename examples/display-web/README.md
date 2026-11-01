@@ -42,19 +42,24 @@ for ownership and error contracts. Mixed trees also work with standard
 `web::launch` / `web::hydrate`, `ssr::snapshot` and the native Widget host.
 Controlled editors use Widget tags within the same DSL.
 
-The same `Widget` contract now backs XML component tags, Sapid and function
+Browser drivers accept `PLAYWRIGHT_MODULE` and `BROWSER_EXECUTABLE` overrides.
+Use `GLORY_WIDGET_SITE`, `GLORY_MIXED_SITE` or `GLORY_MIXED_STREAM_SITE` to select
+an explicitly built fixture directory; streaming also uses `GLORY_MIXED_STREAM_BIN`.
+
+The same `Widget` contract now backs XML component tags, semantic controls and function
 widgets; see the [unification guide](../../docs/v2-widget-dsl-unification-2026-10-29.md).
-`unified-acceptance.cjs` tests the mixed HTML/Sapid fixture, including keyed
+`unified-acceptance.cjs` tests the mixed HTML/semantic-widget fixture, including keyed
 focus preservation, a self-dismissing branch and owned cleanup. Point
 `GLORY_WIDGET_SITE` at the built fixture's `site` directory when using a custom
 build root.
 
-`src/mixed.rs` is shared by the actual SSR generator, browser CSR/adoption and
-Sapid's `examples/native/tests/mixed_dsl.rs`. Run
+`src/mixed.rs` is shared by the actual SSR generator and browser CSR/adoption.
+All widgets in these fixtures are Glory-owned; downstream component compatibility
+belongs in the consumer repository. Run
 `../../scripts/build-mixed-display.ps1 -Verify` from this directory to build and
 exercise it. Existing `fn button(...) -> impl Widget` factories use
 `<{button(...)}/>`; concrete builders also accept setters and children, e.g.
-`<{sapid::card()}><sapid::Button label="Save"/></>`.
+`<{g::ui::view()}><g::ui::Button label="Save"/></>`.
 
 `../../scripts/build-mixed-stream.ps1 -Verify` exercises a real gated Rust HTTP
 stream and final WASM adoption using `src/stream_mixed.rs`. It also checks dirty

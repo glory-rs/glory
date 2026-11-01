@@ -80,6 +80,13 @@ js-framework-benchmark; do not mix its scores with the self-suite's div workload
 
 ## Active architecture
 
+Glory must not depend on downstream component repositories in runtime, tooling,
+tests, examples, benchmarks, registry verification or default CI. Keep consumer
+compatibility suites in the consumer repository. Use the explicit maintained
+workspace list in scripts/library_lockfiles.py; never discover every independent
+Cargo workspace automatically. Path dependencies outside this repository are
+limited to the declared rendering engines in docs/engine-forks.json.
+
 The optional routing system now lives in `crates/routing` and uses the current
 Runtime/Widget contracts. Read `crates/routing/README.md` for delivered behavior
 and `docs/routing-architecture-2026-10-30.md` for the broader roadmap. Keep its
@@ -93,11 +100,11 @@ report and `docs/semantic-ui-implementation.md`; do not preserve the former
 HTML API/feature/wire format through compatibility aliases.
 
 The active workspace currently contains style, render, core, resource, i18n, routing, ui,
-html, web, ssr, apace, glory and salvo-adapter. The opt-in i18n package was authorized after
+html, web, ssr, apace, wry, glory and salvo-adapter. The opt-in i18n package was authorized after
 the semantic rewrite; see `crates/i18n/README.md` for its boundaries.
 Truck, the old core runtime, routing, CLI/macros/serverfn/hot-reload and the old
 desktop/native/liveview/tui adapters and examples have been removed. Only the
-13 active runtime packages, the new opt-in view-macros compiler, and migrated examples/benchmarks are supported. The
+14 active runtime packages, the new opt-in view-macros compiler, and migrated examples/benchmarks are supported. The
 new `tools/cli` is a separate library-only host tooling workspace, explicitly
 authorized after the cleanup. It must not depend on runtime crates or enter
 the facade/default/HTML/SSR/WASM runtime graphs. Applications own a tiny private
@@ -181,6 +188,12 @@ retired feature aliases or count compilation as proof of platform acceptance.
   host sink work follows commit and retains the existing prefix/fault contract.
 - `glory-web`: wasm32 DOM interpreter and RAF/async host; no business reentry
   from native listeners. Read coalesced viewport inputs before frame writes.
+- `glory-wry`: user-authorized native Rust/IPC system-WebView backend, coexisting
+  with Apace. Reuse HTML typed edits; no WASM or snapshot replacement. Keep Wry,
+  Tao and serde out of default/HTML/SSR/WASM graphs. Callbacks enqueue; App runs
+  on its local UI loop. Preserve document/generational identities, query barriers,
+  bounded queues, controlled editing and explicit unsupported preflight. See
+  crates/wry/README.md for current support and real-window acceptance boundaries.
 - `glory-ssr`: synchronous HTML/document output and versioned Snapshot fragments.
   Optional resources exports named terminal data before App cleanup; web/hydrate
   adopts DOM and explicitly restores those seeds. Native-only stream feature

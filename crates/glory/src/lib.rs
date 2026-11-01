@@ -16,6 +16,8 @@ pub use glory_style as style;
 pub use glory_ui as ui;
 #[cfg(feature = "web")]
 pub use glory_web as web;
+#[cfg(all(feature = "wry", not(target_arch = "wasm32")))]
+pub use glory_wry as wry;
 #[cfg(feature = "html")]
 pub mod html {
     pub use glory_html::*;

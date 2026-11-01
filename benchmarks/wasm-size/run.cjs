@@ -1,4 +1,4 @@
-// Node 22+, wasm-bindgen 0.2.129, Binaryen npm 132.0.0. No npm deps in the repos.
+// Node 22+, wasm-bindgen 0.2.130, Binaryen npm 132.0.0. No npm deps in the repos.
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
@@ -9,10 +9,10 @@ const {javascriptMetrics}=require('./javascript.cjs');
 const {compare,enforce}=require('./compare.cjs');
 const fixture = __dirname;
 const glory = path.resolve(fixture, '../..');
-const sapid = path.resolve(glory, '../sapid');
+const engines = JSON.parse(fs.readFileSync(path.join(glory, 'docs/engine-forks.json'))).forks;
 const options = process.argv.slice(2);
 function arg(name, fallback) { const i = options.indexOf(name); return i < 0 ? fallback : options[i + 1]; }
-const root = path.resolve(arg('--build-root', 'D:/BuildCache/sapid/wasm-size'));
+const root = path.resolve(arg('--build-root', 'D:/BuildCache/glory/wasm-size'));
 if (!root.replaceAll('\\', '/').toLowerCase().startsWith('d:/buildcache/')) throw Error('Build root must be on D:/BuildCache');
 const label = arg('--label', 'baseline');
 if (!/^[a-z0-9-]+$/.test(label)) throw Error('Invalid run label');
@@ -70,7 +70,7 @@ function clearStaging() {
 function snapshot() {
   clearStaging();
   const entries = [];
-  for (const [repo, name, dirs] of [[glory, 'glory', ['crates', 'benchmarks/wasm-size']], [sapid, 'sapid', ['src']]]) {
+  for (const [repo, name, dirs] of [[glory, 'glory', ['crates', 'benchmarks/wasm-size']], ...engines.map(engine => [path.resolve(glory, engine.path), engine.name, ['.']])]) {
     const dest = path.join(source, name);
     fs.mkdirSync(dest, { recursive: true });
     for (const file of ['Cargo.toml', 'Cargo.lock', 'README.md', 'AGENTS.md']) {
@@ -84,17 +84,16 @@ function snapshot() {
   }
   // A single frozen source path is reused between runs so embedded Rust paths
   // cannot masquerade as implementation size differences.
-  return { digest: hash(JSON.stringify(entries)), files: entries, roots: {glory,sapid},
+  return { digest: hash(JSON.stringify(entries)), files: entries, roots: {glory, ...Object.fromEntries(engines.map(engine => [engine.name,path.resolve(glory,engine.path)]))},
     gloryRevision: run('git', ['-C', glory, 'rev-parse', 'HEAD']).trim(),
-    sapidRevision: run('git', ['-C', sapid, 'rev-parse', 'HEAD']).trim(),
-    gloryStatus: run('git', ['-C', glory, 'status', '--short']), sapidStatus: run('git', ['-C', sapid, 'status', '--short']) };
+    gloryStatus: run('git', ['-C', glory, 'status', '--short'])};
 }
 function replaySnapshot(from) {
   const archive=path.resolve(from);
   if(archive===source||archive.startsWith(source+path.sep)||source.startsWith(archive+path.sep)) throw Error('Replay archive must be independent of the staging directory');
   const info=JSON.parse(fs.readFileSync(path.join(archive,'../sources.json')));
   if(info.digest!==hash(JSON.stringify(info.files))) throw Error('Archived source manifest digest mismatch');
-  const roots=info.roots||{glory,sapid};
+  const roots=info.roots||{glory};
   const restored=[];
   for(const [file,digest] of info.files) {
     const rootName=Object.keys(roots).find(name=>file.startsWith(roots[name].replaceAll('\\','/')+'/'));
@@ -120,7 +119,7 @@ if (!fs.existsSync(wasmOpt) || JSON.parse(fs.readFileSync(path.join(binaryen, 'p
 }
 const versions = { rustc: run('rustc', ['-Vv']).trim(), cargo: run('cargo',['-V']).trim(),
   bindgen: run(bindgen,['--version']).trim(), binaryen: run(process.execPath,[wasmOpt,'--version']).trim(), node: process.version };
-if (versions.bindgen !== 'wasm-bindgen 0.2.129') throw Error('wasm-bindgen library/CLI version mismatch');
+if (versions.bindgen !== 'wasm-bindgen 0.2.130') throw Error('wasm-bindgen library/CLI version mismatch');
 const metadata = JSON.parse(run('cargo', ['metadata', '--manifest-path', manifest, '--no-deps', '--format-version', '1']));
 if (path.resolve(metadata.target_directory).toLowerCase() !== target.toLowerCase()) throw Error('Cargo output is outside the verified D: target');
 const allCases = JSON.parse(fs.readFileSync(path.join(path.dirname(manifest), 'cases.json')));

@@ -10,7 +10,7 @@ const out=path.join(root,'bundle-size');
 if(!root.replaceAll('\\','/').toLowerCase().startsWith('d:/buildcache/'))throw Error('Build root must be D:/BuildCache');
 if(fs.existsSync(path.join(out,'report.json')))throw Error('Use a new build root to preserve previous results');
 fs.mkdirSync(out,{recursive:true});
-const binaryen=path.resolve(option('--binaryen-dir','D:/BuildCache/sapid/wasm-size/tools/node_modules/binaryen'));
+const binaryen=path.resolve(option('--binaryen-dir','D:/BuildCache/glory/wasm-size/tools/node_modules/binaryen'));
 if(JSON.parse(fs.readFileSync(path.join(binaryen,'package.json'))).version!=='132.0.0')throw Error('Use Binaryen 132.0.0');
 const optimizer=path.join(binaryen,'bin/wasm-opt');
 const env={...process.env,TEMP:path.join(root,'tmp'),TMP:path.join(root,'tmp')};

@@ -82,6 +82,12 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'AccessKit native window acceptance failed' }
         cargo test --locked -p glory-apace --features accesskit --lib real_accesskit_windows_ui_automation -- --ignored --nocapture --test-threads=1
         if ($LASTEXITCODE -ne 0) { throw 'Windows UI Automation acceptance failed' }
+        $savedWryWindow = $env:GLORY_WRY_WINDOW
+        try {
+            $env:GLORY_WRY_WINDOW = '1'
+            cargo test --locked -p glory-wry --all-features --test window
+            if ($LASTEXITCODE -ne 0) { throw 'Wry system WebView acceptance failed' }
+        } finally { $env:GLORY_WRY_WINDOW = $savedWryWindow }
     }
 
     if ($Web) {

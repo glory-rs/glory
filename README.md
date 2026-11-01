@@ -68,8 +68,8 @@ limited to Salvo.
   same runtime; `Each`, `Show`, content ranges, component children and optional
   `#[component]` cover ordinary browser composition. See the
   [counter/list example](examples/display-web/src/bin/counter.rs).
-  Component tags now use the same `Widget` contract as Sapid and handwritten
-  widgets: `<sapid::Button label="Save"/>` calls its ordinary builder.
+  Component tags now use the same `Widget` contract as semantic and handwritten
+  widgets: `<glory::ui::Button label="Save"/>` calls its ordinary builder.
   `#[component]` generates a Widget builder; there is no separate Component or
   IntoView trait. See the [unified Widget DSL guide](docs/v2-widget-dsl-unification-2026-10-29.md).
   Existing factories use `<{button(args)}/>`; mixed HTML/Widget trees work in
@@ -113,6 +113,11 @@ limited to Salvo.
   stylesheet states work for Check's internal control as well.
 - `glory-web`: wasm32 DOM interpreter, RAF host, input/composition handling,
   real geometry/selection queries and windowed browser scrolling.
+- [`glory-wry`](crates/wry/README.md): native Rust state and tasks with an
+  IPC-driven system WebView, optional Wry/Tao desktop shell, incremental HTML
+  edits and asynchronous physical queries. Enable `wry`; run
+  `cargo run -p glory --example semantic_wry --features wry`.
+  It coexists with Apace; its README records current support and acceptance.
 - `glory-ssr`: synchronous snapshots and document output using the same mapper;
   versioned fragments can be adopted with the optional `hydrate` feature.
 - `glory-ssr/stream`: native pull-driven shell/edit/end frames with owned request
@@ -440,7 +445,7 @@ Rust 1.95 or later is declared. Current verification uses Rust 1.98; foundation
 checks also cover wasm32-unknown-unknown, aarch64-linux-android and
 x86_64-unknown-linux-gnu. Actual platform UI validation is tracked separately.
 
-The [Glory/Sapid WASM size baseline](docs/wasm-size-baseline.md) measures minimal apps, unused features and actual widget use, with browser checks and a regression gate.
+The [Historical WASM size baseline](docs/wasm-size-baseline.md) measures minimal apps, unused features and actual widget use, with browser checks and a regression gate.
 
 ## License
 

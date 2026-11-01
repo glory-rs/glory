@@ -465,7 +465,7 @@ single, rows and multiple intrinsic Select controls. `menu-probe` selects a
 Menubar, initially open managed Menu with disabled/Chinese/check items, explicit
 context region and a Palette shortcut/dialog. The command-input button becomes
 visible after the initial popup closes; matching/search policy is tested with
-actual Sapid consumers rather than claimed for this small protocol fixture.
+actual downstream consumers rather than claimed for this small protocol fixture.
 
 Pass the selected feature to the corresponding existing Android GameActivity or
 iOS build script. Select only one acceptance view. SDK installation, launch,
@@ -481,7 +481,7 @@ Select `GLORY_ANDROID_FEATURES=tags-probe` or `GLORY_IOS_FEATURES=tags-probe` wi
 the corresponding build script. The shared fixture displays three ordinary Input
 separator policies and bounded command feedback. Enter/comma/semicolon commit,
 empty Backspace removal, software IME punctuation/Return and composition use the
-native protocol; actual duplicate/token/proxy policy is tested with Sapid consumers.
+native protocol; actual duplicate/token/proxy policy is tested with downstream consumers.
 Select only one acceptance view. Paste requires an explicit document clipboard
 provider/service; on Android `tags-probe,clipboard` supplies the new system driver.
 iOS system clipboard remains separate. SDK screenshots and

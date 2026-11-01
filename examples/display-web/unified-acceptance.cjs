@@ -1,6 +1,6 @@
 'use strict';
 const fs = require('node:fs'), path = require('node:path'), http = require('node:http'), assert = require('node:assert/strict');
-const { chromium } = require('D:/BuildCache/glory-v2-dioxus-20261028/tools/node_modules/playwright');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'D:/BuildCache/glory-v2-dioxus-20261028/tools/node_modules/playwright');
 const site = path.resolve(process.env.GLORY_WIDGET_SITE || 'D:/BuildCache/glory-widget-dsl/site');
 const evidencePath = path.join(path.dirname(site), 'unified-evidence.json');
 const errors = [], evidence = { checks: [] };
@@ -16,7 +16,7 @@ const server = http.createServer((req, res) => {
 });
 (async () => {
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-    const browser = await chromium.launch({headless: true, executablePath: 'C:/Program Files/Google/Chrome/Application/chrome.exe'});
+    const browser = await chromium.launch({headless: true, executablePath: process.env.BROWSER_EXECUTABLE || 'C:/Program Files/Google/Chrome/Application/chrome.exe'});
     try {
         const page = await browser.newPage();
         page.on('pageerror', error => errors.push(error.stack));

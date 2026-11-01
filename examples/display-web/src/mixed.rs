@@ -1,6 +1,9 @@
 //! One mixed tree used by server, browser adoption and the native engine.
 use g::{Cage, Widget, core::KeyedList, ui::Scope};
-use sapid::Button;
+#[path = "controls.rs"]
+mod controls;
+#[allow(unused_imports)]
+use controls::*;
 use std::{cell::Cell, rc::Rc};
 
 pub struct Model {
@@ -33,7 +36,7 @@ impl Drop for Probe {
 }
 
 fn opaque_button(count: Cage<usize>) -> impl Widget {
-    sapid::button()
+    g::ui::button()
         .class("opaque")
         .label("opaque factory")
         .on_press(move || count.revise(|n| *n += 1))
@@ -41,7 +44,7 @@ fn opaque_button(count: Cage<usize>) -> impl Widget {
 
 #[g::component(g)]
 fn Panel(children: g::ui::Children) -> impl Widget {
-    sapid::card().class("panel").fill(children)
+    g::ui::view().class("panel").fill(children)
 }
 
 pub fn view(model: &Model) -> impl Widget + use<> {
@@ -60,11 +63,11 @@ pub fn view(model: &Model) -> impl Widget + use<> {
             <Button class="semantic" label={count.map(|n|format!("widget {n}"))} on_press={move ||count.revise(|n|*n+=1)}/>
             <{opaque_button(count)}/>
             <div class="click-wrapper" on:click={move ||bubbled.revise(|n|*n+=1)}>
-                <{sapid::button()} class="configured" label="configured factory" on_press={move ||count.revise(|n|*n+=1)}/>
+                <{g::ui::button()} class="configured" label="configured factory" on_press={move ||count.revise(|n|*n+=1)}/>
             </div>
             <Panel><div class="nested"><span>"nested raw"</span><Button class="nested-button" label="nested widget"/></div></Panel>
             <table><tbody><tr><td><Button class="table-widget" label="table widget"/></td></tr></tbody></table>
-            <sapid::TextField class="editor" value={input} on_value_change={move |value|input.revise(|current|*current=value)}/>
+            <g::ui::Input class="editor" value={input} on_value_change={move |value|input.revise(|current|*current=value)}/>
             <Show when={move ||visible.get()}>
                 <div class="branch"><Button class="owned" label="owned" on_press={let probe=Probe(drops.clone());move ||{let _=&probe;count.revise(|n|*n+=1);}}/></div>
             </Show>
@@ -73,7 +76,7 @@ pub fn view(model: &Model) -> impl Widget + use<> {
             }}/></div>
             <div class="vector"><Each each={vector} key={|row|row.0} children={move |row|{
                 let id=*row.key();let label=row.field("label",|row|&row.1,|row|&mut row.1);
-                g::view!{<div class="vector-row"><span class="vector-label">{label}</span><span class="vector-index">{row.index}</span><sapid::TextField class={format!("vector-{id}")} default_value={format!("row {id}")}/></div>}
+                g::view!{<div class="vector-row"><span class="vector-label">{label}</span><span class="vector-index">{row.index}</span><g::ui::Input class={format!("vector-{id}")} value={format!("row {id}")}/></div>}
             }}/></div>
         </div>
     }

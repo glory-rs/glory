@@ -2,7 +2,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
-const root = path.resolve(process.argv[2] || 'D:/BuildCache/sapid/wasm-size/runs/baseline');
+const root = path.resolve(process.argv[2] || 'D:/BuildCache/glory/wasm-size/runs/baseline');
 if (!root.replaceAll('\\','/').toLowerCase().startsWith('d:/buildcache/')) throw Error('Evidence directory must be on D:');
 const buildRoot = path.resolve(root,'../../..');
 process.env.TEMP = process.env.TMP = path.join(buildRoot,'tmp');
@@ -39,30 +39,13 @@ function check(value,message) { if(!value) throw Error(message); }
       await page.waitForFunction(()=>document.body.dataset.ready==='true'||!!document.body.dataset.error);
       const failure=await page.locator('body').getAttribute('data-error');
       check(!failure,`${item.name}: ${failure}`);
-      if(item.features.includes('button')||item.features.includes('sapid-button')) {
+      if(item.features.includes('button')) {
         await page.getByRole('button',{name:'Count 0',exact:true}).click();
         await page.getByRole('button',{name:'Count 1',exact:true}).waitFor();
       } else if(item.features.includes('use-resources')) {
         await page.getByText('resource ready',{exact:true}).waitFor();
       } else if(item.features.includes('use-css')) {
         check(await page.locator('.sample').evaluate(node=>getComputedStyle(node).opacity)==='0.75','CSS parser/lowering was not exercised');
-      } else if(item.features.includes('use-charts')) {
-        check(await page.locator('#app svg path').count()>0,'Chart did not produce vector paths');
-      } else if(item.features.includes('use-editor')) {
-        const editor=page.locator('#app [contenteditable=true]');
-        await editor.fill('Baseline edit');
-        check((await editor.textContent()).includes('Baseline edit'),'Rich editor did not accept input');
-      } else if(item.features.includes('use-json')) {
-        check(await page.getByRole('tree').count()===1,'JSON tree was not mounted');
-      } else if(item.features.includes('use-dates')) {
-        check(await page.locator('#app input').count()>0,'Date input was not mounted');
-        check((await page.locator('#app input').first().inputValue()).length>0,'Date value was not formatted');
-      } else if(item.features.includes('use-code')) {
-        check((await page.locator('#app').textContent()).includes('answer'),'Code highlight output missing');
-      } else if(item.features.includes('use-files')) {
-        check(await page.getByRole('button',{name:'Choose file',exact:true}).count()===1,'File control missing');
-      } else if(item.features.includes('use-chat')) {
-        check(await page.getByRole('button',{name:'Explain this code',exact:true}).count()===1,'Chat suggestion missing');
       } else if(item.features.includes('use-i18n')) {
         check((await page.locator('#app').textContent()).includes('baseline'),'Fluent message was not resolved');
       } else if(item.name!=='empty'&&!item.features.includes('minimal')) {

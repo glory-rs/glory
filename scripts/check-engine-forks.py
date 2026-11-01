@@ -50,6 +50,11 @@ def test_fork(fork, directory, target, android):
     manifest = str(directory / "Cargo.toml")
     metadata = json.loads(output("cargo", "metadata", "--no-deps", "--format-version", "1", "--manifest-path", manifest))
     assert Path(metadata["target_directory"]).resolve() == target
+    # Engine libraries also omit locks. Prepare only the explicitly requested
+    # engine workspace before its locked tests, without widening Glory defaults.
+    if not (Path(metadata["workspace_root"]) / "Cargo.lock").exists():
+        run("cargo", "--config", 'resolver.incompatible-rust-versions="fallback"',
+            "generate-lockfile", "--manifest-path", manifest)
     for arguments in [fork["tests"], *fork.get("extra_tests", [])]:
         run("cargo", "test", "--locked", "--manifest-path", manifest, *arguments)
     for index, source in enumerate(fork.get("rustc_tests", [])):
@@ -85,7 +90,7 @@ def main():
     assert member_names == {
         "glory", "glory-style", "glory-render", "glory-core", "glory-resource",
         "glory-i18n", "glory-routing", "glory-ui", "glory-html", "glory-web", "glory-ssr", "glory-apace",
-        "glory-salvo", "glory-view-macros",
+        "glory-salvo", "glory-view-macros", "glory-wry",
     }, member_names
     compiler = next(package for package in metadata["packages"] if package["name"] == "glory-view-macros")
     assert any("proc-macro" in target["kind"] for target in compiler["targets"])

@@ -2,6 +2,12 @@
 
 Start here when evaluating or extending Glory:
 
+- [Upstream build boundary](upstream-build-boundary.md): owned workspace scopes,
+  independent CI and consumer compatibility ownership.
+
+- [Native Wry backend](../crates/wry/README.md): native Rust logic, incremental
+  IPC WebView updates, desktop shell, transport contract and current acceptance.
+
 - [Project quality review and fixes](project-quality-review-2026-10-30.md):
   security, routing, performance and engineering findings, implementation
   status, reproducible checks and remaining acceptance boundaries.

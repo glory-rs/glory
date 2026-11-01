@@ -1,6 +1,9 @@
-//! Mixed HTML/Sapid/function-widget acceptance, sharing a single runtime.
+//! Mixed HTML/semantic-widget/function-widget acceptance, sharing a single runtime.
 use g::{Cage, Widget, core::Scope, display::App};
-use sapid::Button;
+#[path = "controls.rs"]
+mod controls;
+#[allow(unused_imports)]
+use controls::*;
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
@@ -21,7 +24,7 @@ fn Custom(scope: &Scope, shared: Cage<usize>) -> impl Widget {
 }
 #[g::component(g)]
 fn Panel(children: g::ui::Children) -> impl Widget {
-    sapid::card().class("semantic-panel").fill(children)
+    g::ui::view().class("semantic-panel").fill(children)
 }
 struct DropProbe(Rc<Cell<usize>>);
 impl Drop for DropProbe {
@@ -48,9 +51,9 @@ pub fn main() {
     app.render(g::view! {
         <div class="unified">
             <span class="shared">{shared}</span>
-            <sapid::Button class="full" label={shared.map(|n|format!("count {n}"))} on_press={move || shared.revise(|n|*n+=1)}/>
+            <g::ui::Button class="full" label={shared.map(|n|format!("count {n}"))} on_press={move || shared.revise(|n|*n+=1)}/>
             <Button class="imported" label="imported" on_press={move || shared.revise(|n|*n+=1)}/>
-            <Content value={sapid::button().class("content-widget").label("content")}/>
+            <Content value={g::ui::button().class("content-widget").label("content")}/>
             <Show when={move || visible.get()}>
                 <div class="branch">
                     <Custom shared={shared}/>

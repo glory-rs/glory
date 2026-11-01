@@ -1,15 +1,16 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict'),{spawn}=require('node:child_process');
-const {chromium}=require('D:/BuildCache/glory-v2-dioxus-20261028/tools/node_modules/playwright');
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'D:/BuildCache/glory-v2-dioxus-20261028/tools/node_modules/playwright');
 const site=process.env.GLORY_MIXED_STREAM_SITE||'D:/BuildCache/glory-semantic-ui/mixed-stream-site';
 const binary=process.env.GLORY_MIXED_STREAM_BIN||'D:/BuildCache/glory-semantic-ui/target/debug/mixed-stream-ssr.exe';
-process.env.TEMP=process.env.TMP='D:/BuildCache/glory-semantic-ui/tmp';fs.mkdirSync(process.env.TEMP,{recursive:true});
+const temporary=process.env.TMPDIR || process.env.TEMP || 'D:/BuildCache/glory-semantic-ui/tmp';
+process.env.TEMP=process.env.TMP=temporary;fs.mkdirSync(temporary,{recursive:true});
 const asset=path.resolve(__dirname,'../../crates/web/src/stream.js');
 const requests=new Map(),errors=[],evidence={checks:[]};
 const server=http.createServer((req,res)=>{
     const url=new URL(req.url,'http://localhost');
     if(url.pathname==='/page'){
-        const id=url.searchParams.get('id');const child=spawn(binary,[],{windowsHide:true,env:{...process.env,TEMP:'D:/BuildCache/glory-semantic-ui/tmp',TMP:'D:/BuildCache/glory-semantic-ui/tmp'}});
+        const id=url.searchParams.get('id');const child=spawn(binary,[],{windowsHide:true,env:{...process.env,TEMP:temporary,TMP:temporary}});
         const record={child,bytes:[],stderr:'',done:false};requests.set(id,record);
         res.setHeader('Content-Type','text/html; charset=utf-8');res.setHeader('Content-Security-Policy',"default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'unsafe-inline'; connect-src 'self'");
         child.stdout.on('data',data=>record.bytes.push(data));child.stdout.pipe(res);child.stderr.on('data',data=>record.stderr+=data);
@@ -27,7 +28,7 @@ const server=http.createServer((req,res)=>{
 const until=async test=>{for(let attempt=0;attempt<100;attempt++){if(test())return;await new Promise(resolve=>setTimeout(resolve,30));}assert.fail('server cleanup timeout');};
 (async()=>{
     await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const base=`http://127.0.0.1:${server.address().port}`;
-    const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'});
+    const browser=await chromium.launch({headless:true,executablePath:process.env.BROWSER_EXECUTABLE || 'C:/Program Files/Google/Chrome/Application/chrome.exe'});
     try{
         const page=await browser.newPage();page.on('pageerror',error=>errors.push(error.stack));
         const response=await page.goto(base+'/page?id=main',{waitUntil:'commit'});
