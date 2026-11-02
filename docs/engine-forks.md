@@ -1,15 +1,20 @@
 # 引擎依赖维护
 
-2026-10-30：Glory 0.6.1 开发源码使用同级维护仓库，尚未发布。
-精确版本为 Apace 0.3.0、Takia 0.15.1、Wingy 0.31.1；支持包为
+0.6.1 协调发布使用 Apace 0.3.0、Takia 0.15.1、Wingy 0.31.1；支持包为
 `apace_accesskit` 0.2.2、`apace_debug_timer` 0.1.4、`wingy-dpi` 0.1.3。
-请将 apace、takia、wingy 与 glory 放在同一父目录，Sapid 也放在该目录。
-Apace 的 Stylo 继续使用固定 Git 修订，保留本次上游合并所需的接口；不另建发布分支。
+源码开发仍将 apace、takia、wingy、glory 和 Sapid 放在同一父目录。
+发布的 crate 使用精确注册表依赖，消费者不需要这些同级路径。
 
-`docs/engine-forks.json` 记录当前开发版本、合并基线、上游来源及此前发布记录。
-`python scripts/check-engine-forks.py` 校验精确版本、本地源码路径、单一类型身份和工作区边界。
-`--test` 在这些开发源码上执行测试；开发模式不会宣称已验证注册表归档。
-后续发布必须重新固定发布来源并完成原有注册表、校验和及发布门禁，本次不执行发布。
+Stylo 采用 [glory-rs/stylo](https://github.com/glory-rs/stylo) 的命名空间发布，
+固定 `glory-stylo-v0.22.0` / `ec62d42fcaa124ad927ab974aade120d82ce50a2`。
+它保留此前 `nicoburns/stylo` 的 `78734bf554bb40af9dc11c0eedbe724f6055697c`
+源码和 Servo text-fill/background-clip 行为；11 个共享类型包统一使用 `glory-`
+包名、原 Rust library 名和各自版本。Glory/Apace 不再依赖该引擎的 Git 源。
+
+`docs/engine-forks.json` 记录版本、发布来源、上游来源及此前发布记录。
+`python scripts/check-engine-forks.py` 分别校验同级源码和注册表依赖：注册表包
+必须有匹配的版本、单一类型身份、归档 SHA-256 和 `.cargo_vcs_info.json`。
+`--test` 对声明的维护源码执行测试；注册表 Stylo 在构建缓存中使用固定提交。
 原始版权、许可证和第三方来源保留，无 vendor 或全局 Cargo patch。
 
 所有库、示例和基准的 Cargo.lock 均不纳入 Git；website 独立保留锁文件。

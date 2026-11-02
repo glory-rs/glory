@@ -27,5 +27,13 @@
     "tools/cli/Cargo.toml"
   ],
   "registry_verifier": "scripts/verify-registry.py",
-  "uniform_version": true
+  "uniform_version": true,
+  "external_path_dependencies": {
+    "apace-dom": "=0.3.0",
+    "apace-traits": "=0.3.0",
+    "apace-paint": "=0.3.0",
+    "apace_accesskit": "=0.2.2",
+    "apace-shell": "=0.3.0",
+    "wingy": "=0.31.1"
+  }
 }

@@ -101,11 +101,12 @@ def main():
     lock = tomllib.loads((root / "Cargo.lock").read_text(encoding="utf-8"))
     for fork in record["forks"]:
         assert len(fork["rev"]) == 40 and all(c in "0123456789abcdef" for c in fork["rev"])
-        if development:
+        local = development and fork.get("path") is not None
+        if local:
             directory = (root / fork["path"]).resolve()
             assert Path(output("git", "-C", str(directory), "rev-parse", "--show-toplevel")).resolve() == directory
             run("git", "-C", str(directory), "merge-base", "--is-ancestor", fork["rev"], "HEAD")
-        source = None if development else "registry+https://github.com/rust-lang/crates.io-index"
+        source = None if local else "registry+https://github.com/rust-lang/crates.io-index"
         for name in fork["packages"]:
             version = fork.get("versions", {}).get(name, fork["version"])
             resolved = [package for package in metadata["packages"] if package["name"] == name]
@@ -114,7 +115,7 @@ def main():
             locked = [package for package in lock["package"] if package["name"] == name]
             assert len(locked) == 1 and locked[0].get("source") == source, (name, locked)
             assert locked[0]["version"] == version, (name, locked)
-            if development:
+            if local:
                 expected_root = (root / fork["path"]).resolve()
                 assert Path(resolved[0]["manifest_path"]).resolve().is_relative_to(expected_root), (name, resolved)
                 continue
@@ -126,9 +127,12 @@ def main():
             archive = paths["CARGO_HOME"] / "registry/cache" / archive_root.parent.name / f"{name}-{version}.crate"
             assert hashlib.sha256(archive.read_bytes()).hexdigest() == locked[0]["checksum"], name
         if options.test:
-            directory = (root / fork["path"]).resolve() if development else paths["CARGO_TARGET_DIR"].parent / "engine-forks" / fork["name"]
+            directory = (root / fork["path"]).resolve() if local else paths["CARGO_TARGET_DIR"].parent / "engine-forks" / fork["name"]
             directory.parent.mkdir(parents=True, exist_ok=True)
-            test_fork(fork, directory, paths["CARGO_TARGET_DIR"], options.android)
+            test_source = dict(fork)
+            if not local:
+                test_source.pop("path", None)
+            test_fork(test_source, directory, paths["CARGO_TARGET_DIR"], options.android)
     retired = {"glory-apace-dom", "glory-apace-traits", "glory-apace-paint", "glory-apace-shell", "glory-takia", "glory-stylo-takia"}
     for lockfile in (
         root / "Cargo.lock",
@@ -139,7 +143,7 @@ def main():
         packages = tomllib.loads(lockfile.read_text(encoding="utf-8"))["package"]
         assert not retired.intersection(package["name"] for package in packages), lockfile
         for fork in record["forks"]:
-            expected = None if development else "registry+https://github.com/rust-lang/crates.io-index"
+            expected = None if development and fork.get("path") is not None else "registry+https://github.com/rust-lang/crates.io-index"
             for package in packages:
                 if package["name"] in fork["packages"]:
                     assert package.get("source") == expected, (lockfile, package)

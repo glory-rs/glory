@@ -3,7 +3,8 @@
 Glory's runtime, tooling, tests, examples, benchmarks and default CI must build
 without a downstream component repository. Consumer compatibility suites belong
 in the consumer repository. The declared rendering engines in
-`docs/engine-forks.json` remain source dependencies during coordinated development.
+`docs/engine-forks.json` use sibling sources for Apace, Takia and Wingy during
+coordinated development, and checksum-verified registry packages for Stylo.
 
 `scripts/library_lockfiles.py` prepares only the explicit `LIBRARY_MANIFESTS`
 workspaces. It does not discover nested Cargo projects or resolve peer-framework

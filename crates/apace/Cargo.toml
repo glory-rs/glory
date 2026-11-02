@@ -40,7 +40,7 @@ apace-traits = { path = "../../../apace/packages/apace-traits", version = "=0.3.
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
 # Typed visibility returned by Apace's public computed-style API. Keep this
 # engine detail inside the adapter; glory-style remains the portable value crate.
-style = { package = "stylo", version = "=0.22.0", git = "https://github.com/nicoburns/stylo", rev = "78734bf554bb40af9dc11c0eedbe724f6055697c", default-features = false }
+style = { package = "glory-stylo", version = "=0.22.0", default-features = false }
 apace-paint = { path = "../../../apace/packages/apace-paint", version = "=0.3.0", default-features = false, optional = true }
 anyrender = { version = "=0.14.0", optional = true }
 kurbo = { version = "=0.13.1", optional = true }

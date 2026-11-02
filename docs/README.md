@@ -115,8 +115,8 @@ Start here when evaluating or extending Glory:
   comment/range costs, paired timings, identity/pixel checks and the existing anchor failure.
 - [Fractional list anchor correction](anchor-residual-fix-2026-10-23.md): 0.375 px residual
   fix, 64/1024 real-height caches, settled pixel/node identity and complete regression evidence.
-- [Engine forks](engine-forks.md): immutable glory-rs Blitz/Taffy Git dependencies,
-  source provenance, fork tests and the prohibition on vendoring.
+- [Engine forks](engine-forks.md): exact Apace/Takia/Wingy sources and namespaced Stylo
+  registry packages, source provenance, fork tests and the prohibition on vendoring.
 - [API guide](api-guide.md): current semantic entry points, ownership and hosts.
 - [Project-local CLI](../tools/cli/README.md): library-based tooling, shared
   application lockfile, bin launchers, build/preview and version diagnostics.

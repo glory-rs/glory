@@ -65,7 +65,7 @@ class RepositoryBoundaryTests(unittest.TestCase):
     def test_every_declared_path_dependency_is_owned_or_a_declared_engine(self):
         root = Path(__file__).resolve().parents[1]
         engines = json.loads((root / "docs/engine-forks.json").read_text())["forks"]
-        allowed = [root, *((root / engine["path"]).resolve() for engine in engines)]
+        allowed = [root, *((root / engine["path"]).resolve() for engine in engines if engine.get("path"))]
         manifests = subprocess.check_output(["git", "ls-files", "*Cargo.toml"], cwd=root, text=True).splitlines()
 
         def dependencies(table):

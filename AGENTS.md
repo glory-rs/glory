@@ -675,12 +675,13 @@ retired feature aliases or count compilation as proof of platform acceptance.
   They never run business callbacks. Close retires the relay; late completions
   must not decode into or wake a closed document.
 - Never vendor third-party code in this repository. Maintain upstream-derived
-  code in glory-rs/apace, glory-rs/takia and glory-rs/wingy, retaining provenance,
-  licenses and copyright notices. The 2026-10-30 coordinated development versions
-  are explicitly unpublished: Glory/Sapid 0.6.1, Apace 0.3.0, Takia 0.15.1,
-  Wingy 0.31.1. Use exact requirements with sibling source paths, as recorded in
-  docs/engine-forks.json; do not add global Cargo patches. Future publication
-  requires a separate user instruction and the existing publication guards.
+  code in glory-rs/apace, glory-rs/takia, glory-rs/wingy and glory-rs/stylo, retaining provenance,
+  licenses and copyright notices. The coordinated release versions are
+  Glory/Sapid 0.6.1, Apace 0.3.0, Takia 0.15.1 and Wingy 0.31.1. The maintained
+  Stylo graph uses the namespaced registry packages recorded in docs/engine-forks.json.
+  Use exact requirements and the declared sibling source paths for local engine
+  development; do not add global Cargo patches. Publication requires an explicit
+  user instruction and the existing publication guards.
 - Engine/layout/platform packages stay outside the runtime workspace and share
   one type identity. Run python scripts/check-engine-forks.py --test to verify
   their exact versions, sibling paths and baseline ancestry and execute fork-owned

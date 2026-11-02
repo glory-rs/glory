@@ -1,10 +1,10 @@
 {
-  "schema": 3,
+  "schema": 4,
   "forks": [
     {
       "name": "takia",
       "git": "https://github.com/glory-rs/takia",
-      "rev": "c79a14b54ea632462a15624acf9e7daf792bcd13",
+      "rev": "c7dfdfa0ca7fc94cad5c57e2f5e93b1d91b3de03",
       "upstream": "https://github.com/DioxusLabs/taffy",
       "upstream_rev": "c6421c1cb20df5845e83285d3ce63c716f52186c",
       "packages": [
@@ -25,7 +25,7 @@
     {
       "name": "apace",
       "git": "https://github.com/glory-rs/apace",
-      "rev": "9b765df484897e5329736d93bc7d80b2bd0694b4",
+      "rev": "0ae9cb9d51010f3b468a66a9a2e5e627e04c2e62",
       "upstream": "https://github.com/DioxusLabs/blitz",
       "upstream_rev": "e5929f9e2af42f8fdc10cea315b502d3937b1350",
       "packages": [
@@ -177,7 +177,7 @@
         "wingy-win32",
         "wingy-x11"
       ],
-      "rev": "b80608744193df808d71dd9eaf9ff02627351f03",
+      "rev": "b7460c33fa32c9c6ab76a607dc273d446c73f721",
       "upstream": "https://github.com/rust-windowing/winit",
       "upstream_rev": "d597ced770f3263f66ab901cc27bf7984e314465",
       "rustc_tests": [
@@ -237,8 +237,38 @@
         }
       },
       "path": "../wingy"
+    },
+    {
+      "name": "stylo",
+      "git": "https://github.com/glory-rs/stylo",
+      "rev": "ec62d42fcaa124ad927ab974aade120d82ce50a2",
+      "upstream": "https://github.com/nicoburns/stylo",
+      "upstream_rev": "78734bf554bb40af9dc11c0eedbe724f6055697c",
+      "version": "0.22.0",
+      "versions": {
+        "glory-servo-arc": "0.5.0",
+        "glory-to-shmem": "0.6.0",
+        "glory-to-shmem-derive": "0.2.0",
+        "glory-selectors": "0.41.0"
+      },
+      "packages": [
+        "glory-servo-arc",
+        "glory-stylo-atoms",
+        "glory-stylo-derive",
+        "glory-stylo-static-prefs",
+        "glory-to-shmem-derive",
+        "glory-to-shmem",
+        "glory-selectors",
+        "glory-stylo-malloc-size-of",
+        "glory-stylo-dom",
+        "glory-stylo-traits",
+        "glory-stylo"
+      ],
+      "tests": [
+        "--workspace"
+      ]
     }
   ],
   "source_mode": "sibling-development",
-  "publication": "Versions are prepared for coordinated development only; no release is published."
+  "publication": "Coordinated 0.6.1 publication: native engine sources remain sibling paths; the namespaced Stylo graph uses checksum- and source-verified registry packages."
 }

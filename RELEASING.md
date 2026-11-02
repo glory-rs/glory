@@ -1,8 +1,9 @@
 # Releases
 
-The 2026-10-30 version bumps are unpublished development versions. Do not publish
-or create release tags for this change. Library, example and benchmark locks are
-local ignored files; generate and validate them without adding them to Git.
+The coordinated 0.6.1 release requires the exact Stylo, Takia, Wingy and Apace
+registry versions recorded in docs/engine-forks.json before Glory publication.
+Library, example and benchmark locks remain local and ignored; generate and
+validate them without adding them to Git.
 
 
 Push an annotated `v<version>` tag after updating manifests, local resolutions and reviewed `releases/<version>.md` notes.

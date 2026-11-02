@@ -20,9 +20,10 @@ shares its application lockfile with that launcher.
 - [ ] Run its `-Web` checks and the current browser acceptance functions in
   `examples/semantic-web`; a WASM build alone is not browser acceptance.
 - [ ] Run `-Audit` with cargo-audit 0.22.2 installed. Known vulnerabilities,
-  unsoundness and yanked packages fail the gate. Unmaintained-package warnings
-  remain visible in the JSON evidence and require maintenance follow-up.
-- [ ] Verify the Rust 1.94 MSRV and portable Linux gates in `quality.yml`.
+  unsoundness and yanked packages fail the gate, except for the reviewed,
+  visible GLib 0.18.5/RUSTSEC-2024-0429 warning policy. Maintenance warnings
+  remain in the JSON evidence and require follow-up.
+- [ ] Verify the Rust 1.95 MSRV and portable Linux gates in `quality.yml`.
   The Apple job is opt-in and requires a prepared data-volume runner; it is
   separate from the Windows/Linux release checks.
 - [ ] Verify the migrated counter with the commands in its README.
