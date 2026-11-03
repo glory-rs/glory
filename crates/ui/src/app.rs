@@ -1661,6 +1661,20 @@ impl Scope {
             selection,
         })
     }
+    /// Observe bounds at a committed barrier on hosts with an immediate read.
+    /// On other hosts, request `Query::Bounds` for a queued response.
+    pub fn bounds_now(&self, node: NodeId) -> Result<Option<glory_render::Rect>> {
+        let session = self.session()?;
+        session.flush()?;
+        session.runtime.enter(self.id(), || ())?;
+        let query = Query::Bounds(node);
+        query.validate_target(session.present.borrow().tree.node(node)?.descriptor.view())?;
+        let bounds = session.renderer.borrow_mut().bounds_now(node).transpose()?;
+        if let Some(rect) = bounds {
+            query.validate_response(&QueryValue::Bounds(rect))?;
+        }
+        Ok(bounds)
+    }
     /// Flush before observing a host value. The reply executes under this
     /// Scope's Owner, independent of the target's Owner or the pump caller.
     /// Scope disposal drops its waiters without calling user code; a removed

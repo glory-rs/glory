@@ -370,6 +370,18 @@ pub(in crate::browser) fn apply(
         if !prepared.supports(mutation) || packet.records.len() / 10 + 16 > MAX_RECORDS {
             break;
         }
+        // Ordinary nodes use the scalar sink. Avoid preparing and rolling back
+        // their style patch just to discover they have no Plan address.
+        if let Mutation::Patch {
+            id,
+            patch: glory_render::Patch::Style(_),
+        } = mutation
+            && packet
+                .entry(dom, *id)
+                .is_ok_and(|target| target.parts.planned.is_none())
+        {
+            break;
+        }
         let op = match prepared.prepare(mutation) {
             Ok(op) => op,
             Err(Error::Unsupported(_)) => break,

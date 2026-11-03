@@ -80,6 +80,20 @@ impl Renderer {
             supports_files,
         }
     }
+    fn query_entry(&self, query: Query) -> Result<Rc<dom::Entry>, Error> {
+        let mapper = self.mapper.borrow();
+        let node = mapper.tree().node(query.node())?;
+        if self.dom.staging.get() {
+            return Err(Error::Unsupported("physical query before adoption"));
+        }
+        self.dom.read_translations(mapper.tree())?;
+        query.validate_target(node.descriptor.view())?;
+        let entry = self.dom.entry(query.node())?;
+        if !entry.first().is_connected() {
+            return Err(Error::Unsupported("query on a disconnected range"));
+        }
+        Ok(entry)
+    }
     fn check_layers<'a>(
         &self,
         node: impl Into<glory_render::DescriptorView<'a>>,
@@ -372,6 +386,12 @@ impl Render for Renderer {
         }
         perform(&self.dom, action)
     }
+    fn bounds_now(&mut self, node: NodeId) -> Option<Result<glory_render::Rect, Error>> {
+        Some((|| {
+            let entry = self.query_entry(Query::Bounds(node))?;
+            Ok(dom::rect(&entry.element()?.get_bounding_client_rect()))
+        })())
+    }
     fn request(&mut self, query: Query, token: QueryToken) -> Result<(), Error> {
         if matches!(query, Query::FileRead(_) | Query::FilePreview(_)) {
             let result = self.dom.request_file(
@@ -396,12 +416,7 @@ impl Render for Renderer {
             return Err(Error::Unsupported("physical query before adoption"));
         }
         let result = (|| {
-            self.dom.read_translations(self.mapper.borrow().tree())?;
-            query.validate_target(&self.mapper.borrow().tree().node(query.node())?.descriptor)?;
-            let entry = self.dom.entry(query.node())?;
-            if !entry.first().is_connected() {
-                return Err(Error::Unsupported("query on a disconnected range"));
-            }
+            let entry = self.query_entry(query)?;
             match query {
                 Query::RichSelection(_) => {
                     let control = entry.control()?;

@@ -5,8 +5,21 @@ use super::super::{
 };
 use super::target;
 use glory_render::{DragPhase, Event, EventKind, NodeId};
-use wasm_bindgen::JsCast;
+use wasm_bindgen::{JsCast, prelude::wasm_bindgen};
 use web_sys::{Element, PointerEvent};
+
+// web-sys's stable MouseEvent accessors truncate these CSS pixel coordinates.
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(extends = PointerEvent, typescript_type = "PointerEvent")]
+    type PointerCoordinates;
+
+    #[wasm_bindgen(method, getter, structural, js_name = clientX)]
+    fn client_x(this: &PointerCoordinates) -> f64;
+
+    #[wasm_bindgen(method, getter, structural, js_name = clientY)]
+    fn client_y(this: &PointerCoordinates) -> f64;
+}
 
 fn interested(dom: &Dom, mut id: NodeId) -> Option<NodeId> {
     loop {
@@ -63,8 +76,9 @@ pub(super) fn receive(
     if !pointer.is_primary() {
         return Ok(false);
     }
-    let x = f64::from(pointer.client_x());
-    let y = f64::from(pointer.client_y());
+    let coordinates = pointer.unchecked_ref::<PointerCoordinates>();
+    let x = coordinates.client_x();
+    let y = coordinates.client_y();
     if name == "pointerdown" {
         dom.suppress_click.set(false);
         cancel(dom);
@@ -87,18 +101,24 @@ pub(super) fn receive(
         if let Some((id, _)) = target(dom, &element)
             && let Some(from) = interested(dom, id)
         {
-            let slider = dom.entry(from)?.element()?.has_attribute("data-gly-slider");
             let control = dom.entry(from)?.element()?;
+            let slider = control.has_attribute("data-gly-slider");
+            let splitter = control.has_attribute("data-gly-splitter");
             let capture = control.get_attribute("data-gly-drag-capture");
-            let immediate = slider || matches!(capture.as_deref(), Some("press" | "press-focus"));
+            let focus_on_press = slider || capture.as_deref() == Some("press-focus");
+            let immediate = splitter || focus_on_press || capture.as_deref() == Some("press");
             if immediate {
                 if control.closest("[hidden],[data-gly-hidden],[inert],[aria-disabled=true],fieldset[disabled]").map_err(backend)?.is_some()
                     || control.get_attribute("aria-readonly").as_deref() == Some("true")
                 {
                     return Ok(false);
                 }
-                event.prevent_default();
-                if slider || capture.as_deref() == Some("press-focus") {
+                // The separator's default pointer focus preserves the browser's
+                // input modality. Scripted focus here can show a keyboard ring.
+                if !splitter {
+                    event.prevent_default();
+                }
+                if focus_on_press {
                     super::super::dom::focus(&control)?;
                 }
                 dom.queue(
@@ -117,7 +137,7 @@ pub(super) fn receive(
                 x,
                 y,
                 started: immediate,
-                captured: immediate || control.has_attribute("data-gly-splitter"),
+                captured: immediate,
             });
             let _ = element.set_pointer_capture(pointer.pointer_id());
         }
