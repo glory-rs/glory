@@ -12,8 +12,8 @@ and then use --locked. To explicitly refresh an existing resolution, run cargo u
 
 Dependencies were checked against crates.io on 2026-10-30 and updated to the
 latest versions compatible with Rust 1.95 and their shared public types.
-Compatibility exceptions: Stylo remains at Git revision
-78734bf554bb40af9dc11c0eedbe724f6055697c; Boa 0.22 requires ICU 2.3;
+Stylo uses the registry release 0.23.0 and Selectors 0.42.0.
+Compatibility exceptions: Boa 0.22 requires ICU 2.3;
 anyrender_svg 0.15 requires usvg 0.48.1; Parley/Vello share skrifa 0.44;
 rusqlite_migration 2.6 requires rusqlite 0.40. Cap-std/cap-fs-ext 3.4.6,
 and rfd 0.16.1 use the available compatible registry versions. Historical benchmark
