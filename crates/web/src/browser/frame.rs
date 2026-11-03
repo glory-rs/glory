@@ -17,6 +17,10 @@ pub(super) struct Frame {
     processing: Cell<bool>,
     again: Cell<bool>,
     stopped: Cell<bool>,
+    pointer_ready_at: Cell<Option<f64>>,
+    pointer_scheduled: Cell<bool>,
+    pointer_timer: Cell<Option<i32>>,
+    pointer_callback: RefCell<Option<Closure<dyn FnMut()>>>,
 }
 impl Frame {
     pub fn profile(&self) -> Result<glory_render::profile::Profile, glory_render::Error> {
@@ -40,32 +44,130 @@ impl Frame {
             processing: Cell::new(false),
             again: Cell::new(false),
             stopped: Cell::new(false),
+            pointer_ready_at: Cell::new(None),
+            pointer_scheduled: Cell::new(false),
+            pointer_timer: Cell::new(None),
+            pointer_callback: RefCell::new(None),
         });
         let weak = Rc::downgrade(&frame);
         *frame.callback.borrow_mut() = Some(Closure::new(move |_| {
             let Some(frame) = weak.upgrade() else { return };
             frame.pending.set(None);
-            if frame.stopped.get() {
-                return;
-            }
-            frame.processing.set(true);
-            let app = frame.app.borrow().upgrade();
-            if let Some(app) = app
-                && let Err(error) = app.pump()
-            {
-                web_sys::console::error_1(&format!("Glory frame: {error}").into());
-            }
-            if let Some(dom) = frame.dom.borrow().upgrade()
-                && let Err(error) = super::sheet::finish_turn(&dom)
-            {
-                dom.error.borrow_mut().get_or_insert(error);
-            }
-            frame.processing.set(false);
-            if frame.again.replace(false) {
-                frame.schedule();
-            }
+            frame.run();
         }));
         frame
+    }
+    fn run(&self) {
+        if self.stopped.get() {
+            return;
+        }
+        self.cancel_pointer_timer();
+        let clock = self
+            .pointer_ready_at
+            .get()
+            .and_then(|_| self.window.performance());
+        let start = clock.as_ref().map(|clock| clock.now());
+        self.processing.set(true);
+        let app = self.app.borrow().upgrade();
+        if let Some(app) = app
+            && let Err(error) = app.pump()
+        {
+            web_sys::console::error_1(&format!("Glory frame: {error}").into());
+        }
+        if let Some(dom) = self.dom.borrow().upgrade()
+            && let Err(error) = super::sheet::finish_turn(&dom)
+        {
+            dom.error.borrow_mut().get_or_insert(error);
+        }
+        self.processing.set(false);
+        if let Some((clock, start)) = clock.zip(start)
+            && self.pointer_ready_at.get().is_some()
+        {
+            let end = clock.now();
+            if end - start > 2.5 {
+                // Extra turns compete with layout and paint on busy pages.
+                // Retire raw input for this capture and use the RAF path.
+                self.pointer_pacing(false);
+                let raw = self.dom.borrow().upgrade().and_then(|dom| {
+                    dom.drag
+                        .borrow_mut()
+                        .as_mut()
+                        .and_then(|drag| drag.raw.take())
+                });
+                drop(raw);
+            } else {
+                self.pointer_ready_at.set(Some(end + 4.0));
+            }
+        }
+        if self.again.replace(false) {
+            self.schedule();
+        }
+    }
+    pub(super) fn pointer_pacing(&self, active: bool) {
+        if !active {
+            self.cancel_pointer_timer();
+        }
+        self.pointer_ready_at
+            .set(active.then_some(f64::NEG_INFINITY));
+    }
+    fn cancel_pointer_timer(&self) {
+        if let Some(id) = self.pointer_timer.take() {
+            self.window.clear_timeout_with_handle(id);
+        }
+    }
+    fn pointer_wait(&self) -> Option<f64> {
+        if self.stopped.get() || self.processing.get() {
+            return None;
+        }
+        Some(self.pointer_ready_at.get()? - self.window.performance()?.now())
+    }
+    fn run_pointer(&self) {
+        if self.pointer_wait().is_some_and(|wait| wait <= 0.0)
+            && let Some(id) = self.pending.take()
+        {
+            let _ = self.window.cancel_animation_frame(id);
+            self.run();
+        }
+    }
+    pub(super) fn prompt_pointer(self: &Rc<Self>) {
+        if self.pointer_scheduled.get() || self.pointer_timer.get().is_some() {
+            return;
+        }
+        let Some(wait) = self.pointer_wait() else {
+            return;
+        };
+        if wait > 0.0 {
+            // One paced wake per capture. If RAF wins, it handles the same
+            // queued sample and retires the timer.
+            let mut callback = self.pointer_callback.borrow_mut();
+            let callback = callback.get_or_insert_with(|| {
+                let frame = Rc::downgrade(self);
+                Closure::new(move || {
+                    if let Some(frame) = frame.upgrade() {
+                        frame.pointer_timer.set(None);
+                        frame.run_pointer();
+                    }
+                })
+            });
+            if let Ok(id) = self
+                .window
+                .set_timeout_with_callback_and_timeout_and_arguments_0(
+                    callback.as_ref().unchecked_ref(),
+                    wait.ceil() as i32,
+                )
+            {
+                self.pointer_timer.set(Some(id));
+            }
+            return;
+        }
+        self.pointer_scheduled.set(true);
+        let frame = Rc::downgrade(self);
+        // The browser listener has returned before any business code runs.
+        wasm_bindgen_futures::spawn_local(async move {
+            let Some(frame) = frame.upgrade() else { return };
+            frame.pointer_scheduled.set(false);
+            frame.run_pointer();
+        });
     }
     pub fn attach_dom(&self, dom: &Rc<super::dom::Dom>) {
         *self.dom.borrow_mut() = Rc::downgrade(dom);
@@ -99,6 +201,7 @@ impl Frame {
     }
     pub fn stop(&self) {
         self.stopped.set(true);
+        self.cancel_pointer_timer();
         if let Some(id) = self.pending.take() {
             let _ = self.window.cancel_animation_frame(id);
         }

@@ -304,6 +304,7 @@ pub(super) struct DragSession {
     pub y: f64,
     pub started: bool,
     pub captured: bool,
+    pub(super) raw: Option<super::events::drag::RawMotion>,
 }
 pub(super) struct Dom {
     pub(super) rich_pending: RefCell<Vec<NodeId>>,
