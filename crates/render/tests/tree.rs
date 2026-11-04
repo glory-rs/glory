@@ -57,7 +57,7 @@ fn checked_items_require_coordinates_and_are_independent_from_selected() {
     assert!(d.validate().is_err());
 }
 #[test]
-fn tree_popup_requires_intrinsic_select_and_a_managed_nonmodal_tree() {
+fn tree_popup_accepts_managed_select_and_focus_preserving_editable_modes() {
     let mut d = Descriptor::new(Props::Button(Default::default()));
     d.semantics = Some(Box::new(Semantics {
         id: Some(SemanticId::new("trigger").unwrap()),
@@ -73,7 +73,7 @@ fn tree_popup_requires_intrinsic_select_and_a_managed_nonmodal_tree() {
     d.semantics.as_mut().unwrap().active_descendant = None;
     d.props = Props::Input(Default::default());
     d.semantics.as_mut().unwrap().combobox = Some(ComboboxKind::Editable);
-    assert!(d.validate().is_err());
+    d.validate().unwrap();
     let mut layer = root();
     layer.focus = FocusMode::Programmatic;
     layer.semantics.as_mut().unwrap().id = Some(SemanticId::new("tree").unwrap());
@@ -107,6 +107,15 @@ fn tree_popup_requires_intrinsic_select_and_a_managed_nonmodal_tree() {
         .as_mut()
         .unwrap()
         .focus = LayerFocus::Preserve;
+    layer.validate().unwrap();
+    layer
+        .semantics
+        .as_mut()
+        .unwrap()
+        .layer
+        .as_mut()
+        .unwrap()
+        .return_focus = Some(SemanticId::new("trigger").unwrap());
     assert!(layer.validate().is_err());
 }
 #[test]

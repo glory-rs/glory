@@ -115,7 +115,7 @@ fn typed_ch_dimensions_minimums_and_signed_insets_follow_the_same_live_font_metr
 }
 #[test]
 fn typed_ch_resolves_real_zero_and_password_projection_advances_across_fonts_without_author_css() {
-    assert_eq!(glory_apace::STYLE_PROFILE.version, 11);
+    assert_eq!(glory_apace::STYLE_PROFILE.version, 14);
     for font in [14., 24., 36.] {
         for masked in [false, true] {
             let mut output = None;

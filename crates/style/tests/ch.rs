@@ -17,7 +17,7 @@ fn declarations(v: f64) -> [(Property, Style); 8] {
 fn ch_uses_the_last_value_bit_and_each_property_is_independently_rejectable() {
     assert_eq!(Value::Ch as u8, 63);
     assert_eq!(Value::ALL.len(), 64);
-    assert_eq!((Profile::HTML.version, Profile::RECORD.version), (10, 10));
+    assert_eq!((Profile::HTML.version, Profile::RECORD.version), (13, 13));
     for (property, style) in declarations(6.) {
         style.validate().unwrap();
         for profile in [Profile::HTML, Profile::RECORD] {

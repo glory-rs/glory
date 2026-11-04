@@ -196,6 +196,9 @@ impl<'a> DescriptorView<'a> {
         if input && let Props::Graphic(graphic) = self.props {
             graphic.validate()?;
         }
+        if input && let Props::Image(image) = self.props {
+            image.responsive.validate()?;
+        }
         if matches!(self.props, Props::Graphic(graphic) if graphic.alternative.is_none())
             && (self.name.is_some() || self.focus != FocusMode::Auto)
         {

@@ -125,9 +125,10 @@ fn profile_rejection_uses_each_original_declaration_not_the_final_winner() {
 
 #[test]
 fn every_typed_property_has_a_valid_finite_text_representation() {
-    let css = ".all{position:relative;top:-2px;left:3%;display:flex;flex-direction:row;width:20px;height:30%;min-width:0;min-height:auto;max-width:none;max-height:100%;gap:2px;padding:1px 2px 3px 4px;margin:-1px;flex-grow:.5;flex-shrink:2;align-items:center;justify-content:space-between;overflow-x:auto;overflow-y:hidden;overflow-anchor:none;color:#123;background-color:transparent;font-size:16px;line-height:20px}";
+    let css = ".all{position:relative;top:-2px;left:3%;display:flex;flex-direction:row;width:20px;height:30%;min-width:0;min-height:auto;max-width:none;max-height:100%;gap:2px;padding:1px 2px 3px 4px;margin:-1px;flex-grow:.5;flex-shrink:2;align-items:center;justify-content:space-between;overflow-x:auto;overflow-y:hidden;overflow-anchor:none;color:#123;background-color:transparent;background-image:linear-gradient(90deg,transparent,#228be6ff);font-size:16px;line-height:20px}";
     let css = css.replace("line-height:20px", "line-height:20px;font-family:system-ui;font-weight:450.5;white-space:pre-wrap;border-width:1px 2px;border-color:#123;border-style:solid;border-radius:4px;opacity:.5");
     let css = css.replace("line-height:20px", "line-height:20px;field-sizing:content");
+    let css = css.replace("font-size:16px", "font-size:16px;letter-spacing:2px;line-clamp:3;text-gradient:linear-gradient(45deg,#ff0000,#0000ff)");
     let css = css.replace(
         "position:relative",
         "position:relative;right:auto;bottom:4px",

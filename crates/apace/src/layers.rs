@@ -524,6 +524,56 @@ fn sync_inner(
         }
     }
     state.dom.resolve();
+    let mut resized_anchor = false;
+    for entry in &layers.open {
+        let LayerPlacement::Anchor(policy) = entry.config.placement else {
+            continue;
+        };
+        if !entry.physical || !policy.match_width {
+            continue;
+        }
+        let Some(anchor) = entry
+            .config
+            .anchor
+            .as_ref()
+            .and_then(|name| tree.named(name))
+        else {
+            continue;
+        };
+        let anchor = state.dom.main(anchor)?;
+        let Some(anchor) = border_box(&state.dom, anchor) else {
+            continue;
+        };
+        let main = state.dom.main(entry.id)?;
+        let old = state
+            .dom
+            .doc
+            .get_node(main)
+            .and_then(|node| node.attr(apace_dom::LocalName::from("style")))
+            .unwrap_or("");
+        let css = state
+            .dom
+            .doc
+            .style_attr_set_property(
+                old,
+                "--gly-anchor-width",
+                &format!("{}px", anchor.width),
+                false,
+            )
+            .ok_or_else(|| invariant("native anchor width"))?;
+        if css != old {
+            state
+                .dom
+                .doc
+                .mutate()
+                .set_attribute(main, attr("style"), &css);
+            resized_anchor = true;
+        }
+    }
+    if resized_anchor {
+        state.dom.invalidate();
+        state.dom.resolve();
+    }
     for entry in &layers.open {
         if !entry.physical {
             continue;
@@ -533,10 +583,11 @@ fn sync_inner(
             continue;
         };
         let (width, height) = state.dom.doc.viewport().logical_size();
-        let (x, y) = match entry.config.placement {
+        let (x, y, arrow) = match entry.config.placement {
             LayerPlacement::Center => (
                 (f64::from(width) - panel.width) / 2.,
                 (f64::from(height) - panel.height) / 2.,
+                None,
             ),
             LayerPlacement::ContextPoint(point) => (
                 point
@@ -545,6 +596,7 @@ fn sync_inner(
                 point
                     .y
                     .clamp(8.0, (f64::from(height) - panel.height - 8.0).max(8.0)),
+                None,
             ),
             LayerPlacement::Viewport(placement) => {
                 let position = placement.resolve(
@@ -559,7 +611,7 @@ fn sync_inner(
                         ..Default::default()
                     },
                 )?;
-                (position.x, position.y)
+                (position.x, position.y, None)
             }
             LayerPlacement::Anchor(policy) => {
                 let Some(anchor) = entry
@@ -594,7 +646,34 @@ fn sync_inner(
                         height: f64::from(height),
                     },
                 )?;
-                (position.x, position.y)
+                let cross = policy.arrow.map(|arrow| {
+                    let vertical = matches!(
+                        position.side,
+                        glory_render::AnchorSide::Top | glory_render::AnchorSide::Bottom
+                    );
+                    let extent = if vertical { panel.width } else { panel.height };
+                    let centered = if vertical {
+                        anchor.x + anchor.width / 2.0 - position.x
+                    } else {
+                        anchor.y + anchor.height / 2.0 - position.y
+                    };
+                    let requested = match arrow.position {
+                        glory_render::AnchorArrowPosition::Center => centered,
+                        glory_render::AnchorArrowPosition::Side => match policy.align {
+                            glory_render::AnchorAlign::Start => arrow.offset + arrow.size / 2.0,
+                            glory_render::AnchorAlign::Center => centered,
+                            glory_render::AnchorAlign::End => {
+                                extent - arrow.offset - arrow.size / 2.0
+                            }
+                        },
+                    };
+                    requested.clamp(arrow.size, (extent - arrow.size).max(arrow.size))
+                });
+                (
+                    position.x,
+                    position.y,
+                    cross.and_then(|cross| policy.arrow.map(|arrow| (position.side, cross, arrow))),
+                )
             }
             _ => continue,
         };
@@ -616,6 +695,37 @@ fn sync_inner(
                     false,
                 )
             })
+            .and_then(|css| {
+                if let Some((_, cross, arrow)) = arrow {
+                    state
+                        .dom
+                        .doc
+                        .style_attr_set_property(
+                            &css,
+                            "--gly-anchor-arrow-cross",
+                            &format!("{cross}px"),
+                            false,
+                        )
+                        .and_then(|css| {
+                            state.dom.doc.style_attr_set_property(
+                                &css,
+                                "--gly-anchor-arrow-size",
+                                &format!("{}px", arrow.size),
+                                false,
+                            )
+                        })
+                        .and_then(|css| {
+                            state.dom.doc.style_attr_set_property(
+                                &css,
+                                "--gly-anchor-arrow-radius",
+                                &format!("{}px", arrow.radius),
+                                false,
+                            )
+                        })
+                } else {
+                    Some(css)
+                }
+            })
             .ok_or_else(|| invariant("native anchor style"))?;
         if css != old {
             state
@@ -623,6 +733,22 @@ fn sync_inner(
                 .doc
                 .mutate()
                 .set_attribute(main, attr("style"), &css);
+            state.dom.invalidate();
+        }
+        let resolved = arrow.map(|(side, _, _)| side.as_str());
+        let current = state
+            .dom
+            .doc
+            .get_node(main)
+            .and_then(|node| node.attr(apace_dom::LocalName::from("data-gly-anchor-resolved")));
+        if let Some(resolved) = resolved
+            && current != Some(resolved)
+        {
+            state
+                .dom
+                .doc
+                .mutate()
+                .set_attribute(main, attr("data-gly-anchor-resolved"), resolved);
             state.dom.invalidate();
         }
     }

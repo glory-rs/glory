@@ -56,7 +56,7 @@ use std::collections::{BTreeMap, HashMap};
 pub use mapping::{preflight, shape, shape_in};
 pub use serialize::{escape, rich_document, select_options, serialize};
 pub use styles::style;
-pub const FORMAT_VERSION: u32 = 14;
+pub const FORMAT_VERSION: u32 = 17;
 /// Namespace is determined solely by the mapper's finite element vocabulary.
 pub fn element_namespace(tag: &str) -> &'static str {
     if matches!(tag, "svg" | "path") {
@@ -92,6 +92,13 @@ pub const BASE_CSS: &str = concat!(
     "[data-gly-sheet][data-gly-layer=left]>[data-gly-sheet-grip]>*,[data-gly-sheet][data-gly-layer=right]>[data-gly-sheet-grip]>*{width:4px!important;height:48px!important}",
     "[data-gly-layer]:not(:popover-open){display:none!important}",
     "[data-gly-layer]{position:fixed;inset:auto;margin:0;max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px);overflow:auto;overscroll-behavior:contain}",
+    "[data-gly-anchor-match-width]{width:var(--gly-anchor-width)!important}",
+    "[data-gly-anchor-arrow]{overflow:visible}",
+    "[data-gly-anchor-arrow]::before{content:\"\";position:absolute;z-index:-1;width:var(--gly-anchor-arrow-size);height:var(--gly-anchor-arrow-size);border-radius:var(--gly-anchor-arrow-radius);background:inherit;border:inherit;transform:rotate(45deg);box-sizing:border-box}",
+    "[data-gly-anchor-arrow][data-gly-anchor-resolved=bottom]::before{left:calc(var(--gly-anchor-arrow-cross) - var(--gly-anchor-arrow-size)/2);top:calc(var(--gly-anchor-arrow-size)/-2)}",
+    "[data-gly-anchor-arrow][data-gly-anchor-resolved=top]::before{left:calc(var(--gly-anchor-arrow-cross) - var(--gly-anchor-arrow-size)/2);bottom:calc(var(--gly-anchor-arrow-size)/-2)}",
+    "[data-gly-anchor-arrow][data-gly-anchor-resolved=right]::before{top:calc(var(--gly-anchor-arrow-cross) - var(--gly-anchor-arrow-size)/2);left:calc(var(--gly-anchor-arrow-size)/-2)}",
+    "[data-gly-anchor-arrow][data-gly-anchor-resolved=left]::before{top:calc(var(--gly-anchor-arrow-cross) - var(--gly-anchor-arrow-size)/2);right:calc(var(--gly-anchor-arrow-size)/-2)}",
     "[data-gly-layer=center]{top:50%;left:50%;transform:translate(-50%,-50%)}",
     "[data-gly-layer=left]{left:0;top:0;height:100dvh;max-height:100dvh}",
     "[data-gly-layer=right]{right:0;top:0;height:100dvh;max-height:100dvh}",

@@ -149,6 +149,43 @@ fn every_numeric_policy_rejects_nonfinite_negative_and_excess_before_live_commit
             assert_eq!(memory.stats(), stats);
         }
     }
+    for arrow in [
+        AnchorArrow {
+            size: 0.,
+            ..AnchorArrow::default()
+        },
+        AnchorArrow {
+            size: 8.,
+            radius: 5.,
+            ..AnchorArrow::default()
+        },
+        AnchorArrow {
+            offset: f64::NAN,
+            ..AnchorArrow::default()
+        },
+    ] {
+        let mut invalid = descriptor.clone();
+        let LayerPlacement::Anchor(ref mut policy) = invalid
+            .semantics
+            .as_mut()
+            .unwrap()
+            .layer
+            .as_mut()
+            .unwrap()
+            .placement
+        else {
+            panic!()
+        };
+        policy.arrow = Some(arrow);
+        assert!(invalid.validate().is_err());
+        assert!(
+            memory
+                .prepare_patch(id, &Patch::Semantics(Change::Set(invalid.semantics)))
+                .is_err()
+        );
+        assert_eq!(memory.node(id).unwrap().descriptor, descriptor);
+        assert_eq!(memory.stats(), stats);
+    }
 }
 
 #[test]

@@ -6,6 +6,7 @@ fn image() -> Descriptor {
         source: "a.png".into(),
         revision: 1,
         alternative: Some("Photo".into()),
+        ..Default::default()
     }))
 }
 fn source(value: &str, revision: u64) -> Patch {
@@ -116,4 +117,58 @@ fn completion_target_and_future_revision_are_checked_before_delivery() {
             incoming: 2
         })
     ));
+}
+
+#[test]
+fn responsive_image_contract_is_finite_ordered_and_has_a_final_size() {
+    let valid = ResponsiveImage {
+        candidates: vec![
+            ImageCandidate {
+                source: "small.png".into(),
+                width: 320,
+            },
+            ImageCandidate {
+                source: "large.png".into(),
+                width: 960,
+            },
+        ],
+        sizes: vec![
+            ImageSizeHint {
+                max_viewport_width: Some(600),
+                slot: ImageSlotSize::ViewportWidth(100),
+            },
+            ImageSizeHint {
+                max_viewport_width: None,
+                slot: ImageSlotSize::Pixels(480),
+            },
+        ],
+    };
+    assert!(valid.validate().is_ok());
+    for invalid in [
+        ResponsiveImage {
+            candidates: vec![ImageCandidate {
+                source: "bad source.png".into(),
+                width: 320,
+            }],
+            sizes: valid.sizes.clone(),
+        },
+        ResponsiveImage {
+            candidates: valid.candidates.clone(),
+            sizes: vec![ImageSizeHint {
+                max_viewport_width: Some(600),
+                slot: ImageSlotSize::ViewportWidth(100),
+            }],
+        },
+        ResponsiveImage {
+            candidates: vec![valid.candidates[1].clone(), valid.candidates[0].clone()],
+            sizes: valid.sizes.clone(),
+        },
+    ] {
+        let mut descriptor = image();
+        let Props::Image(image) = &mut descriptor.props else {
+            unreachable!()
+        };
+        image.responsive = invalid;
+        assert!(descriptor.validate().is_err());
+    }
 }

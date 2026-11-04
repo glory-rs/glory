@@ -45,6 +45,14 @@ fn finite_anchor_policy_fields_survive_classic_patch_and_versioned_start_end() {
                                         viewport_padding: 23.,
                                         flip: false,
                                         shift: false,
+                                        match_width: true,
+                                        arrow: Some(glory_render::AnchorArrow {
+                                            size: 12.,
+                                            radius: 2.,
+                                            offset: 14.,
+                                            position: glory_render::AnchorArrowPosition::Side,
+                                        }),
+                                        ..AnchorPlacement::default()
                                     }
                                 } else {
                                     AnchorPlacement::default()
@@ -98,6 +106,12 @@ fn finite_anchor_policy_fields_survive_classic_patch_and_versioned_start_end() {
         "data-gly-anchor-padding",
         "data-gly-anchor-flip",
         "data-gly-anchor-shift",
+        "data-gly-anchor-match-width",
+        "data-gly-anchor-arrow",
+        "data-gly-anchor-arrow-size",
+        "data-gly-anchor-arrow-radius",
+        "data-gly-anchor-arrow-offset",
+        "data-gly-anchor-arrow-position",
         "data-gly-viewport-x",
         "data-gly-viewport-y",
         "data-gly-viewport-padding",

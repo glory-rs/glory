@@ -87,8 +87,7 @@ impl crate::Semantics {
             if !valid
                 || self.id.is_none()
                 || self.controls.is_none()
-                || !(self.popup == Some(PopupKind::Listbox)
-                    || kind == ComboboxKind::Select && self.popup == Some(PopupKind::Tree))
+                || !(self.popup == Some(PopupKind::Listbox) || self.popup == Some(PopupKind::Tree))
                 || self.expanded.is_none()
                 || self.tab
                 || self.menu_item.is_some()

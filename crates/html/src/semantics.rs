@@ -503,6 +503,23 @@ pub(crate) fn attributes(
             );
             attrs.insert("data-gly-anchor-flip", placement.flip.to_string());
             attrs.insert("data-gly-anchor-shift", placement.shift.to_string());
+            if placement.match_width {
+                attrs.insert("data-gly-anchor-match-width", String::new());
+            }
+            if let Some(arrow) = placement.arrow {
+                attrs.insert("data-gly-anchor-arrow", String::new());
+                attrs.insert("data-gly-anchor-arrow-size", arrow.size.to_string());
+                attrs.insert("data-gly-anchor-arrow-radius", arrow.radius.to_string());
+                attrs.insert("data-gly-anchor-arrow-offset", arrow.offset.to_string());
+                attrs.insert(
+                    "data-gly-anchor-arrow-position",
+                    match arrow.position {
+                        glory_render::AnchorArrowPosition::Center => "center",
+                        glory_render::AnchorArrowPosition::Side => "side",
+                    }
+                    .into(),
+                );
+            }
         }
         if let glory_render::LayerPlacement::ContextPoint(point) = layer.placement {
             attrs.insert("data-gly-context-x", point.x.to_string());

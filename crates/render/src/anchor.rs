@@ -34,6 +34,49 @@ pub enum AnchorAlign {
     Center,
     End,
 }
+/// Finite arrow placement within the resolved panel edge.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum AnchorArrowPosition {
+    /// Point at the physical center of the live anchor, clamped inside the panel.
+    #[default]
+    Center,
+    /// Keep a fixed inset from the aligned panel edge.
+    Side,
+}
+
+/// Host-rendered anchored-layer arrow, in viewport CSS pixels.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct AnchorArrow {
+    pub size: f64,
+    pub radius: f64,
+    pub offset: f64,
+    pub position: AnchorArrowPosition,
+}
+impl Default for AnchorArrow {
+    fn default() -> Self {
+        Self {
+            size: 8.0,
+            radius: 1.0,
+            offset: 10.0,
+            position: AnchorArrowPosition::Center,
+        }
+    }
+}
+impl AnchorArrow {
+    pub fn validate(self) -> Result<(), Error> {
+        if [self.size, self.radius, self.offset]
+            .iter()
+            .any(|value| !value.is_finite() || !(0.0..=4096.0).contains(value))
+            || self.size == 0.0
+            || self.radius > self.size / 2.0
+        {
+            return Err(Error::InvalidProps(
+                "anchor arrow size, radius and offset must be finite; size must be positive and radius no greater than half the size",
+            ));
+        }
+        Ok(())
+    }
+}
 impl AnchorAlign {
     pub fn as_str(self) -> &'static str {
         match self {
@@ -54,6 +97,10 @@ pub struct AnchorPlacement {
     pub viewport_padding: f64,
     pub flip: bool,
     pub shift: bool,
+    /// Size the panel border box to the live anchor width before placement.
+    pub match_width: bool,
+    /// Render a host-owned arrow using the collision-resolved side.
+    pub arrow: Option<AnchorArrow>,
 }
 impl Default for AnchorPlacement {
     fn default() -> Self {
@@ -69,6 +116,8 @@ impl AnchorPlacement {
             viewport_padding: 8.0,
             flip: true,
             shift: true,
+            match_width: false,
+            arrow: None,
         }
     }
     pub const fn gap(mut self, value: f64) -> Self {
@@ -83,6 +132,9 @@ impl AnchorPlacement {
             return Err(Error::InvalidProps(
                 "anchor gap and viewport padding must be finite and within 4096 CSS pixels",
             ));
+        }
+        if let Some(arrow) = self.arrow {
+            arrow.validate()?;
         }
         Ok(())
     }

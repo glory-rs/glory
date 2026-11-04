@@ -600,6 +600,32 @@ impl Image {
         });
         self
     }
+    pub fn responsive(mut self, value: glory_render::ResponsiveImage) -> Self {
+        let Props::Image(props) = &mut self
+            .inner
+            .descriptor
+            .as_mut()
+            .expect("unmounted builder")
+            .props
+        else {
+            unreachable!()
+        };
+        props.responsive = value;
+        self
+    }
+    pub fn loading(mut self, value: glory_render::ImageLoading) -> Self {
+        let Props::Image(props) = &mut self
+            .inner
+            .descriptor
+            .as_mut()
+            .expect("unmounted builder")
+            .props
+        else {
+            unreachable!()
+        };
+        props.loading = value;
+        self
+    }
     pub fn alt(mut self, value: impl Into<Vary<String>>) -> Self {
         self.inner.needs_alt = false;
         self.inner.set(Slot::Alternative, value, |value| {

@@ -7,6 +7,7 @@ fn length(value: Length) -> String {
         Length::Px(value) => format!("{value}px"),
         Length::Percent(value) => format!("{value}%"),
         Length::Ch(value) => format!("{value}ch"),
+        Length::ChPx { ch, px } => format!("calc({ch}ch {} {}px)", if px < 0. { "-" } else { "+" }, px.abs()),
     }
 }
 fn limit(value: Limit) -> String {
@@ -207,6 +208,7 @@ pub fn style(style: &Style) -> String {
         ("gap", style.gap),
         ("font-size", style.font_size),
         ("line-height", style.line_height),
+        ("letter-spacing", style.letter_spacing),
         ("border-radius", style.radius),
     ] {
         if let Some(value) = value {
@@ -247,6 +249,39 @@ pub fn style(style: &Style) -> String {
             declaration(name, color(value));
         }
     }
+    if let Some(value) = &style.background_image {
+        declaration(
+            "background-image",
+            format!(
+                "linear-gradient({}deg,{})",
+                value.angle,
+                value
+                    .stops
+                    .iter()
+                    .map(|stop| color(*stop))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ),
+        );
+    }
+    if let Some(value) = &style.text_gradient {
+        declaration(
+            "background-image",
+            format!(
+                "linear-gradient({}deg,{})",
+                value.angle,
+                value
+                    .stops
+                    .iter()
+                    .map(|stop| color(*stop))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            ),
+        );
+        declaration("background-clip", "text".into());
+        declaration("-webkit-background-clip", "text".into());
+        declaration("color", "transparent".into());
+    }
     if let Some(value) = &style.font_family {
         declaration(
             "font-family",
@@ -272,6 +307,12 @@ pub fn style(style: &Style) -> String {
             }
             .into(),
         );
+    }
+    if let Some(value) = style.line_clamp {
+        declaration("display", "-webkit-box".into());
+        declaration("-webkit-box-orient", "vertical".into());
+        declaration("-webkit-line-clamp", value.to_string());
+        declaration("overflow", "hidden".into());
     }
     if let Some(value) = style.white_space {
         declaration(

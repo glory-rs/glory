@@ -13,8 +13,8 @@ default = []
 css = ["glory-style/css"]
 
 [dependencies]
-glory-render = { path = "../render", version = "0.6.1" }
-glory-style = { path = "../style", version = "0.6.1" }
+glory-render = { path = "../render", version = "0.7.0" }
+glory-style = { path = "../style", version = "0.7.0" }
 
 [lints]
 workspace = true

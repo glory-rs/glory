@@ -8,6 +8,17 @@ canonicalization makes HTML-equivalent NUL/CR inputs compare consistently.
 Descriptor construction, prepared live patches, rollback and direct adapter
 application enforce the same rule. This is a breaking Rust API change.
 
+`ImageProps::responsive` is a finite host source-selection declaration: at most
+16 whitespace-free candidates use strictly increasing `1..=16384` width
+descriptors, and at most eight ordered viewport hints end in one unconditional
+pixel or viewport-width size. `ImageLoading::{Auto,Eager,Lazy}` is independent of
+the request revision. HTML format v17 lowers these fields to real `srcset`,
+`sizes` and `loading` attributes, so the browser still owns candidate choice and
+the existing decode observer watches the selected real request. The native Apace
+host rejects responsive candidates and `Lazy` at descriptor preflight before
+identity allocation or resource work; its single-source Auto/Eager path is
+unchanged.
+
 Glory's Image builder allocates a bound source revision from the live node,
 including after explicit writes. `Scope::set_image_source` also allocates that
 revision and can explicitly retry the same URL. Higher-revision same-URL writes
@@ -51,7 +62,7 @@ requires an explicit base URL/provider and its existing origin, body, request,
 decode and cache budgets. The injected test provider supplies deterministic PNG
 bytes and proves the protocol, not production transport or OS accessibility.
 
-Evidence: render and UI `image_revision` tests, HTML field-delta oracle, SSR stream
+Evidence: render and UI `image_revision` tests, HTML `responsive_image` and field-delta oracle, SSR stream
 image test, native `image_events`, `object_fit` raster tests and the genuine fork's
 six `image_observation_tests`. The fork is pinned to
 `fa10341fd05899041079b30ab66363f89ccf0404`; its 106 library tests pass in sequential

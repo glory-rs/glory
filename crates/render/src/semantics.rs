@@ -441,11 +441,10 @@ impl Semantics {
             capture.validate()?;
             if !matches!(d.props,Props::Input(p) if !p.multiline&&p.value.len()<=capture.max_bytes)
                 || self.tags_input.is_some()
-                || self.spinbutton.is_some()
                 || self.combobox.is_some()
             {
                 return Err(Error::InvalidProps(
-                    "input edit capture requires an independent bounded single-line Input",
+                    "input edit capture requires a bounded single-line Input or SpinButton",
                 ));
             }
         }
@@ -967,7 +966,7 @@ impl Semantics {
                         || self.navigation != Some(Orientation::Vertical)))
                 || (d.role == Some(Role::Tree)
                     && (layer.modal
-                        || layer.focus != LayerFocus::Manage
+                        || !matches!(layer.focus, LayerFocus::Manage | LayerFocus::Preserve)
                         || self.tree_navigation.is_none()
                         || d.focus == crate::FocusMode::Auto))
                 || (d.role == Some(Role::Menu)

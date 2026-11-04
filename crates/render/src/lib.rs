@@ -7,7 +7,9 @@ pub use viewport_layer::ViewportPlacement;
 #[cfg(feature = "conformance")]
 pub mod conformance;
 mod id;
-pub use anchor::{AnchorAlign, AnchorPlacement, AnchorPosition, AnchorSide};
+pub use anchor::{
+    AnchorAlign, AnchorArrow, AnchorArrowPosition, AnchorPlacement, AnchorPosition, AnchorSide,
+};
 mod node_map;
 pub use node_map::NodeMap;
 mod collapse;
