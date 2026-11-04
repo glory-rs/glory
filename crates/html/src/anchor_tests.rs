@@ -71,6 +71,23 @@ fn every_anchor_field_and_reset_matches_the_full_shape_differential_oracle() {
                 shift: false,
                 ..p
             }));
+            placements.push(LayerPlacement::Anchor(AnchorPlacement {
+                match_width: true,
+                ..p
+            }));
+            placements.push(LayerPlacement::Anchor(AnchorPlacement {
+                arrow: Some(AnchorArrow::default()),
+                ..p
+            }));
+            placements.push(LayerPlacement::Anchor(AnchorPlacement {
+                arrow: Some(AnchorArrow {
+                    size: 13.,
+                    radius: 3.,
+                    offset: 17.,
+                    position: AnchorArrowPosition::Side,
+                }),
+                ..p
+            }));
         }
     }
     for base in placements.iter().copied().map(descriptor) {

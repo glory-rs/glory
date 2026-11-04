@@ -25,6 +25,9 @@ pub enum Length {
     Percent(f64),
     /// Advance of the current font's zero glyph, resolved by the host font engine.
     Ch(f64),
+    /// A finite sum of font-relative zero-glyph advances and CSS pixels.
+    /// Dimensions require nonnegative coefficients; insets may be signed.
+    ChPx { ch: f64, px: f64 },
 }
 
 impl Length {
@@ -32,6 +35,7 @@ impl Length {
         match self {
             Self::Auto => true,
             Self::Px(value) | Self::Percent(value) | Self::Ch(value) => value.is_finite(),
+            Self::ChPx { ch, px } => ch.is_finite() && px.is_finite(),
         }
     }
 
@@ -40,6 +44,7 @@ impl Length {
             && match self {
                 Self::Auto => true,
                 Self::Px(value) | Self::Percent(value) | Self::Ch(value) => value >= 0.0,
+                Self::ChPx { ch, px } => ch >= 0.0 && px >= 0.0,
             }
     }
 }
@@ -183,6 +188,13 @@ impl Edges {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Color(pub u8, pub u8, pub u8, pub u8);
 
+/// A CSS linear gradient with evenly spaced color stops.
+#[derive(Clone, Debug, PartialEq)]
+pub struct LinearGradient {
+    pub angle: f64,
+    pub stops: Vec<Color>,
+}
+
 /// One finite outset shadow, expressed in CSS pixels. Insets, multiple layers
 /// and currentColor are outside this explicit portable declaration.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -307,14 +319,22 @@ pub struct Style {
     pub scroll_anchor: Option<bool>,
     pub color: Option<Color>,
     pub background: Option<Color>,
+    pub background_image: Option<LinearGradient>,
+    /// A text fill lowered by HTML-family hosts to a clipped linear gradient.
+    pub text_gradient: Option<LinearGradient>,
     pub font_size: Option<f64>,
     pub line_height: Option<f64>,
+    /// Additional advance between glyphs in CSS pixels; explicit zero resets it.
+    pub letter_spacing: Option<f64>,
     /// Ordered fallback list. An empty explicit list is invalid.
     pub font_family: Option<Vec<Family>>,
     /// Absolute CSS weight in [1, 1000], including variable-font fractions.
     pub font_weight: Option<f64>,
     pub white_space: Option<WhiteSpace>,
     pub text_overflow: Option<TextOverflow>,
+    /// Maximum visible text lines. HTML lowers this to the interoperable
+    /// line-clamp box contract; adapters must explicitly advertise support.
+    pub line_clamp: Option<u16>,
     pub field_sizing: Option<FieldSizing>,
     pub border_width: Option<Edges>,
     pub border_color: Option<Color>,
@@ -357,6 +377,14 @@ impl Style {
     }
     pub fn text_overflow(mut self, value: TextOverflow) -> Self {
         self.text_overflow = Some(value);
+        self
+    }
+    pub fn text_gradient(mut self, value: LinearGradient) -> Self {
+        self.text_gradient = Some(value);
+        self
+    }
+    pub fn line_clamp(mut self, value: u16) -> Self {
+        self.line_clamp = Some(value);
         self
     }
     pub fn flex_wrap(mut self, value: FlexWrap) -> Self {
@@ -451,6 +479,10 @@ impl Style {
         self.scroll_anchor = Some(value);
         self
     }
+    pub fn background_image(mut self, value: LinearGradient) -> Self {
+        self.background_image = Some(value);
+        self
+    }
 
     pub fn font_family(mut self, value: impl IntoIterator<Item = Family>) -> Self {
         self.font_family = Some(value.into_iter().collect());
@@ -462,6 +494,10 @@ impl Style {
     }
     pub fn white_space(mut self, value: WhiteSpace) -> Self {
         self.white_space = Some(value);
+        self
+    }
+    pub fn letter_spacing(mut self, value: f64) -> Self {
+        self.letter_spacing = Some(value);
         self
     }
     pub fn border_width(mut self, value: Edges) -> Self {
@@ -537,6 +573,22 @@ impl Style {
             .any(|v| !v.is_finite() || v <= 0.0)
         {
             return Err("text sizes must be finite and positive");
+        }
+        if self.letter_spacing.is_some_and(|value| !value.is_finite()) {
+            return Err("letter spacing must be finite");
+        }
+        if [self.background_image.as_ref(), self.text_gradient.as_ref()]
+            .into_iter()
+            .flatten()
+            .any(|gradient| !gradient.angle.is_finite() || gradient.stops.len() < 2)
+        {
+            return Err("linear gradients require a finite angle and at least two stops");
+        }
+        if self
+            .line_clamp
+            .is_some_and(|lines| lines == 0 || lines > 256)
+        {
+            return Err("line clamp must be within 1..=256 lines");
         }
         if self.font_family.as_ref().is_some_and(|families| {
             families.is_empty()

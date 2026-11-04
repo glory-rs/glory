@@ -488,6 +488,47 @@ fn shape_view(descriptor: glory_render::DescriptorView<'_>) -> Result<Shape, Err
             if value.alternative.is_none() {
                 attrs(&mut shape, Part::Main).insert("aria-hidden", "true".into());
             }
+            if !value.responsive.candidates.is_empty() {
+                attrs(&mut shape, Part::Main).insert(
+                    "srcset",
+                    value
+                        .responsive
+                        .candidates
+                        .iter()
+                        .map(|candidate| format!("{} {}w", candidate.source, candidate.width))
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                );
+                attrs(&mut shape, Part::Main).insert(
+                    "sizes",
+                    value
+                        .responsive
+                        .sizes
+                        .iter()
+                        .map(|hint| {
+                            let slot = match hint.slot {
+                                glory_render::ImageSlotSize::Pixels(value) => format!("{value}px"),
+                                glory_render::ImageSlotSize::ViewportWidth(value) => {
+                                    format!("{value}vw")
+                                }
+                            };
+                            hint.max_viewport_width.map_or(slot.clone(), |width| {
+                                format!("(max-width: {width}px) {slot}")
+                            })
+                        })
+                        .collect::<Vec<_>>()
+                        .join(", "),
+                );
+            }
+            match value.loading {
+                glory_render::ImageLoading::Auto => {}
+                glory_render::ImageLoading::Eager => {
+                    attrs(&mut shape, Part::Main).insert("loading", "eager".into());
+                }
+                glory_render::ImageLoading::Lazy => {
+                    attrs(&mut shape, Part::Main).insert("loading", "lazy".into());
+                }
+            }
             "image"
         }
         Props::Graphic(value) => {

@@ -60,12 +60,14 @@ use style::computed_values::visibility::T as Visibility;
 /// Re-audit these exclusions against real geometry/paint before widening them.
 pub const STYLE_PROFILE: glory_render::style::Profile = glory_render::style::Profile {
     name: "apace",
-    version: 11,
+    version: 14,
     inline: glory_render::style::Support::ALL
         .without_value(glory_render::style::Value::Sticky)
         .without_value(glory_render::style::Value::AnchorAuto)
         .without_property(glory_render::style::Property::FieldSizing)
-        .without_property(glory_render::style::Property::TextOverflow),
+        .without_property(glory_render::style::Property::TextOverflow)
+        .without_property(glory_render::style::Property::LineClamp)
+        .without_property(glory_render::style::Property::TextGradient),
     css: glory_render::style::Css::Html,
 };
 
@@ -1580,6 +1582,15 @@ impl Render for Renderer {
         node: glory_render::DescriptorView<'_>,
         patch: Option<&glory_render::Patch>,
     ) -> Result<(), Error> {
+        if patch.is_none()
+            && let glory_render::Props::Image(image) = node.props
+            && (!image.responsive.candidates.is_empty()
+                || image.loading == glory_render::ImageLoading::Lazy)
+        {
+            return Err(Error::Unsupported(
+                "native images do not support responsive source selection or lazy loading",
+            ));
+        }
         check_layer(node, patch)?;
         let files_enabled = self.capabilities().files;
         check_mode(node, patch, files_enabled)?;

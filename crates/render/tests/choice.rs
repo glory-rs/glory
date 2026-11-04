@@ -127,6 +127,9 @@ fn autocomplete_and_multiple_are_intrinsic_inputs_with_finite_remove_last_comman
         descriptor.semantics.as_mut().unwrap().combobox = Some(kind);
         descriptor.semantics.as_mut().unwrap().typeahead = kind == ComboboxKind::Select;
         descriptor.validate().unwrap();
+        let mut tree_descriptor = descriptor.clone();
+        tree_descriptor.semantics.as_mut().unwrap().popup = Some(PopupKind::Tree);
+        tree_descriptor.validate().unwrap();
         let id = ids.allocate();
         let event = Event::Choice {
             from: id,

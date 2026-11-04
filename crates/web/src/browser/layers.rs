@@ -188,6 +188,7 @@ struct Position {
     element: Element,
     x: f64,
     y: f64,
+    anchor: Option<(glory_render::AnchorSide, f64, glory_render::AnchorArrow)>,
 }
 fn position(dom: &Dom, open: &Open, offset: (f64, f64)) -> Result<Option<Position>, Error> {
     let bounds = open.element.get_bounding_client_rect();
@@ -222,6 +223,7 @@ fn position(dom: &Dom, open: &Open, offset: (f64, f64)) -> Result<Option<Positio
             element: open.element.clone(),
             x: resolved.x,
             y: resolved.y,
+            anchor: None,
         }));
     }
     let Some(anchor) = named(dom, open.config.anchor.as_ref()) else {
@@ -235,11 +237,21 @@ fn position(dom: &Dom, open: &Open, offset: (f64, f64)) -> Result<Option<Positio
             y: point
                 .y
                 .clamp(8.0, (height - bounds.height() - 8.0).max(8.0)),
+            anchor: None,
         }));
     }
     let LayerPlacement::Anchor(placement) = open.config.placement else {
         return Ok(None);
     };
+    let style = open
+        .element
+        .dyn_ref::<web_sys::HtmlElement>()
+        .ok_or(Error::Unsupported("layer element"))?
+        .style();
+    style
+        .set_property("--gly-anchor-width", &format!("{}px", anchor.width()))
+        .map_err(backend)?;
+    let bounds = open.element.get_bounding_client_rect();
     let resolved = placement.resolve(
         glory_render::Rect {
             x: anchor.x() + offset.0,
@@ -258,10 +270,37 @@ fn position(dom: &Dom, open: &Open, offset: (f64, f64)) -> Result<Option<Positio
             ..Default::default()
         },
     )?;
+    let arrow_cross = placement.arrow.map(|arrow| {
+        let vertical = matches!(
+            resolved.side,
+            glory_render::AnchorSide::Top | glory_render::AnchorSide::Bottom
+        );
+        let extent = if vertical {
+            bounds.width()
+        } else {
+            bounds.height()
+        };
+        let centered = if vertical {
+            anchor.x() + anchor.width() / 2.0 + offset.0 - resolved.x
+        } else {
+            anchor.y() + anchor.height() / 2.0 + offset.1 - resolved.y
+        };
+        let requested = match arrow.position {
+            glory_render::AnchorArrowPosition::Center => centered,
+            glory_render::AnchorArrowPosition::Side => match placement.align {
+                glory_render::AnchorAlign::Start => arrow.offset + arrow.size / 2.0,
+                glory_render::AnchorAlign::Center => centered,
+                glory_render::AnchorAlign::End => extent - arrow.offset - arrow.size / 2.0,
+            },
+        };
+        requested.clamp(arrow.size, (extent - arrow.size).max(arrow.size))
+    });
     Ok(Some(Position {
         element: open.element.clone(),
         x: resolved.x,
         y: resolved.y,
+        anchor: arrow_cross
+            .and_then(|cross| placement.arrow.map(|arrow| (resolved.side, cross, arrow))),
     }))
 }
 fn place(position: Position) -> Result<(), Error> {
@@ -276,6 +315,29 @@ fn place(position: Position) -> Result<(), Error> {
     style
         .set_property("--gly-layer-y", &format!("{}px", position.y))
         .map_err(backend)?;
+    if let Some((side, cross, arrow)) = position.anchor {
+        position
+            .element
+            .set_attribute("data-gly-anchor-resolved", side.as_str())
+            .map_err(backend)?;
+        style
+            .set_property("--gly-anchor-arrow-cross", &format!("{cross}px"))
+            .map_err(backend)?;
+        style
+            .set_property("--gly-anchor-arrow-size", &format!("{}px", arrow.size))
+            .map_err(backend)?;
+        style
+            .set_property("--gly-anchor-arrow-radius", &format!("{}px", arrow.radius))
+            .map_err(backend)?;
+    } else {
+        position
+            .element
+            .remove_attribute("data-gly-anchor-resolved")
+            .map_err(backend)?;
+        style
+            .remove_property("--gly-anchor-arrow-cross")
+            .map_err(backend)?;
+    }
     Ok(())
 }
 fn positions(dom: &Dom, stack: &[Open]) -> Result<(), Error> {

@@ -2,7 +2,9 @@
 
 use glory_apace::Renderer;
 use glory_html::Part;
-use glory_render::style::{Css, Length, Overflow, Position, Property, Style, Unsupported, Value};
+use glory_render::style::{
+    Color, Css, Length, LinearGradient, Overflow, Position, Property, Style, Unsupported, Value,
+};
 use glory_render::*;
 use glory_ui::{App, Error as UiError, input, view};
 use std::cell::RefCell;
@@ -27,7 +29,7 @@ fn unsupported(property: Property, value: Value) -> Error {
         },
     }
 }
-fn rejected() -> [(Style, Error); 6] {
+fn rejected() -> [(Style, Error); 8] {
     [
         (
             Style::new().text_overflow(glory_render::style::TextOverflow::Clip),
@@ -81,6 +83,31 @@ fn rejected() -> [(Style, Error); 6] {
                 },
             },
         ),
+        (
+            Style::new().line_clamp(2),
+            Error::UnsupportedStyle {
+                profile: "apace",
+                version: glory_apace::STYLE_PROFILE.version,
+                requirement: Unsupported {
+                    property: Property::LineClamp,
+                    value: None,
+                },
+            },
+        ),
+        (
+            Style::new().text_gradient(LinearGradient {
+                angle: 90.0,
+                stops: vec![Color(255, 0, 0, 255), Color(0, 0, 255, 255)],
+            }),
+            Error::UnsupportedStyle {
+                profile: "apace",
+                version: glory_apace::STYLE_PROFILE.version,
+                requirement: Unsupported {
+                    property: Property::TextGradient,
+                    value: None,
+                },
+            },
+        ),
     ]
 }
 fn query(app: &App, query: Query) -> QueryValue {
@@ -103,7 +130,13 @@ fn native_profile_distinguishes_unimplemented_values_from_the_html_dialect() {
     for property in Property::ALL {
         assert_eq!(
             profile.inline.supports_property(*property),
-            !matches!(property, Property::FieldSizing | Property::TextOverflow),
+            !matches!(
+                property,
+                Property::FieldSizing
+                    | Property::TextOverflow
+                    | Property::LineClamp
+                    | Property::TextGradient
+            ),
             "{property:?}"
         );
     }
@@ -116,7 +149,7 @@ fn native_profile_distinguishes_unimplemented_values_from_the_html_dialect() {
     }
     assert_eq!(
         (profile.name, profile.version, profile.css),
-        ("apace", 11, Css::Html)
+        ("apace", 13, Css::Html)
     );
     assert!(
         glory_render::style::Profile::HTML
@@ -145,6 +178,46 @@ fn native_creation_and_explicit_preflight_reject_before_identity_queue_or_layout
     assert_eq!(id.slot(), 0);
     app.flush().unwrap();
     assert!(renderer.engine_id(id, Part::Main).is_ok());
+}
+
+#[test]
+fn native_images_reject_web_source_selection_before_identity_or_resource_work() {
+    let (app, renderer) = app();
+    for props in [
+        ImageProps {
+            source: "default.png".into(),
+            alternative: Some("Photo".into()),
+            loading: ImageLoading::Lazy,
+            ..Default::default()
+        },
+        ImageProps {
+            source: "default.png".into(),
+            alternative: Some("Photo".into()),
+            responsive: ResponsiveImage {
+                candidates: vec![ImageCandidate {
+                    source: "small.png".into(),
+                    width: 320,
+                }],
+                sizes: vec![ImageSizeHint {
+                    max_viewport_width: None,
+                    slot: ImageSlotSize::ViewportWidth(100),
+                }],
+            },
+            ..Default::default()
+        },
+    ] {
+        let node = Descriptor::new(Props::Image(props));
+        let before = (app.stats(), app.tree().stats(), renderer.stats());
+        assert!(matches!(
+            renderer.preflight(node.view(), None),
+            Err(Error::Unsupported(_))
+        ));
+        assert!(matches!(
+            app.scope().create(node),
+            Err(UiError::Render(Error::Unsupported(_)))
+        ));
+        assert_eq!((app.stats(), app.tree().stats(), renderer.stats()), before);
+    }
 }
 
 #[test]

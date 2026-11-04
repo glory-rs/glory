@@ -41,6 +41,16 @@ fn edit_capture_has_explicit_target_budget_and_single_typed_path() {
     let mut n = n.clone();
     n.semantics.as_mut().unwrap().tags_input = Some(TagSeparators::default());
     assert!(n.validate().is_err());
+
+    let mut spin = node();
+    spin.semantics.as_mut().unwrap().spinbutton = Some(SpinValue {
+        min: Some(0.),
+        max: Some(23.),
+        value: Some(12.),
+        ..Default::default()
+    });
+    spin.validate().unwrap();
+    EventKind::InputEdit.validate_target(&spin).unwrap();
 }
 #[test]
 fn edit_payload_validates_current_revision_utf16_direction_and_canonical_bounded_text() {

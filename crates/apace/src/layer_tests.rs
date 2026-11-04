@@ -280,6 +280,36 @@ fn native_anchored_layer_uses_all_finite_sides_and_survives_viewport_scroll() {
             assert_eq!((p.x, p.y), (expected.x, expected.y), "{side:?}/{align:?}");
         }
     }
+    let matched = AnchorPlacement {
+        side: AnchorSide::Bottom,
+        align: AnchorAlign::Center,
+        match_width: true,
+        arrow: Some(glory_render::AnchorArrow {
+            size: 10.,
+            radius: 2.,
+            offset: 12.,
+            position: glory_render::AnchorArrowPosition::Side,
+        }),
+        ..AnchorPlacement::default()
+    };
+    policy.revise(|value| *value = matched);
+    settle(&mut app);
+    let a = bounds_now(&app, anchor.get().unwrap());
+    let p = bounds_now(&app, panel.get().unwrap());
+    assert_eq!(p.width, a.width);
+    let expected = matched
+        .resolve(
+            a,
+            p,
+            Rect {
+                x: 0.,
+                y: 0.,
+                width: 800.,
+                height: 600.,
+            },
+        )
+        .unwrap();
+    assert_eq!((p.x, p.y), (expected.x, expected.y));
 }
 
 #[test]

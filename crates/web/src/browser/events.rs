@@ -459,8 +459,10 @@ fn receive(dom: &Rc<Dom>, name: &str, event: web_sys::Event) -> Result<(), glory
         return Ok(());
     }
     if name == "pointerdown"
-        && (element.has_attribute("data-gly-option-owner")
-            || element.has_attribute("data-gly-menubar-item"))
+        && element
+            .closest("[data-gly-option-owner],[data-gly-menubar-item]")
+            .map_err(backend)?
+            .is_some()
         && let Some(pointer) = event.dyn_ref::<web_sys::PointerEvent>()
         && pointer.is_primary()
         && pointer.button() == 0

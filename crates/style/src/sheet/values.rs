@@ -8,6 +8,22 @@ fn invalid<'i>(input: &Parser<'i>, expected: &str) -> ParseError<Error> {
 }
 fn length<'i>(input: &mut Parser<'i>) -> Result<Length> {
     match input.next()?.clone() {
+        Token::Function(name) if name.eq_ignore_ascii_case("calc") => input.parse_nested_block(|input| {
+            let ch = match input.next()?.clone() {
+                Token::Dimension { value, unit, .. } if unit.eq_ignore_ascii_case("ch") => f64::from(value),
+                _ => return Err(invalid(input, "expected calc(ch + px)")),
+            };
+            let sign = match input.next()?.clone() {
+                Token::Delim('+') => 1., Token::Delim('-') => -1.,
+                _ => return Err(invalid(input, "expected + or -")),
+            };
+            let px = match input.next()?.clone() {
+                Token::Dimension { value, unit, .. } if unit.eq_ignore_ascii_case("px") => f64::from(value) * sign,
+                _ => return Err(invalid(input, "expected px term")),
+            };
+            input.expect_exhausted()?;
+            Ok(Length::ChPx { ch, px })
+        }),
         Token::Ident(name) if name.eq_ignore_ascii_case("auto") => Ok(Length::Auto),
         Token::Percentage { unit_value, .. } => Ok(Length::Percent(f64::from(unit_value) * 100.0)),
         Token::Dimension { value, unit, .. } if unit.eq_ignore_ascii_case("px") => {
@@ -27,7 +43,7 @@ fn limit<'i>(input: &mut Parser<'i>) -> Result<Limit> {
     match length(input)? {
         Length::Px(v) => Ok(Limit::Px(v)),
         Length::Percent(v) => Ok(Limit::Percent(v)),
-        Length::Auto | Length::Ch(_) => Err(invalid(input, "max sizes require px, % or none")),
+        Length::Auto | Length::Ch(_) | Length::ChPx { .. } => Err(invalid(input, "max sizes require px, % or none")),
     }
 }
 fn px<'i>(input: &mut Parser<'i>) -> Result<f64> {
@@ -110,6 +126,21 @@ fn color<'i>(input: &mut Parser<'i>) -> Result<Color> {
             };
     }
     Ok(Color(out[0], out[1], out[2], out[3]))
+}
+
+fn linear_gradient<'i>(input: &mut Parser<'i>) -> Result<LinearGradient> {
+    input.expect_function_matching("linear-gradient")?;
+    input.parse_nested_block(|input| {
+        let angle = match input.next()?.clone() {
+            Token::Dimension { value, unit, .. } if unit.eq_ignore_ascii_case("deg") => {
+                value.into()
+            }
+            _ => return Err(invalid(input, "expected a linear-gradient angle in deg")),
+        };
+        input.expect_comma()?;
+        let stops = input.parse_comma_separated(color)?;
+        Ok(LinearGradient { angle, stops })
+    })
 }
 
 fn box_shadow<'i>(input: &mut Parser<'i>) -> Result<BoxShadow> {
@@ -229,7 +260,10 @@ pub(super) fn parse<'i>(name: &str, input: &mut Parser<'i>) -> Result<Style> {
         "flex-shrink" => style.shrink = Some(input.expect_number()?.into()),
         "color" => style.color = Some(color(input)?),
         "background-color" => style.background = Some(color(input)?),
+        "background-image" => style.background_image = Some(linear_gradient(input)?),
+        "text-gradient" => style.text_gradient = Some(linear_gradient(input)?),
         "font-family" => style.font_family = Some(families(input)?),
+        "letter-spacing" => style.letter_spacing = Some(if input.try_parse(|p| p.expect_ident_matching("normal")).is_ok() { 0. } else { px(input)? }),
         "font-weight" => {
             style.font_weight = Some(if let Ok(value) = input.try_parse(|p| p.expect_number()) {
                 value.into()
@@ -258,6 +292,12 @@ pub(super) fn parse<'i>(name: &str, input: &mut Parser<'i>) -> Result<Style> {
         "text-overflow" => {
             style.text_overflow =
                 Some(keyword!(input,"clip"=>TextOverflow::Clip,"ellipsis"=>TextOverflow::Ellipsis))
+        }
+        "line-clamp" => {
+            let value = input.expect_integer()?;
+            style.line_clamp = Some(
+                u16::try_from(value).map_err(|_| invalid(input, "line clamp within 1..=256"))?,
+            );
         }
         "position" => {
             style.position = Some(

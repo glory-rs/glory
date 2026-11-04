@@ -205,6 +205,7 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
             source: "old.png".into(),
             revision: 1,
             alternative: Some("old".into()),
+            ..Default::default()
         }),
         Props::Link(LinkProps {
             target: "#old".into(),
@@ -1216,6 +1217,11 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
         style::Style::new().left(style::Length::Ch(2.)),
         style::Style::new().right(style::Length::Ch(3.)),
         style::Style::new().bottom(style::Length::Ch(4.)),
+        style::Style::new().width(style::Length::ChPx { ch: 6., px: 144. }),
+        style::Style::new().left(style::Length::ChPx { ch: -1., px: -2. }),
+        style::Style::new().letter_spacing(12.),
+        style::Style::new().letter_spacing(0.),
+        style::Style::new().letter_spacing(-1.),
     ] {
         patches.push(Patch::Style(Change::Set(Box::new(style))));
     }

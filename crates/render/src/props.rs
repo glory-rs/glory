@@ -201,6 +201,102 @@ impl Default for CheckProps {
     }
 }
 
+pub const MAX_IMAGE_CANDIDATES: usize = 16;
+pub const MAX_IMAGE_SIZE_HINTS: usize = 8;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ImageCandidate {
+    pub source: String,
+    pub width: u16,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ImageSlotSize {
+    Pixels(u16),
+    ViewportWidth(u8),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ImageSizeHint {
+    /// A CSS viewport-width upper bound. `None` is the required final fallback.
+    pub max_viewport_width: Option<u16>,
+    pub slot: ImageSlotSize,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ResponsiveImage {
+    pub candidates: Vec<ImageCandidate>,
+    pub sizes: Vec<ImageSizeHint>,
+}
+
+impl ResponsiveImage {
+    pub fn validate(&self) -> Result<(), Error> {
+        if self.candidates.len() > MAX_IMAGE_CANDIDATES {
+            return Err(Error::InvalidProps("too many responsive image candidates"));
+        }
+        let mut previous_width = 0;
+        for candidate in &self.candidates {
+            if candidate.source.is_empty()
+                || candidate.source.len() > 4096
+                || candidate.source.chars().any(|character| {
+                    character.is_control() || character.is_whitespace() || character == ','
+                })
+                || candidate.width == 0
+                || candidate.width > 16_384
+                || candidate.width <= previous_width
+            {
+                return Err(Error::InvalidProps(
+                    "responsive image candidates require ordered unique 1..=16384 widths and bounded sources",
+                ));
+            }
+            previous_width = candidate.width;
+        }
+        if self.sizes.len() > MAX_IMAGE_SIZE_HINTS
+            || self.candidates.is_empty() != self.sizes.is_empty()
+        {
+            return Err(Error::InvalidProps(
+                "responsive image candidates and sizes must be configured together",
+            ));
+        }
+        let mut previous_breakpoint = 0;
+        for (index, hint) in self.sizes.iter().enumerate() {
+            match hint.max_viewport_width {
+                Some(width)
+                    if width > 0
+                        && width <= 16_384
+                        && width > previous_breakpoint
+                        && index + 1 < self.sizes.len() =>
+                {
+                    previous_breakpoint = width;
+                }
+                None if index + 1 == self.sizes.len() => {}
+                _ => {
+                    return Err(Error::InvalidProps(
+                        "responsive image sizes require ordered breakpoints and one final fallback",
+                    ));
+                }
+            }
+            if !matches!(
+                hint.slot,
+                ImageSlotSize::Pixels(1..=16_384) | ImageSlotSize::ViewportWidth(1..=100)
+            ) {
+                return Err(Error::InvalidProps(
+                    "responsive image slot size is outside its finite range",
+                ));
+            }
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ImageLoading {
+    #[default]
+    Auto,
+    Eager,
+    Lazy,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ImageProps {
     pub source: String,
@@ -208,6 +304,8 @@ pub struct ImageProps {
     pub revision: u64,
     /// None is explicitly decorative; Some("") is an empty description.
     pub alternative: Option<String>,
+    pub responsive: ResponsiveImage,
+    pub loading: ImageLoading,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

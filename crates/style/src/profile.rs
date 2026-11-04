@@ -42,10 +42,11 @@ properties! {
     Align => align => "align-items", Justify => justify => "justify-content",
     OverflowX => overflow_x => "overflow-x", OverflowY => overflow_y => "overflow-y",
     ScrollAnchor => scroll_anchor => "overflow-anchor", Color => color => "color",
-    Background => background => "background-color", FontSize => font_size => "font-size",
+    Background => background => "background-color", BackgroundImage => background_image => "background-image", TextGradient => text_gradient => "text-gradient", FontSize => font_size => "font-size",
     LineHeight => line_height => "line-height",
+    LetterSpacing => letter_spacing => "letter-spacing",
     FontFamily => font_family => "font-family", FontWeight => font_weight => "font-weight",
-    WhiteSpace => white_space => "white-space", TextOverflow => text_overflow => "text-overflow", FieldSizing => field_sizing => "field-sizing", BorderWidth => border_width => "border-width",
+    WhiteSpace => white_space => "white-space", TextOverflow => text_overflow => "text-overflow", LineClamp => line_clamp => "line-clamp", FieldSizing => field_sizing => "field-sizing", BorderWidth => border_width => "border-width",
     BorderColor => border_color => "border-color", BorderStyle => border_style => "border-style",
     Radius => radius => "border-radius", Opacity => opacity => "opacity", BoxShadow => box_shadow => "box-shadow",
     Right => right => "right", Bottom => bottom => "bottom",
@@ -112,6 +113,7 @@ impl From<Length> for Value {
             Length::Px(_) => Self::Px,
             Length::Percent(_) => Self::Percent,
             Length::Ch(_) => Self::Ch,
+            Length::ChPx { .. } => Self::Ch,
         }
     }
 }
@@ -280,6 +282,7 @@ impl Support {
             style.margin.map(|_| (Property::Margin, Value::Px)),
             style.font_size.map(|_| (Property::FontSize, Value::Px)),
             style.line_height.map(|_| (Property::LineHeight, Value::Px)),
+            style.letter_spacing.map(|_| (Property::LetterSpacing, Value::Px)),
             style.white_space.map(|v| (Property::WhiteSpace, v.into())),
             style
                 .text_overflow
@@ -314,6 +317,18 @@ impl Support {
                     property,
                     value: Some(value),
                 });
+            }
+        }
+        // ChPx needs both existing unit capabilities, without extending the
+        // finite u64 value domain or treating a partial unit profile as support.
+        for (property, value) in [
+            (Property::Width, style.width), (Property::Height, style.height),
+            (Property::MinWidth, style.min_width), (Property::MinHeight, style.min_height),
+            (Property::Top, style.top), (Property::Left, style.left),
+            (Property::Right, style.right), (Property::Bottom, style.bottom),
+        ] {
+            if matches!(value, Some(Length::ChPx { .. })) && !self.supports_value(Value::Px) {
+                return Err(Unsupported { property, value: Some(Value::Px) });
             }
         }
         for family in style.font_family.iter().flatten() {
@@ -374,7 +389,7 @@ impl Profile {
     /// Reference storage accepts typed declarations but performs no CSS/layout.
     pub const RECORD: Self = Self {
         name: "record",
-        version: 10,
+        version: 13,
         inline: Support::ALL,
         css: Css::None,
     };
@@ -382,7 +397,7 @@ impl Profile {
     /// remains engine-specific; this is not a complete stylesheet validator.
     pub const HTML: Self = Self {
         name: "html",
-        version: 10,
+        version: 13,
         inline: Support::ALL,
         css: Css::Html,
     };
@@ -422,7 +437,7 @@ mod tests {
                 );
             }
         }
-        assert_eq!((Profile::HTML.version, Profile::RECORD.version), (10, 10));
+        assert_eq!((Profile::HTML.version, Profile::RECORD.version), (13, 13));
     }
 
     #[test]
@@ -461,12 +476,22 @@ mod tests {
             scroll_anchor: Some(false),
             color: Some(Color(0, 0, 0, 255)),
             background: Some(Color(255, 255, 255, 255)),
+            background_image: Some(crate::LinearGradient {
+                angle: 90.0,
+                stops: vec![Color(0, 0, 0, 0), Color(255, 255, 255, 255)],
+            }),
+            text_gradient: Some(crate::LinearGradient {
+                angle: 45.0,
+                stops: vec![Color(255, 0, 0, 255), Color(0, 0, 255, 255)],
+            }),
             font_size: Some(16.0),
             line_height: Some(24.0),
+            letter_spacing: Some(2.0),
             font_family: Some(vec![Family::System]),
             font_weight: Some(450.5),
             white_space: Some(WhiteSpace::PreWrap),
             text_overflow: Some(TextOverflow::Ellipsis),
+            line_clamp: Some(3),
             field_sizing: Some(FieldSizing::Content),
             border_width: Some(Edges::all(1.0)),
             border_color: Some(Color(0, 0, 0, 255)),
@@ -802,6 +827,7 @@ mod tests {
                     ..Style::new()
                 },
             ),
+            (Property::LetterSpacing, Style::new().letter_spacing(2.0)),
         ] {
             assert_eq!(
                 support.check(&style),
