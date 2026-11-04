@@ -5,6 +5,10 @@ document.addEventListener("DOMContentLoaded",()=>{
     const input=document.querySelector('input[aria-label="Message"]');
     document.querySelector(".increment").click();
     await wait(()=>document.querySelector(".count").textContent==="Count:1");
+    const large="\\".repeat(512*1024);
+    input.focus();input.value=large;
+    input.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:large}));
+    await wait(()=>document.querySelector(".echo").textContent===large);
     input.focus(); input.value="";
     for(const character of "rapid native input 0123456789") {
       input.value+=character;

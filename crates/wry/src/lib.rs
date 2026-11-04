@@ -151,7 +151,7 @@ impl Renderer {
     pub fn initialization_script(&self) -> String {
         format!(
             "({INTERPRETER})({});",
-            json!({"v":protocol::VERSION,"session":self.session()})
+            json!({"v":protocol::VERSION,"session":self.session(),"maxIpcBytes":protocol::MAX_IPC_BYTES,"maxDeferredBytes":protocol::MAX_PENDING_BYTES})
         )
     }
     /// Take at most one ordered batch; the WebView must acknowledge it before

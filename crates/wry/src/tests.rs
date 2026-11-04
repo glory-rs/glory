@@ -214,6 +214,32 @@ fn disposal_releases_waiters_and_recycled_nodes_reject_old_events() {
     assert!(renderer.0.borrow().pending.is_empty());
 }
 #[test]
+fn escaped_large_editor_snapshots_fit_the_same_bounded_native_and_script_transport() {
+    let runtime = RuntimeId::new();
+    let mut ids = NodeIds::new(runtime);
+    let id = ids.allocate();
+    let mut renderer = Renderer::new(runtime);
+    create(&mut renderer, id, Props::Input(InputProps::default()));
+    let text = "\\".repeat(512 * 1024);
+    let encoded = message(
+        &renderer,
+        json!({"type":"event","node":protocol::id(id),"event":{"kind":"value","value":text,"revision":"0","composing":false}}),
+    );
+    assert!(encoded.len() > 1024 * 1024);
+    assert!(encoded.len() < protocol::MAX_IPC_BYTES);
+    assert!(renderer.receive(&encoded).unwrap());
+    let mut inputs = Vec::new();
+    renderer.drain(&mut inputs);
+    assert!(
+        matches!(&inputs[0],Input::Event{event:Event::ValueChanged{value,..},..} if value==&text)
+    );
+    assert!(
+        renderer
+            .initialization_script()
+            .contains(&format!("\"maxIpcBytes\":{}", protocol::MAX_IPC_BYTES))
+    );
+}
+#[test]
 fn malformed_foreign_stale_and_future_inputs_never_reenter_business_code() {
     let runtime = RuntimeId::new();
     let mut ids = NodeIds::new(runtime);

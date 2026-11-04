@@ -6,7 +6,7 @@ function gloryWry(config) {
   const post = payload => {
     if (stopped) return;
     const message = JSON.stringify({v: config.v, session: config.session, ...payload});
-    if (new TextEncoder().encode(message).length > 1048576) {
+    if (new TextEncoder().encode(message).length > config.maxIpcBytes) {
       window.ipc.postMessage(JSON.stringify({v:config.v,session:config.session,type:"fault",message:"IPC byte budget"}));
       stopped = true;
       return;
@@ -31,7 +31,7 @@ function gloryWry(config) {
       e.dirty=false; editing.add(e);
     } else if(editing.size && ["activate","commit","keyboard"].includes(value.kind)) {
       const bytes=new TextEncoder().encode(JSON.stringify(value)).length;
-      if(deferred.length>=128 || deferredBytes+bytes>1048576) throw Error("pending input action budget");
+      if(deferred.length>=128 || deferredBytes+bytes>config.maxDeferredBytes) throw Error("pending input action budget");
       deferredBytes+=bytes; deferred.push({e,value,bytes}); return;
     }
     post({type:"event",node:e.id,event:value});

@@ -76,7 +76,8 @@ and stale input revisions cannot call application handlers. Disposal retires
 per-node pending queries; closing drops App before closing its executor and
 revoking its document. DOM acknowledgement does not imply pixel presentation.
 
-Limits are 1 MiB per incoming message, 8 MiB pending command/queued input payload,
+Limits are 8 MiB per incoming message and pending command/queued input payload,
+including JSON escaping of large controlled editor snapshots,
 4096 queued inputs, 1024 pending queries, and 32 MiB explicit shell resources.
 Only one batch is in flight. The stock shell fails on document startup or batch
 acknowledgement timeout after 15 seconds. These are transfer/admission limits,
