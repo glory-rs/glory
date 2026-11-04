@@ -32,6 +32,46 @@ fn ack(renderer: &Renderer, value: &Value) {
         ))
         .unwrap();
 }
+#[test]
+fn author_styles_follow_document_order_without_rebuilding_or_parsing_markup() {
+    let runtime = RuntimeId::new();
+    let mut ids = NodeIds::new(runtime);
+    let id = ids.allocate();
+    let mut renderer = Renderer::new(runtime);
+    create(
+        &mut renderer,
+        id,
+        Props::Text(TextProps {
+            content: "retained".into(),
+            ..Default::default()
+        }),
+    );
+    let css = ".theme { color: #123456; } /* </style><script>literal</script> */";
+    renderer.set_author_css(css).unwrap();
+    assert!(renderer.take_script().unwrap().is_none());
+    ready(&renderer);
+    let first = batch(&renderer);
+    assert_eq!(first["commands"][0]["op"], "create");
+    assert_eq!(first["commands"][2], json!({"op":"css","value":css}));
+    renderer
+        .set_author_css(".theme { color: #abcdef }")
+        .unwrap();
+    assert!(renderer.take_script().unwrap().is_none());
+    ack(&renderer, &first);
+    let second = batch(&renderer);
+    assert_eq!(second["commands"].as_array().unwrap().len(), 1);
+    assert_eq!(second["commands"][0]["op"], "css");
+    // A rejected oversized declaration does not poison the renderer or enqueue a prefix.
+    assert!(
+        renderer
+            .set_author_css(&"x".repeat(1024 * 1024 + 1))
+            .is_err()
+    );
+    ack(&renderer, &second);
+    assert!(renderer.take_script().unwrap().is_none());
+    renderer.set_author_css("").unwrap();
+    assert_eq!(batch(&renderer)["commands"][0]["value"], "");
+}
 fn create(renderer: &mut Renderer, id: NodeId, props: Props) -> Receipt {
     renderer
         .apply(&[

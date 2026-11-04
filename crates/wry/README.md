@@ -49,6 +49,10 @@ Checks run in both staged preflight and direct application. They are not silentl
 advertised through capabilities. The HTML mapper retains its remount requirement
 for physical tag changes.
 
+`Renderer::set_author_css` updates the trusted application CSS layer (up to 1 MiB)
+without remounting widgets. It uses the same ordered ready/ack transport and shell
+CSP as the initial `Config::css`; CSS is installed as style text, never HTML.
+
 Link activation can reach Rust handlers. The stock shell denies document
 navigation and new windows, so opening external links is not a provided service.
 Network I/O for application logic can use ordinary native Rust libraries; renderer

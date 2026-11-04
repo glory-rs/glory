@@ -17,6 +17,9 @@ document.addEventListener("DOMContentLoaded",()=>{
     input.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:"中文😀"}));
     await wait(()=>document.querySelector(".echo").textContent==="中文😀");
     if(input!==document.querySelector('input[aria-label="Message"]') || input.selectionStart!==2 || input.selectionEnd!==4) throw Error("input echo replaced identity/selection");
+    document.querySelector(".theme").click();
+    await wait(()=>getComputedStyle(document.querySelector(".echo")).color==="rgb(1, 2, 3)");
+    if(input!==document.querySelector('input[aria-label="Message"]') || document.activeElement!==input || input.value!=="中文😀" || input.selectionStart!==2 || input.selectionEnd!==4) throw Error("author stylesheet changed input/focus/selection");
     input.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true,cancelable:true}));
     document.querySelector("input[type=checkbox]").click();
     document.querySelector(".toggle").click();

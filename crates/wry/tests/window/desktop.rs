@@ -51,6 +51,15 @@ pub fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
         drop(guard);
     })?;
     let output = app.renderer().clone();
+    let author = output.clone();
+    app.mount(
+        button()
+            .class("theme")
+            .label("theme")
+            .on(activate, move |_| {
+                author.set_author_css(".echo {color:rgb(1,2,3)}").unwrap();
+            }),
+    )?;
     app.mount(
         col()
             .class("test-root")

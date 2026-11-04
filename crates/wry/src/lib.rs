@@ -352,14 +352,25 @@ impl Renderer {
         }
         Ok(true)
     }
-    #[cfg(feature = "css")]
-    pub fn set_sheet(&self, sheet: &glory_html::Sheet) -> Result<(), Error> {
-        let css = glory_html::sheet(sheet, style::Profile::HTML)
-            .map_err(|error| Error::Backend(error.to_string()))?;
+    /// Replace this document's trusted application stylesheet without remounting
+    /// widgets or disturbing focus/selection. This is the same author CSS layer
+    /// as `shell::Config::css`; it is not HTML and does not grant network access.
+    /// The shell's content security policy and explicit local assets still apply.
+    /// The update follows the normal ready/ack ordering and pending-byte budget.
+    pub fn set_author_css(&self, css: &str) -> Result<(), Error> {
+        if css.len() > 1024 * 1024 {
+            return Err(Error::InvalidProps("Wry author stylesheet exceeds 1 MiB"));
+        }
         self.0
             .borrow_mut()
             .transport
             .push(json!({"op":"css","value":css}))
+    }
+    #[cfg(feature = "css")]
+    pub fn set_sheet(&self, sheet: &glory_html::Sheet) -> Result<(), Error> {
+        let css = glory_html::sheet(sheet, style::Profile::HTML)
+            .map_err(|error| Error::Backend(error.to_string()))?;
+        self.set_author_css(&css)
     }
 }
 
