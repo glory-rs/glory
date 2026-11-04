@@ -75,6 +75,7 @@ pub const BASE_CSS: &str = concat!(
     "@media(prefers-reduced-motion:reduce){[data-gly-rotate]{animation-name:none;transform:none}}",
     "[data-gly-swipe-axis=horizontal]{touch-action:pan-y pinch-zoom;user-select:none}[data-gly-swipe-axis=vertical]{touch-action:pan-x pinch-zoom;user-select:none}",
     "[data-gly-splitter],[data-gly-slider],[data-gly-sheet-grip],[data-gly-drag-capture]{touch-action:none}",
+    "[data-gly-splitter]{user-select:none}",
     "[data-gly-sheet][data-gly-layer=left],[data-gly-sheet][data-gly-layer=right]{width:var(--gly-sheet-extent,100vw)!important;min-width:0!important;max-width:100vw!important}",
     "[data-gly-sheet][data-gly-layer=top],[data-gly-sheet][data-gly-layer=bottom]{height:var(--gly-sheet-extent,100dvh)!important;min-height:0!important;max-height:100dvh!important}",
     "[data-gly-sheet][data-gly-layer=left]{left:var(--gly-sheet-x,0px);top:var(--gly-sheet-y,0px);height:var(--gly-sheet-height,100dvh)!important}",
@@ -272,6 +273,13 @@ pub enum Op {
 }
 pub trait Sink {
     fn apply(&mut self, op: Op) -> Result<(), Error>;
+    /// Opt in to updating an existing inline flex-grow declaration alone.
+    fn supports_flex_grow_patch(&self) -> bool {
+        false
+    }
+    fn set_flex_grow(&mut self, _id: NodeId, _value: f64) -> Result<(), Error> {
+        Err(Error::Unsupported("incremental flex-grow"))
+    }
     /// A detached semantic construction unit. Hosts without subtree cloning
     /// expand it into their existing finite operations; stream v3 stays intact.
     fn create_plan(
@@ -471,6 +479,15 @@ impl Mapper {
                     let descriptor = self.tree.node(*id)?.descriptor.view();
                     preflight(descriptor, Some(patch))?;
                     let prepared = self.tree.prepare_patch(*id, patch)?;
+                    if sink.supports_flex_grow_patch()
+                        && let Some(grow) =
+                            patch::flex_grow(prepared.descriptor(), prepared.previous())
+                    {
+                        receipt = prepared.commit();
+                        sink.set_flex_grow(*id, grow)?;
+                        self.receipt = receipt;
+                        continue;
+                    }
                     let edits = patch::lower(prepared.descriptor(), prepared.previous());
                     receipt = prepared.commit();
                     Op::Patch { id: *id, edits }

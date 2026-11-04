@@ -9,7 +9,7 @@ use super::{backend, dom::Dom};
 #[path = "context_menu.rs"]
 mod context_menu;
 #[path = "drag.rs"]
-mod drag;
+pub(super) mod drag;
 #[path = "tags.rs"]
 mod tags;
 
@@ -321,7 +321,7 @@ pub(super) fn target(dom: &Dom, element: &Element) -> Option<(NodeId, Element)> 
     let id = dom.id_for_token(&target.get_attribute("data-gly-node")?)?;
     Some((id, target))
 }
-fn receive(dom: &Dom, name: &str, event: web_sys::Event) -> Result<(), glory_render::Error> {
+fn receive(dom: &Rc<Dom>, name: &str, event: web_sys::Event) -> Result<(), glory_render::Error> {
     if name == "selectionchange" {
         if let Some(element) = dom.document.active_element()
             && let Some((id, _)) = target(dom, &element)

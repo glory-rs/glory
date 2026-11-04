@@ -1842,6 +1842,11 @@ pub trait Render {
     }
     fn capabilities(&self) -> Capabilities;
     fn apply(&mut self, mutations: &[Mutation]) -> Result<Receipt, Error>;
+    /// Optional immediate physical read at the caller's committed barrier.
+    /// None means the host requires the queued Bounds query. Never call user code.
+    fn bounds_now(&mut self, _node: NodeId) -> Option<Result<Rect, Error>> {
+        None
+    }
     fn request(&mut self, query: Query, token: QueryToken) -> Result<(), Error>;
     /// Actions run after a frame's mutations and before subsequent queries.
     /// Unsupported focus refusal leaves the semantic tree valid: App treats it

@@ -1100,6 +1100,32 @@ fn native_splitter_captures_release_to_original_handle_and_queues_own_range_keys
     let x = (rect.x + 5.0) as f32;
     let y = (rect.y + 20.0) as f32;
     app.handle_ui_event(UiEvent::PointerDown(pointer(x, y, true)));
+    assert!(observed.borrow().is_empty());
+    tick(&mut app);
+    assert!(matches!(
+        observed.borrow().as_slice(),
+        [(
+            "handle",
+            Event::Drag {
+                phase: DragPhase::Start,
+                ..
+            }
+        )]
+    ));
+    observed.borrow_mut().clear();
+    app.handle_ui_event(UiEvent::PointerMove(pointer(x + 1.0, y, true)));
+    tick(&mut app);
+    assert!(matches!(
+        observed.borrow().as_slice(),
+        [(
+            "handle",
+            Event::Drag {
+                phase: DragPhase::Move,
+                ..
+            }
+        )]
+    ));
+    observed.borrow_mut().clear();
     app.handle_ui_event(UiEvent::PointerMove(pointer(120.0, 130.0, true)));
     app.handle_ui_event(UiEvent::PointerUp(pointer(120.0, 130.0, false)));
     assert!(observed.borrow().is_empty());

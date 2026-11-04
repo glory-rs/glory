@@ -790,10 +790,11 @@ fn drag_input(state: &mut State, target: EngineId, event: &DomEventData) -> bool
                 .ok()
                 .and_then(|node| node.descriptor.view().semantics.as_ref());
             let slider = metadata.is_some_and(|s| s.slider.is_some());
+            let splitter = metadata.is_some_and(|s| s.splitter.is_some());
             let capture = metadata.and_then(|s| s.drag_capture);
-            let captured =
-                slider || capture.is_some() || metadata.is_some_and(|s| s.splitter.is_some());
-            let immediate = slider || capture.is_some();
+            let focus_on_press =
+                slider || splitter || capture == Some(glory_render::DragCapture::PressFocus);
+            let immediate = focus_on_press || capture == Some(glory_render::DragCapture::Press);
             if immediate {
                 if !state.mapper.tree().enabled(from)
                     || state
@@ -804,7 +805,7 @@ fn drag_input(state: &mut State, target: EngineId, event: &DomEventData) -> bool
                 {
                     return false;
                 }
-                if slider || capture == Some(glory_render::DragCapture::PressFocus) {
+                if focus_on_press {
                     let _ = state.focus(from);
                 }
                 state.inputs.push(Input::Event {
@@ -823,7 +824,7 @@ fn drag_input(state: &mut State, target: EngineId, event: &DomEventData) -> bool
                 x,
                 y,
                 started: immediate,
-                captured,
+                captured: immediate,
             });
         }
         return state.drag.as_ref().is_some_and(|drag| drag.started);

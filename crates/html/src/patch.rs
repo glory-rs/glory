@@ -3,6 +3,23 @@
 use crate::{Edit, Part, Property};
 use glory_render::{Change, FocusMode, ItemPosition, Patch, Props, Role, normalize_text};
 
+/// Only replace an existing declaration, so the sink never creates an empty
+/// style attribute or has to decide which author declarations to remove.
+pub(crate) fn flex_grow(next: glory_render::DescriptorView<'_>, previous: &Patch) -> Option<f64> {
+    let Patch::Style(Change::Set(old)) = previous else {
+        return None;
+    };
+    let grow = next.style.grow?;
+    if !matches!(next.props, Props::View) || old.grow.is_none() || old.grow == Some(grow) {
+        return None;
+    }
+    let updated = glory_render::style::Style {
+        grow: Some(grow),
+        ..old.as_ref().clone()
+    };
+    (&updated == next.style).then_some(grow)
+}
+
 fn attribute(
     edits: &mut Vec<Edit>,
     part: Part,

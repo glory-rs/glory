@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(cargo update:*)",
-      "Bash(cargo build:*)"
-    ]
-  }
-}

@@ -304,6 +304,7 @@ pub(super) struct DragSession {
     pub y: f64,
     pub started: bool,
     pub captured: bool,
+    pub(super) raw: Option<super::events::drag::RawMotion>,
 }
 pub(super) struct Dom {
     pub(super) rich_pending: RefCell<Vec<NodeId>>,
@@ -1070,6 +1071,21 @@ impl Dom {
 }
 pub(super) struct Sink(pub Rc<Dom>);
 impl glory_html::Sink for Sink {
+    fn supports_flex_grow_patch(&self) -> bool {
+        !self.0.staging.get()
+    }
+
+    fn set_flex_grow(&mut self, id: NodeId, value: f64) -> Result<(), Error> {
+        self.0
+            .entry(id)?
+            .element()?
+            .dyn_into::<HtmlElement>()
+            .map_err(|_| Error::Unsupported("flex-grow on a non-HTML View"))?
+            .style()
+            .set_property("flex-grow", &value.to_string())
+            .map_err(backend)
+    }
+
     fn create_plan(
         &mut self,
         plan: &glory_render::Plan,
