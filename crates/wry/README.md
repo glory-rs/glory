@@ -98,3 +98,13 @@ macOS is the currently tested runtime; Windows/Linux runtime acceptance is open.
 Windows cross-compilation has been checked; it does not establish WebView2
 runtime behavior. The facade has also been checked with Wry and Apace enabled
 together and on WASM without acquiring native WebView dependencies.
+
+Text proposals use protocol v2 acknowledgements after the Rust UI turn. Each
+live editor has one outstanding proposal; newer native typing remains in the
+editor and its latest value follows the receipt. Controlled echoes preserve
+that newer text. Explicit differing writes and rejected old program barriers
+still replace it. Activation, commit and keyboard commands wait for preceding
+text proposals, so handlers observe the latest accepted value. Deferred actions
+are bounded and retired targets are discarded. Native window acceptance includes
+a rapid-input burst followed immediately by activation, alongside the existing
+UTF-16, composition, identity and lifecycle checks.

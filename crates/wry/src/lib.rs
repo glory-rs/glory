@@ -79,6 +79,7 @@ struct State {
     pending: BTreeMap<QueryToken, Pending>,
     inputs: Vec<Input>,
     input_bytes: usize,
+    edit_receipts: BTreeMap<NodeId, Option<bool>>,
 }
 struct Output<'a> {
     transport: &'a mut Transport,
@@ -140,6 +141,7 @@ impl Renderer {
             pending: BTreeMap::new(),
             inputs: Vec::new(),
             input_bytes: 0,
+            edit_receipts: BTreeMap::new(),
         })))
     }
     pub fn session(&self) -> String {
@@ -156,9 +158,34 @@ impl Renderer {
     /// another is sent. Acknowledgement means DOM execution, never presentation.
     pub fn take_script(&self) -> Result<Option<String>, Error> {
         let mut state = self.0.borrow_mut();
+        state.transport.check()?;
+        if !state.transport.ready || state.transport.flight.is_some() {
+            return Ok(None);
+        }
+        // After App has consumed the proposal and committed bindings, acknowledge
+        // the current program barrier. Never execute callbacks from transport IO.
+        let receipts: Vec<_> = state
+            .edit_receipts
+            .iter()
+            .filter_map(|(id, accepted)| accepted.map(|accepted| (*id, accepted)))
+            .collect();
+        for (id, accepted) in receipts {
+            state.edit_receipts.remove(&id);
+            let command = if let Ok(node) = state.mapper.tree().node(id)
+                && let Props::Input(props) = node.descriptor.view().props
+            {
+                let mut command = json!({"op":"input_done","id":protocol::id(id),"revision":props.revision.to_string(),"reset":!accepted});
+                if !accepted {
+                    command["value"] = json!(props.value);
+                }
+                command
+            } else {
+                json!({"op":"input_done","id":protocol::id(id),"retired":true})
+            };
+            state.transport.push(command)?;
+        }
         let transport = &mut state.transport;
-        transport.check()?;
-        if !transport.ready || transport.flight.is_some() || transport.commands.is_empty() {
+        if transport.commands.is_empty() {
             return Ok(None);
         }
         transport.sequence = transport
@@ -183,6 +210,7 @@ impl Renderer {
         let mut state = self.0.borrow_mut();
         state.transport.closed = true;
         state.transport.commands.clear();
+        state.edit_receipts.clear();
         state.transport.bytes = 0;
         state.transport.flight = None;
         let pending = std::mem::take(&mut state.pending);
@@ -268,6 +296,15 @@ impl Renderer {
                     return Ok(false);
                 };
                 let event = event.into_event(node)?;
+                let editing = matches!(event, Event::ValueChanged { .. });
+                if editing {
+                    if state.edit_receipts.len() >= protocol::MAX_INPUTS
+                        && !state.edit_receipts.contains_key(&node)
+                    {
+                        return Err(Error::InvalidEvent("Wry edit receipt budget"));
+                    }
+                    state.edit_receipts.insert(node, Some(false));
+                }
                 if !state.mapper.tree().validate_event(node, &event)? {
                     return Ok(false);
                 }
@@ -305,6 +342,9 @@ impl Renderer {
                 {
                     *old = event;
                     return Ok(true);
+                }
+                if editing {
+                    state.edit_receipts.insert(node, None);
                 }
                 state.inputs.push(Input::Event { node, event });
                 state.input_bytes += message.len();
@@ -562,6 +602,20 @@ impl Render for Renderer {
     }
     fn drain(&mut self, inputs: &mut Vec<Input>) {
         let mut state = self.0.borrow_mut();
+        let edits: Vec<_> = state
+            .inputs
+            .iter()
+            .filter_map(|input| match input {
+                Input::Event {
+                    node,
+                    event: Event::ValueChanged { .. },
+                } => Some(*node),
+                _ => None,
+            })
+            .collect();
+        for node in edits {
+            state.edit_receipts.insert(node, Some(true));
+        }
         inputs.append(&mut state.inputs);
         state.input_bytes = 0;
     }

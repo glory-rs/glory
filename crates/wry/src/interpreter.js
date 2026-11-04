@@ -20,7 +20,49 @@ function gloryWry(config) {
   const main = e => e.parts.get("main");
   const control = e => e.parts.get(e.control || "main");
   const alive = e => !!(e.start.isConnected && !main(e)?.closest?.("[inert],[data-gly-hidden]"));
-  const event = (e,value) => post({type:"event",node:e.id,event:value});
+  // Only one text proposal per editor crosses IPC at a time. Native edits may
+  // continue locally; retain a dirty bit, not a history of values or revisions.
+  const editing = new Set(), deferred = [];
+  let deferredBytes=0;
+  const event = (e,value) => {
+    if(value.kind==="value") {
+      if(e.proposal) { e.dirty=true; return; }
+      e.proposal={value:value.value,composing:value.composing};
+      e.dirty=false; editing.add(e);
+    } else if(editing.size && ["activate","commit","keyboard"].includes(value.kind)) {
+      const bytes=new TextEncoder().encode(JSON.stringify(value)).length;
+      if(deferred.length>=128 || deferredBytes+bytes>1048576) throw Error("pending input action budget");
+      deferredBytes+=bytes; deferred.push({e,value,bytes}); return;
+    }
+    post({type:"event",node:e.id,event:value});
+  };
+  function flushActions() {
+    while(!editing.size && deferred.length) {
+      const {e,value,bytes}=deferred.shift();
+      deferredBytes-=bytes;
+      if(!entries.has(e.id) || !alive(e)) continue;
+      if(value.kind==="commit") {
+        if(readValue(e)!==value.value) continue;
+        value.revision=e.revision;
+      }
+      event(e,value);
+    }
+  }
+  function inputDone(command) {
+    const e=entries.get(command.id);
+    if(!e || !e.proposal) return;
+    const proposal=e.proposal, dirty=e.dirty;
+    e.proposal=null; e.dirty=false; editing.delete(e);
+    if(command.retired) return;
+    if(command.reset) { e.requested=command.revision; property(e,e.control,"value",command.value); return; }
+    if(e.pending!==null && e.composing) return;
+    e.revision=command.revision;
+    if(dirty && alive(e) && e.interests.has("ValueChanged")) {
+      const value=readValue(e);
+      if(value!==proposal.value || e.composing!==proposal.composing)
+        event(e,{kind:"value",value,revision:e.revision,composing:e.composing});
+    }
+  }
   const observed = (e,kind) => {
     for (let current=e;current;current=current.parent ? entries.get(current.parent) : null)
       if (current.interests.has(kind)) return true;
@@ -66,6 +108,12 @@ function gloryWry(config) {
     const element=e.parts.get(part);
     if(name==="value" && e.edit==="Text") {
       value=canonical(value);
+      // An echo acknowledges the submitted snapshot. It must not replace newer
+      // native typing that is waiting for its own proposal turn.
+      if(e.proposal && e.dirty && value===e.proposal.value) {
+        e.revision=e.requested; e.pending=null; return;
+      }
+      if(e.proposal && value!==e.proposal.value) e.dirty=false;
       if(e.composing && readValue(e)!==value) { e.pending=value; return; }
       if(readValue(e)!==value) element.value=value;
       e.revision=e.requested;
@@ -81,7 +129,7 @@ function gloryWry(config) {
     const shape=command.shape, park=document.createDocumentFragment();
     const e={id:command.id,parts:new Map(),children:shape.children,control:shape.control,
       edit:shape.edit,prevent:shape.prevent,revision:shape.revision,requested:shape.revision,
-      composing:false,pending:null,parent:null,interests:new Set(),park,ack:null};
+      composing:false,pending:null,proposal:null,dirty:false,parent:null,interests:new Set(),park,ack:null};
     for(const piece of shape.pieces) {
       const kind=piece.kind;
       const element=kind.tag ? document.createElement(kind.tag) : document.createTextNode(kind.text);
@@ -187,6 +235,7 @@ function gloryWry(config) {
   const color = () => { for(const e of entries.values()) if(e.interests.has("ColorSchemeChanged") && alive(e)) event(e,{kind:"color_scheme",dark:media.matches}); };
   media.addEventListener("change",color);
   function apply(command) {
+    if(command.op==="input_done") return inputDone(command);
     if(command.op==="create") return create(command);
     if(command.op==="query") return query(command);
     if(command.op==="action") return action(command);
@@ -220,7 +269,7 @@ function gloryWry(config) {
         extract(e);
         for(const id of command.subtree) {
           const old=entries.get(id);
-          if(old) { if(main(old)) observer.unobserve(main(old)); entries.delete(id); old.park.replaceChildren(); }
+          if(old) { if(main(old)) observer.unobserve(main(old)); entries.delete(id); editing.delete(old); old.proposal=null; old.dirty=false; old.park.replaceChildren(); }
         }
         break;
       default: throw Error("unknown operation");
@@ -232,6 +281,7 @@ function gloryWry(config) {
       if(batch.v!==config.v || batch.session!==config.session || BigInt(batch.sequence)!==sequence+1n) throw Error("batch identity/order");
       sequence=BigInt(batch.sequence);
       for(const command of batch.commands) apply(command);
+      flushActions();
       post({type:"ack",sequence:batch.sequence});
     } catch(error) {fault(error);}
   }});

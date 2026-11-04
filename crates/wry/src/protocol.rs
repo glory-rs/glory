@@ -4,7 +4,7 @@ use glory_render::{Error, NodeId};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-pub const VERSION: u32 = 1;
+pub const VERSION: u32 = 2;
 pub const MAX_IPC_BYTES: usize = 1024 * 1024;
 pub const MAX_PENDING_BYTES: usize = 8 * 1024 * 1024;
 pub const MAX_QUERIES: usize = 1024;

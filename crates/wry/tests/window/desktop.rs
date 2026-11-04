@@ -18,6 +18,7 @@ pub fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
     let count = scope.cage(0);
     let value = scope.cage("initial".to_owned());
     let selected = scope.cage(false);
+    let captured = scope.cage(String::new());
     let shown = scope.cage(true);
     let input_node = scope.cage(None);
     let box_node = scope.cage(None);
@@ -78,6 +79,11 @@ pub fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
                         }
                     }),
                 text().class("echo").content(value),
+                text().class("captured").content(captured),
+                button()
+                    .class("capture")
+                    .label("capture")
+                    .on(activate, move |_| captured.revise(|v| *v = value.get())),
                 check()
                     .label("Check")
                     .checked(selected)
@@ -170,6 +176,9 @@ pub fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
                 return Err(ShellError("native WebView acceptance timeout".into()));
             }
             if done.get() && !requested.replace(true) {
+                if captured.get() != "rapid native input 0123456789" {
+                    return Err(ShellError("activation overtook pending native text".into()));
+                }
                 if count.get() != 1
                     || value.get() != "中文😀"
                     || !selected.get()

@@ -5,6 +5,14 @@ document.addEventListener("DOMContentLoaded",()=>{
     const input=document.querySelector('input[aria-label="Message"]');
     document.querySelector(".increment").click();
     await wait(()=>document.querySelector(".count").textContent==="Count:1");
+    input.focus(); input.value="";
+    for(const character of "rapid native input 0123456789") {
+      input.value+=character;
+      input.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:character}));
+    }
+    document.querySelector(".capture").click();
+    await wait(()=>document.querySelector(".captured").textContent==="rapid native input 0123456789");
+    await wait(()=>document.querySelector(".echo").textContent==="rapid native input 0123456789");
     input.focus();input.value="中文😀";input.setSelectionRange(2,4);
     input.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:"中文😀"}));
     await wait(()=>document.querySelector(".echo").textContent==="中文😀");

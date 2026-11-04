@@ -271,3 +271,62 @@ fn selection_boundaries_validate_before_transport_changes() {
     assert_eq!(renderer.0.borrow().transport.commands.len(), size);
     renderer.action(action(1, 3)).unwrap();
 }
+
+#[test]
+fn text_receipts_follow_the_ui_commit_and_reset_rejected_program_barriers() {
+    let runtime = RuntimeId::new();
+    let mut ids = NodeIds::new(runtime);
+    let id = ids.allocate();
+    let mut renderer = Renderer::new(runtime);
+    create(
+        &mut renderer,
+        id,
+        Props::Input(InputProps {
+            value: "initial".into(),
+            revision: 3,
+            ..Default::default()
+        }),
+    );
+    ready(&renderer);
+    let initial = batch(&renderer);
+    ack(&renderer, &initial);
+    let edit = message(
+        &renderer,
+        json!({"type":"event","node":protocol::id(id),"event":{"kind":"value","value":"typed ahead","revision":"3","composing":false}}),
+    );
+    assert!(renderer.receive(&edit).unwrap());
+    assert!(
+        renderer.take_script().unwrap().is_none(),
+        "a queued proposal is not completed input"
+    );
+    let mut inputs = Vec::new();
+    renderer.drain(&mut inputs);
+    assert_eq!(inputs.len(), 1);
+    renderer
+        .apply(&[Mutation::Patch {
+            id,
+            patch: Patch::Value {
+                value: Change::Set("typed ahead".into()),
+                revision: 4,
+            },
+        }])
+        .unwrap();
+    let updated = batch(&renderer);
+    assert_eq!(
+        updated["commands"].as_array().unwrap().last().unwrap(),
+        &json!({"op":"input_done","id":protocol::id(id),"revision":"4","reset":false})
+    );
+    ack(&renderer, &updated);
+    assert!(
+        !renderer.receive(&edit).unwrap(),
+        "old program barriers remain rejected"
+    );
+    let rejected = batch(&renderer);
+    assert_eq!(
+        rejected["commands"][0],
+        json!({"op":"input_done","id":protocol::id(id),"revision":"4","reset":true,"value":"typed ahead"})
+    );
+    assert!(renderer.0.borrow().inputs.is_empty());
+    ack(&renderer, &rejected);
+    assert!(renderer.0.borrow().edit_receipts.is_empty());
+}
