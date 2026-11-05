@@ -1,3 +1,4 @@
+const { localBuildPath } = require("../scripts/local-build-paths.cjs");
 // Compare independently built Plan batch variants with the unchanged rows
 // harness. Per-operation timing stays in the page; CPU counters cover a round.
 'use strict';
@@ -5,11 +6,11 @@ const fs = require('node:fs'), path = require('node:path'), http = require('node
 const cp = require('node:child_process'), crypto = require('node:crypto'), assert = require('node:assert/strict');
 const args = process.argv.slice(2);
 const option = (name, fallback) => args.includes(name) ? args[args.indexOf(name) + 1] : fallback;
-const root = path.resolve(option('--root', 'D:/BuildCache/glory-v2-plan-batch'));
+const root = path.resolve(option('--root', localBuildPath('glory-v2-plan-batch')));
 const out = path.resolve(option('--out', root + '/comparison-' + Date.now()));
 const rounds = Number(option('--rounds', '4'));
 assert(Number.isInteger(rounds) && rounds >= 1 && rounds <= 20);
-for (const dir of [root, out]) assert(dir.replaceAll('\\', '/').toLowerCase().startsWith('d:/buildcache/'));
+for (const dir of [root, out]) assert(dir.replaceAll('\\', '/').toLowerCase().startsWith(localBuildPath('')));
 process.env.TEMP = process.env.TMP = path.join(root, 'tmp');
 fs.mkdirSync(process.env.TEMP, { recursive: true });
 fs.mkdirSync(out);

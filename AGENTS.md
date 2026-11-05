@@ -996,7 +996,7 @@ For native transport acceptance, run the independent example binary
 then `python scripts/check-semantic-stream.py` (localhost:8789). This fixture
 streams NDJSON frames, observes socket disconnect and checks a paused TCP reader
 on /pressure. The same binary serves progressive HTML at /page, /reverse and
-the bootstrap/WASM assets from D:/BuildCache/glory-semantic-ui/web-demo.
+the bootstrap/WASM assets from target/verification/glory-semantic-ui/web-demo.
 It is an acceptance fixture, not a production HTTP framework integration.
 The seventh browser script, focus-acceptance.js, checks fixed/measured virtual
 row pinning, real focus/selection, composition protocol, indexed prepend,
@@ -1048,22 +1048,14 @@ offscreen CPU: cargo run -p glory-apace --example profile --features raster --re
 Both separate setup/cold/warm work and expose aggregate inclusive phases; their
 logical update count need not equal the number of actual draws.
 
-On Windows, all build artifacts, Cargo home and temporary compiler files must be on D:.
-For the macOS support work requested on 2026-10-26, use the local data volume
-`/Volumes/Data/Caches/glory` for artifacts, Cargo home and compiler temporary
-files. Resolve paths before use and reject symlink escapes. Apple SDK tools may
-read the existing Xcode installation; select it per process with DEVELOPER_DIR.
-Do not require an unavailable Windows SMB share on a native Apple host.
-Use D:/BuildCache/glory-semantic-ui and verify target_directory with
-`cargo metadata --no-deps --format-version 1` before new build configurations.
-Never introduce a C: target/cache/temp directory. Docker storage must likewise
-be on D: or remote before any Docker build.
-For WSL use scripts/check-semantic-linux.sh with an existing GLORY_BUILD_ROOT
-under /mnt/d/BuildCache; it verifies either the D: mount or a loop device's
-D:-backed image, then checks cargo metadata. GLORY_ARTIFACT_DIR can point to a
-Windows-readable D: directory; --paint exports actual CPU PNGs. This task uses
-the verified D:/BuildCache/glory-semantic-ui/linux-build-cache.ext4 image for
-Cargo's Unix metadata operations, not the Ubuntu distribution's root disk.
+Build and temporary paths inherit the caller environment and normal project
+configuration. Do not use or recreate the retired D:/BuildCache directory or
+its .codex/build-targets alias. Query `cargo metadata --no-deps --format-version 1`
+in the owning workspace for the actual target directory. Keep verification
+outputs within project-local directories or an explicitly supplied output path.
+Docker builder storage must still be on D: or remote before Docker builds.
+For Linux use scripts/check-semantic-linux.sh; GLORY_BUILD_ROOT and
+GLORY_ARTIFACT_DIR optionally select verification output directories.
 Use --window to run separate X11/Wayland window acceptance on a live display.
 Window gates run both shell and accesskit variants. The Windows -Window gate
 also runs real_accesskit_windows_ui_automation: a separate hidden-console .NET

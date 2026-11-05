@@ -1,18 +1,18 @@
 param(
-    [string]$BuildRoot = 'D:/BuildCache/glory-semantic-ui',
-    [string]$Bindgen = 'D:/BuildCache/glory-v2-dioxus-20261028/tools/wasm-bindgen-0.2.130-x86_64-pc-windows-msvc/wasm-bindgen.exe',
+    [string]$BuildRoot = "$PSScriptRoot/../target/verification/glory-semantic-ui",
+    [string]$Bindgen = 'wasm-bindgen',
     [switch]$Verify
 )
+. "$PSScriptRoot/local-build-paths.ps1"
+
 $ErrorActionPreference = 'Stop'
 $BuildRoot = [IO.Path]::GetFullPath($BuildRoot)
-if (-not $BuildRoot.Replace('\', '/').StartsWith('D:/BuildCache/', [StringComparison]::OrdinalIgnoreCase)) { throw 'BuildRoot must be on D:/BuildCache' }
 $saved = @{}
 foreach ($key in @('CARGO_HOME', 'CARGO_TARGET_DIR', 'TEMP', 'TMP', 'CARGO_INCREMENTAL', 'CARGO_PROFILE_DEV_DEBUG', 'GLORY_ISLAND_SITE')) { $saved[$key] = [Environment]::GetEnvironmentVariable($key, 'Process') }
 try {
-    $env:CARGO_HOME = 'D:/BuildCache/glory-semantic-ui/cargo'
-    $env:CARGO_TARGET_DIR = "$BuildRoot/security-fix-target"
-    $env:TEMP = "$BuildRoot/tmp"
-    $env:TMP = $env:TEMP
+
+    $env:CARGO_TARGET_DIR = Get-NormalCargoTarget
+
     $env:CARGO_INCREMENTAL = '0'
     $env:CARGO_PROFILE_DEV_DEBUG = '0'
     $env:GLORY_ISLAND_SITE = "$BuildRoot/island-readiness-site"

@@ -1,9 +1,9 @@
+const { localBuildPath } = require("../../scripts/local-build-paths.cjs");
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
-const root = path.resolve(process.argv[2] || 'D:/BuildCache/glory/wasm-size/runs/baseline');
-if (!root.replaceAll('\\','/').toLowerCase().startsWith('d:/buildcache/')) throw Error('Evidence directory must be on D:');
+const root = path.resolve(process.argv[2] || localBuildPath('glory/wasm-size/runs/baseline'));
 const buildRoot = path.resolve(root,'../../..');
 process.env.TEMP = process.env.TMP = path.join(buildRoot,'tmp');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || path.resolve(__dirname,'../../tests/playwright/node_modules/playwright'));

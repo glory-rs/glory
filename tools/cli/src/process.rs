@@ -1,8 +1,9 @@
-use crate::Result;
 use std::io::Read;
 use std::process::{Child, Command, Output, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
+
+use crate::Result;
 
 pub fn captured(command: &mut Command, cancel: Option<&AtomicBool>) -> Result<Output> {
     let Some(cancel) = cancel else {
@@ -143,8 +144,9 @@ fn kill_tree(child: &mut Child) {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::sync::Arc;
+
+    use super::*;
     #[test]
     fn child_entry() {
         if std::env::var_os("GLORY_CLI_CANCELLATION_CHILD").is_some() {

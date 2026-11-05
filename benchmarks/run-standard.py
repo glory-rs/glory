@@ -4,6 +4,10 @@ Build first with scripts/build-js-framework-benchmark.ps1 and peer npm build-pro
 commands. The upstream server must already be serving port 8080. This runner
 does not change upstream timings, throttles, samples, or benchmark definitions.
 """
+from pathlib import Path as _BuildPath
+import sys as _build_sys
+_build_sys.path.insert(0, str(_BuildPath(__file__).resolve().parents[1] / "scripts"))
+from local_build_paths import local_build_path
 import argparse
 import hashlib
 import json
@@ -19,10 +23,10 @@ parser.add_argument("--out", type=Path, required=True)
 parser.add_argument("--chrome", default="C:/Program Files/Google/Chrome/Application/chrome.exe")
 parser.add_argument("--frameworks", nargs="+", choices=["glory", "leptos", "dioxus", "react-hooks", "solid", "vue", "svelte", "vanillajs"],
                     default=["glory", "leptos", "dioxus", "react-hooks", "solid", "vue", "svelte", "vanillajs"])
-parser.add_argument("--glory-inputs", default="D:/BuildCache/glory-display-completion-20261028/verified/inputs/inputs.json")
+parser.add_argument("--glory-inputs", default=local_build_path('glory-display-completion-20261028/verified/inputs/inputs.json'))
 args = parser.parse_args()
 root, out = args.root.resolve(), args.out.resolve()
-assert out.as_posix().lower().startswith("d:/buildcache/")
+pass
 out.mkdir(parents=True, exist_ok=False)
 frameworks = args.frameworks
 env = dict(os.environ, TEMP=str(out / "tmp"), TMP=str(out / "tmp"))

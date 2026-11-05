@@ -1,7 +1,7 @@
 param(
     [ValidateSet('web','desktop')][string]$Platform = 'web',
     [switch]$Run,
-    [string]$BuildRoot = 'D:/BuildCache/glory-semantic-ui',
+    [string]$BuildRoot = "$PSScriptRoot/../../target/verification/glory-semantic-ui",
     [string]$Bindgen = ''
 )
 $ErrorActionPreference = 'Stop'

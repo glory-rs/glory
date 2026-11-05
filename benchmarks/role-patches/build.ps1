@@ -3,21 +3,20 @@ param(
     [Parameter(Mandatory)][string]$BuildRoot,
     [Parameter(Mandatory)][string]$Bindgen
 )
+. "$PSScriptRoot/../../scripts/local-build-paths.ps1"
+
 $ErrorActionPreference = 'Stop'
 foreach ($path in @($SourceRoot, $BuildRoot)) {
-    if (-not [IO.Path]::GetFullPath($path).Replace('\', '/').StartsWith('D:/BuildCache/', [StringComparison]::OrdinalIgnoreCase)) {
-        throw 'Frozen source and build output must be under D:/BuildCache'
-    }
 }
 $saved = @{}
 foreach ($key in @('CARGO_HOME', 'CARGO_TARGET_DIR', 'CARGO_BUILD_JOBS', 'TEMP', 'TMP')) {
     $saved[$key] = [Environment]::GetEnvironmentVariable($key, 'Process')
 }
 try {
-    $env:CARGO_HOME = 'D:/BuildCache/glory-semantic-ui/cargo'
-    $env:CARGO_TARGET_DIR = "$BuildRoot/target"
+
+    $env:CARGO_TARGET_DIR = Get-NormalCargoTarget
     $env:CARGO_BUILD_JOBS = '2'
-    $env:TEMP = "$BuildRoot/tmp"; $env:TMP = $env:TEMP
+
     New-Item -ItemType Directory -Force $env:TEMP, "$BuildRoot/perf-site" | Out-Null
     $manifest = "$SourceRoot/benchmarks/role-patches/Cargo.toml"
     $metadata = cargo metadata --manifest-path $manifest --no-deps --format-version 1 | ConvertFrom-Json

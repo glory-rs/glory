@@ -1,6 +1,7 @@
 //! Completion candidates come from the public help, keeping the private runner
 //! independent of a second CLI framework. Scripts never build the application.
-use crate::{Result, args::HELP};
+use crate::Result;
+use crate::args::HELP;
 
 pub fn script(shell: &str) -> Result<String> {
     let commands = HELP

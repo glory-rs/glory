@@ -454,7 +454,7 @@ mod native {
         let directory = PathBuf::from(
             std::env::args()
                 .nth(1)
-                .unwrap_or_else(|| "D:/BuildCache/glory-semantic-ui/web-demo".into()),
+                .unwrap_or_else(|| concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/verification/glory-semantic-ui/web-demo").into()),
         );
         println!("Stream transport fixture at http://{address}/stream");
         for socket in listener.incoming() {

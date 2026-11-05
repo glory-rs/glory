@@ -36,23 +36,20 @@ different recorded toolchain. Set `WASM_BINDGEN` (or `--bindgen`) to a matching
 CLI if the command on PATH has another version.
 
 ```powershell
-$env:TEMP = 'D:/BuildCache/glory/tmp'
-$env:TMP = $env:TEMP
-$env:npm_config_cache = 'D:/BuildCache/glory/wasm-size/npm-cache'
-npm install --prefix D:/BuildCache/glory/wasm-size/tools --save-exact binaryen@132.0.0
-$env:WASM_BINDGEN = 'D:/BuildCache/glory-website/tools/wasm-bindgen-0.2.130-x86_64-pc-windows-msvc/wasm-bindgen.exe'
+npm install --prefix target/verification/glory/wasm-size/tools --save-exact binaryen@132.0.0
+$env:WASM_BINDGEN = 'target/verification/glory-website/tools/wasm-bindgen-0.2.130-x86_64-pc-windows-msvc/wasm-bindgen.exe'
 node benchmarks/wasm-size/run.cjs --label baseline
-node benchmarks/wasm-size/browser.cjs D:/BuildCache/glory/wasm-size/runs/baseline
+node benchmarks/wasm-size/browser.cjs target/verification/glory/wasm-size/runs/baseline
 # Compare against a matching baseline run:
-node benchmarks/wasm-size/run.cjs --label candidate --compare D:/BuildCache/glory/wasm-size/runs/baseline/report.json --check
-node benchmarks/wasm-size/browser.cjs D:/BuildCache/glory/wasm-size/runs/candidate
+node benchmarks/wasm-size/run.cjs --label candidate --compare target/verification/glory/wasm-size/runs/baseline/report.json --check
+node benchmarks/wasm-size/browser.cjs target/verification/glory/wasm-size/runs/candidate
 ```
 
 `--only glory-text,glory-button` selects a quick subset. Browser checks resume
 only cases with an identical WASM hash and the same source digest/browser version.
 Set `PLAYWRIGHT_MODULE` and `BROWSER_EXECUTABLE` when using other installed paths.
 The default Playwright module comes from `tests/playwright/node_modules/playwright`.
-`--source-from D:/BuildCache/glory/wasm-size/runs/baseline/source --label replay`
+`--source-from target/verification/glory/wasm-size/runs/baseline/source --label replay`
 rebuilds an archived source snapshot at the same compilation path after checking
 its file hashes. Restored input timestamps are refreshed so Cargo cannot reuse
 artifacts for newer sources over an old Windows copy timestamp. It does not
@@ -62,7 +59,7 @@ a forced process termination, inspect the recorded PID before removing a stale
 `runner.lock`.
 
 All compiler outputs, temporary files, tools and compression results live under
-`D:/BuildCache/glory/wasm-size`; Cargo's existing D-drive home is reused. The
+`target/verification/glory/wasm-size`; Cargo's existing D-drive home is reused. The
 runner verifies the resolved `cargo metadata` output directory before building.
 It snapshots the current (possibly dirty) Glory and its declared engine sources, records file hashes,
 and archives them per run. Builds always use the same frozen source path, which
@@ -111,7 +108,7 @@ including a regression hidden by a shared runtime reduction.
 checks saved reports without rebuilding. Use a new run label for every build.
 
 After reviewing a complete run, `node benchmarks/wasm-size/capture.cjs
-D:/BuildCache/glory/wasm-size/runs/candidate benchmarks/wasm-size/baseline.json`
+target/verification/glory/wasm-size/runs/candidate benchmarks/wasm-size/baseline.json`
 explicitly records the new baseline. Capture rejects incomplete matrices or
 missing browser evidence. Do not update the baseline automatically after a
 failed size check; review the intended behavior and resulting payload first.

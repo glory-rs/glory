@@ -1,7 +1,8 @@
+const { localBuildPath } = require("../scripts/local-build-paths.cjs");
 // Isolated diagnostic: same standard bundle, only native move API availability varies.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
-const {chromium}=require('D:/BuildCache/glory-v2-dioxus-20261028/tools/node_modules/playwright');
-const root=process.env.GLORY_BENCH_BUILD_ROOT||'D:/BuildCache/glory-display-completion-20261028';
+const {chromium}=require('playwright');
+const root=process.env.GLORY_BENCH_BUILD_ROOT||localBuildPath('glory-display-completion-20261028');
 const out=path.join(root,process.argv[2]||'table-move-diagnostic');fs.mkdirSync(out);
 const selectionExperiment=process.argv[3]==='selection';
 const cacheExperiment=process.argv[3]==='selection-cache';

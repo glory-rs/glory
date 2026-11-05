@@ -7,12 +7,12 @@ param(
 )
 
 $ErrorActionPreference='Stop'
-$taskBuild='D:/BuildCache/glory-framework-compare'
+$taskBuild="$PSScriptRoot/../target/verification/glory-framework-compare"
 & "$PSScriptRoot/build.ps1" -Apps $App -BuildRoot $taskBuild
 Write-Output "Preview: http://127.0.0.1:8790/$App/"
 Write-Output 'For a measured three-framework run, use benchmarks/compare.ps1.'
 $savedCache=$env:PYTHONPYCACHEPREFIX
 try{
- $env:PYTHONPYCACHEPREFIX="$taskBuild/pycache"
+
  python -m http.server 8790 --bind 127.0.0.1 --directory "$taskBuild/site"
 }finally{$env:PYTHONPYCACHEPREFIX=$savedCache}

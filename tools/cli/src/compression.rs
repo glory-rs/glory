@@ -1,7 +1,10 @@
 //! Reproducible, streaming release sidecars. Original URLs and bytes stay valid.
-use crate::Result;
+use std::fs;
+use std::path::Path;
+
 use flate2::{Compression, GzBuilder};
-use std::{fs, path::Path};
+
+use crate::Result;
 
 pub(crate) fn compress(directory: &Path) -> Result<()> {
     for entry in fs::read_dir(directory).map_err(|e| e.to_string())? {
@@ -119,8 +122,9 @@ pub(crate) fn negotiate(header: &str, has_gzip: bool) -> Result<bool> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use std::io::Read;
+
+    use super::*;
 
     #[test]
     fn release_sidecars_round_trip_are_reproducible_and_preserve_supplied_assets() {

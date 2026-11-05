@@ -1,6 +1,11 @@
 //! macOS application bundles. The signature is finalized before hashing/publish.
-use crate::{Result, args::Args, build, project::Project};
-use std::{fs, path::Path, process::Command};
+use std::fs;
+use std::path::Path;
+use std::process::Command;
+
+use crate::args::Args;
+use crate::project::Project;
+use crate::{Result, build};
 
 fn xml(value: &str) -> String {
     value

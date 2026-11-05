@@ -80,10 +80,6 @@ inline styles; no inline executable JavaScript is needed. It demonstrates
 progressive DOM updates and End resource export, without a WASM bundle.
 
 ```powershell
-$env:CARGO_HOME = 'D:/BuildCache/glory-semantic-ui/cargo'
-$env:CARGO_TARGET_DIR = 'D:/BuildCache/glory-semantic-ui/target'
-$env:TEMP = 'D:/BuildCache/glory-salvo/tmp'
-$env:TMP = $env:TEMP
 New-Item -ItemType Directory -Force $env:TEMP | Out-Null
 cargo metadata --no-deps --format-version 1 # verify target_directory is on D:
 cargo run --locked -p glory-salvo --example ssr --features stream

@@ -1,7 +1,9 @@
-use crate::Result;
 use std::fs;
 use std::path::Path;
+
 use toml_edit::{Array, DocumentMut, Item, Table, value};
+
+use crate::Result;
 
 pub fn init(manifest: &Path, force: bool, cli_path: Option<&Path>) -> Result<()> {
     let manifest = manifest.canonicalize().map_err(|e| e.to_string())?;
@@ -234,36 +236,16 @@ fn relative_to(from: &Path, destination: &Path) -> std::path::PathBuf {
 pub const POWERSHELL: &str = r#"param([Parameter(ValueFromRemainingArguments=$true)][string[]]$Arguments)
 $ErrorActionPreference = 'Stop'
 $project = Split-Path -Parent $PSScriptRoot
-$hash = [Security.Cryptography.SHA256]::Create()
-try { $identity = [BitConverter]::ToString($hash.ComputeHash([Text.Encoding]::UTF8.GetBytes([IO.Path]::GetFullPath("$project/Cargo.toml")))).Replace('-','').Substring(0,16).ToLowerInvariant() } finally { $hash.Dispose() }
-$build = if ($env:GLORY_BUILD_ROOT) { [IO.Path]::GetFullPath($env:GLORY_BUILD_ROOT) } else { "D:/BuildCache/glory-projects/$identity" }
-if (-not $build.Replace('\','/').StartsWith('D:/BuildCache/',[StringComparison]::OrdinalIgnoreCase)) { throw 'GLORY_BUILD_ROOT must be under D:/BuildCache' }
-$saved = @{}
-foreach ($name in @('CARGO_HOME','CARGO_TARGET_DIR','TEMP','TMP','GLORY_BUILD_ROOT')) { $saved[$name] = [Environment]::GetEnvironmentVariable($name,'Process') }
 Push-Location $project
 try {
-    $env:GLORY_BUILD_ROOT = $build
-    if (-not $env:CARGO_HOME -or -not $env:CARGO_HOME.Replace('\','/').StartsWith('D:/BuildCache/',[StringComparison]::OrdinalIgnoreCase)) { $env:CARGO_HOME = "$build/cargo" }
-    $env:CARGO_TARGET_DIR = "$build/tools-target"
-    $env:TEMP = "$build/tmp"; $env:TMP = $env:TEMP
     $offline = @()
     foreach ($argument in $Arguments) {
         if ($argument -eq '--') { break }
         if ($argument -eq '--offline') { $offline = @('--offline') }
     }
-    foreach ($path in @($env:CARGO_HOME,$env:CARGO_TARGET_DIR,$env:TEMP)) {
-        $ancestor = [IO.Path]::GetFullPath($path)
-        while ($ancestor) {
-            if (Test-Path -LiteralPath $ancestor) {
-                if ((Get-Item -LiteralPath $ancestor -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { throw "Cache paths must not pass through a junction/symlink: $ancestor" }
-            }
-            $ancestor = Split-Path -Parent $ancestor
-        }
-    }
-    New-Item -ItemType Directory -Force $env:CARGO_HOME,$env:CARGO_TARGET_DIR,$env:TEMP | Out-Null
     $meta = cargo metadata @offline --no-deps --format-version 1 --manifest-path "$project/tools/glory/Cargo.toml" | ConvertFrom-Json
     if ($LASTEXITCODE) { throw 'Project tool metadata failed' }
-    if ([IO.Path]::GetFullPath($meta.target_directory) -ne [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)) { throw 'Unexpected Cargo target' }
+    Write-Host "Cargo target: $($meta.target_directory)"
     $hostLine = rustc -vV | Where-Object { $_.StartsWith('host: ') }
     if ($LASTEXITCODE -or -not $hostLine) { throw 'Cannot determine the Rust host' }
     $native = $hostLine.Substring(6)
@@ -274,58 +256,19 @@ try {
     }
     cargo run @locked @offline --manifest-path "$project/tools/glory/Cargo.toml" --target $native -- @Arguments
     if ($LASTEXITCODE) { throw "Glory command exited with $LASTEXITCODE" }
-}
-finally {
-    Pop-Location
-    foreach ($name in $saved.Keys) { [Environment]::SetEnvironmentVariable($name,$saved[$name],'Process') }
-}
+} finally { Pop-Location }
 "#;
 
 pub const SHELL: &str = r#"#!/bin/sh
 set -eu
 project=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-identity=$(python3 -c 'import hashlib,sys; print(hashlib.sha256(sys.argv[1].encode()).hexdigest()[:16])' "$project/Cargo.toml")
-case "$(uname -s)" in
-    Darwin) cache_base=/Volumes/Data/Caches/glory/projects ;;
-    *) cache_base=/mnt/d/BuildCache/glory-projects
-        mount_source=$(findmnt -n -T /mnt/d -o SOURCE | tr '\\' '/' | tr '[:upper:]' '[:lower:]')
-        case "$mount_source" in d:|d:/*|//localhost/d\$) ;; *) echo '/mnt/d is not the Windows D: mount' >&2; exit 1;; esac ;;
-esac
-export GLORY_BUILD_ROOT=${GLORY_BUILD_ROOT:-$cache_base/$identity}
-export GLORY_CACHE_BASE="$cache_base"
-GLORY_BUILD_ROOT=$(python3 - <<'PYROOT'
-import os,pathlib
-p=pathlib.Path(os.environ['GLORY_BUILD_ROOT'])
-base=pathlib.Path(os.environ['GLORY_CACHE_BASE']).parent
-if not p.is_absolute() or '..' in p.parts or not p.resolve().is_relative_to(base) or p.resolve() == base:
-    raise SystemExit('Build root escaped the approved cache directory')
-print(p.resolve())
-PYROOT
-)
-export GLORY_BUILD_ROOT
-# All launcher outputs are isolated before Cargo is invoked.
-export CARGO_HOME="$GLORY_BUILD_ROOT/cargo" CARGO_TARGET_DIR="$GLORY_BUILD_ROOT/tools-target"
-export TMPDIR="$GLORY_BUILD_ROOT/tmp" TEMP="$GLORY_BUILD_ROOT/tmp" TMP="$GLORY_BUILD_ROOT/tmp"
-export PYTHONPYCACHEPREFIX="$GLORY_BUILD_ROOT/pycache"
-python3 - <<'PYCACHE'
-import os,pathlib
-base=pathlib.Path(os.environ['GLORY_CACHE_BASE']).parent
-for key in ('CARGO_HOME','CARGO_TARGET_DIR','TMPDIR','PYTHONPYCACHEPREFIX'):
-    p=pathlib.Path(os.environ[key]).resolve()
-    if not p.is_relative_to(base):
-        raise SystemExit(f'{key} escaped the approved cache directory')
-    p.mkdir(parents=True,exist_ok=True)
-PYCACHE
 cd "$project"
 offline=
 for argument in "$@"; do
     [ "$argument" != -- ] || break
     if [ "$argument" = --offline ]; then offline=--offline; fi
 done
-cargo metadata $offline --no-deps --format-version 1 --manifest-path tools/glory/Cargo.toml > "$GLORY_BUILD_ROOT/tool-metadata.json"
-# Ask Cargo to verify the real target before compiling the launcher.
-actual=$(sed -n 's/.*"target_directory":"\([^"]*\)".*/\1/p' "$GLORY_BUILD_ROOT/tool-metadata.json")
-[ "$actual" = "$CARGO_TARGET_DIR" ] || { echo 'Unexpected Cargo target' >&2; exit 1; }
+cargo metadata $offline --no-deps --format-version 1 --manifest-path tools/glory/Cargo.toml | python3 -c 'import json,sys; print("Cargo target:",json.load(sys.stdin)["target_directory"])'
 native=$(rustc -vV | sed -n 's/^host: //p')
 [ -n "$native" ] || { echo 'Cannot determine the Rust host' >&2; exit 1; }
 locked=--locked
@@ -359,7 +302,21 @@ mod tests {
         let original = fs::read_to_string(&manifest).unwrap();
         let tool = fs::read_to_string(project.0.join("tools/glory/Cargo.toml")).unwrap();
         assert!(original.contains("# keep this comment"));
-        assert!(tool.contains("path = \".."));
+        let dependency = tool.parse::<DocumentMut>().unwrap();
+        let dependency = dependency["dependencies"]["glory-cli"]["path"]
+            .as_str()
+            .unwrap();
+        assert_eq!(
+            project
+                .0
+                .join("tools/glory")
+                .join(dependency)
+                .canonicalize()
+                .unwrap(),
+            Path::new(env!("CARGO_MANIFEST_DIR"))
+                .canonicalize()
+                .unwrap()
+        );
         init(&manifest, false, None).unwrap();
         assert_eq!(fs::read_to_string(&manifest).unwrap(), original);
         assert_eq!(

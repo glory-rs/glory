@@ -1,12 +1,13 @@
-use crate::Result;
-use crate::args::Args;
-use crate::project::{Platform, Project};
-use serde_json::{Value, json};
-
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+use serde_json::{Value, json};
+
+use crate::Result;
+use crate::args::Args;
+use crate::project::{Platform, Project};
 
 #[derive(Clone)]
 pub struct Built {

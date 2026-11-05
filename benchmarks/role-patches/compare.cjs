@@ -1,8 +1,8 @@
+const { localBuildPath } = require("../../scripts/local-build-paths.cjs");
 // Compare two frozen, same-path builds. This measures the Mapper kernel, not DOM/FPS.
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),cp=require('node:child_process'),assert=require('node:assert/strict'),crypto=require('node:crypto'),os=require('node:os');
 const root=path.resolve(process.argv[2]);
-assert(root.replaceAll('\\','/').toLowerCase().startsWith('d:/buildcache/'));
 process.env.TEMP=process.env.TMP=path.join(root,'tmp');
 const {chromium}=require('../../tests/playwright/node_modules/playwright');
 const cases=['plain','heading','navigation','grid','relations','dialog','same_role','named_reset'];
@@ -12,7 +12,7 @@ const report={recorded:new Date().toISOString(),scope:'Mapper.apply Role kernel;
 const output=path.join(root,'performance.json');assert(!fs.existsSync(output),'Keep existing evidence');
 fs.copyFileSync(__filename,path.join(root,'performance-driver.cjs'));
 function run(exe,args){const r=cp.spawnSync(exe,args,{encoding:'utf8',windowsHide:true,maxBuffer:32*1024*1024});assert.equal(r.status,0,r.stderr||String(r.error));return r.stdout;}
-const binaryen='D:/BuildCache/glory/wasm-size/tools/node_modules/binaryen';
+const binaryen=localBuildPath('glory/wasm-size/tools/node_modules/binaryen');
 assert.equal(JSON.parse(fs.readFileSync(path.join(binaryen,'package.json'))).version,'132.0.0');
 report.environment.rustc=run('rustc',['-Vv']).trim();
 for(const variant of ['before','after']){

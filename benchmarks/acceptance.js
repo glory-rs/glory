@@ -24,7 +24,7 @@ async (page) => {
   await check('empty');
   expected=make(1000);await click('.bench-run');await check('create_1k');
   const geometry=await page.evaluate(()=>[...document.querySelectorAll('.bench-row')].slice(0,3).map(row=>{const b=row.getBoundingClientRect();return [b.x,b.y,b.width,b.height];}));
-  await page.screenshot({path:`${page.__BENCH_ARTIFACT_DIR || 'D:/BuildCache/glory-framework-compare'}/${app}-conformance.png`});
+  await page.screenshot({path:`${page.__BENCH_ARTIFACT_DIR || 'target/verification/glory-framework-compare'}/${app}-conformance.png`});
   await page.evaluate(()=>{window.__benchRows=[...document.querySelectorAll('.bench-row')];});
   expected=expected.map(([id,label],i)=>[id,label+(i%10===0?' !!!':'')]);await click('.bench-update');await check('update_10th');
   selected=expected[1][0];await click('.bench-row:nth-child(2) .lbl');await check('select_row');

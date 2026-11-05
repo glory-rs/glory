@@ -11,7 +11,6 @@ for (const key of ["fixture", "build", "log", "out", "driver", "playwright"]) {
   if (!values[key]) throw new Error(`Missing --${key}`);
 }
 const normalized = path.resolve(values.fixture).replaceAll("\\", "/").toLowerCase();
-if (!normalized.startsWith("d:/buildcache/")) throw new Error("Use a disposable D: fixture");
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function until(callback, timeout = 90000) {
   const start = Date.now();

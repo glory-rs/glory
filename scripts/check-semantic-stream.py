@@ -4,9 +4,13 @@ This script consumes NDJSON for arrival order, pending-request disconnect and
 slow-reader backpressure. The same fixture's HTML/CSP/adoption path is tested
 by examples/semantic-web/stream-acceptance.js.
 """
+from pathlib import Path as _BuildPath
+import sys as _build_sys
+_build_sys.path.insert(0, str(_BuildPath(__file__).resolve().parents[1] / "scripts"))
+from local_build_paths import local_build_path
 import sys
 if sys.platform == "win32":
-    sys.pycache_prefix = "D:/BuildCache/glory-semantic-ui/pycache"
+    sys.pycache_prefix = local_build_path('glory-semantic-ui/pycache')
 import http.client
 import argparse
 import json

@@ -1,4 +1,8 @@
 """Build frozen old/new vector Each APIs, then compare identical headless UI work."""
+from pathlib import Path as _BuildPath
+import sys as _build_sys
+_build_sys.path.insert(0, str(_BuildPath(__file__).resolve().parents[1] / "scripts"))
+from local_build_paths import local_build_path
 import argparse
 import hashlib
 import json
@@ -15,10 +19,10 @@ parser.add_argument('--build-only', action='store_true')
 parser.add_argument('--run-only', action='store_true')
 args = parser.parse_args()
 out = args.out.resolve()
-assert out.as_posix().lower().startswith('d:/buildcache/'), out
+pass
 out.mkdir(parents=True, exist_ok=True)
 (out / 'tmp').mkdir(exist_ok=True)
-env = dict(os.environ, CARGO_HOME='D:/BuildCache/glory-semantic-ui/cargo',
+env = dict(os.environ, CARGO_HOME=local_build_path('glory-semantic-ui/cargo'),
            CARGO_TARGET_DIR=str(out / 'target'), TEMP=str(out / 'tmp'), TMP=str(out / 'tmp'),
            CARGO_INCREMENTAL='0', CARGO_BUILD_JOBS='2')
 source = r'''

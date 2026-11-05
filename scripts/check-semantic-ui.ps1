@@ -1,9 +1,10 @@
 param([switch]$Bench, [switch]$Web, [switch]$Window, [switch]$Android, [switch]$Audit, [string]$AndroidSerial)
+. "$PSScriptRoot/local-build-paths.ps1"
 
 $ErrorActionPreference = 'Stop'
 if ($AndroidSerial -and -not $Android) { throw '-AndroidSerial requires -Android' }
 if ($AndroidSerial -and $AndroidSerial -notmatch '^emulator-\d+$') { throw '-AndroidSerial requires an explicitly selected owned emulator' }
-$taskBuildRoot = 'D:/BuildCache/glory-semantic-ui'
+$taskBuildRoot = Join-Path (Get-NormalCargoTarget) 'verification/glory-semantic-ui'
 $taskWorkspace = Split-Path -Parent $PSScriptRoot
 $savedEnvironment = @{}
 foreach ($name in @('CARGO_HOME', 'CARGO_TARGET_DIR', 'TEMP', 'TMP', 'CARGO_PROFILE_BENCH_OPT_LEVEL', 'PYTHONPYCACHEPREFIX', 'ANDROID_USER_HOME', 'GLORY_DSL_BUILD_ROOT')) {
@@ -12,18 +13,14 @@ foreach ($name in @('CARGO_HOME', 'CARGO_TARGET_DIR', 'TEMP', 'TMP', 'CARGO_PROF
 
 Push-Location $taskWorkspace
 try {
-    $env:CARGO_HOME = "$taskBuildRoot/cargo"
-    $env:CARGO_TARGET_DIR = "$taskBuildRoot/target"
-    $env:TEMP = "$taskBuildRoot/tmp"
-    $env:TMP = $env:TEMP
-    $env:PYTHONPYCACHEPREFIX = "$taskBuildRoot/pycache"
-    New-Item -ItemType Directory -Force -Path $env:CARGO_HOME, $env:TEMP | Out-Null
+
+    New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null
     python scripts/library_lockfiles.py
     if ($LASTEXITCODE -ne 0) { throw 'Library dependency resolution failed' }
     $metadata = cargo metadata --no-deps --format-version 1 | ConvertFrom-Json
     if ($LASTEXITCODE -ne 0) { throw 'cargo metadata failed' }
     $actualTarget = [IO.Path]::GetFullPath($metadata.target_directory)
-    $expectedTarget = [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)
+    $expectedTarget = [IO.Path]::GetFullPath((Get-NormalCargoTarget))
     if (-not [string]::Equals($actualTarget, $expectedTarget, [StringComparison]::OrdinalIgnoreCase)) {
         throw "Unexpected build directory: $actualTarget"
     }
@@ -44,16 +41,20 @@ try {
     if ($facadeGraph | Select-String '^(glory-routing|url) v') {
         throw 'minimal facade acquired optional routing dependencies'
     }
-    $toolMetadata = cargo metadata --locked --manifest-path tools/cli/Cargo.toml --no-deps --format-version 1 | ConvertFrom-Json
-    if ($LASTEXITCODE -ne 0 -or [IO.Path]::GetFullPath($toolMetadata.target_directory) -ne $expectedTarget) { throw 'Unexpected CLI target directory' }
-    cargo fmt --manifest-path tools/cli/Cargo.toml -- --check
+    $expectedToolTarget = Get-NormalCargoTarget -ManifestPath "$taskWorkspace/tools/cli/Cargo.toml"
+    Push-Location "$taskWorkspace/tools/cli"
+    try {
+    $toolMetadata = cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json
+    if ($LASTEXITCODE -ne 0 -or [IO.Path]::GetFullPath($toolMetadata.target_directory) -ne [IO.Path]::GetFullPath($expectedToolTarget)) { throw 'Unexpected CLI target directory' }
+    cargo fmt -- --check
     if ($LASTEXITCODE -ne 0) { throw 'project CLI formatting failed' }
-    cargo test --locked --manifest-path tools/cli/Cargo.toml
+    cargo test --locked
     if ($LASTEXITCODE -ne 0) { throw 'project CLI tests failed' }
-    cargo clippy --locked --manifest-path tools/cli/Cargo.toml --all-targets -- -D warnings
+    cargo clippy --locked --all-targets -- -D warnings
     if ($LASTEXITCODE -ne 0) { throw 'project CLI clippy failed' }
-    $toolArtifacts = cargo build --locked --manifest-path tools/cli/Cargo.toml --example bootstrap --message-format=json-render-diagnostics | ForEach-Object { $_ | ConvertFrom-Json }
+    $toolArtifacts = cargo build --locked --example bootstrap --message-format=json-render-diagnostics | ForEach-Object { $_ | ConvertFrom-Json }
     if ($LASTEXITCODE -ne 0) { throw 'project CLI acceptance driver build failed' }
+    } finally { Pop-Location }
     $toolDriver = $toolArtifacts | Where-Object { $_.reason -eq 'compiler-artifact' -and $_.target.name -eq 'bootstrap' -and $_.executable } | Select-Object -Last 1 -ExpandProperty executable
     if (-not $toolDriver) { throw 'Cargo did not report the CLI acceptance driver' }
     & "$taskWorkspace/tools/cli/tests/native-acceptance.ps1" -Driver $toolDriver
@@ -121,8 +122,11 @@ try {
     }
 
     if ($Android) {
-        $mobileMetadata = cargo metadata --locked --manifest-path examples/mobile/Cargo.toml --no-deps --format-version 1 | ConvertFrom-Json
-        if ($LASTEXITCODE -ne 0 -or [IO.Path]::GetFullPath($mobileMetadata.target_directory) -ne $expectedTarget) { throw 'Unexpected mobile target directory' }
+        $expectedMobileTarget = Get-NormalCargoTarget -ManifestPath "$taskWorkspace/examples/mobile/Cargo.toml"
+        Push-Location "$taskWorkspace/examples/mobile"
+        try { $mobileMetadata = cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json }
+        finally { Pop-Location }
+        if ($LASTEXITCODE -ne 0 -or [IO.Path]::GetFullPath($mobileMetadata.target_directory) -ne [IO.Path]::GetFullPath($expectedMobileTarget)) { throw 'Unexpected mobile target directory' }
         cargo fmt --manifest-path examples/mobile/Cargo.toml -- --check
         if ($LASTEXITCODE -ne 0) { throw 'Mobile formatting failed' }
         $mobileGraph = cargo tree --locked --manifest-path examples/mobile/Cargo.toml --target aarch64-linux-android --edges normal,build --prefix none
@@ -137,7 +141,7 @@ try {
         if ($AndroidSerial) {
             $env:ANDROID_USER_HOME = "$taskBuildRoot/android-home"
             New-Item -ItemType Directory -Force $env:ANDROID_USER_HOME | Out-Null
-            & "$env:ANDROID_HOME/platform-tools/adb.exe" -s $AndroidSerial install --no-incremental -r D:/BuildCache/glory-mobile/package-x86_64-linux-android-debug/glory-counter.apk
+            & "$env:ANDROID_HOME/platform-tools/adb.exe" -s $AndroidSerial install --no-incremental -r "$PSScriptRoot/../target/verification/glory-mobile/package-x86_64-linux-android-debug/glory-counter.apk"
             if ($LASTEXITCODE -ne 0) { throw 'Android APK installation failed' }
             python examples/mobile/accept-android.py --serial $AndroidSerial --out "$taskBuildRoot/android-acceptance"
             if ($LASTEXITCODE -ne 0) { throw 'Android emulator acceptance failed' }

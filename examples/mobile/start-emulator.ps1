@@ -1,5 +1,5 @@
 param(
-    [string]$BuildRoot = 'D:/BuildCache/glory-mobile',
+    [string]$BuildRoot = "$PSScriptRoot/../../target/verification/glory-mobile",
     [string]$Sdk = $env:ANDROID_HOME,
     [string]$Image = 'system-images/android-36.1/google_apis_playstore/x86_64',
     [ValidateRange(5554,5680)][int]$Port = 5580
@@ -18,7 +18,7 @@ try {
     $env:ANDROID_USER_HOME = "$build/android-home"
     $env:ANDROID_EMULATOR_HOME = "$build/emulator-home"
     $env:ANDROID_AVD_HOME = "$build/avd"
-    $env:TEMP = "$build/tmp"; $env:TMP=$env:TEMP
+
     $avd = "$env:ANDROID_AVD_HOME/Glory_Counter.avd"
     New-Item -ItemType Directory -Force $env:ANDROID_USER_HOME,$env:ANDROID_EMULATOR_HOME,$avd,$env:TEMP | Out-Null
     if (-not (Test-Path -LiteralPath "$avd/config.ini")) {

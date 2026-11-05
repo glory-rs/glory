@@ -1,16 +1,16 @@
+const { localBuildPath } = require("../scripts/local-build-paths.cjs");
 // Measure existing semantic-rows-v1 releases; never changes their Cargo profiles.
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),cp=require('node:child_process'),crypto=require('node:crypto'),zlib=require('node:zlib');
 const {javascriptMetrics}=require('./wasm-size/javascript.cjs');
 const args=process.argv.slice(2),option=(key,fallback)=>args.includes(key)?args[args.indexOf(key)+1]:fallback;
-const root=path.resolve(option('--build-root','D:/BuildCache/glory-benchmark-wasm-20261026'));
+const root=path.resolve(option('--build-root',localBuildPath('glory-benchmark-wasm-20261026')));
 const apps=option('--apps','glory,dioxus,leptos').split(',');
 if(!apps.length||new Set(apps).size!==apps.length||apps.some(app=>!['glory','dioxus','leptos'].includes(app)))throw Error('Unknown/duplicate app');
 const out=path.join(root,'bundle-size');
-if(!root.replaceAll('\\','/').toLowerCase().startsWith('d:/buildcache/'))throw Error('Build root must be D:/BuildCache');
 if(fs.existsSync(path.join(out,'report.json')))throw Error('Use a new build root to preserve previous results');
 fs.mkdirSync(out,{recursive:true});
-const binaryen=path.resolve(option('--binaryen-dir','D:/BuildCache/glory/wasm-size/tools/node_modules/binaryen'));
+const binaryen=path.resolve(option('--binaryen-dir',localBuildPath('glory/wasm-size/tools/node_modules/binaryen')));
 if(JSON.parse(fs.readFileSync(path.join(binaryen,'package.json'))).version!=='132.0.0')throw Error('Use Binaryen 132.0.0');
 const optimizer=path.join(binaryen,'bin/wasm-opt');
 const env={...process.env,TEMP:path.join(root,'tmp'),TMP:path.join(root,'tmp')};

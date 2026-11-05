@@ -1,4 +1,8 @@
 """The known glib warning must never hide another finding or auditor failure."""
+from pathlib import Path as _BuildPath
+import sys as _build_sys
+_build_sys.path.insert(0, str(_BuildPath(__file__).resolve().parents[1] / "scripts"))
+from local_build_paths import local_build_path
 from contextlib import redirect_stdout
 import importlib.util
 import io
@@ -163,8 +167,6 @@ class AuditCommandTests(unittest.TestCase):
     def invoke(self, responses):
         with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as directory:
             root = Path(directory)
-            if os.name == "nt":
-                self.assertTrue(root.resolve().is_relative_to(Path("D:/BuildCache").resolve()))
             locks = [f"case-{index}/Cargo.lock" for index in range(len(responses))]
             for relative in locks:
                 lock = root / relative

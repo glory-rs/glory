@@ -1,7 +1,8 @@
+const { localBuildPath } = require("../../scripts/local-build-paths.cjs");
 'use strict';
 const fs = require('node:fs'), path = require('node:path'), http = require('node:http'), assert = require('node:assert/strict');
-const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'D:/BuildCache/glory-v2-dioxus-20261028/tools/node_modules/playwright');
-const site = path.resolve(process.env.GLORY_WIDGET_SITE || 'D:/BuildCache/glory-widget-dsl/site');
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const site = path.resolve(process.env.GLORY_WIDGET_SITE || localBuildPath('glory-widget-dsl/site'));
 const evidencePath = path.join(path.dirname(site), 'unified-evidence.json');
 const errors = [], evidence = { checks: [] };
 const server = http.createServer((req, res) => {

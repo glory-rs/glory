@@ -1,7 +1,8 @@
+const { localBuildPath } = require("../scripts/local-build-paths.cjs");
 // Diagnostic CPU/trace samples, kept separate from uninstrumented timing runs.
 const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict');
-const {chromium}=require('D:/BuildCache/glory-v2-dioxus-20261028/tools/node_modules/playwright');
-const root=path.resolve(process.env.GLORY_BENCH_BUILD_ROOT||'D:/BuildCache/glory-display-completion-20261028');
+const {chromium}=require('playwright');
+const root=path.resolve(process.env.GLORY_BENCH_BUILD_ROOT||localBuildPath('glory-display-completion-20261028'));
 const out=path.join(root,process.argv[2]||'profiles');fs.mkdirSync(out);
 process.env.TEMP=process.env.TMP=path.join(root,'tmp');
 const routes={before:'before/site/glory',api:'first-api/site/glory',after:'after/site/glory',dioxus:'before/site/dioxus'};

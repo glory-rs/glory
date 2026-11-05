@@ -26,7 +26,7 @@ Shared business work and DOM shape are frozen; framework metadata remains.
 ```
 
 The existing wasm-bindgen 0.2.129 CLI must be installed at
-`D:/BuildCache/glory-framework-compare/tools/bin/wasm-bindgen.exe`.
+`target/verification/glory-framework-compare/tools/bin/wasm-bindgen.exe`.
 run.ps1 uses D: for Cargo output, TEMP/TMP, Python cache, browser profiles,
 downloads and evidence. It owns and closes a loopback server and browser.
 The affinity helper assumes this machine's 16 P-core logical processors

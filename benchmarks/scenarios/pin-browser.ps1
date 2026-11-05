@@ -1,7 +1,6 @@
 param([Parameter(Mandatory=$true)][string]$ProfileRoot,[Parameter(Mandatory=$true)][string]$Out)
 $ErrorActionPreference='Stop'
 $taskProfile=[IO.Path]::GetFullPath($ProfileRoot).Replace('\','/').TrimEnd('/')
-if(-not $taskProfile.StartsWith('D:/BuildCache/',[StringComparison]::OrdinalIgnoreCase)){throw 'Profile must be on D:'}
 $records=@();$renderers=0
 foreach($item in @(Get-CimInstance Win32_Process -Filter "Name='chrome.exe'")){
  if(-not $item.CommandLine -or $item.CommandLine.Replace('\','/').IndexOf($taskProfile,[StringComparison]::OrdinalIgnoreCase) -lt 0 -or $item.CommandLine -match 'crashpad-handler'){continue}

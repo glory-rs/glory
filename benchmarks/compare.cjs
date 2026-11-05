@@ -1,8 +1,9 @@
+const { localBuildPath } = require("../scripts/local-build-paths.cjs");
 'use strict';
 const fs = require('node:fs'), path = require('node:path'), http = require('node:http');
 const assert = require('node:assert/strict'), crypto = require('node:crypto'), vm = require('node:vm');
 const cp = require('node:child_process');
-const root = path.resolve(process.env.GLORY_BENCH_BUILD_ROOT || 'D:/BuildCache/glory-benchmark-dsl-20261028'), repo = process.env.GLORY_REPO || 'D:/Works/glory-rs/glory';
+const root = path.resolve(process.env.GLORY_BENCH_BUILD_ROOT || localBuildPath('glory-benchmark-dsl-20261028')), repo = process.env.GLORY_REPO || 'D:/Works/glory-rs/glory';
 const out = path.join(root, process.argv[2] || 'trial1');
 const rounds = Number(process.argv[3] || 4);
 const variants = (process.argv[4] || 'before,glory,handwritten,dioxus').split(',');
@@ -11,7 +12,7 @@ if(process.env.GLORY_CANDIDATE_SITE)routes.glory=process.env.GLORY_CANDIDATE_SIT
 if(process.env.GLORY_PROBES_SITE)routes.probes=process.env.GLORY_PROBES_SITE;
 if(process.env.GLORY_HANDWRITTEN_SITE)routes.handwritten=process.env.GLORY_HANDWRITTEN_SITE;
 routes.completed='completed/site/glory';
-const { chromium } = require('D:/BuildCache/glory-v2-dioxus-20261028/tools/node_modules/playwright');
+const { chromium } = require('playwright');
 process.env.TEMP = process.env.TMP = path.join(root, 'tmp');
 fs.mkdirSync(out);
 fs.mkdirSync(path.join(out, 'driver-source'));

@@ -1,4 +1,8 @@
 """Build isolation: consumer workspaces must never enter upstream defaults."""
+from pathlib import Path as _BuildPath
+import sys as _build_sys
+_build_sys.path.insert(0, str(_BuildPath(__file__).resolve().parents[1] / "scripts"))
+from local_build_paths import local_build_path
 import json
 import os
 from pathlib import Path
@@ -20,9 +24,7 @@ class LockfileScopeTests(unittest.TestCase):
         self.environment = patch.dict(os.environ, {"CARGO_TARGET_DIR": str(self.target)})
         self.environment.start()
         self.addCleanup(self.environment.stop)
-        # Windows tests keep their temporary fixture under the configured D: root.
-        if os.name == "nt":
-            self.assertTrue(self.target.is_relative_to(Path("D:/BuildCache").resolve()))
+        self.assertTrue(self.target.is_relative_to(self.root))
         for relative in LIBRARY_MANIFESTS:
             path = self.root / relative
             path.parent.mkdir(parents=True, exist_ok=True)

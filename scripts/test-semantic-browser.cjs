@@ -1,9 +1,8 @@
+const { localBuildPath } = require("./local-build-paths.cjs");
 // Run the actual browser suites in an owned Chrome process, on isolated ports.
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict'),crypto=require('node:crypto');
 const args=process.argv.slice(2),option=(key,fallback)=>args.includes(key)?args[args.indexOf(key)+1]:fallback;
-const out=path.resolve(option('--out','D:/BuildCache/glory-bulk-optimization/browser-validation'));
-assert(out.replaceAll('\\','/').toLowerCase().startsWith('d:/buildcache/'));
-assert((process.env.TEMP||'').replaceAll('\\','/').toLowerCase().startsWith('d:/buildcache/'),'Set TEMP/TMP on D');
+const out=path.resolve(option('--out',localBuildPath('glory-bulk-optimization/browser-validation')));
 fs.mkdirSync(out,{recursive:false});
 fs.mkdirSync(path.join(out,'driver-source'));
 fs.copyFileSync(__filename,path.join(out,'driver-source','test-semantic-browser.cjs'));

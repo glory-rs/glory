@@ -27,7 +27,7 @@ iOS has Apple-host build and simulator evidence; see the iOS boundaries below.
 Install an Android SDK, NDK, JDK and the Rust target first. The build script reads
 these existing tools; it does not install SDK packages or modify user tool homes.
 All output, compiler caches, Python caches, Java homes, debug signing keys and
-emulator writable images stay under `D:/BuildCache/glory-mobile`.
+emulator writable images stay under `target/verification/glory-mobile`.
 
 ```powershell
 ./examples/mobile/build-android.ps1
@@ -54,11 +54,9 @@ For a disposable Android 16 x86_64 emulator with the existing Google Play image:
 
 ```powershell
 ./examples/mobile/start-emulator.ps1
-$env:ANDROID_USER_HOME = 'D:/BuildCache/glory-mobile/android-home'
-$env:TEMP = 'D:/BuildCache/glory-mobile/tmp'; $env:TMP = $env:TEMP
-$env:PYTHONPYCACHEPREFIX = 'D:/BuildCache/glory-mobile/pycache'
-& "$env:ANDROID_HOME/platform-tools/adb.exe" -s emulator-5580 install --no-incremental -r D:/BuildCache/glory-mobile/package-x86_64-linux-android-debug/glory-counter.apk
-python examples/mobile/accept-android.py --serial emulator-5580 --out D:/BuildCache/glory-mobile/acceptance
+$env:ANDROID_USER_HOME = 'target/verification/glory-mobile/android-home'
+& "$env:ANDROID_HOME/platform-tools/adb.exe" -s emulator-5580 install --no-incremental -r target/verification/glory-mobile/package-x86_64-linux-android-debug/glory-counter.apk
+python examples/mobile/accept-android.py --serial emulator-5580 --out target/verification/glory-mobile/acceptance
 ```
 
 Wait for that emulator to finish booting before installing. Its system image is

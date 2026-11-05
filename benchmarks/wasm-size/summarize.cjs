@@ -3,7 +3,6 @@ const fs=require('node:fs'),path=require('node:path');
 const crypto=require('node:crypto'),zlib=require('node:zlib');
 const {javascriptMetrics}=require('./javascript.cjs');
 const root=path.resolve(process.argv[2]);
-if(!root.replaceAll('\\','/').toLowerCase().startsWith('d:/buildcache/'))throw Error('Artifacts must stay on D:');
 const file=path.join(root,'report.json'),report=JSON.parse(fs.readFileSync(file));
 function hash(bytes){return crypto.createHash('sha256').update(bytes).digest('hex');}
 for(const item of report.cases) {

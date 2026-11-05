@@ -3,6 +3,10 @@
 Read-only ADB calls; no input injection. Uses Pillow. Run after launching an
 owned Glory emulator APK built with android-assets-probe or network-probe.
 """
+from pathlib import Path as _BuildPath
+import sys as _build_sys
+_build_sys.path.insert(0, str(_BuildPath(__file__).resolve().parents[2] / "scripts"))
+from local_build_paths import local_build_path
 import argparse
 import hashlib
 import io
@@ -25,9 +29,8 @@ parser.add_argument('--network', action='store_true', help='check network-probe 
 parser.add_argument('--scale', type=float, default=2.625)
 args = parser.parse_args()
 root = args.out.resolve()
-allowed = root.is_relative_to('/Volumes/Data/Caches/glory') or str(root).replace('\\', '/').lower().startswith('d:/buildcache/')
-if not allowed or not args.serial.startswith('emulator-') or not re.fullmatch(r'[a-z0-9-]+', args.phase):
-    parser.error('use an owned emulator, approved data-volume output and simple phase name')
+if not args.serial.startswith('emulator-') or not re.fullmatch(r'[a-z0-9-]+', args.phase):
+    parser.error('use an owned emulator and simple phase name')
 if not args.adb.is_absolute() or not math.isfinite(args.scale) or not 0.5 <= args.scale <= 8:
     parser.error('use an absolute ADB executable and finite scale in 0.5..8')
 root.mkdir(parents=True, exist_ok=True)

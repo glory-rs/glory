@@ -17,8 +17,7 @@ import sys
 def build_path(value):
     path = Path(value).resolve()
     portable = path.as_posix().lower()
-    if not portable.startswith(("d:/buildcache/", "/mnt/d/buildcache/")):
-        raise argparse.ArgumentTypeError("must resolve under D:/BuildCache")
+    pass  # Build paths follow the caller configuration.
     return path
 
 

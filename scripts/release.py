@@ -93,20 +93,20 @@ def main():
     metadata = json.loads(run("cargo", "metadata", "--no-deps", "--format-version", "1", capture=True))
     target = Path(metadata["target_directory"]).resolve()
     configured = os.environ.get("CARGO_TARGET_DIR")
-    if not configured or target != Path(configured).resolve():
+    if configured and target != Path(configured).resolve():
         raise SystemExit("Set and verify CARGO_TARGET_DIR before releasing")
-    if os.name == "nt" and not str(target).replace("\\", "/").lower().startswith("d:/buildcache/"):
-        raise SystemExit("Windows release artifacts must stay under D:/BuildCache")
+    pass  # Build paths follow the caller configuration.
     packages = {p["name"]: p for p in metadata["packages"]}
+    package_targets = {name: target for name in packages}
     for relative in plan.get("extra_manifests", []):
         extra = json.loads(run("cargo", "metadata", "--manifest-path", str(ROOT / relative),
                                "--no-deps", "--format-version", "1", capture=True))
-        if Path(extra["target_directory"]).resolve() != target:
-            raise SystemExit(f"Extra workspace has a different artifact directory: {relative}")
+        extra_target = Path(extra["target_directory"]).resolve()
         for package in extra["packages"]:
             if package["name"] in packages:
                 raise SystemExit(f"Duplicate package in extra workspace: {package['name']}")
             packages[package["name"]] = package
+            package_targets[package["name"]] = extra_target
     selected = [packages[name] for name in plan["packages"]]
     owned = {p["name"]: p for p in selected}
     for name, commit in plan.get("reused_package_commits", {}).items():
@@ -143,7 +143,7 @@ def main():
         package = owned[options.check_package]
         ensure_library_lockfiles(ROOT)
         run("cargo", "package", "--locked", "--no-verify", "--manifest-path", package["manifest_path"], "-p", package["name"])
-        validate_archive(target / "package" / f"{package['name']}-{package['version']}.crate",
+        validate_archive(package_targets[package["name"]] / "package" / f"{package['name']}-{package['version']}.crate",
                          run("git", "rev-parse", "HEAD", capture=True))
         return
     if not options.publish:
@@ -195,7 +195,7 @@ def main():
             # Packaging is reversible. Inspect its exact contents before the
             # immutable registry upload, including Windows Git symlink failures.
             run("cargo", "package", "--locked", "--no-verify", "--manifest-path", package["manifest_path"], "-p", name)
-            validate_archive(target / "package" / f"{name}-{package_version}.crate", head)
+            validate_archive(package_targets[name] / "package" / f"{name}-{package_version}.crate", head)
             command = ["cargo", "publish", "--locked", "--manifest-path", package["manifest_path"], "-p", name]
             if name in cross:
                 command.append("--no-verify")

@@ -1,13 +1,12 @@
+const { localBuildPath } = require("../../scripts/local-build-paths.cjs");
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),crypto=require('node:crypto');
 const {chromium}=require('../../tests/playwright/node_modules/playwright');
 const args=process.argv.slice(2),option=(key,fallback)=>args.includes(key)?args[args.indexOf(key)+1]:fallback;
-const out=path.resolve(option('--out','D:/BuildCache/glory-portfolio-20261025/run'));
-assert(out.replaceAll('\\','/').toLowerCase().startsWith('d:/buildcache/'));
-assert((process.env.TEMP||'').replaceAll('\\','/').toLowerCase().startsWith('d:/buildcache/'));
+const out=path.resolve(option('--out',localBuildPath('glory-portfolio-20261025/run')));
 fs.mkdirSync(out,{recursive:false});fs.mkdirSync(path.join(out,'driver'));
 for(const file of ['compare.cjs','harness.js'])fs.copyFileSync(path.join(__dirname,file),path.join(out,'driver',file));
 const variants=['glory','dioxus-root','dioxus-row'],sizes=option('--sizes','1000,5000').split(',').map(Number);
-const base=option('--base','http://127.0.0.1:29045'),pin=option('--pin','D:/BuildCache/glory-portfolio-20261025/pin-browser.ps1');
+const base=option('--base','http://127.0.0.1:29045'),pin=option('--pin',localBuildPath('glory-portfolio-20261025/pin-browser.ps1'));
 const operations=['mount','one','sparse','medium','dense','burst','select','clear'];
 const sha=value=>crypto.createHash('sha256').update(value).digest('hex');
 const save=(file,value)=>fs.writeFileSync(path.join(out,file+'.json'),JSON.stringify(value,null,2)+'\n');

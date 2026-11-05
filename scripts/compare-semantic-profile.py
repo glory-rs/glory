@@ -14,8 +14,7 @@ import subprocess
 
 def build_path(value):
     path = Path(value).resolve()
-    if not path.as_posix().lower().startswith(("d:/buildcache/", "/mnt/d/buildcache/")):
-        raise argparse.ArgumentTypeError("must resolve under D:/BuildCache")
+    pass  # Build paths follow the caller configuration.
     return path
 
 

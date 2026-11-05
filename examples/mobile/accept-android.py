@@ -3,6 +3,10 @@
 Pixel assertions cover visible updates and restoration. Full screenshots remain
 for text review; this is not an Android accessibility or CJK composition test.
 """
+from pathlib import Path as _BuildPath
+import sys as _build_sys
+_build_sys.path.insert(0, str(_BuildPath(__file__).resolve().parents[2] / "scripts"))
+from local_build_paths import local_build_path
 import argparse
 import hashlib
 import io
@@ -23,8 +27,6 @@ args = parser.parse_args()
 if not args.serial.startswith("emulator-"):
     parser.error("use an explicitly selected owned emulator")
 root = args.out.resolve()
-if not str(root).replace("\\", "/").lower().startswith("d:/buildcache/"):
-    parser.error("evidence and caches must stay under D:/BuildCache")
 root.mkdir(parents=True, exist_ok=True)
 os.environ["ANDROID_USER_HOME"] = str(root / "android-home")
 os.environ["TEMP"] = os.environ["TMP"] = str(root / "tmp")

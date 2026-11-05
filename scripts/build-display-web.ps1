@@ -1,19 +1,20 @@
 param(
- [string]$BuildRoot='D:/BuildCache/glory-dsl-20261028',
- [string]$Bindgen='D:/BuildCache/glory-v2-dioxus-20261028/tools/wasm-bindgen-0.2.130-x86_64-pc-windows-msvc/wasm-bindgen.exe',
+ [string]$BuildRoot="$PSScriptRoot/../target/verification/glory-dsl-20261028",
+ [string]$Bindgen='wasm-bindgen',
  [switch]$Hand,
  [ValidateSet('display-web','counter')][string]$Bin='display-web'
 )
+. "$PSScriptRoot/local-build-paths.ps1"
+
 $ErrorActionPreference='Stop'
 $BuildRoot=[IO.Path]::GetFullPath($BuildRoot)
-if(-not $BuildRoot.Replace('\','/').StartsWith('D:/BuildCache/',[StringComparison]::OrdinalIgnoreCase)){throw 'BuildRoot must be on D:/BuildCache'}
 if($Hand -and $Bin -ne 'display-web'){throw 'Hand selects the acceptance comparison only'}
 $variant=if($Bin -eq 'counter'){'counter'}elseif($Hand){'hand'}else{'dsl'}
 $saved=@{}
 foreach($key in @('CARGO_HOME','CARGO_TARGET_DIR','TEMP','TMP','CARGO_BUILD_JOBS')){$saved[$key]=[Environment]::GetEnvironmentVariable($key,'Process')}
 try {
- $env:CARGO_HOME='D:/BuildCache/glory-semantic-ui/cargo';$env:CARGO_TARGET_DIR="$BuildRoot/$variant/target"
- $env:TEMP="$BuildRoot/tmp";$env:TMP=$env:TEMP;$env:CARGO_BUILD_JOBS='2'
+ $env:CARGO_TARGET_DIR = Get-NormalCargoTarget
+ $env:CARGO_BUILD_JOBS='2'
  New-Item -ItemType Directory -Force -Path "$BuildRoot/$variant",$env:TEMP | Out-Null
  $manifest=[IO.Path]::GetFullPath("$PSScriptRoot/../examples/display-web/Cargo.toml")
  $flags=@();if($Hand){$flags=@('--features','hand')}

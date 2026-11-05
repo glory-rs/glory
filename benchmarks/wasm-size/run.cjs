@@ -1,3 +1,4 @@
+const { localBuildPath } = require("../../scripts/local-build-paths.cjs");
 // Node 22+, wasm-bindgen 0.2.130, Binaryen npm 132.0.0. No npm deps in the repos.
 'use strict';
 const fs = require('node:fs');
@@ -12,8 +13,7 @@ const glory = path.resolve(fixture, '../..');
 const engines = JSON.parse(fs.readFileSync(path.join(glory, 'docs/engine-forks.json'))).forks;
 const options = process.argv.slice(2);
 function arg(name, fallback) { const i = options.indexOf(name); return i < 0 ? fallback : options[i + 1]; }
-const root = path.resolve(arg('--build-root', 'D:/BuildCache/glory/wasm-size'));
-if (!root.replaceAll('\\', '/').toLowerCase().startsWith('d:/buildcache/')) throw Error('Build root must be on D:/BuildCache');
+const root = path.resolve(arg('--build-root', localBuildPath('glory/wasm-size')));
 const label = arg('--label', 'baseline');
 if (!/^[a-z0-9-]+$/.test(label)) throw Error('Invalid run label');
 const out = path.join(root, 'runs', label);
@@ -24,7 +24,7 @@ const manifest = path.join(source, 'glory/benchmarks/wasm-size/Cargo.toml');
 const binaryen = path.resolve(arg('--binaryen-dir', path.join(root, 'tools/node_modules/binaryen')));
 const wasmOpt = path.join(binaryen, 'bin/wasm-opt');
 const bindgen = arg('--bindgen', process.env.WASM_BINDGEN || 'wasm-bindgen');
-const env = { ...process.env, CARGO_HOME: 'D:/BuildCache/glory-semantic-ui/cargo', CARGO_TARGET_DIR: target,
+const env = { ...process.env, CARGO_HOME: localBuildPath('glory-semantic-ui/cargo'), CARGO_TARGET_DIR: target,
   TEMP: path.join(root, 'tmp'), TMP: path.join(root, 'tmp'), TMPDIR: path.join(root, 'tmp'),
   PYTHONPYCACHEPREFIX: path.join(root, 'pycache'), npm_config_cache: path.join(root, 'npm-cache') };
 for (const key of Object.keys(env)) {
@@ -63,7 +63,7 @@ function copy(from, to, entries) {
 function clearStaging() {
   // Generated staging only: reject junctions and verify the absolute D: target
   // before a recursive replacement. Per-run archives and outputs are separate.
-  if(path.dirname(source)!==root||path.basename(source)!=='source'||!root.replaceAll('\\','/').toLowerCase().startsWith('d:/buildcache/')) throw Error('Invalid staging target');
+  if(path.dirname(source)!==root||path.basename(source)!=='source') throw Error('Invalid staging target');
   if(fs.existsSync(source)&&fs.realpathSync(source).toLowerCase()!==source.toLowerCase()) throw Error('Staging must not be a junction');
   fs.rmSync(source,{recursive:true,force:true});
 }

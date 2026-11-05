@@ -1,15 +1,19 @@
 """Check real downstream compiler diagnostics, including a renamed facade dependency."""
+from pathlib import Path as _BuildPath
+import sys as _build_sys
+_build_sys.path.insert(0, str(_BuildPath(__file__).resolve().parents[1] / "scripts"))
+from local_build_paths import local_build_path
 import json
 import os
 from pathlib import Path
 import subprocess
 
 repo = Path(__file__).resolve().parent.parent
-root = Path(os.environ.get("GLORY_DSL_BUILD_ROOT", "D:/BuildCache/glory-dsl-20261028")).resolve()
+root = Path(os.environ.get("GLORY_DSL_BUILD_ROOT", local_build_path('glory-dsl-20261028'))).resolve()
 project = root / "diagnostics-project"
 (project / "src").mkdir(parents=True, exist_ok=True)
 (root / "tmp").mkdir(exist_ok=True)
-env = dict(os.environ, CARGO_HOME=os.environ.get("CARGO_HOME", "D:/BuildCache/glory-semantic-ui/cargo"),
+env = dict(os.environ, CARGO_HOME=os.environ.get("CARGO_HOME", local_build_path('glory-semantic-ui/cargo')),
            CARGO_TARGET_DIR=str(root / "check-target"), TEMP=str(root / "tmp"), TMP=str(root / "tmp"))
 (project / "Cargo.toml").write_text(
     '[package]\nname="display-diagnostics"\nversion="0.0.0"\nedition="2024"\n'

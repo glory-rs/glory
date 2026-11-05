@@ -1,15 +1,15 @@
 //! Native development restarts only after a successful build. Each running
 //! executable has its own copy, so Windows builds can link the next generation.
-use crate::{Result, args::Args, build, process::Running, project::Project};
-use std::{
-    fs,
-    path::PathBuf,
-    sync::{
-        Arc,
-        atomic::{AtomicBool, Ordering},
-    },
-    time::{Duration, Instant},
-};
+use std::fs;
+use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{Duration, Instant};
+
+use crate::args::Args;
+use crate::process::Running;
+use crate::project::Project;
+use crate::{Result, build};
 
 struct Prepared {
     directory: PathBuf,

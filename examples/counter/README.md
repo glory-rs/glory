@@ -74,9 +74,9 @@ See [the tool package README](../../tools/cli/README.md) for manifest overrides,
 other applications, workspace selection and reproducible tool installation.
 
 The launchers set caches, native tool output and temporary files under
-`D:/BuildCache/glory-projects/<project-path-hash>` before Cargo starts. Application
+`target/verification/glory-projects/<project-path-hash>` before Cargo starts. Application
 builds use a separate `app-target` directory. `GLORY_BUILD_ROOT` can select another
-project directory under D:/BuildCache. A matching wasm-bindgen is installed in
+project directory in the project-local verification directory. A matching wasm-bindgen is installed in
 that project's versioned tools directory on first build. No global bindgen is
 selected implicitly; `--bindgen` accepts an explicitly supplied, checked binary.
 

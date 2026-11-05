@@ -1,9 +1,10 @@
+const { localBuildPath } = require("../../scripts/local-build-paths.cjs");
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict'),{spawn}=require('node:child_process');
-const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'D:/BuildCache/glory-v2-dioxus-20261028/tools/node_modules/playwright');
-const site=process.env.GLORY_MIXED_STREAM_SITE||'D:/BuildCache/glory-semantic-ui/mixed-stream-site';
-const binary=process.env.GLORY_MIXED_STREAM_BIN||'D:/BuildCache/glory-semantic-ui/target/debug/mixed-stream-ssr.exe';
-const temporary=process.env.TMPDIR || process.env.TEMP || 'D:/BuildCache/glory-semantic-ui/tmp';
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const site=process.env.GLORY_MIXED_STREAM_SITE||localBuildPath('glory-semantic-ui/mixed-stream-site');
+const binary=process.env.GLORY_MIXED_STREAM_BIN||localBuildPath('glory-semantic-ui/target/debug/mixed-stream-ssr.exe');
+const temporary=process.env.TMPDIR || process.env.TEMP || localBuildPath('glory-semantic-ui/tmp');
 process.env.TEMP=process.env.TMP=temporary;fs.mkdirSync(temporary,{recursive:true});
 const asset=path.resolve(__dirname,'../../crates/web/src/stream.js');
 const requests=new Map(),errors=[],evidence={checks:[]};

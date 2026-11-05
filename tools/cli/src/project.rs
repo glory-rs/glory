@@ -1,11 +1,13 @@
-use crate::Result;
-use crate::args::Args;
-use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::path::{Component, Path, PathBuf};
 use std::process::{Command, Output};
+
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
+
+use crate::Result;
+use crate::args::Args;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -47,53 +49,59 @@ pub struct Paths {
 
 impl Paths {
     pub fn new(manifest: &Path, requested: Option<&Path>) -> Result<Self> {
-        let digest = sha256(manifest.as_os_str().to_string_lossy().as_bytes());
-        let default = if cfg!(windows) {
-            PathBuf::from("D:/BuildCache/glory-projects")
-        } else if cfg!(target_os = "macos") {
-            PathBuf::from("/Volumes/Data/Caches/glory/projects")
-        } else {
-            PathBuf::from("/mnt/d/BuildCache/glory-projects")
-        }
-        .join(&digest[..16]);
+        let application = manifest.parent().ok_or("manifest has no parent")?;
+        let metadata: Value = serde_json::from_slice(
+            &capture(
+                Command::new("cargo")
+                    .current_dir(application)
+                    .args([
+                        "metadata",
+                        "--no-deps",
+                        "--format-version",
+                        "1",
+                        "--manifest-path",
+                    ])
+                    .arg(manifest),
+            )?
+            .stdout,
+        )
+        .map_err(|e| e.to_string())?;
+        let target = compiler_path(PathBuf::from(
+            metadata["target_directory"]
+                .as_str()
+                .ok_or("Cargo metadata has no target_directory")?,
+        ));
+        std::fs::create_dir_all(&target)
+            .map_err(|e| format!("create {}: {e}", target.display()))?;
         let root = requested
             .map(Path::to_path_buf)
             .or_else(|| std::env::var_os("GLORY_BUILD_ROOT").map(PathBuf::from))
-            .unwrap_or(default);
+            .unwrap_or_else(|| target.join("glory"));
         validate_build_root(&root)?;
         std::fs::create_dir_all(&root).map_err(|e| format!("create {}: {e}", root.display()))?;
-        let root = root.canonicalize().map_err(|e| e.to_string())?;
+        let root = compiler_path(root.canonicalize().map_err(|e| e.to_string())?);
         validate_build_root(&root)?;
-        // Python build generators (including Stylo) join OUT_DIR with `..`.
-        // Windows verbatim paths disable that normalization and reject the
-        // result. Validate the real destination first, then pass Cargo a normal
-        // absolute drive path so downstream generators can traverse parents.
-        let root = compiler_path(root);
+        let application = application.canonicalize().map_err(|e| e.to_string())?;
+        if application.starts_with(&root) {
+            return Err("build output must not overwrite the application source directory".into());
+        }
         let cargo_home = std::env::var_os("CARGO_HOME")
             .map(PathBuf::from)
-            .filter(|path| validate_build_root(path).is_ok())
-            .unwrap_or_else(|| root.join("cargo"));
-        let paths = Self {
-            target: root.join("app-target"),
-            temp: root.join("tmp"),
-            cargo_home,
+            .or_else(|| {
+                std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" })
+                    .map(|home| PathBuf::from(home).join(".cargo"))
+            })
+            .ok_or("cannot determine Cargo home")?;
+        Ok(Self {
             root,
-        };
-        for path in [&paths.target, &paths.temp, &paths.cargo_home] {
-            std::fs::create_dir_all(path).map_err(|e| format!("create {}: {e}", path.display()))?;
-            validate_build_root(&path.canonicalize().map_err(|e| e.to_string())?)?;
-        }
-        Ok(paths)
+            cargo_home,
+            target,
+            temp: std::env::temp_dir(),
+        })
     }
 
-    pub fn apply(&self, command: &mut Command) {
-        command
-            .env("CARGO_HOME", &self.cargo_home)
-            .env("CARGO_TARGET_DIR", &self.target)
-            .env("TEMP", &self.temp)
-            .env("TMP", &self.temp)
-            .env("TMPDIR", &self.temp)
-            .env("PYTHONPYCACHEPREFIX", self.root.join("pycache"));
+    pub fn apply(&self, _command: &mut Command) {
+        // Child commands inherit the caller's Cargo and temporary directories.
     }
 }
 
@@ -114,47 +122,21 @@ pub fn validate_build_root(path: &Path) -> Result<()> {
     {
         return Err("build paths must not contain '..'".into());
     }
+    if !path.is_absolute() || path.parent().is_none() {
+        return Err("build output must be an absolute directory below a filesystem root".into());
+    }
     let portable = path
         .to_string_lossy()
         .replace('\\', "/")
         .to_ascii_lowercase();
-    let portable = portable.strip_prefix("//?/").unwrap_or(&portable);
-    if cfg!(windows) {
-        if portable.starts_with("d:/buildcache/") {
-            return Ok(());
-        }
-    } else if cfg!(target_os = "macos") {
-        if path.starts_with("/Volumes/Data/Caches/glory")
-            && path != Path::new("/Volumes/Data/Caches/glory")
-        {
-            // Validate existing ancestors too, before creating any directories.
-            let ancestor = path
-                .ancestors()
-                .find(|path| path.exists())
-                .ok_or("build path has no existing ancestor")?;
-            let resolved = ancestor.canonicalize().map_err(|e| e.to_string())?;
-            if resolved.starts_with("/Volumes/Data/Caches/glory")
-                || Path::new("/Volumes/Data/Caches/glory").starts_with(&resolved)
-            {
-                return Ok(());
-            }
-        }
-    } else if portable.starts_with("/mnt/d/buildcache/") {
-        let mount = capture(Command::new("findmnt").args(["-n", "-T", "/mnt/d", "-o", "SOURCE"]))?;
-        if is_d_mount(&String::from_utf8_lossy(&mount.stdout)) {
-            return Ok(());
-        }
-        return Err("/mnt/d is not verified as the Windows D: mount".into());
+    if portable == "d:/buildcache"
+        || portable.starts_with("d:/buildcache/")
+        || portable.starts_with("/mnt/d/buildcache/")
+        || portable.contains("/.codex/build-targets")
+    {
+        return Err("the retired shared build directory cannot be used".into());
     }
-    Err(format!(
-        "build/cache paths must be under D:/BuildCache, verified /mnt/d/BuildCache, or macOS /Volumes/Data/Caches/glory: {}",
-        path.display()
-    ))
-}
-
-fn is_d_mount(source: &str) -> bool {
-    let source = source.trim().replace('\\', "/").to_ascii_lowercase();
-    source == "d:" || source.starts_with("d:/") || source == "//localhost/d$"
+    Ok(())
 }
 
 #[derive(Clone)]
@@ -977,46 +959,27 @@ fn main() {
         );
     }
     #[test]
-    fn recognizes_both_wsl_drive_mount_formats_without_accepting_other_drives() {
-        for source in ["D:\\\n", "D:", "//localhost/D$\n"] {
-            assert!(is_d_mount(source), "{source}");
-        }
-        for source in [
-            "C:\\",
-            "/dev/sdb",
-            "//remote/D$",
-            "//localhost/C$",
-            "tmpfs D:",
-        ] {
-            assert!(!is_d_mount(source), "{source}");
-        }
-    }
-    #[test]
-    fn rejects_system_and_escaping_cache_directories() {
-        for path in [
-            "C:/tmp/glory",
-            "D:/Works/app/target",
-            "D:/BuildCache/app/../other",
-            "/tmp/glory",
-        ] {
+    fn accepts_project_output_and_rejects_relative_or_escaping_directories() {
+        let scratch = crate::test_support::Scratch::new();
+        assert!(validate_build_root(&scratch.0.join("target")).is_ok());
+        for path in ["relative-output", "../other", "D:/BuildCache/app/../other"] {
             assert!(validate_build_root(Path::new(path)).is_err(), "{path}");
         }
     }
 
-    #[cfg(target_os = "macos")]
     #[test]
-    fn apple_cache_symlinks_cannot_escape_before_directory_creation() {
+    fn normal_build_paths_do_not_override_the_caller_environment() {
         let scratch = crate::test_support::Scratch::new();
-        let escaped = scratch.0.join("escaped");
-        std::os::unix::fs::symlink("/tmp", &escaped).unwrap();
-        assert!(validate_build_root(&escaped.join("uncreated-child")).is_err());
-        assert!(
-            Paths::new(
-                &scratch.0.join("Cargo.toml"),
-                Some(&escaped.join("uncreated-child"))
-            )
-            .is_err()
+        scratch.write(
+            "Cargo.toml",
+            "[package]\nname=\"path-fixture\"\nversion=\"0.0.0\"\n[workspace]\n",
         );
+        scratch.write("src/lib.rs", "");
+        let paths = Paths::new(&scratch.0.join("Cargo.toml"), None).unwrap();
+        let mut command = Command::new("cargo");
+        paths.apply(&mut command);
+        assert_eq!(command.get_envs().count(), 0);
+        assert_eq!(paths.temp, std::env::temp_dir());
     }
 
     #[test]

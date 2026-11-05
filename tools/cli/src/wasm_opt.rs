@@ -1,11 +1,12 @@
 //! Optional, explicitly pinned Binaryen. Never download or discover a PATH tool.
-use crate::{Result, args::Args, project::Project};
-use std::{
-    fs,
-    io::Read,
-    path::{Path, PathBuf},
-    process::Command,
-};
+use std::fs;
+use std::io::Read;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+
+use crate::Result;
+use crate::args::Args;
+use crate::project::Project;
 
 pub fn verify(project: &Project, args: &Args) -> Result<Option<PathBuf>> {
     let Some(path) = &args.wasm_opt else {

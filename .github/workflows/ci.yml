@@ -16,13 +16,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 90
     env:
-      CARGO_HOME: D:/BuildCache/glory-semantic-ui/cargo
-      CARGO_TARGET_DIR: D:/BuildCache/glory-semantic-ui/target
-      RUSTUP_HOME: D:/BuildCache/glory-semantic-ui/rustup
-      TEMP: D:/BuildCache/glory-semantic-ui/tmp
-      TMP: D:/BuildCache/glory-semantic-ui/tmp
-      PYTHONPYCACHEPREFIX: D:/BuildCache/glory-semantic-ui/pycache
-      npm_config_cache: D:/BuildCache/glory-semantic-ui/npm-cache
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
       CARGO_INCREMENTAL: '0'
       CARGO_PROFILE_DEV_DEBUG: '0'
       CARGO_PROFILE_TEST_DEBUG: '0'
@@ -64,7 +58,7 @@ jobs:
           python-version: '3.x'
       - name: Prepare D drive tools and compiler
         run: |
-          New-Item -ItemType Directory -Force $env:CARGO_HOME,$env:CARGO_TARGET_DIR,$env:RUSTUP_HOME,$env:TEMP | Out-Null
+          New-Item -ItemType Directory -Force $env:CARGO_TARGET_DIR,$env:TEMP | Out-Null
           rustup toolchain install 1.98.0 --profile minimal --component clippy,rustfmt --target wasm32-unknown-unknown
           if ($LASTEXITCODE) { throw 'Rust installation failed' }
           rustup default 1.98.0
@@ -73,9 +67,9 @@ jobs:
           if ($LASTEXITCODE) { throw 'Library dependency resolution failed' }
           $meta = cargo metadata --locked --no-deps --format-version 1 | ConvertFrom-Json
           if ($LASTEXITCODE -or [IO.Path]::GetFullPath($meta.target_directory) -ne [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)) { throw 'Unexpected Cargo target' }
-          cargo install wasm-bindgen-cli --version 0.2.130 --locked --root D:/BuildCache/glory-semantic-ui/tools
+          cargo install wasm-bindgen-cli --version 0.2.130 --locked --root ${{ github.workspace }}/target/verification/glory-semantic-ui/tools
           if ($LASTEXITCODE) { throw 'WASM tools installation failed' }
-          'D:/BuildCache/glory-semantic-ui/tools/bin' >> $env:GITHUB_PATH
+          '${{ github.workspace }}/target/verification/glory-semantic-ui/tools/bin' >> $env:GITHUB_PATH
       - name: Validate release tooling and plan
         run: |
           python -m unittest discover -s scripts -p 'test_*.py'
@@ -97,14 +91,14 @@ jobs:
         run: ./scripts/check-semantic-ui.ps1 -Web -Window
       - name: Install browser driver and build streaming fixture
         run: |
-          npm install --prefix D:/BuildCache/glory-semantic-ui/browser --no-save --package-lock=false playwright@1.64.1
+          npm install --prefix ${{ github.workspace }}/target/verification/glory-semantic-ui/browser --no-save --package-lock=false playwright@1.64.1
           if ($LASTEXITCODE) { throw 'Playwright installation failed' }
           cargo build --locked --manifest-path examples/semantic-web/Cargo.toml --bin stream_fixture
           if ($LASTEXITCODE) { throw 'Stream fixture build failed' }
       - name: Actual Chromium acceptance
         run: |
-          $web = Start-Process python -ArgumentList @('-m','http.server','8792','--bind','127.0.0.1','--directory','D:/BuildCache/glory-semantic-ui/web-demo') -WindowStyle Hidden -PassThru
-          $stream = Start-Process "$env:CARGO_TARGET_DIR/debug/stream_fixture.exe" -ArgumentList @('D:/BuildCache/glory-semantic-ui/web-demo','127.0.0.1:8793') -WindowStyle Hidden -PassThru
+          $web = Start-Process python -ArgumentList @('-m','http.server','8792','--bind','127.0.0.1','--directory','${{ github.workspace }}/target/verification/glory-semantic-ui/web-demo') -WindowStyle Hidden -PassThru
+          $stream = Start-Process "$env:CARGO_TARGET_DIR/debug/stream_fixture.exe" -ArgumentList @('${{ github.workspace }}/target/verification/glory-semantic-ui/web-demo','127.0.0.1:8793') -WindowStyle Hidden -PassThru
           try {
             foreach ($url in @('http://127.0.0.1:8792','http://127.0.0.1:8793/page')) {
               $ready = $false
@@ -114,7 +108,7 @@ jobs:
               }
               if (-not $ready) { throw "Fixture did not start: $url" }
             }
-            node scripts/test-semantic-browser.cjs --out D:/BuildCache/glory-semantic-ui/browser-validation --playwright D:/BuildCache/glory-semantic-ui/browser/node_modules/playwright
+            node scripts/test-semantic-browser.cjs --out ${{ github.workspace }}/target/verification/glory-semantic-ui/browser-validation --playwright ${{ github.workspace }}/target/verification/glory-semantic-ui/browser/node_modules/playwright
             if ($LASTEXITCODE) { throw 'Browser acceptance failed' }
           }
           finally {
@@ -122,8 +116,8 @@ jobs:
           }
       - name: Portable routing browser acceptance
         run: |
-          $env:GLORY_PLAYWRIGHT = 'D:/BuildCache/glory-semantic-ui/browser/node_modules/playwright'
-          $env:GLORY_ROUTING_SITE = 'D:/BuildCache/glory-routing/site'
+          $env:GLORY_PLAYWRIGHT = '${{ github.workspace }}/target/verification/glory-semantic-ui/browser/node_modules/playwright'
+          $env:GLORY_ROUTING_SITE = '${{ github.workspace }}/target/verification/glory-routing/site'
           New-Item -ItemType Directory -Force $env:GLORY_ROUTING_SITE | Out-Null
           cargo build --locked --manifest-path examples/routing/Cargo.toml --features web --lib --target wasm32-unknown-unknown
           if ($LASTEXITCODE) { throw 'Routing WASM build failed' }
@@ -131,10 +125,10 @@ jobs:
           if ($LASTEXITCODE) { throw 'Routing bindings failed' }
           cargo run --locked --manifest-path examples/routing/Cargo.toml --features ssr --bin routing-ssr -- $env:GLORY_ROUTING_SITE
           if ($LASTEXITCODE) { throw 'Routing SSR fixture failed' }
-          node examples/routing/browser.cjs > D:/BuildCache/glory-semantic-ui/browser-validation/routing.json
+          node examples/routing/browser.cjs > ${{ github.workspace }}/target/verification/glory-semantic-ui/browser-validation/routing.json
           if ($LASTEXITCODE) { throw 'Routing browser acceptance failed' }
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
           name: semantic-ui-browser-evidence
-          path: D:/BuildCache/glory-semantic-ui/browser-validation
+          path: ${{ github.workspace }}/target/verification/glory-semantic-ui/browser-validation

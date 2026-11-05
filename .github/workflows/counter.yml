@@ -8,17 +8,12 @@ jobs:
   counter:
     runs-on: windows-latest
     env:
-      CARGO_HOME: D:/BuildCache/glory-counter-ci/cargo
-      CARGO_TARGET_DIR: D:/BuildCache/glory-counter-ci/target
-      TEMP: D:/BuildCache/glory-counter-ci/tmp
-      TMP: D:/BuildCache/glory-counter-ci/tmp
-      npm_config_cache: D:/BuildCache/glory-counter-ci/npm-cache
-      PLAYWRIGHT_BROWSERS_PATH: D:/BuildCache/glory-counter-ci/browsers
-      PYTHONPYCACHEPREFIX: D:/BuildCache/glory-counter-ci/pycache
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/target/verification/glory-counter-ci/browsers
     steps:
       - name: Prepare D drive build directories
         shell: pwsh
-        run: New-Item -ItemType Directory -Force $env:CARGO_HOME, $env:CARGO_TARGET_DIR, $env:TEMP | Out-Null
+        run: New-Item -ItemType Directory -Force  $env:CARGO_TARGET_DIR, $env:TEMP | Out-Null
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Check out coordinated development engines
         shell: bash
@@ -55,10 +50,10 @@ jobs:
       - name: Build desktop and Web entries
         shell: pwsh
         run: |
-          $env:GLORY_BUILD_ROOT = 'D:/BuildCache/glory-counter-ci'
+          $env:GLORY_BUILD_ROOT = '${{ github.workspace }}/target/verification/glory-counter-ci'
           ./examples/counter/bin/glory.ps1 doctor
-          ./examples/counter/build.ps1 -Platform desktop -BuildRoot D:/BuildCache/glory-counter-ci
-          ./examples/counter/build.ps1 -Platform web -BuildRoot D:/BuildCache/glory-counter-ci
+          ./examples/counter/build.ps1 -Platform desktop -BuildRoot ${{ github.workspace }}/target/verification/glory-counter-ci
+          ./examples/counter/build.ps1 -Platform web -BuildRoot ${{ github.workspace }}/target/verification/glory-counter-ci
       - name: Browser acceptance
         shell: pwsh
         working-directory: tests/playwright
@@ -67,7 +62,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Playwright installation failed' }
           npm exec -- playwright install chromium
           if ($LASTEXITCODE -ne 0) { throw 'Chromium installation failed' }
-          $server = Start-Process python -ArgumentList @('-m', 'http.server', '8790', '--bind', '127.0.0.1', '--directory', 'D:/BuildCache/glory-counter-ci/web-debug') -WindowStyle Hidden -PassThru
+          $server = Start-Process python -ArgumentList @('-m', 'http.server', '8790', '--bind', '127.0.0.1', '--directory', '${{ github.workspace }}/target/verification/glory-counter-ci/web-debug') -WindowStyle Hidden -PassThru
           try {
             $ready = $false
             for ($attempt = 0; $attempt -lt 30; $attempt++) {
@@ -76,7 +71,7 @@ jobs:
             }
             if (-not $ready) { throw 'Counter server did not start' }
             $env:GLORY_COUNTER_URL = 'http://127.0.0.1:8790'
-            npm run test:counter -- --output D:/BuildCache/glory-counter-ci/playwright
+            npm run test:counter -- --output ${{ github.workspace }}/target/verification/glory-counter-ci/playwright
             if ($LASTEXITCODE -ne 0) { throw 'Counter browser acceptance failed' }
           }
           finally { Stop-Process -Id $server.Id -ErrorAction SilentlyContinue }

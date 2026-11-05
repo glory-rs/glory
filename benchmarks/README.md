@@ -252,7 +252,7 @@ Historical official tables below do not describe the current architecture.
 Use PowerShell on Windows with Rust's `wasm32-unknown-unknown` target, Node and
 the Playwright package under `tests/playwright/node_modules` installed. Supply
 wasm-bindgen-cli **0.2.129** at
-`D:/BuildCache/glory-framework-compare/tools/bin/wasm-bindgen.exe`.
+`target/verification/glory-framework-compare/tools/bin/wasm-bindgen.exe`.
 The framework library versions and bindgen cohort are locked in the three
 checked-in Cargo.lock files; the CLI version must match.
 
@@ -266,19 +266,19 @@ runs strict WASM Clippy, generates web bindings without wasm-opt, starts a
 loopback server, launches an independent headless Chrome and performs semantic
 conformance before timing. It closes its browser and owned server on exit.
 The default browser is installed Google Chrome; `-Browser` selects an executable.
-All targets, temporary browser profiles and results must stay under D:/BuildCache.
+All targets, temporary browser profiles and results must stay in the project-local verification directory.
 
 ```powershell
 # Reuse already built sites; each run needs a new output directory.
 ./benchmarks/compare.ps1 -SkipBuild `
-  -OutDir D:/BuildCache/glory-framework-compare/my-round
+  -OutDir target/verification/glory-framework-compare/my-round
 ```
 
 To check order sensitivity, reuse one build and run a separate reversed round:
 
 ```powershell
-./benchmarks/compare.ps1 -SkipBuild -Order 'leptos,glory,dioxus' -OutDir D:/BuildCache/glory-framework-compare/forward-round
-./benchmarks/compare.ps1 -SkipBuild -Order 'dioxus,glory,leptos' -OutDir D:/BuildCache/glory-framework-compare/reverse-round
+./benchmarks/compare.ps1 -SkipBuild -Order 'leptos,glory,dioxus' -OutDir target/verification/glory-framework-compare/forward-round
+./benchmarks/compare.ps1 -SkipBuild -Order 'dioxus,glory,leptos' -OutDir target/verification/glory-framework-compare/reverse-round
 ```
 
 For a one-app preview use `./benchmarks/run.ps1 glory` and visit the printed URL.

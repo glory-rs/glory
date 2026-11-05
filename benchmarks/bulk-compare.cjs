@@ -1,12 +1,11 @@
+const { localBuildPath } = require("../scripts/local-build-paths.cjs");
 // Compare independently built Glory revisions with the unchanged rows harness.
-// Example: node benchmarks/bulk-compare.cjs --base http://127.0.0.1:8791 --out D:/BuildCache/glory-bulk-optimization/round
+// Example: node benchmarks/bulk-compare.cjs --base http://127.0.0.1:8791 --out target/verification/glory-bulk-optimization/round
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm');
 const assert = require('node:assert/strict'), crypto = require('node:crypto');
 const args = process.argv.slice(2);
 const option = (key, fallback) => args.includes(key) ? args[args.indexOf(key) + 1] : fallback;
-const out = path.resolve(option('--out', 'D:/BuildCache/glory-bulk-optimization/round'));
-assert(out.replaceAll('\\', '/').toLowerCase().startsWith('d:/buildcache/'));
-assert((process.env.TEMP || '').replaceAll('\\', '/').toLowerCase().startsWith('d:/buildcache/'), 'Set TEMP/TMP on D before launching Node');
+const out = path.resolve(option('--out', localBuildPath('glory-bulk-optimization/round')));
 fs.mkdirSync(out, {recursive:false});
 fs.mkdirSync(path.join(out,'driver-source'));
 for(const name of ['bulk-compare.cjs','acceptance.js','browser-run.js','bench-harness.js','bulk-integrity.js']) {

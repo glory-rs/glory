@@ -1,7 +1,8 @@
+const { localBuildPath } = require("../scripts/local-build-paths.cjs");
 // Exact JS bridge counts through V8 coverage, outside all timing runs.
 const fs=require('node:fs'),http=require('node:http'),path=require('node:path'),assert=require('node:assert/strict');
-const {chromium}=require('D:/BuildCache/glory-v2-dioxus-20261028/tools/node_modules/playwright');
-const root=path.resolve(process.env.GLORY_BENCH_BUILD_ROOT||'D:/BuildCache/glory-display-completion-20261028');
+const {chromium}=require('playwright');
+const root=path.resolve(process.env.GLORY_BENCH_BUILD_ROOT||localBuildPath('glory-display-completion-20261028'));
 const routes={before:'before/site/glory',glory:process.env.GLORY_CANDIDATE_SITE||'completed/site/glory'};
 process.env.TEMP=process.env.TMP=path.join(root,'tmp');
 const output=path.join(root,'submit-counts');fs.mkdirSync(output);

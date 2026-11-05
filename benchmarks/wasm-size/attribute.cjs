@@ -1,5 +1,5 @@
 // Attribute final function bodies using a name-preserving Binaryen output.
-// Usage: node attribute.cjs named.wasm optimized.wasm > D:/BuildCache/.../attribution.json
+// Usage: node attribute.cjs named.wasm optimized.wasm > target/verification/.../attribution.json
 'use strict';
 const fs=require('node:fs'),crypto=require('node:crypto');
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');

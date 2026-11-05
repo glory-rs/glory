@@ -5,7 +5,7 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--out', required=True, type=pathlib.Path)
 out = parser.parse_args().out.resolve()
 root = pathlib.Path(__file__).resolve().parents[2]
-assert out.as_posix().lower().startswith('d:/buildcache/') and not out.exists()
+assert not out.exists()
 members = tomllib.loads((root/'Cargo.toml').read_text())['workspace']['members']
 files = [root/'Cargo.toml', root/'Cargo.lock']
 for base in [*(root/member for member in members), root/'benchmarks/scenarios']:

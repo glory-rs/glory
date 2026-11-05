@@ -1,5 +1,6 @@
+const { localBuildPath } = require("../scripts/local-build-paths.cjs");
 // Independent Chrome process; no shared MCP browser/profile. All temporary
-// profiles, downloads, screenshots and raw samples belong under D:/BuildCache.
+// profiles, downloads, screenshots and raw samples belong in the project verification directory.
 const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
@@ -7,9 +8,7 @@ const assert=require('node:assert/strict');
 const crypto=require('node:crypto');
 const args=process.argv.slice(2);
 const option=(name,fallback)=>{const i=args.indexOf(name);return i<0?fallback:args[i+1];};
-const out=path.resolve(option('--out','D:/BuildCache/glory-framework-compare/browser-round'));
-if(!out.replaceAll('\\','/').toLowerCase().startsWith('d:/buildcache/'))throw Error('Output must be on D:/BuildCache');
-if(!(process.env.TEMP||'').replaceAll('\\','/').toLowerCase().startsWith('d:/buildcache/'))throw Error('Set TEMP/TMP on D before launching Node');
+const out=path.resolve(option('--out',localBuildPath('glory-framework-compare/browser-round')));
 const order=option('--order','leptos,glory,dioxus').split(',');
 assert.deepEqual([...order].sort(),['dioxus','glory','leptos']);
 fs.mkdirSync(out,{recursive:false});

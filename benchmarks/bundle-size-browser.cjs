@@ -1,8 +1,8 @@
+const { localBuildPath } = require("../scripts/local-build-paths.cjs");
 // Verify the same row contract before and after Binaryen; no timing benchmark.
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),vm=require('node:vm'),assert=require('node:assert/strict'),crypto=require('node:crypto');
-const root=path.resolve(process.argv[2]||'D:/BuildCache/glory-benchmark-wasm-20261026');
-if(!root.replaceAll('\\','/').toLowerCase().startsWith('d:/buildcache/'))throw Error('Evidence and browser output must be on D:');
+const root=path.resolve(process.argv[2]||localBuildPath('glory-benchmark-wasm-20261026'));
 process.env.TEMP=process.env.TMP=path.join(root,'tmp');
 const {chromium}=require('../tests/playwright/node_modules/playwright');
 const out=path.join(root,'bundle-size'),site=path.join(out,'site');

@@ -1,3 +1,4 @@
+const { localBuildPath } = require("../scripts/local-build-paths.cjs");
 // Diagnostic only: compare a fresh 1000-row selection with selection after
 // repeated replacement. Not pooled into the nine-operation timing table.
 const {chromium}=require('../tests/playwright/node_modules/playwright');
@@ -5,10 +6,8 @@ const fs=require('node:fs');
 const path=require('node:path');
 const args=process.argv.slice(2);
 const option=(name,fallback)=>{const i=args.indexOf(name);return i<0?fallback:args[i+1];};
-const out=path.resolve(option('--out',args[0]||'D:/BuildCache/glory-framework-compare/selection-probe'));
+const out=path.resolve(option('--out',args[0]||localBuildPath('glory-framework-compare/selection-probe')));
 const base=option('--base-url','http://127.0.0.1:8790');
-if(!out.replaceAll('\\','/').toLowerCase().startsWith('d:/buildcache/'))throw Error('Use D:/BuildCache');
-if(!(process.env.TEMP||'').replaceAll('\\','/').toLowerCase().startsWith('d:/buildcache/'))throw Error('Set TEMP/TMP on D');
 fs.mkdirSync(out,{recursive:false});
 fs.copyFileSync(__filename,path.join(out,'selection-probe.cjs'));
 (async()=>{

@@ -1,10 +1,9 @@
+const { localBuildPath } = require("../../scripts/local-build-paths.cjs");
 // Supplemental ordered, per-node identity checks, separate from all timings.
 const {chromium}=require('../../tests/playwright/node_modules/playwright');
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const args=process.argv.slice(2),get=(key,fallback)=>args.includes(key)?args[args.indexOf(key)+1]:fallback;
-const out=path.resolve(get('--out','D:/BuildCache/glory-portfolio-20261025/integrity.json'));
-assert(out.replaceAll('\\','/').toLowerCase().startsWith('d:/buildcache/'));
-assert((process.env.TEMP||'').replaceAll('\\','/').toLowerCase().startsWith('d:/buildcache/'));
+const out=path.resolve(get('--out',localBuildPath('glory-portfolio-20261025/integrity.json')));
 (async()=>{const browser=await chromium.launch({headless:true,executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'});const records=[];
 try{for(const n of [1000,5000])for(const variant of ['glory','dioxus-root','dioxus-row']){
  const context=await browser.newContext();try{const p=await context.newPage();await p.goto(`${get('--base','http://127.0.0.1:29045')}/site/${variant}/?n=${n}`);await p.waitForFunction(()=>window.scenarioReady);await p.addScriptTag({path:path.join(__dirname,'harness.js')});

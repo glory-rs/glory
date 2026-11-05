@@ -1,7 +1,8 @@
+const { localBuildPath } = require("../../scripts/local-build-paths.cjs");
 'use strict';
 const fs = require('node:fs'), path = require('node:path'), http = require('node:http'), assert = require('node:assert/strict');
 const { chromium } = require(process.env.GLORY_PLAYWRIGHT || path.resolve(__dirname, '../../tests/playwright/node_modules/playwright'));
-const site = path.resolve(process.env.GLORY_ISLAND_SITE || 'D:/BuildCache/glory-semantic-ui/island-readiness-site');
+const site = path.resolve(process.env.GLORY_ISLAND_SITE || localBuildPath('glory-semantic-ui/island-readiness-site'));
 const counts = (process.env.GLORY_ISLAND_COUNTS || '1,32,64').split(',').map(Number);
 const evidence = { build: 'debug wasm32-unknown-unknown', cases: [], checks: [], errors: [] };
 const server = http.createServer((req, res) => {

@@ -1,7 +1,8 @@
+const { localBuildPath } = require("../../scripts/local-build-paths.cjs");
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict'),crypto=require('node:crypto');
-const {chromium}=require('D:/BuildCache/glory-v2-dioxus-20261028/tools/node_modules/playwright');
-const root=path.resolve(process.env.GLORY_DSL_BUILD_ROOT||'D:/BuildCache/glory-dsl-20261028');
+const {chromium}=require('playwright');
+const root=path.resolve(process.env.GLORY_DSL_BUILD_ROOT||localBuildPath('glory-dsl-20261028'));
 process.env.TEMP=process.env.TMP=path.join(root,'tmp');
 const output=path.join(root,process.argv[2]||'acceptance');fs.mkdirSync(output);
 const server=http.createServer((req,res)=>{

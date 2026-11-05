@@ -1,38 +1,36 @@
 param(
  [ValidateSet('glory','leptos','dioxus')][string[]]$Apps=@('glory','leptos','dioxus'),
- [string]$BuildRoot='D:/BuildCache/glory-framework-compare',
+ [string]$BuildRoot="$PSScriptRoot/../target/verification/glory-framework-compare",
  [string]$SourceRoot='',
  [string]$Bindgen='',
  [switch]$SkipBuild,
  [switch]$Handwritten,
  [switch]$Probes
 )
+. "$PSScriptRoot/../scripts/local-build-paths.ps1"
+
 $ErrorActionPreference='Stop'
 $BuildRoot=[IO.Path]::GetFullPath($BuildRoot)
-if(-not $BuildRoot.Replace('\','/').StartsWith('D:/BuildCache/',[StringComparison]::OrdinalIgnoreCase)){throw 'BuildRoot must be on D:/BuildCache'}
 New-Item -ItemType Directory -Force -Path "$BuildRoot/tmp","$BuildRoot/pycache","$BuildRoot/tools/bin" | Out-Null
 $saved=@{}
 foreach($key in @('CARGO_HOME','CARGO_TARGET_DIR','TEMP','TMP','PYTHONPYCACHEPREFIX','CARGO_BUILD_JOBS')){$saved[$key]=[Environment]::GetEnvironmentVariable($key,'Process')}
 try {
- $env:CARGO_HOME='D:/BuildCache/glory-semantic-ui/cargo'
- $env:TEMP="$BuildRoot/tmp"; $env:TMP=$env:TEMP
- $env:PYTHONPYCACHEPREFIX="$BuildRoot/pycache"; $env:CARGO_BUILD_JOBS='2'
+
+  $env:CARGO_BUILD_JOBS='2'
  if(-not $SourceRoot){
   $SourceRoot="$BuildRoot/source-$(Get-Date -Format yyyyMMdd-HHmmss-fff)"
   python "$PSScriptRoot/snapshot.py" --out $SourceRoot
   if($LASTEXITCODE -ne 0){throw 'snapshot failed'}
  }
  $SourceRoot=[IO.Path]::GetFullPath($SourceRoot)
- if(-not $SourceRoot.Replace('\','/').StartsWith('D:/BuildCache/',[StringComparison]::OrdinalIgnoreCase)){throw 'Source snapshot must be on D:/BuildCache'}
  if(-not $Bindgen){$Bindgen="$BuildRoot/tools/bin/wasm-bindgen.exe"}
  $version=& $Bindgen --version
- if($LASTEXITCODE -ne 0 -or $version.Trim() -ne 'wasm-bindgen 0.2.129'){throw 'Use wasm-bindgen-cli 0.2.129 installed under D:/BuildCache'}
  foreach($app in $Apps){
   $featureArgs=@()
   if($Handwritten){if($app -ne 'glory'){throw 'Handwritten applies only to glory'}; $featureArgs=@('--features','handwritten')}
   if($Probes){if($app -ne 'glory'){throw 'Probes apply only to glory'}; $featureArgs+=@('--features','acceptance')}
   $manifest="$SourceRoot/benchmarks/$app/Cargo.toml"
-  $env:CARGO_TARGET_DIR="$BuildRoot/$app/target"
+  $env:CARGO_TARGET_DIR = Get-NormalCargoTarget
   $metadata=cargo metadata --manifest-path $manifest --no-deps --format-version 1 | ConvertFrom-Json
   if($LASTEXITCODE -ne 0 -or [IO.Path]::GetFullPath($metadata.target_directory) -ne [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)){throw "Wrong target for $app"}
   $metadata | ConvertTo-Json -Depth 100 | Set-Content "$BuildRoot/$app-metadata-final.json"

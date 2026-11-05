@@ -26,7 +26,7 @@ Options:
   --no-default-features          Disable the application's default features
   --manifest-path PATH           Select the application manifest
   --cli-path PATH                Local glory-cli source for init (unpublished development)
-  --build-root PATH              D:/BuildCache/<project> (macOS: /Volumes/Data/Caches/glory/...)
+  --build-root PATH              artifact directory (default: Cargo target/glory)
   --bindgen PATH                 Explicit wasm-bindgen executable, version checked
   --wasm-opt PATH                Explicit Binaryen optimizer for release Web builds
   --wasm-opt-version VERSION     Required exact optimizer version (for example 129)

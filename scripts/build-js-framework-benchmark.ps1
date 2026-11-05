@@ -1,22 +1,23 @@
 param(
  [ValidateSet('glory','leptos','dioxus')][string[]]$Frameworks=@('glory','leptos','dioxus'),
- [string]$BuildRoot='D:/BuildCache/glory-display-completion-20261028/js-framework',
+ [string]$BuildRoot="$PSScriptRoot/../target/verification/glory-display-completion-20261028/js-framework",
  [string]$BenchmarkRoot="$PSScriptRoot/../../js-framework-benchmark",
- [string]$Bindgen='D:/BuildCache/glory-v2-dioxus-20261028/tools/wasm-bindgen-0.2.130-x86_64-pc-windows-msvc/wasm-bindgen.exe'
+ [string]$Bindgen='wasm-bindgen'
 )
+. "$PSScriptRoot/local-build-paths.ps1"
+
 $ErrorActionPreference='Stop'
 $BuildRoot=[IO.Path]::GetFullPath($BuildRoot)
-if(-not $BuildRoot.Replace('\','/').StartsWith('D:/BuildCache/',[StringComparison]::OrdinalIgnoreCase)){throw 'Use a D:/BuildCache build root'}
 $BenchmarkRoot=[IO.Path]::GetFullPath($BenchmarkRoot)
 $saved=@{}
 foreach($key in @('CARGO_HOME','CARGO_TARGET_DIR','TEMP','TMP','CARGO_BUILD_JOBS')){$saved[$key]=[Environment]::GetEnvironmentVariable($key,'Process')}
 try {
- $env:CARGO_HOME='D:/BuildCache/glory-semantic-ui/cargo';$env:TEMP="$BuildRoot/tmp";$env:TMP=$env:TEMP;$env:CARGO_BUILD_JOBS='2'
+ $env:CARGO_BUILD_JOBS='2'
  New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null
  if((& $Bindgen --version).Trim() -ne 'wasm-bindgen 0.2.130'){throw 'Wrong bindgen CLI'}
  foreach($framework in $Frameworks){
   $source="$BenchmarkRoot/frameworks/keyed/$framework";$manifest="$source/Cargo.toml"
-  $env:CARGO_TARGET_DIR="$BuildRoot/$framework/target"
+  $env:CARGO_TARGET_DIR = Get-NormalCargoTarget
   $metadata=cargo metadata --locked --manifest-path $manifest --no-deps --format-version 1 | ConvertFrom-Json
   if($LASTEXITCODE -ne 0 -or [IO.Path]::GetFullPath($metadata.target_directory) -ne [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)){throw 'Wrong target directory'}
   $metadata|ConvertTo-Json -Depth 100|Set-Content "$BuildRoot/$framework-metadata.json"

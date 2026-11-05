@@ -6,12 +6,9 @@ WindowApp. The shell editor retains identity across child-parameter changes.
 Build browser artifacts using D: caches and wasm-bindgen-cli 0.2.129:
 
 ```powershell
-$env:CARGO_HOME='D:/BuildCache/glory-semantic-ui/cargo'
-$env:CARGO_TARGET_DIR='D:/BuildCache/glory-semantic-ui/target'
-$env:TEMP=$env:TMP='D:/BuildCache/glory-semantic-ui/tmp'
 cargo build --locked --features web --lib --target wasm32-unknown-unknown
-wasm-bindgen D:/BuildCache/glory-semantic-ui/target/wasm32-unknown-unknown/debug/glory_routing_demo.wasm --target web --out-dir D:/BuildCache/glory-routing/site
-cargo run --locked --features ssr --bin routing-ssr -- D:/BuildCache/glory-routing/site
+wasm-bindgen target/verification/glory-semantic-ui/target/wasm32-unknown-unknown/debug/glory_routing_demo.wasm --target web --out-dir target/verification/glory-routing/site
+cargo run --locked --features ssr --bin routing-ssr -- target/verification/glory-routing/site
 node browser.cjs
 ```
 

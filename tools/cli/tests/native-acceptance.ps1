@@ -1,15 +1,13 @@
 param(
     [Parameter(Mandatory=$true)][string]$Driver,
-    [string]$BuildRoot = 'D:/BuildCache/glory-cli-native-acceptance'
+    [string]$BuildRoot = "$PSScriptRoot/../../../target/verification/glory-cli-native-acceptance"
 )
+. "$PSScriptRoot/../../../scripts/local-build-paths.ps1"
 
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 $Driver = (Resolve-Path -LiteralPath $Driver).Path
 $taskRoot = [IO.Path]::GetFullPath($BuildRoot)
-if (-not $taskRoot.Replace('\','/').StartsWith('D:/BuildCache/', [StringComparison]::OrdinalIgnoreCase)) {
-    throw 'Native acceptance requires a D:/BuildCache root'
-}
 $taskRoot = Join-Path $taskRoot ([guid]::NewGuid().ToString('N'))
 $fixture = Join-Path $taskRoot 'fixture'
 $output = Join-Path $taskRoot 'build'
@@ -19,11 +17,9 @@ foreach ($name in @('CARGO_HOME','CARGO_TARGET_DIR','TEMP','TMP','PYTHONPYCACHEP
     $saved[$name] = [Environment]::GetEnvironmentVariable($name, 'Process')
 }
 try {
-    $env:CARGO_HOME = 'D:/BuildCache/glory-semantic-ui/cargo'
-    $env:CARGO_TARGET_DIR = "$output/app-target"
-    $env:TEMP = "$taskRoot/tmp"
-    $env:TMP = $env:TEMP
-    $env:PYTHONPYCACHEPREFIX = "$taskRoot/pycache"
+
+    $env:CARGO_TARGET_DIR = Get-NormalCargoTarget
+
     New-Item -ItemType Directory -Force "$fixture/src","$fixture/assets",$env:TEMP | Out-Null
     $hostLine = rustc -vV | Where-Object { $_.StartsWith('host: ') }
     if ($LASTEXITCODE -or -not $hostLine) { throw 'Missing Rust host' }

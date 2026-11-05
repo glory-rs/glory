@@ -1,17 +1,18 @@
-param([string]$BuildRoot='D:/BuildCache/glory-portfolio-20261025',[Parameter(Mandatory=$true)][string]$SourceRoot)
+param([string]$BuildRoot="$PSScriptRoot/../../target/verification/glory-portfolio-20261025",[Parameter(Mandatory=$true)][string]$SourceRoot)
+. "$PSScriptRoot/../../scripts/local-build-paths.ps1"
+
 $ErrorActionPreference='Stop'
 $BuildRoot=[IO.Path]::GetFullPath($BuildRoot); $SourceRoot=[IO.Path]::GetFullPath($SourceRoot)
-foreach($taskPath in @($BuildRoot,$SourceRoot)){if(-not $taskPath.Replace('\','/').StartsWith('D:/BuildCache/',[StringComparison]::OrdinalIgnoreCase)){throw 'Use D:/BuildCache'}}
 $saved=@{}; foreach($key in @('CARGO_HOME','CARGO_TARGET_DIR','TEMP','TMP','CARGO_BUILD_JOBS')){$saved[$key]=[Environment]::GetEnvironmentVariable($key,'Process')}
 try {
  New-Item -ItemType Directory -Force -Path "$BuildRoot/tmp" | Out-Null
- $env:CARGO_HOME='D:/BuildCache/glory-semantic-ui/cargo';$env:TEMP="$BuildRoot/tmp";$env:TMP=$env:TEMP;$env:CARGO_BUILD_JOBS='2'
- $bindgen='D:/BuildCache/glory-framework-compare/tools/bin/wasm-bindgen.exe'
+ $env:CARGO_BUILD_JOBS='2'
+ $bindgen='wasm-bindgen'
  if((& $bindgen --version).Trim() -ne 'wasm-bindgen 0.2.129'){throw 'Wrong bindgen'}
  foreach($variant in @('glory','dioxus-root','dioxus-row')){
   $app=if($variant -eq 'glory'){'glory'}else{'dioxus'}; $manifest="$SourceRoot/benchmarks/scenarios/$app/Cargo.toml"
   $flags=@();if($variant -eq 'dioxus-row'){$flags=@('--features','rows')}
-  $env:CARGO_TARGET_DIR="$BuildRoot/$variant/target"
+  $env:CARGO_TARGET_DIR = Get-NormalCargoTarget
   $metadata=cargo metadata --locked --manifest-path $manifest --no-deps --format-version 1 @flags | ConvertFrom-Json
   if($LASTEXITCODE -ne 0 -or [IO.Path]::GetFullPath($metadata.target_directory) -ne [IO.Path]::GetFullPath($env:CARGO_TARGET_DIR)){throw 'Wrong target'}
   $metadata | ConvertTo-Json -Depth 100 | Set-Content "$BuildRoot/$variant-metadata-final.json"

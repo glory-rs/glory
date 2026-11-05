@@ -1,17 +1,16 @@
-use crate::Result;
-use crate::args::Args;
-use crate::build;
-use crate::project::{Platform, Project};
-use notify::{RecursiveMode, Watcher};
-use serde_json::json;
 use std::io::{Read, Write};
 use std::net::{IpAddr, SocketAddr, TcpListener, TcpStream};
 use std::path::{Component, Path, PathBuf};
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
-};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
+
+use notify::{RecursiveMode, Watcher};
+use serde_json::json;
+
+use crate::args::Args;
+use crate::project::{Platform, Project};
+use crate::{Result, build};
 
 const RELOAD: &str = "let revision=Number(new URL(import.meta.url).searchParams.get('revision'));let overlay;setInterval(async()=>{try{const r=await fetch('/__glory_dev/state',{cache:'no-store'});const s=await r.json();if(s.error){if(!overlay){overlay=document.createElement('pre');overlay.setAttribute('role','alert');document.body.prepend(overlay);}overlay.textContent=s.error;}else{overlay?.remove();overlay=null;}if(revision!==s.revision){location.reload();}revision=s.revision;}catch{}},750);";
 

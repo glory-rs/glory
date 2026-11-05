@@ -1,16 +1,17 @@
 param(
- [string]$BuildRoot='D:/BuildCache/glory-semantic-ui',
- [string]$Bindgen='D:/BuildCache/glory-v2-dioxus-20261028/tools/wasm-bindgen-0.2.130-x86_64-pc-windows-msvc/wasm-bindgen.exe',
+ [string]$BuildRoot="$PSScriptRoot/../target/verification/glory-semantic-ui",
+ [string]$Bindgen='wasm-bindgen',
  [switch]$Verify
 )
+. "$PSScriptRoot/local-build-paths.ps1"
+
 $ErrorActionPreference='Stop'
 $BuildRoot=[IO.Path]::GetFullPath($BuildRoot)
-if(-not $BuildRoot.Replace('\','/').StartsWith('D:/BuildCache/',[StringComparison]::OrdinalIgnoreCase)){throw 'BuildRoot must be on D:/BuildCache'}
 $saved=@{}
 foreach($key in @('CARGO_HOME','CARGO_TARGET_DIR','TEMP','TMP','CARGO_BUILD_JOBS','CARGO_INCREMENTAL','CARGO_PROFILE_DEV_DEBUG','GLORY_MIXED_STREAM_SITE','GLORY_MIXED_STREAM_BIN')){$saved[$key]=[Environment]::GetEnvironmentVariable($key,'Process')}
 try {
- $env:CARGO_HOME='D:/BuildCache/glory-semantic-ui/cargo';$env:CARGO_TARGET_DIR="$BuildRoot/target"
- $env:TEMP="$BuildRoot/tmp";$env:TMP=$env:TEMP;$env:CARGO_BUILD_JOBS='2';$env:CARGO_INCREMENTAL='0';$env:CARGO_PROFILE_DEV_DEBUG='0'
+ $env:CARGO_TARGET_DIR = Get-NormalCargoTarget
+ $env:CARGO_BUILD_JOBS='2';$env:CARGO_INCREMENTAL='0';$env:CARGO_PROFILE_DEV_DEBUG='0'
  $site="$BuildRoot/mixed-stream-site";New-Item -ItemType Directory -Force -Path $site,$env:TEMP|Out-Null
  $manifest=[IO.Path]::GetFullPath("$PSScriptRoot/../examples/display-web/Cargo.toml")
  $metadata=cargo metadata --manifest-path $manifest --no-deps --format-version 1 | ConvertFrom-Json

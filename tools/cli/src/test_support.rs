@@ -7,9 +7,7 @@ pub struct Scratch(pub PathBuf);
 
 impl Scratch {
     pub fn new() -> Self {
-        let target = std::env::var_os("CARGO_TARGET_DIR")
-            .expect("set CARGO_TARGET_DIR to an approved build directory for tests");
-        let root = PathBuf::from(target).join("cli-test-data");
+        let root = std::env::temp_dir().join("glory-cli-tests");
         crate::project::validate_build_root(&root).unwrap();
         let path = root.join(format!(
             "{}-{}",

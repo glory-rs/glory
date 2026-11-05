@@ -8,11 +8,7 @@ jobs:
   format:
     runs-on: windows-latest
     env:
-      CARGO_HOME: D:/BuildCache/glory-format-ci/cargo
-      CARGO_TARGET_DIR: D:/BuildCache/glory-format-ci/target
-      RUSTUP_HOME: D:/BuildCache/glory-format-ci/rustup
-      TEMP: D:/BuildCache/glory-format-ci/tmp
-      TMP: D:/BuildCache/glory-format-ci/tmp
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
     defaults:
       run:
         shell: pwsh
@@ -26,7 +22,7 @@ jobs:
           if [ ! -d ../wingy/.git ]; then git clone --filter=blob:none https://github.com/glory-rs/wingy ../wingy; fi
       - name: Format current workspace and migrated examples
         run: |
-          New-Item -ItemType Directory -Force $env:CARGO_HOME,$env:CARGO_TARGET_DIR,$env:RUSTUP_HOME,$env:TEMP | Out-Null
+          New-Item -ItemType Directory -Force $env:CARGO_TARGET_DIR,$env:TEMP | Out-Null
           rustup toolchain install 1.98.0 --profile minimal --component rustfmt
           if ($LASTEXITCODE) { throw 'Rust installation failed' }
           rustup default 1.98.0

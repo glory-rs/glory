@@ -8,11 +8,7 @@ jobs:
   i18n:
     runs-on: windows-latest
     env:
-      CARGO_HOME: D:/BuildCache/glory-i18n-ci/cargo
-      CARGO_TARGET_DIR: D:/BuildCache/glory-i18n-ci/target
-      RUSTUP_HOME: D:/BuildCache/glory-i18n-ci/rustup
-      TEMP: D:/BuildCache/glory-i18n-ci/tmp
-      TMP: D:/BuildCache/glory-i18n-ci/tmp
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
       CARGO_INCREMENTAL: '0'
     defaults:
       run:
@@ -27,7 +23,7 @@ jobs:
           if [ ! -d ../wingy/.git ]; then git clone --filter=blob:none https://github.com/glory-rs/wingy ../wingy; fi
       - name: Prepare D drive and Rust
         run: |
-          New-Item -ItemType Directory -Force $env:CARGO_HOME,$env:CARGO_TARGET_DIR,$env:RUSTUP_HOME,$env:TEMP | Out-Null
+          New-Item -ItemType Directory -Force $env:CARGO_TARGET_DIR,$env:TEMP | Out-Null
           rustup toolchain install 1.98.0 --profile minimal --component clippy,rustfmt --target wasm32-unknown-unknown
           if ($LASTEXITCODE -ne 0) { throw 'Rust installation failed' }
           rustup default 1.98.0

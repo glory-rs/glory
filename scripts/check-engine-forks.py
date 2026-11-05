@@ -21,13 +21,12 @@ def output(*args):
 
 
 def build_environment():
-    paths = {}
-    for name in ("CARGO_HOME", "CARGO_TARGET_DIR"):
-        value = Path(os.environ[name]).resolve()
-        portable = value.as_posix().lower()
-        assert portable.startswith(("d:/buildcache/", "/mnt/d/buildcache/")) or (sys.platform == "darwin" and value.is_relative_to("/Volumes/Data/Caches/glory")), (name, value)
-        paths[name] = value
-    return paths
+    root = Path(__file__).resolve().parents[1]
+    metadata = json.loads(output("cargo", "metadata", "--no-deps", "--format-version", "1", "--manifest-path", str(root / "Cargo.toml")))
+    return {
+        "CARGO_HOME": Path(os.environ.get("CARGO_HOME", Path.home() / ".cargo")).resolve(),
+        "CARGO_TARGET_DIR": Path(metadata["target_directory"]).resolve(),
+    }
 
 
 def test_fork(fork, directory, target, android):

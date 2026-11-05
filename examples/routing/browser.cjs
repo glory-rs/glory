@@ -1,9 +1,10 @@
+const { localBuildPath } = require("../../scripts/local-build-paths.cjs");
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const http = require('node:http');
 const { chromium } = require(process.env.GLORY_PLAYWRIGHT || '../../tests/playwright/node_modules/playwright');
-const directory = process.env.GLORY_ROUTING_SITE || 'D:/BuildCache/glory-routing/site';
+const directory = process.env.GLORY_ROUTING_SITE || localBuildPath('glory-routing/site');
 const checks = [];
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');

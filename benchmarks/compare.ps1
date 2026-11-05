@@ -1,5 +1,5 @@
 param(
- [string]$BuildRoot='D:/BuildCache/glory-framework-compare',
+ [string]$BuildRoot="$PSScriptRoot/../target/verification/glory-framework-compare",
  [string]$SourceRoot='',
  [string]$OutDir='',
  [string]$Browser='C:/Program Files/Google/Chrome/Application/chrome.exe',
@@ -9,15 +9,14 @@ param(
 )
 $ErrorActionPreference='Stop'
 $BuildRoot=[IO.Path]::GetFullPath($BuildRoot)
-if(-not $BuildRoot.Replace('\','/').StartsWith('D:/BuildCache/',[StringComparison]::OrdinalIgnoreCase)){throw 'BuildRoot must be D:/BuildCache'}
 if(-not $OutDir){$OutDir="$BuildRoot/round-$(Get-Date -Format yyyyMMdd-HHmmss-fff)"}
 $saved=@{}
 foreach($key in @('TEMP','TMP','PYTHONPYCACHEPREFIX','NODE_COMPILE_CACHE')){$saved[$key]=[Environment]::GetEnvironmentVariable($key,'Process')}
 $server=$null
 try{
  New-Item -ItemType Directory -Force -Path "$BuildRoot/tmp","$BuildRoot/pycache" | Out-Null
- $env:TEMP="$BuildRoot/tmp"; $env:TMP=$env:TEMP
- $env:PYTHONPYCACHEPREFIX="$BuildRoot/pycache"; $env:NODE_COMPILE_CACHE="$BuildRoot/node-cache"
+
+  $env:NODE_COMPILE_CACHE="$BuildRoot/node-cache"
  if(-not $SkipBuild){& "$PSScriptRoot/build.ps1" -BuildRoot $BuildRoot -SourceRoot $SourceRoot}
  if(Get-NetTCPConnection -State Listen -LocalPort $Port -ErrorAction SilentlyContinue){throw "Port $Port is already owned"}
  $python=(python -c 'import sys;print(sys.executable)').Trim()

@@ -14,8 +14,8 @@ fixture source/lock must be identical in both snapshots. Change only the library
 files under investigation when staging the after source at that common path.
 
 ```powershell
-$root = 'D:/BuildCache/glory-role-comparison'
-$bindgen = 'D:/BuildCache/glory-website/tools/wasm-bindgen-0.2.129-x86_64-pc-windows-msvc/wasm-bindgen.exe'
+$root = 'target/verification/glory-role-comparison'
+$bindgen = 'target/verification/glory-website/tools/wasm-bindgen-0.2.129-x86_64-pc-windows-msvc/wasm-bindgen.exe'
 # Stage the before snapshot under $root/source first:
 ./benchmarks/role-patches/build.ps1 -SourceRoot "$root/source" -BuildRoot "$root/before" -Bindgen $bindgen
 # Preserve before inputs, then stage after inputs at the same source path:
@@ -26,7 +26,7 @@ node benchmarks/role-patches/compare.cjs $root
 ```
 
 `compare.cjs` expects the existing D-drive Binaryen 132.0.0 installation at
-`D:/BuildCache/glory/wasm-size/tools/node_modules/binaryen`, Playwright under
+`target/verification/glory/wasm-size/tools/node_modules/binaryen`, Playwright under
 `tests/playwright/node_modules/playwright`, and installed Chrome. Both native
 and WASM use opt-level 3, LTO and one codegen unit; WASM additionally uses
 wasm-bindgen 0.2.129 and the same Binaryen `-Oz` flags. The script owns its

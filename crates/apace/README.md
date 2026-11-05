@@ -432,7 +432,7 @@ Pixels are premultiplied sRGB RGBA8. The native example converts to straight
 alpha for PNG and generates initial/end screenshots from the same Rust builders:
 
 ```powershell
-cargo run -p glory-apace --example raster --features raster -- D:/BuildCache/glory-semantic-ui/apace-paint.png
+cargo run -p glory-apace --example raster --features raster -- target/verification/glory-semantic-ui/apace-paint.png
 ```
 
 The CPU path redraws the full backbuffer for changed frames. It has no dirty

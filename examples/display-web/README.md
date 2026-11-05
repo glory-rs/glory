@@ -14,7 +14,7 @@ The acceptance-only exports exercise temporary rows/components and cleanup.
 node examples/display-web/acceptance.cjs my-run
 ```
 
-Builds, temporary files and evidence default to `D:/BuildCache/glory-dsl-20261028`.
+Builds, temporary files and evidence default to `target/verification/glory-dsl-20261028`.
 The Node driver owns its local HTTP server and browser and closes both.
 Open the built `dsl/site` with a local HTTP server to use it interactively.
 
@@ -73,7 +73,7 @@ island fixture and runs real Chrome acceptance at 1/32/64 live islands.
 The driver checks raw updates, shared and local reactive updates, pending host
 input, real editing, dirty query barriers, teardown and recreation. It writes
 fixed pump counts and seven debug timing samples to
-`D:/BuildCache/glory-semantic-ui/island-readiness-site/island-readiness-evidence.json`.
+`target/verification/glory-semantic-ui/island-readiness-site/island-readiness-evidence.json`.
 `GLORY_ISLAND_COUNTS` may select a smaller comma-separated matrix. These local
 debug timings do not establish a release speedup; readiness still scans every
 live island, while `island_flushes` counts only actual display-host pump calls.

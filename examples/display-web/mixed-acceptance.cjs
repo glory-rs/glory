@@ -1,7 +1,8 @@
+const { localBuildPath } = require("../../scripts/local-build-paths.cjs");
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),http=require('node:http'),assert=require('node:assert/strict');
-const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'D:/BuildCache/glory-v2-dioxus-20261028/tools/node_modules/playwright');
-const root=process.env.GLORY_MIXED_SITE||'D:/BuildCache/glory-semantic-ui/mixed-site';
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const root=process.env.GLORY_MIXED_SITE||localBuildPath('glory-semantic-ui/mixed-site');
 const snapshot=fs.readFileSync(path.join(root,'snapshot.html'),'utf8').trim();
 const errors=[],evidence={checks:[]};
 const server=http.createServer((req,res)=>{

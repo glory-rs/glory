@@ -1,11 +1,13 @@
 param(
     [ValidateSet('x86_64-linux-android','aarch64-linux-android')][string]$Target = 'x86_64-linux-android',
-    [string]$BuildRoot = 'D:/BuildCache/glory-mobile',
+    [string]$BuildRoot = "$PSScriptRoot/../../target/verification/glory-mobile",
     [string]$Sdk = $env:ANDROID_HOME,
     [string]$Ndk = $env:ANDROID_NDK_HOME,
     [string]$JavaHome = 'C:/Program Files/Android/Android Studio/jbr',
     [switch]$Release
 )
+. "$PSScriptRoot/../../scripts/local-build-paths.ps1"
+
 $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $false
 . "$PSScriptRoot/build-paths.ps1"
@@ -18,10 +20,9 @@ Push-Location $PSScriptRoot
 try {
     if ([string]::IsNullOrWhiteSpace($Sdk) -or -not (Test-Path -LiteralPath "$Sdk/platforms")) { throw 'Set ANDROID_HOME or -Sdk to an installed Android SDK' }
     if (-not (Test-Path -LiteralPath "$JavaHome/bin/java.exe")) { throw 'Set -JavaHome to an installed JDK' }
-    $env:CARGO_HOME = 'D:/BuildCache/glory-semantic-ui/cargo'
-    $env:CARGO_TARGET_DIR = "$build/target"
-    $env:TEMP = "$build/tmp"; $env:TMP = $env:TEMP; $env:TMPDIR = $env:TEMP
-    $env:PYTHONPYCACHEPREFIX = "$build/pycache"
+
+    $env:CARGO_TARGET_DIR = Get-NormalCargoTarget
+
     $env:JAVA_HOME = $JavaHome
     $env:JAVA_TOOL_OPTIONS = "-Djava.io.tmpdir=$build/tmp -Duser.home=$build/java-home"
     New-Item -ItemType Directory -Force $env:TEMP,"$build/java-home","$build/android-home" | Out-Null

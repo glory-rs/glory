@@ -81,7 +81,7 @@ splitting remain separate work.
 ## First use in this repository
 
 The package is not yet published. With Cargo home, target and temporary paths
-set under `D:/BuildCache`, the bootstrap example can configure an application:
+set under the project-local verification directory, the bootstrap example can configure an application:
 
 ```powershell
 python scripts/library_lockfiles.py
@@ -201,7 +201,7 @@ for the implemented scope and deferred work.
 
 ## Isolation and scope
 
-On Windows caches use `D:/BuildCache/glory-projects/<project-path-hash>`. WSL uses
+On Windows caches use `target/verification/glory-projects/<project-path-hash>`. WSL uses
 a verified D:-backed `/mnt/d/BuildCache` mount. `GLORY_BUILD_ROOT` selects another
 project root there; `--build-root` changes the application's output root.
 An existing D: Cargo home may be shared as an immutable package download cache;
@@ -266,7 +266,7 @@ cargo fmt --manifest-path tools/cli/Cargo.toml -- --check
 cargo test --locked --manifest-path tools/cli/Cargo.toml
 cargo clippy --locked --manifest-path tools/cli/Cargo.toml --all-targets -- -D warnings
 cargo build --locked --manifest-path tools/cli/Cargo.toml --example bootstrap
-./tools/cli/tests/native-acceptance.ps1 -Driver D:/BuildCache/glory-semantic-ui/target/debug/examples/bootstrap.exe
+./tools/cli/tests/native-acceptance.ps1 -Driver target/verification/glory-semantic-ui/target/debug/examples/bootstrap.exe
 ```
 
 Windows acceptance on 2026-10-26 used a disposable D: counter copy and real Chrome:
@@ -277,7 +277,7 @@ recovery refresh all passed without browser errors. The driver is
 Its `--fixture`, `--build`, `--log`, `--out`, `--driver` and `--playwright` paths
 select the disposable project, running serve log, evidence output, private runner
 and installed Playwright module. Set Cargo home and temporary paths on D: before
-running it. Results are under `D:/BuildCache/glory-project-cli/browser-acceptance-final`.
+running it. Results are under `target/verification/glory-project-cli/browser-acceptance-final`.
 
 The CLI tests cover configuration isolation, version/source mismatch,
 artifact selection, output rollback, initialization without app compilation,
