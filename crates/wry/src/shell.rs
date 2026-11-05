@@ -49,6 +49,10 @@ pub struct Asset {
 /// the window thread, outside UI runtime borrows. Native callbacks must enqueue
 /// work and wake this loop; they must not invoke application UI closures.
 pub trait NativeLifecycle {
+    /// Bounded OS URL-open notifications; data only, never resource authority.
+    fn opened_urls(&mut self, _urls: &[String]) -> Result<(), ShellError> {
+        Ok(())
+    }
     fn opened(&mut self, _window: &NativeWindow, _wake: &Waker) -> Result<(), ShellError> {
         Ok(())
     }
@@ -332,6 +336,10 @@ impl Shell {
         self.event_loop.run_return(|event,target,flow| {
             if exiting {*flow=ControlFlow::Exit;return;}
             *flow=deadline.map_or(ControlFlow::Wait,ControlFlow::WaitUntil);
+            if let Event::Opened {ref urls}=event && let Some(host)=&mut native {
+                let urls=urls.iter().filter(|url|url.as_str().len()<=8192).take(16).map(ToString::to_string).collect::<Vec<_>>();
+                if let Err(error)=host.opened_urls(&urls){result=Err(error);exiting=true;*flow=ControlFlow::Exit;return;}
+            }
             if let Event::WindowEvent {window_id,event:ref window_event,..}=event
                 && browser_host.as_mut().is_some_and(|host|host.window_event(window_id,window_event)) {return;}
             if matches!(event,Event::WindowEvent{window_id,event:WindowEvent::CloseRequested,..} if window_id==window.id()) {
