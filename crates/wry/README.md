@@ -40,17 +40,32 @@ repository's approved cache environment before Cargo (on macOS, source
 | Commands | Finite Keyboard/Navigate events on explicitly observed ancestors |
 | Styles | Shared HTML inline profile, raw app CSS, optional validated `css` Sheet replacement |
 | Resources | Explicit immutable `Config::assets` served by exact URL path; no implicit filesystem or remote-network access |
+| Local media | Explicit `Renderer::enable_local_media` and scoped `set_local_media`; native audio/video controls and original image zoom/pan/rotate/fit, revoked on suspend/dispose |
+| Text clipboard | Explicit `Renderer::enable_text_clipboard` before shell initialization; write-only, 64 KiB, source revision and single-use request receipts, actual platform outcomes |
+| Range reads | Optional `Config::asset_provider`; four owned workers, queue 16, 1 MiB ranges, 8 MiB full responses, exact capability paths |
+| Web readers | Optional `Config::browser`; 16 isolated HTTP(S) native windows, no application IPC or application resource protocol |
+| Native lifecycle | Optional `Config::native` on the window thread; application-owned tray/close/shutdown integration, absent by default |
 | Platform | Wry system WebView and Tao event loop on Windows/macOS/Linux; Linux uses Tao's GTK container for X11/Wayland |
 
 Raw display/XML templates, structured Select, File, RichEditor, Graphic, virtual collections and advanced
 interaction metadata (layers, focus scopes, motion, drag/swipe, choice/menu/tree
-controllers, forms and clipboard services) currently return `Unsupported`.
+controllers, forms and rich clipboard services) currently return `Unsupported`.
 Checks run in both staged preflight and direct application. They are not silently
 advertised through capabilities. The HTML mapper retains its remount requirement
 for physical tag changes.
 
+`Renderer::set_author_css` updates the trusted application CSS layer (up to 1 MiB)
+without remounting widgets. It uses the same ordered ready/ack transport and shell
+CSP as the initial `Config::css`; CSS is installed as style text, never HTML.
+
 Link activation can reach Rust handlers. The stock shell denies document
-navigation and new windows, so opening external links is not a provided service.
+navigation and new windows. An explicit `browser::Controller` opens separate
+untrusted HTTP(S) reader windows; it never navigates the application document.
+Downloads, popups and supported permission requests are denied there. Navigation
+observations are bounded and generation checked; callbacks only enqueue work.
+Media providers must retain real read operations until completion and check
+scope/account liveness before and after reads. Revocation prevents publication;
+it does not promise to abort foreign OS work already in progress.
 Network I/O for application logic can use ordinary native Rust libraries; renderer
 resources are local. System WebViews differ in CSS and HTML feature support;
 identical pixels, OS IME gestures, screen-reader output and mobile support are not
@@ -72,7 +87,8 @@ and stale input revisions cannot call application handlers. Disposal retires
 per-node pending queries; closing drops App before closing its executor and
 revoking its document. DOM acknowledgement does not imply pixel presentation.
 
-Limits are 1 MiB per incoming message, 8 MiB pending command/queued input payload,
+Limits are 8 MiB per incoming message and pending command/queued input payload,
+including JSON escaping of large controlled editor snapshots,
 4096 queued inputs, 1024 pending queries, and 32 MiB explicit shell resources.
 Only one batch is in flight. The stock shell fails on document startup or batch
 acknowledgement timeout after 15 seconds. These are transfer/admission limits,
@@ -86,6 +102,8 @@ code, not IPC commands.
 cargo test --locked -p glory-wry --all-features
 cargo clippy --locked -p glory-wry --all-features --all-targets -- -D warnings
 GLORY_WRY_WINDOW=1 cargo test --locked -p glory-wry --all-features --test window
+GLORY_WRY_MEDIA=1 cargo test --locked -p glory-wry --all-features --test media_window
+GLORY_WRY_BROWSER=1 cargo test --locked -p glory-wry --all-features --test browser_window
 ```
 
 The opt-in window test runs the actual system WebView on the UI/main thread.
@@ -108,3 +126,12 @@ text proposals, so handlers observe the latest accepted value. Deferred actions
 are bounded and retired targets are discarded. Native window acceptance includes
 a rapid-input burst followed immediately by activation, alongside the existing
 UTF-16, composition, identity and lifecycle checks.
+
+Captured primary-pointer dragging is supported on a View with explicit
+\`Semantics::drag_capture\` and an \`EventKind::Drag\` observer. The host owns
+pointer capture and queues Start/Move/Drop/Cancel with viewport CSS coordinates.
+Adjacent moves coalesce while preserving Start/Drop boundaries. Escape, window
+blur, lost capture and retired sources cancel the gesture. Scrollable ancestors
+scroll near their edges; the application performs hit testing and owns its data
+mutation. Provide separate keyboard controls. Threshold/hit-target dragging
+without explicit source capture remains unsupported.

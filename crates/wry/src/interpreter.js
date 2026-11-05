@@ -6,7 +6,7 @@ function gloryWry(config) {
   const post = payload => {
     if (stopped) return;
     const message = JSON.stringify({v: config.v, session: config.session, ...payload});
-    if (new TextEncoder().encode(message).length > 1048576) {
+    if (new TextEncoder().encode(message).length > config.maxIpcBytes) {
       window.ipc.postMessage(JSON.stringify({v:config.v,session:config.session,type:"fault",message:"IPC byte budget"}));
       stopped = true;
       return;
@@ -31,7 +31,7 @@ function gloryWry(config) {
       e.dirty=false; editing.add(e);
     } else if(editing.size && ["activate","commit","keyboard"].includes(value.kind)) {
       const bytes=new TextEncoder().encode(JSON.stringify(value)).length;
-      if(deferred.length>=128 || deferredBytes+bytes>1048576) throw Error("pending input action budget");
+      if(deferred.length>=128 || deferredBytes+bytes>config.maxDeferredBytes) throw Error("pending input action budget");
       deferredBytes+=bytes; deferred.push({e,value,bytes}); return;
     }
     post({type:"event",node:e.id,event:value});
@@ -123,6 +123,7 @@ function gloryWry(config) {
   function attribute(e,part,name,value) {
     const element=e.parts.get(part);
     if(value===null) element.removeAttribute(name); else element.setAttribute(name,value);
+    if(name==="data-gly-drag-capture" && value===null && drag?.e===e)finishDrag("cancel",drag.x,drag.y);
   }
   function create(command) {
     if(entries.has(command.id)) throw Error("duplicate node");
@@ -178,6 +179,7 @@ function gloryWry(config) {
       }
     }
     e.parent=command.parent;
+    for(const child of entries.values()) if(child.mediaSuspended && alive(child) && contains(e,child.start)) {installMedia(child);child.mediaSuspended=false;}
   }
   function contains(e,node) {
     for(let current=e.start;current;current=current.nextSibling) {
@@ -186,7 +188,57 @@ function gloryWry(config) {
     }
     return false;
   }
+  function stopMedia(e,remember=false) {
+    if(e.localMedia) {
+      e.mediaPosition=remember && Number.isFinite(e.localMedia.currentTime) ? e.localMedia.currentTime : 0;
+      e.mediaCleanup?.(); e.mediaCleanup=null; e.localMedia.pause?.(); e.localMedia.removeAttribute("src"); e.localMedia.load?.(); e.mediaSurface?.remove(); e.mediaSurface=null; e.localMedia.remove(); e.localMedia=null;
+    }
+  }
+  function installMedia(e) {
+    const value=e.mediaConfig;if(!value)return;
+    const player=document.createElement(value.kind);
+    player.controls=true; player.preload="metadata"; player.autoplay=false;
+    player.setAttribute("playsinline",""); player.setAttribute("aria-label",value.title);
+    player.style.width="100%"; player.style.maxHeight="480px";
+    if(e.mediaPosition>0) player.addEventListener('loadedmetadata',()=>{if(e.localMedia===player && Number.isFinite(player.duration))player.currentTime=Math.min(e.mediaPosition,Math.max(0,player.duration-.1));},{once:true});
+    if(value.kind==='img') {
+      const container=document.createElement('div');container.className='glory-image-viewer';
+      const toolbar=document.createElement('div');toolbar.style.cssText='display:flex;gap:.5em;padding:.5em';
+      const surface=document.createElement('div');surface.style.cssText='overflow:auto;max-height:70vh;min-height:120px;position:relative;touch-action:none;cursor:grab';
+      const canvas=document.createElement('div');canvas.style.position='relative';
+      player.alt=value.title;player.draggable=false;player.style.cssText='display:block;position:absolute;left:50%;top:50%;max-width:none;max-height:none;transform-origin:center';
+      let zoom=1,rotation=0;const update=()=>{
+        const width=player.naturalWidth,height=player.naturalHeight;if(!width||!height)return;
+        const rotated=rotation%180!==0;const rw=rotated?height:width,rh=rotated?width:height;
+        const scale=Math.min((surface.clientWidth||640)/rw,Math.max(120,window.innerHeight*.7)/rh)*zoom;
+        canvas.style.width=`${rw*scale}px`;canvas.style.height=`${rh*scale}px`;
+        player.style.width=`${width*scale}px`;player.style.height=`${height*scale}px`;player.style.transform=`translate(-50%,-50%) rotate(${rotation}deg)`;
+        player.dataset.zoom=String(zoom);player.dataset.rotation=String(rotation);
+      };
+      const control=(label,symbol,run)=>{const button=document.createElement('button');button.type='button';button.textContent=symbol;button.setAttribute('aria-label',label);button.title=label;button.addEventListener('click',run);toolbar.appendChild(button);};
+      const change=scale=>{zoom=Math.max(.1,Math.min(8,zoom*scale));update();};
+      control('Zoom in','+',()=>change(1.2));control('Zoom out','−',()=>change(1/1.2));control('Rotate image','↻',()=>{rotation=(rotation+90)%360;update();});
+      const fit=()=>{zoom=1;rotation=0;update();surface.scrollTo(0,0);};control('Fit image','⊡',fit);
+      surface.addEventListener('wheel',event=>{event.preventDefault();change(event.deltaY<0?1.2:1/1.2);},{passive:false});
+      surface.addEventListener('dblclick',fit);
+      const pointers=new Map();let pinch=0;
+      surface.addEventListener('pointerdown',event=>{surface.setPointerCapture(event.pointerId);pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});pinch=0;});
+      surface.addEventListener('pointermove',event=>{const before=pointers.get(event.pointerId);if(!before)return;pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});if(pointers.size===2){const [a,b]=[...pointers.values()];const distance=Math.hypot(a.x-b.x,a.y-b.y);if(pinch>0)change(distance/pinch);pinch=distance;}else{surface.scrollLeft-=event.clientX-before.x;surface.scrollTop-=event.clientY-before.y;}});
+      for(const kind of ['pointerup','pointercancel','lostpointercapture'])surface.addEventListener(kind,event=>{pointers.delete(event.pointerId);pinch=0;});
+      player.addEventListener('load',update);
+      // Never mutate observed geometry during ResizeObserver delivery. Only
+      // width or actual viewport changes affect fit; image height changes do not
+      // recursively schedule themselves.
+      let frame=0,lastWidth=-1;
+      const schedule=()=>{if(!frame)frame=requestAnimationFrame(()=>{frame=0;if(entries.get(e.id)===e&&e.localMedia===player)update();});};
+      const observer=new ResizeObserver(()=>{const width=surface.clientWidth;if(width!==lastWidth){lastWidth=width;schedule();}});
+      observer.observe(surface);window.addEventListener('resize',schedule);
+      e.mediaCleanup=()=>{observer.disconnect();window.removeEventListener('resize',schedule);if(frame)cancelAnimationFrame(frame);};
+      player.src=value.path;canvas.appendChild(player);surface.appendChild(canvas);container.append(toolbar,surface);main(e).appendChild(container);e.mediaSurface=container;e.localMedia=player;
+    } else {player.src=value.path;main(e).appendChild(player);e.localMedia=player;}
+  }
   function suspend(e) {
+    for(const child of entries.values()) if(child.localMedia && contains(e,child.localMedia)) {stopMedia(child,true);child.mediaSuspended=true;}
     const focused=origin(document.activeElement);
     if(focused && contains(e,document.activeElement)) {
       if(focused.composing) {
@@ -216,8 +268,29 @@ function gloryWry(config) {
     } catch(reason) {error=String(reason);}
     post({type:"response",token:command.token,value,error});
   }
+  let clipboardPending=0;
+  async function copyText(e,a) {
+    const complete=outcome=>{if(entries.get(e.id)===e)event(e,{kind:'clipboard',request:a.request,revision:a.revision,outcome});};
+    if(!config.textClipboard||!alive(e)||control(e).disabled||e.clipboardRevision!==a.revision){complete('unavailable');return;}
+    if(clipboardPending>=16||new TextEncoder().encode(a.text).length>65536){complete('failed');return;}
+    clipboardPending++;
+    try {
+      // A temporary plain-text editor avoids HTML interpretation. Restore the
+      // exact original input selection, including UTF-16 surrogate boundaries.
+      const active=document.activeElement;const selection=active&&typeof active.selectionStart==='number'?{start:active.selectionStart,end:active.selectionEnd,direction:active.selectionDirection}:null;
+      const selected=window.getSelection();const ranges=selected?[...Array(selected.rangeCount)].map((_,i)=>selected.getRangeAt(i).cloneRange()):[];
+      const editor=document.createElement('textarea');editor.value=a.text;editor.readOnly=true;editor.style.cssText='position:fixed;left:-10000px;top:0';document.body.appendChild(editor);
+      let written=false;
+      try {editor.select();written=document.execCommand('copy');}catch(_){}finally{editor.value='';editor.remove();if(active?.isConnected){active.focus({preventScroll:true});if(selection)active.setSelectionRange(selection.start,selection.end,selection.direction);}if(!selection&&selected){selected.removeAllRanges();for(const range of ranges)if(range.commonAncestorContainer.isConnected)selected.addRange(range);}}
+      if(written){complete('written');return;}
+      if(!alive(e)||e.clipboardRevision!==a.revision){complete('failed');return;}
+      if(!navigator.clipboard?.writeText){complete('unavailable');return;}
+      try{await navigator.clipboard.writeText(a.text);complete('written');}catch(error){complete(error?.name==='NotAllowedError'?'denied':'failed');}
+    }finally{clipboardPending--;}
+  }
   function action(command) {
     const e=get(command.id),element=main(e),input=control(e),a=command.action;
+    if(a.kind==='copy_text'){copyText(e,a).catch(fault);return;}
     if(!alive(e)) return;
     switch(a.kind) {
       case "focus": input.focus({preventScroll:true});break;
@@ -243,6 +316,13 @@ function gloryWry(config) {
     if(command.op==="css") { document.getElementById("glory-author").textContent=command.value; return; }
     const e=get(command.id);
     switch(command.op) {
+      case "clipboard_source": e.clipboardRevision=command.revision;break;
+      case "local_media": {
+        stopMedia(e);
+        e.mediaConfig=command.value;e.mediaPosition=0;e.mediaSuspended=false;
+        if(alive(e)) installMedia(e);else e.mediaSuspended=!!command.value;
+        break;
+      }
       case "patch":
         for(const edit of command.edits) switch(edit.kind) {
           case "revision": e.requested=edit.value; if(e.edit!=="Text") e.revision=edit.value;break;
@@ -269,7 +349,7 @@ function gloryWry(config) {
         extract(e);
         for(const id of command.subtree) {
           const old=entries.get(id);
-          if(old) { if(main(old)) observer.unobserve(main(old)); entries.delete(id); editing.delete(old); old.proposal=null; old.dirty=false; old.park.replaceChildren(); }
+          if(old) { if(drag?.e===old)finishDrag("cancel",drag.x,drag.y); stopMedia(old); if(main(old)) observer.unobserve(main(old)); entries.delete(id); editing.delete(old); old.proposal=null; old.dirty=false; old.park.replaceChildren(); }
         }
         break;
       default: throw Error("unknown operation");
@@ -285,6 +365,64 @@ function gloryWry(config) {
       post({type:"ack",sequence:batch.sequence});
     } catch(error) {fault(error);}
   }});
+  // Pointer capture is host-owned. Only finite semantic observations leave the
+  // interpreter; applications decide what a completed drag means.
+  let drag=null, suppressClick=false;
+  const dragBlocked=e=>!alive(e) || main(e)?.closest("[hidden],[inert],[data-gly-hidden],[aria-disabled=true],[aria-readonly=true]");
+  function finishDrag(phase,x,y) {
+    const previous=drag;drag=null;
+    if(!previous)return;
+    if(entries.get(previous.e.id)===previous.e)
+      event(previous.e,{kind:"drag",phase,x,y});
+    try{previous.element.releasePointerCapture(previous.pointer);}catch(_){}
+  }
+  function dragScroll() {
+    if(!drag)return;
+    if(dragBlocked(drag.e)){finishDrag("cancel",drag.x,drag.y);return;}
+    let changed=false, vertical=false, horizontal=false;
+    for(let element=document.elementFromPoint(drag.x,drag.y);element && element!==root;element=element.parentElement) {
+      const rect=element.getBoundingClientRect(),style=getComputedStyle(element);
+      const delta=(point,start,end)=>point<start+28?-10:point>end-28?10:0;
+      if(!vertical && /(auto|scroll)/.test(style.overflowY) && element.scrollHeight>element.clientHeight) {
+        const old=element.scrollTop;element.scrollTop+=delta(drag.y,rect.top,rect.bottom);
+        vertical=element.scrollTop!==old;changed||=vertical;
+      }
+      if(!horizontal && /(auto|scroll)/.test(style.overflowX) && element.scrollWidth>element.clientWidth) {
+        const old=element.scrollLeft;element.scrollLeft+=delta(drag.x,rect.left,rect.right);
+        horizontal=element.scrollLeft!==old;changed||=horizontal;
+      }
+    }
+    if(changed)event(drag.e,{kind:"drag",phase:"move",x:drag.x,y:drag.y});
+    requestAnimationFrame(dragScroll);
+  }
+  function receiveDrag(raw) {
+    if(raw.type==="pointerdown") {
+      suppressClick=false;
+      if(drag)finishDrag("cancel",drag.x,drag.y);
+      if(raw.button!==0 || !raw.isPrimary || raw.target.closest?.("input,textarea,select,button,a,[contenteditable=true]"))return;
+      let e=origin(raw.target);
+      while(e && !e.interests.has("Drag"))e=e.parent?entries.get(e.parent):null;
+      if(!e || dragBlocked(e))return;
+      const element=main(e), capture=element.getAttribute("data-gly-drag-capture");
+      // This host supports explicit source capture. Threshold/hit-target drag
+      // remains unsupported rather than silently changing its event contract.
+      if(!capture)return;
+      try{element.setPointerCapture(raw.pointerId);}catch(_){return;}
+      raw.preventDefault();
+      if(capture==="press-focus")element.focus({preventScroll:true});
+      drag={e,element,pointer:raw.pointerId,x:raw.clientX,y:raw.clientY};
+      event(e,{kind:"drag",phase:"start",x:raw.clientX,y:raw.clientY});requestAnimationFrame(dragScroll);return;
+    }
+    if(!drag || raw.pointerId!==drag.pointer)return;
+    if(dragBlocked(drag.e)){finishDrag("cancel",raw.clientX,raw.clientY);return;}
+    raw.preventDefault();
+    drag.x=raw.clientX;drag.y=raw.clientY;
+    if(raw.type==="pointermove")event(drag.e,{kind:"drag",phase:"move",x:drag.x,y:drag.y});
+    else if(raw.type==="pointerup"){suppressClick=true;finishDrag("drop",drag.x,drag.y);}
+    else finishDrag("cancel",drag.x,drag.y);
+  }
+  window.addEventListener("blur",()=>{if(drag)finishDrag("cancel",drag.x,drag.y);});
+  window.addEventListener("keydown",raw=>{if(raw.key==="Escape" && drag){raw.preventDefault();finishDrag("cancel",drag.x,drag.y);}},true);
   function receive(domEvent) {
     const e=origin(domEvent.target);
     if(!e || !alive(e)) return;
@@ -292,6 +430,7 @@ function gloryWry(config) {
     const disabled=!input || input.disabled || element.getAttribute("aria-disabled")==="true";
     switch(domEvent.type) {
       case "click":
+        if(suppressClick){suppressClick=false;domEvent.preventDefault();domEvent.stopPropagation();return;}
         if(disabled || input.readOnly && e.edit==="Check") {domEvent.preventDefault();return;}
         if(e.prevent || element.tagName==="A") domEvent.preventDefault();
         if(observed(e,"Activate")) event(e,{kind:"activate"});break;
@@ -339,6 +478,7 @@ function gloryWry(config) {
     if(!root) {fault("missing Glory mount");return;}
     for(const name of ["click","input","change","compositionstart","compositionend","focusin","focusout","scroll","keydown"])
       root.addEventListener(name,receive,true);
+    for(const name of ["pointerdown","pointermove","pointerup","pointercancel","lostpointercapture"])root.addEventListener(name,receiveDrag,true);
     post({type:"ready"});
   }
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",start,{once:true}); else start();

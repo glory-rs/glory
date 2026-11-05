@@ -5,7 +5,9 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 pub const VERSION: u32 = 2;
-pub const MAX_IPC_BYTES: usize = 1024 * 1024;
+// Controlled document snapshots can expand sixfold when JSON escapes text.
+// Bound encoded bytes independently of the unescaped editor value.
+pub const MAX_IPC_BYTES: usize = 8 * 1024 * 1024;
 pub const MAX_PENDING_BYTES: usize = 8 * 1024 * 1024;
 pub const MAX_QUERIES: usize = 1024;
 pub const MAX_INPUTS: usize = 4096;
@@ -111,7 +113,17 @@ pub enum Payload {
 #[derive(Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum WireEvent {
+    Clipboard {
+        request: String,
+        revision: String,
+        outcome: String,
+    },
     Activate,
+    Drag {
+        phase: String,
+        x: f64,
+        y: f64,
+    },
     Value {
         value: String,
         composing: bool,

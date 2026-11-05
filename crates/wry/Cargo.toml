@@ -11,7 +11,7 @@ description = "Native Rust semantic UI host with an IPC-driven system WebView"
 [features]
 default = []
 css = ["glory-html/css"]
-shell = ["dep:wry", "dep:tao"]
+shell = ["dep:wry", "dep:tao", "dep:url"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 glory-render = { path = "../render", version = "0.7.0" }
@@ -24,6 +24,7 @@ serde_json = "1"
 [target.'cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))'.dependencies]
 wry = { version = "=0.57.1", optional = true }
 tao = { version = "=0.37.2", optional = true }
+url = { version = "2", optional = true }
 
 [lints]
 workspace = true
@@ -31,5 +32,23 @@ workspace = true
 [[test]]
 name = "window"
 path = "tests/window.rs"
+harness = false
+required-features = ["shell"]
+
+[[test]]
+name = "media_window"
+path = "tests/media_window.rs"
+harness = false
+required-features = ["shell"]
+
+[[test]]
+name = "browser_window"
+path = "tests/browser_window.rs"
+harness = false
+required-features = ["shell"]
+
+[[test]]
+name = "clipboard_window"
+path = "tests/clipboard_window.rs"
 harness = false
 required-features = ["shell"]

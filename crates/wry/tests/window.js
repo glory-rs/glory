@@ -5,6 +5,10 @@ document.addEventListener("DOMContentLoaded",()=>{
     const input=document.querySelector('input[aria-label="Message"]');
     document.querySelector(".increment").click();
     await wait(()=>document.querySelector(".count").textContent==="Count:1");
+    const large="\\".repeat(512*1024);
+    input.focus();input.value=large;
+    input.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:large}));
+    await wait(()=>document.querySelector(".echo").textContent===large);
     input.focus(); input.value="";
     for(const character of "rapid native input 0123456789") {
       input.value+=character;
@@ -17,6 +21,9 @@ document.addEventListener("DOMContentLoaded",()=>{
     input.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:"中文😀"}));
     await wait(()=>document.querySelector(".echo").textContent==="中文😀");
     if(input!==document.querySelector('input[aria-label="Message"]') || input.selectionStart!==2 || input.selectionEnd!==4) throw Error("input echo replaced identity/selection");
+    document.querySelector(".theme").click();
+    await wait(()=>getComputedStyle(document.querySelector(".echo")).color==="rgb(1, 2, 3)");
+    if(input!==document.querySelector('input[aria-label="Message"]') || document.activeElement!==input || input.value!=="中文😀" || input.selectionStart!==2 || input.selectionEnd!==4) throw Error("author stylesheet changed input/focus/selection");
     input.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true,cancelable:true}));
     document.querySelector("input[type=checkbox]").click();
     document.querySelector(".toggle").click();

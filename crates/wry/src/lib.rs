@@ -2,7 +2,9 @@
 //! No WASM, second reactive runtime, HTML snapshot replacement or VDOM diff.
 #![cfg(not(target_arch = "wasm32"))]
 
+mod local_media;
 mod protocol;
+pub use local_media::{LocalMedia, MediaKind};
 #[cfg(all(
     feature = "shell",
     any(target_os = "macos", target_os = "windows", target_os = "linux")
@@ -73,6 +75,8 @@ impl Transport {
     }
 }
 struct State {
+    local_media: bool,
+    text_clipboard: bool,
     mapper: Mapper,
     transport: Transport,
     nodes: NodeMap<Live>,
@@ -127,6 +131,8 @@ impl Renderer {
             .expect("Wry document identities exhausted");
         Self(Rc::new(RefCell::new(State {
             mapper: Mapper::new(runtime),
+            local_media: false,
+            text_clipboard: false,
             transport: Transport {
                 session: format!("{}.{}", runtime.value(), document),
                 commands: Vec::new(),
@@ -144,6 +150,11 @@ impl Renderer {
             edit_receipts: BTreeMap::new(),
         })))
     }
+    /// Explicit write-only clipboard opt-in, before shell initialization. The platform may still refuse a
+    /// request; completion carries the actual outcome and original revision.
+    pub fn enable_text_clipboard(&self) {
+        self.0.borrow_mut().text_clipboard = true;
+    }
     pub fn session(&self) -> String {
         self.0.borrow().transport.session.clone()
     }
@@ -151,7 +162,7 @@ impl Renderer {
     pub fn initialization_script(&self) -> String {
         format!(
             "({INTERPRETER})({});",
-            json!({"v":protocol::VERSION,"session":self.session()})
+            json!({"v":protocol::VERSION,"session":self.session(),"maxIpcBytes":protocol::MAX_IPC_BYTES,"maxDeferredBytes":protocol::MAX_PENDING_BYTES,"textClipboard":self.0.borrow().text_clipboard})
         )
     }
     /// Take at most one ordered batch; the WebView must acknowledge it before
@@ -308,6 +319,13 @@ impl Renderer {
                 if !state.mapper.tree().validate_event(node, &event)? {
                     return Ok(false);
                 }
+                if let Event::Clipboard {
+                    request, revision, ..
+                } = &event
+                    && !state.mapper.finish_clipboard(node, *request, *revision)?
+                {
+                    return Ok(false);
+                }
                 if !state.mapper.tree().active(node) && !event.is_terminal_loss() {
                     return Ok(false);
                 }
@@ -332,13 +350,21 @@ impl Renderer {
                     return Err(Error::InvalidEvent("Wry input queue budget"));
                 }
                 // Coalesce only adjacent geometry observations, preserving input order.
-                if matches!(event, Event::Resize { .. } | Event::Scroll { .. })
-                    && let Some(Input::Event {
-                        node: previous,
-                        event: old,
-                    }) = state.inputs.last_mut()
+                if matches!(
+                    event,
+                    Event::Resize { .. }
+                        | Event::Scroll { .. }
+                        | Event::Drag {
+                            phase: glory_render::DragPhase::Move,
+                            ..
+                        }
+                ) && let Some(Input::Event {
+                    node: previous,
+                    event: old,
+                }) = state.inputs.last_mut()
                     && *previous == node
                     && old.kind() == event.kind()
+                    && !matches!(old,Event::Drag{phase,..} if *phase!=glory_render::DragPhase::Move)
                 {
                     *old = event;
                     return Ok(true);
@@ -352,20 +378,38 @@ impl Renderer {
         }
         Ok(true)
     }
-    #[cfg(feature = "css")]
-    pub fn set_sheet(&self, sheet: &glory_html::Sheet) -> Result<(), Error> {
-        let css = glory_html::sheet(sheet, style::Profile::HTML)
-            .map_err(|error| Error::Backend(error.to_string()))?;
+    /// Replace this document's trusted application stylesheet without remounting
+    /// widgets or disturbing focus/selection. This is the same author CSS layer
+    /// as `shell::Config::css`; it is not HTML and does not grant network access.
+    /// The shell's content security policy and explicit local assets still apply.
+    /// The update follows the normal ready/ack ordering and pending-byte budget.
+    pub fn set_author_css(&self, css: &str) -> Result<(), Error> {
+        if css.len() > 1024 * 1024 {
+            return Err(Error::InvalidProps("Wry author stylesheet exceeds 1 MiB"));
+        }
         self.0
             .borrow_mut()
             .transport
             .push(json!({"op":"css","value":css}))
+    }
+    #[cfg(feature = "css")]
+    pub fn set_sheet(&self, sheet: &glory_html::Sheet) -> Result<(), Error> {
+        let css = glory_html::sheet(sheet, style::Profile::HTML)
+            .map_err(|error| Error::Backend(error.to_string()))?;
+        self.set_author_css(&css)
     }
 }
 
 // Refuse host behavior that has not been implemented, before staged UI changes.
 fn preflight(node: DescriptorView<'_>, patch: Option<&Patch>) -> Result<(), Error> {
     glory_html::preflight(node, patch)?;
+    if node
+        .options
+        .get::<glory_html::display::Placement>()
+        .is_some()
+    {
+        return Err(Error::Unsupported("Wry sparse display templates"));
+    }
     if node.options.get::<VirtualPart>().is_some() {
         return Err(Error::Unsupported("Wry virtual collection handover"));
     }
@@ -382,12 +426,10 @@ fn preflight(node: DescriptorView<'_>, patch: Option<&Patch>) -> Result<(), Erro
     };
     if let Some(s) = semantics
         && (s.focus_scope.is_some()
-            || s.clipboard.is_some()
             || s.input_edit.is_some()
             || s.translation.is_some()
             || s.collapse.is_some()
             || s.presence.is_some()
-            || s.drag_capture.is_some()
             || s.swipe_capture.is_some()
             || s.context_menu.is_some()
             || s.tags_input.is_some()
@@ -433,7 +475,9 @@ fn supported_event(kind: EventKind) -> bool {
             | EventKind::Keyboard
             | EventKind::Navigate
             | EventKind::ColorSchemeChanged
+            | EventKind::Clipboard
             | EventKind::ImageStatus
+            | EventKind::Drag
     )
 }
 impl Render for Renderer {
@@ -457,6 +501,7 @@ impl Render for Renderer {
             scroll: true,
             focus: true,
             input: true,
+            clipboard_write: self.0.borrow().text_clipboard,
             ..Capabilities::default()
         }
     }
@@ -467,6 +512,17 @@ impl Render for Renderer {
             kind.validate_target(descriptor)?;
             if !supported_event(kind) {
                 return Err(Error::Unsupported("Wry event"));
+            }
+            if kind == EventKind::Drag
+                && descriptor
+                    .semantics
+                    .as_deref()
+                    .and_then(|s| s.drag_capture)
+                    .is_none()
+            {
+                return Err(Error::Unsupported(
+                    "Wry drag requires explicit source capture",
+                ));
             }
         }
         state.transport.push(json!({"op":"listen","id":protocol::id(node),"kind":format!("{kind:?}"),"enabled":enabled}))?;
@@ -512,6 +568,28 @@ impl Render for Renderer {
                     inputs,
                 },
             )?;
+            let changed: &[NodeId] = match mutation {
+                Mutation::Create { id, .. } | Mutation::Patch { id, .. } => {
+                    std::slice::from_ref(id)
+                }
+                Mutation::CreatePlan { ids, .. } => ids,
+                _ => &[],
+            };
+            for &id in changed {
+                let revision = state
+                    .mapper
+                    .tree()
+                    .node(id)?
+                    .descriptor
+                    .view()
+                    .semantics
+                    .as_ref()
+                    .and_then(|s| s.clipboard.as_ref())
+                    .map(|s| s.revision);
+                if let Some(revision) = revision {
+                    state.transport.push(json!({"op":"clipboard_source","id":protocol::id(id),"revision":revision.to_string()}))?;
+                }
+            }
         }
         Ok(state.mapper.receipt())
     }
@@ -576,6 +654,24 @@ impl Render for Renderer {
             return Err(Error::Unsupported("Wry inactive action target"));
         }
         let value = match action {
+            Action::CopyText {
+                revision, request, ..
+            } => {
+                if !state.text_clipboard {
+                    return Err(Error::Unsupported(
+                        "Wry text clipboard requires explicit host opt-in",
+                    ));
+                }
+                let text = descriptor
+                    .semantics
+                    .as_ref()
+                    .and_then(|s| s.clipboard.as_ref())
+                    .ok_or(Error::Unsupported("No clipboard source"))?
+                    .text
+                    .clone();
+                state.mapper.admit_clipboard(action)?;
+                json!({"kind":"copy_text","revision":revision.to_string(),"request":request.to_string(),"text":text})
+            }
             Action::Focus(_) => json!({"kind":"focus"}),
             Action::ScrollTo { x, y, .. } => json!({"kind":"scroll","x":x,"y":y}),
             Action::ScrollIntoView(_) => json!({"kind":"reveal"}),
@@ -626,6 +722,21 @@ impl Render for Renderer {
 impl WireEvent {
     fn into_event(self, node: NodeId) -> Result<Event, Error> {
         Ok(match self {
+            Self::Clipboard {
+                request,
+                revision,
+                outcome,
+            } => Event::Clipboard {
+                request: protocol::integer(&request)?,
+                revision: protocol::integer(&revision)?,
+                outcome: match outcome.as_str() {
+                    "written" => ClipboardOutcome::Written,
+                    "denied" => ClipboardOutcome::Denied,
+                    "unavailable" => ClipboardOutcome::Unavailable,
+                    "failed" => ClipboardOutcome::Failed,
+                    _ => return Err(Error::InvalidEvent("Wry clipboard outcome")),
+                },
+            },
             Self::Activate => Event::Activate,
             Self::Value {
                 value,
@@ -693,6 +804,18 @@ impl WireEvent {
                     ImageStatus::Loaded
                 } else {
                     ImageStatus::Failed
+                },
+            },
+            Self::Drag { phase, x, y } => Event::Drag {
+                from: node,
+                x,
+                y,
+                phase: match phase.as_str() {
+                    "start" => glory_render::DragPhase::Start,
+                    "move" => glory_render::DragPhase::Move,
+                    "drop" => glory_render::DragPhase::Drop,
+                    "cancel" => glory_render::DragPhase::Cancel,
+                    _ => return Err(Error::InvalidEvent("Wry drag phase")),
                 },
             },
             Self::Keyboard { command } => Event::Keyboard {

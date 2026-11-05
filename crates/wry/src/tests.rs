@@ -13,6 +13,44 @@ fn ready(renderer: &Renderer) {
         .receive(&message(renderer, json!({"type":"ready"})))
         .unwrap();
 }
+#[test]
+fn local_media_requires_explicit_host_opt_in_and_exact_local_paths() {
+    let runtime = RuntimeId::new();
+    let mut ids = NodeIds::new(runtime);
+    let id = ids.allocate();
+    let mut renderer = Renderer::new(runtime);
+    create(&mut renderer, id, Props::View);
+    let media = || LocalMedia {
+        kind: MediaKind::Audio,
+        path: "/media/opaque",
+        title: "Owned attachment",
+    };
+    assert!(renderer.set_local_media(id, Some(media())).is_err());
+    renderer.enable_local_media();
+    for path in [
+        "https://example.org/file",
+        "file:///private/a",
+        "//host/file",
+        "/a/../b",
+        "/a?token=x",
+        "/%2e%2e/a",
+    ] {
+        assert!(
+            renderer
+                .set_local_media(id, Some(LocalMedia { path, ..media() }))
+                .is_err()
+        );
+    }
+    renderer.set_local_media(id, Some(media())).unwrap();
+    ready(&renderer);
+    let value = batch(&renderer);
+    assert_eq!(
+        value["commands"].as_array().unwrap().last().unwrap()["op"],
+        "local_media"
+    );
+    renderer.close();
+    assert!(renderer.set_local_media(id, None).is_err());
+}
 fn batch(renderer: &Renderer) -> Value {
     let script = renderer.take_script().unwrap().unwrap();
     serde_json::from_str(
@@ -31,6 +69,46 @@ fn ack(renderer: &Renderer, value: &Value) {
             json!({"type":"ack","sequence":value["sequence"]}),
         ))
         .unwrap();
+}
+#[test]
+fn author_styles_follow_document_order_without_rebuilding_or_parsing_markup() {
+    let runtime = RuntimeId::new();
+    let mut ids = NodeIds::new(runtime);
+    let id = ids.allocate();
+    let mut renderer = Renderer::new(runtime);
+    create(
+        &mut renderer,
+        id,
+        Props::Text(TextProps {
+            content: "retained".into(),
+            ..Default::default()
+        }),
+    );
+    let css = ".theme { color: #123456; } /* </style><script>literal</script> */";
+    renderer.set_author_css(css).unwrap();
+    assert!(renderer.take_script().unwrap().is_none());
+    ready(&renderer);
+    let first = batch(&renderer);
+    assert_eq!(first["commands"][0]["op"], "create");
+    assert_eq!(first["commands"][2], json!({"op":"css","value":css}));
+    renderer
+        .set_author_css(".theme { color: #abcdef }")
+        .unwrap();
+    assert!(renderer.take_script().unwrap().is_none());
+    ack(&renderer, &first);
+    let second = batch(&renderer);
+    assert_eq!(second["commands"].as_array().unwrap().len(), 1);
+    assert_eq!(second["commands"][0]["op"], "css");
+    // A rejected oversized declaration does not poison the renderer or enqueue a prefix.
+    assert!(
+        renderer
+            .set_author_css(&"x".repeat(1024 * 1024 + 1))
+            .is_err()
+    );
+    ack(&renderer, &second);
+    assert!(renderer.take_script().unwrap().is_none());
+    renderer.set_author_css("").unwrap();
+    assert_eq!(batch(&renderer)["commands"][0]["value"], "");
 }
 fn create(renderer: &mut Renderer, id: NodeId, props: Props) -> Receipt {
     renderer
@@ -174,6 +252,32 @@ fn disposal_releases_waiters_and_recycled_nodes_reject_old_events() {
     assert!(renderer.0.borrow().pending.is_empty());
 }
 #[test]
+fn escaped_large_editor_snapshots_fit_the_same_bounded_native_and_script_transport() {
+    let runtime = RuntimeId::new();
+    let mut ids = NodeIds::new(runtime);
+    let id = ids.allocate();
+    let mut renderer = Renderer::new(runtime);
+    create(&mut renderer, id, Props::Input(InputProps::default()));
+    let text = "\\".repeat(512 * 1024);
+    let encoded = message(
+        &renderer,
+        json!({"type":"event","node":protocol::id(id),"event":{"kind":"value","value":text,"revision":"0","composing":false}}),
+    );
+    assert!(encoded.len() > 1024 * 1024);
+    assert!(encoded.len() < protocol::MAX_IPC_BYTES);
+    assert!(renderer.receive(&encoded).unwrap());
+    let mut inputs = Vec::new();
+    renderer.drain(&mut inputs);
+    assert!(
+        matches!(&inputs[0],Input::Event{event:Event::ValueChanged{value,..},..} if value==&text)
+    );
+    assert!(
+        renderer
+            .initialization_script()
+            .contains(&format!("\"maxIpcBytes\":{}", protocol::MAX_IPC_BYTES))
+    );
+}
+#[test]
 fn malformed_foreign_stale_and_future_inputs_never_reenter_business_code() {
     let runtime = RuntimeId::new();
     let mut ids = NodeIds::new(runtime);
@@ -303,6 +407,112 @@ fn presence_is_explicitly_unsupported_before_wry_identity_allocation() {
     assert!(renderer.0.borrow().mapper.tree().node(id).is_err());
 }
 #[test]
+fn captured_drag_is_supported_and_rejects_nonfinite_coordinates_and_unknown_phases() {
+    let runtime = RuntimeId::new();
+    let mut ids = NodeIds::new(runtime);
+    let id = ids.allocate();
+    let mut renderer = Renderer::new(runtime);
+    let mut descriptor = Descriptor::new(Props::View);
+    descriptor.semantics = Some(Box::new(Semantics {
+        drag_capture: Some(glory_render::DragCapture::Press),
+        ..Default::default()
+    }));
+    renderer
+        .apply(&[
+            Mutation::Create {
+                id,
+                node: Box::new(descriptor),
+            },
+            Mutation::Place {
+                id,
+                parent: None,
+                before: None,
+            },
+        ])
+        .unwrap();
+    renderer.listen(id, EventKind::Drag, true).unwrap();
+    let event = |phase: &str| {
+        serde_json::json!({"kind":"drag","phase":phase,"x":12.5,"y":22.5}).to_string()
+    };
+    for phase in ["start", "move", "drop", "cancel"] {
+        let wire: WireEvent = serde_json::from_str(&event(phase)).unwrap();
+        let event = wire.into_event(id).unwrap();
+        assert!(
+            renderer
+                .0
+                .borrow()
+                .mapper
+                .tree()
+                .validate_event(id, &event)
+                .unwrap()
+        );
+    }
+    assert!(
+        serde_json::from_str::<WireEvent>(&event("foreign"))
+            .unwrap()
+            .into_event(id)
+            .is_err()
+    );
+    ready(&renderer);
+    for phase in ["start", "move", "move", "drop"] {
+        let wire: Value = serde_json::from_str(&event(phase)).unwrap();
+        renderer
+            .receive(&message(
+                &renderer,
+                json!({"type":"event","node":protocol::id(id),"event":wire}),
+            ))
+            .unwrap();
+    }
+    let state = renderer.0.borrow();
+    assert_eq!(state.inputs.len(), 3);
+    assert!(matches!(
+        state.inputs[0],
+        Input::Event {
+            event: Event::Drag {
+                phase: glory_render::DragPhase::Start,
+                ..
+            },
+            ..
+        }
+    ));
+    assert!(matches!(
+        state.inputs[1],
+        Input::Event {
+            event: Event::Drag {
+                phase: glory_render::DragPhase::Move,
+                ..
+            },
+            ..
+        }
+    ));
+    assert!(matches!(
+        state.inputs[2],
+        Input::Event {
+            event: Event::Drag {
+                phase: glory_render::DragPhase::Drop,
+                ..
+            },
+            ..
+        }
+    ));
+    drop(state);
+    let bad = Event::Drag {
+        from: id,
+        phase: glory_render::DragPhase::Move,
+        x: f64::NAN,
+        y: 0.,
+    };
+    assert!(
+        renderer
+            .0
+            .borrow()
+            .mapper
+            .tree()
+            .validate_event(id, &bad)
+            .is_err()
+    );
+}
+#[test]
 fn selection_boundaries_validate_before_transport_changes() {
     let runtime = RuntimeId::new();
     let mut ids = NodeIds::new(runtime);
@@ -388,4 +598,122 @@ fn text_receipts_follow_the_ui_commit_and_reset_rejected_program_barriers() {
     assert!(renderer.0.borrow().inputs.is_empty());
     ack(&renderer, &rejected);
     assert!(renderer.0.borrow().edit_receipts.is_empty());
+}
+
+#[test]
+fn clipboard_opt_in_revision_and_original_receipts_refuse_stale_duplicate_and_retired_events() {
+    for plan_mode in [false, true] {
+        let runtime = RuntimeId::new();
+        let mut ids = NodeIds::new(runtime);
+        let id = ids.allocate();
+        let mut renderer = Renderer::new(runtime);
+        let source = |text: &str, revision| {
+            Some(Box::new(Semantics {
+                clipboard: Some(ClipboardText {
+                    text: text.into(),
+                    revision,
+                }),
+                ..Default::default()
+            }))
+        };
+        let mut descriptor = Descriptor::new(Props::Button(ButtonProps {
+            label: "Copy".into(),
+            ..Default::default()
+        }));
+        descriptor.semantics = source("literal <script>😀", 1);
+        renderer
+            .apply(&[
+                if plan_mode {
+                    Mutation::CreatePlan {
+                        plan: Plan::new(vec![PlanNode {
+                            parent: None,
+                            descriptor,
+                        }])
+                        .unwrap(),
+                        ids: vec![id],
+                    }
+                } else {
+                    Mutation::Create {
+                        id,
+                        node: Box::new(descriptor),
+                    }
+                },
+                Mutation::Place {
+                    id,
+                    parent: None,
+                    before: None,
+                },
+            ])
+            .unwrap();
+        renderer.listen(id, EventKind::Clipboard, true).unwrap();
+        assert!(!renderer.capabilities().clipboard_write);
+        assert!(
+            renderer
+                .action(Action::CopyText {
+                    node: id,
+                    revision: 1,
+                    request: 1
+                })
+                .is_err()
+        );
+        renderer.enable_text_clipboard();
+        assert!(renderer.capabilities().clipboard_write);
+        ready(&renderer);
+        let before = batch(&renderer);
+        assert!(!before.to_string().contains("literal"));
+        ack(&renderer, &before);
+        renderer
+            .action(Action::CopyText {
+                node: id,
+                revision: 1,
+                request: 1,
+            })
+            .unwrap();
+        let copy = batch(&renderer);
+        assert_eq!(copy["commands"][0]["action"]["text"], "literal <script>😀");
+        ack(&renderer, &copy);
+        let completion = |renderer: &Renderer, request, revision| {
+            message(
+                renderer,
+                json!({"type":"event","node":protocol::id(id),"event":{"kind":"clipboard","request":request,"revision":revision,"outcome":"written"}}),
+            )
+        };
+        assert!(renderer.receive(&completion(&renderer, "1", "1")).unwrap());
+        assert!(!renderer.receive(&completion(&renderer, "1", "1")).unwrap());
+        let mut inputs = vec![];
+        renderer.drain(&mut inputs);
+        assert_eq!(inputs.len(), 1);
+        renderer
+            .action(Action::CopyText {
+                node: id,
+                revision: 1,
+                request: 2,
+            })
+            .unwrap();
+        renderer
+            .apply(&[Mutation::Patch {
+                id,
+                patch: Patch::Semantics(Change::Set(source("new", 2))),
+            }])
+            .unwrap();
+        assert!(!renderer.receive(&completion(&renderer, "2", "1")).unwrap());
+        assert!(
+            renderer
+                .action(Action::CopyText {
+                    node: id,
+                    revision: 1,
+                    request: 3
+                })
+                .is_err()
+        );
+        renderer
+            .action(Action::CopyText {
+                node: id,
+                revision: 2,
+                request: 3,
+            })
+            .unwrap();
+        renderer.apply(&[Mutation::Dispose { id }]).unwrap();
+        assert!(!renderer.receive(&completion(&renderer, "3", "2")).unwrap());
+    }
 }
