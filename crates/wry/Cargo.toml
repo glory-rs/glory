@@ -46,3 +46,9 @@ name = "browser_window"
 path = "tests/browser_window.rs"
 harness = false
 required-features = ["shell"]
+
+[[test]]
+name = "clipboard_window"
+path = "tests/clipboard_window.rs"
+harness = false
+required-features = ["shell"]

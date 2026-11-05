@@ -69,6 +69,10 @@ pub trait NativeLifecycle {
 #[cfg(target_os = "windows")]
 pub use tao::platform::windows::WindowExtWindows as NativeWindowExtWindows;
 pub use tao::window::Window as NativeWindow;
+pub use tao::{
+    dpi::{LogicalSize, PhysicalPosition},
+    window::Fullscreen,
+};
 pub struct Config {
     /// No tray, startup registration, updater, or platform hooks by default.
     pub native: Option<Box<dyn NativeLifecycle>>,

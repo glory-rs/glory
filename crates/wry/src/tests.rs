@@ -15,17 +15,41 @@ fn ready(renderer: &Renderer) {
 }
 #[test]
 fn local_media_requires_explicit_host_opt_in_and_exact_local_paths() {
-    let runtime=RuntimeId::new();let mut ids=NodeIds::new(runtime);let id=ids.allocate();
-    let mut renderer=Renderer::new(runtime);create(&mut renderer,id,Props::View);
-    let media=||LocalMedia {kind:MediaKind::Audio,path:"/media/opaque",title:"Owned attachment"};
-    assert!(renderer.set_local_media(id,Some(media())).is_err());
+    let runtime = RuntimeId::new();
+    let mut ids = NodeIds::new(runtime);
+    let id = ids.allocate();
+    let mut renderer = Renderer::new(runtime);
+    create(&mut renderer, id, Props::View);
+    let media = || LocalMedia {
+        kind: MediaKind::Audio,
+        path: "/media/opaque",
+        title: "Owned attachment",
+    };
+    assert!(renderer.set_local_media(id, Some(media())).is_err());
     renderer.enable_local_media();
-    for path in ["https://example.org/file","file:///private/a","//host/file","/a/../b","/a?token=x","/%2e%2e/a"] {
-        assert!(renderer.set_local_media(id,Some(LocalMedia {path,..media()})).is_err());
+    for path in [
+        "https://example.org/file",
+        "file:///private/a",
+        "//host/file",
+        "/a/../b",
+        "/a?token=x",
+        "/%2e%2e/a",
+    ] {
+        assert!(
+            renderer
+                .set_local_media(id, Some(LocalMedia { path, ..media() }))
+                .is_err()
+        );
     }
-    renderer.set_local_media(id,Some(media())).unwrap();ready(&renderer);
-    let value=batch(&renderer);assert_eq!(value["commands"].as_array().unwrap().last().unwrap()["op"],"local_media");
-    renderer.close();assert!(renderer.set_local_media(id,None).is_err());
+    renderer.set_local_media(id, Some(media())).unwrap();
+    ready(&renderer);
+    let value = batch(&renderer);
+    assert_eq!(
+        value["commands"].as_array().unwrap().last().unwrap()["op"],
+        "local_media"
+    );
+    renderer.close();
+    assert!(renderer.set_local_media(id, None).is_err());
 }
 fn batch(renderer: &Renderer) -> Value {
     let script = renderer.take_script().unwrap().unwrap();
@@ -409,4 +433,122 @@ fn text_receipts_follow_the_ui_commit_and_reset_rejected_program_barriers() {
     assert!(renderer.0.borrow().inputs.is_empty());
     ack(&renderer, &rejected);
     assert!(renderer.0.borrow().edit_receipts.is_empty());
+}
+
+#[test]
+fn clipboard_opt_in_revision_and_original_receipts_refuse_stale_duplicate_and_retired_events() {
+    for plan_mode in [false, true] {
+        let runtime = RuntimeId::new();
+        let mut ids = NodeIds::new(runtime);
+        let id = ids.allocate();
+        let mut renderer = Renderer::new(runtime);
+        let source = |text: &str, revision| {
+            Some(Box::new(Semantics {
+                clipboard: Some(ClipboardText {
+                    text: text.into(),
+                    revision,
+                }),
+                ..Default::default()
+            }))
+        };
+        let mut descriptor = Descriptor::new(Props::Button(ButtonProps {
+            label: "Copy".into(),
+            ..Default::default()
+        }));
+        descriptor.semantics = source("literal <script>😀", 1);
+        renderer
+            .apply(&[
+                if plan_mode {
+                    Mutation::CreatePlan {
+                        plan: Plan::new(vec![PlanNode {
+                            parent: None,
+                            descriptor,
+                        }])
+                        .unwrap(),
+                        ids: vec![id],
+                    }
+                } else {
+                    Mutation::Create {
+                        id,
+                        node: Box::new(descriptor),
+                    }
+                },
+                Mutation::Place {
+                    id,
+                    parent: None,
+                    before: None,
+                },
+            ])
+            .unwrap();
+        renderer.listen(id, EventKind::Clipboard, true).unwrap();
+        assert!(!renderer.capabilities().clipboard_write);
+        assert!(
+            renderer
+                .action(Action::CopyText {
+                    node: id,
+                    revision: 1,
+                    request: 1
+                })
+                .is_err()
+        );
+        renderer.enable_text_clipboard();
+        assert!(renderer.capabilities().clipboard_write);
+        ready(&renderer);
+        let before = batch(&renderer);
+        assert!(!before.to_string().contains("literal"));
+        ack(&renderer, &before);
+        renderer
+            .action(Action::CopyText {
+                node: id,
+                revision: 1,
+                request: 1,
+            })
+            .unwrap();
+        let copy = batch(&renderer);
+        assert_eq!(copy["commands"][0]["action"]["text"], "literal <script>😀");
+        ack(&renderer, &copy);
+        let completion = |renderer: &Renderer, request, revision| {
+            message(
+                renderer,
+                json!({"type":"event","node":protocol::id(id),"event":{"kind":"clipboard","request":request,"revision":revision,"outcome":"written"}}),
+            )
+        };
+        assert!(renderer.receive(&completion(&renderer, "1", "1")).unwrap());
+        assert!(!renderer.receive(&completion(&renderer, "1", "1")).unwrap());
+        let mut inputs = vec![];
+        renderer.drain(&mut inputs);
+        assert_eq!(inputs.len(), 1);
+        renderer
+            .action(Action::CopyText {
+                node: id,
+                revision: 1,
+                request: 2,
+            })
+            .unwrap();
+        renderer
+            .apply(&[Mutation::Patch {
+                id,
+                patch: Patch::Semantics(Change::Set(source("new", 2))),
+            }])
+            .unwrap();
+        assert!(!renderer.receive(&completion(&renderer, "2", "1")).unwrap());
+        assert!(
+            renderer
+                .action(Action::CopyText {
+                    node: id,
+                    revision: 1,
+                    request: 3
+                })
+                .is_err()
+        );
+        renderer
+            .action(Action::CopyText {
+                node: id,
+                revision: 2,
+                request: 3,
+            })
+            .unwrap();
+        renderer.apply(&[Mutation::Dispose { id }]).unwrap();
+        assert!(!renderer.receive(&completion(&renderer, "3", "2")).unwrap());
+    }
 }

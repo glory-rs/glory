@@ -6,6 +6,7 @@ use serde_json::json;
 #[derive(Clone, Copy, Debug)]
 pub enum MediaKind {
     Audio,
+    Image,
     Video,
 }
 pub struct LocalMedia<'a> {
@@ -51,7 +52,7 @@ impl Renderer {
             if !valid_path(media.path) || media.title.len() > 4096 {
                 return Err(Error::InvalidProps("Invalid local media source"));
             }
-            json!({"kind":match media.kind {MediaKind::Audio=>"audio",MediaKind::Video=>"video"},"path":media.path,"title":media.title})
+            json!({"kind":match media.kind {MediaKind::Audio=>"audio",MediaKind::Video=>"video",MediaKind::Image=>"img"},"path":media.path,"title":media.title})
         } else {
             serde_json::Value::Null
         };

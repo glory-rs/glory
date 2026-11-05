@@ -190,7 +190,7 @@ function gloryWry(config) {
   function stopMedia(e,remember=false) {
     if(e.localMedia) {
       e.mediaPosition=remember && Number.isFinite(e.localMedia.currentTime) ? e.localMedia.currentTime : 0;
-      e.localMedia.pause(); e.localMedia.removeAttribute("src"); e.localMedia.load(); e.localMedia.remove(); e.localMedia=null;
+      e.mediaCleanup?.(); e.mediaCleanup=null; e.localMedia.pause?.(); e.localMedia.removeAttribute("src"); e.localMedia.load?.(); e.mediaSurface?.remove(); e.mediaSurface=null; e.localMedia.remove(); e.localMedia=null;
     }
   }
   function installMedia(e) {
@@ -200,7 +200,41 @@ function gloryWry(config) {
     player.setAttribute("playsinline",""); player.setAttribute("aria-label",value.title);
     player.style.width="100%"; player.style.maxHeight="480px";
     if(e.mediaPosition>0) player.addEventListener('loadedmetadata',()=>{if(e.localMedia===player && Number.isFinite(player.duration))player.currentTime=Math.min(e.mediaPosition,Math.max(0,player.duration-.1));},{once:true});
-    player.src=value.path;main(e).appendChild(player);e.localMedia=player;
+    if(value.kind==='img') {
+      const container=document.createElement('div');container.className='glory-image-viewer';
+      const toolbar=document.createElement('div');toolbar.style.cssText='display:flex;gap:.5em;padding:.5em';
+      const surface=document.createElement('div');surface.style.cssText='overflow:auto;max-height:70vh;min-height:120px;position:relative;touch-action:none;cursor:grab';
+      const canvas=document.createElement('div');canvas.style.position='relative';
+      player.alt=value.title;player.draggable=false;player.style.cssText='display:block;position:absolute;left:50%;top:50%;max-width:none;max-height:none;transform-origin:center';
+      let zoom=1,rotation=0;const update=()=>{
+        const width=player.naturalWidth,height=player.naturalHeight;if(!width||!height)return;
+        const rotated=rotation%180!==0;const rw=rotated?height:width,rh=rotated?width:height;
+        const scale=Math.min((surface.clientWidth||640)/rw,Math.max(120,window.innerHeight*.7)/rh)*zoom;
+        canvas.style.width=`${rw*scale}px`;canvas.style.height=`${rh*scale}px`;
+        player.style.width=`${width*scale}px`;player.style.height=`${height*scale}px`;player.style.transform=`translate(-50%,-50%) rotate(${rotation}deg)`;
+        player.dataset.zoom=String(zoom);player.dataset.rotation=String(rotation);
+      };
+      const control=(label,symbol,run)=>{const button=document.createElement('button');button.type='button';button.textContent=symbol;button.setAttribute('aria-label',label);button.title=label;button.addEventListener('click',run);toolbar.appendChild(button);};
+      const change=scale=>{zoom=Math.max(.1,Math.min(8,zoom*scale));update();};
+      control('Zoom in','+',()=>change(1.2));control('Zoom out','−',()=>change(1/1.2));control('Rotate image','↻',()=>{rotation=(rotation+90)%360;update();});
+      const fit=()=>{zoom=1;rotation=0;update();surface.scrollTo(0,0);};control('Fit image','⊡',fit);
+      surface.addEventListener('wheel',event=>{event.preventDefault();change(event.deltaY<0?1.2:1/1.2);},{passive:false});
+      surface.addEventListener('dblclick',fit);
+      const pointers=new Map();let pinch=0;
+      surface.addEventListener('pointerdown',event=>{surface.setPointerCapture(event.pointerId);pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});pinch=0;});
+      surface.addEventListener('pointermove',event=>{const before=pointers.get(event.pointerId);if(!before)return;pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});if(pointers.size===2){const [a,b]=[...pointers.values()];const distance=Math.hypot(a.x-b.x,a.y-b.y);if(pinch>0)change(distance/pinch);pinch=distance;}else{surface.scrollLeft-=event.clientX-before.x;surface.scrollTop-=event.clientY-before.y;}});
+      for(const kind of ['pointerup','pointercancel','lostpointercapture'])surface.addEventListener(kind,event=>{pointers.delete(event.pointerId);pinch=0;});
+      player.addEventListener('load',update);
+      // Never mutate observed geometry during ResizeObserver delivery. Only
+      // width or actual viewport changes affect fit; image height changes do not
+      // recursively schedule themselves.
+      let frame=0,lastWidth=-1;
+      const schedule=()=>{if(!frame)frame=requestAnimationFrame(()=>{frame=0;if(entries.get(e.id)===e&&e.localMedia===player)update();});};
+      const observer=new ResizeObserver(()=>{const width=surface.clientWidth;if(width!==lastWidth){lastWidth=width;schedule();}});
+      observer.observe(surface);window.addEventListener('resize',schedule);
+      e.mediaCleanup=()=>{observer.disconnect();window.removeEventListener('resize',schedule);if(frame)cancelAnimationFrame(frame);};
+      player.src=value.path;canvas.appendChild(player);surface.appendChild(canvas);container.append(toolbar,surface);main(e).appendChild(container);e.mediaSurface=container;e.localMedia=player;
+    } else {player.src=value.path;main(e).appendChild(player);e.localMedia=player;}
   }
   function suspend(e) {
     for(const child of entries.values()) if(child.localMedia && contains(e,child.localMedia)) {stopMedia(child,true);child.mediaSuspended=true;}
@@ -233,8 +267,29 @@ function gloryWry(config) {
     } catch(reason) {error=String(reason);}
     post({type:"response",token:command.token,value,error});
   }
+  let clipboardPending=0;
+  async function copyText(e,a) {
+    const complete=outcome=>{if(entries.get(e.id)===e)event(e,{kind:'clipboard',request:a.request,revision:a.revision,outcome});};
+    if(!config.textClipboard||!alive(e)||control(e).disabled||e.clipboardRevision!==a.revision){complete('unavailable');return;}
+    if(clipboardPending>=16||new TextEncoder().encode(a.text).length>65536){complete('failed');return;}
+    clipboardPending++;
+    try {
+      // A temporary plain-text editor avoids HTML interpretation. Restore the
+      // exact original input selection, including UTF-16 surrogate boundaries.
+      const active=document.activeElement;const selection=active&&typeof active.selectionStart==='number'?{start:active.selectionStart,end:active.selectionEnd,direction:active.selectionDirection}:null;
+      const selected=window.getSelection();const ranges=selected?[...Array(selected.rangeCount)].map((_,i)=>selected.getRangeAt(i).cloneRange()):[];
+      const editor=document.createElement('textarea');editor.value=a.text;editor.readOnly=true;editor.style.cssText='position:fixed;left:-10000px;top:0';document.body.appendChild(editor);
+      let written=false;
+      try {editor.select();written=document.execCommand('copy');}catch(_){}finally{editor.value='';editor.remove();if(active?.isConnected){active.focus({preventScroll:true});if(selection)active.setSelectionRange(selection.start,selection.end,selection.direction);}if(!selection&&selected){selected.removeAllRanges();for(const range of ranges)if(range.commonAncestorContainer.isConnected)selected.addRange(range);}}
+      if(written){complete('written');return;}
+      if(!alive(e)||e.clipboardRevision!==a.revision){complete('failed');return;}
+      if(!navigator.clipboard?.writeText){complete('unavailable');return;}
+      try{await navigator.clipboard.writeText(a.text);complete('written');}catch(error){complete(error?.name==='NotAllowedError'?'denied':'failed');}
+    }finally{clipboardPending--;}
+  }
   function action(command) {
     const e=get(command.id),element=main(e),input=control(e),a=command.action;
+    if(a.kind==='copy_text'){copyText(e,a).catch(fault);return;}
     if(!alive(e)) return;
     switch(a.kind) {
       case "focus": input.focus({preventScroll:true});break;
@@ -260,6 +315,7 @@ function gloryWry(config) {
     if(command.op==="css") { document.getElementById("glory-author").textContent=command.value; return; }
     const e=get(command.id);
     switch(command.op) {
+      case "clipboard_source": e.clipboardRevision=command.revision;break;
       case "local_media": {
         stopMedia(e);
         e.mediaConfig=command.value;e.mediaPosition=0;e.mediaSuspended=false;

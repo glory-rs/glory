@@ -2,8 +2,8 @@
 //! No WASM, second reactive runtime, HTML snapshot replacement or VDOM diff.
 #![cfg(not(target_arch = "wasm32"))]
 
-mod protocol;
 mod local_media;
+mod protocol;
 pub use local_media::{LocalMedia, MediaKind};
 #[cfg(all(
     feature = "shell",
@@ -76,6 +76,7 @@ impl Transport {
 }
 struct State {
     local_media: bool,
+    text_clipboard: bool,
     mapper: Mapper,
     transport: Transport,
     nodes: NodeMap<Live>,
@@ -131,6 +132,7 @@ impl Renderer {
         Self(Rc::new(RefCell::new(State {
             mapper: Mapper::new(runtime),
             local_media: false,
+            text_clipboard: false,
             transport: Transport {
                 session: format!("{}.{}", runtime.value(), document),
                 commands: Vec::new(),
@@ -148,6 +150,11 @@ impl Renderer {
             edit_receipts: BTreeMap::new(),
         })))
     }
+    /// Explicit write-only clipboard opt-in, before shell initialization. The platform may still refuse a
+    /// request; completion carries the actual outcome and original revision.
+    pub fn enable_text_clipboard(&self) {
+        self.0.borrow_mut().text_clipboard = true;
+    }
     pub fn session(&self) -> String {
         self.0.borrow().transport.session.clone()
     }
@@ -155,7 +162,7 @@ impl Renderer {
     pub fn initialization_script(&self) -> String {
         format!(
             "({INTERPRETER})({});",
-            json!({"v":protocol::VERSION,"session":self.session(),"maxIpcBytes":protocol::MAX_IPC_BYTES,"maxDeferredBytes":protocol::MAX_PENDING_BYTES})
+            json!({"v":protocol::VERSION,"session":self.session(),"maxIpcBytes":protocol::MAX_IPC_BYTES,"maxDeferredBytes":protocol::MAX_PENDING_BYTES,"textClipboard":self.0.borrow().text_clipboard})
         )
     }
     /// Take at most one ordered batch; the WebView must acknowledge it before
@@ -312,6 +319,13 @@ impl Renderer {
                 if !state.mapper.tree().validate_event(node, &event)? {
                     return Ok(false);
                 }
+                if let Event::Clipboard {
+                    request, revision, ..
+                } = &event
+                    && !state.mapper.finish_clipboard(node, *request, *revision)?
+                {
+                    return Ok(false);
+                }
                 if !state.mapper.tree().active(node) && !event.is_terminal_loss() {
                     return Ok(false);
                 }
@@ -381,7 +395,11 @@ impl Renderer {
 // Refuse host behavior that has not been implemented, before staged UI changes.
 fn preflight(node: DescriptorView<'_>, patch: Option<&Patch>) -> Result<(), Error> {
     glory_html::preflight(node, patch)?;
-    if node.options.get::<glory_html::display::Placement>().is_some() {
+    if node
+        .options
+        .get::<glory_html::display::Placement>()
+        .is_some()
+    {
         return Err(Error::Unsupported("Wry sparse display templates"));
     }
     if node.options.get::<VirtualPart>().is_some() {
@@ -400,7 +418,6 @@ fn preflight(node: DescriptorView<'_>, patch: Option<&Patch>) -> Result<(), Erro
     };
     if let Some(s) = semantics
         && (s.focus_scope.is_some()
-            || s.clipboard.is_some()
             || s.input_edit.is_some()
             || s.translation.is_some()
             || s.collapse.is_some()
@@ -449,6 +466,7 @@ fn supported_event(kind: EventKind) -> bool {
             | EventKind::Keyboard
             | EventKind::Navigate
             | EventKind::ColorSchemeChanged
+            | EventKind::Clipboard
             | EventKind::ImageStatus
     )
 }
@@ -473,6 +491,7 @@ impl Render for Renderer {
             scroll: true,
             focus: true,
             input: true,
+            clipboard_write: self.0.borrow().text_clipboard,
             ..Capabilities::default()
         }
     }
@@ -528,6 +547,28 @@ impl Render for Renderer {
                     inputs,
                 },
             )?;
+            let changed: &[NodeId] = match mutation {
+                Mutation::Create { id, .. } | Mutation::Patch { id, .. } => {
+                    std::slice::from_ref(id)
+                }
+                Mutation::CreatePlan { ids, .. } => ids,
+                _ => &[],
+            };
+            for &id in changed {
+                let revision = state
+                    .mapper
+                    .tree()
+                    .node(id)?
+                    .descriptor
+                    .view()
+                    .semantics
+                    .as_ref()
+                    .and_then(|s| s.clipboard.as_ref())
+                    .map(|s| s.revision);
+                if let Some(revision) = revision {
+                    state.transport.push(json!({"op":"clipboard_source","id":protocol::id(id),"revision":revision.to_string()}))?;
+                }
+            }
         }
         Ok(state.mapper.receipt())
     }
@@ -592,6 +633,24 @@ impl Render for Renderer {
             return Err(Error::Unsupported("Wry inactive action target"));
         }
         let value = match action {
+            Action::CopyText {
+                revision, request, ..
+            } => {
+                if !state.text_clipboard {
+                    return Err(Error::Unsupported(
+                        "Wry text clipboard requires explicit host opt-in",
+                    ));
+                }
+                let text = descriptor
+                    .semantics
+                    .as_ref()
+                    .and_then(|s| s.clipboard.as_ref())
+                    .ok_or(Error::Unsupported("No clipboard source"))?
+                    .text
+                    .clone();
+                state.mapper.admit_clipboard(action)?;
+                json!({"kind":"copy_text","revision":revision.to_string(),"request":request.to_string(),"text":text})
+            }
             Action::Focus(_) => json!({"kind":"focus"}),
             Action::ScrollTo { x, y, .. } => json!({"kind":"scroll","x":x,"y":y}),
             Action::ScrollIntoView(_) => json!({"kind":"reveal"}),
@@ -642,6 +701,21 @@ impl Render for Renderer {
 impl WireEvent {
     fn into_event(self, node: NodeId) -> Result<Event, Error> {
         Ok(match self {
+            Self::Clipboard {
+                request,
+                revision,
+                outcome,
+            } => Event::Clipboard {
+                request: protocol::integer(&request)?,
+                revision: protocol::integer(&revision)?,
+                outcome: match outcome.as_str() {
+                    "written" => ClipboardOutcome::Written,
+                    "denied" => ClipboardOutcome::Denied,
+                    "unavailable" => ClipboardOutcome::Unavailable,
+                    "failed" => ClipboardOutcome::Failed,
+                    _ => return Err(Error::InvalidEvent("Wry clipboard outcome")),
+                },
+            },
             Self::Activate => Event::Activate,
             Self::Value {
                 value,

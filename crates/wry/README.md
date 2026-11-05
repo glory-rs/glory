@@ -40,7 +40,8 @@ repository's approved cache environment before Cargo (on macOS, source
 | Commands | Finite Keyboard/Navigate events on explicitly observed ancestors |
 | Styles | Shared HTML inline profile, raw app CSS, optional validated `css` Sheet replacement |
 | Resources | Explicit immutable `Config::assets` served by exact URL path; no implicit filesystem or remote-network access |
-| Local media | Explicit `Renderer::enable_local_media` and scoped `set_local_media`; native audio/video controls, paused on suspend, revoked on dispose |
+| Local media | Explicit `Renderer::enable_local_media` and scoped `set_local_media`; native audio/video controls and original image zoom/pan/rotate/fit, revoked on suspend/dispose |
+| Text clipboard | Explicit `Renderer::enable_text_clipboard` before shell initialization; write-only, 64 KiB, source revision and single-use request receipts, actual platform outcomes |
 | Range reads | Optional `Config::asset_provider`; four owned workers, queue 16, 1 MiB ranges, 8 MiB full responses, exact capability paths |
 | Web readers | Optional `Config::browser`; 16 isolated HTTP(S) native windows, no application IPC or application resource protocol |
 | Native lifecycle | Optional `Config::native` on the window thread; application-owned tray/close/shutdown integration, absent by default |
@@ -48,7 +49,7 @@ repository's approved cache environment before Cargo (on macOS, source
 
 Raw display/XML templates, structured Select, File, RichEditor, Graphic, virtual collections and advanced
 interaction metadata (layers, focus scopes, motion, drag/swipe, choice/menu/tree
-controllers, forms and clipboard services) currently return `Unsupported`.
+controllers, forms and rich clipboard services) currently return `Unsupported`.
 Checks run in both staged preflight and direct application. They are not silently
 advertised through capabilities. The HTML mapper retains its remount requirement
 for physical tag changes.
