@@ -3,6 +3,54 @@ use glory_render::{
     GraphicAnimation, GraphicPoint, GraphicProps, GraphicStroke, PathCommand, StrokeCap,
 };
 #[test]
+fn finite_pulse_survives_real_stream_lowering_and_end_without_a_frame_controller() {
+    let gate = Gate::default();
+    let loader = gate.clone();
+    let mut stream = stream_with(
+        Resources::default(),
+        Config::default(),
+        move |scope, resources| {
+            let ready = resources
+                .bind(
+                    scope.owner(),
+                    "pulse",
+                    "v1",
+                    || 1u64,
+                    move |_| loader.waiting(),
+                )
+                .unwrap();
+            glory_ui::graphic().drawing(ready.map(|state| GraphicProps {
+                commands: vec![
+                    PathCommand::Move(GraphicPoint::new(4., 4.)),
+                    PathCommand::Line(GraphicPoint::new(20., 20.)),
+                ],
+                animation: matches!(state, ResourceState::Ready { .. }).then_some(
+                    GraphicAnimation::Pulse {
+                        period_millis: 900,
+                        phase_millis: 300,
+                    },
+                ),
+                ..Default::default()
+            }))
+        },
+    )
+    .unwrap();
+    let shell = frame(&mut stream);
+    assert!(!shell.body().contains("data-gly-pulse"));
+    gate.resolve(Ok("ready".into()));
+    let patch = frame(&mut stream);
+    assert_eq!(patch.kind(), FrameKind::Patch);
+    assert!(
+        patch.body().contains("data-gly-pulse")
+            && patch
+                .body()
+                .contains("animation-duration:900ms;animation-delay:-300ms;")
+            && patch.body().contains("\"part\":\"content\"")
+    );
+    assert!(!patch.body().contains("replace"));
+    assert_eq!(frame(&mut stream).kind(), FrameKind::End);
+}
+#[test]
 fn finite_rotation_survives_stream_content_attribute_patch_and_end() {
     let gate = Gate::default();
     let loader = gate.clone();

@@ -501,6 +501,10 @@ impl Descriptor {
             self.semantics.as_ref().and_then(|s| s.swipe_capture),
             next.semantics.as_ref().and_then(|s| s.swipe_capture),
         )?;
+        crate::presence::revision(
+            self.semantics.as_ref().and_then(|s| s.presence.as_deref()),
+            next.semantics.as_ref().and_then(|s| s.presence.as_deref()),
+        )?;
         crate::collapse::revision(
             self.semantics.as_ref().and_then(|s| s.collapse.as_ref()),
             next.semantics.as_ref().and_then(|s| s.collapse.as_ref()),

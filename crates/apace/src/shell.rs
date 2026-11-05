@@ -458,7 +458,9 @@ impl EventHandler for Events {
                 })
             });
         if let Some(node) = node {
-            if choice::prevent_pointer_focus(&state, node, &event.data) {
+            if choice::prevent_pointer_focus(&state, node, &event.data)
+                || menu::prevent_pointer_focus(&state, node, &event.data)
+            {
                 event_state.prevent_default();
             }
             choice::pointer(&mut state, node, self.previous_hover, &event.data);
@@ -663,7 +665,9 @@ impl EventHandler for Events {
                         event: Event::Activate,
                     });
                     if state.mapper.tree().enabled(target) && state.mapper.tree().active(target) {
-                        let _ = state.focus(target);
+                        if !menu::preserve_search_focus(&state, target) {
+                            let _ = state.focus(target);
+                        }
                         if state.mapper.tree().node(target).is_ok_and(|n| {
                             matches!(n.descriptor.view().props, glory_render::Props::Check(_))
                                 && !n.descriptor.view().readonly()
@@ -682,7 +686,9 @@ impl EventHandler for Events {
                 }
                 if radio::is_radio(&state, node) {
                     event_state.prevent_default();
-                    let _ = state.focus(node);
+                    if !menu::preserve_search_focus(&state, node) {
+                        let _ = state.focus(node);
+                    }
                     activate_control(&mut state, node);
                     return;
                 }
@@ -694,13 +700,15 @@ impl EventHandler for Events {
                     // and clears focus. Keep the actual intrinsic control as
                     // the pointer focus/return target, including visual slots.
                     event_state.prevent_default();
-                    if !state.mapper.tree().node(button).is_ok_and(|node| {
-                        node.descriptor
-                            .view()
-                            .semantics
-                            .as_ref()
-                            .is_some_and(|s| s.option.is_some())
-                    }) {
+                    if !menu::preserve_search_focus(&state, button)
+                        && !state.mapper.tree().node(button).is_ok_and(|node| {
+                            node.descriptor
+                                .view()
+                                .semantics
+                                .as_ref()
+                                .is_some_and(|s| s.option.is_some())
+                        })
+                    {
                         let _ = state.focus(button);
                     }
                 }
@@ -1930,6 +1938,17 @@ impl Shell {
         }
         for view in self.inner.windows.values_mut() {
             prepare(view);
+            let presence_running = view
+                .downcast_doc_mut::<WindowApp>()
+                .renderer
+                .0
+                .borrow()
+                .dom
+                .presences
+                .running();
+            if presence_running {
+                view.request_redraw();
+            }
             if let Some(error) = view.renderer.error.take() {
                 self.error.borrow_mut().get_or_insert(error);
             }

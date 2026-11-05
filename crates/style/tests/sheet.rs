@@ -5,6 +5,59 @@ use glory_style::{
 };
 
 #[test]
+fn caption_and_border_keywords_keep_order_and_reject_each_original_unsupported_value() {
+    use glory_style::{BorderStyle, CaptionSide, Value};
+    let sheet = Sheet::parse(
+        ".a{caption-side:top;caption-side:bottom;border-style:dashed;border-style:dotted}",
+    )
+    .unwrap();
+    let declarations = sheet.rules()[0].declarations();
+    assert_eq!(declarations[0].style().caption_side, Some(CaptionSide::Top));
+    assert_eq!(
+        declarations[1].style().caption_side,
+        Some(CaptionSide::Bottom)
+    );
+    assert_eq!(
+        declarations[2].style().border_style,
+        Some(BorderStyle::Dashed)
+    );
+    assert_eq!(
+        declarations[3].style().border_style,
+        Some(BorderStyle::Dotted)
+    );
+    for value in [
+        Value::CaptionTop,
+        Value::CaptionBottom,
+        Value::BorderDashed,
+        Value::BorderDotted,
+    ] {
+        assert!(
+            sheet
+                .check(Profile {
+                    inline: Support::ALL.without_value(value),
+                    ..Profile::HTML
+                })
+                .is_err()
+        );
+    }
+    assert!(
+        sheet
+            .check(Profile {
+                inline: Support::ALL.without_property(Property::CaptionSide),
+                ..Profile::HTML
+            })
+            .is_err()
+    );
+    for bad in [
+        "caption-side:left",
+        "caption-side:block-start",
+        "border-style:double",
+    ] {
+        assert!(Sheet::parse(&format!(".a{{{bad}}}")).is_err());
+    }
+}
+
+#[test]
 fn selectors_keep_combinators_specificity_escapes_and_declaration_order() {
     let sheet = Sheet::parse(
         "/* comment */ .pane.hot > .row:hover, .a/**/.b .c:FOCUS { width: 20px; WIDTH: 50%; margin: -1px 2px 3px; color:#3a7f; max-width:none }",
@@ -94,7 +147,7 @@ fn unsupported_input_never_returns_a_partly_accepted_sheet() {
         ".a{font-weight:bolder}",
         ".a{white-space:break-spaces}",
         ".a{border-width:-1px}",
-        ".a{border-style:dotted}",
+        ".a{border-style:double}",
         ".a{border-radius:1px 2px}",
         ".a{border-radius:1%}",
         ".a{border-radius:-1px}",
@@ -126,7 +179,7 @@ fn profile_rejection_uses_each_original_declaration_not_the_final_winner() {
 #[test]
 fn every_typed_property_has_a_valid_finite_text_representation() {
     let css = ".all{position:relative;top:-2px;left:3%;display:flex;flex-direction:row;width:20px;height:30%;min-width:0;min-height:auto;max-width:none;max-height:100%;gap:2px;padding:1px 2px 3px 4px;margin:-1px;flex-grow:.5;flex-shrink:2;align-items:center;justify-content:space-between;overflow-x:auto;overflow-y:hidden;overflow-anchor:none;color:#123;background-color:transparent;background-image:linear-gradient(90deg,transparent,#228be6ff);font-size:16px;line-height:20px}";
-    let css = css.replace("line-height:20px", "line-height:20px;font-family:system-ui;font-weight:450.5;white-space:pre-wrap;border-width:1px 2px;border-color:#123;border-style:solid;border-radius:4px;opacity:.5");
+    let css = css.replace("line-height:20px", "line-height:20px;font-family:system-ui;font-weight:450.5;white-space:pre-wrap;border-width:1px 2px;border-color:#123;border-style:solid;caption-side:bottom;border-radius:4px;opacity:.5");
     let css = css.replace("line-height:20px", "line-height:20px;field-sizing:content");
     let css = css.replace("font-size:16px", "font-size:16px;letter-spacing:2px;line-clamp:3;text-gradient:linear-gradient(45deg,#ff0000,#0000ff)");
     let css = css.replace(

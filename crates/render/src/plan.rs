@@ -285,6 +285,7 @@ pub(crate) fn validate_context<'a>(
                     || s.popup.is_some()
                     || s.expanded.is_some()
                     || s.menu_item.is_some()
+                    || s.menu_search.is_some()
                     || s.form_action.is_some()
                     || s.swipe_capture.is_some()
             }))

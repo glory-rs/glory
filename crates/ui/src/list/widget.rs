@@ -735,7 +735,7 @@ impl<K: Clone + Eq + Hash + 'static> Widget for List<K> {
                     if data_changed && let Some(old) = anchor {
                         let located = old_key
                             .as_ref()
-                            .map(&resolve)
+                            .map(resolve)
                             .transpose()
                             .map_err(UiError::List)?
                             .flatten();

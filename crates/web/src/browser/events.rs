@@ -458,11 +458,29 @@ fn receive(dom: &Rc<Dom>, name: &str, event: web_sys::Event) -> Result<(), glory
         event.prevent_default();
         return Ok(());
     }
+    let menu_search_pointer = if name == "pointerdown" || name == "click" {
+        if let Some(editor) = dom.document.active_element()
+            && editor.has_attribute("data-gly-menu-search")
+            && (element
+                .closest("[data-gly-menu-item]")
+                .map_err(backend)?
+                .is_some()
+                || entry.control()?.has_attribute("data-gly-menu-item"))
+        {
+            let owner = editor.closest("[role=menu]").map_err(backend)?;
+            owner.is_some() && owner == element.closest("[role=menu]").map_err(backend)?
+        } else {
+            false
+        }
+    } else {
+        false
+    };
     if name == "pointerdown"
-        && element
-            .closest("[data-gly-option-owner],[data-gly-menubar-item]")
-            .map_err(backend)?
-            .is_some()
+        && (menu_search_pointer
+            || element
+                .closest("[data-gly-option-owner],[data-gly-menubar-item]")
+                .map_err(backend)?
+                .is_some())
         && let Some(pointer) = event.dyn_ref::<web_sys::PointerEvent>()
         && pointer.is_primary()
         && pointer.button() == 0
@@ -509,6 +527,19 @@ fn receive(dom: &Rc<Dom>, name: &str, event: web_sys::Event) -> Result<(), glory
             // Label default activation dispatches a second click to its input.
             // Only that control click represents checkbox activation.
             if entry.edit == EditKind::Check && entry.control()? != element {
+                if menu_search_pointer {
+                    // A label's click default can focus its check even after a
+                    // cancelled pointerdown. Perform the intrinsic activation
+                    // without that label focus default; listeners only enqueue.
+                    event.prevent_default();
+                    entry
+                        .control()?
+                        .dyn_into::<web_sys::HtmlElement>()
+                        .map_err(|_| {
+                            glory_render::Error::Unsupported("menu search check activation")
+                        })?
+                        .click();
+                }
                 return Ok(());
             }
             let mut ancestor = Some(element.clone());
@@ -917,6 +948,30 @@ fn receive(dom: &Rc<Dom>, name: &str, event: web_sys::Event) -> Result<(), glory
                     return Ok(());
                 }
             }
+            // Search editors consume only their declared menu commands before
+            // the ordinary text-editor fast path returns. Other editing keys
+            // keep the browser's native caret, selection and IME behavior.
+            if element.has_attribute("data-gly-menu-search")
+                && let Some(root) = element.closest("[role=menu]").map_err(backend)?
+                && target(dom, &root)
+                    .and_then(|(id, _)| dom.entry(id).ok())
+                    .is_some_and(|entry| entry.interests.borrow().contains(&EventKind::Menu))
+                && let Some(command) = (KeyboardInput {
+                    key: &key.key(),
+                    control: key.ctrl_key(),
+                    meta: key.meta_key(),
+                    alt: key.alt_key(),
+                    shift: key.shift_key(),
+                    repeat: key.repeat(),
+                    composing: false,
+                    editable,
+                })
+                .menu_search()
+            {
+                event.prevent_default();
+                dom.queue(id, Event::Menu { from: id, command });
+                return Ok(());
+            }
             let command = KeyboardInput {
                 key: &key.key(),
                 control: key.ctrl_key(),
@@ -1098,19 +1153,18 @@ fn receive(dom: &Rc<Dom>, name: &str, event: web_sys::Event) -> Result<(), glory
                         .and_then(|(id, _)| dom.entry(id).ok())
                         .is_some_and(|entry| entry.interests.borrow().contains(&EventKind::Menu))
                 };
-                if interested
-                    && let Some(command) = (KeyboardInput {
-                        key: &key.key(),
-                        control: key.ctrl_key(),
-                        meta: key.meta_key(),
-                        alt: key.alt_key(),
-                        shift: key.shift_key(),
-                        repeat: key.repeat(),
-                        composing: false,
-                        editable,
-                    })
-                    .menu(direction, menu_trigger)
-                {
+                let keyboard = KeyboardInput {
+                    key: &key.key(),
+                    control: key.ctrl_key(),
+                    meta: key.meta_key(),
+                    alt: key.alt_key(),
+                    shift: key.shift_key(),
+                    repeat: key.repeat(),
+                    composing: false,
+                    editable,
+                };
+                let command = keyboard.menu(direction, menu_trigger);
+                if interested && let Some(command) = command {
                     event.prevent_default();
                     dom.queue(id, Event::Menu { from: id, command });
                     return Ok(());

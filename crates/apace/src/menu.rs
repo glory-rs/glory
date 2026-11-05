@@ -96,9 +96,21 @@ pub(super) fn key(
         .map(|s| s.navigation_direction)
         .unwrap_or_default();
     let observer = if trigger { Some(origin) } else { root };
+    let command = if d
+        .semantics
+        .as_ref()
+        .is_some_and(|s| s.menu_search.is_some())
+    {
+        if state.mapper.tree().menu_search_owner(origin).ok().flatten() != root {
+            return false;
+        }
+        input.menu_search()
+    } else {
+        input.menu(direction, trigger)
+    };
     if let Some(observer) = observer
         && state.subscriptions.contains(&(observer, EventKind::Menu))
-        && let Some(command) = input.menu(direction, trigger)
+        && let Some(command) = command
     {
         state.inputs.push(Input::Event {
             node: origin,
@@ -108,6 +120,47 @@ pub(super) fn key(
             },
         });
         return true;
+    }
+    false
+}
+
+pub(super) fn prevent_pointer_focus(state: &State, origin: NodeId, event: &DomEventData) -> bool {
+    if !matches!(event, DomEventData::PointerDown(pointer)
+        if pointer.is_primary && pointer.button == apace_traits::events::MouseEventButton::Main)
+    {
+        return false;
+    }
+    preserve_search_focus(state, origin)
+}
+
+pub(super) fn preserve_search_focus(state: &State, origin: NodeId) -> bool {
+    let Some(owner) = state
+        .focused
+        .and_then(|input| state.mapper.tree().menu_search_owner(input).ok().flatten())
+    else {
+        return false;
+    };
+    if nearest(state, origin, Role::Menu) != Some(owner) {
+        return false;
+    }
+    let mut cursor = Some(origin);
+    while let Some(id) = cursor {
+        let Ok(node) = state.mapper.tree().node(id) else {
+            return false;
+        };
+        if node
+            .descriptor
+            .view()
+            .semantics
+            .as_ref()
+            .is_some_and(|s| s.menu_item.is_some())
+        {
+            return true;
+        }
+        if id == owner {
+            break;
+        }
+        cursor = node.parent;
     }
     false
 }

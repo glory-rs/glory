@@ -27,7 +27,10 @@ pub enum Length {
     Ch(f64),
     /// A finite sum of font-relative zero-glyph advances and CSS pixels.
     /// Dimensions require nonnegative coefficients; insets may be signed.
-    ChPx { ch: f64, px: f64 },
+    ChPx {
+        ch: f64,
+        px: f64,
+    },
 }
 
 impl Length {
@@ -266,6 +269,16 @@ pub enum BorderStyle {
     #[default]
     None,
     Solid,
+    Dashed,
+    Dotted,
+}
+
+/// Physical placement of a table caption in the table formatting context.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum CaptionSide {
+    #[default]
+    Top,
+    Bottom,
 }
 
 /// Intrinsic control sizing. Content sizing requires host support; native
@@ -344,9 +357,14 @@ pub struct Style {
     /// Group opacity in [0, 1], applied by the engine after compositing children.
     pub opacity: Option<f64>,
     pub box_shadow: Option<BoxShadow>,
+    pub caption_side: Option<CaptionSide>,
 }
 
 impl Style {
+    pub fn caption_side(mut self, side: CaptionSide) -> Self {
+        self.caption_side = Some(side);
+        self
+    }
     pub fn pointer_events(mut self, value: PointerEvents) -> Self {
         self.pointer_events = Some(value);
         self

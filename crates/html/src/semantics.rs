@@ -273,6 +273,53 @@ pub(crate) fn attributes(
             attrs.insert("inputmode", mode.as_str().into());
         }
     }
+    if let Some(presence) = &value.presence {
+        let style = presence.effect.style(presence.distance);
+        attrs.insert(
+            "data-gly-presence-opacity",
+            (f64::from(style.opacity) / 1000.).to_string(),
+        );
+        attrs.insert(
+            "data-gly-presence-scale-x",
+            (f64::from(style.scale_x) / 1000.).to_string(),
+        );
+        attrs.insert(
+            "data-gly-presence-scale-y",
+            (f64::from(style.scale_y) / 1000.).to_string(),
+        );
+        attrs.insert("data-gly-presence-x", format!("{}px", style.translate_x));
+        attrs.insert("data-gly-presence-y", format!("{}px", style.translate_y));
+        attrs.insert("data-gly-presence-rotate", format!("{}deg", style.rotate));
+        attrs.insert("data-gly-presence-skew-x", format!("{}deg", style.skew_x));
+        attrs.insert("data-gly-presence-skew-y", format!("{}deg", style.skew_y));
+        attrs.insert("data-gly-presence-origin-x", format!("{}%", style.origin_x));
+        attrs.insert("data-gly-presence-origin-y", format!("{}%", style.origin_y));
+        attrs.insert(
+            "data-gly-presence",
+            if presence.open { "open" } else { "closed" }.into(),
+        );
+        attrs.insert("data-gly-presence-effect", presence.effect.as_str().into());
+        attrs.insert("data-gly-presence-timing", presence.timing.as_str().into());
+        attrs.insert(
+            "data-gly-presence-duration",
+            format!("{}ms", presence.duration_millis),
+        );
+        attrs.insert(
+            "data-gly-presence-delay",
+            format!("{}ms", presence.delay_millis),
+        );
+        attrs.insert(
+            "data-gly-presence-distance",
+            format!("{}px", presence.distance),
+        );
+        attrs.insert("data-gly-presence-revision", presence.revision.to_string());
+        if presence.appear {
+            attrs.insert("data-gly-presence-appear", String::new());
+        }
+        if !presence.open {
+            attrs.insert("aria-hidden", "true".into());
+        }
+    }
     if let Some(collapse) = value.collapse {
         attrs.insert(
             "data-gly-collapse",
@@ -292,6 +339,9 @@ pub(crate) fn attributes(
     }
     if let Some(policy) = value.tags_input {
         attrs.insert("data-gly-tags", policy.as_str().into());
+    }
+    if let Some(owner) = &value.menu_search {
+        attrs.insert("data-gly-menu-search", owner.as_str().into());
     }
     if value.inert {
         attrs.insert("inert", String::new());
@@ -566,7 +616,7 @@ pub(crate) fn attributes(
         attrs.insert("data-gly-pressed", String::new());
     }
     if value.hidden {
-        if value.collapse.is_none() {
+        if value.collapse.is_none() && value.presence.is_none() {
             attrs.insert("hidden", String::new());
         }
         attrs.insert("data-gly-hidden", String::new());

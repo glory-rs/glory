@@ -52,7 +52,6 @@ fn finite_anchor_policy_fields_survive_classic_patch_and_versioned_start_end() {
                                             offset: 14.,
                                             position: glory_render::AnchorArrowPosition::Side,
                                         }),
-                                        ..AnchorPlacement::default()
                                     }
                                 } else {
                                     AnchorPlacement::default()

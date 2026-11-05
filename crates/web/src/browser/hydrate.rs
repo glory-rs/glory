@@ -62,7 +62,7 @@ struct Plan {
     inputs: Vec<Input>,
     check_repairs: Vec<(Element, bool)>,
     select_repairs: Vec<(Element, Vec<String>)>,
-    collapse_revisions: Vec<(Element, String)>,
+    collapse_revisions: Vec<(Element, String, String)>,
     file_adoptions: Vec<NodeId>,
     rich_repairs: Vec<(Element, Rc<glory_render::RichDocument>)>,
 }
@@ -524,7 +524,11 @@ impl Validator<'_> {
                     return Err(mismatch(Some(key), "unexpected attributes"));
                 }
                 for (name, expected) in attributes {
-                    if *name == "data-gly-collapse-revision" && part == Part::Main {
+                    if matches!(
+                        *name,
+                        "data-gly-collapse-revision" | "data-gly-presence-revision"
+                    ) && part == Part::Main
+                    {
                         let actual = element
                             .get_attribute(name)
                             .ok_or_else(|| mismatch(Some(key), "collapse revision"))?;
@@ -537,9 +541,11 @@ impl Validator<'_> {
                         // lifetime. Validate the server counter, then defer its
                         // reset until the entire subtree has validated.
                         if parsed.to_string() != *expected {
-                            self.plan
-                                .collapse_revisions
-                                .push((element.clone(), expected.clone()));
+                            self.plan.collapse_revisions.push((
+                                element.clone(),
+                                (*name).to_owned(),
+                                expected.clone(),
+                            ));
                         }
                         continue;
                     }
@@ -691,9 +697,9 @@ pub fn hydrate_with<W: Widget>(root: Element, factory: impl FnOnce(&Scope) -> W)
     // Validation is complete. Only now create missing empty slots and attach
     // runtime metadata; no initial value setter or element move is replayed.
     *dom.root_end.borrow_mut() = Some(end);
-    for (element, revision) in plan.collapse_revisions {
+    for (element, attribute, revision) in plan.collapse_revisions {
         element
-            .set_attribute("data-gly-collapse-revision", &revision)
+            .set_attribute(&attribute, &revision)
             .map_err(backend)?;
     }
     for (control, checked) in plan.check_repairs {

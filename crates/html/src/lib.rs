@@ -30,6 +30,8 @@ mod menubar_tests;
 mod patch_tests;
 #[cfg(test)]
 mod placeholder_tests;
+#[cfg(test)]
+mod presence_tests;
 mod semantics;
 #[cfg(test)]
 mod semantics_tests;
@@ -56,7 +58,7 @@ use std::collections::{BTreeMap, HashMap};
 pub use mapping::{preflight, shape, shape_in};
 pub use serialize::{escape, rich_document, select_options, serialize};
 pub use styles::style;
-pub const FORMAT_VERSION: u32 = 17;
+pub const FORMAT_VERSION: u32 = 19;
 /// Namespace is determined solely by the mapper's finite element vocabulary.
 pub fn element_namespace(tag: &str) -> &'static str {
     if matches!(tag, "svg" | "path") {
@@ -73,6 +75,9 @@ pub const BASE_CSS: &str = concat!(
     "@keyframes gly-rotate{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}",
     "[data-gly-rotate]{animation-name:gly-rotate;animation-timing-function:linear;animation-iteration-count:infinite;transform-box:view-box;transform-origin:50% 50%}",
     "@media(prefers-reduced-motion:reduce){[data-gly-rotate]{animation-name:none;transform:none}}",
+    "@keyframes gly-pulse{0%,100%{opacity:.25}50%{opacity:1}}",
+    "[data-gly-pulse]{animation-name:gly-pulse;animation-timing-function:linear;animation-iteration-count:infinite}",
+    "@media(prefers-reduced-motion:reduce){[data-gly-pulse]{animation-name:none;opacity:1}}",
     "[data-gly-swipe-axis=horizontal]{touch-action:pan-y pinch-zoom;user-select:none}[data-gly-swipe-axis=vertical]{touch-action:pan-x pinch-zoom;user-select:none}",
     "[data-gly-splitter],[data-gly-slider],[data-gly-sheet-grip],[data-gly-drag-capture]{touch-action:none}",
     "[data-gly-splitter]{user-select:none}",
@@ -106,7 +111,13 @@ pub const BASE_CSS: &str = concat!(
     "[data-gly-layer=bottom]{left:0;bottom:0;width:100vw;max-width:100vw}",
     "[data-gly-layer=anchor],[data-gly-layer=context-point],[data-gly-layer=viewport]{left:var(--gly-layer-x,12px);top:var(--gly-layer-y,12px)}",
     "[data-gly-layer][aria-modal=true]::backdrop{background:rgba(0,0,0,.35)}",
-    "[data-gly-hidden]:not([data-gly-collapse]){display:none!important}",
+    "[data-gly-hidden]:not([data-gly-collapse]):not([data-gly-presence]){display:none!important}",
+    "[data-gly-presence]{--gly-presence-transform:translate(attr(data-gly-presence-x type(<length>),0px),attr(data-gly-presence-y type(<length>),0px)) scale(attr(data-gly-presence-scale-x type(<number>),1),attr(data-gly-presence-scale-y type(<number>),1)) rotate(attr(data-gly-presence-rotate type(<angle>),0deg)) skew(attr(data-gly-presence-skew-x type(<angle>),0deg),attr(data-gly-presence-skew-y type(<angle>),0deg));opacity:1;transform:none;transform-origin:attr(data-gly-presence-origin-x type(<percentage>),50%) attr(data-gly-presence-origin-y type(<percentage>),50%);transition:opacity attr(data-gly-presence-duration type(<time>),0ms) ease attr(data-gly-presence-delay type(<time>),0ms),transform attr(data-gly-presence-duration type(<time>),0ms) ease attr(data-gly-presence-delay type(<time>),0ms),display attr(data-gly-presence-duration type(<time>),0ms) allow-discrete attr(data-gly-presence-delay type(<time>),0ms)}",
+    "[data-gly-presence-timing=linear]{transition-timing-function:linear}[data-gly-presence-timing=ease-in]{transition-timing-function:ease-in}[data-gly-presence-timing=ease-out]{transition-timing-function:ease-out}[data-gly-presence-timing=ease-in-out]{transition-timing-function:ease-in-out}",
+    "[data-gly-presence=closed]{display:none;opacity:attr(data-gly-presence-opacity type(<number>),0);transform:var(--gly-presence-transform);pointer-events:none}",
+    "@starting-style{[data-gly-presence=open][data-gly-presence-appear],[data-gly-presence=open]:not([data-gly-presence-revision=\"0\"]){opacity:attr(data-gly-presence-opacity type(<number>),0);transform:var(--gly-presence-transform)}}",
+    "[data-gly-presence-settled],[data-gly-presence-duration=\"0ms\"],[data-gly-presence-effect=none],[data-gly-app][data-gly-presence-static] [data-gly-presence]{transition:none!important}",
+    "@media(prefers-reduced-motion:reduce){[data-gly-presence]{transition:none!important}}",
     "[data-gly-collapse]{interpolate-size:allow-keywords;overflow:hidden!important;transition:height attr(data-gly-collapse-duration type(<time>),0ms) linear}",
     "[data-gly-collapse=open]{height:auto!important}",
     "[data-gly-collapse=closed]{height:0!important}",

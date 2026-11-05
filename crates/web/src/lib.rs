@@ -27,6 +27,17 @@ pub use browser::*;
 #[cfg(feature = "stream")]
 pub const STREAM_SCRIPT: &str = include_str!("stream.js");
 
+#[cfg(all(test, feature = "stream"))]
+#[test]
+fn stream_script_accepts_the_current_html_format_at_start_and_end() {
+    for envelope in ["initial", "frame"] {
+        assert!(STREAM_SCRIPT.contains(&format!(
+            "{envelope}.html_version !== {} ||",
+            glory_html::FORMAT_VERSION
+        )));
+    }
+}
+
 /// Read a snapshot without modifying/consuming the data block. A failed
 /// hydration can create a fresh Resources context from the same payload.
 #[cfg(all(target_arch = "wasm32", feature = "resources"))]

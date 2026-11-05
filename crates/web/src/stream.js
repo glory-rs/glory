@@ -138,7 +138,7 @@
     class Controller {
       constructor(root, initial) {
         if (!(root instanceof Element) || root.namespaceURI !== 'http://www.w3.org/1999/xhtml' || !root.isConnected || controllers.has(root) || root.hasAttribute('data-gly-app') || !root.hasAttribute('data-gly-stream-pending')) fail('root already claimed or unavailable');
-        if (initial.version !== 2 || initial.html_version !== 14 || initial.kind !== 'start' || initial.sequence !== 0 || !Array.isArray(initial.nodes) || initial.nodes.length > MAX_NODES) fail('start envelope');
+        if (initial.version !== 2 || initial.html_version !== 19 || initial.kind !== 'start' || initial.sequence !== 0 || !Array.isArray(initial.nodes) || initial.nodes.length > MAX_NODES) fail('start envelope');
         if (typeof initial.data_id !== 'string' || !initial.data_id || initial.data_id === root.id) fail('data id');
         this.root = root; this.dataId = initial.data_id; this.entries = new Map(); this.layers = new Set(); this.composing = new Set(); this.sequence = 1; this.phase = 'active'; this.peak = 0;
         this.translations = new Map(); this.translationFrame = null; this.translationMedia = null;
@@ -590,7 +590,7 @@
         this.root.dispatchEvent(new CustomEvent('glory:stream-patch', { detail: { sequence: frame.sequence, nodes: this.entries.size } }));
       }
       validateEnd(frame) {
-        if (frame.html_version !== 14 || !Array.isArray(frame.rekey) || frame.rekey.length !== this.entries.size) fail('end keys/version');
+        if (frame.html_version !== 19 || !Array.isArray(frame.rekey) || frame.rekey.length !== this.entries.size) fail('end keys/version');
         const old = new Set(), next = new Set();
         for (const pair of frame.rekey) { if (!Array.isArray(pair) || pair.length !== 2 || old.has(key(pair[0])) || next.has(key(pair[1])) || !this.entries.has(pair[0])) fail('rekey'); old.add(pair[0]); next.add(pair[1]); }
         if (document.getElementById(this.dataId) || !frame.resources || frame.resources.version !== 1 || !Array.isArray(frame.resources.records) || frame.resources.records.length > 4096) fail('resource envelope/data id');

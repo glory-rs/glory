@@ -13,13 +13,17 @@ pub use anchor::{
 mod node_map;
 pub use node_map::NodeMap;
 mod collapse;
+mod presence;
+pub use presence::{
+    MAX_PRESENCE_MILLIS, PresenceConfig, PresenceEffect, PresenceStyle, PresenceTiming,
+};
 mod document;
 pub use collapse::{CollapseConfig, MAX_COLLAPSE_MILLIS};
 mod graphic;
 mod graphic_transition;
 pub use graphic::{
-    GraphicPoint, GraphicProps, GraphicStroke, MAX_GRAPHIC_COMMANDS, MAX_GRAPHIC_COORDINATE,
-    PathCommand, StrokeCap,
+    GraphicFit, GraphicPoint, GraphicProps, GraphicStroke, MAX_GRAPHIC_COMMANDS,
+    MAX_GRAPHIC_COORDINATE, PathCommand, StrokeCap,
 };
 pub use graphic_transition::GraphicTransition;
 mod choice;
@@ -196,6 +200,10 @@ pub struct Capabilities {
     pub input: bool,
     /// Emits a terminal observation for each finite collapse configuration.
     pub collapse_completion: bool,
+    /// Host supplies revisioned presence completion; static renderers settle in the component.
+    pub presence_completion: bool,
+    /// Transform presence effects in addition to fade/none.
+    pub presence_transforms: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -640,6 +648,9 @@ pub enum Event {
     CollapseComplete {
         revision: u64,
     },
+    PresenceComplete {
+        revision: u64,
+    },
     ContextMenu {
         from: NodeId,
         point: ContextPoint,
@@ -818,6 +829,7 @@ pub enum EventKind {
     GridNavigate,
     InputEdit,
     CollapseComplete,
+    PresenceComplete,
     ContextMenu,
     Tags,
     Sheet,
@@ -936,6 +948,17 @@ impl EventKind {
         {
             return Err(Error::Unsupported(
                 "InputEdit requires an opted-in single-line Input",
+            ));
+        }
+        if self == Self::PresenceComplete
+            && (!matches!(node.props, Props::View)
+                || !node
+                    .semantics
+                    .as_ref()
+                    .is_some_and(|s| s.presence.is_some()))
+        {
+            return Err(Error::InvalidProps(
+                "presence completion requires a presence View",
             ));
         }
         if self == Self::CollapseComplete
@@ -1110,6 +1133,7 @@ impl Event {
             self,
             Self::Clipboard { .. }
                 | Self::CollapseComplete { .. }
+                | Self::PresenceComplete { .. }
                 | Self::FocusChanged(false)
                 | Self::Composition { active: false }
                 | Self::FocusWithin { focused: false, .. }
@@ -1298,6 +1322,21 @@ impl Event {
                 return Err(Error::InputRevision {
                     current: input.revision,
                     incoming: edit.revision(),
+                });
+            }
+        }
+        if let Self::PresenceComplete { revision } = self {
+            let config = node
+                .semantics
+                .as_ref()
+                .and_then(|s| s.presence.as_ref())
+                .ok_or(Error::InvalidEvent(
+                    "presence completion requires a presence View",
+                ))?;
+            if *revision > config.revision {
+                return Err(Error::PresenceRevision {
+                    current: config.revision,
+                    incoming: *revision,
                 });
             }
         }
@@ -1495,13 +1534,41 @@ impl Event {
                 }
                 if matches!(self, Self::Menu { .. })
                     && node.role != Some(Role::Menu)
-                    && !node
-                        .semantics
-                        .as_ref()
-                        .is_some_and(|s| s.menu_item.is_some() || s.popup == Some(PopupKind::Menu))
+                    && !node.semantics.as_ref().is_some_and(|s| {
+                        s.menu_item.is_some()
+                            || s.menu_search.is_some()
+                            || s.popup == Some(PopupKind::Menu)
+                    })
                 {
                     return Err(Error::InvalidEvent(
                         "menu command requires a menu or menu trigger/item",
+                    ));
+                }
+                if matches!(
+                    self,
+                    Self::Menu {
+                        command: MenuCommand::SearchNext
+                            | MenuCommand::SearchPrevious
+                            | MenuCommand::SearchCommit,
+                        ..
+                    }
+                ) && node
+                    .semantics
+                    .as_ref()
+                    .is_none_or(|s| s.menu_search.is_none())
+                {
+                    return Err(Error::InvalidEvent(
+                        "search commands require a declared menu search editor",
+                    ));
+                }
+                if node
+                    .semantics
+                    .as_ref()
+                    .is_some_and(|s| s.menu_search.is_some())
+                    && matches!(self, Self::Menu { command, .. } if !matches!(command, MenuCommand::SearchNext | MenuCommand::SearchPrevious | MenuCommand::SearchCommit | MenuCommand::Exit { .. }))
+                {
+                    return Err(Error::InvalidEvent(
+                        "menu search editors accept search navigation and exit commands only",
                     ));
                 }
                 if let Self::Pointer {
@@ -1663,6 +1730,7 @@ impl Event {
             Self::GridNavigate { .. } => EventKind::GridNavigate,
             Self::InputEdit(_) => EventKind::InputEdit,
             Self::CollapseComplete { .. } => EventKind::CollapseComplete,
+            Self::PresenceComplete { .. } => EventKind::PresenceComplete,
             Self::ContextMenu { .. } => EventKind::ContextMenu,
             Self::Tags { .. } => EventKind::Tags,
             Self::Spin { .. } => EventKind::Spin,
@@ -1767,6 +1835,11 @@ pub enum Error {
         incoming: u64,
     },
     CollapseRevisionExhausted,
+    PresenceRevision {
+        current: u64,
+        incoming: u64,
+    },
+    PresenceRevisionExhausted,
 }
 
 impl std::fmt::Display for Error {

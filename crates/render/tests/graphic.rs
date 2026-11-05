@@ -45,6 +45,13 @@ fn raw_and_prepared_graphic_validation_have_identical_rollback() {
             ..drawing()
         },
         GraphicProps {
+            animation: Some(GraphicAnimation::Pulse {
+                period_millis: 1000,
+                phase_millis: 1000,
+            }),
+            ..drawing()
+        },
+        GraphicProps {
             commands: vec![PathCommand::Close],
             ..drawing()
         },

@@ -386,6 +386,7 @@ fn preflight(node: DescriptorView<'_>, patch: Option<&Patch>) -> Result<(), Erro
             || s.input_edit.is_some()
             || s.translation.is_some()
             || s.collapse.is_some()
+            || s.presence.is_some()
             || s.drag_capture.is_some()
             || s.swipe_capture.is_some()
             || s.context_menu.is_some()
@@ -397,6 +398,7 @@ fn preflight(node: DescriptorView<'_>, patch: Option<&Patch>) -> Result<(), Erro
             || s.combobox.is_some()
             || s.option.is_some()
             || s.menu_item.is_some()
+            || s.menu_search.is_some()
             || s.menubar_item
             || s.layer.is_some()
             || s.sheet_grip

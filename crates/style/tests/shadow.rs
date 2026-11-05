@@ -88,7 +88,7 @@ fn shadow_property_and_each_value_and_px_unit_are_rejected_independently() {
             .check(&Style::new().box_shadow(BoxShadow::None))
             .is_ok()
     );
-    assert_eq!((Profile::HTML.version, Profile::RECORD.version), (13, 13));
+    assert_eq!((Profile::HTML.version, Profile::RECORD.version), (14, 14));
 }
 #[cfg(feature = "css")]
 #[test]

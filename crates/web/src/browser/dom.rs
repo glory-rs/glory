@@ -126,6 +126,7 @@ pub(super) struct Entry {
     pub placement: Option<glory_html::display::Placement>,
     pub(super) rich: RefCell<Option<Box<super::rich::Editing>>>,
     pub(super) collapse: RefCell<Option<Box<super::collapse::Observer>>>,
+    pub(super) presence: RefCell<Option<Box<super::presence::Observer>>>,
     pub(super) image: RefCell<Option<Box<super::images::Observer>>>,
     pub parent: Cell<Option<NodeId>>,
     #[cfg(feature = "hydrate")]
@@ -157,6 +158,7 @@ impl Entry {
             placement: shape.display.clone(),
             rich: RefCell::new(None),
             collapse: RefCell::new(None),
+            presence: RefCell::new(None),
             image: RefCell::new(None),
             parent: Cell::new(parent),
             #[cfg(feature = "hydrate")]
@@ -313,6 +315,7 @@ pub(super) struct Dom {
     pub(super) clipboards: RefCell<super::clipboard::Writes>,
     pub(super) translations: RefCell<super::translation::Translations>,
     pub(super) collapses: RefCell<super::collapse::Collapses>,
+    pub(super) presences: RefCell<super::presence::Presences>,
     pub(super) images: RefCell<super::images::Images>,
     pub layers: RefCell<super::layers::Layers>,
     pub document_layers: Rc<super::layers::DocumentLayers>,
@@ -354,6 +357,7 @@ impl Dom {
             files: RefCell::new(files),
             translations: RefCell::new(super::translation::Translations::default()),
             collapses: RefCell::new(super::collapse::Collapses::default()),
+            presences: RefCell::new(super::presence::Presences::default()),
             images: RefCell::new(super::images::Images::default()),
             clipboards: RefCell::new(super::clipboard::Writes::default()),
             layers: RefCell::new(super::layers::Layers::default()),
@@ -518,6 +522,9 @@ impl Dom {
         }
         if kind == EventKind::ImageStatus {
             self.queue_image(id, &entry, enabled);
+        }
+        if kind == EventKind::PresenceComplete {
+            self.queue_presence(id, &entry, enabled);
         }
         if kind == EventKind::CollapseComplete {
             self.queue_collapse(id, &entry, enabled);
@@ -971,6 +978,7 @@ impl Dom {
                 self.images.borrow_mut().retire(*id);
                 self.clipboards.borrow_mut().retire(*id);
                 self.collapses.borrow_mut().retire(*id);
+                self.presences.borrow_mut().retire(*id);
                 self.translations.borrow_mut().retire(*id);
             }
         }
@@ -1027,6 +1035,7 @@ impl Dom {
         self.swipe.borrow_mut().take();
         self.close_files();
         *self.collapses.borrow_mut() = super::collapse::Collapses::default();
+        *self.presences.borrow_mut() = super::presence::Presences::default();
         *self.translations.borrow_mut() = super::translation::Translations::default();
         *self.sheets.borrow_mut() = super::sheet::Sheets::default();
         if self.cleared.replace(true) {

@@ -34,7 +34,14 @@ pub(crate) fn main(graphic: &GraphicProps, name: Option<&str>) -> BTreeMap<&'sta
             "viewBox",
             format!("0 0 {} {}", graphic.width, graphic.height),
         ),
-        ("preserveAspectRatio", "xMidYMid meet".into()),
+        (
+            "preserveAspectRatio",
+            match graphic.fit {
+                glory_render::GraphicFit::Contain => "xMidYMid meet",
+                glory_render::GraphicFit::Stretch => "none",
+            }
+            .into(),
+        ),
         ("overflow", "hidden".into()),
         ("width", graphic.width.to_string()),
         ("height", graphic.height.to_string()),
@@ -79,9 +86,25 @@ pub(crate) fn content(graphic: &GraphicProps) -> BTreeMap<&'static str, String> 
             format!("transition-duration:{}ms;", transition.duration_millis),
         );
     }
-    if let Some(glory_render::GraphicAnimation::Rotate { period_millis }) = graphic.animation {
-        attributes.insert("data-gly-rotate", String::new());
-        attributes.insert("style", format!("animation-duration:{period_millis}ms;"));
+    if let Some(animation) = graphic.animation {
+        match animation {
+            glory_render::GraphicAnimation::Rotate { period_millis } => {
+                attributes.insert("data-gly-rotate", String::new());
+                attributes.insert("style", format!("animation-duration:{period_millis}ms;"));
+            }
+            glory_render::GraphicAnimation::Pulse {
+                period_millis,
+                phase_millis,
+            } => {
+                attributes.insert("data-gly-pulse", String::new());
+                attributes.insert(
+                    "style",
+                    format!(
+                        "animation-duration:{period_millis}ms;animation-delay:-{phase_millis}ms;"
+                    ),
+                );
+            }
+        }
     }
     attributes
 }

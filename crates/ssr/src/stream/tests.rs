@@ -8,6 +8,8 @@ use glory_core::{AccessError, Resource, ResourceState};
 use glory_ui::{Widget, group, list, text, view, when, widget};
 
 use super::*;
+#[path = "presence_tests.rs"]
+mod presence;
 
 #[test]
 fn stream_links_reject_executable_targets_and_keep_safe_shell_output() {

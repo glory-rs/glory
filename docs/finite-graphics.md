@@ -90,3 +90,25 @@ cover rejection/reset. Native `tests/graphic_transition.rs` proves actual raster
 interpolation, continuous interruption, equal/Keep behavior, final frame/idle clock,
 reduction, clip/opacity and hidden/Owner cancellation. Sapid Burger uses this path
 for three bars, with component/browser evidence in its `docs/burger.md`.
+
+## Finite pulse and viewport fit (2026-11-05)
+
+`GraphicAnimation::Pulse { period_millis, phase_millis }` uses a triangular
+opacity wave from .25 to 1 and back. Period is 16..=60000 ms and phase is strictly
+less than period; raw and prepared payloads reject invalid values with rollback.
+It shares rotation's host clock, live visibility membership, wake coalescing and
+retirement. Reduced motion is a visible static opacity of 1. Native paint applies
+opacity once to the complete clipped Graphic group, preserving overlapping
+fill/stroke and ancestor opacity; it does not multiply each primitive separately.
+No widget frame task, application callback or reactive source write is introduced.
+
+`GraphicFit::Contain` remains the default uniform centered viewport mapping.
+Explicit `Stretch` maps the declared viewport independently to both box axes,
+for example a rectangular placeholder covering intrinsic content. This payload
+field does not widen native support for typed Style object-fit, padding or border
+properties; those documented rejections remain. HTML maps fit to the SVG
+preserveAspectRatio attribute and pulse to finite shared CSS markers. HTML shape
+format is now 19; classic stream envelope remains 2. SSR Patch/End and the web
+consumer agree with that shape version. The full-shape differential oracle covers
+fit, pulse/phase, rotation and reset. Native raster tests cover non-square fit,
+overlapping fill/stroke group alpha, clipping, ancestor opacity and reduction.

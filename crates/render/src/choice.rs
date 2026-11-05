@@ -101,6 +101,7 @@ impl crate::Semantics {
             }
         }
         if self.active_descendant.is_some()
+            && self.menu_search.is_none()
             && (self.combobox.is_none()
                 || self.expanded != Some(true)
                 || self.active_descendant == self.id
@@ -267,6 +268,16 @@ impl crate::memory::Memory {
         &self,
         trigger: crate::NodeId,
     ) -> Result<Option<crate::NodeId>, crate::Error> {
+        if self
+            .node(trigger)?
+            .descriptor
+            .view()
+            .semantics
+            .as_ref()
+            .is_some_and(|s| s.menu_search.is_some())
+        {
+            return self.resolve_menu_active_descendant(trigger);
+        }
         let descriptor = self.node(trigger)?.descriptor.view();
         let Some(semantics) = descriptor
             .semantics
@@ -335,6 +346,33 @@ impl crate::memory::Memory {
         let Some(semantics) = descriptor.semantics.as_deref() else {
             return Ok(());
         };
+        if let Some(owner) = &semantics.menu_search {
+            if let Some(owner) = self.named(owner)
+                && self.node(owner)?.descriptor.view().role != Some(crate::Role::Menu)
+            {
+                return Err(crate::Error::InvalidProps(
+                    "menu search controls must identify a Menu",
+                ));
+            }
+            if let Some(active) = semantics
+                .active_descendant
+                .as_ref()
+                .and_then(|name| self.named(name))
+                && self
+                    .node(active)?
+                    .descriptor
+                    .view()
+                    .semantics
+                    .as_ref()
+                    .and_then(|s| s.menu_item.as_ref())
+                    .is_none_or(|item| &item.owner != owner)
+            {
+                return Err(crate::Error::InvalidProps(
+                    "menu search highlight must identify an item of its Menu",
+                ));
+            }
+            return Ok(());
+        }
         if semantics.combobox.is_some()
             && let Some(owner) = semantics
                 .controls

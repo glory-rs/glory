@@ -243,6 +243,65 @@ fn preflight_and_direct_apply_reject_unsupported_metadata_with_accepted_prefix()
     assert!(renderer.listen(id, EventKind::Drag, true).is_err());
     renderer.listen(id, EventKind::Drag, false).unwrap();
 }
+
+#[test]
+fn menu_search_is_explicitly_unsupported_before_wry_identity_allocation() {
+    let runtime = RuntimeId::new();
+    let id = NodeIds::new(runtime).allocate();
+    let mut renderer = Renderer::new(runtime);
+    let mut editor = Descriptor::new(Props::Input(InputProps {
+        purpose: Purpose::Search,
+        ..Default::default()
+    }));
+    editor.semantics = Some(Box::new(Semantics {
+        id: Some(SemanticId::new("search").unwrap()),
+        controls: Some(SemanticId::new("menu").unwrap()),
+        menu_search: Some(SemanticId::new("menu").unwrap()),
+        ..Default::default()
+    }));
+    editor.validate().unwrap();
+    assert!(renderer.preflight(editor.view(), None).is_err());
+    assert!(
+        renderer
+            .apply(&[Mutation::Create {
+                id,
+                node: Box::new(editor)
+            }])
+            .is_err()
+    );
+    assert!(renderer.0.borrow().mapper.tree().node(id).is_err());
+}
+#[test]
+fn presence_is_explicitly_unsupported_before_wry_identity_allocation() {
+    let runtime = RuntimeId::new();
+    let id = NodeIds::new(runtime).allocate();
+    let mut renderer = Renderer::new(runtime);
+    let before = renderer.0.borrow().mapper.tree().stats();
+    let mut descriptor = Descriptor::new(Props::View);
+    descriptor.semantics = Some(Box::new(glory_render::Semantics {
+        presence: Some(Box::new(glory_render::PresenceConfig {
+            open: true,
+            duration_millis: 200,
+            ..Default::default()
+        })),
+        ..Default::default()
+    }));
+    descriptor.validate().unwrap();
+    assert!(matches!(
+        renderer.preflight(descriptor.view(), None),
+        Err(Error::Unsupported(_))
+    ));
+    assert!(
+        renderer
+            .apply(&[Mutation::Create {
+                id,
+                node: Box::new(descriptor)
+            }])
+            .is_err()
+    );
+    assert_eq!(renderer.0.borrow().mapper.tree().stats(), before);
+    assert!(renderer.0.borrow().mapper.tree().node(id).is_err());
+}
 #[test]
 fn selection_boundaries_validate_before_transport_changes() {
     let runtime = RuntimeId::new();

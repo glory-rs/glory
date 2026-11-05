@@ -149,7 +149,7 @@ fn native_profile_distinguishes_unimplemented_values_from_the_html_dialect() {
     }
     assert_eq!(
         (profile.name, profile.version, profile.css),
-        ("apace", 13, Css::Html)
+        ("apace", 15, Css::Html)
     );
     assert!(
         glory_render::style::Profile::HTML

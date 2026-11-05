@@ -7,7 +7,11 @@ fn length(value: Length) -> String {
         Length::Px(value) => format!("{value}px"),
         Length::Percent(value) => format!("{value}%"),
         Length::Ch(value) => format!("{value}ch"),
-        Length::ChPx { ch, px } => format!("calc({ch}ch {} {}px)", if px < 0. { "-" } else { "+" }, px.abs()),
+        Length::ChPx { ch, px } => format!(
+            "calc({ch}ch {} {}px)",
+            if px < 0. { "-" } else { "+" },
+            px.abs()
+        ),
     }
 }
 fn limit(value: Limit) -> String {
@@ -332,6 +336,18 @@ pub fn style(style: &Style) -> String {
             match value {
                 BorderStyle::None => "none",
                 BorderStyle::Solid => "solid",
+                BorderStyle::Dashed => "dashed",
+                BorderStyle::Dotted => "dotted",
+            }
+            .into(),
+        );
+    }
+    if let Some(side) = style.caption_side {
+        declaration(
+            "caption-side",
+            match side {
+                CaptionSide::Top => "top",
+                CaptionSide::Bottom => "bottom",
             }
             .into(),
         );

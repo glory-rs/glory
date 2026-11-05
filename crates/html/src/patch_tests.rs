@@ -175,6 +175,17 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
         Props::Image(Default::default()),
         Props::Graphic(GraphicProps::default()),
         Props::Graphic(GraphicProps {
+            fit: GraphicFit::Stretch,
+            ..Default::default()
+        }),
+        Props::Graphic(GraphicProps {
+            animation: Some(GraphicAnimation::Pulse {
+                period_millis: 700,
+                phase_millis: 199,
+            }),
+            ..Default::default()
+        }),
+        Props::Graphic(GraphicProps {
             commands: vec![
                 PathCommand::Move(GraphicPoint::new(2., 4.)),
                 PathCommand::Line(GraphicPoint::new(22., 4.)),
@@ -563,6 +574,24 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
             ..Default::default()
         }))),
         Patch::Graphic(Change::Clear),
+        Patch::Graphic(Change::Set(Box::new(GraphicProps {
+            fit: GraphicFit::Stretch,
+            ..Default::default()
+        }))),
+        Patch::Graphic(Change::Set(Box::new(GraphicProps {
+            animation: Some(GraphicAnimation::Pulse {
+                period_millis: 1000,
+                phase_millis: 0,
+            }),
+            ..Default::default()
+        }))),
+        Patch::Graphic(Change::Set(Box::new(GraphicProps {
+            animation: Some(GraphicAnimation::Pulse {
+                period_millis: 1000,
+                phase_millis: 333,
+            }),
+            ..Default::default()
+        }))),
         Patch::Graphic(Change::Set(Box::new(GraphicProps::default()))),
         Patch::Graphic(Change::Set(Box::new(GraphicProps {
             width: 48.0,
@@ -667,6 +696,18 @@ fn every_field_delta_matches_full_shape_difference_including_resets_and_normaliz
         ))),
         Patch::Style(Change::Set(Box::new(
             style::Style::new().field_sizing(style::FieldSizing::Fixed),
+        ))),
+        Patch::Style(Change::Set(Box::new(
+            style::Style::new().caption_side(style::CaptionSide::Top),
+        ))),
+        Patch::Style(Change::Set(Box::new(
+            style::Style::new().caption_side(style::CaptionSide::Bottom),
+        ))),
+        Patch::Style(Change::Set(Box::new(
+            style::Style::new().border_style(style::BorderStyle::Dashed),
+        ))),
+        Patch::Style(Change::Set(Box::new(
+            style::Style::new().border_style(style::BorderStyle::Dotted),
         ))),
         Patch::Style(Change::Set(Box::new(
             style::Style::new().width(style::Length::Px(-0.0)),

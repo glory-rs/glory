@@ -1,6 +1,6 @@
 # Native menus and command palettes
 
-The Blitz shell connects the shared Menu, Menubar, ContextMenu and Palette
+The Apace shell connects the shared Menu, Menubar, ContextMenu and Palette
 protocols. Sapid owns menu membership, matching, checked/radio values, submenus,
 controlled open state and delays. These are self-drawn semantic controls; platform
 system menus, application menu bars and tray services remain separate work.
@@ -14,6 +14,20 @@ Enter activates an intrinsic menu checkbox/radio exactly once; Space retains its
 ordinary activation. Disabled, inert, hidden, composing and retired controls do
 not supply input. Palette shortcuts use the nearest explicit Palette/Keyboard
 scope, preserving editor input and the shared modifier/repeat restrictions.
+
+`Semantics.menu_search` declares a single-line `Purpose::Search` input with a
+distinct named Menu owner and matching controls relation. Its component owns the
+query, filtering and one current highlight. Shared SearchNext/SearchPrevious/
+SearchCommit commands preserve editing focus; horizontal/Home/End keys, modifier
+shortcuts and IME retain ordinary editing. Enter repeats do not activate twice.
+Pointerdown and click preserve that editor when activating an item in the same
+current Menu. Intrinsic check/radio activation remains unchanged. Tab uses the
+existing ExitMenu action. These checks use current ancestry rather than a menu
+registry; moves, hiding, disabling and retirement invalidate stale events and
+active-descendant queries. AccessKit exports the actual SearchInput and the
+current available menu item. HTML/SSR use the same finite relation attributes;
+Wry explicitly rejects this new policy along with its existing menu restrictions.
+Model/CPU/AX tests do not establish OS keyboard or screen-reader acceptance.
 
 Context requests come from mouse/pen context events or the shared keyboard chord.
 The nearest declared region is a boundary, including an unsubscribed region.

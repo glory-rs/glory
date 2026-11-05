@@ -1,8 +1,8 @@
 //! Machine-readable acceptance of the typed inline style contract. This is not
 //! a CSS parser, cascade engine, or claim that every HTML stylesheet is portable.
 use crate::{
-    Align, AspectRatio, BorderStyle, Display, Family, FieldSizing, FlexDirection, FlexWrap,
-    GridPlacement, GridTrack, GridTracks, Justify, Length, Limit, ObjectFit, Overflow,
+    Align, AspectRatio, BorderStyle, CaptionSide, Display, Family, FieldSizing, FlexDirection,
+    FlexWrap, GridPlacement, GridTrack, GridTracks, Justify, Length, Limit, ObjectFit, Overflow,
     PointerEvents, Position, Style, TextOverflow, WhiteSpace,
 };
 
@@ -50,6 +50,7 @@ properties! {
     BorderColor => border_color => "border-color", BorderStyle => border_style => "border-style",
     Radius => radius => "border-radius", Opacity => opacity => "opacity", BoxShadow => box_shadow => "box-shadow",
     Right => right => "right", Bottom => bottom => "bottom",
+    CaptionSide => caption_side => "caption-side",
 }
 
 macro_rules! values {
@@ -63,11 +64,11 @@ macro_rules! values {
 values! {
     Auto, Px, Percent, Block, Flex, InlineFlex, None, Static, Relative, Absolute, Sticky,
     Visible, Hidden, Clip, OverflowAuto, Scroll, AnchorAuto, AnchorNone,
-    AlignStart, AlignEnd, AlignCenter, AlignStretch, JustifyStart, JustifyEnd,
-    JustifyCenter, Between, Around, Evenly, Row, Column,
+    Start, End, Center, AlignStretch, CaptionTop, CaptionBottom,
+    BorderDashed, Between, Around, Evenly, Row, Column,
     Normal, NoWrap, Pre, PreWrap, BorderNone, BorderSolid,
     FontNamed, Serif, Sans, Mono, System, Cursive, Fantasy, FieldFixed, FieldContent,
-    ShadowNone, ShadowOutset, FlexNoWrap, FlexWrap,
+    ShadowNone, ShadowOutset, BorderDotted, FlexWrap,
     TextClip, TextEllipsis,
     Grid, TrackList, Fr, PlacementSpan, PlacementAt, Ratio,
     FitFill, FitContain, FitCover, FitNone, FitScaleDown,
@@ -83,16 +84,17 @@ macro_rules! convert {
 convert!(Display, Block => Block, Flex => Flex, InlineFlex => InlineFlex, Grid => Grid, None => None);
 convert!(Position, Static => Static, Relative => Relative, Absolute => Absolute, Sticky => Sticky, Fixed => Fixed);
 convert!(Overflow, Visible => Visible, Hidden => Hidden, Clip => Clip, Auto => OverflowAuto, Scroll => Scroll);
-convert!(Align, Start => AlignStart, End => AlignEnd, Center => AlignCenter, Stretch => AlignStretch);
-convert!(Justify, Start => JustifyStart, End => JustifyEnd, Center => JustifyCenter, Between => Between, Around => Around, Evenly => Evenly);
+convert!(Align, Start => Start, End => End, Center => Center, Stretch => AlignStretch);
+convert!(Justify, Start => Start, End => End, Center => Center, Between => Between, Around => Around, Evenly => Evenly);
 convert!(FlexDirection, Row => Row, Column => Column);
-convert!(FlexWrap, NoWrap => FlexNoWrap, Wrap => FlexWrap);
+convert!(FlexWrap, NoWrap => NoWrap, Wrap => FlexWrap);
 convert!(WhiteSpace, Normal => Normal, NoWrap => NoWrap, Pre => Pre, PreWrap => PreWrap);
 convert!(ObjectFit, Fill => FitFill, Contain => FitContain, Cover => FitCover, None => FitNone, ScaleDown => FitScaleDown);
 convert!(TextOverflow, Clip => TextClip, Ellipsis => TextEllipsis);
 convert!(PointerEvents, Auto => Auto, None => None);
 convert!(FieldSizing, Fixed => FieldFixed, Content => FieldContent);
-convert!(BorderStyle, None => BorderNone, Solid => BorderSolid);
+convert!(BorderStyle, None => BorderNone, Solid => BorderSolid, Dashed => BorderDashed, Dotted => BorderDotted);
+convert!(CaptionSide, Top => CaptionTop, Bottom => CaptionBottom);
 impl From<&Family> for Value {
     fn from(value: &Family) -> Self {
         match value {
@@ -176,6 +178,10 @@ pub struct Support {
     properties: u64,
     values: u64,
 }
+const _: () = {
+    assert!(Property::ALL.len() <= 64);
+    assert!(Value::ALL.len() <= 64);
+};
 impl Support {
     pub const NONE: Self = Self {
         properties: 0,
@@ -230,6 +236,9 @@ impl Support {
             }
         }
         let values = [
+            style
+                .caption_side
+                .map(|v| (Property::CaptionSide, v.into())),
             style.position.map(|v| (Property::Position, v.into())),
             style.top.map(|v| (Property::Top, v.into())),
             style.left.map(|v| (Property::Left, v.into())),
@@ -282,7 +291,9 @@ impl Support {
             style.margin.map(|_| (Property::Margin, Value::Px)),
             style.font_size.map(|_| (Property::FontSize, Value::Px)),
             style.line_height.map(|_| (Property::LineHeight, Value::Px)),
-            style.letter_spacing.map(|_| (Property::LetterSpacing, Value::Px)),
+            style
+                .letter_spacing
+                .map(|_| (Property::LetterSpacing, Value::Px)),
             style.white_space.map(|v| (Property::WhiteSpace, v.into())),
             style
                 .text_overflow
@@ -322,13 +333,20 @@ impl Support {
         // ChPx needs both existing unit capabilities, without extending the
         // finite u64 value domain or treating a partial unit profile as support.
         for (property, value) in [
-            (Property::Width, style.width), (Property::Height, style.height),
-            (Property::MinWidth, style.min_width), (Property::MinHeight, style.min_height),
-            (Property::Top, style.top), (Property::Left, style.left),
-            (Property::Right, style.right), (Property::Bottom, style.bottom),
+            (Property::Width, style.width),
+            (Property::Height, style.height),
+            (Property::MinWidth, style.min_width),
+            (Property::MinHeight, style.min_height),
+            (Property::Top, style.top),
+            (Property::Left, style.left),
+            (Property::Right, style.right),
+            (Property::Bottom, style.bottom),
         ] {
             if matches!(value, Some(Length::ChPx { .. })) && !self.supports_value(Value::Px) {
-                return Err(Unsupported { property, value: Some(Value::Px) });
+                return Err(Unsupported {
+                    property,
+                    value: Some(Value::Px),
+                });
             }
         }
         for family in style.font_family.iter().flatten() {
@@ -389,7 +407,7 @@ impl Profile {
     /// Reference storage accepts typed declarations but performs no CSS/layout.
     pub const RECORD: Self = Self {
         name: "record",
-        version: 13,
+        version: 14,
         inline: Support::ALL,
         css: Css::None,
     };
@@ -397,7 +415,7 @@ impl Profile {
     /// remains engine-specific; this is not a complete stylesheet validator.
     pub const HTML: Self = Self {
         name: "html",
-        version: 13,
+        version: 14,
         inline: Support::ALL,
         css: Css::Html,
     };
@@ -437,7 +455,7 @@ mod tests {
                 );
             }
         }
-        assert_eq!((Profile::HTML.version, Profile::RECORD.version), (13, 13));
+        assert_eq!((Profile::HTML.version, Profile::RECORD.version), (14, 14));
     }
 
     #[test]
@@ -499,6 +517,7 @@ mod tests {
             radius: Some(4.0),
             opacity: Some(0.5),
             box_shadow: Some(crate::BoxShadow::None),
+            caption_side: Some(CaptionSide::Top),
         };
         style.validate().unwrap();
         assert_eq!(style.properties().collect::<Vec<_>>(), Property::ALL);
@@ -515,6 +534,62 @@ mod tests {
         }
         assert_eq!(Support::NONE.check(&Style::default()), Ok(()));
         assert_eq!(Style::default().properties().count(), 0);
+    }
+
+    #[test]
+    fn canonical_css_keywords_keep_u64_masks_and_check_each_using_property() {
+        assert_eq!(
+            std::mem::size_of::<Support>(),
+            2 * std::mem::size_of::<u64>()
+        );
+        assert_eq!(Value::ALL.len(), 64);
+        for (property, value, style) in [
+            (
+                Property::Justify,
+                Value::Start,
+                Style {
+                    justify: Some(Justify::Start),
+                    ..Style::new()
+                },
+            ),
+            (
+                Property::Justify,
+                Value::End,
+                Style {
+                    justify: Some(Justify::End),
+                    ..Style::new()
+                },
+            ),
+            (
+                Property::Justify,
+                Value::Center,
+                Style {
+                    justify: Some(Justify::Center),
+                    ..Style::new()
+                },
+            ),
+            (
+                Property::FlexWrap,
+                Value::NoWrap,
+                Style::new().flex_wrap(FlexWrap::NoWrap),
+            ),
+        ] {
+            assert_eq!(Support::ALL.check(&style), Ok(()));
+            assert_eq!(
+                Support::ALL.without_property(property).check(&style),
+                Err(Unsupported {
+                    property,
+                    value: None
+                })
+            );
+            assert_eq!(
+                Support::ALL.without_value(value).check(&style),
+                Err(Unsupported {
+                    property,
+                    value: Some(value)
+                })
+            );
+        }
     }
 
     #[test]
@@ -549,7 +624,6 @@ mod tests {
                     Property::TextOverflow,
                     Style::new().text_overflow(TextOverflow::Ellipsis),
                 ),
-                Value::FlexNoWrap => (Property::FlexWrap, Style::new().flex_wrap(FlexWrap::NoWrap)),
                 Value::FlexWrap => (Property::FlexWrap, Style::new().flex_wrap(FlexWrap::Wrap)),
                 Value::ShadowNone => (
                     Property::BoxShadow,
@@ -631,21 +705,21 @@ mod tests {
                 ),
                 Value::AnchorAuto => (Property::ScrollAnchor, Style::new().scroll_anchor(true)),
                 Value::AnchorNone => (Property::ScrollAnchor, Style::new().scroll_anchor(false)),
-                Value::AlignStart => (
+                Value::Start => (
                     Property::Align,
                     Style {
                         align: Some(Align::Start),
                         ..Style::new()
                     },
                 ),
-                Value::AlignEnd => (
+                Value::End => (
                     Property::Align,
                     Style {
                         align: Some(Align::End),
                         ..Style::new()
                     },
                 ),
-                Value::AlignCenter => (
+                Value::Center => (
                     Property::Align,
                     Style {
                         align: Some(Align::Center),
@@ -656,27 +730,6 @@ mod tests {
                     Property::Align,
                     Style {
                         align: Some(Align::Stretch),
-                        ..Style::new()
-                    },
-                ),
-                Value::JustifyStart => (
-                    Property::Justify,
-                    Style {
-                        justify: Some(Justify::Start),
-                        ..Style::new()
-                    },
-                ),
-                Value::JustifyEnd => (
-                    Property::Justify,
-                    Style {
-                        justify: Some(Justify::End),
-                        ..Style::new()
-                    },
-                ),
-                Value::JustifyCenter => (
-                    Property::Justify,
-                    Style {
-                        justify: Some(Justify::Center),
                         ..Style::new()
                     },
                 ),
@@ -732,6 +785,22 @@ mod tests {
                 Value::BorderSolid => (
                     Property::BorderStyle,
                     Style::new().border_style(BorderStyle::Solid),
+                ),
+                Value::BorderDashed => (
+                    Property::BorderStyle,
+                    Style::new().border_style(BorderStyle::Dashed),
+                ),
+                Value::BorderDotted => (
+                    Property::BorderStyle,
+                    Style::new().border_style(BorderStyle::Dotted),
+                ),
+                Value::CaptionTop => (
+                    Property::CaptionSide,
+                    Style::new().caption_side(CaptionSide::Top),
+                ),
+                Value::CaptionBottom => (
+                    Property::CaptionSide,
+                    Style::new().caption_side(CaptionSide::Bottom),
                 ),
                 Value::FontNamed => (
                     Property::FontFamily,

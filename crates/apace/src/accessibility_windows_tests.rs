@@ -122,7 +122,11 @@ fn real_accesskit_windows_ui_automation() {
         );
     }
     let report = std::path::PathBuf::from(format!(
-        "D:/BuildCache/glory-semantic-ui/accesskit-uia-{nonce}.json"
+        concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../target/verification/glory-semantic-ui/accesskit-uia-{nonce}.json"
+        ),
+        nonce = nonce
     ));
     eprintln!("UIA report: {}", report.display());
     let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

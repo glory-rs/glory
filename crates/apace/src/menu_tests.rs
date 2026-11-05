@@ -1,6 +1,7 @@
 use super::focus_tests::{focus, key, settle};
 use super::tests::pointer;
 use super::*;
+use glory_render::style::{Length, Style};
 use glory_render::{
     Action, Change, ContextEditPolicy, ContextPoint, ContextSource, Direction, FocusMode, Layer,
     LayerFocus, LayerPlacement, MenuCommand, MenuItemKind, MenuItemSemantics, Orientation, Patch,
@@ -39,6 +40,118 @@ fn member(kind: MenuItemKind) -> Option<Box<Semantics>> {
         }),
         ..Default::default()
     }))
+}
+
+#[test]
+fn native_menu_search_keeps_real_editor_focus_for_commands_and_pointer_activation() {
+    let mut host = WindowApp::new();
+    let scope = host.app.scope();
+    let editor = scope.cage(None);
+    let item = scope.cage(None);
+    let commands = Rc::new(RefCell::new(Vec::new()));
+    let output = commands.clone();
+    let activated = scope.cage(0usize);
+    let mut metadata = menu_metadata("panel", "trigger", false).unwrap();
+    metadata.typeahead = false;
+    metadata.layer.as_mut().unwrap().initial_focus = Some(name("search"));
+    let mut item_metadata = member(MenuItemKind::Action).unwrap();
+    item_metadata.id = Some(name("result"));
+    host.mount(
+        group().fill((
+            button()
+                .label("Open search menu")
+                .semantics(Some(Box::new(Semantics {
+                    id: Some(name("trigger")),
+                    ..Default::default()
+                }))),
+            view()
+                .role(Role::Menu)
+                .name("Search menu")
+                .focus(FocusMode::Programmatic)
+                .semantics(Some(metadata))
+                .style(
+                    Style::new()
+                        .display(glory_render::style::Display::Flex)
+                        .flex_direction(glory_render::style::FlexDirection::Column)
+                        .width(Length::Px(220.))
+                        .height(Length::Px(100.)),
+                )
+                .on(EventKind::Menu, move |event| {
+                    if let Event::Menu { from, command } = event {
+                        output.borrow_mut().push((from, command));
+                    }
+                })
+                .fill((
+                    input()
+                        .purpose(glory_render::Purpose::Search)
+                        .name("Search actions")
+                        .value("Find")
+                        .node_ref(editor)
+                        .style(
+                            Style::new()
+                                .width(Length::Percent(100.))
+                                .height(Length::Px(36.)),
+                        )
+                        .semantics(Some(Box::new(Semantics {
+                            id: Some(name("search")),
+                            controls: Some(name("panel")),
+                            menu_search: Some(name("panel")),
+                            active_descendant: Some(name("result")),
+                            ..Default::default()
+                        }))),
+                    button()
+                        .label("Save document")
+                        .node_ref(item)
+                        .semantics(Some(item_metadata))
+                        .style(
+                            Style::new()
+                                .width(Length::Percent(100.))
+                                .height(Length::Px(36.)),
+                        )
+                        .on(EventKind::Activate, move |_| {
+                            activated.revise(|old| *old += 1)
+                        }),
+                )),
+        )),
+    )
+    .unwrap();
+    let editor = editor.get().unwrap();
+    focus(&mut host, editor);
+    for key_name in [NamedKey::ArrowDown, NamedKey::ArrowUp, NamedKey::Enter] {
+        key(&mut host, Key::Named(key_name), Modifiers::empty());
+        assert_eq!(host.renderer.0.borrow().focused, Some(editor));
+    }
+    assert_eq!(
+        *commands.borrow(),
+        [
+            (editor, MenuCommand::SearchNext),
+            (editor, MenuCommand::SearchPrevious),
+            (editor, MenuCommand::SearchCommit)
+        ]
+    );
+    key(
+        &mut host,
+        Key::Named(NamedKey::ArrowLeft),
+        Modifiers::empty(),
+    );
+    key(&mut host, Key::Named(NamedKey::Home), Modifiers::empty());
+    assert_eq!(commands.borrow().len(), 3);
+    let rect = {
+        let mut state = host.renderer.0.borrow_mut();
+        state.dom.resolve();
+        state
+            .dom
+            .doc
+            .get_client_bounding_rect(state.dom.main(item.get().unwrap()).unwrap())
+            .unwrap()
+    };
+    let (x, y) = ((rect.x + 10.) as f32, (rect.y + rect.height / 2.) as f32);
+    host.handle_ui_event(UiEvent::PointerMove(pointer(x, y, false)));
+    host.handle_ui_event(UiEvent::PointerDown(pointer(x, y, true)));
+    host.handle_ui_event(UiEvent::PointerUp(pointer(x, y, false)));
+    settle(&mut host);
+    assert_eq!(activated.get(), 1);
+    assert_eq!(host.renderer.0.borrow().focused, Some(editor));
 }
 #[test]
 fn native_menu_trigger_submenu_rtl_typeahead_and_check_enter_use_live_component_protocols() {

@@ -43,6 +43,8 @@ mod graphic_motion;
 mod layers;
 #[path = "native_select.rs"]
 mod native_select;
+#[path = "presence.rs"]
+mod presence;
 #[path = "scroll_into_view.rs"]
 mod scroll_into_view;
 #[cfg(feature = "shell")]
@@ -60,7 +62,7 @@ use style::computed_values::visibility::T as Visibility;
 /// Re-audit these exclusions against real geometry/paint before widening them.
 pub const STYLE_PROFILE: glory_render::style::Profile = glory_render::style::Profile {
     name: "apace",
-    version: 14,
+    version: 15,
     inline: glory_render::style::Support::ALL
         .without_value(glory_render::style::Value::Sticky)
         .without_value(glory_render::style::Value::AnchorAuto)
@@ -149,6 +151,7 @@ fn check_mode<'a>(
     files_enabled: Option<glory_render::FileCapabilities>,
 ) -> Result<(), Error> {
     let node = node.into();
+    presence::check(node, patch)?;
     use glory_render::Props;
     if matches!(node.props, Props::RichEditor(_)) {
         return Err(Error::Unsupported("native rich editing"));
@@ -281,6 +284,7 @@ struct Dom {
     open_select: Option<NodeId>,
     translations: translation::Translations,
     collapses: collapse::Collapses,
+    presences: presence::Presences,
     #[cfg(feature = "paint")]
     motion: graphic_motion::Motion,
     doc: BaseDocument,
@@ -366,7 +370,7 @@ impl Dom {
             let body = m.create_element(tag("body"), Vec::new());
             let base = m.create_element(tag("style"), Vec::new());
             let baseline = m.create_text_node(&format!(
-                "html,body{{margin:0;padding:0}}{}[data-gly-layer=center]{{left:var(--gly-layer-x,0px);top:var(--gly-layer-y,0px);transform:none}}[data-gly-rotate]{{animation:none!important;transform:none!important}}[data-gly-path-transition]{{transition:none!important}}",
+                "html,body{{margin:0;padding:0}}{}[data-gly-layer=center]{{left:var(--gly-layer-x,0px);top:var(--gly-layer-y,0px);transform:none}}[data-gly-rotate]{{animation:none!important;transform:none!important}}[data-gly-pulse]{{animation:none!important;opacity:1!important}}[data-gly-path-transition]{{transition:none!important}}",
                 format_args!("{}{}", glory_html::BASE_CSS, native_select::CSS)
             ));
             let sheet = m.create_element(tag("style"), Vec::new());
@@ -389,6 +393,7 @@ impl Dom {
             display_space: None,
             translations: translation::Translations::new(translation_sheet, config.motion),
             collapses: collapse::Collapses::default(),
+            presences: presence::Presences::default(),
             #[cfg(feature = "paint")]
             motion: graphic_motion::Motion::new(config.motion),
             open_select: None,
@@ -882,6 +887,7 @@ impl Dom {
             self.invalidate();
         }
         collapse::resolve(self);
+        presence::resolve(self);
         if self.dirty {
             self.layout();
         }
@@ -1473,6 +1479,7 @@ impl Renderer {
             let State { mapper, dom, .. } = &mut *state;
             dom.collapses.natural_dirty = true;
             dom.sync_collapses(mapper.tree(), &[]);
+            dom.sync_presences(mapper.tree(), &[]);
             dom.sync_translations(mapper.tree(), &[])?;
         }
         Ok(())
@@ -1555,7 +1562,9 @@ impl Renderer {
             return Err(Error::InvalidProps("invalid Apace animation time"));
         }
         if seconds > state.dom.time {
-            let was_animating = state.dom.doc.is_animating() || state.dom.collapses.running();
+            let was_animating = state.dom.doc.is_animating()
+                || state.dom.collapses.running()
+                || state.dom.presences.running();
             state.dom.time = seconds;
             #[cfg(feature = "paint")]
             state.dom.motion.clock.set(seconds);
@@ -1621,6 +1630,7 @@ impl Render for Renderer {
             || state.dom.doc.resource_stats().completions != 0
             || state.dom.resource_wake.is_pending()
             || state.dom.collapses.ready(&state.subscriptions)
+            || state.dom.presences.ready(&state.subscriptions)
     }
     fn set_profile(&mut self, profile: Option<Profile>) -> Option<Profile> {
         let engine = profile
@@ -1660,6 +1670,8 @@ impl Render for Renderer {
             focus: self.0.borrow().interactive,
             input: self.0.borrow().interactive,
             collapse_completion: true,
+            presence_completion: true,
+            presence_transforms: false,
         }
     }
     fn apply(&mut self, mutations: &[Mutation]) -> Result<Receipt, Error> {
@@ -1788,6 +1800,7 @@ impl Render for Renderer {
         let translated = {
             let State { mapper, dom, .. } = &mut *state;
             dom.sync_collapses(mapper.tree(), mutations);
+            dom.sync_presences(mapper.tree(), mutations);
             dom.sync_translations(mapper.tree(), mutations)
         };
         if result.is_ok() {
@@ -2183,6 +2196,7 @@ impl Render for Renderer {
         }
         state.dom.resolve();
         collapse::collect(&mut state);
+        presence::collect(&mut state);
         state.collect_image_inputs();
         state.sync_focus();
         let State {

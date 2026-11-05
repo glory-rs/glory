@@ -259,6 +259,8 @@ pub struct Semantics {
     pub placeholder: Option<String>,
     /// Optional intrinsic-height presentation with immediate logical hiding.
     pub collapse: Option<crate::CollapseConfig>,
+    /// Optional finite opacity/transform presence; logical availability is immediate.
+    pub presence: Option<Box<crate::PresenceConfig>>,
     /// Immediate primary-pointer capture, in viewport CSS pixels.
     pub drag_capture: Option<crate::DragCapture>,
     /// Axis intent capture preserves orthogonal native panning.
@@ -300,6 +302,9 @@ pub struct Semantics {
     pub active_descendant: Option<SemanticId>,
     pub listbox_multiple: bool,
     pub menu_item: Option<MenuItemSemantics>,
+    /// Single-line search editor controlling its nearest named Menu. Matching,
+    /// highlight and activation remain owned by the component.
+    pub menu_search: Option<SemanticId>,
     /// An intrinsic action trigger belonging to a structural Menubar.
     pub menubar_item: bool,
     pub layer: Option<Layer>,
@@ -456,6 +461,7 @@ impl Semantics {
                 || d.name.is_some()
                 || d.focus != crate::FocusMode::Auto
                 || self.collapse.is_some()
+                || self.presence.is_some()
                 || self.layer.is_some()
                 || self.drag_capture.is_some()
                 || self.document_part.is_some()
@@ -471,10 +477,28 @@ impl Semantics {
                 "input assist requires a single-line Input",
             ));
         }
+        if let Some(presence) = &self.presence {
+            presence.validate()?;
+            presence.validate_style(d.style)?;
+            if !matches!(d.props, Props::View)
+                || self.layer.is_some()
+                || self.collapse.is_some()
+                || self.translation.is_some()
+                || self.document_part.is_some()
+                || self.field_part.is_some()
+                || self.hidden == presence.open
+                || self.inert == presence.open
+            {
+                return Err(Error::InvalidProps(
+                    "presence requires an independent View and hidden/inert opposite to open",
+                ));
+            }
+        }
         if let Some(collapse) = &self.collapse {
             collapse.validate()?;
             collapse.validate_style(d.style)?;
             if !matches!(d.props, Props::View)
+                || self.presence.is_some()
                 || self.layer.is_some()
                 || self.document_part.is_some()
                 || self.field_part.is_some()
@@ -496,7 +520,8 @@ impl Semantics {
                 || self.splitter.is_some()
                 || self.sheet_grip
                 || self.layer.is_some()
-                || self.collapse.is_some())
+                || self.collapse.is_some()
+                || self.presence.is_some())
         {
             return Err(Error::InvalidProps(
                 "swipe capture requires an independent boxed View",
@@ -619,6 +644,7 @@ impl Semantics {
             return Err(Error::InvalidProps("inert regions require a view"));
         }
         self.validate_choice(d)?;
+        self.validate_menu_search(d)?;
         if let Some(progress) = &self.progress {
             progress.validate()?;
             if d.role != Some(Role::ProgressBar)

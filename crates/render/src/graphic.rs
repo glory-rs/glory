@@ -51,12 +51,20 @@ pub struct GraphicStroke {
     pub cap: StrokeCap,
 }
 
-/// One nonzero-winding path, uniformly scaled and centered in its content box.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum GraphicFit {
+    #[default]
+    Contain,
+    Stretch,
+}
+
+/// One nonzero-winding path, contained by default or explicitly stretched.
 /// Geometry is clipped to that box. Multiple colors are separate semantic nodes.
 #[derive(Clone, Debug, PartialEq)]
 pub struct GraphicProps {
     pub width: f64,
     pub height: f64,
+    pub fit: GraphicFit,
     pub commands: Vec<PathCommand>,
     pub fill: Option<Color>,
     pub stroke: Option<GraphicStroke>,
@@ -70,6 +78,7 @@ impl Default for GraphicProps {
         Self {
             width: 24.0,
             height: 24.0,
+            fit: GraphicFit::Contain,
             commands: Vec::new(),
             fill: None,
             stroke: None,

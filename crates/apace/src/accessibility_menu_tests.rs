@@ -2,6 +2,89 @@ use super::*;
 use glory_render::{MenuItemKind, MenuItemSemantics, PopupKind, SemanticId, Semantics};
 
 #[test]
+fn menu_search_exports_search_role_and_only_the_current_available_menu_item() {
+    let host = WindowApp::new();
+    let scope = host.app.scope();
+    let active = scope.cage(true);
+    let enabled = scope.cage(true);
+    let editor = scope.cage(None);
+    let target = scope.cage(None);
+    let panel = scope.cage(None);
+    host.mount(
+        view()
+            .role(Role::Menu)
+            .name("Search menu")
+            .node_ref(panel)
+            .semantics(Some(Box::new(Semantics {
+                id: Some(SemanticId::new("search-menu").unwrap()),
+                ..Default::default()
+            })))
+            .fill((
+                glory_ui::input()
+                    .purpose(glory_render::Purpose::Search)
+                    .name("Find an action")
+                    .node_ref(editor)
+                    .semantics(active.map(|active| {
+                        Some(Box::new(Semantics {
+                            id: Some(SemanticId::new("search-editor").unwrap()),
+                            controls: Some(SemanticId::new("search-menu").unwrap()),
+                            menu_search: Some(SemanticId::new("search-menu").unwrap()),
+                            active_descendant: active
+                                .then(|| SemanticId::new("search-result").unwrap()),
+                            ..Default::default()
+                        }))
+                    })),
+                button()
+                    .label("Save")
+                    .node_ref(target)
+                    .enabled(enabled)
+                    .semantics(Some(Box::new(Semantics {
+                        id: Some(SemanticId::new("search-result").unwrap()),
+                        menu_item: Some(MenuItemSemantics {
+                            kind: MenuItemKind::Action,
+                            owner: SemanticId::new("search-menu").unwrap(),
+                        }),
+                        ..Default::default()
+                    }))),
+            )),
+    )
+    .unwrap();
+    let first = build(&host, true);
+    let editor = id(&host, editor.get().unwrap());
+    let target = id(&host, target.get().unwrap());
+    let panel = id(&host, panel.get().unwrap());
+    let search = &first.nodes.iter().find(|(id, _)| *id == editor).unwrap().1;
+    assert_eq!(search.role(), AxRole::SearchInput);
+    assert_eq!(search.controls(), [panel]);
+    assert_eq!(search.active_descendant(), Some(target));
+    enabled.revise(|value| *value = false);
+    let second = build(&host, true);
+    assert_eq!(
+        second
+            .nodes
+            .iter()
+            .find(|(id, _)| *id == editor)
+            .unwrap()
+            .1
+            .active_descendant(),
+        None
+    );
+    enabled.revise(|value| *value = true);
+    active.revise(|value| *value = false);
+    let third = build(&host, true);
+    assert_eq!(
+        third
+            .nodes
+            .iter()
+            .find(|(id, _)| *id == editor)
+            .unwrap()
+            .1
+            .active_descendant(),
+        None
+    );
+}
+
+#[test]
 fn menu_metadata_refines_actual_intrinsic_controls_and_exports_typed_popup() {
     let app = WindowApp::new();
     let checked = app.app.scope().cage(false);

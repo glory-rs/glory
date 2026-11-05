@@ -890,6 +890,35 @@ impl Memory {
             nodes.get(&id).ok_or(Error::NodeGone(id))
         };
         let target = get(id)?;
+        if matches!(event, Event::Menu { .. })
+            && let Some(owner) = target
+                .descriptor
+                .view()
+                .semantics
+                .as_ref()
+                .and_then(|s| s.menu_search.as_ref())
+        {
+            event.validate_payload(id, &target.descriptor)?;
+            if !Self::active_in(nodes, id)
+                || !Self::enabled_in(nodes, id)
+                || Self::inert_in(nodes, id)
+            {
+                return Ok(false);
+            }
+            let mut cursor = target.parent;
+            let mut matching = false;
+            while let Some(parent) = cursor {
+                let node = get(parent)?;
+                if node.descriptor.view().role == Some(crate::Role::Menu) {
+                    matching = node.descriptor.view().semantic_id() == Some(owner);
+                    break;
+                }
+                cursor = node.parent;
+            }
+            if !matching {
+                return Ok(false);
+            }
+        }
         if let Event::Clipboard {
             request, revision, ..
         } = event
@@ -912,6 +941,19 @@ impl Memory {
             }
             event.validate_payload(id, &target.descriptor)?;
             return Ok(state.matches(*request, *revision));
+        }
+        if let Event::PresenceComplete { revision } = event {
+            event.validate_payload(id, &target.descriptor)?;
+            if target
+                .descriptor
+                .view()
+                .semantics
+                .as_ref()
+                .and_then(|s| s.presence.as_ref())
+                .is_some_and(|config| *revision < config.revision)
+            {
+                return Ok(false);
+            }
         }
         if let Event::CollapseComplete { revision } = event {
             event.validate_payload(id, &target.descriptor)?;

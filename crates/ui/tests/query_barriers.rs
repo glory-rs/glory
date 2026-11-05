@@ -26,6 +26,8 @@ impl Render for Delayed {
             focus: true,
             input: true,
             collapse_completion: false,
+            presence_completion: false,
+            presence_transforms: false,
             clipboard_write: false,
             files: None,
         }

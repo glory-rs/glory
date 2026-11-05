@@ -432,6 +432,13 @@ impl Storage {
                     previous.as_ref().and_then(|s| s.swipe_capture),
                     self.view().semantics.as_ref().and_then(|s| s.swipe_capture),
                 )?;
+                crate::presence::revision(
+                    previous.as_ref().and_then(|s| s.presence.as_deref()),
+                    self.view()
+                        .semantics
+                        .as_ref()
+                        .and_then(|s| s.presence.as_deref()),
+                )?;
                 crate::collapse::revision(
                     previous.as_ref().and_then(|s| s.collapse.as_ref()),
                     self.view()

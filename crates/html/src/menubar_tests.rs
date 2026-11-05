@@ -44,6 +44,52 @@ fn oracle(base: &Descriptor, patch: Patch) {
         .unwrap();
     assert!(matches!(&sink.0[0],Op::Patch{edits,..}if edits==&expected));
 }
+
+#[test]
+fn menu_search_editor_relations_and_clears_match_the_full_shape_oracle() {
+    let mut editor = Descriptor::new(Props::Input(InputProps {
+        purpose: Purpose::Search,
+        value: "current query".into(),
+        ..Default::default()
+    }));
+    editor.semantics = Some(Box::new(Semantics {
+        id: Some(SemanticId::new("search").unwrap()),
+        controls: Some(SemanticId::new("menu").unwrap()),
+        menu_search: Some(SemanticId::new("menu").unwrap()),
+        active_descendant: Some(SemanticId::new("result").unwrap()),
+        ..Default::default()
+    }));
+    let shape = shape(&editor).unwrap();
+    let attrs = shape
+        .pieces
+        .iter()
+        .find_map(|piece| match &piece.kind {
+            Kind::Element { attributes, .. } => Some(attributes),
+            _ => None,
+        })
+        .unwrap();
+    assert_eq!(attrs.get("type").map(String::as_str), Some("search"));
+    assert_eq!(
+        attrs.get("data-gly-menu-search").map(String::as_str),
+        Some("menu")
+    );
+    assert_eq!(attrs.get("aria-controls").map(String::as_str), Some("menu"));
+    assert_eq!(
+        attrs.get("aria-activedescendant").map(String::as_str),
+        Some("result")
+    );
+    assert!(!attrs.contains_key("aria-haspopup"));
+    assert!(!attrs.contains_key("aria-autocomplete"));
+    let mut no_highlight = editor.semantics.clone().unwrap();
+    no_highlight.active_descendant = None;
+    for patch in [
+        Patch::Semantics(Change::Keep),
+        Patch::Semantics(Change::Clear),
+        Patch::Semantics(Change::Set(Some(no_highlight))),
+    ] {
+        oracle(&editor, patch);
+    }
+}
 #[test]
 fn menubar_intrinsic_refinement_role_focus_and_defaults_match_full_shape_oracle() {
     let mut bar = Descriptor::new(Props::View);

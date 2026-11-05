@@ -213,6 +213,7 @@ impl Renderer {
             state.dom.translations.preference = preference;
             let State { mapper, dom, .. } = &mut *state;
             dom.sync_collapses(mapper.tree(), &[]);
+            dom.sync_presences(mapper.tree(), &[]);
             if let Err(error) = dom.sync_translations(mapper.tree(), &[]) {
                 state.input_error.get_or_insert(error);
             }
@@ -221,6 +222,7 @@ impl Renderer {
                 && state.dom.motion.transitions.is_empty()
                 && state.dom.translations.is_empty()
                 && state.dom.collapses.is_empty()
+                && state.dom.presences.is_empty()
             {
                 None
             } else {
@@ -286,6 +288,115 @@ mod tests {
     fn pixel(raster: &Raster, x: usize, y: usize) -> &[u8] {
         let width = raster.frame().unwrap().width as usize;
         &raster.pixels()[(y * width + x) * 4..(y * width + x) * 4 + 4]
+    }
+    #[cfg(feature = "raster")]
+    #[test]
+    fn explicit_stretch_fills_a_non_square_box_while_default_contain_keeps_its_aspect() {
+        for fit in [
+            glory_render::GraphicFit::Contain,
+            glory_render::GraphicFit::Stretch,
+        ] {
+            let (app, renderer) = app();
+            app.mount(
+                graphic()
+                    .drawing(GraphicProps {
+                        fit,
+                        fill: Some(Color(0, 255, 0, 255)),
+                        commands: vec![
+                            Path::Move(Point::new(4., 4.)),
+                            Path::Line(Point::new(20., 4.)),
+                            Path::Line(Point::new(20., 20.)),
+                            Path::Line(Point::new(4., 20.)),
+                            Path::Close,
+                        ],
+                        ..Default::default()
+                    })
+                    .style(Style::new().width(Length::Px(40.)).height(Length::Px(20.))),
+            )
+            .unwrap();
+            let mut raster = Raster::new();
+            raster.draw(&renderer).unwrap();
+            assert_eq!(pixel(&raster, 20, 10), [0, 255, 0, 255]);
+            assert_eq!(
+                pixel(&raster, 8, 10),
+                if fit == glory_render::GraphicFit::Stretch {
+                    [0, 255, 0, 255]
+                } else {
+                    [0, 0, 0, 0]
+                }
+            );
+        }
+    }
+    #[cfg(feature = "raster")]
+    #[test]
+    fn real_pulse_pixels_compose_opacity_clip_and_reduce_without_source_writes() {
+        for mode in 0..3 {
+            let (app, renderer) = app();
+            let mut value = drawing();
+            value.animation = Some(GraphicAnimation::Pulse {
+                period_millis: 1000,
+                phase_millis: 0,
+            });
+            if mode > 0 {
+                value.fill = Some(Color(0, 255, 0, 255));
+                value.stroke = None;
+                value.commands = vec![
+                    Path::Move(Point::new(4., 4.)),
+                    Path::Line(Point::new(22., 4.)),
+                    Path::Line(Point::new(22., 20.)),
+                    Path::Line(Point::new(4., 20.)),
+                    Path::Close,
+                ];
+                if mode == 2 {
+                    value.stroke = Some(GraphicStroke {
+                        color: Color(0, 255, 0, 255),
+                        width: 4.,
+                        cap: StrokeCap::Butt,
+                    });
+                }
+            }
+            app.mount(
+                view()
+                    .style(
+                        Style::new()
+                            .width(Length::Px(18.))
+                            .height(Length::Px(24.))
+                            .opacity(0.5)
+                            .overflow_x(glory_render::style::Overflow::Hidden),
+                    )
+                    .fill(
+                        graphic()
+                            .drawing(value)
+                            .style(Style::new().width(Length::Px(24.)).height(Length::Px(24.))),
+                    ),
+            )
+            .unwrap();
+            let root = app.tree().roots()[0];
+            let child = app.tree().node(root).unwrap().children[0];
+            let physical = renderer.engine_id(child, Part::Main).unwrap();
+            let writes = app.runtime_stats().source_writes;
+            let mut raster = Raster::new();
+            for (time, alpha) in [(0., 32), (0.25, 80), (0.5, 128)] {
+                renderer.advance_time(time).unwrap();
+                raster.draw(&renderer).unwrap();
+                assert_eq!(pixel(&raster, 16, 12), [0, alpha, 0, alpha]);
+                if mode == 2 {
+                    assert_eq!(pixel(&raster, 5, 12), [0, alpha, 0, alpha]);
+                }
+                assert_eq!(pixel(&raster, 20, 12), [0, 0, 0, 0]);
+            }
+            assert_eq!(app.runtime_stats().source_writes, writes);
+            assert_eq!(renderer.engine_id(child, Part::Main).unwrap(), physical);
+            renderer.set_motion_preference(MotionPreference::Reduce);
+            raster.draw(&renderer).unwrap();
+            assert_eq!(pixel(&raster, 16, 12), [0, 128, 0, 128]);
+            let revision = renderer.stats().visual_revision;
+            renderer.advance_time(1.).unwrap();
+            assert_eq!(renderer.stats().visual_revision, revision);
+            assert!(!raster.draw(&renderer).unwrap().rendered);
+            app.clear().unwrap();
+            assert!(renderer.0.borrow().dom.motion.candidates.is_empty());
+        }
     }
     #[cfg(feature = "raster")]
     #[test]

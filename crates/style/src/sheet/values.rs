@@ -8,22 +8,29 @@ fn invalid<'i>(input: &Parser<'i>, expected: &str) -> ParseError<Error> {
 }
 fn length<'i>(input: &mut Parser<'i>) -> Result<Length> {
     match input.next()?.clone() {
-        Token::Function(name) if name.eq_ignore_ascii_case("calc") => input.parse_nested_block(|input| {
-            let ch = match input.next()?.clone() {
-                Token::Dimension { value, unit, .. } if unit.eq_ignore_ascii_case("ch") => f64::from(value),
-                _ => return Err(invalid(input, "expected calc(ch + px)")),
-            };
-            let sign = match input.next()?.clone() {
-                Token::Delim('+') => 1., Token::Delim('-') => -1.,
-                _ => return Err(invalid(input, "expected + or -")),
-            };
-            let px = match input.next()?.clone() {
-                Token::Dimension { value, unit, .. } if unit.eq_ignore_ascii_case("px") => f64::from(value) * sign,
-                _ => return Err(invalid(input, "expected px term")),
-            };
-            input.expect_exhausted()?;
-            Ok(Length::ChPx { ch, px })
-        }),
+        Token::Function(name) if name.eq_ignore_ascii_case("calc") => {
+            input.parse_nested_block(|input| {
+                let ch = match input.next()?.clone() {
+                    Token::Dimension { value, unit, .. } if unit.eq_ignore_ascii_case("ch") => {
+                        f64::from(value)
+                    }
+                    _ => return Err(invalid(input, "expected calc(ch + px)")),
+                };
+                let sign = match input.next()?.clone() {
+                    Token::Delim('+') => 1.,
+                    Token::Delim('-') => -1.,
+                    _ => return Err(invalid(input, "expected + or -")),
+                };
+                let px = match input.next()?.clone() {
+                    Token::Dimension { value, unit, .. } if unit.eq_ignore_ascii_case("px") => {
+                        f64::from(value) * sign
+                    }
+                    _ => return Err(invalid(input, "expected px term")),
+                };
+                input.expect_exhausted()?;
+                Ok(Length::ChPx { ch, px })
+            })
+        }
         Token::Ident(name) if name.eq_ignore_ascii_case("auto") => Ok(Length::Auto),
         Token::Percentage { unit_value, .. } => Ok(Length::Percent(f64::from(unit_value) * 100.0)),
         Token::Dimension { value, unit, .. } if unit.eq_ignore_ascii_case("px") => {
@@ -43,7 +50,9 @@ fn limit<'i>(input: &mut Parser<'i>) -> Result<Limit> {
     match length(input)? {
         Length::Px(v) => Ok(Limit::Px(v)),
         Length::Percent(v) => Ok(Limit::Percent(v)),
-        Length::Auto | Length::Ch(_) | Length::ChPx { .. } => Err(invalid(input, "max sizes require px, % or none")),
+        Length::Auto | Length::Ch(_) | Length::ChPx { .. } => {
+            Err(invalid(input, "max sizes require px, % or none"))
+        }
     }
 }
 fn px<'i>(input: &mut Parser<'i>) -> Result<f64> {
@@ -263,7 +272,18 @@ pub(super) fn parse<'i>(name: &str, input: &mut Parser<'i>) -> Result<Style> {
         "background-image" => style.background_image = Some(linear_gradient(input)?),
         "text-gradient" => style.text_gradient = Some(linear_gradient(input)?),
         "font-family" => style.font_family = Some(families(input)?),
-        "letter-spacing" => style.letter_spacing = Some(if input.try_parse(|p| p.expect_ident_matching("normal")).is_ok() { 0. } else { px(input)? }),
+        "letter-spacing" => {
+            style.letter_spacing = Some(
+                if input
+                    .try_parse(|p| p.expect_ident_matching("normal"))
+                    .is_ok()
+                {
+                    0.
+                } else {
+                    px(input)?
+                },
+            )
+        }
         "font-weight" => {
             style.font_weight = Some(if let Ok(value) = input.try_parse(|p| p.expect_number()) {
                 value.into()
@@ -275,6 +295,10 @@ pub(super) fn parse<'i>(name: &str, input: &mut Parser<'i>) -> Result<Style> {
             style.field_sizing = Some(keyword!(input,
                 "fixed" => FieldSizing::Fixed, "content" => FieldSizing::Content));
         }
+        "caption-side" => {
+            style.caption_side = Some(keyword!(input,
+            "top" => CaptionSide::Top, "bottom" => CaptionSide::Bottom))
+        }
         "white-space" => {
             style.white_space = Some(keyword!(input,
             "normal"=>WhiteSpace::Normal, "nowrap"=>WhiteSpace::NoWrap,
@@ -283,8 +307,9 @@ pub(super) fn parse<'i>(name: &str, input: &mut Parser<'i>) -> Result<Style> {
         "border-width" => style.border_width = Some(edges(input)?),
         "border-color" => style.border_color = Some(color(input)?),
         "border-style" => {
-            style.border_style =
-                Some(keyword!(input,"none"=>BorderStyle::None,"solid"=>BorderStyle::Solid))
+            style.border_style = Some(
+                keyword!(input,"none"=>BorderStyle::None,"solid"=>BorderStyle::Solid,"dashed"=>BorderStyle::Dashed,"dotted"=>BorderStyle::Dotted),
+            )
         }
         "border-radius" => style.radius = Some(px(input)?),
         "opacity" => style.opacity = Some(input.expect_number()?.into()),

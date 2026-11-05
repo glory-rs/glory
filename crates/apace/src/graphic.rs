@@ -49,9 +49,9 @@ pub(super) fn check(
 mod paint {
     use super::*;
     use anyrender::{PaintScene, Scene};
-    use glory_render::{PathCommand, StrokeCap};
+    use glory_render::{GraphicAnimation, PathCommand, StrokeCap};
     use kurbo::{Affine, BezPath, Cap, Join, Rect, Stroke};
-    use peniko::{Color, Fill};
+    use peniko::{BlendMode, Color, Fill};
 
     struct Graphic(
         GraphicProps,
@@ -84,26 +84,41 @@ mod paint {
             }
             let sx = f64::from(width) / self.0.width;
             let sy = f64::from(height) / self.0.height;
-            let scale = sx.min(sy);
+            let (scale_x, scale_y) = if self.0.fit == glory_render::GraphicFit::Stretch {
+                (sx, sy)
+            } else {
+                let scale = sx.min(sy);
+                (scale, scale)
+            };
             let mut transform = Affine::new([
-                scale,
+                scale_x,
                 0.0,
                 0.0,
-                scale,
-                (f64::from(width) - self.0.width * scale) / 2.0,
-                (f64::from(height) - self.0.height * scale) / 2.0,
+                scale_y,
+                (f64::from(width) - self.0.width * scale_x) / 2.0,
+                (f64::from(height) - self.0.height * scale_y) / 2.0,
             ]);
+            let mut opacity = 1.;
             if let (Some(animation), Some(state)) = (self.0.animation, &self.1)
                 && state.running.get()
             {
-                let angle = animation
-                    .radians(state.clock.get())
-                    .expect("validated host clock and animation");
-                let center = (self.0.width / 2., self.0.height / 2.);
-                transform = transform
-                    * Affine::translate(center)
-                    * Affine::rotate(angle)
-                    * Affine::translate((-center.0, -center.1));
+                match animation {
+                    GraphicAnimation::Rotate { .. } => {
+                        let angle = animation
+                            .radians(state.clock.get())
+                            .expect("validated host clock and animation");
+                        let center = (self.0.width / 2., self.0.height / 2.);
+                        transform = transform
+                            * Affine::translate(center)
+                            * Affine::rotate(angle)
+                            * Affine::translate((-center.0, -center.1));
+                    }
+                    GraphicAnimation::Pulse { .. } => {
+                        opacity = animation
+                            .opacity(state.clock.get())
+                            .expect("validated host clock and animation")
+                    }
+                }
             }
             let mut path = BezPath::new();
             for (index, target) in self.0.commands.iter().enumerate() {
@@ -120,11 +135,20 @@ mod paint {
                     PathCommand::Close => path.close_path(),
                 }
             }
-            scene.push_clip_layer(
-                Fill::NonZero,
-                Affine::IDENTITY,
-                &Rect::new(0.0, 0.0, f64::from(width), f64::from(height)),
-            );
+            let clip = Rect::new(0.0, 0.0, f64::from(width), f64::from(height));
+            if opacity == 1. {
+                scene.push_clip_layer(Fill::NonZero, Affine::IDENTITY, &clip);
+            } else {
+                scene.push_layer(
+                    Fill::NonZero,
+                    BlendMode::default(),
+                    opacity as f32,
+                    Affine::IDENTITY,
+                    &clip,
+                    None,
+                    None,
+                );
+            }
             if let Some(color) = self.0.fill {
                 scene.fill(
                     Fill::NonZero,

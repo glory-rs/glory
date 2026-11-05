@@ -2,7 +2,7 @@ use glory_style::{FlexWrap, Profile, Property, Style, Support, Unsupported, Valu
 #[test]
 fn wrap_property_and_both_values_have_independent_rejection() {
     for (wrap, value) in [
-        (FlexWrap::NoWrap, Value::FlexNoWrap),
+        (FlexWrap::NoWrap, Value::NoWrap),
         (FlexWrap::Wrap, Value::FlexWrap),
     ] {
         let style = Style::new().flex_wrap(wrap);

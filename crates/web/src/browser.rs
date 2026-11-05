@@ -11,6 +11,7 @@ mod hydrate;
 mod images;
 mod input_edit;
 mod layers;
+mod presence;
 mod rich;
 mod scroll_into_view;
 mod select;
@@ -54,6 +55,9 @@ pub struct Renderer {
 impl Renderer {
     fn new(runtime: RuntimeId, dom: Rc<Dom>) -> Self {
         if let Err(error) = dom.configure_collapse() {
+            dom.error.borrow_mut().get_or_insert(error);
+        }
+        if let Err(error) = dom.configure_presence() {
             dom.error.borrow_mut().get_or_insert(error);
         }
         let supports_layers =
@@ -163,6 +167,8 @@ impl Render for Renderer {
             focus: true,
             input: true,
             collapse_completion: true,
+            presence_completion: true,
+            presence_transforms: true,
         }
     }
     fn apply(&mut self, mutations: &[Mutation]) -> Result<Receipt, Error> {
@@ -224,6 +230,7 @@ impl Render for Renderer {
             .borrow_mut()
             .update(mapper.tree(), metadata, &changes.state);
         self.dom.update_collapses(mapper.tree(), metadata);
+        self.dom.update_presences(mapper.tree(), metadata);
         self.dom.update_translations(mapper.tree(), metadata);
         self.dom.update_clipboard(mapper.tree());
         if changes.state.structure || changes.state.file_configuration {
@@ -242,6 +249,9 @@ impl Render for Renderer {
         let descriptor = mapper.tree().node(node)?.descriptor.view();
         if enabled {
             kind.validate_target(descriptor)?;
+            if kind == EventKind::PresenceComplete {
+                self.dom.admit_presence(mapper.tree(), node);
+            }
             if kind == EventKind::CollapseComplete {
                 self.dom.admit_collapse(mapper.tree(), node);
             }
@@ -498,6 +508,9 @@ impl Render for Renderer {
             self.dom.error.borrow_mut().get_or_insert(error);
         }
         if let Err(error) = self.dom.read_translations(self.mapper.borrow().tree()) {
+            self.dom.error.borrow_mut().get_or_insert(error);
+        }
+        if let Err(error) = self.dom.read_presences(self.mapper.borrow().tree()) {
             self.dom.error.borrow_mut().get_or_insert(error);
         }
         if let Err(error) = self.dom.read_collapses(self.mapper.borrow().tree()) {
