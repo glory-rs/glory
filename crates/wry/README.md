@@ -40,6 +40,10 @@ repository's approved cache environment before Cargo (on macOS, source
 | Commands | Finite Keyboard/Navigate events on explicitly observed ancestors |
 | Styles | Shared HTML inline profile, raw app CSS, optional validated `css` Sheet replacement |
 | Resources | Explicit immutable `Config::assets` served by exact URL path; no implicit filesystem or remote-network access |
+| Local media | Explicit `Renderer::enable_local_media` and scoped `set_local_media`; native audio/video controls, paused on suspend, revoked on dispose |
+| Range reads | Optional `Config::asset_provider`; four owned workers, queue 16, 1 MiB ranges, 8 MiB full responses, exact capability paths |
+| Web readers | Optional `Config::browser`; 16 isolated HTTP(S) native windows, no application IPC or application resource protocol |
+| Native lifecycle | Optional `Config::native` on the window thread; application-owned tray/close/shutdown integration, absent by default |
 | Platform | Wry system WebView and Tao event loop on Windows/macOS/Linux; Linux uses Tao's GTK container for X11/Wayland |
 
 Raw display/XML templates, structured Select, File, RichEditor, Graphic, virtual collections and advanced
@@ -54,7 +58,13 @@ without remounting widgets. It uses the same ordered ready/ack transport and she
 CSP as the initial `Config::css`; CSS is installed as style text, never HTML.
 
 Link activation can reach Rust handlers. The stock shell denies document
-navigation and new windows, so opening external links is not a provided service.
+navigation and new windows. An explicit `browser::Controller` opens separate
+untrusted HTTP(S) reader windows; it never navigates the application document.
+Downloads, popups and supported permission requests are denied there. Navigation
+observations are bounded and generation checked; callbacks only enqueue work.
+Media providers must retain real read operations until completion and check
+scope/account liveness before and after reads. Revocation prevents publication;
+it does not promise to abort foreign OS work already in progress.
 Network I/O for application logic can use ordinary native Rust libraries; renderer
 resources are local. System WebViews differ in CSS and HTML feature support;
 identical pixels, OS IME gestures, screen-reader output and mobile support are not
@@ -91,6 +101,8 @@ code, not IPC commands.
 cargo test --locked -p glory-wry --all-features
 cargo clippy --locked -p glory-wry --all-features --all-targets -- -D warnings
 GLORY_WRY_WINDOW=1 cargo test --locked -p glory-wry --all-features --test window
+GLORY_WRY_MEDIA=1 cargo test --locked -p glory-wry --all-features --test media_window
+GLORY_WRY_BROWSER=1 cargo test --locked -p glory-wry --all-features --test browser_window
 ```
 
 The opt-in window test runs the actual system WebView on the UI/main thread.

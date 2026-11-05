@@ -13,6 +13,20 @@ fn ready(renderer: &Renderer) {
         .receive(&message(renderer, json!({"type":"ready"})))
         .unwrap();
 }
+#[test]
+fn local_media_requires_explicit_host_opt_in_and_exact_local_paths() {
+    let runtime=RuntimeId::new();let mut ids=NodeIds::new(runtime);let id=ids.allocate();
+    let mut renderer=Renderer::new(runtime);create(&mut renderer,id,Props::View);
+    let media=||LocalMedia {kind:MediaKind::Audio,path:"/media/opaque",title:"Owned attachment"};
+    assert!(renderer.set_local_media(id,Some(media())).is_err());
+    renderer.enable_local_media();
+    for path in ["https://example.org/file","file:///private/a","//host/file","/a/../b","/a?token=x","/%2e%2e/a"] {
+        assert!(renderer.set_local_media(id,Some(LocalMedia {path,..media()})).is_err());
+    }
+    renderer.set_local_media(id,Some(media())).unwrap();ready(&renderer);
+    let value=batch(&renderer);assert_eq!(value["commands"].as_array().unwrap().last().unwrap()["op"],"local_media");
+    renderer.close();assert!(renderer.set_local_media(id,None).is_err());
+}
 fn batch(renderer: &Renderer) -> Value {
     let script = renderer.take_script().unwrap().unwrap();
     serde_json::from_str(

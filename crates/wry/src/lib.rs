@@ -3,6 +3,8 @@
 #![cfg(not(target_arch = "wasm32"))]
 
 mod protocol;
+mod local_media;
+pub use local_media::{LocalMedia, MediaKind};
 #[cfg(all(
     feature = "shell",
     any(target_os = "macos", target_os = "windows", target_os = "linux")
@@ -73,6 +75,7 @@ impl Transport {
     }
 }
 struct State {
+    local_media: bool,
     mapper: Mapper,
     transport: Transport,
     nodes: NodeMap<Live>,
@@ -127,6 +130,7 @@ impl Renderer {
             .expect("Wry document identities exhausted");
         Self(Rc::new(RefCell::new(State {
             mapper: Mapper::new(runtime),
+            local_media: false,
             transport: Transport {
                 session: format!("{}.{}", runtime.value(), document),
                 commands: Vec::new(),
@@ -377,6 +381,9 @@ impl Renderer {
 // Refuse host behavior that has not been implemented, before staged UI changes.
 fn preflight(node: DescriptorView<'_>, patch: Option<&Patch>) -> Result<(), Error> {
     glory_html::preflight(node, patch)?;
+    if node.options.get::<glory_html::display::Placement>().is_some() {
+        return Err(Error::Unsupported("Wry sparse display templates"));
+    }
     if node.options.get::<VirtualPart>().is_some() {
         return Err(Error::Unsupported("Wry virtual collection handover"));
     }

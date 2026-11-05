@@ -1,5 +1,8 @@
 //! Desktop lifecycle. Wry callbacks enqueue strings; Rust UI stays on this loop.
 use crate::Renderer;
+mod assets;
+pub mod browser;
+pub use assets::{AssetProvider, AssetSource, MAX_RANGE_BYTES};
 use glory_core::executor::Executor;
 use glory_ui::{App, Widget};
 use std::{
@@ -42,23 +45,52 @@ pub struct Asset {
     pub mime: String,
     pub bytes: Vec<u8>,
 }
+/// Optional application-owned native shell integration. Every method runs on
+/// the window thread, outside UI runtime borrows. Native callbacks must enqueue
+/// work and wake this loop; they must not invoke application UI closures.
+pub trait NativeLifecycle {
+    fn opened(&mut self, _window: &NativeWindow, _wake: &Waker) -> Result<(), ShellError> {
+        Ok(())
+    }
+    /// Return false to keep a reachable application window alive (e.g. tray).
+    fn close_requested(&mut self, _window: &NativeWindow) -> Result<bool, ShellError> {
+        Ok(true)
+    }
+    /// Return true to finish the shell. The application still owns shutdown.
+    fn poll(&mut self, _window: &NativeWindow) -> Result<bool, ShellError> {
+        Ok(false)
+    }
+    fn closed(&mut self, _window: &NativeWindow) {}
+}
+#[cfg(target_os = "windows")]
+pub use tao::platform::windows::WindowExtWindows as NativeWindowExtWindows;
+pub use tao::window::Window as NativeWindow;
 pub struct Config {
+    /// No tray, startup registration, updater, or platform hooks by default.
+    pub native: Option<Box<dyn NativeLifecycle>>,
     pub title: String,
+    /// Explicit isolated native HTTP(S) reader windows; absent by default.
+    pub browser: Option<browser::Controller>,
     pub width: f64,
     pub height: f64,
     pub css: String,
     pub assets: BTreeMap<String, Asset>,
+    /// Explicit capability provider for bounded asynchronous local range reads.
+    pub asset_provider: Option<Arc<dyn AssetProvider>>,
     /// Trusted application bootstrap, run at document start after the bridge.
     pub initialization_script: Option<String>,
 }
 impl Default for Config {
     fn default() -> Self {
         Self {
+            native: None,
             title: "Glory".into(),
+            browser: None,
             width: 800.,
             height: 600.,
             css: String::new(),
             assets: BTreeMap::new(),
+            asset_provider: None,
             initialization_script: None,
         }
     }
@@ -206,6 +238,10 @@ impl Shell {
             .map_err(|e| ShellError(e.to_string()))?;
         let proxy = self.event_loop.create_proxy();
         let waker = Waker::from(Arc::new(LoopWake(proxy.clone())));
+        let mut browser_host = config
+            .browser
+            .map(|controller| browser::Host::new(controller, waker.clone()))
+            .transpose()?;
         let initial_url = if cfg!(target_os = "windows") {
             "http://glory.localhost/index.html"
         } else {
@@ -213,24 +249,62 @@ impl Shell {
         };
         let index = html.into_bytes();
         let assets = config.assets;
-        let builder=WebViewBuilder::new()
-            .with_custom_protocol("glory".into(),move |_,request| {
-                let path=request.uri().path();
-                let (status,mime,body)=if request.method()!="GET" || request.uri().host().is_some_and(|host|host!="localhost" && host!="glory.localhost") {
-                    (403,"text/plain",Vec::new())
-                } else if path=="/index.html" {(200,"text/html; charset=utf-8",index.clone())}
-                else if let Some(asset)=assets.get(path) {(200,asset.mime.as_str(),asset.bytes.clone())}
-                else {(404,"text/plain",Vec::new())};
-                Response::builder().status(status).header("Content-Type",mime).header("X-Content-Type-Options","nosniff")
-                    .header("Content-Security-Policy","default-src 'none'; script-src 'none'; style-src 'unsafe-inline' glory: http://glory.localhost; img-src glory: http://glory.localhost data:; font-src glory: http://glory.localhost; base-uri 'none'; frame-src 'none'; form-action 'none'")
-                    .body(Cow::Owned(body)).expect("validated static response headers")
+        let local_media = app.renderer.0.borrow().local_media;
+        let media_policy = if local_media {
+            "; media-src glory: http://glory.localhost"
+        } else {
+            ""
+        };
+        let policy = format!(
+            "default-src 'none'; script-src 'none'; style-src 'unsafe-inline' glory: http://glory.localhost; img-src glory: http://glory.localhost data:; font-src glory: http://glory.localhost; base-uri 'none'; frame-src 'none'; form-action 'none'{media_policy}"
+        );
+        let asset_pool = config.asset_provider.map(assets::Pool::new).transpose()?;
+        let builder = WebViewBuilder::new()
+            .with_asynchronous_custom_protocol("glory".into(), move |_, request, responder| {
+                let path = request.uri().path();
+                if request
+                    .uri()
+                    .host()
+                    .is_none_or(|host| host == "localhost" || host == "glory.localhost")
+                    && path != "/index.html"
+                    && !assets.contains_key(path)
+                    && let Some(pool) = &asset_pool
+                {
+                    pool.submit(request, responder);
+                    return;
+                }
+                let (status, mime, body) = if request.method() != "GET"
+                    || request
+                        .uri()
+                        .host()
+                        .is_some_and(|host| host != "localhost" && host != "glory.localhost")
+                {
+                    (403, "text/plain", Vec::new())
+                } else if path == "/index.html" {
+                    (200, "text/html; charset=utf-8", index.clone())
+                } else if let Some(asset) = assets.get(path) {
+                    (200, asset.mime.as_str(), asset.bytes.clone())
+                } else {
+                    (404, "text/plain", Vec::new())
+                };
+                responder.respond(
+                    Response::builder()
+                        .status(status)
+                        .header("Content-Type", mime)
+                        .header("X-Content-Type-Options", "nosniff")
+                        .header("Content-Security-Policy", policy.as_str())
+                        .body(Cow::Owned(body))
+                        .expect("validated static response headers"),
+                );
             })
             .with_initialization_script(app.renderer.initialization_script())
-            .with_navigation_handler(move |url|url==initial_url)
-            .with_new_window_req_handler(|_,_|wry::NewWindowResponse::Deny)
+            .with_navigation_handler(move |url| url == initial_url)
+            .with_new_window_req_handler(|_, _| wry::NewWindowResponse::Deny)
             .with_ipc_handler(move |request| {
                 // Callbacks never borrow UI or invoke user closures.
-                if request.body().len()<=crate::protocol::MAX_IPC_BYTES {let _=proxy.send_event(Message::Ipc(request.into_body()));}
+                if request.body().len() <= crate::protocol::MAX_IPC_BYTES {
+                    let _ = proxy.send_event(Message::Ipc(request.into_body()));
+                }
             })
             .with_url(initial_url);
         let builder = if let Some(script) = config.initialization_script {
@@ -247,13 +321,26 @@ impl Shell {
         #[cfg(not(target_os = "linux"))]
         let webview = builder.build(&window);
         let webview = webview.map_err(|e| ShellError(e.to_string()))?;
+        let mut native = config.native;
+        if let Some(host) = &mut native {
+            host.opened(&window, &waker)?;
+        }
         let mut result = Ok(());
         let mut ready = false;
+        let mut exiting = false;
         let mut deadline = Some(Instant::now() + Duration::from_secs(15));
-        self.event_loop.run_return(|event,_,flow| {
+        self.event_loop.run_return(|event,target,flow| {
+            if exiting {*flow=ControlFlow::Exit;return;}
             *flow=deadline.map_or(ControlFlow::Wait,ControlFlow::WaitUntil);
+            if let Event::WindowEvent {window_id,event:ref window_event,..}=event
+                && browser_host.as_mut().is_some_and(|host|host.window_event(window_id,window_event)) {return;}
             if matches!(event,Event::WindowEvent{window_id,event:WindowEvent::CloseRequested,..} if window_id==window.id()) {
-                *flow=ControlFlow::Exit;return;
+                match native.as_mut().map_or(Ok(true),|host|host.close_requested(&window)) {
+                    Ok(false)=>return,
+                    Err(error)=>result=Err(error),
+                    Ok(true)=>{},
+                }
+                exiting=true;*flow=ControlFlow::Exit;return;
             }
             let turn=(||->Result<bool,ShellError>{
                 if let Event::UserEvent(Message::Ipc(message))=&event {
@@ -263,6 +350,8 @@ impl Shell {
                 }
                 if !matches!(event,Event::MainEventsCleared|Event::UserEvent(_)|Event::NewEvents(_)) {return Ok(false);}
                 if deadline.is_some_and(|deadline|Instant::now()>=deadline) {return Err(ShellError("Wry document/acknowledgement timed out".into()));}
+                if let Some(host)=&mut browser_host {host.poll(target);}
+                if native.as_mut().is_some_and(|host|match host.poll(&window) {Ok(quit)=>quit,Err(error)=>{result=Err(error);true}}) {return Ok(true);}
                 app.observe(&waker)?;
                 if let Some(script)=app.renderer.take_script()? {
                     webview.evaluate_script(&script).map_err(|e|ShellError(e.to_string()))?;
@@ -270,9 +359,14 @@ impl Shell {
                 }
                 finished(&app)
             })();
-            match turn {Ok(true)=>*flow=ControlFlow::Exit,Err(error)=>{result=Err(error);*flow=ControlFlow::Exit;},_=>{}}
+            match turn {Ok(true)=>{exiting=true;*flow=ControlFlow::Exit;},Err(error)=>{result=Err(error);exiting=true;*flow=ControlFlow::Exit;},_=>{}}
             if !matches!(*flow,ControlFlow::Exit) {*flow=deadline.map_or(ControlFlow::Wait,ControlFlow::WaitUntil);}
         });
+        if let Some(host) = &mut native {
+            host.closed(&window);
+        }
+        drop(native);
+        drop(browser_host);
         drop(app);
         drop(webview);
         drop(window);

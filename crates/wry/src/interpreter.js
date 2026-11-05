@@ -178,6 +178,7 @@ function gloryWry(config) {
       }
     }
     e.parent=command.parent;
+    for(const child of entries.values()) if(child.mediaSuspended && alive(child) && contains(e,child.start)) {installMedia(child);child.mediaSuspended=false;}
   }
   function contains(e,node) {
     for(let current=e.start;current;current=current.nextSibling) {
@@ -186,7 +187,23 @@ function gloryWry(config) {
     }
     return false;
   }
+  function stopMedia(e,remember=false) {
+    if(e.localMedia) {
+      e.mediaPosition=remember && Number.isFinite(e.localMedia.currentTime) ? e.localMedia.currentTime : 0;
+      e.localMedia.pause(); e.localMedia.removeAttribute("src"); e.localMedia.load(); e.localMedia.remove(); e.localMedia=null;
+    }
+  }
+  function installMedia(e) {
+    const value=e.mediaConfig;if(!value)return;
+    const player=document.createElement(value.kind);
+    player.controls=true; player.preload="metadata"; player.autoplay=false;
+    player.setAttribute("playsinline",""); player.setAttribute("aria-label",value.title);
+    player.style.width="100%"; player.style.maxHeight="480px";
+    if(e.mediaPosition>0) player.addEventListener('loadedmetadata',()=>{if(e.localMedia===player && Number.isFinite(player.duration))player.currentTime=Math.min(e.mediaPosition,Math.max(0,player.duration-.1));},{once:true});
+    player.src=value.path;main(e).appendChild(player);e.localMedia=player;
+  }
   function suspend(e) {
+    for(const child of entries.values()) if(child.localMedia && contains(e,child.localMedia)) {stopMedia(child,true);child.mediaSuspended=true;}
     const focused=origin(document.activeElement);
     if(focused && contains(e,document.activeElement)) {
       if(focused.composing) {
@@ -243,6 +260,12 @@ function gloryWry(config) {
     if(command.op==="css") { document.getElementById("glory-author").textContent=command.value; return; }
     const e=get(command.id);
     switch(command.op) {
+      case "local_media": {
+        stopMedia(e);
+        e.mediaConfig=command.value;e.mediaPosition=0;e.mediaSuspended=false;
+        if(alive(e)) installMedia(e);else e.mediaSuspended=!!command.value;
+        break;
+      }
       case "patch":
         for(const edit of command.edits) switch(edit.kind) {
           case "revision": e.requested=edit.value; if(e.edit!=="Text") e.revision=edit.value;break;
@@ -269,7 +292,7 @@ function gloryWry(config) {
         extract(e);
         for(const id of command.subtree) {
           const old=entries.get(id);
-          if(old) { if(main(old)) observer.unobserve(main(old)); entries.delete(id); editing.delete(old); old.proposal=null; old.dirty=false; old.park.replaceChildren(); }
+          if(old) { stopMedia(old); if(main(old)) observer.unobserve(main(old)); entries.delete(id); editing.delete(old); old.proposal=null; old.dirty=false; old.park.replaceChildren(); }
         }
         break;
       default: throw Error("unknown operation");
