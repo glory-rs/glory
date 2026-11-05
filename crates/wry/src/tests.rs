@@ -347,6 +347,113 @@ fn preflight_and_direct_apply_reject_unsupported_metadata_with_accepted_prefix()
     assert!(renderer.listen(id, EventKind::Drag, true).is_err());
     renderer.listen(id, EventKind::Drag, false).unwrap();
 }
+
+#[test]
+fn captured_drag_is_supported_and_rejects_nonfinite_coordinates_and_unknown_phases() {
+    let runtime = RuntimeId::new();
+    let mut ids = NodeIds::new(runtime);
+    let id = ids.allocate();
+    let mut renderer = Renderer::new(runtime);
+    let mut descriptor = Descriptor::new(Props::View);
+    descriptor.semantics = Some(Box::new(Semantics {
+        drag_capture: Some(glory_render::DragCapture::Press),
+        ..Default::default()
+    }));
+    renderer
+        .apply(&[
+            Mutation::Create {
+                id,
+                node: Box::new(descriptor),
+            },
+            Mutation::Place {
+                id,
+                parent: None,
+                before: None,
+            },
+        ])
+        .unwrap();
+    renderer.listen(id, EventKind::Drag, true).unwrap();
+    let event = |phase: &str| {
+        serde_json::json!({"kind":"drag","phase":phase,"x":12.5,"y":22.5}).to_string()
+    };
+    for phase in ["start", "move", "drop", "cancel"] {
+        let wire: WireEvent = serde_json::from_str(&event(phase)).unwrap();
+        let event = wire.into_event(id).unwrap();
+        assert!(
+            renderer
+                .0
+                .borrow()
+                .mapper
+                .tree()
+                .validate_event(id, &event)
+                .unwrap()
+        );
+    }
+    assert!(
+        serde_json::from_str::<WireEvent>(&event("foreign"))
+            .unwrap()
+            .into_event(id)
+            .is_err()
+    );
+    ready(&renderer);
+    for phase in ["start", "move", "move", "drop"] {
+        let wire: Value = serde_json::from_str(&event(phase)).unwrap();
+        renderer
+            .receive(&message(
+                &renderer,
+                json!({"type":"event","node":protocol::id(id),"event":wire}),
+            ))
+            .unwrap();
+    }
+    let state = renderer.0.borrow();
+    assert_eq!(state.inputs.len(), 3);
+    assert!(matches!(
+        state.inputs[0],
+        Input::Event {
+            event: Event::Drag {
+                phase: glory_render::DragPhase::Start,
+                ..
+            },
+            ..
+        }
+    ));
+    assert!(matches!(
+        state.inputs[1],
+        Input::Event {
+            event: Event::Drag {
+                phase: glory_render::DragPhase::Move,
+                ..
+            },
+            ..
+        }
+    ));
+    assert!(matches!(
+        state.inputs[2],
+        Input::Event {
+            event: Event::Drag {
+                phase: glory_render::DragPhase::Drop,
+                ..
+            },
+            ..
+        }
+    ));
+    drop(state);
+    let bad = Event::Drag {
+        from: id,
+        phase: glory_render::DragPhase::Move,
+        x: f64::NAN,
+        y: 0.,
+    };
+    assert!(
+        renderer
+            .0
+            .borrow()
+            .mapper
+            .tree()
+            .validate_event(id, &bad)
+            .is_err()
+    );
+}
 #[test]
 fn selection_boundaries_validate_before_transport_changes() {
     let runtime = RuntimeId::new();

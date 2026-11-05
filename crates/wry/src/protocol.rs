@@ -119,6 +119,11 @@ pub enum WireEvent {
         outcome: String,
     },
     Activate,
+    Drag {
+        phase: String,
+        x: f64,
+        y: f64,
+    },
     Value {
         value: String,
         composing: bool,

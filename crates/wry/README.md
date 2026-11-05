@@ -126,3 +126,12 @@ text proposals, so handlers observe the latest accepted value. Deferred actions
 are bounded and retired targets are discarded. Native window acceptance includes
 a rapid-input burst followed immediately by activation, alongside the existing
 UTF-16, composition, identity and lifecycle checks.
+
+Captured primary-pointer dragging is supported on a View with explicit
+\`Semantics::drag_capture\` and an \`EventKind::Drag\` observer. The host owns
+pointer capture and queues Start/Move/Drop/Cancel with viewport CSS coordinates.
+Adjacent moves coalesce while preserving Start/Drop boundaries. Escape, window
+blur, lost capture and retired sources cancel the gesture. Scrollable ancestors
+scroll near their edges; the application performs hit testing and owns its data
+mutation. Provide separate keyboard controls. Threshold/hit-target dragging
+without explicit source capture remains unsupported.

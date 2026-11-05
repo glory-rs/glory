@@ -350,13 +350,21 @@ impl Renderer {
                     return Err(Error::InvalidEvent("Wry input queue budget"));
                 }
                 // Coalesce only adjacent geometry observations, preserving input order.
-                if matches!(event, Event::Resize { .. } | Event::Scroll { .. })
-                    && let Some(Input::Event {
-                        node: previous,
-                        event: old,
-                    }) = state.inputs.last_mut()
+                if matches!(
+                    event,
+                    Event::Resize { .. }
+                        | Event::Scroll { .. }
+                        | Event::Drag {
+                            phase: glory_render::DragPhase::Move,
+                            ..
+                        }
+                ) && let Some(Input::Event {
+                    node: previous,
+                    event: old,
+                }) = state.inputs.last_mut()
                     && *previous == node
                     && old.kind() == event.kind()
+                    && !matches!(old,Event::Drag{phase,..} if *phase!=glory_render::DragPhase::Move)
                 {
                     *old = event;
                     return Ok(true);
@@ -421,7 +429,6 @@ fn preflight(node: DescriptorView<'_>, patch: Option<&Patch>) -> Result<(), Erro
             || s.input_edit.is_some()
             || s.translation.is_some()
             || s.collapse.is_some()
-            || s.drag_capture.is_some()
             || s.swipe_capture.is_some()
             || s.context_menu.is_some()
             || s.tags_input.is_some()
@@ -468,6 +475,7 @@ fn supported_event(kind: EventKind) -> bool {
             | EventKind::ColorSchemeChanged
             | EventKind::Clipboard
             | EventKind::ImageStatus
+            | EventKind::Drag
     )
 }
 impl Render for Renderer {
@@ -502,6 +510,17 @@ impl Render for Renderer {
             kind.validate_target(descriptor)?;
             if !supported_event(kind) {
                 return Err(Error::Unsupported("Wry event"));
+            }
+            if kind == EventKind::Drag
+                && descriptor
+                    .semantics
+                    .as_deref()
+                    .and_then(|s| s.drag_capture)
+                    .is_none()
+            {
+                return Err(Error::Unsupported(
+                    "Wry drag requires explicit source capture",
+                ));
             }
         }
         state.transport.push(json!({"op":"listen","id":protocol::id(node),"kind":format!("{kind:?}"),"enabled":enabled}))?;
@@ -783,6 +802,18 @@ impl WireEvent {
                     ImageStatus::Loaded
                 } else {
                     ImageStatus::Failed
+                },
+            },
+            Self::Drag { phase, x, y } => Event::Drag {
+                from: node,
+                x,
+                y,
+                phase: match phase.as_str() {
+                    "start" => glory_render::DragPhase::Start,
+                    "move" => glory_render::DragPhase::Move,
+                    "drop" => glory_render::DragPhase::Drop,
+                    "cancel" => glory_render::DragPhase::Cancel,
+                    _ => return Err(Error::InvalidEvent("Wry drag phase")),
                 },
             },
             Self::Keyboard { command } => Event::Keyboard {

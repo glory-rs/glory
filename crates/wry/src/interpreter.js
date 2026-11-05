@@ -123,6 +123,7 @@ function gloryWry(config) {
   function attribute(e,part,name,value) {
     const element=e.parts.get(part);
     if(value===null) element.removeAttribute(name); else element.setAttribute(name,value);
+    if(name==="data-gly-drag-capture" && value===null && drag?.e===e)finishDrag("cancel",drag.x,drag.y);
   }
   function create(command) {
     if(entries.has(command.id)) throw Error("duplicate node");
@@ -348,7 +349,7 @@ function gloryWry(config) {
         extract(e);
         for(const id of command.subtree) {
           const old=entries.get(id);
-          if(old) { stopMedia(old); if(main(old)) observer.unobserve(main(old)); entries.delete(id); editing.delete(old); old.proposal=null; old.dirty=false; old.park.replaceChildren(); }
+          if(old) { if(drag?.e===old)finishDrag("cancel",drag.x,drag.y); stopMedia(old); if(main(old)) observer.unobserve(main(old)); entries.delete(id); editing.delete(old); old.proposal=null; old.dirty=false; old.park.replaceChildren(); }
         }
         break;
       default: throw Error("unknown operation");
@@ -364,6 +365,64 @@ function gloryWry(config) {
       post({type:"ack",sequence:batch.sequence});
     } catch(error) {fault(error);}
   }});
+  // Pointer capture is host-owned. Only finite semantic observations leave the
+  // interpreter; applications decide what a completed drag means.
+  let drag=null, suppressClick=false;
+  const dragBlocked=e=>!alive(e) || main(e)?.closest("[hidden],[inert],[data-gly-hidden],[aria-disabled=true],[aria-readonly=true]");
+  function finishDrag(phase,x,y) {
+    const previous=drag;drag=null;
+    if(!previous)return;
+    if(entries.get(previous.e.id)===previous.e)
+      event(previous.e,{kind:"drag",phase,x,y});
+    try{previous.element.releasePointerCapture(previous.pointer);}catch(_){}
+  }
+  function dragScroll() {
+    if(!drag)return;
+    if(dragBlocked(drag.e)){finishDrag("cancel",drag.x,drag.y);return;}
+    let changed=false, vertical=false, horizontal=false;
+    for(let element=document.elementFromPoint(drag.x,drag.y);element && element!==root;element=element.parentElement) {
+      const rect=element.getBoundingClientRect(),style=getComputedStyle(element);
+      const delta=(point,start,end)=>point<start+28?-10:point>end-28?10:0;
+      if(!vertical && /(auto|scroll)/.test(style.overflowY) && element.scrollHeight>element.clientHeight) {
+        const old=element.scrollTop;element.scrollTop+=delta(drag.y,rect.top,rect.bottom);
+        vertical=element.scrollTop!==old;changed||=vertical;
+      }
+      if(!horizontal && /(auto|scroll)/.test(style.overflowX) && element.scrollWidth>element.clientWidth) {
+        const old=element.scrollLeft;element.scrollLeft+=delta(drag.x,rect.left,rect.right);
+        horizontal=element.scrollLeft!==old;changed||=horizontal;
+      }
+    }
+    if(changed)event(drag.e,{kind:"drag",phase:"move",x:drag.x,y:drag.y});
+    requestAnimationFrame(dragScroll);
+  }
+  function receiveDrag(raw) {
+    if(raw.type==="pointerdown") {
+      suppressClick=false;
+      if(drag)finishDrag("cancel",drag.x,drag.y);
+      if(raw.button!==0 || !raw.isPrimary || raw.target.closest?.("input,textarea,select,button,a,[contenteditable=true]"))return;
+      let e=origin(raw.target);
+      while(e && !e.interests.has("Drag"))e=e.parent?entries.get(e.parent):null;
+      if(!e || dragBlocked(e))return;
+      const element=main(e), capture=element.getAttribute("data-gly-drag-capture");
+      // This host supports explicit source capture. Threshold/hit-target drag
+      // remains unsupported rather than silently changing its event contract.
+      if(!capture)return;
+      try{element.setPointerCapture(raw.pointerId);}catch(_){return;}
+      raw.preventDefault();
+      if(capture==="press-focus")element.focus({preventScroll:true});
+      drag={e,element,pointer:raw.pointerId,x:raw.clientX,y:raw.clientY};
+      event(e,{kind:"drag",phase:"start",x:raw.clientX,y:raw.clientY});requestAnimationFrame(dragScroll);return;
+    }
+    if(!drag || raw.pointerId!==drag.pointer)return;
+    if(dragBlocked(drag.e)){finishDrag("cancel",raw.clientX,raw.clientY);return;}
+    raw.preventDefault();
+    drag.x=raw.clientX;drag.y=raw.clientY;
+    if(raw.type==="pointermove")event(drag.e,{kind:"drag",phase:"move",x:drag.x,y:drag.y});
+    else if(raw.type==="pointerup"){suppressClick=true;finishDrag("drop",drag.x,drag.y);}
+    else finishDrag("cancel",drag.x,drag.y);
+  }
+  window.addEventListener("blur",()=>{if(drag)finishDrag("cancel",drag.x,drag.y);});
+  window.addEventListener("keydown",raw=>{if(raw.key==="Escape" && drag){raw.preventDefault();finishDrag("cancel",drag.x,drag.y);}},true);
   function receive(domEvent) {
     const e=origin(domEvent.target);
     if(!e || !alive(e)) return;
@@ -371,6 +430,7 @@ function gloryWry(config) {
     const disabled=!input || input.disabled || element.getAttribute("aria-disabled")==="true";
     switch(domEvent.type) {
       case "click":
+        if(suppressClick){suppressClick=false;domEvent.preventDefault();domEvent.stopPropagation();return;}
         if(disabled || input.readOnly && e.edit==="Check") {domEvent.preventDefault();return;}
         if(e.prevent || element.tagName==="A") domEvent.preventDefault();
         if(observed(e,"Activate")) event(e,{kind:"activate"});break;
@@ -418,6 +478,7 @@ function gloryWry(config) {
     if(!root) {fault("missing Glory mount");return;}
     for(const name of ["click","input","change","compositionstart","compositionend","focusin","focusout","scroll","keydown"])
       root.addEventListener(name,receive,true);
+    for(const name of ["pointerdown","pointermove","pointerup","pointercancel","lostpointercapture"])root.addEventListener(name,receiveDrag,true);
     post({type:"ready"});
   }
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",start,{once:true}); else start();
