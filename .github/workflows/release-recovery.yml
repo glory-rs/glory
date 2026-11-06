@@ -1,0 +1,80 @@
+name: Resume verified release
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing immutable release tag
+        required: true
+        type: string
+      validation_run:
+        description: Completed Release run with all required product checks passing
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: glory-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: windows-latest
+    timeout-minutes: 360
+    permissions:
+      contents: write
+      actions: read
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_BUILD_JOBS: '2'
+      GIT_CONFIG_COUNT: '1'
+      GIT_CONFIG_KEY_0: core.symlinks
+      GIT_CONFIG_VALUE_0: 'true'
+      RELEASE_TAG: ${{ inputs.tag }}
+      VALIDATION_RUN: ${{ inputs.validation_run }}
+      GH_TOKEN: ${{ github.token }}
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ github.sha }}
+          path: release-tools
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag }}
+          path: product
+      - name: Validate the requested tag
+        run: |
+          git -C product check-ref-format "refs/tags/$env:RELEASE_TAG"
+          if ($LASTEXITCODE) { throw 'Invalid release tag' }
+          $commit = git -C product rev-parse --verify "refs/tags/$env:RELEASE_TAG^{commit}"
+          $head = git -C product rev-parse HEAD
+          if ($LASTEXITCODE -or $commit -ne $head) { throw 'Product checkout must be the exact release tag' }
+      - name: Check out exact published engine sources
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch takia-v0.15.1 https://github.com/glory-rs/takia takia
+          git clone --depth 1 --branch wingy-v0.31.1 https://github.com/glory-rs/wingy wingy
+          git clone --depth 1 --branch apace-v0.3.0 https://github.com/glory-rs/apace apace
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
+        with:
+          python-version: '3.13'
+      - name: Prepare compiler and verify publisher tests
+        run: |
+          New-Item -ItemType Directory -Force $env:CARGO_TARGET_DIR,$env:TEMP | Out-Null
+          rustup toolchain install 1.98.0 --profile minimal
+          if ($LASTEXITCODE) { throw 'Toolchain installation failed' }
+          rustup default 1.98.0
+          python -m unittest discover -s release-tools/scripts -p test_release.py
+          if ($LASTEXITCODE) { throw 'Publisher regression tests failed' }
+      - name: Resume only the validated frozen product
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          python release-tools/scripts/release.py --source-root product --publish --tag $env:RELEASE_TAG --validation-run $env:VALIDATION_RUN
+          if ($LASTEXITCODE) { throw 'Release recovery failed' }

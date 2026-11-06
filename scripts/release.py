@@ -25,9 +25,11 @@ def run(*args, capture=False):
     return result.stdout.strip() if capture else None
 
 
-def publish(command):
+def publish(command, before_upload=None):
     """Retry only an explicit registry rate limit, at the server's stated time."""
     for attempt in range(12):
+        if before_upload:
+            before_upload()
         result = subprocess.run(command, cwd=ROOT, text=True, encoding="utf-8", errors="replace",
                                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         print(result.stdout, end="", flush=True)
@@ -75,12 +77,74 @@ def validate_archive(archive, expected_commit):
     return vcs
 
 
+def development_bootstrap(package, owned, completed):
+    """Resolve only unpublished owned dev dependencies from this frozen checkout.
+
+    Cargo resolves dev dependencies while making the archive lockfile, even
+    though publish verification builds only the library. Command-local patches
+    break that resolution cycle; they never enter the distributed manifest.
+    """
+    flags = []
+    for dependency in package["dependencies"]:
+        name = dependency["name"]
+        if dependency["kind"] != "dev" or name not in owned or name in completed:
+            continue
+        # Never replace a normal/build dependency, including optional edges.
+        pending = [package["name"]]
+        visited = set()
+        while pending:
+            current = pending.pop()
+            if current in visited:
+                continue
+            visited.add(current)
+            if current == name:
+                raise SystemExit("Dev bootstrap would replace a production dependency: " + name)
+            pending.extend(d["name"] for d in owned[current]["dependencies"]
+                           if d["kind"] != "dev" and d["name"] in owned)
+        path = Path(owned[name]["manifest_path"]).parent.resolve().as_posix()
+        flags.extend(["--config", f"patch.crates-io.{name}.path={json.dumps(path)}"])
+    return flags
+
+
+def verify_validation_run(repository, tag, commit, run_id):
+    """Reuse only the successful required checks of this exact immutable release."""
+    if not os.environ.get("GITHUB_ACTIONS") or not re.fullmatch(r"[0-9]+", str(run_id)):
+        raise SystemExit("Recovery requires a gated Actions run")
+    record = json.loads(run("gh", "api", f"repos/{repository}/actions/runs/{run_id}", capture=True))
+    if (record.get("head_sha") != commit or record.get("head_branch") != tag
+            or record.get("event") != "push" or record.get("status") != "completed"
+            or record.get("path") != ".github/workflows/release.yml"
+            or record.get("repository", {}).get("full_name") != repository):
+        raise SystemExit("Validation run does not identify this frozen release")
+    jobs = json.loads(run("gh", "api", f"repos/{repository}/actions/runs/{run_id}/jobs?per_page=100", capture=True))["jobs"]
+    required = {"checks / semantic-ui", "checks / quality / msrv",
+                "checks / quality / linux", "checks / quality / dependencies"}
+    successful = {j["name"] for j in jobs if j.get("conclusion") == "success"}
+    if not required.issubset(successful) or any(
+            j.get("conclusion") not in ("success", "skipped") for j in jobs if j["name"] != "publish"):
+        raise SystemExit("Required frozen release checks have not all succeeded")
+    return {"run_id": int(run_id), "attempt": record["run_attempt"], "commit": commit}
+
+
+def verify_remote_tag(tag, commit):
+    records = run("git", "ls-remote", "origin", f"refs/tags/{tag}", f"refs/tags/{tag}^{{}}", capture=True)
+    refs = dict(line.split()[::-1] for line in records.splitlines())
+    actual = refs.get(f"refs/tags/{tag}^{{}}", refs.get(f"refs/tags/{tag}"))
+    if actual != commit:
+        raise SystemExit("Remote release tag moved or disappeared")
+
+
 def main():
+    global ROOT
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--publish", action="store_true")
     parser.add_argument("--tag")
     parser.add_argument("--check-package", help="package and inspect one owned crate without uploading")
+    parser.add_argument("--source-root", type=Path, help="frozen product checkout for workflow-versioned tooling")
+    parser.add_argument("--validation-run", help="completed release run whose product checks all succeeded")
     options = parser.parse_args()
+    if options.source_root:
+        ROOT = options.source_root.resolve()
     plan = json.loads((ROOT / "release.json").read_text(encoding="utf-8"))
     manifest = tomllib.loads((ROOT / "Cargo.toml").read_text(encoding="utf-8"))
     workspace = manifest.get("workspace", {})
@@ -168,12 +232,16 @@ def main():
         succeeded = {job["name"] for job in jobs["jobs"] if job["conclusion"] == "success"}
         if not set(plan.get("required_release_jobs", [])).issubset(succeeded):
             raise SystemExit("Required platform validation jobs have not all succeeded")
+    validation = verify_validation_run(plan["repository"], tag, head, options.validation_run) if options.validation_run else None
+    verify_remote_tag(tag, head)
     artifacts = []
     ensure_library_lockfiles(ROOT)
     release_packages = []
     output = target / "release" / tag
     output.mkdir(parents=True, exist_ok=True)
+    completed_publications = set()
     for package in selected:
+        bootstrap = development_bootstrap(package, owned, completed_publications)
         name, package_version = package["name"], package["version"]
         expected_commit = plan.get("reused_package_commits", {}).get(name, head)
         request = urllib.request.Request(f"https://crates.io/api/v1/crates/{name}/{package_version}",
@@ -194,12 +262,12 @@ def main():
                 raise SystemExit(f"A reused package must already exist in the registry: {name}")
             # Packaging is reversible. Inspect its exact contents before the
             # immutable registry upload, including Windows Git symlink failures.
-            run("cargo", "package", "--locked", "--no-verify", "--manifest-path", package["manifest_path"], "-p", name)
+            run("cargo", "package", "--locked", "--no-verify", "--manifest-path", package["manifest_path"], "-p", name, *bootstrap)
             validate_archive(package_targets[name] / "package" / f"{name}-{package_version}.crate", head)
-            command = ["cargo", "publish", "--locked", "--manifest-path", package["manifest_path"], "-p", name]
+            command = ["cargo", "publish", "--locked", "--manifest-path", package["manifest_path"], "-p", name, *bootstrap]
             if name in cross:
                 command.append("--no-verify")
-            publish(command)
+            publish(command, before_upload=lambda: verify_remote_tag(tag, head))
         # Let sparse-index propagation finish before building dependent crates.
         ready = False
         for attempt in range(30):
@@ -223,6 +291,7 @@ def main():
         if checksum != published["checksum"]:
             raise SystemExit(f"Registry checksum differs from packaged artifact: {name}")
         validate_archive(archive, expected_commit)
+        completed_publications.add(name)
         artifacts.append(archive)
         release_packages.append({"name": name, "version": package_version,
                                  "checksum": checksum, "source_commit": expected_commit})
@@ -231,7 +300,7 @@ def main():
         artifacts.extend([output / "registry-consumer.json", output / "registry-consumer.lock"])
     evidence = output / "release.json"
     evidence.write_text(json.dumps({"repository": plan["repository"], "tag": tag, "commit": head,
-        "packages": release_packages}, indent=2) + "\n", encoding="utf-8")
+        "packages": release_packages, "validation": validation}, indent=2) + "\n", encoding="utf-8")
     exists = subprocess.run(["gh", "release", "view", tag, "--repo", plan["repository"]],
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
     if not exists:
