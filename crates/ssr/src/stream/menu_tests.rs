@@ -208,38 +208,81 @@ fn menu_stream_retains_intrinsic_roles_and_lowers_popup_layer_and_controlled_pro
 
 #[test]
 fn menu_search_stream_retains_the_editor_and_updates_the_active_relation_before_wasm() {
-    let gate = Gate::default(); let loader = gate.clone();
-    let mut stream = stream_with(Resources::default(), Config::default(), move |scope, resources| {
-        let resource = resources.bind(scope.owner(), "menu-search", "v1", || 1_u64, move |_| loader.waiting()).unwrap();
-        let ready = resource.map(|state| matches!(state, ResourceState::Ready { .. }));
-        view().role(Role::Menu).name("Search stream menu")
-            .semantics(Some(Box::new(Semantics { id: Some(SemanticId::new("search-menu").unwrap()), ..Default::default() })))
-            .fill((
-                glory_ui::input().purpose(glory_render::Purpose::Search).name("Find stream action")
-                    .semantics(scope.bond(move || Some(Box::new(Semantics {
-                        id: Some(SemanticId::new("search-editor").unwrap()),
-                        controls: Some(SemanticId::new("search-menu").unwrap()),
-                        menu_search: Some(SemanticId::new("search-menu").unwrap()),
-                        active_descendant: ready.get().then(|| SemanticId::new("search-result").unwrap()),
-                        ..Default::default()
-                    })))),
-                glory_ui::button().label("Save stream document").semantics(Some(Box::new(Semantics {
-                    id: Some(SemanticId::new("search-result").unwrap()),
-                    menu_item: Some(MenuItemSemantics { kind: MenuItemKind::Action, owner: SemanticId::new("search-menu").unwrap() }),
+    let gate = Gate::default();
+    let loader = gate.clone();
+    let mut stream = stream_with(
+        Resources::default(),
+        Config::default(),
+        move |scope, resources| {
+            let resource = resources
+                .bind(
+                    scope.owner(),
+                    "menu-search",
+                    "v1",
+                    || 1_u64,
+                    move |_| loader.waiting(),
+                )
+                .unwrap();
+            let ready = resource.map(|state| matches!(state, ResourceState::Ready { .. }));
+            view()
+                .role(Role::Menu)
+                .name("Search stream menu")
+                .semantics(Some(Box::new(Semantics {
+                    id: Some(SemanticId::new("search-menu").unwrap()),
                     ..Default::default()
-                }))),
-            ))
-    }).unwrap();
+                })))
+                .fill((
+                    glory_ui::input()
+                        .purpose(glory_render::Purpose::Search)
+                        .name("Find stream action")
+                        .semantics(scope.bond(move || {
+                            Some(Box::new(Semantics {
+                                id: Some(SemanticId::new("search-editor").unwrap()),
+                                controls: Some(SemanticId::new("search-menu").unwrap()),
+                                menu_search: Some(SemanticId::new("search-menu").unwrap()),
+                                active_descendant: ready
+                                    .get()
+                                    .then(|| SemanticId::new("search-result").unwrap()),
+                                ..Default::default()
+                            }))
+                        })),
+                    glory_ui::button()
+                        .label("Save stream document")
+                        .semantics(Some(Box::new(Semantics {
+                            id: Some(SemanticId::new("search-result").unwrap()),
+                            menu_item: Some(MenuItemSemantics {
+                                kind: MenuItemKind::Action,
+                                owner: SemanticId::new("search-menu").unwrap(),
+                            }),
+                            ..Default::default()
+                        }))),
+                ))
+        },
+    )
+    .unwrap();
     let shell = frame(&mut stream);
-    assert!(shell.body().contains("data-gly-menu-search=\"search-menu\""));
+    assert!(
+        shell
+            .body()
+            .contains("data-gly-menu-search=\"search-menu\"")
+    );
     assert!(shell.body().contains("type=\"search\""));
     assert!(!shell.body().contains("aria-activedescendant"));
-    assert!(poll(&mut stream).is_pending()); gate.resolve(Ok("ready".into()));
-    let patch = frame(&mut stream); assert_eq!(patch.kind(), FrameKind::Patch);
-    assert!(patch.body().contains("aria-activedescendant")); assert!(patch.body().contains("search-result"));
-    let end = frame(&mut stream); assert_eq!(end.kind(), FrameKind::End);
+    assert!(poll(&mut stream).is_pending());
+    gate.resolve(Ok("ready".into()));
+    let patch = frame(&mut stream);
+    assert_eq!(patch.kind(), FrameKind::Patch);
+    assert!(patch.body().contains("aria-activedescendant"));
+    assert!(patch.body().contains("search-result"));
+    let end = frame(&mut stream);
+    assert_eq!(end.kind(), FrameKind::End);
     if let Some(path) = std::env::var_os("GLORY_MENU_SEARCH_STREAM_FIXTURE") {
-        let bootstrap = Bootstrap { root_id: "menu-search-stream-root".into(), data_id: "menu-search-stream-data".into(), script_url: "glory-stream.js".into(), nonce: None };
+        let bootstrap = Bootstrap {
+            root_id: "menu-search-stream-root".into(),
+            data_id: "menu-search-stream-data".into(),
+            script_url: "glory-stream.js".into(),
+            nonce: None,
+        };
         let path = std::path::PathBuf::from(path);
         std::fs::write(&path, format!("<!doctype html><html><head><link rel=\"icon\" href=\"data:,\">{}</head><body>{}{}{}</body></html>",
             bootstrap.head_script().unwrap(), shell.to_html(&bootstrap).unwrap(), patch.to_html(&bootstrap).unwrap(), end.to_html(&bootstrap).unwrap())).unwrap();

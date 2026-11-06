@@ -451,11 +451,13 @@ mod native {
             .unwrap_or_else(|| "127.0.0.1:8789".into());
         let listener = TcpListener::bind(&address)?;
         let metrics = Arc::new(Metrics::default());
-        let directory = PathBuf::from(
-            std::env::args()
-                .nth(1)
-                .unwrap_or_else(|| concat!(env!("CARGO_MANIFEST_DIR"), "/../../target/verification/glory-semantic-ui/web-demo").into()),
-        );
+        let directory = PathBuf::from(std::env::args().nth(1).unwrap_or_else(|| {
+            concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../target/verification/glory-semantic-ui/web-demo"
+            )
+            .into()
+        }));
         println!("Stream transport fixture at http://{address}/stream");
         for socket in listener.incoming() {
             let socket = socket?;

@@ -284,7 +284,17 @@ impl Host {
                     title,
                     generation,
                 } => {
-                    if self.controller.0.lock().unwrap().entries.get(&key).is_none_or(|(current,_)|*current!=generation){continue;}
+                    if self
+                        .controller
+                        .0
+                        .lock()
+                        .unwrap()
+                        .entries
+                        .get(&key)
+                        .is_none_or(|(current, _)| *current != generation)
+                    {
+                        continue;
+                    }
                     self.pages.remove(&key);
                     match page(target, &self.controller, &key, &url, &title, generation) {
                         Ok(page) => {
@@ -378,7 +388,11 @@ fn page(
             true
         })
         .with_document_title_changed_handler(move |title| {
-            let title = title.chars().filter(|value|!value.is_control()).take(512).collect();
+            let title = title
+                .chars()
+                .filter(|value| !value.is_control())
+                .take(512)
+                .collect();
             title_proxy.post(&title_key, generation, Observation::Title(title));
         })
         .with_on_page_load_handler(move |event, _| {
