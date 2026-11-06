@@ -25,7 +25,7 @@
     {
       "name": "apace",
       "git": "https://github.com/glory-rs/apace",
-      "rev": "0ae9cb9d51010f3b468a66a9a2e5e627e04c2e62",
+      "rev": "e7c2f483ed454d62183efbfcb9b60e8328effaed",
       "upstream": "https://github.com/DioxusLabs/blitz",
       "upstream_rev": "e5929f9e2af42f8fdc10cea315b502d3937b1350",
       "packages": [
@@ -240,35 +240,74 @@
     },
     {
       "name": "stylo",
-      "git": "https://github.com/glory-rs/stylo",
-      "rev": "ec62d42fcaa124ad927ab974aade120d82ce50a2",
-      "upstream": "https://github.com/nicoburns/stylo",
-      "upstream_rev": "78734bf554bb40af9dc11c0eedbe724f6055697c",
-      "version": "0.22.0",
+      "git": "https://github.com/servo/stylo",
+      "rev": "2dca34592ced37c6aa01733e94206a767194cf9d",
+      "upstream": "https://github.com/servo/stylo",
+      "upstream_rev": "2dca34592ced37c6aa01733e94206a767194cf9d",
+      "version": "0.23.0",
       "versions": {
-        "glory-servo-arc": "0.5.0",
-        "glory-to-shmem": "0.6.0",
-        "glory-to-shmem-derive": "0.2.0",
-        "glory-selectors": "0.41.0"
+        "servo_arc": "0.6.0",
+        "to_shmem": "0.7.0",
+        "to_shmem_derive": "0.3.0",
+        "selectors": "0.42.0"
       },
       "packages": [
-        "glory-servo-arc",
-        "glory-stylo-atoms",
-        "glory-stylo-derive",
-        "glory-stylo-static-prefs",
-        "glory-to-shmem-derive",
-        "glory-to-shmem",
-        "glory-selectors",
-        "glory-stylo-malloc-size-of",
-        "glory-stylo-dom",
-        "glory-stylo-traits",
-        "glory-stylo"
+        "servo_arc",
+        "stylo_atoms",
+        "stylo_derive",
+        "stylo_static_prefs",
+        "to_shmem_derive",
+        "to_shmem",
+        "selectors",
+        "stylo_malloc_size_of",
+        "stylo_dom",
+        "stylo_traits",
+        "stylo"
       ],
       "tests": [
         "--workspace"
-      ]
+      ],
+      "auxiliary_versions": {
+        "servo_arc": [
+          "0.4.3"
+        ],
+        "selectors": [
+          "0.38.0"
+        ]
+      },
+      "previous_release": {
+        "name": "stylo",
+        "git": "https://github.com/glory-rs/stylo",
+        "rev": "ec62d42fcaa124ad927ab974aade120d82ce50a2",
+        "upstream": "https://github.com/nicoburns/stylo",
+        "upstream_rev": "78734bf554bb40af9dc11c0eedbe724f6055697c",
+        "version": "0.22.0",
+        "versions": {
+          "glory-servo-arc": "0.5.0",
+          "glory-to-shmem": "0.6.0",
+          "glory-to-shmem-derive": "0.2.0",
+          "glory-selectors": "0.41.0"
+        },
+        "packages": [
+          "glory-servo-arc",
+          "glory-stylo-atoms",
+          "glory-stylo-derive",
+          "glory-stylo-static-prefs",
+          "glory-to-shmem-derive",
+          "glory-to-shmem",
+          "glory-selectors",
+          "glory-stylo-malloc-size-of",
+          "glory-stylo-dom",
+          "glory-stylo-traits",
+          "glory-stylo"
+        ],
+        "tests": [
+          "--workspace"
+        ]
+      },
+      "source_notes": "Current Cargo manifests use upstream Stylo 0.23.0 registry archives. Older selectors/servo_arc belong only to Wry dom_query, not the Apace style engine. The prior namespaced 0.22 source record is retained as historical provenance."
     }
   ],
   "source_mode": "sibling-development",
-  "publication": "Coordinated 0.6.1 publication: native engine sources remain sibling paths; the namespaced Stylo graph uses checksum- and source-verified registry packages."
+  "publication": "Development sources: Apace/Takia/Wingy use declared sibling paths; upstream Stylo 0.23.0 registry archives are verified by exact version, VCS identity and checksum. This record does not assert a new publication."
 }

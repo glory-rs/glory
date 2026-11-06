@@ -112,7 +112,7 @@ def main():
     parser.add_argument("--no-fetch", action="store_true")
     args = parser.parse_args()
     ensure_library_lockfiles()
-    cargo_home = Path(os.environ["CARGO_HOME"]).resolve()
+    cargo_home = Path(os.environ.get("CARGO_HOME") or Path.home() / ".cargo").resolve()
     database = cargo_home / "advisory-db"
     args.out.mkdir(parents=True, exist_ok=True)
     command = [args.audit_bin, "audit"] if args.audit_bin else ["cargo", "audit"]

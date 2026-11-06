@@ -35,13 +35,13 @@ def ensure_library_lockfiles(root=None, manifests=None):
     for manifest in sorted(selected):
         metadata = json.loads(subprocess.check_output(
             ["cargo", "metadata", "--no-deps", "--format-version", "1", "--manifest-path", str(manifest)],
-            cwd=root, text=True, encoding="utf-8"))
+            cwd=manifest.parent, text=True, encoding="utf-8"))
         if target is not None and Path(metadata["target_directory"]).resolve() != target:
             raise SystemExit(f"Unexpected Cargo target for {manifest}")
         lock = Path(metadata["workspace_root"]) / "Cargo.lock"
         if not lock.exists():
             subprocess.run(["cargo", "--config", 'resolver.incompatible-rust-versions="fallback"',
-                            "generate-lockfile", "--manifest-path", str(manifest)], cwd=root, check=True)
+                            "generate-lockfile", "--manifest-path", str(manifest)], cwd=manifest.parent, check=True)
 
 
 if __name__ == "__main__":

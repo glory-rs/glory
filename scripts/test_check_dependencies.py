@@ -164,7 +164,7 @@ class AuditPolicyTests(unittest.TestCase):
 
 
 class AuditCommandTests(unittest.TestCase):
-    def invoke(self, responses):
+    def invoke(self, responses, default_home=False):
         with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as directory:
             root = Path(directory)
             locks = [f"case-{index}/Cargo.lock" for index in range(len(responses))]
@@ -177,7 +177,8 @@ class AuditCommandTests(unittest.TestCase):
             with patch.object(AUDIT, "ROOT", root), patch.object(AUDIT, "LOCKFILES", locks), \
                     patch.object(AUDIT, "ensure_library_lockfiles"), \
                     patch.object(AUDIT.subprocess, "run", side_effect=responses) as run, \
-                    patch.dict(os.environ, {"CARGO_HOME": str(root / "cargo")}), \
+                    patch.dict(os.environ, {} if default_home else {"CARGO_HOME": str(root / "cargo")}, clear=default_home), \
+                    patch.object(Path, "home", return_value=root), \
                     patch.object(sys, "argv", ["check-dependencies.py", "--out", str(out)]), \
                     redirect_stdout(output):
                 result = AUDIT.main()
@@ -190,6 +191,13 @@ class AuditCommandTests(unittest.TestCase):
 
     def response(self, value, code=0):
         return subprocess.CompletedProcess([], code, json.dumps(value), "")
+
+    def test_unset_cargo_home_uses_normal_home_without_changing_environment(self):
+        result, _, _, calls, _, _ = self.invoke([self.response(report())], default_home=True)
+        self.assertEqual(result, 0)
+        command = calls[0].args[0]
+        database = Path(command[command.index("--db") + 1])
+        self.assertEqual(database.parts[-2:], (".cargo", "advisory-db"))
 
     def test_known_warning_is_visible_and_raw_report_is_preserved(self):
         value = known_report()

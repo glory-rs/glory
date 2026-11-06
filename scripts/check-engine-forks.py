@@ -16,13 +16,13 @@ def run(*args, **kwargs):
     return subprocess.run(args, check=True, text=True, **kwargs)
 
 
-def output(*args):
-    return run(*args, stdout=subprocess.PIPE).stdout.strip()
+def output(*args, **kwargs):
+    return run(*args, stdout=subprocess.PIPE, **kwargs).stdout.strip()
 
 
 def build_environment():
     root = Path(__file__).resolve().parents[1]
-    metadata = json.loads(output("cargo", "metadata", "--no-deps", "--format-version", "1", "--manifest-path", str(root / "Cargo.toml")))
+    metadata = json.loads(output("cargo", "metadata", "--no-deps", "--format-version", "1", cwd=root))
     return {
         "CARGO_HOME": Path(os.environ.get("CARGO_HOME", Path.home() / ".cargo")).resolve(),
         "CARGO_TARGET_DIR": Path(metadata["target_directory"]).resolve(),
@@ -47,25 +47,27 @@ def test_fork(fork, directory, target, android):
             run("git", "-C", str(directory), "fetch", "origin", fork["rev"])
         run("git", "-C", str(directory), "checkout", "--detach", fork["rev"])
     manifest = str(directory / "Cargo.toml")
-    metadata = json.loads(output("cargo", "metadata", "--no-deps", "--format-version", "1", "--manifest-path", manifest))
-    assert Path(metadata["target_directory"]).resolve() == target
+    # Each independent engine owns its Cargo configuration and normal target.
+    metadata = json.loads(output("cargo", "metadata", "--no-deps", "--format-version", "1", cwd=directory))
+    engine_target = Path(metadata["target_directory"]).resolve()
     # Engine libraries also omit locks. Prepare only the explicitly requested
     # engine workspace before its locked tests, without widening Glory defaults.
     if not (Path(metadata["workspace_root"]) / "Cargo.lock").exists():
         run("cargo", "--config", 'resolver.incompatible-rust-versions="fallback"',
-            "generate-lockfile", "--manifest-path", manifest)
+            "generate-lockfile", "--manifest-path", manifest, cwd=directory)
     for arguments in [fork["tests"], *fork.get("extra_tests", [])]:
-        run("cargo", "test", "--locked", "--manifest-path", manifest, *arguments)
+        run("cargo", "test", "--locked", "--manifest-path", manifest, *arguments, cwd=directory)
     for index, source in enumerate(fork.get("rustc_tests", [])):
-        executable = target / f"{fork['name']}-standalone-{index}{'.exe' if os.name == 'nt' else ''}"
+        engine_target.mkdir(parents=True, exist_ok=True)
+        executable = engine_target / f"{fork['name']}-standalone-{index}{'.exe' if os.name == 'nt' else ''}"
         run("rustc", "--edition", "2024", "--test", str(directory / source), "-o", str(executable))
         run(str(executable))
     if sys.platform == "darwin":
         for arguments in fork.get("apple_checks", []):
-            run("cargo", "check", "--locked", "--manifest-path", manifest, *arguments)
+            run("cargo", "check", "--locked", "--manifest-path", manifest, *arguments, cwd=directory)
     if android:
         for arguments in fork.get("android_checks", []):
-            run("cargo", "check", "--locked", "--manifest-path", manifest, *arguments)
+            run("cargo", "check", "--locked", "--manifest-path", manifest, *arguments, cwd=directory)
     if not development:
         assert not output("git", "-C", str(directory), "status", "--porcelain"), directory
 
@@ -108,10 +110,13 @@ def main():
         source = None if local else "registry+https://github.com/rust-lang/crates.io-index"
         for name in fork["packages"]:
             version = fork.get("versions", {}).get(name, fork["version"])
-            resolved = [package for package in metadata["packages"] if package["name"] == name]
+            allowed = {version, *fork.get("auxiliary_versions", {}).get(name, [])}
+            named = [package for package in metadata["packages"] if package["name"] == name]
+            assert all(package["version"] in allowed for package in named), (name, named)
+            resolved = [package for package in named if package["version"] == version]
             assert len(resolved) == 1 and resolved[0]["source"] == source, (name, resolved)
             assert resolved[0]["version"] == version, (name, resolved[0]["version"], version)
-            locked = [package for package in lock["package"] if package["name"] == name]
+            locked = [package for package in lock["package"] if package["name"] == name and package["version"] == version]
             assert len(locked) == 1 and locked[0].get("source") == source, (name, locked)
             assert locked[0]["version"] == version, (name, locked)
             if local:
@@ -126,7 +131,7 @@ def main():
             archive = paths["CARGO_HOME"] / "registry/cache" / archive_root.parent.name / f"{name}-{version}.crate"
             assert hashlib.sha256(archive.read_bytes()).hexdigest() == locked[0]["checksum"], name
         if options.test:
-            directory = (root / fork["path"]).resolve() if local else paths["CARGO_TARGET_DIR"].parent / "engine-forks" / fork["name"]
+            directory = (root / fork["path"]).resolve() if local else paths["CARGO_TARGET_DIR"] / "verification" / "engine-forks" / fork["name"]
             directory.parent.mkdir(parents=True, exist_ok=True)
             test_source = dict(fork)
             if not local:
@@ -146,7 +151,9 @@ def main():
             for package in packages:
                 if package["name"] in fork["packages"]:
                     assert package.get("source") == expected, (lockfile, package)
-                    assert package["version"] == fork.get("versions", {}).get(package["name"], fork["version"]), (lockfile, package)
+                    version = fork.get("versions", {}).get(package["name"], fork["version"])
+                    allowed = {version, *fork.get("auxiliary_versions", {}).get(package["name"], [])}
+                    assert package["version"] in allowed, (lockfile, package)
         legacy = {"blitz-dom", "blitz-traits", "blitz-paint", "blitz-shell", "stylo_taffy", "taffy", "winit", "winit-core"}
         assert not legacy.intersection(package["name"] for package in packages), lockfile
         assert not any(package["name"].startswith(("winit-", "glory-blitz", "blitz-")) for package in packages), lockfile

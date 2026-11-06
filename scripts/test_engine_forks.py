@@ -34,6 +34,26 @@ class EngineLockfileTests(unittest.TestCase):
                 checker.test_fork(fork, root, target, False)
             self.assertEqual(lock.read_bytes(), saved)
 
+    def test_engine_uses_its_own_configuration_when_called_from_another_workspace(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            (root / "src").mkdir()
+            (root / "src/lib.rs").write_text("#[test] fn ready() {}\n", encoding="utf-8")
+            (root / "Cargo.toml").write_text(
+                '[workspace]\n[package]\nname="engine-own-target"\nversion="0.0.0"\n'
+                'edition="2024"\npublish=false\n', encoding="utf-8")
+            (root / ".cargo").mkdir()
+            (root / ".cargo/config.toml").write_text('[build]\ntarget-dir="own-target"\n', encoding="utf-8")
+            origin = "https://example.invalid/engine-own-target"
+            subprocess.run(["git", "init", "--quiet", str(root)], check=True)
+            subprocess.run(["git", "-C", str(root), "remote", "add", "origin", origin], check=True)
+            with patch.dict(os.environ):
+                os.environ.pop("CARGO_TARGET_DIR", None)
+                checker.test_fork({"path": ".", "git": origin, "tests": ["--lib"]},
+                                  root, root / "caller-target", False)
+            self.assertTrue((root / "own-target/debug/deps").is_dir())
+            self.assertFalse((root / "caller-target").exists())
+
 
 if __name__ == "__main__":
     unittest.main()
