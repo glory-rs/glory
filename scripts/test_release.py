@@ -109,6 +109,53 @@ class ReleasePlanTests(unittest.TestCase):
         self.assertIn('v0.6.0',self.validate(mutation))
 
 
+class RecoveryTests(unittest.TestCase):
+    def test_only_unpublished_dev_dependency_gets_a_command_local_patch(self):
+        core = {"name": "owned-core", "manifest_path": "core/Cargo.toml", "dependencies": []}
+        ssr = {"name": "owned-ssr", "manifest_path": "ssr/Cargo.toml", "dependencies": []}
+        package = {"name": "owned-routing", "dependencies": [
+            {"name": "owned-core", "kind": None}, {"name": "owned-ssr", "kind": "dev"}]}
+        owned = {p["name"]: p for p in [core, ssr, package]}
+        flags = publisher.development_bootstrap(package, owned, {"owned-core"})
+        self.assertEqual(flags[0], "--config")
+        self.assertIn("patch.crates-io.owned-ssr.path=", flags[1])
+        self.assertEqual(publisher.development_bootstrap(package, owned, set(owned)), [])
+        package["dependencies"].append({"name": "owned-ssr", "kind": None})
+        with self.assertRaisesRegex(SystemExit, "production dependency"):
+            publisher.development_bootstrap(package, owned, {"owned-core"})
+
+    def validate(self, mutate=lambda record, jobs: None):
+        record = {"head_sha": "a" * 40, "head_branch": "v0.7.0", "event": "push", "status": "completed",
+                  "path": ".github/workflows/release.yml", "repository": {"full_name": "glory-rs/glory"}, "run_attempt": 1}
+        jobs = [{"name": name, "conclusion": "success"} for name in
+                ["checks / semantic-ui", "checks / quality / msrv", "checks / quality / linux", "checks / quality / dependencies"]]
+        jobs.append({"name": "publish", "conclusion": "failure"})
+        mutate(record, jobs)
+        with patch.object(publisher, "run", side_effect=[json.dumps(record), json.dumps({"jobs": jobs})]), \
+             patch.dict(os.environ, {"GITHUB_ACTIONS": "true"}):
+            return publisher.verify_validation_run("glory-rs/glory", "v0.7.0", "a" * 40, "123")
+
+    def test_exact_successful_product_checks_can_resume_a_failed_publisher(self):
+        self.assertEqual(self.validate()["commit"], "a" * 40)
+
+    def test_changed_or_incomplete_validation_cannot_publish(self):
+        mutations = [lambda r, j: r.update(head_sha="b" * 40), lambda r, j: r.update(head_branch="main"),
+                     lambda r, j: r.update(path=".github/workflows/other.yml"), lambda r, j: r.update(status="in_progress"),
+                     lambda r, j: r.update(repository={"full_name": "other/repo"}),
+                     lambda r, j: j[0].update(conclusion="failure"), lambda r, j: j[0].update(conclusion="skipped"),
+                     lambda r, j: j.pop(0)]
+        for mutation in mutations:
+            with self.subTest(mutation=mutation), self.assertRaises(SystemExit):
+                self.validate(mutation)
+
+    def test_remote_tag_must_still_identify_frozen_commit(self):
+        with patch.object(publisher, "run", return_value="b" * 40 + "\trefs/tags/v0.7.0\n" + "a" * 40 + "\trefs/tags/v0.7.0^{}"):
+            publisher.verify_remote_tag("v0.7.0", "a" * 40)
+        with patch.object(publisher, "run", return_value="b" * 40 + "\trefs/tags/v0.7.0"):
+            with self.assertRaisesRegex(SystemExit, "moved"):
+                publisher.verify_remote_tag("v0.7.0", "a" * 40)
+
+
 class ArchiveTests(unittest.TestCase):
     def inspect(self, license_content, sha='a'*40, dirty=False):
         parent=Path(os.environ.get('CARGO_TARGET_DIR',local_build_path('release-tests/target'))).parent

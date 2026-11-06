@@ -14,3 +14,16 @@ The optional Apple runner and device/reader acceptance are recorded separately.
 Configure the repository Actions secret `CARGO_REGISTRY_TOKEN`. Never commit credentials.
 Run `python scripts/release.py` with the approved Cargo artifact directory to validate the plan locally.
 Builds inherit the caller environment and normal project configuration. Do not redirect Cargo home, target or TEMP/TMP to a global cache root. Obtain artifact paths from `cargo metadata --no-deps --format-version 1` in the owning workspace; do not use or recreate the retired `D:/BuildCache` directory.
+
+If publication tooling fails after all product checks passed, use the manual
+**Resume verified release** workflow with the immutable tag and original Release
+run ID. It checks that run's repository, workflow, tag, commit and every required
+successful product job before any registry operation. Tooling comes from the
+workflow revision while every package and release note comes from the frozen tag;
+existing registry archives must retain that same commit and checksum.
+
+Cargo resolves dev dependencies while packaging. Unpublished owned dev-only
+edges may use command-local Cargo patches to the same frozen source, without
+changing manifests, normal/build dependencies or consumer configuration. The
+publisher still builds each package and finishes with the registry-only consumer.
+The remote immutable tag is rechecked before each upload, including rate-limit retries.
