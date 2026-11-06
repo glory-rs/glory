@@ -19,3 +19,5 @@ examples/_*/
 
 # Library, example and benchmark resolutions are generated locally.
 **/Cargo.lock
+
+**/__pycache__/
