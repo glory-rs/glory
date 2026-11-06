@@ -1,119 +1,122 @@
-//! Native media acceptance without autoplay or audio hardware access.
-use glory_ui::{events::*, *};
-use glory_wry::{LocalMedia, MediaKind, shell::*};
-use std::{
-    cell::{Cell, RefCell},
-    rc::Rc,
-    sync::{Arc, Mutex},
-    time::{Duration, Instant},
-};
-struct Wav {
-    bytes: Vec<u8>,
-    offsets: Mutex<Vec<u64>>,
-    mime: &'static str,
-}
-impl AssetSource for Wav {
-    fn len(&self) -> u64 {
-        self.bytes.len() as u64
+#[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+mod desktop {
+    //! Native media acceptance without autoplay or audio hardware access.
+    use glory_ui::{events::*, *};
+    use glory_wry::{LocalMedia, MediaKind, shell::*};
+    use std::{
+        cell::{Cell, RefCell},
+        rc::Rc,
+        sync::{Arc, Mutex},
+        time::{Duration, Instant},
+    };
+    struct Wav {
+        bytes: Vec<u8>,
+        offsets: Mutex<Vec<u64>>,
+        mime: &'static str,
     }
-    fn mime(&self) -> &str {
-        self.mime
-    }
-    fn current(&self) -> bool {
-        true
-    }
-    fn read_range(&self, offset: u64, length: usize) -> std::result::Result<Vec<u8>, String> {
-        assert!(length <= MAX_RANGE_BYTES);
-        self.offsets.lock().unwrap().push(offset);
-        Ok(self.bytes[offset as usize..offset as usize + length].to_vec())
-    }
-}
-struct Provider(Arc<Wav>, Arc<Wav>);
-impl AssetProvider for Provider {
-    fn get(&self, path: &str) -> Option<Arc<dyn AssetSource>> {
-        match path {
-            "/media/owned.wav" => Some(self.0.clone() as Arc<dyn AssetSource>),
-            "/media/owned.png" => Some(self.1.clone() as Arc<dyn AssetSource>),
-            _ => None,
+    impl AssetSource for Wav {
+        fn len(&self) -> u64 {
+            self.bytes.len() as u64
+        }
+        fn mime(&self) -> &str {
+            self.mime
+        }
+        fn current(&self) -> bool {
+            true
+        }
+        fn read_range(&self, offset: u64, length: usize) -> std::result::Result<Vec<u8>, String> {
+            assert!(length <= MAX_RANGE_BYTES);
+            self.offsets.lock().unwrap().push(offset);
+            Ok(self.bytes[offset as usize..offset as usize + length].to_vec())
         }
     }
-}
-fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
-    if std::env::var("GLORY_WRY_MEDIA").as_deref() != Ok("1") {
-        println!("Set GLORY_WRY_MEDIA=1 for native media acceptance");
-        return Ok(());
-    }
-    let size = 120 * 8000 * 2u32;
-    let mut bytes = b"RIFF".to_vec();
-    bytes.extend((size + 36).to_le_bytes());
-    bytes.extend(b"WAVEfmt ");
-    bytes.extend(16u32.to_le_bytes());
-    bytes.extend(1u16.to_le_bytes());
-    bytes.extend(1u16.to_le_bytes());
-    bytes.extend(8000u32.to_le_bytes());
-    bytes.extend(16000u32.to_le_bytes());
-    bytes.extend(2u16.to_le_bytes());
-    bytes.extend(16u16.to_le_bytes());
-    bytes.extend(b"data");
-    bytes.extend(size.to_le_bytes());
-    bytes.resize(size as usize + 44, 0);
-    let wav = Arc::new(Wav {
-        bytes,
-        offsets: Mutex::new(vec![]),
-        mime: "audio/wav",
-    });
-    let png = Arc::new(Wav {
-        bytes: vec![
-            137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0, 1,
-            8, 4, 0, 0, 0, 181, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, 218, 99, 252, 255, 31,
-            0, 3, 3, 2, 0, 239, 154, 238, 95, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96, 130,
-        ],
-        offsets: Mutex::new(vec![]),
-        mime: "image/png",
-    });
-    let app = WindowApp::new();
-    let scope = app.app().scope();
-    let node = scope.cage(None);
-    let image_node = scope.cage(None);
-    let status = Rc::new(Cell::new(0));
-    let receipt = status.clone();
-    let part = Rc::new(RefCell::new(Some(
-        group()
-            .fill((
-                view().node_ref(node).class("player"),
-                view().node_ref(image_node).class("image"),
-            ))
-            .mount(scope)?,
-    )));
-    app.mount(col().fill((
-        text().content("Owned media"),
-        input().class("status").on(value_changed, move |event| {
-            if let Event::ValueChanged { value, .. } = event {
-                receipt.set(value.parse().unwrap_or(-1));
+    struct Provider(Arc<Wav>, Arc<Wav>);
+    impl AssetProvider for Provider {
+        fn get(&self, path: &str) -> Option<Arc<dyn AssetSource>> {
+            match path {
+                "/media/owned.wav" => Some(self.0.clone() as Arc<dyn AssetSource>),
+                "/media/owned.png" => Some(self.1.clone() as Arc<dyn AssetSource>),
+                _ => None,
             }
-        }),
-    )))?;
-    app.app().flush()?;
-    app.renderer().enable_local_media();
-    app.renderer().set_local_media(
-        node.get().unwrap(),
-        Some(LocalMedia {
-            kind: MediaKind::Audio,
-            path: "/media/owned.wav",
-            title: "Owned wave",
-        }),
-    )?;
-    app.renderer().set_local_media(
-        image_node.get().unwrap(),
-        Some(LocalMedia {
-            kind: MediaKind::Image,
-            path: "/media/owned.png",
-            title: "Owned image",
-        }),
-    )?;
-    let started = Instant::now();
-    let retired = Cell::new(0);
-    Shell::new().run_until(app,Config {
+        }
+    }
+    pub(super) fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
+        if std::env::var("GLORY_WRY_MEDIA").as_deref() != Ok("1") {
+            println!("Set GLORY_WRY_MEDIA=1 for native media acceptance");
+            return Ok(());
+        }
+        let size = 120 * 8000 * 2u32;
+        let mut bytes = b"RIFF".to_vec();
+        bytes.extend((size + 36).to_le_bytes());
+        bytes.extend(b"WAVEfmt ");
+        bytes.extend(16u32.to_le_bytes());
+        bytes.extend(1u16.to_le_bytes());
+        bytes.extend(1u16.to_le_bytes());
+        bytes.extend(8000u32.to_le_bytes());
+        bytes.extend(16000u32.to_le_bytes());
+        bytes.extend(2u16.to_le_bytes());
+        bytes.extend(16u16.to_le_bytes());
+        bytes.extend(b"data");
+        bytes.extend(size.to_le_bytes());
+        bytes.resize(size as usize + 44, 0);
+        let wav = Arc::new(Wav {
+            bytes,
+            offsets: Mutex::new(vec![]),
+            mime: "audio/wav",
+        });
+        let png = Arc::new(Wav {
+            bytes: vec![
+                137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1, 0, 0, 0,
+                1, 8, 4, 0, 0, 0, 181, 28, 12, 2, 0, 0, 0, 11, 73, 68, 65, 84, 120, 218, 99, 252,
+                255, 31, 0, 3, 3, 2, 0, 239, 154, 238, 95, 0, 0, 0, 0, 73, 69, 78, 68, 174, 66, 96,
+                130,
+            ],
+            offsets: Mutex::new(vec![]),
+            mime: "image/png",
+        });
+        let app = WindowApp::new();
+        let scope = app.app().scope();
+        let node = scope.cage(None);
+        let image_node = scope.cage(None);
+        let status = Rc::new(Cell::new(0));
+        let receipt = status.clone();
+        let part = Rc::new(RefCell::new(Some(
+            group()
+                .fill((
+                    view().node_ref(node).class("player"),
+                    view().node_ref(image_node).class("image"),
+                ))
+                .mount(scope)?,
+        )));
+        app.mount(col().fill((
+            text().content("Owned media"),
+            input().class("status").on(value_changed, move |event| {
+                if let Event::ValueChanged { value, .. } = event {
+                    receipt.set(value.parse().unwrap_or(-1));
+                }
+            }),
+        )))?;
+        app.app().flush()?;
+        app.renderer().enable_local_media();
+        app.renderer().set_local_media(
+            node.get().unwrap(),
+            Some(LocalMedia {
+                kind: MediaKind::Audio,
+                path: "/media/owned.wav",
+                title: "Owned wave",
+            }),
+        )?;
+        app.renderer().set_local_media(
+            image_node.get().unwrap(),
+            Some(LocalMedia {
+                kind: MediaKind::Image,
+                path: "/media/owned.png",
+                title: "Owned image",
+            }),
+        )?;
+        let started = Instant::now();
+        let retired = Cell::new(0);
+        Shell::new().run_until(app,Config {
         title:"Glory native media acceptance".into(),asset_provider:Some(Arc::new(Provider(wav.clone(),png.clone()))),
         initialization_script:Some(r#"(()=>{
           let phase=0, player=null, image=null;const start=Date.now();
@@ -145,5 +148,12 @@ fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
         }
         Ok(false)
     })?;
+        Ok(())
+    }
+}
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    #[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+    desktop::run()?;
     Ok(())
 }
