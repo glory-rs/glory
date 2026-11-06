@@ -13,6 +13,13 @@ spec.loader.exec_module(checker)
 
 
 class EngineLockfileTests(unittest.TestCase):
+    def test_registry_archive_uses_actual_source_when_cargo_home_is_empty_or_different(self):
+        root = Path("actual-cargo/registry/src/index-identity/example-1.0.0").resolve()
+        expected = root.parent.parent.parent / "cache/index-identity/example-1.0.0.crate"
+        for home in ("", "different-cargo"):
+            with self.subTest(home=home), patch.dict(os.environ, {"CARGO_HOME": home}):
+                self.assertEqual(checker.registry_archive_path(root, "example", "1.0.0"), expected)
+
     def test_fresh_engine_gets_a_lock_and_existing_lock_is_preserved(self):
         with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as directory:
             root = Path(directory).resolve()

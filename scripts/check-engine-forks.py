@@ -24,7 +24,7 @@ def build_environment():
     root = Path(__file__).resolve().parents[1]
     metadata = json.loads(output("cargo", "metadata", "--no-deps", "--format-version", "1", cwd=root))
     return {
-        "CARGO_HOME": Path(os.environ.get("CARGO_HOME", Path.home() / ".cargo")).resolve(),
+        "CARGO_HOME": Path(os.environ.get("CARGO_HOME") or Path.home() / ".cargo").resolve(),
         "CARGO_TARGET_DIR": Path(metadata["target_directory"]).resolve(),
     }
 
@@ -70,6 +70,13 @@ def test_fork(fork, directory, target, android):
             run("cargo", "check", "--locked", "--manifest-path", manifest, *arguments, cwd=directory)
     if not development:
         assert not output("git", "-C", str(directory), "status", "--porcelain"), directory
+
+
+def registry_archive_path(package_root, name, version):
+    # Metadata supplies the actual Cargo source directory even when CARGO_HOME
+    # is unset/empty or a child tool changed its environment temporarily.
+    assert package_root.parent.parent.name == "src", package_root
+    return package_root.parent.parent.parent / "cache" / package_root.parent.name / f"{name}-{version}.crate"
 
 
 def main():
@@ -128,7 +135,7 @@ def main():
             vcs = json.loads((archive_root / ".cargo_vcs_info.json").read_text(encoding="utf-8"))
             expected_revision = fork.get("revisions", {}).get(name, fork["rev"])
             assert vcs["git"]["sha1"] == expected_revision, (name, vcs, expected_revision)
-            archive = paths["CARGO_HOME"] / "registry/cache" / archive_root.parent.name / f"{name}-{version}.crate"
+            archive = registry_archive_path(archive_root, name, version)
             assert hashlib.sha256(archive.read_bytes()).hexdigest() == locked[0]["checksum"], name
         if options.test:
             directory = (root / fork["path"]).resolve() if local else paths["CARGO_TARGET_DIR"] / "verification" / "engine-forks" / fork["name"]

@@ -619,7 +619,7 @@
           if(entry.display)entry.display.markers.forEach((marker,slot)=>{marker.nodeValue=`gly:slot:${next}:${slot}`;});
         }
         const data = document.createElement('script'); data.id = this.dataId; data.type = 'application/json'; data.setAttribute('data-gly-resources', '1'); data.textContent = JSON.stringify(frame.resources);
-        this.root.after(data); this.first.nodeValue = 'gly:v:14'; this.last.nodeValue = 'gly:/v:14';
+        this.root.after(data); this.first.nodeValue = `gly:v:${frame.html_version}`; this.last.nodeValue = `gly:/v:${frame.html_version}`;
         this.phase = 'ready'; this.root.removeAttribute('data-gly-stream-pending'); this.root.dataset.glyStreamState = 'ready';
         this.release(); this.root.dispatchEvent(new CustomEvent('glory:stream-ready', { detail: { dataId: this.dataId, peak: this.peak } }));
       }
