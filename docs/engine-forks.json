@@ -25,7 +25,7 @@
     {
       "name": "apace",
       "git": "https://github.com/glory-rs/apace",
-      "rev": "e7c2f483ed454d62183efbfcb9b60e8328effaed",
+      "rev": "a2407c3b2c1d6e25b7fd2ce1421daffff266e584",
       "upstream": "https://github.com/DioxusLabs/blitz",
       "upstream_rev": "e5929f9e2af42f8fdc10cea315b502d3937b1350",
       "packages": [
@@ -151,7 +151,8 @@
           "apace_accesskit": "0.2.1"
         }
       },
-      "path": "../apace"
+      "path": "../apace",
+      "source_notes": "The apace-v0.3.0 release commit is the minimum sibling-source baseline. Later development commits remain separately validated; frozen release CI checks the immutable tag."
     },
     {
       "extra_tests": [

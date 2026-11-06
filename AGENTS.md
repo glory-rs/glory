@@ -677,8 +677,8 @@ retired feature aliases or count compilation as proof of platform acceptance.
 - Never vendor third-party code in this repository. Maintain upstream-derived
   code in glory-rs/apace, glory-rs/takia, glory-rs/wingy and glory-rs/stylo, retaining provenance,
   licenses and copyright notices. The coordinated release versions are
-  Glory/Sapid 0.6.1, Apace 0.3.0, Takia 0.15.1 and Wingy 0.31.1. The maintained
-  Stylo graph uses the namespaced registry packages recorded in docs/engine-forks.json.
+  Glory/Sapid 0.7.0, Apace 0.3.0, Takia 0.15.1 and Wingy 0.31.1. The maintained
+  Stylo graph uses the upstream registry packages recorded in docs/engine-forks.json.
   Use exact requirements and the declared sibling source paths for local engine
   development; do not add global Cargo patches. Publication requires an explicit
   user instruction and the existing publication guards.

@@ -1,15 +1,14 @@
 # 引擎依赖维护
 
-0.6.1 协调发布使用 Apace 0.3.0、Takia 0.15.1、Wingy 0.31.1；支持包为
+0.7.0 协调发布使用 Apace 0.3.0、Takia 0.15.1、Wingy 0.31.1；支持包为
 `apace_accesskit` 0.2.2、`apace_debug_timer` 0.1.4、`wingy-dpi` 0.1.3。
 源码开发仍将 apace、takia、wingy、glory 和 Sapid 放在同一父目录。
 发布的 crate 使用精确注册表依赖，消费者不需要这些同级路径。
 
-Stylo 采用 [glory-rs/stylo](https://github.com/glory-rs/stylo) 的命名空间发布，
-固定 `glory-stylo-v0.22.0` / `ec62d42fcaa124ad927ab974aade120d82ce50a2`。
-它保留此前 `nicoburns/stylo` 的 `78734bf554bb40af9dc11c0eedbe724f6055697c`
-源码和 Servo text-fill/background-clip 行为；11 个共享类型包统一使用 `glory-`
-包名、原 Rust library 名和各自版本。Glory/Apace 不再依赖该引擎的 Git 源。
+Stylo 使用上游注册表 `stylo` 0.23.0 和 `selectors` 0.42.0；
+当前源码、归档校验值和共享类型身份由下面的检查器验证。
+此前的 glory-rs/stylo 命名空间 0.22.0 来源仍保留在 JSON 的历史记录中，
+不代表当前依赖。Glory/Apace 不依赖该引擎的 Git 源。
 
 `docs/engine-forks.json` 记录版本、发布来源、上游来源及此前发布记录。
 `python scripts/check-engine-forks.py` 分别校验同级源码和注册表依赖：注册表包
@@ -19,7 +18,7 @@ Stylo 采用 [glory-rs/stylo](https://github.com/glory-rs/stylo) 的命名空间
 
 所有库、示例和基准的 Cargo.lock 均不纳入 Git；website 独立保留锁文件。
 设置 Cargo 构建环境后运行 `python scripts/library_lockfiles.py`，首次生成缺失的锁，
-后续 `--locked` 检查复用该解析。Windows 的 Cargo home、target 和临时目录使用 D:/BuildCache。
+后续 `--locked` 检查复用该解析。构建遵循调用者环境和项目配置；不重定向 Cargo home、target 或临时目录，也不使用或重建已停用的 D:/BuildCache。产物目录以所属 workspace 的 cargo metadata 返回值为准。
 实际窗口、IME、无障碍和设备验收仍是独立门禁，不能用编译或模型测试代替。
 
 以下保留既有补丁的验证记录，历史提交和旧构建路径对应当时的源码。

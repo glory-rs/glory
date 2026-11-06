@@ -1,7 +1,7 @@
-# Unpublished development versions
+# Coordinated release versions
 
-This development cycle bumps Glory and Sapid to 0.6.1, Apace to 0.3.0,
-Takia to 0.15.1 and Wingy to 0.31.1 without publishing or creating release tags.
+Glory and Sapid 0.7.0 use Apace 0.3.0, Takia 0.15.1 and Wingy 0.31.1.
+Publish Glory before Sapid, after validating the exact published engine prerequisites.
 Use the five sibling source repositories. Exact dependency requirements prevent
 silently mixing these changes with older published packages.
 
@@ -20,6 +20,7 @@ and rfd 0.16.1 use the available compatible registry versions. Historical benchm
 comparison dependencies remain on the versions they measure.
 
 Normal development CI checks sibling main branches. Frozen publication checks
-remain separate and require a future reviewed, publishable dependency graph;
-the current source graph is not presented as published release evidence.
+use exact release tags and published engine sources. Registry-only consumers
+independently verify the packaged dependency graph; sibling-source checks alone
+do not establish registry compatibility.
 See [licensing](licensing.md) for Apache-2.0 and retained third-party notices.

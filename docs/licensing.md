@@ -1,12 +1,12 @@
 # Licensing
 
-Glory 0.6.1 development sources and project-authored documentation are
+Glory 0.7.0 sources and project-authored documentation are
 licensed under **Apache-2.0**. Package metadata, the root LICENSE, and NOTICE
-use the same license declaration. This version is not published by this update.
+use the same license declaration. Previously published releases retain their
+original license grants.
 
 Include LICENSE and NOTICE when redistributing these sources or their packaged
 artifacts. Preserve applicable third-party copyright and license notices.
-Previously published releases keep their original license grants.
 
 This license applies to project-authored code; it does not change the licenses
 of linked dependencies, fonts, images, examples derived from other projects,
