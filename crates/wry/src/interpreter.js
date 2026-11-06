@@ -29,7 +29,7 @@ function gloryWry(config) {
       if(e.proposal) { e.dirty=true; return; }
       e.proposal={value:value.value,composing:value.composing};
       e.dirty=false; editing.add(e);
-    } else if(editing.size && ["activate","commit","keyboard"].includes(value.kind)) {
+    } else if(editing.size && ["activate","commit","keyboard","focus"].includes(value.kind)) {
       const bytes=new TextEncoder().encode(JSON.stringify(value)).length;
       if(deferred.length>=128 || deferredBytes+bytes>config.maxDeferredBytes) throw Error("pending input action budget");
       deferredBytes+=bytes; deferred.push({e,value,bytes}); return;
@@ -397,6 +397,19 @@ function gloryWry(config) {
   }
   function receiveDrag(raw) {
     if(raw.type==="pointerdown") {
+      // WebKit on macOS does not focus buttons on a mouse press. Give enabled
+      // tab stops actual focus before the editor loses it, so focus-within forms
+      // can distinguish Cancel/Add from an outside click. Programmatic-only
+      // controls retain their explicit non-pointer focus policy.
+      const button=raw.target.closest?.("button");
+      const owner=button && origin(button);
+      if(raw.button===0 && raw.isPrimary && !raw.defaultPrevented && owner && alive(owner)
+          && !button.disabled && button.tabIndex>=0 && button.getAttribute("aria-disabled")!=="true") {
+        // Cancel WebKit's subsequent default mouse focus clearing. Click still
+        // activates on release; no activation is sent from this press handler.
+        raw.preventDefault();
+        button.focus({preventScroll:true});
+      }
       suppressClick=false;
       if(drag)finishDrag("cancel",drag.x,drag.y);
       if(raw.button!==0 || !raw.isPrimary || raw.target.closest?.("input,textarea,select,button,a,[contenteditable=true]"))return;

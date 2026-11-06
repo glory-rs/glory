@@ -121,7 +121,7 @@ Text proposals use protocol v2 acknowledgements after the Rust UI turn. Each
 live editor has one outstanding proposal; newer native typing remains in the
 editor and its latest value follows the receipt. Controlled echoes preserve
 that newer text. Explicit differing writes and rejected old program barriers
-still replace it. Activation, commit and keyboard commands wait for preceding
+still replace it. Activation, commit, keyboard and focus events wait for preceding
 text proposals, so handlers observe the latest accepted value. Deferred actions
 are bounded and retired targets are discarded. Native window acceptance includes
 a rapid-input burst followed immediately by activation, alongside the existing
@@ -135,3 +135,9 @@ blur, lost capture and retired sources cancel the gesture. Scrollable ancestors
 scroll near their edges; the application performs hit testing and owns its data
 mutation. Provide separate keyboard controls. Threshold/hit-target dragging
 without explicit source capture remains unsupported.
+
+Enabled button tab stops take actual focus on primary pointer press, including
+macOS WebKit. This lets focus-within editors distinguish their own actions from
+outside focus transitions before click activation. Disabled and programmatic-only
+buttons keep their existing focus policy. Native window acceptance checks these
+press cases; physical macOS pointer acceptance is recorded by the consumer.

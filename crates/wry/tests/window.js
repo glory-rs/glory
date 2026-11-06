@@ -5,6 +5,17 @@ document.addEventListener("DOMContentLoaded",()=>{
     const input=document.querySelector('input[aria-label="Message"]');
     document.querySelector(".increment").click();
     await wait(()=>document.querySelector(".count").textContent==="Count:1");
+    const capture=document.querySelector(".capture");
+    const press=()=>{
+      const event=new PointerEvent("pointerdown",{bubbles:true,cancelable:true,button:0,isPrimary:true,pointerId:1});
+      capture.dispatchEvent(event);return event.defaultPrevented;
+    };
+    input.focus();capture.disabled=true;press();
+    if(document.activeElement!==input)throw Error("Disabled pointer button stole editor focus");
+    capture.disabled=false;capture.tabIndex=-1;press();
+    if(document.activeElement!==input)throw Error("Programmatic-only pointer button stole editor focus");
+    capture.tabIndex=0;if(!press())throw Error("Button press left WebKit default focus clearing enabled");
+    if(document.activeElement!==capture)throw Error("Primary button press did not transfer actual focus before blur");
     const large="\\".repeat(512*1024);
     input.focus();input.value=large;
     input.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:large}));
@@ -14,6 +25,8 @@ document.addEventListener("DOMContentLoaded",()=>{
       input.value+=character;
       input.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:character}));
     }
+    press();
+    if(document.activeElement!==capture)throw Error("Rapid-input button press did not retain focus");
     document.querySelector(".capture").click();
     await wait(()=>document.querySelector(".captured").textContent==="rapid native input 0123456789");
     await wait(()=>document.querySelector(".echo").textContent==="rapid native input 0123456789");
