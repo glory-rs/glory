@@ -1,4 +1,4 @@
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
 use std::net::{IpAddr, SocketAddr, TcpListener, TcpStream};
 use std::path::{Component, Path, PathBuf};
 use std::sync::Arc;
@@ -13,6 +13,157 @@ use crate::project::{Platform, Project};
 use crate::{Result, build};
 
 const RELOAD: &str = "let revision=Number(new URL(import.meta.url).searchParams.get('revision'));let overlay;setInterval(async()=>{try{const r=await fetch('/__glory_dev/state',{cache:'no-store'});const s=await r.json();if(s.error){if(!overlay){overlay=document.createElement('pre');overlay.setAttribute('role','alert');document.body.prepend(overlay);}overlay.textContent=s.error;}else{overlay?.remove();overlay=null;}if(revision!==s.revision){location.reload();}revision=s.revision;}catch{}},750);";
+
+const MAX_CONNECTIONS: usize = 8;
+const IO_TICK: Duration = Duration::from_millis(25);
+#[derive(Clone, Copy)]
+struct Deadlines {
+    headers: Duration,
+    response: Duration,
+}
+impl Default for Deadlines {
+    fn default() -> Self {
+        Self {
+            headers: Duration::from_secs(2),
+            response: Duration::from_secs(10),
+        }
+    }
+}
+
+/// Only admitted connections own threads. Excess sockets are closed without
+/// queuing work; the watch/build loop never waits for a client's socket IO.
+struct Connections {
+    workers: Vec<std::thread::JoinHandle<()>>,
+    stop: Arc<AtomicBool>,
+    deadlines: Deadlines,
+}
+impl Connections {
+    fn new(stop: Arc<AtomicBool>, deadlines: Deadlines) -> Self {
+        Self {
+            workers: Vec::new(),
+            stop,
+            deadlines,
+        }
+    }
+    fn accept(
+        &mut self,
+        listener: &TcpListener,
+        root: &Path,
+        revision: u64,
+        error: Option<&str>,
+        reload: bool,
+    ) -> Result<()> {
+        let mut index = 0;
+        while index < self.workers.len() {
+            if self.workers[index].is_finished() {
+                let _ = self.workers.swap_remove(index).join();
+            } else {
+                index += 1;
+            }
+        }
+        for _ in 0..32 {
+            if self.stop.load(Ordering::Acquire) {
+                break;
+            }
+            match listener.accept() {
+                Ok((mut stream, _)) => {
+                    if self.workers.len() == MAX_CONNECTIONS {
+                        continue;
+                    }
+                    let root = root.to_path_buf();
+                    let error = error.map(str::to_owned);
+                    let stop = self.stop.clone();
+                    let deadlines = self.deadlines;
+                    self.workers.push(
+                        std::thread::Builder::new()
+                            .name("glory-dev-http".into())
+                            .spawn(move || {
+                                if let Err(error) = respond(
+                                    &mut stream,
+                                    &root,
+                                    revision,
+                                    error.as_deref(),
+                                    reload,
+                                    deadlines,
+                                    &stop,
+                                ) && !stop.load(Ordering::Acquire)
+                                {
+                                    eprintln!("HTTP: {error}");
+                                }
+                            })
+                            .map_err(|error| error.to_string())?,
+                    );
+                }
+                Err(error) if error.kind() == io::ErrorKind::WouldBlock => break,
+                Err(error) => return Err(error.to_string()),
+            }
+        }
+        Ok(())
+    }
+}
+impl Drop for Connections {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Release);
+        for worker in self.workers.drain(..) {
+            let _ = worker.join();
+        }
+    }
+}
+
+/// Socket timeouts are short cancellation checkpoints. The phase deadline is
+/// absolute, so receiving or sending another byte never renews it.
+struct Connection<'a> {
+    socket: &'a mut TcpStream,
+    stop: &'a AtomicBool,
+    deadline: Instant,
+}
+impl Connection<'_> {
+    fn perform<T>(
+        &mut self,
+        writing: bool,
+        mut operation: impl FnMut(&mut TcpStream) -> io::Result<T>,
+    ) -> io::Result<T> {
+        loop {
+            if self.stop.load(Ordering::Acquire) {
+                return Err(io::Error::other("HTTP request cancelled"));
+            }
+            let remaining = self
+                .deadline
+                .checked_duration_since(Instant::now())
+                .filter(|time| !time.is_zero())
+                .ok_or_else(|| io::Error::new(io::ErrorKind::TimedOut, "HTTP phase deadline"))?;
+            if writing {
+                self.socket
+                    .set_write_timeout(Some(remaining.min(IO_TICK)))?;
+            } else {
+                self.socket.set_read_timeout(Some(remaining.min(IO_TICK)))?;
+            }
+            match operation(self.socket) {
+                Err(error)
+                    if matches!(
+                        error.kind(),
+                        io::ErrorKind::WouldBlock
+                            | io::ErrorKind::TimedOut
+                            | io::ErrorKind::Interrupted
+                    ) => {}
+                result => return result,
+            }
+        }
+    }
+}
+impl Read for Connection<'_> {
+    fn read(&mut self, buffer: &mut [u8]) -> io::Result<usize> {
+        self.perform(false, |socket| socket.read(buffer))
+    }
+}
+impl Write for Connection<'_> {
+    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+        self.perform(true, |socket| socket.write(buffer))
+    }
+    fn flush(&mut self) -> io::Result<()> {
+        self.perform(true, Write::flush)
+    }
+}
 
 pub fn serve(mut project: Project, mut args: Args) -> Result<()> {
     if project.platform != Platform::Web {
@@ -42,24 +193,15 @@ pub fn serve(mut project: Project, mut args: Args) -> Result<()> {
         "Glory: http://{} (Ctrl+C to stop)",
         listener.local_addr().map_err(|e| e.to_string())?
     );
+    let mut connections = Connections::new(stop.clone(), Deadlines::default());
     while !stop.load(Ordering::Acquire) {
-        for _ in 0..32 {
-            match listener.accept() {
-                Ok((mut stream, _)) => {
-                    if let Err(error) = respond(
-                        &mut stream,
-                        &directory,
-                        revision,
-                        error.as_deref(),
-                        args.watch,
-                    ) {
-                        eprintln!("HTTP: {error}");
-                    }
-                }
-                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => break,
-                Err(error) => return Err(error.to_string()),
-            }
-        }
+        connections.accept(
+            &listener,
+            &directory,
+            revision,
+            error.as_deref(),
+            args.watch,
+        )?;
         if changed.swap(false, Ordering::AcqRel) {
             last_event = Some(Instant::now());
         }
@@ -137,16 +279,17 @@ fn respond(
     revision: u64,
     error: Option<&str>,
     reload: bool,
+    deadlines: Deadlines,
+    stop: &AtomicBool,
 ) -> Result<()> {
-    // Windows accepts can inherit the listener's nonblocking mode. Request
-    // reads use deadlines, and must wait for headers rather than reset clients.
+    // Windows accepts can inherit the listener's nonblocking mode.
     stream.set_nonblocking(false).map_err(|e| e.to_string())?;
-    stream
-        .set_read_timeout(Some(Duration::from_secs(2)))
-        .map_err(|e| e.to_string())?;
-    stream
-        .set_write_timeout(Some(Duration::from_secs(2)))
-        .map_err(|e| e.to_string())?;
+    let mut connection = Connection {
+        socket: stream,
+        stop,
+        deadline: Instant::now() + deadlines.headers,
+    };
+    let stream = &mut connection;
     let mut request = Vec::new();
     let mut chunk = [0_u8; 1024];
     while !request.windows(4).any(|bytes| bytes == b"\r\n\r\n") {
@@ -165,6 +308,7 @@ fn respond(
             );
         }
     }
+    stream.deadline = Instant::now() + deadlines.response;
     let request = match std::str::from_utf8(&request) {
         Ok(request) => request,
         Err(_) => {
@@ -177,9 +321,10 @@ fn respond(
             );
         }
     };
-    let Some((method, url)) =
-        local_request(request, stream.local_addr().map_err(|e| e.to_string())?)
-    else {
+    let Some((method, url)) = local_request(
+        request,
+        stream.socket.local_addr().map_err(|e| e.to_string())?,
+    ) else {
         return reply(
             stream,
             "400 Bad Request",
@@ -379,12 +524,12 @@ fn local_authority(authority: &str, address: SocketAddr) -> bool {
             || host.parse::<IpAddr>().is_ok_and(|ip| ip == address.ip()))
 }
 
-fn reply(stream: &mut TcpStream, status: &str, kind: &str, body: &[u8], head: bool) -> Result<()> {
+fn reply(stream: &mut impl Write, status: &str, kind: &str, body: &[u8], head: bool) -> Result<()> {
     reply_encoded(stream, status, kind, body, head, false)
 }
 
 fn reply_encoded(
-    stream: &mut TcpStream,
+    stream: &mut impl Write,
     status: &str,
     kind: &str,
     body: &[u8],
@@ -474,7 +619,16 @@ mod tests {
         let worker = std::thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
             stream.set_nonblocking(true).unwrap();
-            respond(&mut stream, &root, 7, Some("<compiler error>"), reload).unwrap();
+            respond(
+                &mut stream,
+                &root,
+                7,
+                Some("<compiler error>"),
+                reload,
+                Deadlines::default(),
+                &AtomicBool::new(false),
+            )
+            .unwrap();
         });
         let mut client = TcpStream::connect(address).unwrap();
         std::thread::sleep(Duration::from_millis(20));
@@ -666,5 +820,142 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn continuously_dripping_headers_cannot_renew_the_absolute_deadline() {
+        let root = crate::test_support::Scratch::new();
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let mut client = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
+        let (done, result) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            done.send(respond(
+                &mut stream,
+                &root.0,
+                1,
+                None,
+                false,
+                Deadlines {
+                    headers: Duration::from_millis(100),
+                    response: Duration::from_secs(1),
+                },
+                &AtomicBool::new(false),
+            ))
+            .unwrap();
+        });
+        client.write_all(b"GET / HTTP/1.1\r\nX-Drip: ").unwrap();
+        let watchdog = Instant::now() + Duration::from_secs(2);
+        let outcome = loop {
+            match result.recv_timeout(Duration::from_millis(10)) {
+                Ok(outcome) => break outcome,
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) if Instant::now() < watchdog => {
+                    let _ = client.write_all(b"x");
+                }
+                other => {
+                    drop(client);
+                    worker.join().unwrap();
+                    panic!("dripping request did not expire: {other:?}");
+                }
+            }
+        };
+        assert!(outcome.unwrap_err().contains("HTTP phase deadline"));
+        worker.join().unwrap();
+    }
+
+    #[test]
+    fn stalled_clients_do_not_block_new_state_requests_or_shutdown_and_admission_is_bounded() {
+        let root = crate::test_support::Scratch::new();
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let address = listener.local_addr().unwrap();
+        let stop = Arc::new(AtomicBool::new(false));
+        let mut connections = Connections::new(
+            stop.clone(),
+            Deadlines {
+                headers: Duration::from_secs(30),
+                response: Duration::from_secs(30),
+            },
+        );
+        let mut stalled = TcpStream::connect(address).unwrap();
+        stalled.write_all(b"GET / HTTP/1.1\r\n").unwrap();
+        connections
+            .accept(&listener, &root.0, 1, None, true)
+            .unwrap();
+        assert_eq!(connections.workers.len(), 1);
+
+        // The watch loop can publish a later revision while the first header
+        // is still incomplete, and a normal request receives that new state.
+        let mut normal = TcpStream::connect(address).unwrap();
+        normal
+            .set_read_timeout(Some(Duration::from_secs(2)))
+            .unwrap();
+        write!(
+            normal,
+            "GET /__glory_dev/state HTTP/1.1\r\nHost: localhost:{}\r\n\r\n",
+            address.port()
+        )
+        .unwrap();
+        connections
+            .accept(&listener, &root.0, 12, Some("rebuilt"), true)
+            .unwrap();
+        let mut response = String::new();
+        normal.read_to_string(&mut response).unwrap();
+        assert!(response.starts_with("HTTP/1.1 200 OK"));
+        let state: serde_json::Value =
+            serde_json::from_str(response.split_once("\r\n\r\n").unwrap().1).unwrap();
+        assert_eq!(state, json!({"revision":12,"error":"rebuilt"}));
+
+        let clients = (0..MAX_CONNECTIONS + 2)
+            .map(|_| TcpStream::connect(address).unwrap())
+            .collect::<Vec<_>>();
+        connections
+            .accept(&listener, &root.0, 12, None, true)
+            .unwrap();
+        assert_eq!(connections.workers.len(), MAX_CONNECTIONS);
+        let (done, result) = std::sync::mpsc::channel();
+        stop.store(true, Ordering::Release);
+        let shutdown = std::thread::spawn(move || {
+            drop(connections);
+            done.send(()).unwrap();
+        });
+        result
+            .recv_timeout(Duration::from_secs(2))
+            .expect("stop must cancel pending socket reads");
+        shutdown.join().unwrap();
+        drop((clients, stalled));
+    }
+
+    #[test]
+    fn a_nonreading_client_cannot_renew_the_response_deadline() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let client = TcpStream::connect(address).unwrap();
+        let (done, result) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut connection = Connection {
+                socket: &mut stream,
+                stop: &AtomicBool::new(false),
+                deadline: Instant::now() + Duration::from_millis(100),
+            };
+            // Do not assume an OS-specific socket buffer size. Continuous
+            // successful partial writes must not renew this response budget.
+            let bytes = [b'x'; 65_536];
+            loop {
+                if let Err(error) = connection.write_all(&bytes) {
+                    done.send(error.to_string()).unwrap();
+                    break;
+                }
+            }
+        });
+        let outcome = result.recv_timeout(Duration::from_secs(2));
+        drop(client);
+        worker.join().unwrap();
+        assert!(
+            outcome
+                .expect("response must expire")
+                .contains("HTTP phase deadline")
+        );
     }
 }
