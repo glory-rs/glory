@@ -10,7 +10,7 @@ use std::task::{Context, Poll};
 use std::time::Duration;
 
 use glory::prelude::*;
-use glory_salvo::{StreamError, StreamPage, StreamRenderer, ssr};
+use glory_salvo::{StreamError, StreamPage, StreamRenderer, StreamTimeout, StreamTimeouts, ssr};
 use http_body_util::BodyExt;
 use salvo::conn::Acceptor;
 use salvo::http::ResBody;
@@ -18,6 +18,10 @@ use salvo::prelude::*;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::oneshot;
 use tokio::time::{sleep, timeout};
+
+// These timers run on separate native worker runtimes. Allow thread scheduling
+// slack; the five-second watchdogs detect missing cleanup/wake independently.
+const TIMEOUT_TEST_BUDGET: Duration = Duration::from_secs(1);
 
 #[derive(Default)]
 struct Metrics {
@@ -313,6 +317,184 @@ async fn outer_configuration_is_validated_before_the_factory() {
     ));
 }
 
+#[test]
+fn timeout_configuration_rejects_zero_and_unrepresentable_durations() {
+    for duration in [Duration::ZERO, Duration::MAX] {
+        for timeouts in [
+            StreamTimeouts {
+                request: Some(duration),
+                idle: None,
+            },
+            StreamTimeouts {
+                request: None,
+                idle: Some(duration),
+            },
+        ] {
+            assert!(matches!(
+                StreamRenderer::with_timeouts(1, timeouts),
+                Err(StreamError::Config)
+            ));
+        }
+    }
+}
+
+#[tokio::test]
+async fn request_and_idle_timeouts_cancel_pending_frames_without_dropping_the_body() {
+    for (timeouts, expected) in [
+        (
+            StreamTimeouts {
+                request: Some(TIMEOUT_TEST_BUDGET),
+                idle: None,
+            },
+            "Timeout(Request)",
+        ),
+        (
+            StreamTimeouts {
+                request: None,
+                idle: Some(TIMEOUT_TEST_BUDGET),
+            },
+            "Timeout(Idle)",
+        ),
+    ] {
+        let renderer = StreamRenderer::with_timeouts(1, timeouts).unwrap();
+        let (mut send, gate) = gate();
+        let metrics = gate.1.clone();
+        let mut response = renderer
+            .render(page(), move || {
+                pending_stream(vec![gate], Default::default())
+            })
+            .await
+            .unwrap();
+        let mut body = response.take_body();
+        assert!(!chunk(&mut body).await.contains("\"kind\":\"end\""));
+        let error = timeout(Duration::from_secs(5), body.frame())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(error.to_string(), expected);
+        assert!(body.frame().await.is_none());
+        timeout(Duration::from_secs(5), send.closed())
+            .await
+            .unwrap();
+        until(|| metrics.cleaned() == 1 && metrics.dropped.load(Ordering::SeqCst) == 1).await;
+        assert!(metrics.polls() > 0);
+        assert_reusable(&renderer).await;
+    }
+}
+
+#[tokio::test]
+async fn timeouts_reclaim_unread_responses_and_preserve_the_error_for_later_polls() {
+    for (timeouts, expected) in [
+        (
+            StreamTimeouts {
+                request: Some(TIMEOUT_TEST_BUDGET),
+                idle: None,
+            },
+            "Timeout(Request)",
+        ),
+        (
+            StreamTimeouts {
+                request: None,
+                idle: Some(TIMEOUT_TEST_BUDGET),
+            },
+            "Timeout(Idle)",
+        ),
+    ] {
+        let renderer = StreamRenderer::with_timeouts(1, timeouts).unwrap();
+        let (mut send, gate) = gate();
+        let metrics = gate.1.clone();
+        let mut response = renderer
+            .render(page(), move || {
+                pending_stream(vec![gate], Default::default())
+            })
+            .await
+            .unwrap();
+        // Keep the response alive without ever demanding a frame. The worker's
+        // receive timeout must release its Owner and admission independently.
+        timeout(Duration::from_secs(5), send.closed())
+            .await
+            .unwrap();
+        until(|| metrics.cleaned() == 1).await;
+        assert_eq!(metrics.polls(), 0);
+        assert_reusable(&renderer).await;
+        let mut body = response.take_body();
+        let error = body.frame().await.unwrap().unwrap_err();
+        assert_eq!(error.to_string(), expected);
+        assert!(body.frame().await.is_none());
+    }
+}
+
+#[tokio::test]
+async fn request_timeout_checks_synchronous_startup_after_it_returns() {
+    // A heavily delayed worker may correctly expire before invoking factory.
+    // Validate that path, then retry: this test must still exercise at least one
+    // factory that started, remained synchronous across expiry, and returned.
+    for _ in 0..3 {
+        let renderer = StreamRenderer::with_timeouts(
+            1,
+            StreamTimeouts {
+                request: Some(TIMEOUT_TEST_BUDGET),
+                idle: None,
+            },
+        )
+        .unwrap();
+        let (mut send, gate) = gate();
+        let metrics = gate.1.clone();
+        let (started, receive_started) = oneshot::channel();
+        let (release, receive_release) = std::sync::mpsc::sync_channel(1);
+        let worker = renderer.clone();
+        let request = tokio::spawn(async move {
+            worker
+                .render(page(), move || {
+                    started.send(()).unwrap();
+                    receive_release
+                        .recv_timeout(Duration::from_secs(5))
+                        .unwrap();
+                    pending_stream(vec![gate], Default::default())
+                })
+                .await
+        });
+        let entered = timeout(Duration::from_secs(5), receive_started)
+            .await
+            .expect("startup signal watchdog")
+            .is_ok();
+        if entered {
+            // The deadline began before started was sent. Release only after
+            // a full budget from that signal, without guessing thread latency.
+            sleep(TIMEOUT_TEST_BUDGET).await;
+            assert!(
+                !request.is_finished(),
+                "synchronous factory was not released"
+            );
+            assert_eq!(metrics.cleaned(), 0);
+            release.send(()).unwrap();
+        }
+        let result = timeout(Duration::from_secs(5), request)
+            .await
+            .expect("startup completion watchdog")
+            .unwrap();
+        assert!(matches!(
+            result,
+            Err(StreamError::Timeout(StreamTimeout::Request))
+        ));
+        timeout(Duration::from_secs(5), send.closed())
+            .await
+            .unwrap();
+        assert_eq!(metrics.polls(), 0);
+        if entered {
+            until(|| metrics.cleaned() == 1).await;
+        } else {
+            assert_eq!(metrics.cleaned(), 0, "factory never registered an Owner");
+        }
+        assert_reusable(&renderer).await;
+        if entered {
+            return;
+        }
+    }
+    panic!("workers never entered the factory within three scheduling budgets");
+}
+
 #[tokio::test]
 async fn startup_failures_and_panics_do_not_return_a_success_response_or_leak_slots() {
     let renderer = StreamRenderer::new(1).unwrap();
@@ -512,6 +694,18 @@ async fn server_with_factory(
     salvo::server::ServerHandle,
     tokio::task::JoinHandle<std::io::Result<()>>,
 ) {
+    server_with_renderer(StreamRenderer::new(2).unwrap(), factory).await
+}
+async fn server_with_renderer(
+    renderer: StreamRenderer,
+    factory: impl FnOnce() -> std::result::Result<ssr::stream::Stream, ssr::stream::Error>
+    + Send
+    + 'static,
+) -> (
+    tokio::net::TcpStream,
+    salvo::server::ServerHandle,
+    tokio::task::JoinHandle<std::io::Result<()>>,
+) {
     let acceptor = TcpListener::new("127.0.0.1:0").bind().await;
     let address = acceptor.holdings()[0]
         .local_addr
@@ -521,7 +715,7 @@ async fn server_with_factory(
     let server = Server::new(acceptor);
     let handle = server.handle();
     let router = Router::new().get(HttpStream {
-        renderer: StreamRenderer::new(2).unwrap(),
+        renderer,
         factory: Mutex::new(Some(Box::new(factory))),
     });
     let task = tokio::spawn(server.try_serve(router));
@@ -593,6 +787,44 @@ async fn real_socket_disconnect_drops_pending_local_resource_future() {
         .await
         .unwrap();
     until(|| metrics.cleaned() == 1 && metrics.dropped.load(Ordering::SeqCst) == 1).await;
+    handle.stop_graceful(Some(Duration::from_secs(1)));
+    task.await.unwrap().unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn real_socket_stays_connected_while_request_timeout_cancels_its_pending_loader() {
+    let renderer = StreamRenderer::with_timeouts(
+        1,
+        StreamTimeouts {
+            request: Some(TIMEOUT_TEST_BUDGET),
+            idle: None,
+        },
+    )
+    .unwrap();
+    let (mut send, gate) = gate();
+    let metrics = gate.1.clone();
+    let (mut client, handle, task) = server_with_renderer(renderer.clone(), move || {
+        pending_stream(vec![gate], Default::default())
+    })
+    .await;
+    let shell = read_until(&mut client, "\"kind\":\"start\"").await;
+    assert!(!shell.contains("\"kind\":\"end\""));
+    until(|| metrics.polls() > 0).await;
+    // Do not disconnect: expiration must revoke this still-owned request.
+    timeout(Duration::from_secs(5), send.closed())
+        .await
+        .unwrap();
+    until(|| metrics.cleaned() == 1 && metrics.dropped.load(Ordering::SeqCst) == 1).await;
+    let mut remaining = String::new();
+    // An aborted chunked body can close cleanly or reset the socket.
+    let _ = timeout(
+        Duration::from_secs(5),
+        client.read_to_string(&mut remaining),
+    )
+    .await
+    .unwrap();
+    assert!(!remaining.contains("\"kind\":\"end\""));
+    assert_reusable(&renderer).await;
     handle.stop_graceful(Some(Duration::from_secs(1)));
     task.await.unwrap().unwrap();
 }

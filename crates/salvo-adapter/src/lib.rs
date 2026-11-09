@@ -11,7 +11,7 @@ use salvo::http::{HeaderValue, StatusCode, header};
 #[cfg(feature = "stream")]
 mod streaming;
 #[cfg(feature = "stream")]
-pub use streaming::{StreamError, StreamPage, StreamRenderer};
+pub use streaming::{StreamError, StreamPage, StreamRenderer, StreamTimeout, StreamTimeouts};
 
 /// Wrap already-rendered HTML, including explicitly assembled resource snapshots.
 pub fn html_response(html: impl Into<String>) -> Response {
