@@ -108,8 +108,9 @@ desktop/native/liveview/tui adapters and examples have been removed. Only the
 new `tools/cli` is a separate library-only host tooling workspace, explicitly
 authorized after the cleanup. It must not depend on runtime crates or enter
 the facade/default/HTML/SSR/WASM runtime graphs. Applications own a tiny private
-workspace executable and shared Cargo.lock; bin launchers set approved per-host caches and the
-native tool target before Cargo. The canonical check script also verifies CLI
+workspace executable and shared Cargo.lock; bin launchers inherit the caller's
+Cargo and temporary paths and select the native tool target before Cargo.
+The canonical check script also verifies CLI
 metadata, fmt, tests and Clippy independently of the runtime workspace. Historical
 design and measurement reports may refer to removed sources through Git history;
 they do not advertise current APIs or platform acceptance. Do not reintroduce
