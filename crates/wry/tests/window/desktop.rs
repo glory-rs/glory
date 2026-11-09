@@ -8,7 +8,19 @@ use std::{
     time::{Duration, Instant},
 };
 
+// Fixed CSS sizes can be quantized by the WebView's 1/64 layout units at
+// fractional effective scale. The measured WebView2 DPR=1.02 returns 359.9877319
+// for both this fixture and an independent plain DOM width:360px probe.
+// Keep this bound below a CSS pixel; do not apply it to selection/scroll data.
+fn fixed_layout_dimension(actual: f64, expected: f64) -> bool {
+    actual.is_finite() && actual > 0. && (actual - expected).abs() <= 1. / 64.
+}
+
 pub fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
+    assert!(fixed_layout_dimension(359.98773193359375, 360.));
+    for invalid in [359., 361., 0., f64::NAN, f64::INFINITY] {
+        assert!(!fixed_layout_dimension(invalid, 360.));
+    }
     if std::env::var("GLORY_WRY_WINDOW").as_deref() != Ok("1") {
         println!("Set GLORY_WRY_WINDOW=1 to run actual system WebView acceptance.");
         return Ok(());
@@ -226,8 +238,8 @@ pub fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
                                 assert_eq!((start, end), (2, 4))
                             }
                             QueryValue::Bounds(rect) => {
-                                assert_eq!(rect.width, 360.);
-                                assert_eq!(rect.height, 260.);
+                                assert!(fixed_layout_dimension(rect.width, 360.), "{rect:?}");
+                                assert!(fixed_layout_dimension(rect.height, 260.), "{rect:?}");
                             }
                             QueryValue::ScrollMetrics(metrics) => {
                                 assert_eq!(metrics.viewport_width, 360.)
