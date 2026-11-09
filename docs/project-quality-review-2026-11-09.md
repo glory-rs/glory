@@ -1,6 +1,58 @@
 # Glory 多维代码评审与后续改进报告
 
-评审日期：2026 年 11 月 9 日。源码基线：`d20a1392e358afaf3fe6cc17481bee38cb4a0fc0`，版本线 `0.7.0`。本次只评审并生成报告，没有修复业务源码。
+评审日期：2026 年 11 月 9 日。初轮源码基线：`d20a1392e358afaf3fe6cc17481bee38cb4a0fc0`，版本线 `0.7.0`。后续修复以 `50098a4` 为开发基线，通过 [PR 60](https://github.com/glory-rs/glory/pull/60) 提交；下列完成状态和新增证据描述修复结果，原始发现保留其基线含义。
+
+## 修复完成状态
+
+七项具体改进均已实现并补充回归。主评审协调三个 agent 分工修复，再交换未参与实现的专项进行代码审查。交叉审查没有发现阻止合并的运行时问题；发现的超时测试窄窗口已用更宽预算和 started/release 信号修正。最终远端 CI、review 和合并状态以 [PR 60](https://github.com/glory-rs/glory/pull/60) 为准。
+
+| 项目 | 实现与回归状态 | 保留边界 |
+| --- | --- | --- |
+| F01 完成 | 最多 8 个连接处理线程，header/response 绝对期限，25ms socket 取消检查；真实慢滴、并发正常请求、满额和阻塞写回归通过；CLI 全部 33 项通过 | 限制 socket 等待，无法抢占同步本地文件系统调用 |
+| F02 完成 | callback 前置 inbox 同时限 4096 条和 8 MiB，Tao 只收到合并 Wake；7 项 inbox 回归含真实 Renderer ready/ack/FIFO、洪泛、关闭和线程交错 | 溢出保留已接受前缀后明确终止；原生平台自身的 IPC 分配与真实窗口洪泛不是该预算的证明范围 |
+| F03 完成 | 宽序列非边界编辑提升为 live NodeId 邻接索引；小/追加序列保留 Vec；工作量测试、顺序差分、跨父、悬挂、拒绝前缀、身份复用通过 | 2048 提升、1024 退回；以额外 O(live siblings) 索引内存换结构修改成本；公开每步读取连续 slice 仍 O(N) |
+| F04 完成 | Text/Value 不再使 translation pending；保留结构、metadata、typed Style 和 reduced-motion 失效；新增真实 Chromium 回归在 0/1/1000 节点通过 | 相同回归在旧驱动上失败：10 次局部更新额外请求 10 个 RAF，修复后为 0；仅声明 typed Style 隐藏，未扩展任意 author CSS 的动画资格契约 |
+| F05 完成 | 当前发布/CLI/README 指南统一继承调用者环境、按所属 workspace metadata 查 target；新增文档负向回归，46 项脚本测试通过 | 历史报告中的路径不改写；检查只覆盖明确列出的当前操作指南 |
+| R01 完成 | 新增可选 StreamTimeouts request/idle，覆盖无 demand 与 Pending；区分超时原因；不断开真实连接也能清理并恢复 admission；Salvo 共 29 项通过 | 默认均 None；生产应用显式选期限；同步 factory/loader/序列化仍为合作式 |
+| R02 完成 | Loader/FileStats 聚合 worker_panicked/worker_cancelled；覆盖 async 与 spawn_blocking；panic 后继续真实文件读取/资源处理并检查许可释放 | 不保存 panic 正文或逐任务历史；completed 仍是接受发布，不是 handler 完成 |
+
+### 修复后的验证证据
+
+本机活动 workspace 全 feature 测试 **1263 passed、0 failed、2 ignored**；两个显式平台验收测试不计为通过。独立 CLI **33 passed**；脚本 **46 passed**。**32 套 Chromium 验收全部通过**，包括新增 translation，以及既有 SSR adoption、stream、查询、输入、焦点、选择和清理；独立真实 TCP 顺序、断连与慢读背压检查也通过。其余整体验证命令及各检查状态记录在 [修复验证清单](quality-fixes-2026-11-09-validation.json)。
+
+原生与 WASM 的 workspace all-features/all-targets 严格 Clippy、独立 CLI 和 WASM fixture 严格 Clippy 均通过。另显式运行的真实 Wry 窗口验收通过。该窗口首轮在固定宽度的浮点精确相等断言失败；原始 `50098a4` shell 与独立 plain DOM 都复现同样的 `359.9877319`，WebView2 的有效 DPR 为 `1.02`。只把两个固定尺寸断言改为有限正数且误差不超过 `1/64` CSS px，明确验证 359/361 这样的 1px 偏差仍失败，未放宽选择、焦点或滚动断言。失败、基线、独立探针及最终通过日志均保留。
+
+新回归的红绿证据使用同一 translation fixture：旧 production driver 仅适配新增私有参数签名，出现 10 个额外 RAF 而失败；恢复修复后的源码与产物后，0/1/1000 节点的无关更新均不新增 RAF，并保留 animation/editor 身份、typed 隐藏/恢复、Suspend/Resume、reduced-motion 和卸载行为。
+
+### 宽列表的工作量与性能取舍
+
+确定性测试验证宽列表重排/前插的 promotion 只检查 N 个 live 节点，随后不再逐步移动或搜索连续兄弟；全循环结束前不物化 snapshot。追加和首部退休保持原 Vec 路径。当前 x64 Rust 布局中 Children 本体修复前后均为 32B；提升后的哈希索引及按需 slice 另占内存，没有 allocator/RSS 改善结论。
+
+以下是共享主机上固定同一逻辑 CPU 的冻结 release 二进制对照，中位数单位为 ms。两侧使用相同数值 workload，准备和完整顺序/邻接校验均在计时外；它测量 semantic Memory，不测 DOM、布局或呈现。完整原始数据、二进制 hash、源码溯源和限制保存在 [性能证据](quality-review-2026-11-09-performance.json)。
+
+| 节点数 | 操作 | 修复前 | 修复后 | 变化 |
+| --- | --- | --- | --- | --- |
+| 1000 | append | 0.1661 | 0.17035 | +2.6% |
+| 1000 | prepend | 0.3839 | 0.3967 | +3.3% |
+| 1000 | reverse | 0.39945 | 0.32955 | -17.5% |
+| 1000 | shuffle | 0.7377 | 0.51195 | -30.6% |
+| 1000 | head retire | 0.2030 | 0.20125 | -0.9% |
+| 10000 | append | 2.3557 | 2.54905 | +8.2% |
+| 10000 | prepend | 31.14545 | 5.37305 | -82.7% |
+| 10000 | reverse | 21.6511 | 5.3226 | -75.4% |
+| 10000 | shuffle | 50.53375 | 7.0185 | -86.1% |
+| 10000 | head retire | 3.06735 | 2.9891 | -2.6% |
+| 50000 | append | 12.49725 | 13.03485 | +4.3% |
+| 50000 | prepend | 789.7053 | 27.9837 | -96.5% |
+| 50000 | reverse | 557.56485 | 33.6980 | -94.0% |
+| 50000 | shuffle | 1315.85315 | 48.3045 | -96.3% |
+| 50000 | head retire | 16.5326 | 15.0697 | -8.8% |
+
+保留 append 的回退，不声称整体提速。早期未固定 CPU 的 ABBA 曾测到小操作约 2 倍回退；同一冻结候选重新交替和同 CPU 复测未重复该统一幅度，同进程 old/new Children 微基准的 fast path 约在 -2.7% 至 +4.2% 内。异构核/调度影响只是解释假设，原始不利结果完整保留，主机仍有其他编译任务，亲和设置不等于独占 CPU。第一次 baseline benchmark 格式化前的原始文件字节未另存，数值 workload/计时区不变，但不提供不存在的原始字节 hash。
+
+具体修复完成不等于“架构与 API 后续投入”中的长期工作全部完成。新增公共 Stats 字段及 StreamError::Timeout 可能要求外部穷举初始化或 match 更新；未增加 unsafe、I/O 默认授权、全局缓存根目录或 runtime 依赖。
+
+## 初轮评审结论
 
 Glory 已具备较完整的所有权、代际身份、显式 I/O 授权、失败前缀和宿主验收体系。本轮最值得优先处理的是开发 HTTP 服务的请求占用时间、Wry 入队前的资源预算，以及两处随页面规模放大的结构与控制器工作量。并发专项没有发现高置信的 P1/P2 并发正确性错误；生产流式 SSR 的超时策略和 native worker 故障观测仍有改进空间。
 
@@ -154,7 +206,7 @@ JoinSet 的消费路径忽略 JoinError。自定义 handler/future panic 时，�
 
 不建议把这些工作合成一次大重构。每次修改应携带最小触发场景、失败前证据、修复后验证，以及对成功前缀、焦点/选区和资源释放的检查。
 
-## 本轮实际验证
+## 初轮实际验证
 
 执行环境：Windows `x86_64-pc-windows-msvc`，Rust/Cargo `1.99.1`。产物目录由所属 workspace 的 metadata 查询：主仓库为 `D:/Works/glory-rs/glory/target`，CLI 为 `D:/Works/glory-rs/glory/tools/cli/target`。没有重定向 Cargo home、target 或 TEMP/TMP，没有 Docker 构建。
 
@@ -172,4 +224,4 @@ JoinSet 的消费路径忽略 JoinError。自定义 handler/future panic 时，�
 
 Rust 测试合计 867 项，Python 测试 43 项。命令、覆盖边界和日志摘要见随报告保存的 [验证清单](quality-review-2026-11-09-validation.json)。原始日志位于本机 `target/verification/code-review-2026-11-09/`，该目录不随 Git 提交。
 
-本轮没有执行完整的 `check-semantic-ui.ps1 -Web -Window -Audit`、新的 RustSec 在线扫描、浏览器/真实窗口验收、Apace 全 feature 测试、Android/iOS/Apple 验收或新性能计时。867 项测试通过只支持列出的范围，不能替代这些检查；F01—F04 的专项故障/压力和性能用例仍是下一轮改进的验收任务。
+初轮没有执行完整的 `check-semantic-ui.ps1 -Web -Window -Audit`、新的 RustSec 在线扫描、浏览器/真实窗口验收、Apace 全 feature 测试、Android/iOS/Apple 验收或新性能计时。初轮 867 项测试只支持该阶段列出的范围；后续新增的故障/压力、浏览器和性能验证见本文开头的修复状态与验证清单。

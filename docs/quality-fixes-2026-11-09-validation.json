@@ -1,0 +1,385 @@
+{
+  "schema": "glory.quality-fix-validation.v1",
+  "review_date": "2026-11-09",
+  "timezone": "Asia/Shanghai",
+  "initial_review_commit": "d20a1392e358afaf3fe6cc17481bee38cb4a0fc0",
+  "development_base": "50098a42d2a83c8ab2a6b274a58f7b0d7d4747f6",
+  "implementation_head_before_this_report": "deba9d36833b97fdb8aeb0099d165b556ccbda66",
+  "pull_request": "https://github.com/glory-rs/glory/pull/60",
+  "status_policy": "Per-finding status records completed implementation and local regression. Consult the PR for the latest CI, review and merge state; merge only after checks and reviews have no blockers.",
+  "toolchain": {
+    "rustc": "1.99.1",
+    "cargo": "1.99.1",
+    "host": "x86_64-pc-windows-msvc"
+  },
+  "targets_from_owning_workspace_metadata": {
+    "runtime": "D:\\Works\\glory-rs\\glory\\target",
+    "cli": "D:\\Works\\glory-rs\\glory\\tools\\cli\\target",
+    "browser_fixture": "D:\\Works\\glory-rs\\glory\\examples\\semantic-web\\target"
+  },
+  "environment": "Inherited normal Cargo home/target/TEMP/TMP; no retired directory or alias access and no Docker. Only explicit owned-window test flag is scoped.",
+  "checks": [
+    {
+      "command": "cargo test --locked --workspace --all-features -j 2",
+      "exit_code": 0,
+      "log": "target/verification/quality-fixes-20261109/workspace-tests.log",
+      "log_sha256": "613c8105b49edd643dd03941e0d76d2ce110d521aa977d582da09d862213fc66",
+      "tests": {
+        "passed": 1263,
+        "failed": 0,
+        "ignored": 2
+      }
+    },
+    {
+      "command": "cargo clippy --locked --workspace --all-features --all-targets -j 2 -- -D warnings",
+      "exit_code": 0,
+      "log": "target/verification/quality-fixes-20261109/workspace-clippy.log",
+      "log_sha256": "fbc4064eee1390aa511c1159ed643a7c7185ee1df19c41034052f97d8b63b375"
+    },
+    {
+      "command": "cargo clippy --locked --workspace --all-features --all-targets --target wasm32-unknown-unknown -j 2 -- -D warnings",
+      "exit_code": 0,
+      "log": "target/verification/quality-fixes-20261109/wasm-clippy.log",
+      "log_sha256": "821bb6e120664d82b84b4eb2bbaf26866349ba9829ea5acc0ed3dc2245328fe3"
+    },
+    {
+      "command": "cargo test --locked [cwd tools/cli]",
+      "exit_code": 0,
+      "log": "target/verification/quality-fixes-20261109/cli-tests.log",
+      "log_sha256": "b02372de2bc7e6e519d21586aeedb1c25ed73985175dbb9d94a6cfa9cd8ea351",
+      "tests": {
+        "passed": 33,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": "cargo clippy --locked --all-targets -- -D warnings [cwd tools/cli]",
+      "exit_code": 0,
+      "log": "target/verification/quality-fixes-20261109/cli-clippy.log",
+      "log_sha256": "39b3e2833d27e06a0f21f03b1461de1bb1db25dc651c57a94b889a4a191048e8"
+    },
+    {
+      "command": "python -m unittest discover -s scripts -p 'test_*.py'",
+      "exit_code": 0,
+      "log": "target/verification/quality-fixes-20261109/python-tests.log",
+      "log_sha256": "45d255e47b5450d69129fd79a96dd87c5d283c79b7002d1697e26d1374c448a5",
+      "tests": {
+        "passed": 46,
+        "failed": 0
+      }
+    },
+    {
+      "command": "cargo fmt --all -- --check",
+      "exit_code": 0,
+      "log": "target/verification/quality-fixes-20261109/fmt-check.log",
+      "log_sha256": "88c7457ca5b54f39243ecdd41d49b396e704091cba3875142d40932750d79877",
+      "note": "Stable rustfmt reports unsupported existing nightly configuration options."
+    },
+    {
+      "command": "cargo fmt --manifest-path examples/semantic-web/Cargo.toml -- --check",
+      "exit_code": 0,
+      "log": "target/verification/quality-fixes-20261109/fixture-fmt.log",
+      "log_sha256": "c7384e2b6c5eccbead60266d6778d3cc3d44a874c3786c5eb54ec34afe6b7db5"
+    },
+    {
+      "command": "cargo clippy --locked --manifest-path examples/semantic-web/Cargo.toml --all-targets --target wasm32-unknown-unknown -j 2 -- -D warnings",
+      "exit_code": 0,
+      "log": "target/verification/quality-fixes-20261109/fixture-clippy.log",
+      "log_sha256": "9f2e1c9dcd11e883ba5384b83437de6ac3507bf1f4c772a3c7f201b1012bb703"
+    },
+    {
+      "command": "cargo build --locked --lib --target wasm32-unknown-unknown [cwd examples/semantic-web]",
+      "exit_code": 0,
+      "log": "target/verification/quality-fixes-20261109/web-final-build.log",
+      "log_sha256": "18a184aa601994dd708fd6c3a3089b4e5088fb9f6501c875ded8d216e782e271"
+    },
+    {
+      "command": "node scripts/test-semantic-browser.cjs --base http://127.0.0.1:8792 --stream http://127.0.0.1:8793 --out target/verification/quality-fixes-20261109/browser-all --playwright <project-local playwright@1.64.1>",
+      "exit_code": 0,
+      "log": "target/verification/quality-fixes-20261109/browser-all.log",
+      "log_sha256": "bb6dddd07f3128575030bdd347f95fd90022ef0160dd1780085a07b074bd12ac"
+    },
+    {
+      "command": "python scripts/check-semantic-stream.py --port 8793",
+      "exit_code": 0,
+      "log": "target/verification/quality-fixes-20261109/stream-transport.log",
+      "log_sha256": "e0ca0da4a9ba9ceb539c4a332cb02d3d3b359a02257294729bc320df993ca1f1"
+    },
+    {
+      "command": "GLORY_WRY_WINDOW=1 cargo test --locked -p glory-wry --all-features --test window",
+      "exit_code": 0,
+      "log": "target/verification/quality-fixes-20261109/wry-window-final.log",
+      "log_sha256": "e1d928b6440df6cfc171a4685d95eea6ae009104dd961034518849a92dcba17e",
+      "note": "Environment flag scoped and restored; no Cargo/cache/temp redirection."
+    },
+    {
+      "command": "python scripts/check-current-docs.py",
+      "exit_code": 0,
+      "output": "Current documentation references verified for 15 workspace packages"
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "browser": {
+    "version": "157.0.8103.39",
+    "suite_count": 32,
+    "passed": 32,
+    "failed": 0,
+    "evidence_sha256": "2cf69e7ddd70c25704f8188d6e912259dda8f0522055c673dde6647e3de11807",
+    "suites": [
+      {
+        "file": "acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "adaptive-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "budget-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "controller-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "create-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "css-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "entries-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "event-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "fields-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "flex-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "focus-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "focus-result-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "hydrate-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "identity-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "input-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "intrinsic-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "navigation-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "owner-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "plan-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "plan-parts-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "profile-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "query-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "resource-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "resource-snapshot-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "semantics-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "size-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "stream-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "submission-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "target-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "translation-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "typography-acceptance.js",
+        "passed": true
+      },
+      {
+        "file": "unicode-selection-acceptance.js",
+        "passed": true
+      }
+    ]
+  },
+  "regression_red_green": {
+    "finding": "F04",
+    "baseline_driver": "origin/main:crates/web/src/browser/translation.rs at development base, with only unused private parameter added for signature compatibility; finally restored fixed source",
+    "baseline_expected_exit": 1,
+    "baseline_failure": "Error: unrelated patch: {\"count\":1,\"local\":{\"rafs\":10,\"value\":\"updated 10\",\"identity\":true,\"animationsPreserved\":true}}\n    at assert (translation-acceptance.js:4:58)\n    at translation-acceptance.js:33:7\n    at async D:\\Works\\glory-rs\\glory\\scripts\\test-semantic-browser.cjs:26:21",
+    "fixed_result": {
+      "results": [
+        {
+          "count": 0,
+          "local": {
+            "rafs": 0,
+            "value": "updated 10",
+            "identity": true,
+            "animationsPreserved": true
+          },
+          "lifecycle": true,
+          "reducedMotion": true,
+          "cleanup": true
+        },
+        {
+          "count": 1,
+          "local": {
+            "rafs": 0,
+            "value": "updated 10",
+            "identity": true,
+            "animationsPreserved": true
+          },
+          "lifecycle": true,
+          "reducedMotion": true,
+          "cleanup": true
+        },
+        {
+          "count": 1000,
+          "local": {
+            "rafs": 0,
+            "value": "updated 10",
+            "identity": true,
+            "animationsPreserved": true
+          },
+          "lifecycle": true,
+          "reducedMotion": true,
+          "cleanup": true
+        }
+      ],
+      "errors": []
+    },
+    "final_all_suite_result": "32/32 passed after restoring and rebuilding the fixed driver"
+  },
+  "window_geometry": {
+    "initial_fix_branch": {
+      "command": "explicit Wry window acceptance before fixture correction",
+      "exit_code": 101,
+      "log": "target/verification/quality-fixes-20261109/wry-window.log",
+      "log_sha256": "8f9649a78c328b8122dce14d8de10f0a06948bc57d3ec9243be5e967d7ad65ff"
+    },
+    "baseline": {
+      "command": "same unchanged fixture with baseline 50098a4 shell, restored with finally",
+      "exit_code": 101,
+      "log": "target/verification/quality-fixes-20261109/wry-window-baseline-50098a4.log",
+      "log_sha256": "081e1cfa3aa8116b9f2c3b96b05884b6fc151ee453cf14304579415732736ff1"
+    },
+    "independent_probe": {
+      "command": "temporary diagnostic bootstrap; error payload intentionally emits DPR and independent DOM probes, then restored",
+      "exit_code": null,
+      "log": "target/verification/quality-fixes-20261109/wry-window-geometry-evidence.log",
+      "log_sha256": "1875db579681b8bbb340923c331efbc3dda6b899d1adbeace6998975c9e32c96",
+      "expected_outcome": "Intentional diagnostic failure; child process exited 1 per log, exact Cargo wrapper exit was not independently retained."
+    },
+    "dpr": 1.0199999809265137,
+    "viewport_scale": 1,
+    "inline_css": {
+      "width": 360,
+      "height": 260
+    },
+    "observed_bounds": {
+      "width": 359.98773193359375,
+      "height": 259.98773193359375
+    },
+    "plain_dom_width_360": 359.98773193359375,
+    "assertion_policy": "Only the two fixed layout dimensions allow <=1/64 CSS px; finite and positive required; 359/361, zero, NaN and infinity explicitly rejected. Selection/focus/scroll assertions unchanged.",
+    "production_shell_restored_blob": "66eee38530b0187b8dd2a5e195f63f39ee31b768",
+    "final": "explicit actual window passed; see wry-window-final.log"
+  },
+  "independent_review": [
+    {
+      "reviewer": "security_review",
+      "scope": [
+        "F02 inbox and shell",
+        "F04 typed invalidation",
+        "F03 sibling storage and Memory integration"
+      ],
+      "verdict": "No actionable blocking correctness findings. Author CSS eligibility is not newly claimed; ordinary placement complexity excludes necessary Group/interactive-subtree validation."
+    },
+    {
+      "reviewer": "concurrency_review",
+      "scope": [
+        "F01 HTTP connection cancellation and admission",
+        "R01 request/idle deadlines"
+      ],
+      "verdict": "No blocking runtime issue found; narrow timing assumptions in tests were corrected using wider deadlines and startup/release signals."
+    }
+  ],
+  "external_review_request": "https://github.com/glory-rs/glory/pull/60#issuecomment-6743348387",
+  "finding_status": {
+    "F01": "implemented and regression verified",
+    "F02": "implemented and regression verified",
+    "F03": "implemented and regression verified",
+    "F04": "implemented and regression verified",
+    "F05": "implemented and regression verified",
+    "R01": "implemented and regression verified",
+    "R02": "implemented and regression verified"
+  },
+  "performance_evidence": "quality-review-2026-11-09-performance.json",
+  "limits": [
+    "Wry owned-window suite passed; real platform IPC flood behavior is separate from deterministic production inbox admission tests.",
+    "Two explicitly ignored Apace platform tests are not counted as acceptance.",
+    "No new Android/iOS/Apple device, OS IME or screen-reader speech acceptance.",
+    "No local fresh RustSec scan; reusable CI owns current dependency audit.",
+    "Performance samples are shared-host diagnostics, not DOM/layout/frame or RSS evidence; all unfavorable samples retained.",
+    "Long-term architecture/API opportunities remain follow-up work."
+  ],
+  "raw_logs": "Local ignored target artifacts; hashes and command scope are preserved here. GitHub CI uploads its own artifacts."
+}

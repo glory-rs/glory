@@ -13,7 +13,7 @@ Start here when evaluating or extending Glory:
 
 - [Current multidimensional code review](project-quality-review-2026-11-09.md):
   multi-agent security, concurrency, performance and engineering findings,
-  prioritized follow-up work and current validation scope.
+  completed fixes, regression evidence and retained performance tradeoffs.
 
 - [Project quality review and fixes](project-quality-review-2026-10-30.md):
   security, routing, performance and engineering findings, implementation
