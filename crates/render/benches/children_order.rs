@@ -92,9 +92,13 @@ fn run(count: usize, scenario: &str) -> u128 {
 }
 
 fn main() {
-    let repeats = std::env::args()
-        .nth(1)
-        .map_or(5, |value| value.parse::<usize>().unwrap());
+    let repeats = std::env::args().nth(1).map_or(5, |value| {
+        if value == "--test" {
+            1
+        } else {
+            value.parse::<usize>().unwrap()
+        }
+    });
     println!("count,scenario,repeat,nanoseconds");
     for count in [1_000, 10_000, 50_000] {
         for scenario in ["append", "prepend", "reverse", "shuffle", "head-retire"] {
