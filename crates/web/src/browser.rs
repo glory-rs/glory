@@ -231,7 +231,8 @@ impl Render for Renderer {
             .update(mapper.tree(), metadata, &changes.state);
         self.dom.update_collapses(mapper.tree(), metadata);
         self.dom.update_presences(mapper.tree(), metadata);
-        self.dom.update_translations(mapper.tree(), metadata);
+        self.dom
+            .update_translations(mapper.tree(), metadata, &changes.state);
         self.dom.update_clipboard(mapper.tree());
         if changes.state.structure || changes.state.file_configuration {
             self.dom.update_files(mapper.tree());

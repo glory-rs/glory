@@ -112,14 +112,21 @@ impl Dom {
         self: &Rc<Self>,
         tree: &Memory,
         changes: &crate::semantic_changes::Changes<'_>,
+        invalidation: &crate::semantic_changes::StateChanges,
     ) {
+        if changes.is_empty() && !invalidation.translations() {
+            return;
+        }
         let mut state = self.translations.borrow_mut();
+        let mut changed = invalidation.translations();
         for (&id, semantics) in changes {
             let next = semantics.and_then(|s| s.translation);
             if let Some(next) = next {
                 if let Some(current) = state.live.get_mut(&id) {
+                    changed |= current.next != next;
                     current.next = next;
                 } else {
+                    changed = true;
                     state.live.insert(
                         id,
                         Current {
@@ -130,21 +137,23 @@ impl Dom {
                     );
                 }
             } else {
-                state.live.remove(&id);
+                changed |= state.live.remove(&id).is_some();
             }
         }
         // Structural edits can retire a member without a metadata patch.
         // Recheck only live controllers, never rebuild a union of all created
         // semantic identities just to discover that most have no translation.
-        state.live.retain(|id, _| tree.node(*id).is_ok());
-        state.pending = !state.live.is_empty();
+        if invalidation.structure {
+            state.live.retain(|id, _| tree.node(*id).is_ok());
+        }
         if state.live.is_empty() {
             let retired = std::mem::take(&mut *state);
             drop(state);
             drop(retired);
             return;
         }
-        if state.pending {
+        if changed {
+            state.pending = true;
             self.frame.input();
         }
     }
