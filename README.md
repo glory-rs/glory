@@ -114,7 +114,7 @@ On macOS or a configured WSL host:
 ```
 
 On Windows, use `./examples/counter/bin/glory.ps1` with the same arguments.
-The launchers configure approved host caches before invoking Cargo; no global
+The launchers select the native tool target and inherit the caller's build paths; no global
 Glory CLI is required. First use resolves the private runner and installs the
 matching wasm-bindgen tool when needed.
 

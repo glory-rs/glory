@@ -18,7 +18,7 @@ workspace's Cargo metadata; this independent tooling workspace is excluded.
 | Version ownership | CLI library pinned by the project | One `glory-cli` library; exact release or full Git revision, shared application Cargo.lock |
 | Startup during application errors | A separate private workspace executable | `tools/glory` has no application dependency; `doctor` still works with broken application source |
 | Convenient invocation | Project Cargo alias | `cargo glory` plus generated `bin/glory.ps1` and `bin/glory` |
-| Host and cache isolation | Cargo controls tool compilation | Bin launchers select the native Rust target and approved Windows/WSL/macOS data-volume caches before compiling the private runner |
+| Host and build paths | Cargo controls tool compilation | Bin launchers select the native Rust target; builds inherit the caller environment and normal project configuration |
 | Configuration | Application-owned setup | Infer ordinary entries/features/assets; put only overrides in `package.metadata.glory` |
 | Auxiliary tools | Project command owns its tools | Resolve wasm-bindgen from Cargo.lock and install that exact version under the project build root |
 
@@ -117,8 +117,8 @@ For a published release the private package uses an exact dependency such as
 Git-based projects must pin the CLI and framework to the same complete commit.
 Ordinary commands never update those pins. Commit the shared Cargo.lock.
 
-The bin launchers set Cargo caches, the native tool target and temporary paths
-before invoking Cargo. On first use they resolve the new tool dependency into
+The bin launchers select the native tool target and inherit Cargo and temporary
+paths from the caller. On first use they resolve the new tool dependency into
 Cargo.lock; later invocations use `--locked`. Changes to an existing tool pin
 require an explicit Cargo update. Application builds use a separate target
 directory, so the enclosing `cargo run` cannot hold their build lock.
@@ -201,15 +201,13 @@ for the implemented scope and deferred work.
 
 ## Isolation and scope
 
-On Windows caches use `target/verification/glory-projects/<project-path-hash>`. WSL uses
-a verified D:-backed `/mnt/d/BuildCache` mount. `GLORY_BUILD_ROOT` selects another
-project root there; `--build-root` changes the application's output root.
-An existing D: Cargo home may be shared as an immutable package download cache;
-versions come from the project lock, not its contents. No C: cache fallback is
-used. macOS uses `/Volumes/Data/Caches/glory/projects/<project-path-hash>`;
-`GLORY_BUILD_ROOT` can select a project directory under that approved data-volume
-cache root. Paths and existing symlink parents are checked before creating files.
-Other native Unix cache layouts have not been implemented or accepted.
+On Windows, WSL and macOS, builds inherit the caller environment and normal
+project configuration, including Cargo home, target and temporary directories.
+The CLI obtains `target_directory` from `cargo metadata --no-deps --format-version 1`
+in the owning workspace. Application outputs default to `<target_directory>/glory`;
+`GLORY_BUILD_ROOT` or `--build-root` selects an explicit output directory without
+redirecting compiler caches or TEMP/TMP. Relative paths, parent traversals,
+filesystem roots and outputs that would overwrite the application root are rejected.
 
 The matching wasm-bindgen CLI is installed into a version/host-specific project
 directory on the first Web build. `--offline` prohibits installation; `--bindgen`
@@ -251,13 +249,14 @@ only `wasm32-unknown-unknown` for Web. The configured platform still selects
 application features and entry points; a triple does not install a mobile host.
 `doctor` checks the selected target's standard library. Cross-compilation needs
 an appropriate Cargo linker and SDK; `run` rejects a target different from the
-Rust host before building or launching it. Native Unix tool launchers still
-require the verified D: mount described above. Selecting an Apple target from
+Rust host before building or launching it. Native Unix tool launchers use the
+caller's configured paths. Selecting an Apple target from
 Windows does not establish macOS/iOS build or device acceptance.
 
 ## Verification
 
-Set all Cargo/cache/temp paths on D: and verify `cargo metadata`'s target first.
+Query `cargo metadata --no-deps --format-version 1` in `tools/cli` for the tool's
+actual target directory, preserving the caller's Cargo/cache/temp environment.
 Then run:
 
 ```powershell
@@ -266,7 +265,8 @@ cargo fmt --manifest-path tools/cli/Cargo.toml -- --check
 cargo test --locked --manifest-path tools/cli/Cargo.toml
 cargo clippy --locked --manifest-path tools/cli/Cargo.toml --all-targets -- -D warnings
 cargo build --locked --manifest-path tools/cli/Cargo.toml --example bootstrap
-./tools/cli/tests/native-acceptance.ps1 -Driver target/verification/glory-semantic-ui/target/debug/examples/bootstrap.exe
+$cliTarget = (cargo metadata --manifest-path tools/cli/Cargo.toml --no-deps --format-version 1 | ConvertFrom-Json).target_directory
+./tools/cli/tests/native-acceptance.ps1 -Driver (Join-Path $cliTarget 'debug/examples/bootstrap.exe')
 ```
 
 Windows acceptance on 2026-10-26 used a disposable D: counter copy and real Chrome:
@@ -276,8 +276,9 @@ recovery refresh all passed without browser errors. The driver is
 `tests/web-acceptance.cjs`; never point it at the application's working sources.
 Its `--fixture`, `--build`, `--log`, `--out`, `--driver` and `--playwright` paths
 select the disposable project, running serve log, evidence output, private runner
-and installed Playwright module. Set Cargo home and temporary paths on D: before
-running it. Results are under `target/verification/glory-project-cli/browser-acceptance-final`.
+and installed Playwright module. Query the owning workspace's metadata before
+selecting output paths. The historical results are under
+`target/verification/glory-project-cli/browser-acceptance-final`.
 
 The CLI tests cover configuration isolation, version/source mismatch,
 artifact selection, output rollback, initialization without app compilation,
@@ -295,9 +296,8 @@ fixture does not assert window/input or mobile device behavior.
 ## Native Apple hosts
 
 The shell launcher works on macOS without GNU sha256sum/realpath/findmnt.
-It isolates Cargo/tool/app/temp/Python caches under `/Volumes/Data/Caches/glory`;
-Windows D: and verified WSL mount behavior remain supported. Canonical path
-checks reject `..` and symlink escapes before creating output directories.
+It inherits the caller's Cargo/tool/temp environment, as on Windows and WSL.
+Build output validation rejects `..` and source-root overwrites.
 
 `package.metadata.glory.desktop.bundle-identifier` sets the macOS reverse-DNS
 identifier; the default is `rs.glory.<package-name>`. `bundle --platform desktop`
