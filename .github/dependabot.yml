@@ -1,22 +1,15 @@
-# To get started with Dependabot version updates, you'll need to specify which
-# package ecosystems to update and where the package manifests are located.
-# Please see the documentation for all configuration options:
-# https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
+# The runtime requires sibling engine checkouts, which Dependabot cannot fetch.
+# Keep its Cargo updater on the independent CLI workspace. Runtime dependencies
+# remain covered by quality.yml's maintained-workspace RustSec audit.
+# See docs/dependency-maintenance.md for the coordinated runtime update process.
 
 version: 2
 updates:
   - package-ecosystem: "cargo"
-    directories:
-      - "/"
-      - "/tools/cli"
-      - "/examples/counter"
-      - "/examples/display-web"
-      - "/examples/mobile"
-      - "/examples/routing"
-      - "/examples/semantic-web"
-      - "/benchmarks/glory"
-      - "/benchmarks/role-patches"
-      - "/benchmarks/wasm-size"
-      - "/benchmarks/scenarios/glory"
+    directory: "/tools/cli"
     schedule:
       interval: "daily"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
