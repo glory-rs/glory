@@ -1424,18 +1424,7 @@ impl Memory {
         } else {
             &mut self.roots
         };
-        let index = if siblings.first() == Some(&id) {
-            0
-        } else if siblings.last() == Some(&id) {
-            siblings.len() - 1
-        } else {
-            siblings
-                .iter()
-                .position(|child| *child == id)
-                .expect("placed sibling")
-        };
-        let previous = index.checked_sub(1).map(|index| siblings[index]);
-        siblings.remove(index);
+        let previous = siblings.remove_id(id);
         if let Some(previous) = previous {
             self.nodes
                 .get_mut(&previous)
@@ -1670,19 +1659,7 @@ impl Memory {
         } else {
             &mut self.roots
         };
-        let index = before
-            .map(|before| {
-                if siblings.first() == Some(&before) {
-                    return 0;
-                }
-                siblings
-                    .iter()
-                    .position(|child| *child == before)
-                    .expect("validated sibling")
-            })
-            .unwrap_or(siblings.len());
-        let previous = index.checked_sub(1).map(|index| siblings[index]);
-        siblings.insert(index, id);
+        let previous = siblings.insert_before(id, before);
         if let Some(previous) = previous {
             self.nodes
                 .get_mut(&previous)
@@ -1779,7 +1756,7 @@ impl Memory {
                             .expect("plan parent")
                             .children;
                         let previous = siblings.last().copied();
-                        siblings.insert(siblings.len(), id);
+                        siblings.insert_before(id, None);
                         if let Some(previous) = previous {
                             self.nodes.get_mut(&previous).expect("plan sibling").next = Some(id);
                         }
