@@ -42,6 +42,8 @@ pub struct Files {
     pub(crate) dropper: Option<Arc<dyn FileDrop>>,
     pub(crate) shared: Arc<Shared>,
     pub(crate) timeout: Duration,
+    #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
+    worker: Option<Arc<worker::Failures>>,
 }
 impl Files {
     pub fn new(driver: Arc<dyn FilePicker>) -> Self {
@@ -50,6 +52,8 @@ impl Files {
             dropper: None,
             shared: Arc::new(Shared::default()),
             timeout: Duration::from_secs(120),
+            #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
+            worker: None,
         }
     }
     pub fn with_timeout(
@@ -69,16 +73,32 @@ impl Files {
         self
     }
     pub fn stats(&self) -> FileStats {
-        self.shared.0.lock().expect("file budget").stats
+        let stats = self.shared.0.lock().expect("file budget").stats;
+        #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
+        if let Some(worker) = &self.worker {
+            let (worker_panicked, worker_cancelled) = worker.counts();
+            return FileStats {
+                worker_panicked,
+                worker_cancelled,
+                ..stats
+            };
+        }
+        stats
     }
     #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
     pub fn desktop() -> Result<Self, FileRejection> {
         let driver = Arc::new(desktop::Desktop::new()?);
-        Ok(Self::new(driver.clone()).with_drop_driver(driver))
+        let mut files = Self::new(driver.clone()).with_drop_driver(driver.clone());
+        files.worker = Some(driver.worker_failures());
+        Ok(files)
     }
 }
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct FileStats {
+    /// Reaped desktop worker panics. Custom/mobile drivers report zero here.
+    pub worker_panicked: u64,
+    /// Reaped desktop task cancellations, independent of withdrawn receipts.
+    pub worker_cancelled: u64,
     pub picker: bool,
     /// Current host-owned native drop receipt/opener slot. Raw platform
     /// allocation and the driver's actual OS permits are separate budgets.

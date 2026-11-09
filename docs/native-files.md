@@ -92,6 +92,10 @@ not an OS sandbox or proof that its producer came from a filesystem browser.
 
 The drop opener returns the same stable readers as the chooser, using bounded
 worker admission and a physical permit owned by the actual blocking closure.
+Desktop `FileStats::worker_panicked` and `worker_cancelled` expose saturating
+counts of reaped asynchronous and blocking task failures, shared by service
+clones. They retain no panic payloads/history and stay zero for custom/mobile
+drivers. Withdrawing a receipt does not count as worker task cancellation.
 Selection metadata/filter/size budgets and transactional replacement are shared.
 Clear/remove/revision change, hiding, focus loss, surface/DPI changes and Owner
 retirement revoke late acceptance. Author CSS visibility is resolved before raw
