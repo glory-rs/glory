@@ -1,0 +1,173 @@
+{
+  "review_date": "2026-11-09",
+  "timezone": "Asia/Shanghai",
+  "repository": "glory",
+  "source_commit": "d20a1392e358afaf3fe6cc17481bee38cb4a0fc0",
+  "initial_worktree": "clean",
+  "review_team": {
+    "agents": 4,
+    "specialists": [
+      "security",
+      "concurrency and lifecycle",
+      "performance and efficiency"
+    ],
+    "lead": "architecture, engineering, independent verification and synthesis"
+  },
+  "toolchain": {
+    "rustc": "1.99.1",
+    "cargo": "1.99.1",
+    "host": "x86_64-pc-windows-msvc"
+  },
+  "cargo_target_directories": {
+    "workspace": "D:\\Works\\glory-rs\\glory\\target",
+    "cli": "D:\\Works\\glory-rs\\glory\\tools\\cli\\target"
+  },
+  "environment_policy": "Inherited caller environment and normal workspace configuration; no Cargo home/target/TEMP/TMP redirection; no Docker builds.",
+  "checks": [
+    {
+      "command": "cargo test --locked -p glory-core -p glory-routing -p glory-resource -p glory-render -p glory-html -p glory-ssr -p glory-style -p glory-ui -p glory-i18n -p glory-view-macros --all-features",
+      "exit_code": 0,
+      "log": "target/verification/code-review-2026-11-09/runtime-tests.log",
+      "log_sha256": "dca929f74f178b6e72823b0d54f4e4178c0577224c8e81650fd6532e3a660bbd",
+      "test_counts": {
+        "passed": 797,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": "cargo clippy --locked -p glory-core -p glory-routing -p glory-resource -p glory-render -p glory-html -p glory-ssr -p glory-style -p glory-ui -p glory-i18n -p glory-view-macros --all-features --all-targets -- -D warnings",
+      "exit_code": 0,
+      "log": "target/verification/code-review-2026-11-09/runtime-clippy.log",
+      "log_sha256": "fa2b8279f662167961cdf84e334cc33a0dcc33554919a5412325d1f6e584d3dc"
+    },
+    {
+      "command": "cargo test --locked -p glory-wry -p glory-salvo --all-features --lib",
+      "exit_code": 0,
+      "log": "target/verification/code-review-2026-11-09/host-tests.log",
+      "log_sha256": "ba0d7e47ee0709cc35806f5c5d29d528f5dad9eeda856527ddb6134ba4b6b46d",
+      "test_counts": {
+        "passed": 16,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": "cargo test --locked -p glory-salvo --all-features --tests",
+      "exit_code": 0,
+      "log": "target/verification/code-review-2026-11-09/salvo-tests.log",
+      "log_sha256": "7ac5f1826352548d6147ce92efeb955908722574b36782b13d62d56bdef77e16",
+      "test_counts": {
+        "passed": 24,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": "cargo test --locked [cwd tools/cli]",
+      "exit_code": 0,
+      "log": "target/verification/code-review-2026-11-09/cli-tests.log",
+      "log_sha256": "dcd2a5dc05084228481856ee9e7725339eb17c8daa606b90d4a98d88a8fc55c1",
+      "test_counts": {
+        "passed": 30,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": "python -m unittest discover -s scripts -p 'test_*.py'",
+      "exit_code": 0,
+      "log": "target/verification/code-review-2026-11-09/tooling-tests.log",
+      "log_sha256": "54976f2437505909218bb0092a837aab08e4ddf7dbc34ee8cf283c2e04356352",
+      "test_counts": {
+        "passed": 43,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "command": "cargo fmt --all -- --check",
+      "exit_code": 0,
+      "log": "target/verification/code-review-2026-11-09/fmt.log",
+      "log_sha256": "9a9a403a35d3c0180d6811f70ee30d0db1fb3a36c103328782d5b19e77a900c7"
+    },
+    {
+      "command": "python scripts/check-current-docs.py",
+      "exit_code": 0,
+      "output": "Current documentation references verified for 15 workspace packages",
+      "limitation": "Does not detect current build directory guidance conflicts (F05)."
+    },
+    {
+      "command": "git diff --check",
+      "exit_code": 0
+    }
+  ],
+  "unique_test_totals": {
+    "rust_passed_including_doctests": 867,
+    "python_passed": 43,
+    "failed": 0,
+    "ignored": 0
+  },
+  "additional_agent_checks": [
+    {
+      "command": "cargo test --manifest-path tools/cli/Cargo.toml --locked serve::tests -- --test-threads=1",
+      "passed": 5,
+      "included_in_cli_total": true
+    }
+  ],
+  "findings": [
+    {
+      "id": "F01",
+      "priority": "P2",
+      "evidence": "static",
+      "subject": "CLI cumulative HTTP request deadline"
+    },
+    {
+      "id": "F02",
+      "priority": "P2",
+      "evidence": "static budget coverage gap; platform flooding not reproduced",
+      "subject": "Wry pre-event-loop IPC admission"
+    },
+    {
+      "id": "F03",
+      "priority": "P2",
+      "evidence": "static complexity; performance not measured",
+      "subject": "Wide semantic sibling insertion/reordering"
+    },
+    {
+      "id": "F04",
+      "priority": "P2",
+      "evidence": "static work count; browser frame impact not measured",
+      "subject": "Unrelated patch invalidates translation drivers"
+    },
+    {
+      "id": "F05",
+      "priority": "P2",
+      "evidence": "static documentation/code contract conflict",
+      "subject": "Retired build directory in current guides"
+    },
+    {
+      "id": "R01",
+      "priority": "P2 deployment dependent",
+      "evidence": "capability gap",
+      "subject": "Progressive SSR request/idle lifetime policy"
+    },
+    {
+      "id": "R02",
+      "priority": "P3",
+      "evidence": "static observability gap",
+      "subject": "Native worker JoinError classification"
+    }
+  ],
+  "not_run": [
+    "Full check-semantic-ui.ps1 -Web -Window -Audit",
+    "Fresh online RustSec scan",
+    "Browser or real-window acceptance",
+    "Apace all-feature tests",
+    "Android/iOS/Apple runtime acceptance",
+    "New fault-injection or flooding reproduction for findings",
+    "Current-head performance timing, RSS or output-size benchmarks"
+  ],
+  "source_changes": "No business source or tests changed; review documents and index only.",
+  "logs_delivery": "Raw logs are local ignored target artifacts; this manifest preserves command scope, summaries and SHA256."
+}
