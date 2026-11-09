@@ -90,6 +90,13 @@ revoking its document. DOM acknowledgement does not imply pixel presentation.
 Limits are 8 MiB per incoming message and pending command/queued input payload,
 including JSON escaping of large controlled editor snapshots,
 4096 queued inputs, 1024 pending queries, and 32 MiB explicit shell resources.
+Before callbacks notify the native event loop, a separate raw IPC inbox admits
+at most 4096 messages and 8 MiB total UTF-8 payload. The native event queue receives
+only a shared, coalesced body-free wake. Inbox overflow or an oversized message
+is terminal: the shell processes the accepted FIFO prefix and then fails,
+rather than discarding acknowledgements or terminal input and continuing.
+Closing the inbox releases its bodies and refuses late callbacks. WebView's
+allocation of an incoming callback body remains outside this inbox budget.
 Only one batch is in flight. The stock shell fails on document startup or batch
 acknowledgement timeout after 15 seconds. These are transfer/admission limits,
 not limits on WebView or OS allocation. The shell serves a local document with

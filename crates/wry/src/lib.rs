@@ -2,6 +2,8 @@
 //! No WASM, second reactive runtime, HTML snapshot replacement or VDOM diff.
 #![cfg(not(target_arch = "wasm32"))]
 
+#[cfg(any(feature = "shell", test))]
+mod host_inbox;
 mod local_media;
 mod protocol;
 pub use local_media::{LocalMedia, MediaKind};
