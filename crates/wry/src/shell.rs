@@ -10,12 +10,12 @@ use std::{
     collections::BTreeMap,
     rc::Rc,
     sync::Arc,
-    task::{Wake, Waker},
+    task::Waker,
     time::{Duration, Instant},
 };
 use tao::{
     event::{Event, WindowEvent},
-    event_loop::{ControlFlow, EventLoop, EventLoopBuilder, EventLoopProxy},
+    event_loop::{ControlFlow, EventLoop, EventLoopBuilder},
     platform::run_return::EventLoopExtRunReturn,
     window::WindowBuilder,
 };
@@ -201,16 +201,6 @@ impl Drop for WindowApp {
 
 enum Message {
     Wake,
-    Ipc(String),
-}
-struct LoopWake(EventLoopProxy<Message>);
-impl Wake for LoopWake {
-    fn wake(self: Arc<Self>) {
-        let _ = self.0.send_event(Message::Wake);
-    }
-    fn wake_by_ref(self: &Arc<Self>) {
-        let _ = self.0.send_event(Message::Wake);
-    }
 }
 pub struct Shell {
     event_loop: EventLoop<Message>,
@@ -245,7 +235,10 @@ impl Shell {
             .build(&self.event_loop)
             .map_err(|e| ShellError(e.to_string()))?;
         let proxy = self.event_loop.create_proxy();
-        let waker = Waker::from(Arc::new(LoopWake(proxy.clone())));
+        let (ipc, inbox) = crate::host_inbox::channel(move || {
+            let _ = proxy.send_event(Message::Wake);
+        });
+        let waker = Waker::from(Arc::new(ipc.clone()));
         let mut browser_host = config
             .browser
             .map(|controller| browser::Host::new(controller, waker.clone()))
@@ -310,9 +303,7 @@ impl Shell {
             .with_new_window_req_handler(|_, _| wry::NewWindowResponse::Deny)
             .with_ipc_handler(move |request| {
                 // Callbacks never borrow UI or invoke user closures.
-                if request.body().len() <= crate::protocol::MAX_IPC_BYTES {
-                    let _ = proxy.send_event(Message::Ipc(request.into_body()));
-                }
+                let _ = ipc.post(request.into_body());
             })
             .with_url(initial_url);
         let builder = if let Some(script) = config.initialization_script {
@@ -355,12 +346,14 @@ impl Shell {
                 exiting=true;*flow=ControlFlow::Exit;return;
             }
             let turn=(||->Result<bool,ShellError>{
-                if let Event::UserEvent(Message::Ipc(message))=&event {
-                    app.renderer.receive(message)?;
+                if matches!(event,Event::UserEvent(Message::Wake)) {inbox.acknowledge();}
+                if !matches!(event,Event::MainEventsCleared|Event::UserEvent(_)|Event::NewEvents(_)) {return Ok(false);}
+                if let Some(message)=inbox.pop().map_err(|error|ShellError(error.to_string()))? {
+                    app.renderer.receive(&message)?;
                     ready |= app.renderer.0.borrow().transport.ready;
                     if ready && !app.renderer.in_flight() {deadline=None;}
                 }
-                if !matches!(event,Event::MainEventsCleared|Event::UserEvent(_)|Event::NewEvents(_)) {return Ok(false);}
+                inbox.resignal();
                 if deadline.is_some_and(|deadline|Instant::now()>=deadline) {return Err(ShellError("Wry document/acknowledgement timed out".into()));}
                 if let Some(host)=&mut browser_host {host.poll(target);}
                 if native.as_mut().is_some_and(|host|match host.poll(&window) {Ok(quit)=>quit,Err(error)=>{result=Err(error);true}}) {return Ok(true);}
@@ -374,6 +367,7 @@ impl Shell {
             match turn {Ok(true)=>{exiting=true;*flow=ControlFlow::Exit;},Err(error)=>{result=Err(error);exiting=true;*flow=ControlFlow::Exit;},_=>{}}
             if !matches!(*flow,ControlFlow::Exit) {*flow=deadline.map_or(ControlFlow::Wait,ControlFlow::WaitUntil);}
         });
+        inbox.close();
         if let Some(host) = &mut native {
             host.closed(&window);
         }

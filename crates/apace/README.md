@@ -370,6 +370,12 @@ HTTP futures/sockets; close revokes queued work and shuts down the runtime witho
 joining it on the UI thread. Finished task entries are reaped, and idle loaders
 wait for notification instead of polling a timer.
 
+`LoadStats::worker_panicked` and `worker_cancelled` count reaped task failures
+separately from request cancellation. These are saturating aggregates without
+panic payloads or task history. `completed` counts an accepted successful
+publication before its handler parses/decodes it; it does not prove that handler
+execution finished successfully.
+
 DNS resolution is shared once per configured host (maximum 64 origins), keeping
 at most 16 addresses or a failure for the document lifetime. This prevents repeated
 request cancellation from queuing system lookups. OS getaddrinfo itself cannot

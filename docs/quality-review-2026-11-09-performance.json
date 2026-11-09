@@ -1,0 +1,4231 @@
+{
+  "schema": "glory.performance-review-evidence.v1",
+  "review_date": "2026-11-09",
+  "finding": "F03",
+  "claim": "Wide sibling mutations no longer perform a linear sibling search/Vec shift per mutation after promotion. This is not a claim of universal speedup, lower memory use, or host-frame improvement.",
+  "source_provenance": {
+    "baseline_commit": "50098a42d2a83c8ab2a6b274a58f7b0d7d4747f6",
+    "implementation_commit": "ddec3e2682d79127f5840eaab9e4e70d424c2a4d",
+    "bench_smoke_compatibility_commit": "85d74be0796f4bc81cf0f9fd205be2e39a796a53",
+    "baseline_render_files": [
+      {
+        "git_ref": "50098a4:crates/render/src/memory.rs",
+        "git_blob": "7b42cce4cfafd9ab18f5f10bdc52231d47436447",
+        "sha256_git_bytes": "c7077d74c5444e03fefbf1a1943719d4457e6ce94c9e2bec6dbdb9ff884229a6"
+      },
+      {
+        "git_ref": "50098a4:crates/render/src/memory/children.rs",
+        "git_blob": "5e3c9e6d6ab0ad18e4b4f649505dc9be22313e4b",
+        "sha256_git_bytes": "2b71bf3795b4d3885db8fd03e9ad7bf5572ad8d3619bb5a24364365f343a4c9b"
+      }
+    ],
+    "changed_render_production_files": [
+      "crates/render/src/memory.rs",
+      "crates/render/src/memory/children.rs"
+    ],
+    "unchanged_style_source_tree": "0d49a00dd03cb0af23f6ee1c4a40e8f0753037c0",
+    "canonical_numeric_benchmark": {
+      "git_ref": "ddec3e2:crates/render/benches/children_order.rs",
+      "git_blob": "cf38d1b7e61cc2a1837191f5f1ffb1b4c1e9cae4",
+      "sha256_git_bytes": "2eb0b72d06b32423e54b83e17675f72d4a2f40035c704a512f0b2d37ed61a5f7"
+    },
+    "current_benchmark_sha256_worktree_bytes": "72943c86b623fbea7c491b0707b537274416f0d2af729b66266cd04e5dbc0e3f",
+    "exact_first_before_benchmark_bytes_preserved": false,
+    "source_hash_limit": "The initial newly added benchmark was rustfmt-formatted before candidate builds; exact pre-format before-source bytes were not separately archived. Canonical source hashes identify the preserved numeric-argument workload, not a claim of byte-identical before/final benchmark files. No workload/data/timed-region changes were made. Commit 85d74be only adds --test argument handling.",
+    "build_command": "cargo bench -p glory-render --bench children_order --no-run --message-format=json",
+    "declared_workspace_release_profile": {
+      "opt_level": "z",
+      "lto": true,
+      "codegen_units": 1,
+      "strip": "symbols"
+    },
+    "cargo_reported_artifacts": {
+      "before": [
+        {
+          "target": "glory_style",
+          "profile": {
+            "opt_level": "z",
+            "debuginfo": 0,
+            "debug_assertions": false,
+            "overflow_checks": false,
+            "test": false
+          },
+          "features": [
+            "default"
+          ]
+        },
+        {
+          "target": "glory_render",
+          "profile": {
+            "opt_level": "z",
+            "debuginfo": 0,
+            "debug_assertions": false,
+            "overflow_checks": false,
+            "test": false
+          },
+          "features": [
+            "default"
+          ]
+        },
+        {
+          "target": "children_order",
+          "profile": {
+            "opt_level": "z",
+            "debuginfo": 0,
+            "debug_assertions": false,
+            "overflow_checks": false,
+            "test": true
+          },
+          "features": [
+            "default"
+          ]
+        }
+      ],
+      "final": [
+        {
+          "target": "glory_style",
+          "profile": {
+            "opt_level": "z",
+            "debuginfo": 0,
+            "debug_assertions": false,
+            "overflow_checks": false,
+            "test": false
+          },
+          "features": [
+            "default"
+          ]
+        },
+        {
+          "target": "glory_render",
+          "profile": {
+            "opt_level": "z",
+            "debuginfo": 0,
+            "debug_assertions": false,
+            "overflow_checks": false,
+            "test": false
+          },
+          "features": [
+            "default"
+          ]
+        },
+        {
+          "target": "children_order",
+          "profile": {
+            "opt_level": "z",
+            "debuginfo": 0,
+            "debug_assertions": false,
+            "overflow_checks": false,
+            "test": true
+          },
+          "features": [
+            "default"
+          ]
+        }
+      ]
+    },
+    "later_benchmark_cli_fix": {
+      "commit": "0d1375c6c796c3eaa3a9e32569d5c667de1f4d6a",
+      "sha256_worktree_bytes": "e700d43e31b1396b5ac9830a23806217c4f7bc1d5f6e22f0cc37e2e15df2e056",
+      "scope": "Ignore Cargo-injected --bench flag. Numeric runs, workload and timer unchanged; frozen experiment binaries and samples above remain their recorded versions."
+    }
+  },
+  "environment": {
+    "os": "Windows",
+    "host": "x86_64-pc-windows-msvc",
+    "rustc": [
+      "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+      "binary: rustc",
+      "commit-hash: 58cf8f9c35b355199727627d07ae34a4e2846d67",
+      "commit-date: 2026-10-13",
+      "host: x86_64-pc-windows-msvc",
+      "release: 1.99.1",
+      "LLVM version: 23.1.1"
+    ],
+    "cargo": "cargo 1.99.1 (5f94df478 2026-08-27)",
+    "workspace": "D:/Works/glory-rs/glory",
+    "target_directory_from_cargo_metadata": "D:/Works/glory-rs/glory/target",
+    "target_environment_redirected": false,
+    "docker_used": false,
+    "exclusive_cpu": false,
+    "external_builds_present": true,
+    "concurrent_process_snapshot": "ProcessName    Id    CPU\n-----------    --    ---\ncargo       43776   0.05\ncargo       45108   1.02\ncargo       66080   1.36\ncargo       71384   0.00\ncargo       77700   0.70\ncargo       83140   0.00\ncargo       85580   0.02\ncargo       87496   0.34\nrustc       70708 242.73\nrustc       86124   0.38",
+    "interpretation": "All timing series are shared-host diagnostics. Root paused its own new heavy builds for the first ABBA window, but unrelated user builds remained active; no unrelated process was stopped or reprioritized."
+  },
+  "frozen_artifacts": [
+    {
+      "filename": "before.exe",
+      "local_path": "target/verification/children-order-20261109/before.exe",
+      "sha256": "c8cc7761f4f213df3765882c7029cce6d6654845767f1d2c74b09947488cc710",
+      "bytes": 323584,
+      "role": "Original render baseline; all complete-Memory baseline runs"
+    },
+    {
+      "filename": "paired-final.exe",
+      "local_path": "target/verification/children-order-20261109/paired-final.exe",
+      "sha256": "6ed3c9a12d050fcbcc51c45f42a0b6b3c3fa03d7aa4a2885020eb33516d73935",
+      "bytes": 330752,
+      "role": "Final numeric-workload candidate; ABBA, recheck-final and CPU-affinity runs"
+    },
+    {
+      "filename": "after.exe",
+      "local_path": "target/verification/children-order-20261109/after.exe",
+      "sha256": "8768616812ffb798172a5279f406cc61972974163ae1230fb6bc1ccaef126431",
+      "bytes": 330752,
+      "role": "Rejected threshold-128 diagnostic"
+    },
+    {
+      "filename": "final.exe",
+      "local_path": "target/verification/children-order-20261109/final.exe",
+      "sha256": "34d93843ca0df5cf50f498558d4c674a7d45aa571014894794806c2ff65cc014",
+      "bytes": 330752,
+      "role": "Earlier threshold-2048 diagnostic; not pooled with paired-final"
+    },
+    {
+      "filename": "dual.exe",
+      "local_path": "target/verification/children-order-20261109/dual.exe",
+      "sha256": "3f3a34ed2e28f9913ac1939522098f41e9d403d425489e27e16a1d5ce8546261",
+      "bytes": 144896,
+      "role": "Same-process old/new Children diagnostic"
+    }
+  ],
+  "benchmark_contract": {
+    "counts": [
+      1000,
+      10000,
+      50000
+    ],
+    "scenarios": [
+      "append",
+      "prepend",
+      "reverse",
+      "shuffle",
+      "head-retire"
+    ],
+    "setup": "Create one parent and N placed View children; create detached incoming children for append/prepend. Prebuild deterministic mutation arrays before starting Instant.",
+    "timed_region": "Only Memory::apply over the prebuilt batch, with its receipt black-boxed; setup, final contiguous order/next-sibling validation and object destruction are outside the timer.",
+    "prepend": "Insert N new identities before the original first child, preserving incoming order; final sibling count is 2N.",
+    "reverse_shuffle": "Place existing N identities in target order using a reverse traversal; deterministic shuffle uses seed 17 and the committed LCG. It is an isolated order stress workload, not the UI Cache LIS workload.",
+    "head_retire": "Dispose the N original children in original front-to-back order.",
+    "not_measured": [
+      "DOM/layout/paint/presentation",
+      "focus/selection host behavior",
+      "allocator bytes",
+      "RSS",
+      "network/platform input"
+    ],
+    "nanoseconds_are_wall_elapsed_not_cpu_cycles": true
+  },
+  "experiments": [
+    {
+      "id": "initial-threshold-128",
+      "scope": "complete Memory::apply semantic operations",
+      "cpu_affinity_mask": null,
+      "threshold": 128,
+      "interpretation": "Rejected threshold experiment: small-width regressions retained.",
+      "runs": [
+        {
+          "execution_order": 0,
+          "version": "before",
+          "source_csv": "target/verification/children-order-20261109/before.csv",
+          "source_csv_sha256": "ad08ac81fd75d63945fb197c339d814d0e25e022bdec1f7bd4a528db6ea502b3",
+          "repeat_axis": "zero-based repeat order within each count/scenario",
+          "raw_nanoseconds": {
+            "1000": {
+              "append": [
+                141100,
+                144500,
+                150000
+              ],
+              "prepend": [
+                364300,
+                359300,
+                360200
+              ],
+              "reverse": [
+                331600,
+                364300,
+                321300
+              ],
+              "shuffle": [
+                597800,
+                569400,
+                543800
+              ],
+              "head-retire": [
+                172900,
+                161000,
+                164100
+              ]
+            },
+            "10000": {
+              "append": [
+                2246000,
+                2268200,
+                2296200
+              ],
+              "prepend": [
+                30573300,
+                29142400,
+                29412900
+              ],
+              "reverse": [
+                21137400,
+                20575600,
+                20237600
+              ],
+              "shuffle": [
+                47070100,
+                47095400,
+                47342900
+              ],
+              "head-retire": [
+                2253700,
+                2302100,
+                2315100
+              ]
+            },
+            "50000": {
+              "append": [
+                10959600,
+                11494200,
+                10874800
+              ],
+              "prepend": [
+                739094600,
+                723317300,
+                742448400
+              ],
+              "reverse": [
+                536679400,
+                589194500,
+                483679800
+              ],
+              "shuffle": [
+                1510749500,
+                1233855800,
+                1320381300
+              ],
+              "head-retire": [
+                15283500,
+                25502800,
+                19446000
+              ]
+            }
+          },
+          "executable": "before.exe"
+        },
+        {
+          "execution_order": 1,
+          "version": "after",
+          "source_csv": "target/verification/children-order-20261109/after.csv",
+          "source_csv_sha256": "5278c3d6bc8770de054d51a4d58f7c604eb4bf588133d0085d9ceca2f3407ad1",
+          "repeat_axis": "zero-based repeat order within each count/scenario",
+          "raw_nanoseconds": {
+            "1000": {
+              "append": [
+                139000,
+                138400,
+                149900
+              ],
+              "prepend": [
+                421600,
+                407200,
+                401900
+              ],
+              "reverse": [
+                351700,
+                363500,
+                414000
+              ],
+              "shuffle": [
+                468500,
+                444400,
+                402900
+              ],
+              "head-retire": [
+                188400,
+                212900,
+                192000
+              ]
+            },
+            "10000": {
+              "append": [
+                2207700,
+                2158800,
+                2991500
+              ],
+              "prepend": [
+                5861900,
+                4699200,
+                5122600
+              ],
+              "reverse": [
+                5122000,
+                5436000,
+                6529500
+              ],
+              "shuffle": [
+                7532300,
+                6699000,
+                6297000
+              ],
+              "head-retire": [
+                3111700,
+                2827200,
+                2439900
+              ]
+            },
+            "50000": {
+              "append": [
+                12608200,
+                11219100,
+                11226500
+              ],
+              "prepend": [
+                27368700,
+                25990200,
+                27383800
+              ],
+              "reverse": [
+                29677300,
+                26806600,
+                30284500
+              ],
+              "shuffle": [
+                48604500,
+                43105500,
+                47549500
+              ],
+              "head-retire": [
+                14883400,
+                16342500,
+                17093900
+              ]
+            }
+          },
+          "executable": "after.exe"
+        }
+      ],
+      "summary": [
+        {
+          "count": 1000,
+          "scenario": "append",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 144500,
+          "after_median_ns": 139000,
+          "change_pct": -3.8062,
+          "before_range_ns": [
+            141100,
+            150000
+          ],
+          "after_range_ns": [
+            138400,
+            149900
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "prepend",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 360200,
+          "after_median_ns": 407200,
+          "change_pct": 13.0483,
+          "before_range_ns": [
+            359300,
+            364300
+          ],
+          "after_range_ns": [
+            401900,
+            421600
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "reverse",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 331600,
+          "after_median_ns": 363500,
+          "change_pct": 9.62,
+          "before_range_ns": [
+            321300,
+            364300
+          ],
+          "after_range_ns": [
+            351700,
+            414000
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "shuffle",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 569400,
+          "after_median_ns": 444400,
+          "change_pct": -21.9529,
+          "before_range_ns": [
+            543800,
+            597800
+          ],
+          "after_range_ns": [
+            402900,
+            468500
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "head-retire",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 164100,
+          "after_median_ns": 192000,
+          "change_pct": 17.0018,
+          "before_range_ns": [
+            161000,
+            172900
+          ],
+          "after_range_ns": [
+            188400,
+            212900
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "append",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 2268200,
+          "after_median_ns": 2207700,
+          "change_pct": -2.6673,
+          "before_range_ns": [
+            2246000,
+            2296200
+          ],
+          "after_range_ns": [
+            2158800,
+            2991500
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "prepend",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 29412900,
+          "after_median_ns": 5122600,
+          "change_pct": -82.5838,
+          "before_range_ns": [
+            29142400,
+            30573300
+          ],
+          "after_range_ns": [
+            4699200,
+            5861900
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "reverse",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 20575600,
+          "after_median_ns": 5436000,
+          "change_pct": -73.5804,
+          "before_range_ns": [
+            20237600,
+            21137400
+          ],
+          "after_range_ns": [
+            5122000,
+            6529500
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "shuffle",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 47095400,
+          "after_median_ns": 6699000,
+          "change_pct": -85.7757,
+          "before_range_ns": [
+            47070100,
+            47342900
+          ],
+          "after_range_ns": [
+            6297000,
+            7532300
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "head-retire",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 2302100,
+          "after_median_ns": 2827200,
+          "change_pct": 22.8096,
+          "before_range_ns": [
+            2253700,
+            2315100
+          ],
+          "after_range_ns": [
+            2439900,
+            3111700
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "append",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 10959600,
+          "after_median_ns": 11226500,
+          "change_pct": 2.4353,
+          "before_range_ns": [
+            10874800,
+            11494200
+          ],
+          "after_range_ns": [
+            11219100,
+            12608200
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "prepend",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 739094600,
+          "after_median_ns": 27368700,
+          "change_pct": -96.297,
+          "before_range_ns": [
+            723317300,
+            742448400
+          ],
+          "after_range_ns": [
+            25990200,
+            27383800
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "reverse",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 536679400,
+          "after_median_ns": 29677300,
+          "change_pct": -94.4702,
+          "before_range_ns": [
+            483679800,
+            589194500
+          ],
+          "after_range_ns": [
+            26806600,
+            30284500
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "shuffle",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 1320381300,
+          "after_median_ns": 47549500,
+          "change_pct": -96.3988,
+          "before_range_ns": [
+            1233855800,
+            1510749500
+          ],
+          "after_range_ns": [
+            43105500,
+            48604500
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "head-retire",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 19446000,
+          "after_median_ns": 16342500,
+          "change_pct": -15.9596,
+          "before_range_ns": [
+            15283500,
+            25502800
+          ],
+          "after_range_ns": [
+            14883400,
+            17093900
+          ]
+        }
+      ]
+    },
+    {
+      "id": "initial-threshold-2048",
+      "scope": "complete Memory::apply semantic operations",
+      "cpu_affinity_mask": null,
+      "threshold": 2048,
+      "interpretation": "Sequential diagnostic; reuses initial before.csv rather than claiming a new baseline run.",
+      "runs": [
+        {
+          "execution_order": 0,
+          "version": "before",
+          "source_csv": "target/verification/children-order-20261109/before.csv",
+          "source_csv_sha256": "ad08ac81fd75d63945fb197c339d814d0e25e022bdec1f7bd4a528db6ea502b3",
+          "repeat_axis": "zero-based repeat order within each count/scenario",
+          "raw_nanoseconds": {
+            "1000": {
+              "append": [
+                141100,
+                144500,
+                150000
+              ],
+              "prepend": [
+                364300,
+                359300,
+                360200
+              ],
+              "reverse": [
+                331600,
+                364300,
+                321300
+              ],
+              "shuffle": [
+                597800,
+                569400,
+                543800
+              ],
+              "head-retire": [
+                172900,
+                161000,
+                164100
+              ]
+            },
+            "10000": {
+              "append": [
+                2246000,
+                2268200,
+                2296200
+              ],
+              "prepend": [
+                30573300,
+                29142400,
+                29412900
+              ],
+              "reverse": [
+                21137400,
+                20575600,
+                20237600
+              ],
+              "shuffle": [
+                47070100,
+                47095400,
+                47342900
+              ],
+              "head-retire": [
+                2253700,
+                2302100,
+                2315100
+              ]
+            },
+            "50000": {
+              "append": [
+                10959600,
+                11494200,
+                10874800
+              ],
+              "prepend": [
+                739094600,
+                723317300,
+                742448400
+              ],
+              "reverse": [
+                536679400,
+                589194500,
+                483679800
+              ],
+              "shuffle": [
+                1510749500,
+                1233855800,
+                1320381300
+              ],
+              "head-retire": [
+                15283500,
+                25502800,
+                19446000
+              ]
+            }
+          },
+          "executable": "before.exe"
+        },
+        {
+          "execution_order": 1,
+          "version": "after",
+          "source_csv": "target/verification/children-order-20261109/final.csv",
+          "source_csv_sha256": "893cf71dcd3ba443acf05647fdd7d94dd3e997efaf042c0c219898192d1f1e3e",
+          "repeat_axis": "zero-based repeat order within each count/scenario",
+          "raw_nanoseconds": {
+            "1000": {
+              "append": [
+                144400,
+                130900,
+                135900
+              ],
+              "prepend": [
+                356500,
+                352800,
+                365200
+              ],
+              "reverse": [
+                320700,
+                330900,
+                319200
+              ],
+              "shuffle": [
+                481300,
+                448600,
+                466600
+              ],
+              "head-retire": [
+                174800,
+                206700,
+                330600
+              ]
+            },
+            "10000": {
+              "append": [
+                2176900,
+                2333800,
+                2160300
+              ],
+              "prepend": [
+                4675900,
+                4757900,
+                4703800
+              ],
+              "reverse": [
+                4971500,
+                5635400,
+                5611300
+              ],
+              "shuffle": [
+                5781700,
+                7222600,
+                5907600
+              ],
+              "head-retire": [
+                2236500,
+                2302800,
+                2177900
+              ]
+            },
+            "50000": {
+              "append": [
+                10859600,
+                11264100,
+                11517200
+              ],
+              "prepend": [
+                25294500,
+                24252600,
+                24085800
+              ],
+              "reverse": [
+                29123100,
+                28447100,
+                29905600
+              ],
+              "shuffle": [
+                45225300,
+                39999100,
+                41930500
+              ],
+              "head-retire": [
+                13393600,
+                16680600,
+                14504800
+              ]
+            }
+          },
+          "executable": "final.exe"
+        }
+      ],
+      "summary": [
+        {
+          "count": 1000,
+          "scenario": "append",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 144500,
+          "after_median_ns": 135900,
+          "change_pct": -5.9516,
+          "before_range_ns": [
+            141100,
+            150000
+          ],
+          "after_range_ns": [
+            130900,
+            144400
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "prepend",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 360200,
+          "after_median_ns": 356500,
+          "change_pct": -1.0272,
+          "before_range_ns": [
+            359300,
+            364300
+          ],
+          "after_range_ns": [
+            352800,
+            365200
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "reverse",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 331600,
+          "after_median_ns": 320700,
+          "change_pct": -3.2871,
+          "before_range_ns": [
+            321300,
+            364300
+          ],
+          "after_range_ns": [
+            319200,
+            330900
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "shuffle",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 569400,
+          "after_median_ns": 466600,
+          "change_pct": -18.0541,
+          "before_range_ns": [
+            543800,
+            597800
+          ],
+          "after_range_ns": [
+            448600,
+            481300
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "head-retire",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 164100,
+          "after_median_ns": 206700,
+          "change_pct": 25.9598,
+          "before_range_ns": [
+            161000,
+            172900
+          ],
+          "after_range_ns": [
+            174800,
+            330600
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "append",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 2268200,
+          "after_median_ns": 2176900,
+          "change_pct": -4.0252,
+          "before_range_ns": [
+            2246000,
+            2296200
+          ],
+          "after_range_ns": [
+            2160300,
+            2333800
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "prepend",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 29412900,
+          "after_median_ns": 4703800,
+          "change_pct": -84.0077,
+          "before_range_ns": [
+            29142400,
+            30573300
+          ],
+          "after_range_ns": [
+            4675900,
+            4757900
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "reverse",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 20575600,
+          "after_median_ns": 5611300,
+          "change_pct": -72.7284,
+          "before_range_ns": [
+            20237600,
+            21137400
+          ],
+          "after_range_ns": [
+            4971500,
+            5635400
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "shuffle",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 47095400,
+          "after_median_ns": 5907600,
+          "change_pct": -87.4561,
+          "before_range_ns": [
+            47070100,
+            47342900
+          ],
+          "after_range_ns": [
+            5781700,
+            7222600
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "head-retire",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 2302100,
+          "after_median_ns": 2236500,
+          "change_pct": -2.8496,
+          "before_range_ns": [
+            2253700,
+            2315100
+          ],
+          "after_range_ns": [
+            2177900,
+            2302800
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "append",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 10959600,
+          "after_median_ns": 11264100,
+          "change_pct": 2.7784,
+          "before_range_ns": [
+            10874800,
+            11494200
+          ],
+          "after_range_ns": [
+            10859600,
+            11517200
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "prepend",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 739094600,
+          "after_median_ns": 24252600,
+          "change_pct": -96.7186,
+          "before_range_ns": [
+            723317300,
+            742448400
+          ],
+          "after_range_ns": [
+            24085800,
+            25294500
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "reverse",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 536679400,
+          "after_median_ns": 29123100,
+          "change_pct": -94.5735,
+          "before_range_ns": [
+            483679800,
+            589194500
+          ],
+          "after_range_ns": [
+            28447100,
+            29905600
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "shuffle",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 1320381300,
+          "after_median_ns": 41930500,
+          "change_pct": -96.8244,
+          "before_range_ns": [
+            1233855800,
+            1510749500
+          ],
+          "after_range_ns": [
+            39999100,
+            45225300
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "head-retire",
+          "before_n": 3,
+          "after_n": 3,
+          "before_median_ns": 19446000,
+          "after_median_ns": 14504800,
+          "change_pct": -25.4099,
+          "before_range_ns": [
+            15283500,
+            25502800
+          ],
+          "after_range_ns": [
+            13393600,
+            16680600
+          ]
+        }
+      ]
+    },
+    {
+      "id": "complete-memory-unpinned-abba",
+      "scope": "complete Memory::apply semantic operations",
+      "cpu_affinity_mask": null,
+      "execution_order": "before, after, after, before; 3 repeats per process/count/scenario",
+      "interpretation": "Shared-host diagnostic. Large fast-path regressions in both candidate runs remain in raw samples and summaries; no environmental explanation is asserted as fact.",
+      "runs": [
+        {
+          "execution_order": 0,
+          "version": "before",
+          "source_csv": "target/verification/children-order-20261109/paired-before-1.csv",
+          "source_csv_sha256": "78386592893debb1333dd81fac82634b7b0115c1510f25863b9ead90e007eec0",
+          "repeat_axis": "zero-based repeat order within each count/scenario",
+          "raw_nanoseconds": {
+            "1000": {
+              "append": [
+                153400,
+                135400,
+                151400
+              ],
+              "prepend": [
+                387200,
+                382600,
+                384300
+              ],
+              "reverse": [
+                321500,
+                331800,
+                401200
+              ],
+              "shuffle": [
+                609200,
+                595000,
+                575800
+              ],
+              "head-retire": [
+                178500,
+                192000,
+                181600
+              ]
+            },
+            "10000": {
+              "append": [
+                2292800,
+                2215700,
+                2924200
+              ],
+              "prepend": [
+                32618600,
+                33419900,
+                29342000
+              ],
+              "reverse": [
+                21624500,
+                22561700,
+                20611000
+              ],
+              "shuffle": [
+                49660600,
+                47735800,
+                56231100
+              ],
+              "head-retire": [
+                3269900,
+                3175600,
+                3437000
+              ]
+            },
+            "50000": {
+              "append": [
+                12231700,
+                12478900,
+                11593900
+              ],
+              "prepend": [
+                943081000,
+                846493600,
+                1489125000
+              ],
+              "reverse": [
+                943206200,
+                671795000,
+                908800300
+              ],
+              "shuffle": [
+                3060869800,
+                3055186100,
+                3538266500
+              ],
+              "head-retire": [
+                47799400,
+                46214200,
+                56410900
+              ]
+            }
+          },
+          "executable": "before.exe"
+        },
+        {
+          "execution_order": 1,
+          "version": "after",
+          "source_csv": "target/verification/children-order-20261109/paired-after-1.csv",
+          "source_csv_sha256": "fcc56b678c585d5bfa1b9525efdaa457c964414181a7e484680e5850da5af1a4",
+          "repeat_axis": "zero-based repeat order within each count/scenario",
+          "raw_nanoseconds": {
+            "1000": {
+              "append": [
+                294600,
+                286100,
+                328500
+              ],
+              "prepend": [
+                765500,
+                789000,
+                799500
+              ],
+              "reverse": [
+                487100,
+                503100,
+                736700
+              ],
+              "shuffle": [
+                1072900,
+                1288200,
+                951600
+              ],
+              "head-retire": [
+                628300,
+                522400,
+                558000
+              ]
+            },
+            "10000": {
+              "append": [
+                4597600,
+                4152200,
+                3158000
+              ],
+              "prepend": [
+                5180000,
+                8860800,
+                8936300
+              ],
+              "reverse": [
+                6001300,
+                5854100,
+                5509500
+              ],
+              "shuffle": [
+                9038200,
+                16441700,
+                26920800
+              ],
+              "head-retire": [
+                8161300,
+                9871300,
+                8526900
+              ]
+            },
+            "50000": {
+              "append": [
+                29883700,
+                24733100,
+                23045800
+              ],
+              "prepend": [
+                49769100,
+                51592800,
+                59832400
+              ],
+              "reverse": [
+                64476400,
+                57926600,
+                57336500
+              ],
+              "shuffle": [
+                111786500,
+                86808800,
+                75824800
+              ],
+              "head-retire": [
+                28159100,
+                47830500,
+                49134200
+              ]
+            }
+          },
+          "executable": "paired-final.exe"
+        },
+        {
+          "execution_order": 2,
+          "version": "after",
+          "source_csv": "target/verification/children-order-20261109/paired-after-2.csv",
+          "source_csv_sha256": "fd228ab4a97d2ddea030b637913b16317ad33120f4e5694e075bad5c247bc630",
+          "repeat_axis": "zero-based repeat order within each count/scenario",
+          "raw_nanoseconds": {
+            "1000": {
+              "append": [
+                369000,
+                373600,
+                409400
+              ],
+              "prepend": [
+                765800,
+                749400,
+                823200
+              ],
+              "reverse": [
+                759600,
+                680100,
+                761500
+              ],
+              "shuffle": [
+                4673600,
+                1792200,
+                1139600
+              ],
+              "head-retire": [
+                447600,
+                372300,
+                436900
+              ]
+            },
+            "10000": {
+              "append": [
+                4682200,
+                5279300,
+                5876900
+              ],
+              "prepend": [
+                11316700,
+                7587200,
+                6295900
+              ],
+              "reverse": [
+                10457200,
+                12041100,
+                20672600
+              ],
+              "shuffle": [
+                11832100,
+                10005000,
+                7931800
+              ],
+              "head-retire": [
+                12474400,
+                8640200,
+                9971500
+              ]
+            },
+            "50000": {
+              "append": [
+                26981600,
+                36597800,
+                25697700
+              ],
+              "prepend": [
+                56852700,
+                44153200,
+                37551300
+              ],
+              "reverse": [
+                35671500,
+                47723700,
+                39187500
+              ],
+              "shuffle": [
+                61643200,
+                65561900,
+                68664900
+              ],
+              "head-retire": [
+                27720700,
+                29093200,
+                27245700
+              ]
+            }
+          },
+          "executable": "paired-final.exe"
+        },
+        {
+          "execution_order": 3,
+          "version": "before",
+          "source_csv": "target/verification/children-order-20261109/paired-before-2.csv",
+          "source_csv_sha256": "46da5449ba05bff2a5f1eb0404ca7aa45b638865a55a2e3fd79b77c951a4124c",
+          "repeat_axis": "zero-based repeat order within each count/scenario",
+          "raw_nanoseconds": {
+            "1000": {
+              "append": [
+                149700,
+                142900,
+                143100
+              ],
+              "prepend": [
+                377500,
+                364700,
+                435800
+              ],
+              "reverse": [
+                333200,
+                687500,
+                335300
+              ],
+              "shuffle": [
+                607900,
+                595900,
+                566300
+              ],
+              "head-retire": [
+                191400,
+                188800,
+                174900
+              ]
+            },
+            "10000": {
+              "append": [
+                2371900,
+                2560400,
+                2960400
+              ],
+              "prepend": [
+                32914400,
+                43441400,
+                37100200
+              ],
+              "reverse": [
+                25986800,
+                27931000,
+                24237700
+              ],
+              "shuffle": [
+                65756300,
+                55714300,
+                55368600
+              ],
+              "head-retire": [
+                2636800,
+                2901100,
+                5949400
+              ]
+            },
+            "50000": {
+              "append": [
+                17405200,
+                15930900,
+                14591000
+              ],
+              "prepend": [
+                1122647200,
+                1181015700,
+                1258926700
+              ],
+              "reverse": [
+                854744500,
+                659545600,
+                669709300
+              ],
+              "shuffle": [
+                1416407100,
+                1975051800,
+                2227814500
+              ],
+              "head-retire": [
+                15559200,
+                15153500,
+                27067900
+              ]
+            }
+          },
+          "executable": "before.exe"
+        }
+      ],
+      "per_run_medians_ns": [
+        {
+          "execution_order": 0,
+          "version": "before",
+          "medians": {
+            "1000": {
+              "append": 151400,
+              "prepend": 384300,
+              "reverse": 331800,
+              "shuffle": 595000,
+              "head-retire": 181600
+            },
+            "10000": {
+              "append": 2292800,
+              "prepend": 32618600,
+              "reverse": 21624500,
+              "shuffle": 49660600,
+              "head-retire": 3269900
+            },
+            "50000": {
+              "append": 12231700,
+              "prepend": 943081000,
+              "reverse": 908800300,
+              "shuffle": 3060869800,
+              "head-retire": 47799400
+            }
+          }
+        },
+        {
+          "execution_order": 1,
+          "version": "after",
+          "medians": {
+            "1000": {
+              "append": 294600,
+              "prepend": 789000,
+              "reverse": 503100,
+              "shuffle": 1072900,
+              "head-retire": 558000
+            },
+            "10000": {
+              "append": 4152200,
+              "prepend": 8860800,
+              "reverse": 5854100,
+              "shuffle": 16441700,
+              "head-retire": 8526900
+            },
+            "50000": {
+              "append": 24733100,
+              "prepend": 51592800,
+              "reverse": 57926600,
+              "shuffle": 86808800,
+              "head-retire": 47830500
+            }
+          }
+        },
+        {
+          "execution_order": 2,
+          "version": "after",
+          "medians": {
+            "1000": {
+              "append": 373600,
+              "prepend": 765800,
+              "reverse": 759600,
+              "shuffle": 1792200,
+              "head-retire": 436900
+            },
+            "10000": {
+              "append": 5279300,
+              "prepend": 7587200,
+              "reverse": 12041100,
+              "shuffle": 10005000,
+              "head-retire": 9971500
+            },
+            "50000": {
+              "append": 26981600,
+              "prepend": 44153200,
+              "reverse": 39187500,
+              "shuffle": 65561900,
+              "head-retire": 27720700
+            }
+          }
+        },
+        {
+          "execution_order": 3,
+          "version": "before",
+          "medians": {
+            "1000": {
+              "append": 143100,
+              "prepend": 377500,
+              "reverse": 335300,
+              "shuffle": 595900,
+              "head-retire": 188800
+            },
+            "10000": {
+              "append": 2560400,
+              "prepend": 37100200,
+              "reverse": 25986800,
+              "shuffle": 55714300,
+              "head-retire": 2901100
+            },
+            "50000": {
+              "append": 15930900,
+              "prepend": 1181015700,
+              "reverse": 669709300,
+              "shuffle": 1975051800,
+              "head-retire": 15559200
+            }
+          }
+        }
+      ],
+      "summary": [
+        {
+          "count": 1000,
+          "scenario": "append",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 146400.0,
+          "after_median_ns": 348750.0,
+          "change_pct": 138.2172,
+          "before_range_ns": [
+            135400,
+            153400
+          ],
+          "after_range_ns": [
+            286100,
+            409400
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "prepend",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 383450.0,
+          "after_median_ns": 777400.0,
+          "change_pct": 102.7383,
+          "before_range_ns": [
+            364700,
+            435800
+          ],
+          "after_range_ns": [
+            749400,
+            823200
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "reverse",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 334250.0,
+          "after_median_ns": 708400.0,
+          "change_pct": 111.9372,
+          "before_range_ns": [
+            321500,
+            687500
+          ],
+          "after_range_ns": [
+            487100,
+            761500
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "shuffle",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 595450.0,
+          "after_median_ns": 1213900.0,
+          "change_pct": 103.8626,
+          "before_range_ns": [
+            566300,
+            609200
+          ],
+          "after_range_ns": [
+            951600,
+            4673600
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "head-retire",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 185200.0,
+          "after_median_ns": 485000.0,
+          "change_pct": 161.879,
+          "before_range_ns": [
+            174900,
+            192000
+          ],
+          "after_range_ns": [
+            372300,
+            628300
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "append",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 2466150.0,
+          "after_median_ns": 4639900.0,
+          "change_pct": 88.1435,
+          "before_range_ns": [
+            2215700,
+            2960400
+          ],
+          "after_range_ns": [
+            3158000,
+            5876900
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "prepend",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 33167150.0,
+          "after_median_ns": 8224000.0,
+          "change_pct": -75.2044,
+          "before_range_ns": [
+            29342000,
+            43441400
+          ],
+          "after_range_ns": [
+            5180000,
+            11316700
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "reverse",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 23399700.0,
+          "after_median_ns": 8229250.0,
+          "change_pct": -64.8318,
+          "before_range_ns": [
+            20611000,
+            27931000
+          ],
+          "after_range_ns": [
+            5509500,
+            20672600
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "shuffle",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 55541450.0,
+          "after_median_ns": 10918550.0,
+          "change_pct": -80.3416,
+          "before_range_ns": [
+            47735800,
+            65756300
+          ],
+          "after_range_ns": [
+            7931800,
+            26920800
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "head-retire",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 3222750.0,
+          "after_median_ns": 9255750.0,
+          "change_pct": 187.2004,
+          "before_range_ns": [
+            2636800,
+            5949400
+          ],
+          "after_range_ns": [
+            8161300,
+            12474400
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "append",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 13534950.0,
+          "after_median_ns": 26339650.0,
+          "change_pct": 94.6047,
+          "before_range_ns": [
+            11593900,
+            17405200
+          ],
+          "after_range_ns": [
+            23045800,
+            36597800
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "prepend",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 1151831450.0,
+          "after_median_ns": 50680950.0,
+          "change_pct": -95.6,
+          "before_range_ns": [
+            846493600,
+            1489125000
+          ],
+          "after_range_ns": [
+            37551300,
+            59832400
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "reverse",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 763269750.0,
+          "after_median_ns": 52530100.0,
+          "change_pct": -93.1178,
+          "before_range_ns": [
+            659545600,
+            943206200
+          ],
+          "after_range_ns": [
+            35671500,
+            64476400
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "shuffle",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 2641500300.0,
+          "after_median_ns": 72244850.0,
+          "change_pct": -97.265,
+          "before_range_ns": [
+            1416407100,
+            3538266500
+          ],
+          "after_range_ns": [
+            61643200,
+            111786500
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "head-retire",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 36641050.0,
+          "after_median_ns": 28626150.0,
+          "change_pct": -21.8741,
+          "before_range_ns": [
+            15153500,
+            56410900
+          ],
+          "after_range_ns": [
+            27245700,
+            49134200
+          ]
+        }
+      ]
+    },
+    {
+      "id": "complete-memory-unpinned-recheck",
+      "scope": "complete Memory::apply semantic operations",
+      "cpu_affinity_mask": null,
+      "interpretation": "Single-sample diagnostic per case; not pooled with ABBA or affinity results.",
+      "runs": [
+        {
+          "execution_order": 0,
+          "version": "before",
+          "source_csv": "target/verification/children-order-20261109/recheck-before.csv",
+          "source_csv_sha256": "7933a5738b57dfd11676c8bf615c71f31b649f97130cb625b044968d12ef47c2",
+          "repeat_axis": "zero-based repeat order within each count/scenario",
+          "raw_nanoseconds": {
+            "1000": {
+              "append": [
+                154900
+              ],
+              "prepend": [
+                340200
+              ],
+              "reverse": [
+                343800
+              ],
+              "shuffle": [
+                608900
+              ],
+              "head-retire": [
+                202000
+              ]
+            },
+            "10000": {
+              "append": [
+                2770700
+              ],
+              "prepend": [
+                55827000
+              ],
+              "reverse": [
+                48312700
+              ],
+              "shuffle": [
+                121039200
+              ],
+              "head-retire": [
+                4174000
+              ]
+            },
+            "50000": {
+              "append": [
+                25178700
+              ],
+              "prepend": [
+                2055643200
+              ],
+              "reverse": [
+                1273153800
+              ],
+              "shuffle": [
+                2993323500
+              ],
+              "head-retire": [
+                29798100
+              ]
+            }
+          },
+          "executable": "before.exe"
+        },
+        {
+          "execution_order": 1,
+          "version": "early-final",
+          "source_csv": "target/verification/children-order-20261109/recheck-final.csv",
+          "source_csv_sha256": "21465cf86f4de1aa59df4e713c8a652c2608693471c1dddb5b9575e2c5727099",
+          "repeat_axis": "zero-based repeat order within each count/scenario",
+          "raw_nanoseconds": {
+            "1000": {
+              "append": [
+                159900
+              ],
+              "prepend": [
+                423200
+              ],
+              "reverse": [
+                338200
+              ],
+              "shuffle": [
+                483100
+              ],
+              "head-retire": [
+                169900
+              ]
+            },
+            "10000": {
+              "append": [
+                2234700
+              ],
+              "prepend": [
+                4991700
+              ],
+              "reverse": [
+                4740900
+              ],
+              "shuffle": [
+                6458200
+              ],
+              "head-retire": [
+                2904700
+              ]
+            },
+            "50000": {
+              "append": [
+                11143200
+              ],
+              "prepend": [
+                25841000
+              ],
+              "reverse": [
+                35014400
+              ],
+              "shuffle": [
+                54306000
+              ],
+              "head-retire": [
+                14602500
+              ]
+            }
+          },
+          "executable": "final.exe"
+        },
+        {
+          "execution_order": 2,
+          "version": "final",
+          "source_csv": "target/verification/children-order-20261109/recheck-paired-final.csv",
+          "source_csv_sha256": "346717be2937eb03d37b6f1d5bf16bd5c3f4b7973e30cc7db4ee1eb8a84c6423",
+          "repeat_axis": "zero-based repeat order within each count/scenario",
+          "raw_nanoseconds": {
+            "1000": {
+              "append": [
+                161000
+              ],
+              "prepend": [
+                542500
+              ],
+              "reverse": [
+                338900
+              ],
+              "shuffle": [
+                486100
+              ],
+              "head-retire": [
+                251200
+              ]
+            },
+            "10000": {
+              "append": [
+                2584400
+              ],
+              "prepend": [
+                5079000
+              ],
+              "reverse": [
+                5173800
+              ],
+              "shuffle": [
+                6696800
+              ],
+              "head-retire": [
+                2541200
+              ]
+            },
+            "50000": {
+              "append": [
+                13086300
+              ],
+              "prepend": [
+                28331100
+              ],
+              "reverse": [
+                29292900
+              ],
+              "shuffle": [
+                44846500
+              ],
+              "head-retire": [
+                13823100
+              ]
+            }
+          },
+          "executable": "paired-final.exe"
+        }
+      ],
+      "summary_final_vs_before": [
+        {
+          "count": 1000,
+          "scenario": "append",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 154900,
+          "after_median_ns": 161000,
+          "change_pct": 3.938,
+          "before_range_ns": [
+            154900,
+            154900
+          ],
+          "after_range_ns": [
+            161000,
+            161000
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "prepend",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 340200,
+          "after_median_ns": 542500,
+          "change_pct": 59.465,
+          "before_range_ns": [
+            340200,
+            340200
+          ],
+          "after_range_ns": [
+            542500,
+            542500
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "reverse",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 343800,
+          "after_median_ns": 338900,
+          "change_pct": -1.4252,
+          "before_range_ns": [
+            343800,
+            343800
+          ],
+          "after_range_ns": [
+            338900,
+            338900
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "shuffle",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 608900,
+          "after_median_ns": 486100,
+          "change_pct": -20.1675,
+          "before_range_ns": [
+            608900,
+            608900
+          ],
+          "after_range_ns": [
+            486100,
+            486100
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "head-retire",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 202000,
+          "after_median_ns": 251200,
+          "change_pct": 24.3564,
+          "before_range_ns": [
+            202000,
+            202000
+          ],
+          "after_range_ns": [
+            251200,
+            251200
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "append",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 2770700,
+          "after_median_ns": 2584400,
+          "change_pct": -6.7239,
+          "before_range_ns": [
+            2770700,
+            2770700
+          ],
+          "after_range_ns": [
+            2584400,
+            2584400
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "prepend",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 55827000,
+          "after_median_ns": 5079000,
+          "change_pct": -90.9023,
+          "before_range_ns": [
+            55827000,
+            55827000
+          ],
+          "after_range_ns": [
+            5079000,
+            5079000
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "reverse",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 48312700,
+          "after_median_ns": 5173800,
+          "change_pct": -89.291,
+          "before_range_ns": [
+            48312700,
+            48312700
+          ],
+          "after_range_ns": [
+            5173800,
+            5173800
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "shuffle",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 121039200,
+          "after_median_ns": 6696800,
+          "change_pct": -94.4672,
+          "before_range_ns": [
+            121039200,
+            121039200
+          ],
+          "after_range_ns": [
+            6696800,
+            6696800
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "head-retire",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 4174000,
+          "after_median_ns": 2541200,
+          "change_pct": -39.1184,
+          "before_range_ns": [
+            4174000,
+            4174000
+          ],
+          "after_range_ns": [
+            2541200,
+            2541200
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "append",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 25178700,
+          "after_median_ns": 13086300,
+          "change_pct": -48.0263,
+          "before_range_ns": [
+            25178700,
+            25178700
+          ],
+          "after_range_ns": [
+            13086300,
+            13086300
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "prepend",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 2055643200,
+          "after_median_ns": 28331100,
+          "change_pct": -98.6218,
+          "before_range_ns": [
+            2055643200,
+            2055643200
+          ],
+          "after_range_ns": [
+            28331100,
+            28331100
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "reverse",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 1273153800,
+          "after_median_ns": 29292900,
+          "change_pct": -97.6992,
+          "before_range_ns": [
+            1273153800,
+            1273153800
+          ],
+          "after_range_ns": [
+            29292900,
+            29292900
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "shuffle",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 2993323500,
+          "after_median_ns": 44846500,
+          "change_pct": -98.5018,
+          "before_range_ns": [
+            2993323500,
+            2993323500
+          ],
+          "after_range_ns": [
+            44846500,
+            44846500
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "head-retire",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 29798100,
+          "after_median_ns": 13823100,
+          "change_pct": -53.6108,
+          "before_range_ns": [
+            29798100,
+            29798100
+          ],
+          "after_range_ns": [
+            13823100,
+            13823100
+          ]
+        }
+      ],
+      "summary_early_final_vs_before": [
+        {
+          "count": 1000,
+          "scenario": "append",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 154900,
+          "after_median_ns": 159900,
+          "change_pct": 3.2279,
+          "before_range_ns": [
+            154900,
+            154900
+          ],
+          "after_range_ns": [
+            159900,
+            159900
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "prepend",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 340200,
+          "after_median_ns": 423200,
+          "change_pct": 24.3974,
+          "before_range_ns": [
+            340200,
+            340200
+          ],
+          "after_range_ns": [
+            423200,
+            423200
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "reverse",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 343800,
+          "after_median_ns": 338200,
+          "change_pct": -1.6289,
+          "before_range_ns": [
+            343800,
+            343800
+          ],
+          "after_range_ns": [
+            338200,
+            338200
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "shuffle",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 608900,
+          "after_median_ns": 483100,
+          "change_pct": -20.6602,
+          "before_range_ns": [
+            608900,
+            608900
+          ],
+          "after_range_ns": [
+            483100,
+            483100
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "head-retire",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 202000,
+          "after_median_ns": 169900,
+          "change_pct": -15.8911,
+          "before_range_ns": [
+            202000,
+            202000
+          ],
+          "after_range_ns": [
+            169900,
+            169900
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "append",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 2770700,
+          "after_median_ns": 2234700,
+          "change_pct": -19.3453,
+          "before_range_ns": [
+            2770700,
+            2770700
+          ],
+          "after_range_ns": [
+            2234700,
+            2234700
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "prepend",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 55827000,
+          "after_median_ns": 4991700,
+          "change_pct": -91.0586,
+          "before_range_ns": [
+            55827000,
+            55827000
+          ],
+          "after_range_ns": [
+            4991700,
+            4991700
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "reverse",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 48312700,
+          "after_median_ns": 4740900,
+          "change_pct": -90.1871,
+          "before_range_ns": [
+            48312700,
+            48312700
+          ],
+          "after_range_ns": [
+            4740900,
+            4740900
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "shuffle",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 121039200,
+          "after_median_ns": 6458200,
+          "change_pct": -94.6644,
+          "before_range_ns": [
+            121039200,
+            121039200
+          ],
+          "after_range_ns": [
+            6458200,
+            6458200
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "head-retire",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 4174000,
+          "after_median_ns": 2904700,
+          "change_pct": -30.4097,
+          "before_range_ns": [
+            4174000,
+            4174000
+          ],
+          "after_range_ns": [
+            2904700,
+            2904700
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "append",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 25178700,
+          "after_median_ns": 11143200,
+          "change_pct": -55.7435,
+          "before_range_ns": [
+            25178700,
+            25178700
+          ],
+          "after_range_ns": [
+            11143200,
+            11143200
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "prepend",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 2055643200,
+          "after_median_ns": 25841000,
+          "change_pct": -98.7429,
+          "before_range_ns": [
+            2055643200,
+            2055643200
+          ],
+          "after_range_ns": [
+            25841000,
+            25841000
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "reverse",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 1273153800,
+          "after_median_ns": 35014400,
+          "change_pct": -97.2498,
+          "before_range_ns": [
+            1273153800,
+            1273153800
+          ],
+          "after_range_ns": [
+            35014400,
+            35014400
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "shuffle",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 2993323500,
+          "after_median_ns": 54306000,
+          "change_pct": -98.1858,
+          "before_range_ns": [
+            2993323500,
+            2993323500
+          ],
+          "after_range_ns": [
+            54306000,
+            54306000
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "head-retire",
+          "before_n": 1,
+          "after_n": 1,
+          "before_median_ns": 29798100,
+          "after_median_ns": 14602500,
+          "change_pct": -50.9952,
+          "before_range_ns": [
+            29798100,
+            29798100
+          ],
+          "after_range_ns": [
+            14602500,
+            14602500
+          ]
+        }
+      ]
+    },
+    {
+      "id": "complete-memory-affinity-abba-baab",
+      "scope": "complete Memory::apply semantic operations",
+      "cpu_affinity_mask": 4,
+      "logical_cpu_zero_based": 2,
+      "execution_order": [
+        "before",
+        "after",
+        "after",
+        "before",
+        "after",
+        "before",
+        "before",
+        "after"
+      ],
+      "affinity_method": "Start-Process -WindowStyle Hidden -PassThru; set only each owned benchmark process ProcessorAffinity to 4 immediately after launch; no priority changes.",
+      "limitations": [
+        "CPU affinity is not CPU exclusivity. Other tasks continued to run.",
+        "Affinity is assigned after Start-Process returns, so startup and possibly an earliest sample can precede assignment.",
+        "Four samples per version/case provide diagnostic medians, not statistical performance guarantees."
+      ],
+      "interpretation": "Same frozen binaries; no source changes to explain differences from unpinned ABBA. Small/append regressions remain visible. Scheduling/heterogeneous cores are possible influences, not a demonstrated root cause.",
+      "runs": [
+        {
+          "execution_order": 0,
+          "version": "before",
+          "source_csv": "target/verification/children-order-20261109/affinity-0-before.csv",
+          "source_csv_sha256": "8d104b2c60076579534cc709cc493df391335beb26dbcff156332d446bf3d403",
+          "repeat_axis": "zero-based repeat order within each count/scenario",
+          "raw_nanoseconds": {
+            "1000": {
+              "append": [
+                167400
+              ],
+              "prepend": [
+                360700
+              ],
+              "reverse": [
+                356500
+              ],
+              "shuffle": [
+                739500
+              ],
+              "head-retire": [
+                204300
+              ]
+            },
+            "10000": {
+              "append": [
+                2233000
+              ],
+              "prepend": [
+                31212100
+              ],
+              "reverse": [
+                21199200
+              ],
+              "shuffle": [
+                50452600
+              ],
+              "head-retire": [
+                2707200
+              ]
+            },
+            "50000": {
+              "append": [
+                12972400
+              ],
+              "prepend": [
+                800682000
+              ],
+              "reverse": [
+                598303700
+              ],
+              "shuffle": [
+                1344900700
+              ],
+              "head-retire": [
+                20000200
+              ]
+            }
+          },
+          "executable": "before.exe"
+        },
+        {
+          "execution_order": 1,
+          "version": "after",
+          "source_csv": "target/verification/children-order-20261109/affinity-1-after.csv",
+          "source_csv_sha256": "aec75499ab2f33182c46335d934084e0fbc28a89cfb6c57757f33627e5a3f05a",
+          "repeat_axis": "zero-based repeat order within each count/scenario",
+          "raw_nanoseconds": {
+            "1000": {
+              "append": [
+                168800
+              ],
+              "prepend": [
+                421000
+              ],
+              "reverse": [
+                320200
+              ],
+              "shuffle": [
+                527600
+              ],
+              "head-retire": [
+                191800
+              ]
+            },
+            "10000": {
+              "append": [
+                3359600
+              ],
+              "prepend": [
+                6136100
+              ],
+              "reverse": [
+                5777900
+              ],
+              "shuffle": [
+                7453700
+              ],
+              "head-retire": [
+                6968000
+              ]
+            },
+            "50000": {
+              "append": [
+                12308900
+              ],
+              "prepend": [
+                26467300
+              ],
+              "reverse": [
+                31081700
+              ],
+              "shuffle": [
+                48177100
+              ],
+              "head-retire": [
+                14749600
+              ]
+            }
+          },
+          "executable": "paired-final.exe"
+        },
+        {
+          "execution_order": 2,
+          "version": "after",
+          "source_csv": "target/verification/children-order-20261109/affinity-2-after.csv",
+          "source_csv_sha256": "9a1333a6e7578bf0b22060e553265455fb1bd686890804e49f059bbd63509cd9",
+          "repeat_axis": "zero-based repeat order within each count/scenario",
+          "raw_nanoseconds": {
+            "1000": {
+              "append": [
+                171900
+              ],
+              "prepend": [
+                372400
+              ],
+              "reverse": [
+                327500
+              ],
+              "shuffle": [
+                496300
+              ],
+              "head-retire": [
+                197200
+              ]
+            },
+            "10000": {
+              "append": [
+                2526800
+              ],
+              "prepend": [
+                5446000
+              ],
+              "reverse": [
+                5061200
+              ],
+              "shuffle": [
+                6585900
+              ],
+              "head-retire": [
+                3031200
+              ]
+            },
+            "50000": {
+              "append": [
+                12838900
+              ],
+              "prepend": [
+                29186000
+              ],
+              "reverse": [
+                36314300
+              ],
+              "shuffle": [
+                48431900
+              ],
+              "head-retire": [
+                14861300
+              ]
+            }
+          },
+          "executable": "paired-final.exe"
+        },
+        {
+          "execution_order": 3,
+          "version": "before",
+          "source_csv": "target/verification/children-order-20261109/affinity-3-before.csv",
+          "source_csv_sha256": "d7078b9b7f75f602d1f42eec5869bd641f4cb4c7fde09b3e551260a6118310e6",
+          "repeat_axis": "zero-based repeat order within each count/scenario",
+          "raw_nanoseconds": {
+            "1000": {
+              "append": [
+                259700
+              ],
+              "prepend": [
+                492600
+              ],
+              "reverse": [
+                437500
+              ],
+              "shuffle": [
+                580300
+              ],
+              "head-retire": [
+                194200
+              ]
+            },
+            "10000": {
+              "append": [
+                2194800
+              ],
+              "prepend": [
+                31078800
+              ],
+              "reverse": [
+                21340900
+              ],
+              "shuffle": [
+                49193200
+              ],
+              "head-retire": [
+                2620700
+              ]
+            },
+            "50000": {
+              "append": [
+                12115900
+              ],
+              "prepend": [
+                763461000
+              ],
+              "reverse": [
+                524379800
+              ],
+              "shuffle": [
+                1286805600
+              ],
+              "head-retire": [
+                17060500
+              ]
+            }
+          },
+          "executable": "before.exe"
+        },
+        {
+          "execution_order": 4,
+          "version": "after",
+          "source_csv": "target/verification/children-order-20261109/affinity-4-after.csv",
+          "source_csv_sha256": "a782430aae15ecd93a717a7941234526f06b6f961f92d8b43675e857b5d3d832",
+          "repeat_axis": "zero-based repeat order within each count/scenario",
+          "raw_nanoseconds": {
+            "1000": {
+              "append": [
+                154200
+              ],
+              "prepend": [
+                367000
+              ],
+              "reverse": [
+                331600
+              ],
+              "shuffle": [
+                661200
+              ],
+              "head-retire": [
+                205300
+              ]
+            },
+            "10000": {
+              "append": [
+                2571300
+              ],
+              "prepend": [
+                5300100
+              ],
+              "reverse": [
+                5521900
+              ],
+              "shuffle": [
+                7122600
+              ],
+              "head-retire": [
+                2780800
+              ]
+            },
+            "50000": {
+              "append": [
+                13230800
+              ],
+              "prepend": [
+                30907000
+              ],
+              "reverse": [
+                37711300
+              ],
+              "shuffle": [
+                58155300
+              ],
+              "head-retire": [
+                19653700
+              ]
+            }
+          },
+          "executable": "paired-final.exe"
+        },
+        {
+          "execution_order": 5,
+          "version": "before",
+          "source_csv": "target/verification/children-order-20261109/affinity-5-before.csv",
+          "source_csv_sha256": "03d856ce32281ada41d06bdde82bf0db959aad4ce6d9107879db8ff774eb9824",
+          "repeat_axis": "zero-based repeat order within each count/scenario",
+          "raw_nanoseconds": {
+            "1000": {
+              "append": [
+                161600
+              ],
+              "prepend": [
+                402400
+              ],
+              "reverse": [
+                742600
+              ],
+              "shuffle": [
+                1010900
+              ],
+              "head-retire": [
+                327500
+              ]
+            },
+            "10000": {
+              "append": [
+                2948000
+              ],
+              "prepend": [
+                36097600
+              ],
+              "reverse": [
+                21961300
+              ],
+              "shuffle": [
+                54502600
+              ],
+              "head-retire": [
+                3427500
+              ]
+            },
+            "50000": {
+              "append": [
+                12878600
+              ],
+              "prepend": [
+                808938300
+              ],
+              "reverse": [
+                590749900
+              ],
+              "shuffle": [
+                1349559800
+              ],
+              "head-retire": [
+                16004700
+              ]
+            }
+          },
+          "executable": "before.exe"
+        },
+        {
+          "execution_order": 6,
+          "version": "before",
+          "source_csv": "target/verification/children-order-20261109/affinity-6-before.csv",
+          "source_csv_sha256": "5deb2bfee52f3c4c4584ba1b00b00c279654b72f021645aa24f60537e9741a01",
+          "repeat_axis": "zero-based repeat order within each count/scenario",
+          "raw_nanoseconds": {
+            "1000": {
+              "append": [
+                164800
+              ],
+              "prepend": [
+                365400
+              ],
+              "reverse": [
+                361400
+              ],
+              "shuffle": [
+                735900
+              ],
+              "head-retire": [
+                201700
+              ]
+            },
+            "10000": {
+              "append": [
+                2478400
+              ],
+              "prepend": [
+                31030200
+              ],
+              "reverse": [
+                22597600
+              ],
+              "shuffle": [
+                50614900
+              ],
+              "head-retire": [
+                3554600
+              ]
+            },
+            "50000": {
+              "append": [
+                11459000
+              ],
+              "prepend": [
+                778728600
+              ],
+              "reverse": [
+                520987500
+              ],
+              "shuffle": [
+                1243091300
+              ],
+              "head-retire": [
+                15383200
+              ]
+            }
+          },
+          "executable": "before.exe"
+        },
+        {
+          "execution_order": 7,
+          "version": "after",
+          "source_csv": "target/verification/children-order-20261109/affinity-7-after.csv",
+          "source_csv_sha256": "3157554cf490d9d7554557f79f9163f7946eae6b4b582a22d1b31eb96ab9769a",
+          "repeat_axis": "zero-based repeat order within each count/scenario",
+          "raw_nanoseconds": {
+            "1000": {
+              "append": [
+                211600
+              ],
+              "prepend": [
+                588800
+              ],
+              "reverse": [
+                333000
+              ],
+              "shuffle": [
+                477100
+              ],
+              "head-retire": [
+                208400
+              ]
+            },
+            "10000": {
+              "append": [
+                2245000
+              ],
+              "prepend": [
+                4955000
+              ],
+              "reverse": [
+                5123300
+              ],
+              "shuffle": [
+                6914400
+              ],
+              "head-retire": [
+                2947000
+              ]
+            },
+            "50000": {
+              "append": [
+                17369900
+              ],
+              "prepend": [
+                26781400
+              ],
+              "reverse": [
+                30111100
+              ],
+              "shuffle": [
+                47717500
+              ],
+              "head-retire": [
+                15278100
+              ]
+            }
+          },
+          "executable": "paired-final.exe"
+        }
+      ],
+      "summary": [
+        {
+          "count": 1000,
+          "scenario": "append",
+          "before_n": 4,
+          "after_n": 4,
+          "before_median_ns": 166100.0,
+          "after_median_ns": 170350.0,
+          "change_pct": 2.5587,
+          "before_range_ns": [
+            161600,
+            259700
+          ],
+          "after_range_ns": [
+            154200,
+            211600
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "prepend",
+          "before_n": 4,
+          "after_n": 4,
+          "before_median_ns": 383900.0,
+          "after_median_ns": 396700.0,
+          "change_pct": 3.3342,
+          "before_range_ns": [
+            360700,
+            492600
+          ],
+          "after_range_ns": [
+            367000,
+            588800
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "reverse",
+          "before_n": 4,
+          "after_n": 4,
+          "before_median_ns": 399450.0,
+          "after_median_ns": 329550.0,
+          "change_pct": -17.4991,
+          "before_range_ns": [
+            356500,
+            742600
+          ],
+          "after_range_ns": [
+            320200,
+            333000
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "shuffle",
+          "before_n": 4,
+          "after_n": 4,
+          "before_median_ns": 737700.0,
+          "after_median_ns": 511950.0,
+          "change_pct": -30.6019,
+          "before_range_ns": [
+            580300,
+            1010900
+          ],
+          "after_range_ns": [
+            477100,
+            661200
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "head-retire",
+          "before_n": 4,
+          "after_n": 4,
+          "before_median_ns": 203000.0,
+          "after_median_ns": 201250.0,
+          "change_pct": -0.8621,
+          "before_range_ns": [
+            194200,
+            327500
+          ],
+          "after_range_ns": [
+            191800,
+            208400
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "append",
+          "before_n": 4,
+          "after_n": 4,
+          "before_median_ns": 2355700.0,
+          "after_median_ns": 2549050.0,
+          "change_pct": 8.2078,
+          "before_range_ns": [
+            2194800,
+            2948000
+          ],
+          "after_range_ns": [
+            2245000,
+            3359600
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "prepend",
+          "before_n": 4,
+          "after_n": 4,
+          "before_median_ns": 31145450.0,
+          "after_median_ns": 5373050.0,
+          "change_pct": -82.7485,
+          "before_range_ns": [
+            31030200,
+            36097600
+          ],
+          "after_range_ns": [
+            4955000,
+            6136100
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "reverse",
+          "before_n": 4,
+          "after_n": 4,
+          "before_median_ns": 21651100.0,
+          "after_median_ns": 5322600.0,
+          "change_pct": -75.4165,
+          "before_range_ns": [
+            21199200,
+            22597600
+          ],
+          "after_range_ns": [
+            5061200,
+            5777900
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "shuffle",
+          "before_n": 4,
+          "after_n": 4,
+          "before_median_ns": 50533750.0,
+          "after_median_ns": 7018500.0,
+          "change_pct": -86.1113,
+          "before_range_ns": [
+            49193200,
+            54502600
+          ],
+          "after_range_ns": [
+            6585900,
+            7453700
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "head-retire",
+          "before_n": 4,
+          "after_n": 4,
+          "before_median_ns": 3067350.0,
+          "after_median_ns": 2989100.0,
+          "change_pct": -2.5511,
+          "before_range_ns": [
+            2620700,
+            3554600
+          ],
+          "after_range_ns": [
+            2780800,
+            6968000
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "append",
+          "before_n": 4,
+          "after_n": 4,
+          "before_median_ns": 12497250.0,
+          "after_median_ns": 13034850.0,
+          "change_pct": 4.3017,
+          "before_range_ns": [
+            11459000,
+            12972400
+          ],
+          "after_range_ns": [
+            12308900,
+            17369900
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "prepend",
+          "before_n": 4,
+          "after_n": 4,
+          "before_median_ns": 789705300.0,
+          "after_median_ns": 27983700.0,
+          "change_pct": -96.4564,
+          "before_range_ns": [
+            763461000,
+            808938300
+          ],
+          "after_range_ns": [
+            26467300,
+            30907000
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "reverse",
+          "before_n": 4,
+          "after_n": 4,
+          "before_median_ns": 557564850.0,
+          "after_median_ns": 33698000.0,
+          "change_pct": -93.9562,
+          "before_range_ns": [
+            520987500,
+            598303700
+          ],
+          "after_range_ns": [
+            30111100,
+            37711300
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "shuffle",
+          "before_n": 4,
+          "after_n": 4,
+          "before_median_ns": 1315853150.0,
+          "after_median_ns": 48304500.0,
+          "change_pct": -96.329,
+          "before_range_ns": [
+            1243091300,
+            1349559800
+          ],
+          "after_range_ns": [
+            47717500,
+            58155300
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "head-retire",
+          "before_n": 4,
+          "after_n": 4,
+          "before_median_ns": 16532600.0,
+          "after_median_ns": 15069700.0,
+          "change_pct": -8.8486,
+          "before_range_ns": [
+            15383200,
+            20000200
+          ],
+          "after_range_ns": [
+            14749600,
+            19653700
+          ]
+        }
+      ]
+    },
+    {
+      "id": "same-process-children-dual",
+      "scope": "Children order storage only; excludes Memory validation, node maps, receipts and all hosts",
+      "cpu_affinity_mask": null,
+      "harness_source_path": "target/verification/children-order-20261109/dual.rs",
+      "harness_sha256": "6c6515c2f21e30f11d52ec9f75a2ef250803adac4321bb72f7d230580af6b09a",
+      "harness_source": "pub use glory_render::NodeId;\nuse glory_render::{NodeIds, RuntimeId};\nuse std::{hint::black_box, time::Instant};\n#[path = \"children-before.rs\"] mod before;\n#[path = \"../../../crates/render/src/memory/children.rs\"] mod after;\ntrait Order: Default {\n    fn insert(&mut self, id: NodeId, before: Option<NodeId>);\n    fn remove(&mut self, id: NodeId);\n    fn slice(&self) -> &[NodeId];\n}\nimpl Order for before::Children {\n    fn insert(&mut self, id: NodeId, before: Option<NodeId>) {\n        let at = before.map_or(self.len(), |before| if self.first() == Some(&before) { 0 } else { self.iter().position(|&i| i == before).unwrap() });\n        self.insert(at, id);\n    }\n    fn remove(&mut self, id: NodeId) {\n        let at = if self.first() == Some(&id) { 0 } else if self.last() == Some(&id) { self.len()-1 } else { self.iter().position(|&i| i == id).unwrap() };\n        self.remove(at);\n    }\n    fn slice(&self) -> &[NodeId] { self }\n}\nimpl Order for after::Children {\n    fn insert(&mut self, id: NodeId, before: Option<NodeId>) { self.insert_before(id, before); }\n    fn remove(&mut self, id: NodeId) { self.remove_id(id); }\n    fn slice(&self) -> &[NodeId] { self }\n}\nfn run<O: Order>(rows: &[NodeId], incoming: &[NodeId], expected: &[NodeId], scenario: &str) -> u128 {\n    let mut children = O::default();\n    for &id in rows { children.insert(id, None); }\n    let start = Instant::now();\n    match scenario {\n        \"append\" => for &id in incoming { children.insert(black_box(id), None); },\n        \"prepend\" => for &id in incoming { children.insert(black_box(id), Some(rows[0])); },\n        \"reverse\" | \"shuffle\" => {\n            let mut before = None;\n            for &id in expected.iter().rev() { children.remove(id); children.insert(id,before); before=Some(id); }\n        }\n        \"head-retire\" => for &id in rows { children.remove(black_box(id)); },\n        _=>unreachable!(),\n    }\n    let elapsed=start.elapsed().as_nanos();\n    assert_eq!(children.slice(), expected);\n    elapsed\n}\nfn main() {\n    println!(\"count,scenario,repeat,version,nanoseconds\");\n    for count in [1000,10000,50000] {\n        let mut ids = NodeIds::new(RuntimeId::new());\n        let rows: Vec<_> = (0..count).map(|_|ids.allocate()).collect();\n        let incoming: Vec<_> = (0..count).map(|_|ids.allocate()).collect();\n        for scenario in [\"append\",\"prepend\",\"reverse\",\"shuffle\",\"head-retire\"] {\n            let mut expected=rows.clone();\n            match scenario {\n                \"append\"=>expected.extend_from_slice(&incoming),\n                \"prepend\"=>{expected.splice(..0,incoming.clone());},\n                \"reverse\"=>expected.reverse(),\n                \"shuffle\"=>{let mut seed=17u64; for index in (1..count).rev(){seed=seed.wrapping_mul(6364136223846793005).wrapping_add(1); expected.swap(index,seed as usize%(index+1));}},\n                _=>expected.clear(),\n            }\n            for repeat in 0..6 {\n                let versions=if repeat%2==0 {[\"before\",\"after\"]} else {[\"after\",\"before\"]};\n                for version in versions {\n                    let ns=if version==\"before\"{run::<before::Children>(&rows,&incoming,&expected,scenario)}else{run::<after::Children>(&rows,&incoming,&expected,scenario)};\n                    println!(\"{count},{scenario},{repeat},{version},{ns}\");\n                }\n            }\n        }\n    }\n}\n",
+      "compiler_command": "rustc --edition=2024 -A dead_code -C opt-level=z -C lto=true -C codegen-units=1 -L dependency=target/release/deps --extern glory_render=<release rlib> dual.rs -o dual.exe",
+      "execution_order": "For each count/scenario, 6 repeats; before then after on even repeats, after then before on odd repeats.",
+      "raw_nanoseconds": {
+        "before": {
+          "1000": {
+            "append": [
+              10100,
+              3600,
+              3600,
+              3600,
+              3600,
+              3500
+            ],
+            "prepend": [
+              220200,
+              223600,
+              228000,
+              225000,
+              221900,
+              221000
+            ],
+            "reverse": [
+              179200,
+              171800,
+              175600,
+              173000,
+              174400,
+              172800
+            ],
+            "shuffle": [
+              332200,
+              309200,
+              306900,
+              304400,
+              319200,
+              299900
+            ],
+            "head-retire": [
+              4000,
+              3800,
+              3900,
+              3600,
+              3600,
+              3600
+            ]
+          },
+          "10000": {
+            "append": [
+              94000,
+              113600,
+              107700,
+              89400,
+              89600,
+              91000
+            ],
+            "prepend": [
+              27040100,
+              28278000,
+              27908300,
+              26794000,
+              28044200,
+              27944100
+            ],
+            "reverse": [
+              18208400,
+              18335600,
+              18253700,
+              18789900,
+              18327800,
+              18315600
+            ],
+            "shuffle": [
+              38465100,
+              39216500,
+              38128700,
+              42020500,
+              39532900,
+              36331000
+            ],
+            "head-retire": [
+              36500,
+              36100,
+              37700,
+              36900,
+              36200,
+              35800
+            ]
+          },
+          "50000": {
+            "append": [
+              420600,
+              421700,
+              416100,
+              415000,
+              444900,
+              428400
+            ],
+            "prepend": [
+              905610500,
+              834231500,
+              1136521300,
+              1410410200,
+              1524115600,
+              1384473700
+            ],
+            "reverse": [
+              893521400,
+              780320400,
+              810245800,
+              645207500,
+              631813700,
+              810101800
+            ],
+            "shuffle": [
+              1259649200,
+              1194733000,
+              1180185500,
+              1123451000,
+              1170676400,
+              1098332900
+            ],
+            "head-retire": [
+              189500,
+              194100,
+              237400,
+              187000,
+              187000,
+              197400
+            ]
+          }
+        },
+        "after": {
+          "1000": {
+            "append": [
+              6400,
+              3700,
+              3700,
+              3700,
+              3600,
+              3700
+            ],
+            "prepend": [
+              215800,
+              220000,
+              220200,
+              217200,
+              215100,
+              216400
+            ],
+            "reverse": [
+              170500,
+              173400,
+              168300,
+              172400,
+              174300,
+              171000
+            ],
+            "shuffle": [
+              297200,
+              306100,
+              343700,
+              326400,
+              302100,
+              299900
+            ],
+            "head-retire": [
+              3700,
+              3700,
+              3600,
+              3600,
+              3500,
+              3600
+            ]
+          },
+          "10000": {
+            "append": [
+              95000,
+              96500,
+              92700,
+              92700,
+              90700,
+              98500
+            ],
+            "prepend": [
+              2338100,
+              2104700,
+              2340300,
+              2064400,
+              2336500,
+              2020800
+            ],
+            "reverse": [
+              1882100,
+              1988500,
+              1858700,
+              2089200,
+              1853500,
+              1834700
+            ],
+            "shuffle": [
+              2262300,
+              2080100,
+              2136600,
+              2230200,
+              2142300,
+              2162500
+            ],
+            "head-retire": [
+              36700,
+              35600,
+              36500,
+              36300,
+              36000,
+              42300
+            ]
+          },
+          "50000": {
+            "append": [
+              417700,
+              417200,
+              418800,
+              477800,
+              414700,
+              443000
+            ],
+            "prepend": [
+              15531100,
+              11937200,
+              18262200,
+              16987600,
+              15694700,
+              17245800
+            ],
+            "reverse": [
+              18597500,
+              17468900,
+              16891800,
+              13311600,
+              15011500,
+              14666400
+            ],
+            "shuffle": [
+              21901000,
+              28398100,
+              14968100,
+              18664400,
+              21362600,
+              16416700
+            ],
+            "head-retire": [
+              189800,
+              214000,
+              190900,
+              190100,
+              230500,
+              208900
+            ]
+          }
+        }
+      },
+      "summary": [
+        {
+          "count": 1000,
+          "scenario": "append",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 3600.0,
+          "after_median_ns": 3700.0,
+          "change_pct": 2.7778,
+          "before_range_ns": [
+            3500,
+            10100
+          ],
+          "after_range_ns": [
+            3600,
+            6400
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "prepend",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 222750.0,
+          "after_median_ns": 216800.0,
+          "change_pct": -2.6712,
+          "before_range_ns": [
+            220200,
+            228000
+          ],
+          "after_range_ns": [
+            215100,
+            220200
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "reverse",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 173700.0,
+          "after_median_ns": 171700.0,
+          "change_pct": -1.1514,
+          "before_range_ns": [
+            171800,
+            179200
+          ],
+          "after_range_ns": [
+            168300,
+            174300
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "shuffle",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 308050.0,
+          "after_median_ns": 304100.0,
+          "change_pct": -1.2823,
+          "before_range_ns": [
+            299900,
+            332200
+          ],
+          "after_range_ns": [
+            297200,
+            343700
+          ]
+        },
+        {
+          "count": 1000,
+          "scenario": "head-retire",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 3700.0,
+          "after_median_ns": 3600.0,
+          "change_pct": -2.7027,
+          "before_range_ns": [
+            3600,
+            4000
+          ],
+          "after_range_ns": [
+            3500,
+            3700
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "append",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 92500.0,
+          "after_median_ns": 93850.0,
+          "change_pct": 1.4595,
+          "before_range_ns": [
+            89400,
+            113600
+          ],
+          "after_range_ns": [
+            90700,
+            98500
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "prepend",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 27926200.0,
+          "after_median_ns": 2220600.0,
+          "change_pct": -92.0483,
+          "before_range_ns": [
+            26794000,
+            28278000
+          ],
+          "after_range_ns": [
+            2020800,
+            2340300
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "reverse",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 18321700.0,
+          "after_median_ns": 1870400.0,
+          "change_pct": -89.7913,
+          "before_range_ns": [
+            18208400,
+            18789900
+          ],
+          "after_range_ns": [
+            1834700,
+            2089200
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "shuffle",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 38840800.0,
+          "after_median_ns": 2152400.0,
+          "change_pct": -94.4584,
+          "before_range_ns": [
+            36331000,
+            42020500
+          ],
+          "after_range_ns": [
+            2080100,
+            2262300
+          ]
+        },
+        {
+          "count": 10000,
+          "scenario": "head-retire",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 36350.0,
+          "after_median_ns": 36400.0,
+          "change_pct": 0.1376,
+          "before_range_ns": [
+            35800,
+            37700
+          ],
+          "after_range_ns": [
+            35600,
+            42300
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "append",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 421150.0,
+          "after_median_ns": 418250.0,
+          "change_pct": -0.6886,
+          "before_range_ns": [
+            415000,
+            444900
+          ],
+          "after_range_ns": [
+            414700,
+            477800
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "prepend",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 1260497500.0,
+          "after_median_ns": 16341150.0,
+          "change_pct": -98.7036,
+          "before_range_ns": [
+            834231500,
+            1524115600
+          ],
+          "after_range_ns": [
+            11937200,
+            18262200
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "reverse",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 795211100.0,
+          "after_median_ns": 15951650.0,
+          "change_pct": -97.994,
+          "before_range_ns": [
+            631813700,
+            893521400
+          ],
+          "after_range_ns": [
+            13311600,
+            18597500
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "shuffle",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 1175430950.0,
+          "after_median_ns": 20013500.0,
+          "change_pct": -98.2973,
+          "before_range_ns": [
+            1098332900,
+            1259649200
+          ],
+          "after_range_ns": [
+            14968100,
+            28398100
+          ]
+        },
+        {
+          "count": 50000,
+          "scenario": "head-retire",
+          "before_n": 6,
+          "after_n": 6,
+          "before_median_ns": 191800.0,
+          "after_median_ns": 199900.0,
+          "change_pct": 4.2231,
+          "before_range_ns": [
+            187000,
+            237400
+          ],
+          "after_range_ns": [
+            189800,
+            230500
+          ]
+        }
+      ],
+      "limitations": [
+        "Both modules are optimized in one process using the same real NodeId type and a common workload. This isolates the order container, not complete Memory or an application.",
+        "Does not prove that all unpinned Memory regressions are environmental."
+      ]
+    }
+  ],
+  "all_positive_median_changes": [
+    {
+      "experiment": "initial-threshold-128",
+      "summary": "summary",
+      "count": 1000,
+      "scenario": "prepend",
+      "before_median_ns": 360200,
+      "after_median_ns": 407200,
+      "change_pct": 13.0483
+    },
+    {
+      "experiment": "initial-threshold-128",
+      "summary": "summary",
+      "count": 1000,
+      "scenario": "reverse",
+      "before_median_ns": 331600,
+      "after_median_ns": 363500,
+      "change_pct": 9.62
+    },
+    {
+      "experiment": "initial-threshold-128",
+      "summary": "summary",
+      "count": 1000,
+      "scenario": "head-retire",
+      "before_median_ns": 164100,
+      "after_median_ns": 192000,
+      "change_pct": 17.0018
+    },
+    {
+      "experiment": "initial-threshold-128",
+      "summary": "summary",
+      "count": 10000,
+      "scenario": "head-retire",
+      "before_median_ns": 2302100,
+      "after_median_ns": 2827200,
+      "change_pct": 22.8096
+    },
+    {
+      "experiment": "initial-threshold-128",
+      "summary": "summary",
+      "count": 50000,
+      "scenario": "append",
+      "before_median_ns": 10959600,
+      "after_median_ns": 11226500,
+      "change_pct": 2.4353
+    },
+    {
+      "experiment": "initial-threshold-2048",
+      "summary": "summary",
+      "count": 1000,
+      "scenario": "head-retire",
+      "before_median_ns": 164100,
+      "after_median_ns": 206700,
+      "change_pct": 25.9598
+    },
+    {
+      "experiment": "initial-threshold-2048",
+      "summary": "summary",
+      "count": 50000,
+      "scenario": "append",
+      "before_median_ns": 10959600,
+      "after_median_ns": 11264100,
+      "change_pct": 2.7784
+    },
+    {
+      "experiment": "complete-memory-unpinned-abba",
+      "summary": "summary",
+      "count": 1000,
+      "scenario": "append",
+      "before_median_ns": 146400.0,
+      "after_median_ns": 348750.0,
+      "change_pct": 138.2172
+    },
+    {
+      "experiment": "complete-memory-unpinned-abba",
+      "summary": "summary",
+      "count": 1000,
+      "scenario": "prepend",
+      "before_median_ns": 383450.0,
+      "after_median_ns": 777400.0,
+      "change_pct": 102.7383
+    },
+    {
+      "experiment": "complete-memory-unpinned-abba",
+      "summary": "summary",
+      "count": 1000,
+      "scenario": "reverse",
+      "before_median_ns": 334250.0,
+      "after_median_ns": 708400.0,
+      "change_pct": 111.9372
+    },
+    {
+      "experiment": "complete-memory-unpinned-abba",
+      "summary": "summary",
+      "count": 1000,
+      "scenario": "shuffle",
+      "before_median_ns": 595450.0,
+      "after_median_ns": 1213900.0,
+      "change_pct": 103.8626
+    },
+    {
+      "experiment": "complete-memory-unpinned-abba",
+      "summary": "summary",
+      "count": 1000,
+      "scenario": "head-retire",
+      "before_median_ns": 185200.0,
+      "after_median_ns": 485000.0,
+      "change_pct": 161.879
+    },
+    {
+      "experiment": "complete-memory-unpinned-abba",
+      "summary": "summary",
+      "count": 10000,
+      "scenario": "append",
+      "before_median_ns": 2466150.0,
+      "after_median_ns": 4639900.0,
+      "change_pct": 88.1435
+    },
+    {
+      "experiment": "complete-memory-unpinned-abba",
+      "summary": "summary",
+      "count": 10000,
+      "scenario": "head-retire",
+      "before_median_ns": 3222750.0,
+      "after_median_ns": 9255750.0,
+      "change_pct": 187.2004
+    },
+    {
+      "experiment": "complete-memory-unpinned-abba",
+      "summary": "summary",
+      "count": 50000,
+      "scenario": "append",
+      "before_median_ns": 13534950.0,
+      "after_median_ns": 26339650.0,
+      "change_pct": 94.6047
+    },
+    {
+      "experiment": "complete-memory-unpinned-recheck",
+      "summary": "summary_final_vs_before",
+      "count": 1000,
+      "scenario": "append",
+      "before_median_ns": 154900,
+      "after_median_ns": 161000,
+      "change_pct": 3.938
+    },
+    {
+      "experiment": "complete-memory-unpinned-recheck",
+      "summary": "summary_final_vs_before",
+      "count": 1000,
+      "scenario": "prepend",
+      "before_median_ns": 340200,
+      "after_median_ns": 542500,
+      "change_pct": 59.465
+    },
+    {
+      "experiment": "complete-memory-unpinned-recheck",
+      "summary": "summary_final_vs_before",
+      "count": 1000,
+      "scenario": "head-retire",
+      "before_median_ns": 202000,
+      "after_median_ns": 251200,
+      "change_pct": 24.3564
+    },
+    {
+      "experiment": "complete-memory-unpinned-recheck",
+      "summary": "summary_early_final_vs_before",
+      "count": 1000,
+      "scenario": "append",
+      "before_median_ns": 154900,
+      "after_median_ns": 159900,
+      "change_pct": 3.2279
+    },
+    {
+      "experiment": "complete-memory-unpinned-recheck",
+      "summary": "summary_early_final_vs_before",
+      "count": 1000,
+      "scenario": "prepend",
+      "before_median_ns": 340200,
+      "after_median_ns": 423200,
+      "change_pct": 24.3974
+    },
+    {
+      "experiment": "complete-memory-affinity-abba-baab",
+      "summary": "summary",
+      "count": 1000,
+      "scenario": "append",
+      "before_median_ns": 166100.0,
+      "after_median_ns": 170350.0,
+      "change_pct": 2.5587
+    },
+    {
+      "experiment": "complete-memory-affinity-abba-baab",
+      "summary": "summary",
+      "count": 1000,
+      "scenario": "prepend",
+      "before_median_ns": 383900.0,
+      "after_median_ns": 396700.0,
+      "change_pct": 3.3342
+    },
+    {
+      "experiment": "complete-memory-affinity-abba-baab",
+      "summary": "summary",
+      "count": 10000,
+      "scenario": "append",
+      "before_median_ns": 2355700.0,
+      "after_median_ns": 2549050.0,
+      "change_pct": 8.2078
+    },
+    {
+      "experiment": "complete-memory-affinity-abba-baab",
+      "summary": "summary",
+      "count": 50000,
+      "scenario": "append",
+      "before_median_ns": 12497250.0,
+      "after_median_ns": 13034850.0,
+      "change_pct": 4.3017
+    },
+    {
+      "experiment": "same-process-children-dual",
+      "summary": "summary",
+      "count": 1000,
+      "scenario": "append",
+      "before_median_ns": 3600.0,
+      "after_median_ns": 3700.0,
+      "change_pct": 2.7778
+    },
+    {
+      "experiment": "same-process-children-dual",
+      "summary": "summary",
+      "count": 10000,
+      "scenario": "append",
+      "before_median_ns": 92500.0,
+      "after_median_ns": 93850.0,
+      "change_pct": 1.4595
+    },
+    {
+      "experiment": "same-process-children-dual",
+      "summary": "summary",
+      "count": 10000,
+      "scenario": "head-retire",
+      "before_median_ns": 36350.0,
+      "after_median_ns": 36400.0,
+      "change_pct": 0.1376
+    },
+    {
+      "experiment": "same-process-children-dual",
+      "summary": "summary",
+      "count": 50000,
+      "scenario": "head-retire",
+      "before_median_ns": 191800.0,
+      "after_median_ns": 199900.0,
+      "change_pct": 4.2231
+    }
+  ],
+  "layout_check": {
+    "type": "Children",
+    "baseline_bytes": 32,
+    "candidate_bytes": 32,
+    "NodeId_bytes": 16,
+    "scope": "Non-test x86_64 layout with the same real NodeId. Baseline module from Git and candidate module compiled by one rustc process. This is not total allocated memory/RSS.",
+    "harness_sha256": "c8d43ba0e81e4f1d1c7ae75b8ee05e10298a63834f426657d80c152747f2a69a",
+    "harness_source": "pub use glory_render::NodeId;\n#[path = \"children-before.rs\"] mod before;\n#[path = \"../../../crates/render/src/memory/children.rs\"] mod after;\nfn main() {\n    println!(\"Children before={}B after={}B NodeId={}B\", std::mem::size_of::<before::Children>(), std::mem::size_of::<after::Children>(), std::mem::size_of::<NodeId>());\n}\n"
+  },
+  "deterministic_work_tests": [
+    {
+      "name": "memory::children::tests::wide_reversal_has_linear_index_work_and_no_implicit_slice_reads",
+      "counts": [
+        4096,
+        10000,
+        50000
+      ],
+      "assertions": [
+        "promotion visits exactly N live identities",
+        "indexed mutations exactly 2*(N-1)",
+        "Vec moved entries=0",
+        "linear sibling searched entries=0",
+        "indexed snapshot absent until final explicit iteration"
+      ]
+    },
+    {
+      "name": "memory::children::tests::wide_prepend_and_shuffle_use_live_identity_work_without_searching_or_shifting",
+      "counts": [
+        10000,
+        50000
+      ],
+      "scenarios": [
+        "prepend",
+        "shuffle"
+      ],
+      "assertions": [
+        "promotion visits exactly N live identities",
+        "indexed mutations <=2*N",
+        "Vec moved entries=0",
+        "linear sibling searched entries=0",
+        "no snapshot before final explicit order assertion"
+      ]
+    },
+    {
+      "name": "memory::children::tests::append_and_front_retirement_keep_the_amortized_vector_path",
+      "counts": [
+        32768
+      ],
+      "assertions": [
+        "no index promotion",
+        "no sibling searches",
+        "front-compaction moved entries < N",
+        "physical numeric prefix <= live+64"
+      ]
+    },
+    {
+      "name": "memory::children::tests::complete_memory_placement_does_not_materialize_wide_sibling_slices",
+      "counts": [
+        3000
+      ],
+      "assertions": [
+        "with and without declared FocusScope",
+        "validate_placement, full Memory::apply, and next_sibling do not materialize indexed sibling slices",
+        "final focus-scope live size remains 3001"
+      ]
+    },
+    {
+      "name": "memory::children::tests::edits_and_lazy_snapshots_match_vector_across_promotions_and_retirement",
+      "operations": 10000,
+      "assertions": [
+        "front/middle/tail insertion/removal and reused IDs match Vec oracle",
+        "first/last/len/order, clone and owned iteration agree",
+        "wide index releases on small tail/empty"
+      ]
+    },
+    {
+      "name": "wide_order_matches_vector_across_reparent_suspend_prefix_rejection_and_reused_ids",
+      "path": "crates/render/tests/wide_order.rs",
+      "initial_children": 6000,
+      "assertions": [
+        "cross-parent/root moves match independent Vec oracle",
+        "Suspend preserves logical order; Resume moves",
+        "later invalid mutation retains exactly successful prefix receipt and does not execute suffix",
+        "snapshot independence",
+        "retired/reused complete IDs reject without receipt changes"
+      ]
+    }
+  ],
+  "verification": {
+    "cargo_test_render_all_features": {
+      "command": "cargo test -p glory-render --locked --all-features",
+      "passed": 243,
+      "failed": 0,
+      "log": "target/verification/children-order-20261109/render-tests-final2.log"
+    },
+    "clippy": {
+      "command": "cargo clippy -p glory-render --locked --all-features --all-targets -- -D warnings",
+      "result": "passed",
+      "log": "target/verification/children-order-20261109/clippy-final2.log"
+    },
+    "bench_test_argument_smoke": {
+      "method": "Standalone rustc links the already-built debug glory_render rlib and executes benchmark --test; no timings are performance evidence. Cargo bench smoke was also requested but initially waited on shared target lock.",
+      "result": "passed all 15 count/scenario order/adjacency assertions",
+      "log": "target/verification/children-order-20261109/bench-direct-smoke.log"
+    },
+    "git_diff_check": "passed for crates/render; full workspace validation owned by primary agent"
+  },
+  "tradeoffs_and_limits": [
+    "The 2048 promotion threshold retains 1k reorder and 1k-to-2k append/prepend on contiguous storage. It was chosen after the threshold-128 diagnostic regressed small cases; it is not a claim of a universally optimal threshold.",
+    "After promotion the index stores only live NodeId keys and current previous/next links. It allocates O(live sibling count) extra storage. A requested contiguous snapshot adds another O(live sibling count) vector. Total allocator/RSS was not measured.",
+    "At <=1024 indexed siblings the representation demotes to contiguous storage, releasing the formerly wide hash index. Hysteresis avoids repeated promotion at a single boundary.",
+    "Public Deref/AsRef/iter/debug/equality/clone can request the contiguous snapshot. First access after an indexed mutation is O(N); repeated accesses without a mutation reuse it. Reading all children after every mutation can still produce O(N^2) total reads. Required restricted-subtree validation remains unchanged.",
+    "HashMap live-ID edits are expected O(1) each, not a worst-case hash-complexity guarantee. Deterministic work assertions count visited/promotion/index operations and prove the removed explicit search/Vec shifts; they do not time hash probing or allocator internals.",
+    "Pinned complete-Memory append medians regress by 2.6%, 8.2%, and 4.3% at 1k/10k/50k; these results are retained. Early unpinned ABBA fast-path regressions up to ~187% remain visible and are not erased by later pinned or pure-container results.",
+    "Later same-binary/pinned and same-process container diagnostics did not reproduce a uniform twofold fast-path slowdown. Scheduling, heterogeneous cores, and code-layout effects remain possible influences; the measurements do not establish a single cause.",
+    "Only removal of the explicit quadratic wide-sibling mutation work is claimed. No universal application speedup, host frame-time benefit, lower memory use, physical focus/selection acceptance, or platform result is inferred."
+  ]
+}

@@ -40,6 +40,26 @@ futures. The UI never crosses threads. Admission is bounded with no wait queue;
 Choose both that limit and the underlying SSR task/chunk/resource budgets for
 the application. Separate renderer instances have separate limits.
 
+`StreamRenderer::new` leaves request durations unlimited. Applications can opt
+into `StreamRenderer::with_timeouts(max_requests, StreamTimeouts { request,
+idle })`, where both fields are `Option<std::time::Duration>`. `request` bounds
+total time from admission, including startup and body work. `idle` bounds time
+without a successfully prepared frame reply after the shell, including waiting
+for HTTP body demand or pending resources. A successful frame resets only the
+idle deadline. Choose idle limits with expected client backpressure in mind;
+both defaults are `None`. Zero and unrepresentable durations return
+`StreamError::Config`.
+
+Expiration disposes the request on its worker and releases admission after
+cleanup, even if the caller retains the response without polling its body.
+Startup expiration returns `StreamError::Timeout(StreamTimeout::Request)`;
+later body errors distinguish `StreamTimeout::Request` and `StreamTimeout::Idle`,
+including when a body is first polled after its worker has timed out. No
+successful End is emitted. These limits are cooperative: synchronous factories,
+serialization, cleanup or blocking loader code cannot be interrupted. An overdue
+factory is rejected when it returns; limits cannot bound how long such code
+blocks its worker or holds admission. The limits require no changes to SSR core.
+
 The response is prepared after shell construction/serialization, before polling
 any loader. It starts with the shared SSR document prefix and preload capture
 script, then the Shell. Subsequent HTTP body polls request one Patch/End at a
@@ -93,6 +113,9 @@ backpressure, reverse completion, request isolation, startup/body errors and
 panics, cancellation during initialization, admission recovery, real Salvo
 chunked HTTP, TCP disconnect and a paused TCP reader. The browser acceptance
 script beside the example checks the actual progressive DOM and CSP behavior.
+Timeout tests also retain unread responses and open sockets while pending
+resources expire, verify error classification and Owner cleanup, and reuse the
+released admission slot.
 
 The library and example are native-only (empty on wasm32). Merely using the
 Glory facade/default/HTML/SSR features does not enable this HTTP integration.

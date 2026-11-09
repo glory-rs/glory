@@ -32,9 +32,10 @@ shares its application lockfile with that launcher.
 - [ ] For desktop claims, run the `-Window` checks and record the actual host,
   OS input and accessibility scope separately.
 
-All build artifacts, Cargo caches and compiler temporary files must use
-`D:/BuildCache/<task>` (or a verified D:-backed WSL mount). Verify Cargo's actual
-`target_directory` with metadata before building.
+Builds inherit the caller environment and normal project configuration. Do not
+redirect Cargo home, target or TEMP/TMP to a global cache root. In the owning
+workspace, run `cargo metadata --no-deps --format-version 1` and use its actual
+`target_directory` for verification output paths.
 
 ## Publishing
 

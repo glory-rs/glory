@@ -1,8 +1,9 @@
 use std::future::Future;
 use std::io;
 use std::pin::Pin;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll, ready};
+use std::time::{Duration, Instant};
 
 use futures_core::Stream;
 use glory_ssr::stream::{Bootstrap, FrameKind, Stream as SsrStream};
@@ -18,6 +19,26 @@ pub struct StreamPage {
     pub bootstrap: Bootstrap,
 }
 
+/// Optional cooperative limits for admitted requests. Defaults preserve streams
+/// with arbitrarily slow resources or clients. Neither limit preempts synchronous
+/// application code; expiration is checked when that code returns.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct StreamTimeouts {
+    /// Total time from admission, including startup and all body demands.
+    pub request: Option<Duration>,
+    /// Time without a successful frame reply, including waiting for body demand
+    /// or a pending loader. Starts after the shell is prepared.
+    pub idle: Option<Duration>,
+}
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// Which configured deadline expired. No application state crosses threads.
+pub enum StreamTimeout {
+    /// The admitted request exceeded its total lifetime.
+    Request,
+    /// No frame reply was prepared within the configured idle interval.
+    Idle,
+}
+
 #[derive(Debug)]
 pub enum StreamError {
     /// No worker is admitted; retry or return HTTP 503. There is no wait queue.
@@ -28,6 +49,8 @@ pub enum StreamError {
     Io(io::Error),
     /// A worker exited (including a panic) without completing its reply.
     WorkerStopped,
+    /// Cooperative request/idle expiration; the stream emits no successful End.
+    Timeout(StreamTimeout),
 }
 impl std::fmt::Display for StreamError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -46,14 +69,31 @@ impl std::error::Error for StreamError {}
 #[derive(Clone)]
 pub struct StreamRenderer {
     slots: Arc<Semaphore>,
+    timeouts: StreamTimeouts,
 }
 impl StreamRenderer {
     pub fn new(max_requests: usize) -> Result<Self, StreamError> {
-        if max_requests == 0 || max_requests > Semaphore::MAX_PERMITS {
+        Self::with_timeouts(max_requests, StreamTimeouts::default())
+    }
+
+    /// Set explicit request/idle limits shared by cloned renderers. Zero and
+    /// unrepresentable durations are rejected before any worker is admitted.
+    pub fn with_timeouts(
+        max_requests: usize,
+        timeouts: StreamTimeouts,
+    ) -> Result<Self, StreamError> {
+        if max_requests == 0
+            || max_requests > Semaphore::MAX_PERMITS
+            || [timeouts.request, timeouts.idle]
+                .into_iter()
+                .flatten()
+                .any(|time| time.is_zero() || Instant::now().checked_add(time).is_none())
+        {
             return Err(StreamError::Config);
         }
         Ok(Self {
             slots: Arc::new(Semaphore::new(max_requests)),
+            timeouts,
         })
     }
 
@@ -79,6 +119,9 @@ impl StreamRenderer {
             .map_err(|_| StreamError::Busy)?;
         let (started, initial) = oneshot::channel();
         let (demand, requests) = mpsc::channel(1);
+        let timing = Timing::new(self.timeouts)?;
+        let terminal = Arc::new(Mutex::new(None));
+        let worker_terminal = terminal.clone();
         std::thread::Builder::new()
             .name("glory-salvo-ssr".into())
             .spawn(move || {
@@ -94,7 +137,15 @@ impl StreamRenderer {
                         return;
                     }
                 };
-                runtime.block_on(serve(page.bootstrap, opening, factory, started, requests));
+                runtime.block_on(serve(
+                    page.bootstrap,
+                    opening,
+                    factory,
+                    started,
+                    requests,
+                    timing,
+                    worker_terminal,
+                ));
             })
             .map_err(StreamError::Io)?;
         let first = initial.await.map_err(|_| StreamError::WorkerStopped)??;
@@ -110,6 +161,7 @@ impl StreamRenderer {
             demand: Some(demand),
             pending: None,
             done: false,
+            terminal,
         });
         Ok(response)
     }
@@ -120,6 +172,64 @@ struct Chunk {
     end: bool,
 }
 type Reply = oneshot::Sender<Result<Chunk, StreamError>>;
+type Terminal = Arc<Mutex<Option<StreamTimeout>>>;
+
+struct Timing {
+    request: Option<Instant>,
+    idle: Option<Instant>,
+    idle_duration: Option<Duration>,
+}
+impl Timing {
+    fn new(timeouts: StreamTimeouts) -> Result<Self, StreamError> {
+        let now = Instant::now();
+        let request = timeouts
+            .request
+            .map(|duration| now.checked_add(duration).ok_or(StreamError::Config))
+            .transpose()?;
+        Ok(Self {
+            request,
+            idle: None,
+            idle_duration: timeouts.idle,
+        })
+    }
+    fn progress(&mut self) -> Result<(), StreamError> {
+        self.idle = self
+            .idle_duration
+            .map(|duration| {
+                Instant::now()
+                    .checked_add(duration)
+                    .ok_or(StreamError::Config)
+            })
+            .transpose()?;
+        Ok(())
+    }
+    fn deadline(&self) -> Option<(Instant, StreamTimeout)> {
+        match (self.request, self.idle) {
+            (Some(request), Some(idle)) if idle < request => Some((idle, StreamTimeout::Idle)),
+            (Some(request), _) => Some((request, StreamTimeout::Request)),
+            (_, Some(idle)) => Some((idle, StreamTimeout::Idle)),
+            _ => None,
+        }
+    }
+    fn expired(&self) -> Option<StreamTimeout> {
+        self.deadline()
+            .filter(|(deadline, _)| *deadline <= Instant::now())
+            .map(|(_, kind)| kind)
+    }
+    async fn wait(&self) -> StreamTimeout {
+        match self.deadline() {
+            Some((deadline, kind)) => {
+                tokio::time::sleep_until(deadline.into()).await;
+                kind
+            }
+            None => std::future::pending().await,
+        }
+    }
+}
+fn expire(terminal: &Terminal, kind: StreamTimeout) -> StreamError {
+    *terminal.lock().expect("stream terminal state") = Some(kind);
+    StreamError::Timeout(kind)
+}
 
 async fn serve(
     bootstrap: Bootstrap,
@@ -127,11 +237,22 @@ async fn serve(
     factory: impl FnOnce() -> Result<SsrStream, glory_ssr::stream::Error>,
     started: oneshot::Sender<Result<String, StreamError>>,
     mut requests: mpsc::Receiver<Reply>,
+    mut timing: Timing,
+    terminal: Terminal,
 ) {
     if started.is_closed() {
         return;
     }
-    let mut stream = match factory() {
+    if let Some(kind) = timing.expired() {
+        let _ = started.send(Err(expire(&terminal, kind)));
+        return;
+    }
+    let created = factory();
+    if let Some(kind) = timing.expired() {
+        let _ = started.send(Err(expire(&terminal, kind)));
+        return;
+    }
+    let mut stream = match created {
         Ok(stream) => stream,
         Err(error) => {
             let _ = started.send(Err(StreamError::Render(error)));
@@ -139,7 +260,15 @@ async fn serve(
         }
     };
     // next_frame yields the prebuilt shell without polling the local executor.
-    let shell = match stream.next_frame().await {
+    let frame = tokio::select! {
+        biased;
+        kind = timing.wait() => {
+            let _ = started.send(Err(expire(&terminal, kind)));
+            return;
+        }
+        frame = stream.next_frame() => frame,
+    };
+    let shell = match frame {
         Some(Ok(frame)) => frame.to_html(&bootstrap).map_err(StreamError::Render),
         Some(Err(error)) => Err(StreamError::Render(error)),
         None => Err(StreamError::WorkerStopped),
@@ -151,17 +280,33 @@ async fn serve(
             return;
         }
     }
+    if let Some(kind) = timing.expired() {
+        let _ = started.send(Err(expire(&terminal, kind)));
+        return;
+    }
+    if let Err(error) = timing.progress() {
+        let _ = started.send(Err(error));
+        return;
+    }
     if started.send(Ok(opening)).is_err() {
         return;
     }
-    while let Some(mut reply) = requests.recv().await {
-        let frame = tokio::select! {
+    loop {
+        let Some(mut reply) = (tokio::select! {
             biased;
-            _ = reply.closed() => break,
-            frame = stream.next_frame() => frame,
+            kind = timing.wait() => { expire(&terminal, kind); break; }
+            reply = requests.recv() => reply,
+        }) else {
+            break;
         };
-        let result = match frame {
-            Some(Ok(frame)) => frame
+        let result = tokio::select! {
+            biased;
+            kind = timing.wait() => Err(expire(&terminal, kind)),
+            _ = reply.closed() => break,
+            frame = stream.next_frame() => Ok(frame),
+        };
+        let result = match result {
+            Ok(Some(Ok(frame))) => frame
                 .to_html(&bootstrap)
                 .map(|mut html| {
                     let end = frame.kind() == FrameKind::End;
@@ -171,9 +316,19 @@ async fn serve(
                     Chunk { html, end }
                 })
                 .map_err(StreamError::Render),
-            Some(Err(error)) => Err(StreamError::Render(error)),
-            None => Err(StreamError::WorkerStopped),
+            Ok(Some(Err(error))) => Err(StreamError::Render(error)),
+            Ok(None) => Err(StreamError::WorkerStopped),
+            Err(error) => Err(error),
         };
+        let result = if let Some(kind) = timing.expired() {
+            Err(expire(&terminal, kind))
+        } else {
+            result
+        };
+        let result = result.and_then(|chunk| {
+            timing.progress()?;
+            Ok(chunk)
+        });
         let terminal = match &result {
             Ok(chunk) => chunk.end,
             Err(_) => true,
@@ -190,10 +345,18 @@ struct Body {
     demand: Option<mpsc::Sender<Reply>>,
     pending: Option<oneshot::Receiver<Result<Chunk, StreamError>>>,
     done: bool,
+    terminal: Terminal,
 }
 impl Body {
+    fn stopped(&self) -> StreamError {
+        self.terminal
+            .lock()
+            .expect("stream terminal state")
+            .map_or(StreamError::WorkerStopped, StreamError::Timeout)
+    }
     fn finish(&mut self) {
         self.done = true;
+        self.first = None;
         self.pending = None;
         self.demand = None;
     }
@@ -204,6 +367,11 @@ impl Stream for Body {
         let this = self.get_mut();
         if this.done {
             return Poll::Ready(None);
+        }
+        let timeout = *this.terminal.lock().expect("stream terminal state");
+        if let Some(kind) = timeout {
+            this.finish();
+            return Poll::Ready(Some(Err(StreamError::Timeout(kind))));
         }
         if let Some(first) = this.first.take() {
             return Poll::Ready(Some(Ok(first)));
@@ -218,7 +386,7 @@ impl Stream for Body {
                 .is_err()
             {
                 this.finish();
-                return Poll::Ready(Some(Err(StreamError::WorkerStopped)));
+                return Poll::Ready(Some(Err(this.stopped())));
             }
             this.pending = Some(receive);
         }
@@ -237,7 +405,7 @@ impl Stream for Body {
             }
             Err(_) => {
                 this.finish();
-                Poll::Ready(Some(Err(StreamError::WorkerStopped)))
+                Poll::Ready(Some(Err(this.stopped())))
             }
         }
     }

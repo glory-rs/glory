@@ -28,6 +28,9 @@ impl Drop for ReadPermit {
     }
 }
 impl Desktop {
+    pub(super) fn worker_failures(&self) -> Arc<super::worker::Failures> {
+        self.worker.failures()
+    }
     pub fn new() -> Result<Self, FileRejection> {
         Ok(Self {
             worker: Arc::new(Worker::new()?),
@@ -62,19 +65,21 @@ impl FileReader for Opened {
                 .map_err(|_| FileRejection::Busy)?;
             let permit = ReadPermit(reads);
             let (sender, receiver) = oneshot::channel();
+            let outcomes = worker.failures();
             worker.send(Box::pin(async move {
                 // The blocking closure, not its JoinHandle, owns admission.
-                let result = tokio::task::spawn_blocking(move || {
-                    let _permit = permit;
-                    let mut file = file.lock().map_err(|_| FileRejection::Failed)?;
-                    let mut bytes = vec![0; length as usize];
-                    file.seek(SeekFrom::Start(offset))
-                        .and_then(|_| file.read_exact(&mut bytes))
-                        .map_err(|_| FileRejection::Failed)?;
-                    Ok(bytes)
-                })
-                .await
-                .unwrap_or(Err(FileRejection::Failed));
+                let result = outcomes.blocking(
+                    tokio::task::spawn_blocking(move || {
+                        let _permit = permit;
+                        let mut file = file.lock().map_err(|_| FileRejection::Failed)?;
+                        let mut bytes = vec![0; length as usize];
+                        file.seek(SeekFrom::Start(offset))
+                            .and_then(|_| file.read_exact(&mut bytes))
+                            .map_err(|_| FileRejection::Failed)?;
+                        Ok(bytes)
+                    })
+                    .await,
+                );
                 let _ = sender.send(result);
             }))?;
             receiver.await.map_err(|_| FileRejection::Unavailable)?
@@ -177,21 +182,23 @@ impl FilePicker for Desktop {
                         Err(FileRejection::Count)
                     }
                     Some(files) => {
+                        let outcomes = opener.failures();
                         // Full paths exist only in this explicitly selected OS grant.
                         // Never derive one from FileInfo's display name.
                         let paths = files
                             .into_iter()
                             .map(|f| f.path().to_owned())
                             .collect::<Vec<_>>();
-                        tokio::task::spawn_blocking(move || {
-                            paths
-                                .into_iter()
-                                .map(|p| open(p, opener.clone(), reads.clone()))
-                                .collect::<Result<Vec<_>, _>>()
-                                .map(Some)
-                        })
-                        .await
-                        .unwrap_or(Err(FileRejection::Failed))
+                        outcomes.blocking(
+                            tokio::task::spawn_blocking(move || {
+                                paths
+                                    .into_iter()
+                                    .map(|p| open(p, opener.clone(), reads.clone()))
+                                    .collect::<Result<Vec<_>, _>>()
+                                    .map(Some)
+                            })
+                            .await,
+                        )
                     }
                 };
                 let _ = sender.send(result);
@@ -216,16 +223,18 @@ impl FileDrop for Desktop {
             let permit = PickPermit(dropping);
             let (sender, receiver) = oneshot::channel();
             let opener = worker.clone();
+            let outcomes = worker.failures();
             worker.send(Box::pin(async move {
-                let result = tokio::task::spawn_blocking(move || {
-                    let _permit = permit;
-                    paths
-                        .into_iter()
-                        .map(|path| open(path, opener.clone(), reads.clone()))
-                        .collect()
-                })
-                .await
-                .unwrap_or(Err(FileRejection::Failed));
+                let result = outcomes.blocking(
+                    tokio::task::spawn_blocking(move || {
+                        let _permit = permit;
+                        paths
+                            .into_iter()
+                            .map(|path| open(path, opener.clone(), reads.clone()))
+                            .collect()
+                    })
+                    .await,
+                );
                 let _ = sender.send(result);
             }))?;
             receiver.await.map_err(|_| FileRejection::Unavailable)?
@@ -278,6 +287,40 @@ mod tests {
         fn drop(&mut self) {
             std::fs::remove_dir_all(&self.0).unwrap();
         }
+    }
+    #[test]
+    fn worker_panic_is_visible_and_later_real_file_reads_release_their_permits() {
+        let dir = Directory::new();
+        let path = dir.0.join("worker-probe.txt");
+        std::fs::write(&path, b"still readable").unwrap();
+        let driver = Arc::new(Desktop::new().unwrap());
+        let mut service = Files::new(driver.clone());
+        service.worker = Some(driver.worker_failures());
+        driver
+            .worker
+            .send(Box::pin(async {
+                panic!("owned desktop worker panic probe");
+            }))
+            .unwrap();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while service.stats().worker_panicked == 0 {
+            assert!(Instant::now() < deadline, "worker probe deadline");
+            std::thread::yield_now();
+        }
+        let file = open(path, driver.worker.clone(), driver.reads.clone()).unwrap();
+        assert_eq!(
+            await_reply(file.reader.read(0, 14)).unwrap(),
+            b"still readable"
+        );
+        assert_eq!(driver.reads.load(Ordering::Acquire), 0);
+        assert_eq!(
+            (
+                service.stats().worker_panicked,
+                service.stats().worker_cancelled
+            ),
+            (1, 0)
+        );
+        assert_eq!(service.clone().stats().worker_panicked, 1);
     }
     #[test]
     fn opened_file_identity_survives_path_replacement_and_short_reads_return_no_partial_body() {

@@ -54,6 +54,8 @@ mod submission_client;
 #[cfg(target_arch = "wasm32")]
 mod targets;
 #[cfg(target_arch = "wasm32")]
+mod translation_client;
+#[cfg(target_arch = "wasm32")]
 mod browser {
     use std::cell::{Cell, RefCell};
     use std::rc::Rc;
@@ -220,6 +222,7 @@ mod browser {
         crate::size_client::clear();
         crate::flex_client::clear();
         crate::targets::clear();
+        crate::translation_client::clear();
         crate::intrinsic::clear();
         crate::focus::clear();
         crate::stream_client::clear();

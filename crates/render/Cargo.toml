@@ -15,5 +15,9 @@ conformance = []
 [dependencies]
 glory-style = { path = "../style", version = "0.7.0" }
 
+[[bench]]
+name = "children_order"
+harness = false
+
 [lints]
 workspace = true

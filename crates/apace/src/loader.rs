@@ -94,10 +94,15 @@ pub struct LoadStats {
     pub active: usize,
     pub peak_queued: usize,
     pub peak_active: usize,
+    /// Accepted successful publications, before the handler decodes/parses them.
     pub completed: u64,
     pub failed: u64,
     pub rejected: u64,
     pub cancelled: u64,
+    /// Panics observed when reaping worker tasks. No panic payload is retained.
+    pub worker_panicked: u64,
+    /// Worker task cancellation, distinct from cancelled resource requests.
+    pub worker_cancelled: u64,
     /// Actual blocking file/APK operations, including cancelled reads that have
     /// not returned from the OS yet. Independent of transport active jobs.
     pub file_active: usize,
@@ -423,7 +428,9 @@ impl LoadConfig {
 async fn run(inner: Arc<Inner>) {
     let mut tasks = JoinSet::new();
     loop {
-        while tasks.try_join_next().is_some() {}
+        while let Some(result) = tasks.try_join_next() {
+            record_worker(&inner, result);
+        }
         // One receiver: notify_one stores a permit across the state inspection.
         let notified = inner.notify.notified();
         let (launch, expired, closed) = {
@@ -493,10 +500,22 @@ async fn run(inner: Arc<Inner>) {
         }
         tokio::select! {
             _ = notified => {},
-            _ = tasks.join_next(), if !tasks.is_empty() => {},
+            result = tasks.join_next(), if !tasks.is_empty() => {
+                if let Some(result) = result { record_worker(&inner, result); }
+            },
             // Observe external AbortSignals and expire queued work even while
             // all I/O slots are occupied. Work depends on bounded jobs only.
             _ = tokio::time::sleep(Duration::from_millis(20)), if !tasks.is_empty() => {},
+        }
+    }
+}
+fn record_worker(inner: &Inner, result: Result<(), tokio::task::JoinError>) {
+    if let Err(error) = result {
+        let mut state = inner.state.lock().expect("asset state");
+        if error.is_panic() {
+            state.stats.worker_panicked = state.stats.worker_panicked.saturating_add(1);
+        } else if error.is_cancelled() {
+            state.stats.worker_cancelled = state.stats.worker_cancelled.saturating_add(1);
         }
     }
 }
@@ -577,5 +596,100 @@ async fn work(inner: Arc<Inner>, mut job: Job) {
             Ok((url, bytes)) => job.handler.bytes(url, bytes),
             Err(error) => job.handler.error(job.request.url.to_string(), error),
         }
+    }
+}
+
+#[cfg(test)]
+mod worker_tests {
+    use super::*;
+    use std::sync::mpsc;
+
+    struct Panics;
+    impl NetHandler for Panics {
+        fn bytes(self: Box<Self>, _: String, _: Bytes) {
+            panic!("owned loader worker panic probe");
+        }
+        fn error(self: Box<Self>, _: String, _: String) {
+            panic!("unexpected loader error");
+        }
+    }
+    struct Receives(mpsc::Sender<Bytes>);
+    impl NetHandler for Receives {
+        fn bytes(self: Box<Self>, _: String, bytes: Bytes) {
+            self.0.send(bytes).unwrap();
+        }
+        fn error(self: Box<Self>, _: String, error: String) {
+            panic!("unexpected loader error: {error}");
+        }
+    }
+    fn loader() -> Loader {
+        Loader::new(LoadConfig {
+            package: BTreeMap::from([("/probe".into(), Bytes::from_static(b"body"))]),
+            limits: LoadLimits {
+                workers: 1,
+                ..Default::default()
+            },
+            ..Default::default()
+        })
+        .unwrap()
+    }
+    fn wait(mut predicate: impl FnMut() -> bool) {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !predicate() {
+            assert!(Instant::now() < deadline, "worker probe deadline");
+            std::thread::yield_now();
+        }
+    }
+    #[test]
+    fn panicked_handler_is_counted_and_releases_the_real_worker_slot() {
+        let loader = loader();
+        let url = Url::parse("asset://app/probe").unwrap();
+        loader.fetch(1, Request::get(url.clone()), Box::new(Panics));
+        wait(|| loader.stats().worker_panicked == 1);
+        assert_eq!(loader.stats().active, 0);
+        let (send, receive) = mpsc::channel();
+        loader.fetch(1, Request::get(url), Box::new(Receives(send)));
+        assert_eq!(
+            receive
+                .recv_timeout(Duration::from_secs(5))
+                .unwrap()
+                .as_ref(),
+            b"body"
+        );
+        wait(|| loader.stats().active == 0);
+        let stats = loader.stats();
+        assert_eq!(
+            stats.completed, 2,
+            "publication acceptance precedes handler execution"
+        );
+        assert_eq!((stats.worker_panicked, stats.worker_cancelled), (1, 0));
+        loader.shutdown();
+        wait(|| loader.stats().stopped);
+    }
+    #[test]
+    fn cancellation_is_classified_separately_from_resource_cancellation() {
+        let loader = loader();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .build()
+            .unwrap();
+        runtime.block_on(async {
+            let mut tasks = JoinSet::new();
+            let task = tasks.spawn(std::future::pending::<()>());
+            task.abort();
+            record_worker(&loader.inner, tasks.join_next().await.unwrap());
+            tasks.spawn(async {});
+            record_worker(&loader.inner, tasks.join_next().await.unwrap());
+        });
+        let stats = loader.stats();
+        assert_eq!(
+            (
+                stats.worker_panicked,
+                stats.worker_cancelled,
+                stats.cancelled
+            ),
+            (0, 1, 0)
+        );
+        loader.shutdown();
+        wait(|| loader.stats().stopped);
     }
 }

@@ -3,8 +3,11 @@ import json
 from pathlib import Path
 import re
 import tomllib
+from doc_build_policy import CURRENT_GUIDES, validate_build_guidance
 
 ROOT = Path(__file__).resolve().parents[1]
+for relative in CURRENT_GUIDES:
+    validate_build_guidance((ROOT / relative).read_text(encoding="utf-8"), relative)
 manifest = tomllib.loads((ROOT / "Cargo.toml").read_text(encoding="utf-8"))
 plan = json.loads((ROOT / "release.json").read_text(encoding="utf-8"))
 readme = (ROOT / "README.md").read_text(encoding="utf-8")

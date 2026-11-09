@@ -21,10 +21,15 @@ pub(crate) struct StateChanges {
     pub focus: bool,
     pub rich_document: bool,
     pub file_configuration: bool,
+    pub presentation: bool,
 }
 impl StateChanges {
     pub fn inherited(&self) -> bool {
         self.structure || self.eligibility
+    }
+
+    pub fn translations(&self) -> bool {
+        self.inherited() || self.presentation
     }
 
     fn record(&mut self, mutation: &Mutation) {
@@ -42,6 +47,9 @@ impl StateChanges {
                 Patch::Focus(_) => self.focus = true,
                 Patch::RichDocument { .. } => self.rich_document = true,
                 Patch::File { .. } => self.file_configuration = true,
+                // Typed ancestor display changes must recheck animation
+                // eligibility. Keep class edits conservative, as before.
+                Patch::Style(_) | Patch::Classes(_) => self.presentation = true,
                 Patch::Text(_)
                 | Patch::TextKind(_)
                 | Patch::Selectable(_)
@@ -56,8 +64,6 @@ impl StateChanges {
                 | Patch::Alternative(_)
                 | Patch::Graphic(_)
                 | Patch::Target(_)
-                | Patch::Classes(_)
-                | Patch::Style(_)
                 | Patch::Name(_)
                 | Patch::Item(_) => {}
             },
@@ -105,6 +111,48 @@ pub(crate) fn collect<'a>(tree: &'a Memory, mutations: &[Mutation]) -> Batch<'a>
 mod tests {
     use super::*;
     use glory_render::*;
+
+    #[test]
+    fn translations_skip_local_values_but_recheck_ancestor_presentation_and_lifecycle() {
+        let id = NodeIds::new(RuntimeId::new()).allocate();
+        for patch in [
+            Patch::Text(Change::Set("unrelated".into())),
+            Patch::Value {
+                value: Change::Set("edited".into()),
+                revision: 1,
+            },
+            Patch::Name(Change::Set(Some("label".into()))),
+        ] {
+            let mut state = StateChanges::default();
+            state.record(&Mutation::Patch { id, patch });
+            assert!(!state.translations());
+        }
+        for patch in [
+            Patch::Style(Change::Set(Box::new(
+                style::Style::new().display(style::Display::None),
+            ))),
+            Patch::Style(Change::Clear),
+            Patch::Classes(Change::Set(vec!["hidden-by-css".into()])),
+            Patch::Semantics(Change::Clear),
+        ] {
+            let mut state = StateChanges::default();
+            state.record(&Mutation::Patch { id, patch });
+            assert!(state.translations());
+        }
+        for mutation in [
+            Mutation::Suspend { id },
+            Mutation::Resume {
+                id,
+                parent: None,
+                before: None,
+            },
+            Mutation::Dispose { id },
+        ] {
+            let mut state = StateChanges::default();
+            state.record(&mutation);
+            assert!(state.translations());
+        }
+    }
 
     fn descriptor(metadata: bool) -> Descriptor {
         let mut node = Descriptor::new(Props::View);
