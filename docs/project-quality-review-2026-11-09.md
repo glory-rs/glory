@@ -22,6 +22,8 @@
 
 原生与 WASM 的 workspace all-features/all-targets 严格 Clippy、独立 CLI 和 WASM fixture 严格 Clippy 均通过。另显式运行的真实 Wry 窗口验收通过。该窗口首轮在固定宽度的浮点精确相等断言失败；原始 `50098a4` shell 与独立 plain DOM 都复现同样的 `359.9877319`，WebView2 的有效 DPR 为 `1.02`。只把两个固定尺寸断言改为有限正数且误差不超过 `1/64` CSS px，明确验证 359/361 这样的 1px 偏差仍失败，未放宽选择、焦点或滚动断言。失败、基线、独立探针及最终通过日志均保留。
 
+新增 benchmark 的真实默认 Cargo 调用也完成红绿验证：修正注入的 `--bench` 参数被误当重复次数解析的问题，默认 `cargo bench`、bench 的 `cargo test` 入口及严格 Clippy 均通过；数值 workload 和计时区未改变。
+
 新回归的红绿证据使用同一 translation fixture：旧 production driver 仅适配新增私有参数签名，出现 10 个额外 RAF 而失败；恢复修复后的源码与产物后，0/1/1000 节点的无关更新均不新增 RAF，并保留 animation/editor 身份、typed 隐藏/恢复、Suspend/Resume、reduced-motion 和卸载行为。
 
 ### 宽列表的工作量与性能取舍

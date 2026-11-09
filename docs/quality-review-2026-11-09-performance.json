@@ -122,6 +122,11 @@
           ]
         }
       ]
+    },
+    "later_benchmark_cli_fix": {
+      "commit": "0d1375c6c796c3eaa3a9e32569d5c667de1f4d6a",
+      "sha256_worktree_bytes": "e700d43e31b1396b5ac9830a23806217c4f7bc1d5f6e22f0cc37e2e15df2e056",
+      "scope": "Ignore Cargo-injected --bench flag. Numeric runs, workload and timer unchanged; frozen experiment binaries and samples above remain their recorded versions."
     }
   },
   "environment": {

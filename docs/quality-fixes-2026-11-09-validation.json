@@ -381,5 +381,35 @@
     "Performance samples are shared-host diagnostics, not DOM/layout/frame or RSS evidence; all unfavorable samples retained.",
     "Long-term architecture/API opportunities remain follow-up work."
   ],
-  "raw_logs": "Local ignored target artifacts; hashes and command scope are preserved here. GitHub CI uploads its own artifacts."
+  "raw_logs": "Local ignored target artifacts; hashes and command scope are preserved here. GitHub CI uploads its own artifacts.",
+  "later_benchmark_cli_fix": {
+    "commit": "0d1375c6c796c3eaa3a9e32569d5c667de1f4d6a",
+    "scope": "Accept the --bench mode flag injected by the actual default Cargo bench invocation; numeric workload and timed region unchanged.",
+    "baseline_failure": {
+      "command": "cargo bench --locked -p glory-render --bench children_order before CLI fix",
+      "exit_code": 101,
+      "log": "target/verification/quality-fixes-20261109/bench-invocation.log",
+      "log_sha256": "33bda2ed418099615103dbfefffc502d067aa3f8fb11d3dc9e3f18d19df9677e"
+    },
+    "passed_invocations": [
+      {
+        "command": "cargo bench --locked -p glory-render --bench children_order",
+        "exit_code": 0,
+        "log": "target/verification/quality-fixes-20261109/bench-invocation-fixed.log",
+        "log_sha256": "62f83ae54a6d26727affab6d129c285927e9797ab12d3b1bf94983c6a55921db"
+      },
+      {
+        "command": "cargo test --locked -p glory-render --bench children_order",
+        "exit_code": 0,
+        "log": "target/verification/quality-fixes-20261109/bench-smoke-final.log",
+        "log_sha256": "e62766c1b322ff41da88581dc47659a894bfa1b74c3a4ec21ec20fa62aa67ffd"
+      },
+      {
+        "command": "cargo clippy --locked -p glory-render --all-targets --all-features -- -D warnings",
+        "exit_code": 0,
+        "log": "target/verification/quality-fixes-20261109/bench-clippy-final.log",
+        "log_sha256": "fcc7b04800b7ec217e84353cab57622d99d715b736d8260dd0fad210e22ab1d6"
+      }
+    ]
+  }
 }
