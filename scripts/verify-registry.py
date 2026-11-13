@@ -16,7 +16,9 @@ options=parser.parse_args()
 plan=json.loads((root/'release.json').read_text(encoding='utf-8'))
 target=Path(json.loads(subprocess.check_output(['cargo','metadata','--no-deps','--format-version','1'],cwd=root,text=True))['target_directory']).resolve()
 pass  # Build paths follow the caller configuration.
-directory=Path(tempfile.mkdtemp(prefix='registry-consumer-',dir=target.parent))
+consumer_root=target/'registry-consumers'
+consumer_root.mkdir(parents=True,exist_ok=True)
+directory=Path(tempfile.mkdtemp(prefix='registry-consumer-',dir=consumer_root))
 manifest=tomllib.loads((root/'Cargo.toml').read_text(encoding='utf-8'))
 version=manifest.get('workspace',{}).get('package',{}).get('version') or manifest['package']['version']
 glory_version='='+version
@@ -34,8 +36,7 @@ for relative in sources:
 def cargo(*args,capture=False):
     return subprocess.check_output(['cargo',*args],cwd=directory,text=True,encoding='utf-8') if capture else subprocess.run(['cargo',*args],cwd=directory,check=True)
 metadata=json.loads(cargo('metadata','--no-deps','--format-version','1',capture=True))
-if Path(metadata['target_directory']).resolve()!=target:
-    raise SystemExit('Unexpected registry consumer target')
+consumer_target=Path(metadata['target_directory']).resolve()
 cargo('test')
 # Include the native dependency graph even though the DSL suite uses SSR and the
 # headless semantic host: the published adapter must compile from registry crates.
@@ -50,6 +51,6 @@ evidence=target/'release'/options.tag/'registry-consumer.json'
 evidence.parent.mkdir(parents=True,exist_ok=True)
 shutil.copyfile(directory/'Cargo.lock',evidence.with_name('registry-consumer.lock'))
 evidence.write_text(json.dumps({'workspace':str(directory),'repository':plan['repository'],'tag':options.tag,
-    'test_sources_sha256':hashes,'lock_sha256':hashlib.sha256((directory/'Cargo.lock').read_bytes()).hexdigest(),
+    'consumer_target_directory':str(consumer_target),'test_sources_sha256':hashes,'lock_sha256':hashlib.sha256((directory/'Cargo.lock').read_bytes()).hexdigest(),
     'registry_only':True},indent=2)+'\n',encoding='utf-8')
 print('Registry-only DSL/SSR/native consumer verified:',evidence)

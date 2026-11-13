@@ -1,6 +1,6 @@
 # Releases
 
-The coordinated 0.7.0 release requires the exact Stylo, Takia, Wingy and Apace
+The coordinated 0.8.0 release requires the exact Stylo, Takia, Wingy and Apace
 registry versions recorded in docs/engine-forks.json before Glory publication.
 Library, example and benchmark locks remain local and ignored; generate and
 validate them without adding them to Git.

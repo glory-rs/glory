@@ -29,7 +29,7 @@ XML-like `view!` syntax, then select the rendering host in your application.
 - **Tools owned by your project.** Build, run, watch, diagnose and bundle with a
   CLI pinned alongside your application dependencies.
 
-> **0.7.0 release line · Rust 1.95+.** This series includes breaking API changes.
+> **0.8.0 release line · Rust 1.95+.** This series includes breaking API changes.
 > Source development uses sibling Glory, Apace, Takia
 > and Wingy repositories; see [engine setup](docs/engine-forks.md) and
 > [release readiness](docs/release-readiness.md).
@@ -40,7 +40,7 @@ Add Glory to your application:
 
 ```toml
 [dependencies]
-glory = { version = "=0.7.0", default-features = false }
+glory = { version = "=0.8.0", default-features = false }
 ```
 
 For sibling-source development, add `path = "../glory/crates/glory"` to that

@@ -27,11 +27,11 @@ android-game-activity = ["shell", "wingy/android-game-activity", "apace-shell/an
 accesskit = ["shell", "dep:accesskit", "dep:apace_accesskit"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-glory-routing = { path = "../routing", version = "0.7.0", optional = true }
-glory-html = { path = "../html", version = "0.7.0" }
-glory-render = { path = "../render", version = "0.7.0" }
-glory-core = { path = "../core", version = "0.7.0", optional = true }
-glory-ui = { path = "../ui", version = "0.7.0", optional = true }
+glory-routing = { path = "../routing", version = "0.8.0", optional = true }
+glory-html = { path = "../html", version = "0.8.0" }
+glory-render = { path = "../render", version = "0.8.0" }
+glory-core = { path = "../core", version = "0.8.0", optional = true }
+glory-ui = { path = "../ui", version = "0.8.0", optional = true }
 tokio = { version = "1.54.1", default-features = false, features = ["rt", "sync", "time", "macros"], optional = true }
 futures-timer = { version = "=3.0.4", optional = true }
 percent-encoding = { version = "2.3.2", optional = true }
@@ -76,10 +76,10 @@ softbuffer_window_renderer = { version = "=0.9.0", optional = true }
 fontique = { version = "=0.12.0", default-features = false, features = ["fontconfig-dlopen"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-glory-web = { path = "../web", version = "0.7.0" }
-glory-core = { path = "../core", version = "0.7.0" }
-glory-render = { path = "../render", version = "0.7.0", features = ["conformance"] }
-glory-ui = { path = "../ui", version = "0.7.0" }
+glory-web = { path = "../web", version = "0.8.0" }
+glory-core = { path = "../core", version = "0.8.0" }
+glory-render = { path = "../render", version = "0.8.0", features = ["conformance"] }
+glory-ui = { path = "../ui", version = "0.8.0" }
 png = "0.18.1"
 
 [target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))'.dev-dependencies]

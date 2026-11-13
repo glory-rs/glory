@@ -9,9 +9,9 @@ license.workspace = true
 description = "Pure Rust semantic widgets and windowed lists for Glory"
 
 [dependencies]
-glory-core = { path = "../core", version = "0.7.0" }
-glory-render = { path = "../render", version = "0.7.0" }
-glory-style = { path = "../style", version = "0.7.0" }
+glory-core = { path = "../core", version = "0.8.0" }
+glory-render = { path = "../render", version = "0.8.0" }
+glory-style = { path = "../style", version = "0.8.0" }
 
 [[bench]]
 name = "virtual_list"

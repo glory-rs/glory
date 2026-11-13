@@ -6,10 +6,10 @@ exclude = ["examples", "benchmarks", "tools/cli"]
 resolver = "3"
 
 [workspace.package]
-version = "0.7.0"
+version = "0.8.0"
 authors = ["Chris Young <chris@veco.id>"]
 edition = "2024"
-# Minimum supported Rust version for the coordinated 0.7.0 development series.
+# Minimum supported Rust version for the coordinated 0.8.0 development series.
 rust-version = "1.95"
 description = """
 Glory is a Rust semantic UI framework with replaceable rendering hosts.
