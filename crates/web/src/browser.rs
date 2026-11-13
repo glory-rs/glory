@@ -11,6 +11,7 @@ mod hydrate;
 mod images;
 mod input_edit;
 mod layers;
+mod plot_pointer;
 mod presence;
 mod rich;
 mod scroll_into_view;
@@ -51,6 +52,7 @@ pub struct Renderer {
     supports_layers: bool,
     supports_translations: bool,
     supports_files: bool,
+    supports_plot_pointer: bool,
 }
 impl Renderer {
     fn new(runtime: RuntimeId, dom: Rc<Dom>) -> Self {
@@ -74,6 +76,10 @@ impl Renderer {
             });
         dom.frame.attach_dom(&dom);
         let events = events::Listeners::new(dom.clone());
+        let supports_plot_pointer = dom.observer.borrow().is_some()
+            && dom.document.default_view().is_some_and(|window| {
+                js_sys::Reflect::get(&window, &"PointerEvent".into()).is_ok_and(|v| v.is_function())
+            });
         Self {
             mapper: Rc::new(RefCell::new(Mapper::new(runtime))),
             dom,
@@ -82,6 +88,7 @@ impl Renderer {
             supports_layers,
             supports_translations,
             supports_files,
+            supports_plot_pointer,
         }
     }
     fn query_entry(&self, query: Query) -> Result<Rc<dom::Entry>, Error> {
@@ -123,6 +130,9 @@ impl Renderer {
     }
 }
 impl Render for Renderer {
+    fn supports_plot_pointer(&self) -> bool {
+        self.supports_plot_pointer
+    }
     fn flush_display(&mut self) -> Result<(), Error> {
         for id in self.dom.display_queue.take() {
             if let Ok(entry) = self.dom.entry(id)
@@ -215,6 +225,7 @@ impl Render for Renderer {
             })()
         };
         self.receipt = mapper.receipt();
+        plot_pointer::changed(&self.dom);
         let changes = crate::semantic_changes::collect(mapper.tree(), mutations);
         let metadata = &changes.metadata;
         swipe::update(&self.dom, mapper.tree());
@@ -246,6 +257,9 @@ impl Render for Renderer {
         result
     }
     fn listen(&mut self, node: NodeId, kind: EventKind, enabled: bool) -> Result<(), Error> {
+        if enabled && kind == EventKind::PlotPointer && !self.supports_plot_pointer {
+            return Err(Error::Unsupported("fractional plot pointer ingress"));
+        }
         let mapper = self.mapper.borrow();
         let descriptor = mapper.tree().node(node)?.descriptor.view();
         if enabled {

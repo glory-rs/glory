@@ -116,6 +116,10 @@ mod drag;
 pub use drag::{DragCapture, DragPhase};
 mod menu;
 pub use menu::{MenuCommand, PointerPhase};
+mod plot_pointer;
+pub use plot_pointer::{
+    MAX_PLOT_POINTER_COORDINATE, PlotPointer, PlotPointerDevice, PlotPointerPhase,
+};
 
 /// Optional windowed-view metadata. Engines can show a flow preview before
 /// geometry is available without changing logical ownership or identity.
@@ -686,6 +690,11 @@ pub enum Event {
         from: NodeId,
         command: MenuCommand,
     },
+    /// A queued observation in an explicitly observed View's local border box.
+    PlotPointer {
+        from: NodeId,
+        pointer: PlotPointer,
+    },
     Pointer {
         from: NodeId,
         related: Option<NodeId>,
@@ -839,6 +848,7 @@ pub enum EventKind {
     ScrollKeyboard,
     ImageStatus,
     Menu,
+    PlotPointer,
     Pointer,
     PointerWithin,
     Submit,
@@ -874,6 +884,11 @@ impl EventKind {
     /// can produce it (SSR records handlers for later browser adoption).
     pub fn validate_target<'a>(self, node: impl Into<DescriptorView<'a>>) -> Result<(), Error> {
         let node = node.into();
+        if self == Self::PlotPointer && !matches!(node.props, Props::View) {
+            return Err(Error::Unsupported(
+                "plot pointer requires a physical View viewport",
+            ));
+        }
         if self == Self::DisplayClick
             && (!matches!(node.props, Props::Group)
                 || node.options.get::<DisplayEvents>().is_none())
@@ -1145,6 +1160,13 @@ impl Event {
                     phase: DragPhase::Cancel,
                     ..
                 }
+                | Self::PlotPointer {
+                    pointer: PlotPointer {
+                        phase: PlotPointerPhase::Leave | PlotPointerPhase::Cancel,
+                        ..
+                    },
+                    ..
+                }
                 | Self::Pointer {
                     phase: PointerPhase::Leave,
                     ..
@@ -1166,6 +1188,7 @@ impl Event {
             Self::FocusWithin { node, .. } => Some(*node),
             Self::Navigate { from, .. } => Some(*from),
             Self::Menu { from, .. }
+            | Self::PlotPointer { from, .. }
             | Self::Pointer { from, .. }
             | Self::PointerWithin { from, .. } => Some(*from),
             Self::Typeahead { from, .. } => Some(*from),
@@ -1438,6 +1461,14 @@ impl Event {
                 && rect.height >= 0.0
         };
         match self {
+            Self::PlotPointer { from, pointer } => {
+                if *from != target {
+                    return Err(Error::InvalidEvent(
+                        "plot pointer requires its observed viewport origin",
+                    ));
+                }
+                pointer.validate()?;
+            }
             Self::ContextMenu { from, point, .. } => {
                 if from.runtime() != target.runtime() {
                     return Err(Error::ForeignRuntime);
@@ -1740,6 +1771,7 @@ impl Event {
             Self::ScrollKeyboard { .. } => EventKind::ScrollKeyboard,
             Self::ImageStatus { .. } => EventKind::ImageStatus,
             Self::Menu { .. } => EventKind::Menu,
+            Self::PlotPointer { .. } => EventKind::PlotPointer,
             Self::Pointer { .. } => EventKind::Pointer,
             Self::PointerWithin { .. } => EventKind::PointerWithin,
             Self::Submit { .. } => EventKind::Submit,
@@ -1914,6 +1946,12 @@ pub trait Render {
     /// thousands of nodes whose resize/scroll events nobody consumes.
     fn listen(&mut self, _node: NodeId, _kind: EventKind, _enabled: bool) -> Result<(), Error> {
         Ok(())
+    }
+    /// Whether this host implements the finite local-coordinate plot channel.
+    /// Static adapters may record interests for later adoption; input adapters
+    /// must opt in explicitly. This does not enable ordinary Pointer events.
+    fn supports_plot_pointer(&self) -> bool {
+        false
     }
     fn capabilities(&self) -> Capabilities;
     fn apply(&mut self, mutations: &[Mutation]) -> Result<Receipt, Error>;

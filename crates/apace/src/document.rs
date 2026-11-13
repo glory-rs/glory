@@ -43,6 +43,9 @@ mod graphic_motion;
 mod layers;
 #[path = "native_select.rs"]
 mod native_select;
+#[cfg(feature = "shell")]
+#[path = "plot_pointer.rs"]
+mod plot_pointer;
 #[path = "presence.rs"]
 mod presence;
 #[path = "scroll_into_view.rs"]
@@ -1125,6 +1128,8 @@ struct DragSession {
     captured: bool,
 }
 struct State {
+    #[cfg(feature = "shell")]
+    plot_pointer: plot_pointer::Pointers,
     #[cfg(feature = "files")]
     files: files_io::Io,
     #[cfg(feature = "clipboard")]
@@ -1426,6 +1431,8 @@ impl Renderer {
             (config, files)
         };
         Self(Rc::new(RefCell::new(State {
+            #[cfg(feature = "shell")]
+            plot_pointer: Default::default(),
             #[cfg(feature = "files")]
             files,
             #[cfg(feature = "clipboard")]
@@ -1472,6 +1479,8 @@ impl Renderer {
             return Err(Error::InvalidProps("Apace logical viewport overflow"));
         }
         if state.dom.doc.viewport() != &viewport {
+            #[cfg(feature = "shell")]
+            plot_pointer::cancel(&mut state);
             #[cfg(feature = "shell")]
             swipe::cancel(&mut state);
             state.dom.doc.set_viewport(viewport);
@@ -1583,6 +1592,16 @@ impl Renderer {
     }
 }
 impl Render for Renderer {
+    fn supports_plot_pointer(&self) -> bool {
+        #[cfg(feature = "shell")]
+        {
+            self.0.borrow().interactive
+        }
+        #[cfg(not(feature = "shell"))]
+        {
+            false
+        }
+    }
     fn flush_display(&mut self) -> Result<(), Error> {
         self.0.borrow_mut().dom.flush_display()
     }
@@ -1832,6 +1851,8 @@ impl Render for Renderer {
         interests.retain(|(id, _), _| mapper.tree().node(*id).is_ok());
         subscriptions.retain(|(id, _)| mapper.tree().node(*id).is_ok());
         state.sync_focus();
+        #[cfg(feature = "shell")]
+        plot_pointer::sync(&mut state);
         native_select::sync(&mut state);
         #[cfg(feature = "files")]
         let retired = {
@@ -1844,6 +1865,9 @@ impl Render for Renderer {
         result
     }
     fn listen(&mut self, node: NodeId, kind: EventKind, enabled: bool) -> Result<(), Error> {
+        if enabled && kind == EventKind::PlotPointer && !self.supports_plot_pointer() {
+            return Err(Error::Unsupported("native plot pointer ingress"));
+        }
         let mut state = self.0.borrow_mut();
         let descriptor = state.mapper.tree().node(node)?.descriptor.view();
         if enabled {
@@ -1880,6 +1904,10 @@ impl Render for Renderer {
             {
                 swipe::cancel(&mut state);
             }
+        }
+        #[cfg(feature = "shell")]
+        if kind == EventKind::PlotPointer {
+            plot_pointer::interest(&mut state, node, enabled);
         }
         if matches!(kind, EventKind::Scroll | EventKind::Resize) {
             if enabled {
@@ -2195,6 +2223,8 @@ impl Render for Renderer {
             state.input_error = Some(error);
         }
         state.dom.resolve();
+        #[cfg(feature = "shell")]
+        plot_pointer::observe(&mut state);
         collapse::collect(&mut state);
         presence::collect(&mut state);
         state.collect_image_inputs();

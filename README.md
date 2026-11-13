@@ -151,7 +151,7 @@ Apace's typed style support is defined separately by
 | UI and large lists | Typed controls, keyed rows and bounded fixed/measured-height windows | [API guide](docs/api-guide.md) |
 | Routing | Typed targets, nested outlets, retained layouts, history and SSR outcomes | [Routing](crates/routing/README.md) |
 | Localization | Opt-in Fluent catalogs and reactive application-local language selection | [i18n](crates/i18n/README.md) |
-| Application widgets | Controls, forms, navigation, themes and specialized widgets built on Glory | [Sapid](https://github.com/sapid-ui/sapid) |
+| Application widgets | Controls, forms, navigation, themes and specialized widgets built on Glory | [Sapid](https://github.com/taidge/sapid) |
 
 `get()` clones a value; use `with(...)` to borrow large data. Reactive reads track
 inside bindings, derived values and effects. A bare widget-build read is not a

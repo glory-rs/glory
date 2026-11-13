@@ -1137,6 +1137,12 @@ impl Memory {
                 return Ok(false);
             }
         }
+        if let Event::PlotPointer { .. } = event {
+            event.validate_payload(id, &target.descriptor)?;
+            return Ok((event.is_terminal_loss()
+                || (Self::active_in(nodes, id) && Self::enabled_in(nodes, id)))
+                && interactive());
+        }
         if let Event::Pointer { related, .. } | Event::PointerWithin { related, .. } = event {
             event.validate_payload(id, &target.descriptor)?;
             if let Some(related) = related {
@@ -1883,6 +1889,9 @@ impl Memory {
 }
 
 impl Render for Memory {
+    fn supports_plot_pointer(&self) -> bool {
+        true
+    }
     fn listen(&mut self, node: NodeId, kind: EventKind, enabled: bool) -> Result<(), Error> {
         let descriptor = self.node(node)?.descriptor.view();
         if enabled {

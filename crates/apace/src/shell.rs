@@ -295,6 +295,7 @@ impl Document for WindowApp {
         }))
     }
     fn handle_ui_event(&mut self, mut event: UiEvent) {
+        plot_pointer::begin_ui(&mut self.renderer.0.borrow_mut(), &event);
         #[cfg(feature = "routing")]
         if let UiEvent::KeyDown(key) = &event {
             let delta = match key.key {
@@ -355,6 +356,7 @@ impl Document for WindowApp {
             EventDriver::new(self, collector).handle_ui_event(event);
         }
         let mut state = self.renderer.0.borrow_mut();
+        plot_pointer::finish_ui(&mut state);
         if !apple_command {
             state.apple_input = None;
         }
@@ -412,6 +414,7 @@ impl EventHandler for Events {
         event_state: &mut EventState,
     ) {
         let mut state = self.renderer.0.borrow_mut();
+        plot_pointer::dom(&mut state, chain, &event.data);
         if matches!(event.data, DomEventData::Click(_)) && std::mem::take(&mut state.suppress_click)
         {
             event_state.prevent_default();
@@ -2044,6 +2047,7 @@ impl ApplicationHandler for Shell {
                 let mut state = view.downcast_doc_mut::<WindowApp>().renderer.0.borrow_mut();
                 cancel_drag(&mut state);
                 swipe::cancel(&mut state);
+                plot_pointer::cancel(&mut state);
             }
             if matches!(event, WindowEvent::RedrawRequested) {
                 // Read queued scroll/resize inputs and commit the current
@@ -2154,3 +2158,7 @@ mod layer_tests;
 #[cfg(all(test, not(any(target_os = "android", target_os = "ios"))))]
 #[path = "shell_tests.rs"]
 mod tests;
+
+#[cfg(all(test, not(any(target_os = "android", target_os = "ios"))))]
+#[path = "plot_pointer_tests.rs"]
+mod plot_pointer_tests;

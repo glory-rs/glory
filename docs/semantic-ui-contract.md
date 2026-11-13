@@ -143,6 +143,27 @@ Mask 12 项已验收；这些不证明实际 OS IME 或 Unicode 字素选择能�
 后续文本/密码的 Unicode 双向程序选区、CSR/SSR 身份保持及移动系统拼音验收，
 见 2026-10-27 的功能差距报告；任意原生选择手势仍是独立边界。
 
+### 有限图形坐标事件
+
+`EventKind::PlotPointer` 是显式订阅的独立坐标通道，仅接受有物理盒子的
+`View`。`Event::PlotPointer { from, pointer }` 的 `from` 必须等于该观察视口，
+不能用子节点、其他视口或已复用的身份代替。原 `Pointer` / `PointerWithin`
+的结构和边界派发保持独立。
+
+`PlotPointer` 保留 pointer ID、Mouse／Pen／Touch、Move／Down／Up／Leave／Cancel，
+以及同次观察的局部 border-box 坐标和 extent。x／y、宽／高保留小数，不按 DPR
+倍乘、不取整、不钳位；捕获中的点可以位于盒外。viewport 的 x／y 为零，普通输入
+要求正宽高，Leave／Cancel 可携带零 extent。所有坐标须有限，绝对值不超过
+`MAX_PLOT_POINTER_COORDINATE`。宿主只应在可以正确解析该节点及其祖先变换时发送
+普通输入；布局查询的 AABB 本身不证明已支持旋转、透视或任意 CSS 变换。
+
+`Render::supports_plot_pointer()` 默认 false。具备输入能力但未实现该通道的宿主，
+在替换 handler 或排队 interest 前明确拒绝注册；静态宿主可以记录合法兴趣供后续
+adoption，但不能派发坐标输入。参考 Memory 支持注入受检载荷，不代表物理设备验收。
+输入在进入业务回调前重验当前身份、enabled／inert 与活跃状态；存活的暂停节点仍可
+接收 Leave／Cancel 清理，Dispose 后不能复活。监听器只排队，业务回调遵循原 Scope
+Owner 和宿主观察边界；该协议不会把整个视口矩形解释成业务 datum。
+
 ## 查询、动作与能力
 
 ### 有限二维 Grid

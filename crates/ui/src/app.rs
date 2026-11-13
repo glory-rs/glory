@@ -803,6 +803,11 @@ impl Session {
             if !present.tree.validate_event(node, &event)? {
                 return Ok(false);
             }
+            if matches!(event, Event::PlotPointer { .. })
+                && !self.renderer.borrow().supports_plot_pointer()
+            {
+                return Err(RenderError::Unsupported("finite plot pointer input").into());
+            }
             if let Event::Files(result) = &event {
                 let files = self.renderer.borrow().capabilities().files.ok_or(
                     RenderError::InvalidEvent("file observation without a file consumer"),
@@ -1711,6 +1716,10 @@ impl Scope {
             .enter(self.id(), || glory_core::untracked(|| drop(pending)))?;
         Ok(removed)
     }
+    /// Explicit finite plot input support, independent of ordinary Pointer.
+    pub fn supports_plot_pointer(&self) -> Result<bool> {
+        Ok(self.session()?.renderer.borrow().supports_plot_pointer())
+    }
     pub fn capabilities(&self) -> Result<glory_render::Capabilities> {
         Ok(self.session()?.renderer.borrow().capabilities())
     }
@@ -1782,6 +1791,12 @@ impl Scope {
         let previous = {
             let mut present = session.present.borrow_mut();
             kind.validate_target(&present.tree.node(node)?.descriptor)?;
+            if kind == EventKind::PlotPointer {
+                let renderer = session.renderer.borrow();
+                if renderer.capabilities().input && !renderer.supports_plot_pointer() {
+                    return Err(RenderError::Unsupported("finite plot pointer input").into());
+                }
+            }
             present.register_subscription(
                 node,
                 kind,

@@ -309,6 +309,7 @@ pub(super) struct DragSession {
     pub(super) raw: Option<super::events::drag::RawMotion>,
 }
 pub(super) struct Dom {
+    pub(super) plot_pointer: RefCell<super::plot_pointer::Pointers>,
     pub(super) rich_pending: RefCell<Vec<NodeId>>,
     pub(super) rich_live: RefCell<BTreeSet<NodeId>>,
     pub(super) files: RefCell<super::files::Files>,
@@ -352,6 +353,7 @@ impl Dom {
         let error = root.set_attribute("data-gly-app", "").err().map(backend);
         let files = super::files::Files::new(&document)?;
         let dom = Rc::new(Self {
+            plot_pointer: RefCell::default(),
             rich_pending: RefCell::new(Vec::new()),
             rich_live: RefCell::new(BTreeSet::new()),
             files: RefCell::new(files),
@@ -545,13 +547,18 @@ impl Dom {
                 },
             );
         }
-        if kind == EventKind::Resize {
+        if kind == EventKind::PlotPointer {
+            super::plot_pointer::interest(self, id, enabled);
+        }
+        if matches!(kind, EventKind::Resize | EventKind::PlotPointer) {
             let element = entry.element()?;
             let observer = self.observer.borrow();
             let observer = observer
                 .as_ref()
                 .ok_or(Error::Unsupported("ResizeObserver"))?;
-            if enabled {
+            if entry.interests.borrow().contains(&EventKind::Resize)
+                || entry.interests.borrow().contains(&EventKind::PlotPointer)
+            {
                 let options = web_sys::ResizeObserverOptions::new();
                 options.set_box(web_sys::ResizeObserverBoxOptions::BorderBox);
                 observer.observe_with_options(&element, &options);
@@ -644,6 +651,7 @@ impl Dom {
         self.frame.input();
     }
     pub fn read_layout(&self) {
+        super::plot_pointer::observe(self);
         let sheet_writes = super::sheet::read(self);
         // Exactly one read phase before App processes events and writes DOM.
         let pending = std::mem::take(&mut *self.layout.borrow_mut());
@@ -946,6 +954,7 @@ impl Dom {
         confirmed: bool,
     ) -> Result<(), Error> {
         let entry = self.entry(id)?;
+        super::plot_pointer::retire(self, &subtree);
         // Remove lookup/queued state before native focus events from removal.
         let removed: Vec<_> = {
             let mut entries = self.entries.borrow_mut();
@@ -985,13 +994,15 @@ impl Dom {
         self.layout
             .borrow_mut()
             .retain(|(id, _)| entries.contains_key(id));
+        super::plot_pointer::retaining_inputs(self, &entries);
         self.inputs.borrow_mut().retain(
             |input| !matches!(input, Input::Event { node, .. } if !entries.contains_key(node)),
         );
         drop(entries);
         if let Some(observer) = self.observer.borrow().as_ref() {
             for entry in &removed {
-                if entry.interests.borrow().contains(&EventKind::Resize)
+                if (entry.interests.borrow().contains(&EventKind::Resize)
+                    || entry.interests.borrow().contains(&EventKind::PlotPointer))
                     && let Ok(element) = entry.element()
                 {
                     observer.unobserve(&element);
@@ -1030,6 +1041,7 @@ impl Dom {
         result.and(retired)
     }
     pub fn clear(&self) {
+        *self.plot_pointer.borrow_mut() = Default::default();
         self.rich_pending.borrow_mut().clear();
         self.rich_live.borrow_mut().clear();
         self.swipe.borrow_mut().take();
@@ -1118,6 +1130,7 @@ impl glory_html::Sink for Sink {
             Op::Place { id, parent, before } => self.0.place(id, parent, before),
             Op::Dispose { id, subtree } => self.0.dispose(id, subtree),
             Op::Suspend { id } => {
+                super::plot_pointer::changed(&self.0);
                 let entry = self.0.entry(id)?;
                 let mut parking = entry.fragment.borrow_mut();
                 let fragment =

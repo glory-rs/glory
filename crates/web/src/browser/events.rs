@@ -145,6 +145,10 @@ impl Listeners {
             let weak = Rc::downgrade(&dom);
             let callback = Closure::new(move |event: web_sys::Event| {
                 let Some(dom) = weak.upgrade() else { return };
+                if let Err(error) = super::plot_pointer::receive(&dom, name, &event) {
+                    dom.error.borrow_mut().get_or_insert(error);
+                    dom.frame.input();
+                }
                 if let Err(error) = receive(&dom, name, event) {
                     dom.error.borrow_mut().get_or_insert(error);
                     dom.frame.input();
@@ -209,6 +213,10 @@ impl Listeners {
                 let callback = Closure::new(move |event: web_sys::Event| {
                     let Some(dom) = weak.upgrade() else { return };
                     super::swipe::cancel(&dom);
+                    if let Err(error) = super::plot_pointer::receive(&dom, "resize", &event) {
+                        dom.error.borrow_mut().get_or_insert(error);
+                        dom.frame.input();
+                    }
                     if let Err(error) = super::sheet::receive(&dom, "resize", &event) {
                         dom.error.borrow_mut().get_or_insert(error);
                     }
@@ -242,6 +250,7 @@ impl Listeners {
                     {
                         super::swipe::cancel(&dom);
                     }
+                    super::plot_pointer::changed(&dom);
                     if let Some(size) = border_size(&dom, &entry) {
                         dom.sizes.borrow_mut().insert(id, size);
                     }
