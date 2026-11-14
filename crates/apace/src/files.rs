@@ -126,7 +126,7 @@ enum Operation {
     Picker,
     Read,
     #[cfg(all(
-        feature = "shell",
+        feature = "shell-base",
         any(target_os = "windows", target_os = "linux", target_os = "macos")
     ))]
     Drop,
@@ -144,7 +144,7 @@ impl Shared {
         })
     }
     #[cfg(all(
-        feature = "shell",
+        feature = "shell-base",
         any(target_os = "windows", target_os = "linux", target_os = "macos")
     ))]
     pub(crate) fn drop_permit(self: &Arc<Self>) -> Result<Permit, FileRejection> {
@@ -230,7 +230,7 @@ impl Drop for Permit {
         match self.kind {
             Operation::Picker => budget.stats.picker = false,
             #[cfg(all(
-                feature = "shell",
+                feature = "shell-base",
                 any(target_os = "windows", target_os = "linux", target_os = "macos")
             ))]
             Operation::Drop => budget.stats.dropping = false,

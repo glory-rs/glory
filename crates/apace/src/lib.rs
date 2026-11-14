@@ -1,8 +1,9 @@
 //! Incremental semantic-to-Apace document adapter. Optional paint/raster record
-//! scenes and CPU images; optional shell adds a desktop window/event-loop host.
+//! scenes and CPU images; optional shell adds a Hybrid GPU window/event-loop host.
+//! shell-cpu selects the software window backend instead.
 //! Headless, window, editor/IME and accessibility evidence remain distinct.
 #[cfg(all(
-    feature = "accesskit",
+    feature = "accesskit-base",
     any(target_os = "windows", target_os = "linux", target_os = "macos")
 ))]
 pub use ::accesskit;

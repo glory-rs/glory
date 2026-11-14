@@ -314,7 +314,7 @@ fn close_from_a_native_poll_revokes_a_result_that_was_not_yet_delivered() {
     holder.borrow_mut().take();
 }
 
-#[cfg(feature = "shell")]
+#[cfg(feature = "shell-base")]
 #[test]
 fn owner_retirement_drops_the_permission_future_and_never_runs_a_late_application_callback() {
     use glory_core::{Runtime, executor::Executor};

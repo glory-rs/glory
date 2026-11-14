@@ -81,7 +81,7 @@ impl Layers {
     /// Accessibility keeps transparent ancestors of the current modal while
     /// omitting unrelated branches. No business source participates.
     #[cfg(all(
-        feature = "accesskit",
+        feature = "accesskit-base",
         not(any(target_os = "android", target_os = "ios"))
     ))]
     pub fn ax_branch(&self, tree: &glory_render::memory::Memory, id: NodeId) -> bool {
@@ -178,7 +178,7 @@ pub(super) fn sync(state: &mut State, mutations: &[Mutation]) -> Result<(), Erro
     let result = sync_inner(state, &mut layers, mutations);
     state.layers = layers;
     let opened = result?;
-    #[cfg(feature = "shell")]
+    #[cfg(feature = "shell-base")]
     if state
         .drag
         .as_ref()
@@ -823,7 +823,7 @@ pub(super) fn repair_focus(state: &mut State) {
     }
 }
 
-#[cfg(feature = "shell")]
+#[cfg(feature = "shell-base")]
 fn dismiss(state: &mut State, id: NodeId, reason: DismissReason) {
     let Some(entry) = state.layers.open.iter_mut().find(|entry| entry.id == id) else {
         return;
@@ -842,7 +842,7 @@ fn dismiss(state: &mut State, id: NodeId, reason: DismissReason) {
     });
 }
 
-#[cfg(feature = "shell")]
+#[cfg(feature = "shell-base")]
 pub(super) fn outside_focus(state: &mut State, next: Option<NodeId>) {
     let Some(next) = next else { return };
     let Some(top) = state.layers.open.iter().rev().find(|entry| entry.physical) else {
@@ -863,7 +863,7 @@ pub(super) fn drained(state: &mut State) {
     }
 }
 
-#[cfg(feature = "shell")]
+#[cfg(feature = "shell-base")]
 pub(super) fn lock_viewport(state: &mut State) {
     if let Some(scroll) = state.layers.scroll
         && state.dom.doc.viewport_scroll() != scroll
@@ -873,7 +873,7 @@ pub(super) fn lock_viewport(state: &mut State) {
     }
 }
 
-#[cfg(feature = "shell")]
+#[cfg(feature = "shell-base")]
 pub(super) fn receive(
     state: &mut State,
     target: EngineId,

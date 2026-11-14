@@ -1,18 +1,18 @@
 //! Optional native window host. UI state remains local to the event-loop thread.
-//! CPU presentation and queued native input share the semantic document. OS IME
+//! GPU/CPU drawing and queued native input share the semantic document. OS IME
 //! and accessibility acceptance remain distinct from the protocol tests.
 use super::*;
 #[path = "editing.rs"]
 pub(super) mod editing;
 use editing::ime_event;
 #[cfg(all(
-    feature = "accesskit",
+    feature = "accesskit-base",
     not(any(target_os = "android", target_os = "ios"))
 ))]
 #[path = "accessibility.rs"]
 mod accessibility;
 #[cfg(all(
-    feature = "accesskit",
+    feature = "accesskit-base",
     not(any(target_os = "android", target_os = "ios"))
 ))]
 #[path = "accesskit_platform.rs"]
@@ -49,9 +49,23 @@ use std::sync::Arc;
 use std::task::Context;
 
 use anyrender::{WindowHandle, WindowRenderer};
-type VelloCpuWindowRenderer = softbuffer_window_renderer::SoftbufferWindowRenderer<
-    anyrender_vello_cpu::VelloCpuImageRenderer,
->;
+#[cfg(not(any(feature = "shell", feature = "shell-cpu")))]
+compile_error!("select a window renderer with `shell` (Vello Hybrid) or `shell-cpu`");
+#[cfg(feature = "shell-cpu")]
+#[path = "surface_cpu.rs"]
+mod surface_cpu;
+#[cfg(feature = "shell-cpu")]
+pub use surface_cpu::CpuRenderer;
+#[cfg(feature = "shell")]
+#[path = "surface_gpu.rs"]
+mod surface_gpu;
+#[cfg(feature = "shell")]
+pub use surface_gpu::GpuRenderer;
+// Cargo features are additive. An explicit CPU selection wins when both exist.
+#[cfg(feature = "shell-cpu")]
+type SelectedRenderer = CpuRenderer;
+#[cfg(all(feature = "shell", not(feature = "shell-cpu")))]
+type SelectedRenderer = GpuRenderer;
 use apace_dom::{DocGuard, DocGuardMut, Document, EventDriver, EventHandler};
 use apace_shell::{ApaceApplication, ApaceShellEvent, ApaceShellProxy, WindowConfig};
 use apace_traits::events::{
@@ -99,6 +113,12 @@ pub enum ShellError {
         height: u32,
         limit: usize,
     },
+    GpuDimensions {
+        width: u32,
+        height: u32,
+        maximum: u32,
+    },
+    Renderer(String),
 }
 impl std::fmt::Display for ShellError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -127,12 +147,12 @@ pub struct WindowApp {
     #[cfg(feature = "routing")]
     navigation_result: RefCell<Option<glory_routing::Result<glory_routing::Navigation>>>,
     #[cfg(all(
-        feature = "accesskit",
+        feature = "accesskit-base",
         not(any(target_os = "android", target_os = "ios"))
     ))]
     accessibility: RefCell<accessibility::Tree>,
     #[cfg(all(
-        feature = "accesskit",
+        feature = "accesskit-base",
         not(any(target_os = "android", target_os = "ios"))
     ))]
     requested_visible: bool,
@@ -173,12 +193,12 @@ impl WindowApp {
             #[cfg(feature = "routing")]
             navigation_result: RefCell::new(None),
             #[cfg(all(
-                feature = "accesskit",
+                feature = "accesskit-base",
                 not(any(target_os = "android", target_os = "ios"))
             ))]
             accessibility: RefCell::default(),
             #[cfg(all(
-                feature = "accesskit",
+                feature = "accesskit-base",
                 not(any(target_os = "android", target_os = "ios"))
             ))]
             requested_visible: true,
@@ -1662,122 +1682,31 @@ fn activate_control(state: &mut State, id: NodeId) {
     state.dom.invalidate();
 }
 
-/// Guard the pinned CPU backend's u16 dimensions and its RGBA allocation.
-/// Zero-size releases the surface; a later resize resumes the same document.
-pub struct CpuRenderer {
-    inner: VelloCpuWindowRenderer,
-    window: Option<Arc<dyn WindowHandle>>,
-    error: Option<ShellError>,
-    limit: usize,
-    frames: u64,
-}
-impl Default for CpuRenderer {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-impl CpuRenderer {
-    pub fn new() -> Self {
-        Self::with_limit(64 * 1024 * 1024)
-    }
-    pub fn with_limit(limit: usize) -> Self {
-        Self {
-            inner: VelloCpuWindowRenderer::new(),
-            window: None,
-            error: None,
-            limit,
-            frames: 0,
-        }
-    }
-    pub fn frames(&self) -> u64 {
-        self.frames
-    }
-    fn resize(&mut self, width: u32, height: u32) {
-        if width == 0 || height == 0 {
-            self.inner.suspend();
-            self.inner = VelloCpuWindowRenderer::new();
-            return;
-        }
-        // Check dimensions first: arbitrary u32 width*height*4 can overflow u64.
-        if width > u32::from(u16::MAX)
-            || height > u32::from(u16::MAX)
-            || u64::from(width) * u64::from(height) * 4 > self.limit as u64
-        {
-            self.inner.suspend();
-            self.error = Some(ShellError::Surface {
-                width,
-                height,
-                limit: self.limit,
-            });
-            return;
-        }
-        if self.inner.is_active() {
-            self.inner.set_size(width, height);
-        } else if let Some(window) = &self.window {
-            self.inner.resume(window.clone(), width, height, || {});
-            self.inner.complete_resume();
-        }
-    }
-}
-impl anyrender::RenderContext for CpuRenderer {}
-impl WindowRenderer for CpuRenderer {
-    type ScenePainter<'a> = <VelloCpuWindowRenderer as WindowRenderer>::ScenePainter<'a>;
-    fn resume<F: FnOnce() + 'static>(
-        &mut self,
-        window: Arc<dyn WindowHandle>,
-        width: u32,
-        height: u32,
-        on_ready: F,
-    ) {
-        self.window = Some(window);
-        self.resize(width, height);
-        on_ready();
-    }
-    fn complete_resume(&mut self) -> bool {
-        // This synchronous CPU implementation has no pending initialization.
-        // Install the poll waker even while a zero-size surface is inactive.
-        true
-    }
-    fn suspend(&mut self) {
-        self.inner.suspend();
-        self.inner = VelloCpuWindowRenderer::new();
-        self.window = None;
-    }
-    fn is_active(&self) -> bool {
-        self.inner.is_active()
-    }
-    fn set_size(&mut self, width: u32, height: u32) {
-        self.resize(width, height);
-    }
-    fn render<F: FnOnce(&mut Self::ScenePainter<'_>)>(&mut self, draw: F) {
-        if self.is_active() {
-            let mut painted = false;
-            self.inner.render(|scene| {
-                painted = true;
-                draw(scene);
-            });
-            // The pinned softbuffer backend skips draw if buffer acquisition
-            // fails, and returns normally after a successful present otherwise.
-            if painted {
-                self.frames += 1;
-            }
-        }
-    }
+/// Current native surface diagnostics; counters do not trigger layout or redraw.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WindowBackend {
+    VelloHybrid,
+    VelloCpu,
 }
 
-/// Current native surface diagnostics; counters do not trigger layout or redraw.
+/// A drawing callback does not prove that a surface was presented.
 #[derive(Clone, Copy, Debug)]
 pub struct WindowStats {
     pub surface_size: wingy::dpi::PhysicalSize<u32>,
     pub scale_factor: f64,
-    pub presented_frames: u64,
+    pub backend: WindowBackend,
+    /// Frames recorded by the backend, including GPU frames skipped at present.
+    pub drawn_frames: u64,
+    /// CPU softbuffer presents. The pinned Hybrid API exposes no present result.
+    /// Neither counter establishes compositor/vsync completion.
+    pub presented_frames: Option<u64>,
 }
 
 /// One native event-loop owner; supports multiple independently owned Apps.
 pub struct Shell {
     // Platform subclasses must be removed before their window handles die.
     #[cfg(all(
-        feature = "accesskit",
+        feature = "accesskit-base",
         not(any(target_os = "android", target_os = "ios"))
     ))]
     accessibility: std::collections::HashMap<WindowId, accesskit_platform::Platform>,
@@ -1785,11 +1714,11 @@ pub struct Shell {
     uikit_active: bool,
     #[cfg(target_os = "ios")]
     uikit_error_reported: bool,
-    inner: ApaceApplication<CpuRenderer>,
+    inner: ApaceApplication<SelectedRenderer>,
     event_loop: Option<EventLoop>,
     error: Rc<RefCell<Option<ShellError>>>,
 }
-fn prepare(view: &mut apace_shell::View<CpuRenderer>) {
+fn prepare(view: &mut apace_shell::View<SelectedRenderer>) {
     if let Some(theme) = view.window.theme() {
         queue_color_scheme(
             &mut view.downcast_doc_mut::<WindowApp>().renderer.0.borrow_mut(),
@@ -1833,7 +1762,7 @@ impl Shell {
         let (proxy, queue) = ApaceShellProxy::new(event_loop.create_proxy());
         Self {
             #[cfg(all(
-                feature = "accesskit",
+                feature = "accesskit-base",
                 not(any(target_os = "android", target_os = "ios"))
             ))]
             accessibility: Default::default(),
@@ -1860,7 +1789,7 @@ impl Shell {
     }
     pub fn add_window(&mut self, app: WindowApp, attributes: WindowAttributes) {
         #[cfg(all(
-            feature = "accesskit",
+            feature = "accesskit-base",
             not(any(target_os = "android", target_os = "ios"))
         ))]
         let (app, attributes) = {
@@ -1870,7 +1799,7 @@ impl Shell {
         };
         self.inner.add_window(WindowConfig::with_attributes(
             Box::new(app),
-            CpuRenderer::new(),
+            SelectedRenderer::new(),
             attributes,
         ));
     }
@@ -1879,7 +1808,9 @@ impl Shell {
         self.inner.windows.get(&id).map(|view| WindowStats {
             surface_size: view.window.surface_size(),
             scale_factor: view.window.scale_factor(),
-            presented_frames: view.renderer.frames(),
+            backend: SelectedRenderer::BACKEND,
+            drawn_frames: view.renderer.frames(),
+            presented_frames: view.renderer.presented_frames(),
         })
     }
     /// Some platforms resize synchronously and emit no SurfaceResized event.
@@ -1925,7 +1856,7 @@ impl Shell {
     }
     fn check(&mut self, event_loop: &dyn ActiveEventLoop) {
         #[cfg(all(
-            feature = "accesskit",
+            feature = "accesskit-base",
             not(any(target_os = "android", target_os = "ios"))
         ))]
         for (id, view) in &mut self.inner.windows {
@@ -1952,7 +1883,7 @@ impl Shell {
             if presence_running {
                 view.request_redraw();
             }
-            if let Some(error) = view.renderer.error.take() {
+            if let Some(error) = view.renderer.take_error() {
                 self.error.borrow_mut().get_or_insert(error);
             }
             if let Some(error) = view.downcast_doc_mut::<WindowApp>().error.take() {
@@ -1971,7 +1902,7 @@ impl Shell {
                 }
             }
             #[cfg(all(
-                feature = "accesskit",
+                feature = "accesskit-base",
                 not(any(target_os = "android", target_os = "ios"))
             ))]
             self.accessibility.clear();
@@ -2013,7 +1944,7 @@ impl ApplicationHandler for Shell {
     }
     fn window_event(&mut self, event_loop: &dyn ActiveEventLoop, id: WindowId, event: WindowEvent) {
         #[cfg(all(
-            feature = "accesskit",
+            feature = "accesskit-base",
             not(any(target_os = "android", target_os = "ios"))
         ))]
         if let Some(platform) = self.accessibility.get_mut(&id) {
@@ -2074,7 +2005,19 @@ impl ApplicationHandler for Shell {
                 self.inner.proxy.send_event(event);
                 break;
             }
-            let resumed = matches!(event, ApaceShellEvent::ResumeReady { .. });
+            let resume_event = matches!(event, ApaceShellEvent::ResumeReady { .. });
+            // A native resume completes inline but queues its notification. A
+            // platform suspend can retire that surface before delivery. Consume
+            // readiness here: the engine shell asserts that every queued event
+            // is still current, whereas a suspended window must keep no waker.
+            let resumed = if let ApaceShellEvent::ResumeReady { window_id } = &event {
+                self.inner
+                    .windows
+                    .get_mut(window_id)
+                    .is_some_and(|view| view.complete_resume())
+            } else {
+                false
+            };
             if let ApaceShellEvent::Poll { window_id } = &event
                 && let Some(view) = self.inner.windows.get_mut(window_id)
             {
@@ -2091,14 +2034,14 @@ impl ApplicationHandler for Shell {
                 }
             }
             #[cfg(all(
-                feature = "accesskit",
+                feature = "accesskit-base",
                 not(any(target_os = "android", target_os = "ios"))
             ))]
             if let ApaceShellEvent::CloseWindow { window_id } = &event {
                 self.accessibility.remove(window_id);
             }
             #[cfg(all(
-                feature = "accesskit",
+                feature = "accesskit-base",
                 not(any(target_os = "android", target_os = "ios"))
             ))]
             let accessibility = if let ApaceShellEvent::Embedder(value) = &event
@@ -2115,11 +2058,11 @@ impl ApplicationHandler for Shell {
                 false
             };
             #[cfg(not(all(
-                feature = "accesskit",
+                feature = "accesskit-base",
                 not(any(target_os = "android", target_os = "ios"))
             )))]
             let accessibility = false;
-            if !accessibility {
+            if !accessibility && !resume_event {
                 self.inner.handle_apace_shell_event(event_loop, event);
             }
             if resumed {

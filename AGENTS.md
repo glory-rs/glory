@@ -222,7 +222,13 @@ retired feature aliases or count compilation as proof of platform acceptance.
   reject per operation to preserve an accepted prefix/query watermark. Raw
   author CSS retains engine-specific coverage and does not widen this promise.
   Optional paint records AnyRender frames; raster uses Vello CPU without a GPU.
-  Optional desktop shell provides wingy/CPU-softbuffer windows, ready-only Host
+  Optional shell defaults to Wingy/Vello Hybrid GPU windows; shell-cpu selects
+  CPU/softbuffer without GPU dependencies. accesskit-cpu selects the CPU AX host.
+  Shared implementation uses shell-base/accesskit-base; explicit CPU selection
+  wins when Cargo features combine. Keep default/headless graphs GPU-free and
+  check GPU hosts separately from --all-features (which selects CPU windows).
+  Drawn frames are not GPU presentation evidence; WindowStats::presented_frames
+  is None for Hybrid and Some for CPU. Preserve ready-only Host
   and queued activation/focus/navigation/editing. WindowApp supports controlled
   text/check events, UTF-16 selection and native IME protocol; the standalone
   Renderer has no input driver.

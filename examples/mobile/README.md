@@ -6,7 +6,11 @@ event loop; no process-global AndroidApp or second reactive runtime is installed
 The standalone workspace depends on the existing facade and counter library,
 so the runtime workspace retains twelve packages.
 
-Android uses the shell's CPU renderer with explicitly selected Wingy Activity glue.
+The native shell now defaults to Vello Hybrid GPU drawing, with explicitly selected
+Wingy Activity glue. Existing CPU emulator/simulator evidence below predates this
+backend change and does not establish Hybrid device acceptance. CPU-only windows
+remain available through `apace-android-native-activity-cpu` or
+`apace-android-game-activity-cpu` instead of their default Hybrid variants.
 NativeActivity remains the default; GameActivity adds real GameTextInput composition.
 `Shell::android(app)` requires the AndroidApp passed to this invocation's
 `android_main`. `Shell::from_event_loop` also accepts an explicitly configured

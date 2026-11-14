@@ -34,7 +34,7 @@ pub(super) struct Platform {
     title: String,
 }
 impl Platform {
-    pub(super) fn new(view: &mut apace_shell::View<CpuRenderer>) -> Self {
+    pub(super) fn new(view: &mut apace_shell::View<SelectedRenderer>) -> Self {
         let window = view.window.clone();
         let runtime = view.downcast_doc_mut::<WindowApp>().app.runtime().id();
         let adapter = Adapter::with_combined_handler(
@@ -84,7 +84,11 @@ impl Platform {
             _ => {}
         }
     }
-    pub(super) fn event(&mut self, view: &mut apace_shell::View<CpuRenderer>, event: &AxEvent) {
+    pub(super) fn event(
+        &mut self,
+        view: &mut apace_shell::View<SelectedRenderer>,
+        event: &AxEvent,
+    ) {
         match event {
             AxEvent::InitialTreeRequested => {
                 self.active = true;
@@ -118,7 +122,10 @@ impl Platform {
             }
         }
     }
-    pub(super) fn update(&mut self, view: &mut apace_shell::View<CpuRenderer>) -> glory_ui::Result {
+    pub(super) fn update(
+        &mut self,
+        view: &mut apace_shell::View<SelectedRenderer>,
+    ) -> glory_ui::Result {
         if !self.active {
             return Ok(());
         }

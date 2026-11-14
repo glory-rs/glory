@@ -98,5 +98,12 @@ fn main() {
     Write-Output "Native CLI acceptance passed: $taskRoot/result.json"
 }
 finally {
-    foreach ($name in $saved.Keys) { [Environment]::SetEnvironmentVariable($name, $saved[$name], 'Process') }
+    foreach ($name in $saved.Keys) {
+        if ($null -eq $saved[$name]) {
+            Remove-Item -LiteralPath "Env:$name" -ErrorAction SilentlyContinue
+        }
+        else {
+            [Environment]::SetEnvironmentVariable($name, $saved[$name], 'Process')
+        }
+    }
 }

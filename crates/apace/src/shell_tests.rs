@@ -217,6 +217,7 @@ fn self_waking_local_tasks_yield_and_window_drop_cancels_before_executor_close()
     executor.close();
     assert!(executor.spawn(Box::pin(async {})).is_err());
 }
+#[cfg(feature = "shell-cpu")]
 #[test]
 fn cpu_surface_guards_run_before_native_allocation() {
     let mut renderer = CpuRenderer::with_limit(4096);
@@ -489,6 +490,11 @@ impl ApplicationHandler for Driver {
         }
         match self.phase {
             0 => {
+                #[cfg(all(feature = "shell", not(feature = "shell-cpu")))]
+                for v in self.shell.inner.windows.values() {
+                    eprintln!("Hybrid adapter: {:?}", v.renderer.adapter_info().unwrap());
+                    assert_eq!(v.renderer.presented_frames(), None);
+                }
                 for v in self.shell.inner.windows.values_mut() {
                     click(v.downcast_doc_mut::<WindowApp>());
                 }
@@ -538,6 +544,18 @@ impl ApplicationHandler for Driver {
                 for (v, count) in self.shell.inner.windows.values_mut().zip(counts) {
                     assert_eq!(v.downcast_doc_mut::<WindowApp>().app.stats().nodes, count);
                 }
+                // Initialization completes inline, but ResumeReady is queued.
+                // Suspend again before delivery to reproduce a stale notification.
+                self.shell.can_create_surfaces(el);
+                self.shell.destroy_surfaces(el);
+                self.shell.proxy_wake_up(el);
+                for v in self.shell.inner.windows.values_mut() {
+                    assert!(!v.renderer.is_active());
+                    assert!(
+                        !v.poll(),
+                        "stale readiness installed a suspended poll waker"
+                    );
+                }
                 self.shell.can_create_surfaces(el);
             }
             23 => {
@@ -551,7 +569,7 @@ impl ApplicationHandler for Driver {
                     return;
                 }
                 // Native surface activation can precede the queued ResumeReady
-                // callback and its first present. Wait for that actual frame.
+                // callback and its first draw. Wait for that recorded frame.
                 if self
                     .shell
                     .inner
@@ -852,6 +870,7 @@ fn start_timer(app: &WindowApp, count: Cage<usize>, ready: Rc<Cell<bool>>) {
 #[ignore = "requires a real Windows/X11/Wayland display; run explicitly"]
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 fn real_windows_present_scroll_resume_and_release_owned_tasks() {
+    eprintln!("native window backend: {:?}", SelectedRenderer::BACKEND);
     let mut builder = EventLoop::builder();
     #[cfg(target_os = "windows")]
     wingy::platform::windows::EventLoopBuilderExtWindows::with_any_thread(&mut builder, true);
@@ -871,7 +890,7 @@ fn real_windows_present_scroll_resume_and_release_owned_tasks() {
     let event_loop = builder.build().unwrap();
     let (proxy, queue) = ApaceShellProxy::new(event_loop.create_proxy());
     let mut shell = Shell {
-        #[cfg(feature = "accesskit")]
+        #[cfg(feature = "accesskit-base")]
         accessibility: Default::default(),
         inner: ApaceApplication::new(proxy.clone(), queue),
         event_loop: None,

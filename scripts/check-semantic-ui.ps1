@@ -27,6 +27,8 @@ try {
     Write-Output "Verified target: $actualTarget"
     python scripts/check-current-docs.py
     if ($LASTEXITCODE -ne 0) { throw 'current documentation consistency failed' }
+    python scripts/check-native-renderers.py
+    if ($LASTEXITCODE -ne 0) { throw 'native renderer dependency isolation failed' }
     if ($Audit) {
         python scripts/check-dependencies.py --out "$taskBuildRoot/dependency-audit"
         if ($LASTEXITCODE -ne 0) { throw 'dependency audit failed' }
@@ -75,6 +77,13 @@ try {
     }
     cargo clippy --locked --workspace --all-features --all-targets -- -D warnings
     if ($LASTEXITCODE -ne 0) { throw 'semantic clippy failed' }
+    # --all-features selects CPU windows. Check the default GPU host separately.
+    cargo test --locked -p glory-apace --no-default-features --features shell --lib
+    if ($LASTEXITCODE -ne 0) { throw 'Hybrid host tests failed' }
+    cargo clippy --locked -p glory-apace --no-default-features --features accesskit --all-targets -- -D warnings
+    if ($LASTEXITCODE -ne 0) { throw 'Hybrid host clippy failed' }
+    cargo clippy --locked -p glory-apace --no-default-features --features accesskit-cpu --all-targets -- -D warnings
+    if ($LASTEXITCODE -ne 0) { throw 'CPU-only host clippy failed' }
 
     if ($Window) {
         cargo test --locked -p glory-apace --features shell --lib real_windows -- --ignored --nocapture --test-threads=1
@@ -83,6 +92,10 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'AccessKit native window acceptance failed' }
         cargo test --locked -p glory-apace --features accesskit --lib real_accesskit_windows_ui_automation -- --ignored --nocapture --test-threads=1
         if ($LASTEXITCODE -ne 0) { throw 'Windows UI Automation acceptance failed' }
+        cargo test --locked -p glory-apace --no-default-features --features shell-cpu --lib real_windows -- --ignored --nocapture --test-threads=1
+        if ($LASTEXITCODE -ne 0) { throw 'CPU-only native window acceptance failed' }
+        cargo test --locked -p glory-apace --no-default-features --features accesskit-cpu --lib real_accesskit_windows_ui_automation -- --ignored --nocapture --test-threads=1
+        if ($LASTEXITCODE -ne 0) { throw 'CPU-only Windows UI Automation acceptance failed' }
         $savedWryWindow = $env:GLORY_WRY_WINDOW
         try {
             $env:GLORY_WRY_WINDOW = '1'

@@ -85,7 +85,7 @@ fn shared_router_updates_a_real_native_document_and_preserves_layout_through_can
     assert!(!handle.is_alive());
 }
 
-#[cfg(feature = "shell")]
+#[cfg(feature = "shell-base")]
 #[test]
 fn native_window_queues_back_input_until_observation() {
     use std::task::{Context, Waker};

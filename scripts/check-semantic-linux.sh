@@ -19,6 +19,7 @@ glory_build_root=${GLORY_BUILD_ROOT:-$glory_target}
 glory_artifacts=$(realpath -m "${GLORY_ARTIFACT_DIR:-$glory_build_root/verification/linux}")
 mkdir -p "$glory_artifacts"
 python3 scripts/library_lockfiles.py
+python3 scripts/check-native-renderers.py
 cargo metadata --no-deps --format-version 1 > "$glory_artifacts/metadata-linux.json"
 python3 -c 'import json,sys; print("Verified target:",json.load(open(sys.argv[1]))["target_directory"])' "$glory_artifacts/metadata-linux.json"
 python3 scripts/check-engine-forks.py --test
@@ -27,6 +28,9 @@ cargo test --locked --workspace --all-features
 cargo clippy --locked --workspace --all-features --all-targets -- -D warnings
 cargo clippy --locked -p glory-apace --no-default-features --all-targets -- -D warnings
 cargo clippy --locked -p glory-apace --no-default-features --features paint --all-targets -- -D warnings
+cargo test --locked -p glory-apace --no-default-features --features shell --lib
+cargo clippy --locked -p glory-apace --no-default-features --features accesskit --all-targets -- -D warnings
+cargo clippy --locked -p glory-apace --no-default-features --features accesskit-cpu --all-targets -- -D warnings
 if "$glory_paint"; then
     cargo run --locked -p glory-apace --example raster --features raster -- "$glory_artifacts/apace-paint-linux.png"
 fi
@@ -36,5 +40,7 @@ if "$glory_window"; then
         printf 'Native window acceptance: %s\n' "$GLORY_WINDOW_BACKEND"
         cargo test --locked -p glory-apace --features shell --lib real_windows -- --ignored --nocapture --test-threads=1
         cargo test --locked -p glory-apace --features accesskit --lib real_windows -- --ignored --nocapture --test-threads=1
+        cargo test --locked -p glory-apace --no-default-features --features shell-cpu --lib real_windows -- --ignored --nocapture --test-threads=1
+        cargo test --locked -p glory-apace --no-default-features --features accesskit-cpu --lib real_windows -- --ignored --nocapture --test-threads=1
     done
 fi

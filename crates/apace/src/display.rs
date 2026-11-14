@@ -217,7 +217,7 @@ impl Dom {
         }
         Ok(())
     }
-    #[cfg(feature = "shell")]
+    #[cfg(feature = "shell-base")]
     pub(super) fn display_control(
         &self,
         mut node: EngineId,
@@ -237,7 +237,7 @@ impl Dom {
     }
 }
 
-#[cfg(feature = "shell")]
+#[cfg(feature = "shell-base")]
 pub(super) fn receive(
     state: &mut State,
     target: EngineId,

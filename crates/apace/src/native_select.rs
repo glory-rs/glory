@@ -29,16 +29,16 @@ pub(super) struct Control {
     pub rows: Vec<Row>,
     pub panel: EngineId,
     caption: Option<EngineId>,
-    #[cfg(feature = "shell")]
+    #[cfg(feature = "shell-base")]
     pub inline: bool,
-    #[cfg(feature = "shell")]
+    #[cfg(feature = "shell-base")]
     pub multiple: bool,
     pub cursor: Option<usize>,
-    #[cfg(feature = "shell")]
+    #[cfg(feature = "shell-base")]
     anchor: Option<usize>,
-    #[cfg(feature = "shell")]
+    #[cfg(feature = "shell-base")]
     search: String,
-    #[cfg(feature = "shell")]
+    #[cfg(feature = "shell-base")]
     searched_at: Option<std::time::Instant>,
 }
 impl Control {
@@ -129,16 +129,16 @@ impl Control {
             rows,
             panel,
             caption,
-            #[cfg(feature = "shell")]
+            #[cfg(feature = "shell-base")]
             inline,
-            #[cfg(feature = "shell")]
+            #[cfg(feature = "shell-base")]
             multiple,
             cursor: None,
-            #[cfg(feature = "shell")]
+            #[cfg(feature = "shell-base")]
             anchor: None,
-            #[cfg(feature = "shell")]
+            #[cfg(feature = "shell-base")]
             search: String::new(),
-            #[cfg(feature = "shell")]
+            #[cfg(feature = "shell-base")]
             searched_at: None,
         }
     }
@@ -166,7 +166,7 @@ impl Control {
             m.set_node_text(caption, text);
         }
     }
-    #[cfg(feature = "shell")]
+    #[cfg(feature = "shell-base")]
     pub fn selected_keys(&self) -> Vec<glory_render::SemanticId> {
         self.rows
             .iter()
@@ -175,7 +175,7 @@ impl Control {
             .map(|(i, _)| self.option(i).0.key.clone())
             .collect()
     }
-    #[cfg(feature = "shell")]
+    #[cfg(feature = "shell-base")]
     fn first(&self, last: bool) -> Option<usize> {
         if last {
             (0..self.rows.len()).rev().find(|i| !self.option(*i).1)
@@ -300,7 +300,7 @@ pub(super) fn position(dom: &mut Dom) -> bool {
     true
 }
 
-#[cfg(any(feature = "shell", feature = "accesskit"))]
+#[cfg(any(feature = "shell-base", feature = "accesskit-base"))]
 pub(super) fn open(state: &mut State, id: NodeId) -> Result<(), Error> {
     if !available(state, id) {
         return Ok(());
@@ -346,7 +346,7 @@ pub(super) fn open(state: &mut State, id: NodeId) -> Result<(), Error> {
     Ok(())
 }
 
-#[cfg(any(feature = "shell", feature = "accesskit"))]
+#[cfg(any(feature = "shell-base", feature = "accesskit-base"))]
 pub(super) fn choose(
     state: &mut State,
     id: NodeId,
@@ -409,7 +409,7 @@ pub(super) fn choose(
     Ok(true)
 }
 
-#[cfg(any(feature = "shell", feature = "accesskit"))]
+#[cfg(any(feature = "shell-base", feature = "accesskit-base"))]
 pub(super) fn reveal(state: &mut State, id: NodeId) {
     let Some(index) = state
         .dom
@@ -423,7 +423,7 @@ pub(super) fn reveal(state: &mut State, id: NodeId) {
     reveal_row(state, id, index);
 }
 
-#[cfg(any(feature = "shell", feature = "accesskit"))]
+#[cfg(any(feature = "shell-base", feature = "accesskit-base"))]
 pub(super) fn reveal_row(state: &mut State, id: NodeId, index: usize) {
     state.dom.resolve();
     let Some(control) = state.dom.ranges.get(&id).and_then(|r| r.select.as_ref()) else {
@@ -465,7 +465,7 @@ pub(super) fn reveal_row(state: &mut State, id: NodeId, index: usize) {
     }
 }
 
-#[cfg(feature = "shell")]
+#[cfg(feature = "shell-base")]
 pub(super) fn popup_target(state: &State, mut target: EngineId) -> bool {
     let Some(panel) = state
         .dom
@@ -486,7 +486,7 @@ pub(super) fn popup_target(state: &State, mut target: EngineId) -> bool {
         target = parent;
     }
 }
-#[cfg(feature = "shell")]
+#[cfg(feature = "shell-base")]
 fn row_at(state: &State, id: NodeId, mut target: EngineId) -> Option<usize> {
     let control = state.dom.range(id).ok()?.select.as_ref()?;
     loop {
@@ -507,7 +507,7 @@ fn row_at(state: &State, id: NodeId, mut target: EngineId) -> Option<usize> {
         target = n.parent?;
     }
 }
-#[cfg(feature = "shell")]
+#[cfg(feature = "shell-base")]
 pub(super) fn receive(
     state: &mut State,
     target: EngineId,
@@ -573,7 +573,7 @@ pub(super) fn receive(
     false
 }
 
-#[cfg(feature = "shell")]
+#[cfg(feature = "shell-base")]
 fn key_event(state: &mut State, id: NodeId, key: &apace_traits::events::ApaceKeyEvent) -> bool {
     use keyboard_types::Modifiers as M;
     if state.focused != Some(id) {

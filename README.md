@@ -129,7 +129,7 @@ completion, JSON build plans and opt-in WASM optimization. See the
 |---|---|---|
 | Browser | `web` or `dsl` | Incremental DOM updates, controlled input and browser event/frame handling. |
 | SSR and hydration | `ssr`, `hydrate`; optional `stream`, `resources` | HTML snapshots, adoption and pull-driven progressive output. [Salvo](crates/salvo-adapter/README.md) supplies HTTP integration. |
-| Native document | `apace`; optional `apace-raster`, `apace-shell`, `apace-accesskit` | HTML/CSS document layout, CPU rendering, window host and accessibility bridge. [Adapter guide](crates/apace/README.md). |
+| Native document | `apace`; optional `apace-raster`, `apace-shell`, `apace-accesskit` | HTML/CSS document layout; Hybrid GPU windows by default, optional CPU windows (`apace-shell-cpu` / `apace-accesskit-cpu`) and CPU raster output. [Adapter guide](crates/apace/README.md). |
 | System WebView | `wry` | Native Rust state and tasks with incremental IPC-driven HTML updates. [Adapter guide](crates/wry/README.md). |
 | Android and iOS | App-owned native hosts | Activity/UIKit entries, packaging and platform setup live in the [mobile example](examples/mobile/README.md). |
 

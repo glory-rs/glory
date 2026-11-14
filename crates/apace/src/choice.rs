@@ -33,7 +33,7 @@ pub(super) fn reveal(state: &mut State, id: NodeId) -> Result<(), Error> {
     Ok(())
 }
 
-#[cfg(feature = "shell")]
+#[cfg(feature = "shell-base")]
 pub(super) fn key(
     state: &mut State,
     origin: NodeId,
@@ -138,7 +138,7 @@ pub(super) fn key(
     false
 }
 
-#[cfg(feature = "shell")]
+#[cfg(feature = "shell-base")]
 pub(super) fn apple(state: &mut State, origin: NodeId, target: EngineId, command: &str) -> bool {
     if command != "deleteBackward:"
         || state.focused != Some(origin)
@@ -183,7 +183,7 @@ pub(super) fn apple(state: &mut State, origin: NodeId, target: EngineId, command
     true
 }
 
-#[cfg(feature = "shell")]
+#[cfg(feature = "shell-base")]
 fn typeahead(state: &mut State, origin: NodeId, input: glory_render::KeyboardInput<'_>) -> bool {
     let at_millis = state
         .keyboard_clock
@@ -204,7 +204,7 @@ fn typeahead(state: &mut State, origin: NodeId, input: glory_render::KeyboardInp
     true
 }
 
-#[cfg(feature = "shell")]
+#[cfg(feature = "shell-base")]
 pub(super) fn prevent_pointer_focus(
     state: &State,
     id: NodeId,
@@ -234,7 +234,7 @@ pub(super) fn prevent_pointer_focus(
     false
 }
 
-#[cfg(feature = "shell")]
+#[cfg(feature = "shell-base")]
 pub(super) fn pointer(
     state: &mut State,
     id: NodeId,

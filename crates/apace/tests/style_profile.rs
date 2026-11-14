@@ -468,7 +468,7 @@ fn advertised_overflow_modes_preserve_scroll_container_and_clip_semantics() {
 }
 
 #[cfg(all(
-    feature = "shell",
+    feature = "shell-base",
     any(target_os = "windows", target_os = "linux", target_os = "macos")
 ))]
 #[test]
