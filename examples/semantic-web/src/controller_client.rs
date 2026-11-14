@@ -255,7 +255,7 @@ pub fn controller_probe(command: u8) -> Result<String> {
                 patch(probe.destination, Patch::Semantics(Change::Clear))?;
                 patch(probe.destination, Patch::Role(Change::Clear))?;
             }
-            19 => {
+            19 | 23 => {
                 let file = *probe
                     .files
                     .borrow()
@@ -267,7 +267,7 @@ pub fn controller_probe(command: u8) -> Result<String> {
                     .request(
                         Query::FileRead(FileRead {
                             file,
-                            offset: 0,
+                            offset: if command == 23 { 3 } else { 0 },
                             length: 3,
                         }),
                         move |reply| {
@@ -280,6 +280,7 @@ pub fn controller_probe(command: u8) -> Result<String> {
                     .map_err(js)?;
             }
             20 => {}
+            21 | 22 => patch(probe.file, Patch::Enabled(Change::Set(command == 22)))?,
             _ => return Err(js("unknown controller command")),
         }
         app.flush().map_err(js)?;

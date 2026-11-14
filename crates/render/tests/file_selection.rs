@@ -174,6 +174,65 @@ fn document_identity_target_lifetime_inert_disabled_and_clear_have_explicit_boun
     assert!(tree.finish_files(id, document, &event).is_err());
 }
 #[test]
+fn disabling_selection_keeps_selected_file_queries_but_blocks_picker_and_removal() {
+    let runtime = RuntimeId::new();
+    let id = NodeIds::new(runtime).allocate();
+    let document = FileDocumentId::new().unwrap();
+    let mut tree = Memory::new(runtime);
+    tree.apply(&[
+        Mutation::Create {
+            id,
+            node: Box::new(Descriptor::new(Props::File(FileProps {
+                configuration: FileConfig {
+                    preview: Some(Default::default()),
+                    ..Default::default()
+                },
+                ..Default::default()
+            }))),
+        },
+        Mutation::Place {
+            id,
+            parent: None,
+            before: None,
+        },
+    ])
+    .unwrap();
+    tree.admit_file_picker(id, 0, 1).unwrap();
+    let event = selected(id, document, 0, Some(1), 1);
+    tree.finish_files(id, document, &event).unwrap();
+    let token = file(&event);
+    tree.prepare_patch(id, &Patch::Enabled(Change::Set(false)))
+        .unwrap()
+        .commit();
+    let query = Query::FileRead(FileRead {
+        file: token,
+        offset: 0,
+        length: 5,
+    });
+    query
+        .validate_target(tree.node(id).unwrap().descriptor.view())
+        .unwrap();
+    Query::FilePreview(token)
+        .validate_target(tree.node(id).unwrap().descriptor.view())
+        .unwrap();
+    assert!(tree.selected_file(token).is_ok());
+    assert!(
+        tree.admit_file_action(Action::PickFiles {
+            node: id,
+            revision: 0,
+            request: 2,
+        })
+        .is_err()
+    );
+    assert!(tree.admit_file_action(Action::RemoveFile(token)).is_err());
+    tree.admit_file_action(Action::ClearFiles {
+        node: id,
+        revision: 0,
+    })
+    .unwrap();
+    assert!(tree.selected_file(token).is_err());
+}
+#[test]
 fn adoption_is_fresh_lifetime_only_and_reuses_neither_picker_requests_nor_retired_read_rights() {
     let runtime = RuntimeId::new();
     let id = NodeIds::new(runtime).allocate();

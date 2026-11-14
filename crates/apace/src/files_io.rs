@@ -352,7 +352,8 @@ pub(super) fn request(state: &mut State, operation: Query, query: QueryToken) ->
         .config
         .as_ref()
         .ok_or(Error::Unsupported("native file access"))?;
-    if !available(state, file.node) {
+    let tree = state.mapper.tree();
+    if !tree.active(file.node) || tree.inert(file.node) || !state.layers.allowed(tree, file.node) {
         return Err(Error::Unsupported("file control unavailable"));
     }
     operation.validate_target(&state.mapper.tree().node(file.node)?.descriptor)?;

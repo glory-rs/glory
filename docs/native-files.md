@@ -59,6 +59,13 @@ also rechecks a successful file response at delivery: an earlier event in the
 same drained tick may already have cleared the grant. Scope cancellation retires
 callbacks; it does not claim to interrupt physical work.
 
+Disabling the picker prevents new selection and user removal while retaining
+already selected token grants. Applications may disable it during an upload and
+continue bounded reads or previews, including subsequent chunks. Active/inert
+and modal-layer admission checks still apply. Clear/removal, configuration changes
+and Owner retirement continue to revoke grants and pending delivery; disabling
+the control alone is not a revocation operation. Web follows the same distinction.
+
 The native file button uses intrinsic focus, pointer and Enter/Space activation.
 Sapid retains selection policy and attachment state in its normal widget Owners.
 No host business controller or source scan is added.
