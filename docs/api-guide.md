@@ -51,8 +51,8 @@ mutation. Applications handle custom navigation through explicit callbacks.
   `scripts/build-semantic-web.ps1`.
 - [Salvo adapter](../crates/salvo-adapter/README.md): synchronous semantic SSR and
   optional pull-driven streaming responses.
-- [Apace adapter](../crates/apace/README.md): native document, CPU paint and
-  optional desktop shell, assets and AccessKit.
+- [Apace adapter](../crates/apace/README.md): native document, Hybrid GPU windows,
+  optional CPU windows/raster output, assets and AccessKit.
 - [Localization](../crates/i18n/README.md): opt-in immutable Fluent catalogs and
   explicit application-local language selection.
 - [Routing](../crates/routing/README.md): opt-in portable routes, retained layouts,

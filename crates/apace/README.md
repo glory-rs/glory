@@ -3,7 +3,8 @@
 Native document interpreter for Glory's semantic render port. It
 applies the shared `glory-html` mapper's typed edits directly to Apace nodes;
 updates do not serialize and reparse the document. Optional shell adds a desktop
-window host with CPU presentation; the headless default creates no window/GPU.
+window host with Vello Hybrid GPU drawing; `shell-cpu` selects CPU/softbuffer.
+The headless default creates no window/GPU.
 
 The shell also exposes `Shell::android(AndroidApp)` and `Shell::from_event_loop`;
 its existing `Shell::new` supports the UIKit entry path. The
@@ -63,7 +64,7 @@ remains separate from this editor protocol and CPU/window evidence.
 | File services | Optional `files` (facade `apace-files`), explicit Config service; desktop picker/drop and Android safe-JNI picker/PFD reads, bounded chunks and private PNG/JPEG previews. Android owned-source SDK chain verified; actual system dialog/drag input, iOS driver, sandbox security scopes and readers remain open. See [native files](../../docs/native-files.md) |
 | Drawing | Optional `paint`: complete AnyRender frames; optional `raster`: Vello CPU premultiplied sRGB RGBA8 |
 | Collapse motion | Revisioned intrinsic-height transitions and completion; real native constraints, clipping, flow, reversal and content retargeting. Explicit motion preference defaults to Reduce. See [native collapse](../../docs/native-collapse.md) |
-| Window/platform | Optional desktop shell: wingy + Vello CPU/softbuffer; default creates no window |
+| Window/platform | Optional shell: Wingy + Vello Hybrid/wgpu; `shell-cpu` selects Vello CPU/softbuffer; headless default creates no window/GPU |
 | Platform accessibility | Optional `accesskit` (facade `apace-accesskit`): semantic roles/names/values, collection metadata and Focus/Click/SetValue; virtual-row ScrollIntoView uses the shared list controller, then native ancestors/viewport. Windows UIA and macOS AX clients tested. Linux AT-SPI clients and screen-reader announcements remain pending |
 
 `Renderer` is a cloneable handle to one document. `set_css` replaces a single
@@ -448,16 +449,35 @@ resource or animation hosts must call invalidate when their engine state changes
 
 ## Desktop window host
 
-Enable `glory-apace/shell` or facade `apace-shell` explicitly. The initial shell
-uses CPU/softbuffer, independent of the offscreen Raster API. Its Rust entry is
+Enable `glory-apace/shell` or facade `apace-shell` explicitly. The window defaults
+to Vello Hybrid through AnyRender/wgpu. Use `shell-cpu` / facade `apace-shell-cpu`
+for software drawing and softbuffer presentation without compiling GPU backends.
+`accesskit` / facade `apace-accesskit` adds platform accessibility to Hybrid;
+`accesskit-cpu` / facade `apace-accesskit-cpu` adds it to the CPU window host.
+These window backends are independent of the offscreen CPU Raster API. The window entry is
 `shell::{WindowApp, Shell, WindowAttributes}`. WindowApp owns an App, Renderer and
 ready-only local executor; move it into Shell::add_window, then call Shell::run.
 The executable example contains a counter and a 100-million-row windowed list:
 
 ```powershell
 cargo run -p glory-apace --features shell --example window
+cargo run -p glory-apace --no-default-features --features shell-cpu --example window
 ./scripts/check-semantic-ui.ps1 -Window
 ```
+
+Backend selection is compile-time. Cargo features are additive: `shell-cpu`
+(including `accesskit-cpu`) explicitly takes precedence if both window backends
+are enabled, so `--all-features` exercises CPU windows. GPU windows are checked
+separately with `shell` and `accesskit`. Enabling `raster` alone does not change
+the selected window backend. GPU initialization failures do not switch to CPU.
+`shell-base` and `accesskit-base` only group shared implementation dependencies;
+applications select one of the public backend combinations above. The existing
+`android-native-activity` / `android-game-activity` features also select Hybrid;
+their `-cpu` variants select CPU-only windows with the same Activity integration.
+The facade forwards these as `apace-android-native-activity[-cpu]` and
+`apace-android-game-activity[-cpu]`. Select one Activity implementation per app.
+`python scripts/check-native-renderers.py` verifies the default/headless/GPU/CPU
+dependency profiles, including that CPU-only window builds exclude wgpu.
 
 Native callbacks enqueue semantic activation/focus/editing; business code runs after engine
 borrows end. Geometry/scroll observations and commits run before frame paint.
@@ -479,7 +499,7 @@ cancels when focus changes. WindowApp's enabled capability describes this
 protocol implementation, not successful OS IME or assistive-technology acceptance.
 
 `CheckMode::Mixed` has a live indeterminate property independent of checkedness.
-The CPU renderer draws a dash; program checked updates preserve mixed, while
+The document painter draws a dash; program checked updates preserve mixed, while
 click/Space/AccessKit activation clears it and emits one boolean change. Mode
 changes and Clear preserve control identity. The AX tree reads the current native
 mixed state, including after activation. These
@@ -501,13 +521,33 @@ Explicit navigation/tab policies remain with the application's controller.
 framework-injected keys/clicks and AccessKit tree/action tests remain separate from physical
 input and screen-reader speech. Typeahead and native menus are separate gaps.
 
-Surface suspension preserves App/document; zero dimensions release CPU/surface
-buffers and later resize restores them. Closing a window drops App and cancels
+Surface suspension preserves App/document; zero dimensions release renderer/surface
+resources and later resize restores them. Closing a window drops App and cancels
 its tasks before the executor. CPU dimensions are checked before allocation
 (u16 limit, default 64MiB RGBA budget); this is not a limit on all engine/window
-allocations. `CpuRenderer::frames` counts draws that returned after softbuffer
-presentation, not a compositor/vsync completion notification. The initial host
-is opaque and redraws full changed frames.
+allocations. Hybrid checks the u16 scene range and requested/active device texture
+dimension limit before creating or resizing a surface. These dimension checks
+are not a total GPU memory budget. Native initialization completes inline in the
+pinned Hybrid backend; the host still follows ready notification/complete-resume.
+Queued readiness that outlives surface suspension is ignored without reinstalling
+the document's poll waker; a later valid resume restores the same document.
+Unwinding backend failures are returned through `ShellError::Renderer`; aborting
+panics and OOM are not recoverable, and device-loss recovery is not promised.
+
+`WindowStats` reports the selected `backend` and `drawn_frames`. Hybrid can skip
+presentation after recording commands, so its `presented_frames` is `None`.
+CPU returns `Some(count)` for softbuffer presents. Neither establishes compositor
+or vsync completion. Both hosts are opaque and redraw full changed frames.
+Existing CPU pixel baselines remain CPU evidence; GPU appearance and platform
+acceptance require separate verification.
+
+Validation on 2026-11-14: the Windows full check with `-Window` passed both
+backends, including multiwindow scrolling, zero-size/suspend/resume and external
+UIA clients. Hybrid used a discrete NVIDIA adapter through Vulkan; the native
+example's visible text, button update and scrolling were also inspected.
+Android ARM64 GPU/CPU, Linux x86_64 Hybrid, macOS x86_64 Hybrid and the WASM facade
+passed compilation checks. These cross-compilation results do not establish
+runtime acceptance on those platforms; iOS Hybrid runtime remains unverified.
 
 `Shell::request_size` handles both wingy resize paths: a returned Some(size) is
 applied immediately because a native event may never follow; None waits for the

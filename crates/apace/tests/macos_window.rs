@@ -48,7 +48,7 @@ fn main() {
             let Some(stats) = self.shell.window_stats(id) else {
                 return;
             };
-            if stats.presented_frames == 0 {
+            if stats.drawn_frames == 0 {
                 return;
             }
             assert!(stats.surface_size.width > 0 && stats.surface_size.height > 0);
@@ -59,9 +59,9 @@ fn main() {
                     .request_size(id, wingy::dpi::PhysicalSize::new(640, 480).into())
                     .unwrap();
             } else if stats.surface_size == wingy::dpi::PhysicalSize::new(640, 480)
-                && stats.presented_frames >= 2
+                && stats.drawn_frames >= 2
             {
-                println!("macOS native present/resize: {stats:?}");
+                println!("macOS native draw/resize: {stats:?}");
                 self.shell
                     .window_event(event_loop, id, WindowEvent::CloseRequested);
                 assert_eq!(self.live.get(), 0, "window Owner cleanup");

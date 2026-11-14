@@ -540,16 +540,34 @@ fn native_menu_exit_accepts_or_refuses_close_without_trapping_tab_and_skips_all_
     }
 }
 
+#[cfg(any(
+    feature = "raster",
+    all(
+        feature = "accesskit-base",
+        not(any(target_os = "android", target_os = "ios"))
+    )
+))]
 pub(super) struct ModalFixture {
     pub host: WindowApp,
+    #[cfg(feature = "raster")]
     pub panel: NodeId,
     pub item: NodeId,
+    #[cfg(feature = "raster")]
     pub trigger: NodeId,
+    #[cfg(feature = "raster")]
     pub after: NodeId,
+    #[cfg(feature = "raster")]
     pub background: NodeId,
     pub open: glory_core::Cage<bool>,
     pub picked: glory_core::Cage<usize>,
 }
+#[cfg(any(
+    feature = "raster",
+    all(
+        feature = "accesskit-base",
+        not(any(target_os = "android", target_os = "ios"))
+    )
+))]
 pub(super) fn modal_fixture(scale: f32) -> ModalFixture {
     use glory_render::style::{Color, Length, Style};
     let host = WindowApp::new();
@@ -640,20 +658,17 @@ pub(super) fn modal_fixture(scale: f32) -> ModalFixture {
         )),
     )
     .unwrap();
-    let (panel, item, trigger, after, background) = (
-        panel.get().unwrap(),
-        item.get().unwrap(),
-        trigger.get().unwrap(),
-        after.get().unwrap(),
-        background.get().unwrap(),
-    );
     ModalFixture {
         host,
-        panel,
-        item,
-        trigger,
-        after,
-        background,
+        #[cfg(feature = "raster")]
+        panel: panel.get().unwrap(),
+        item: item.get().unwrap(),
+        #[cfg(feature = "raster")]
+        trigger: trigger.get().unwrap(),
+        #[cfg(feature = "raster")]
+        after: after.get().unwrap(),
+        #[cfg(feature = "raster")]
+        background: background.get().unwrap(),
         open,
         picked,
     }

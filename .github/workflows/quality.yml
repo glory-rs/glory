@@ -167,6 +167,9 @@ jobs:
           cargo test --locked -p glory-style -p glory-render -p glory-core -p glory-resource -p glory-i18n -p glory-routing -p glory-ui -p glory-html -p glory-ssr -p glory-view-macros --all-features
           cargo clippy --locked -p glory-style -p glory-render -p glory-core -p glory-resource -p glory-i18n -p glory-routing -p glory-ui -p glory-html -p glory-ssr -p glory-view-macros --all-features --all-targets -- -D warnings
           cargo check --locked -p glory-apace --no-default-features --features raster
+          python3 scripts/check-native-renderers.py
+          cargo check --locked -p glory-apace --no-default-features --features accesskit
+          cargo check --locked -p glory-apace --no-default-features --features accesskit-cpu
   apple:
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.apple }}
     runs-on: [self-hosted, macOS, ARM64, glory-data-cache]

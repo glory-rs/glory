@@ -10,13 +10,13 @@ use std::{
     task::{Context, Poll, Waker},
     time::Instant,
 };
-#[cfg(feature = "shell")]
+#[cfg(feature = "shell-base")]
 #[path = "clipboard_editor.rs"]
 pub(super) mod editor;
 
 enum Payload {
     Written,
-    #[cfg(feature = "shell")]
+    #[cfg(feature = "shell-base")]
     Text(String),
 }
 type Completion = Result<Payload, ClipboardError>;
@@ -28,7 +28,7 @@ enum Consumer {
         request: u64,
         revision: u64,
     },
-    #[cfg(feature = "shell")]
+    #[cfg(feature = "shell-base")]
     Editor(editor::Lease),
 }
 struct Work {
@@ -45,7 +45,7 @@ pub(super) struct Io {
     next: u64,
     active: Option<u64>,
     work: Option<Work>,
-    #[cfg(feature = "shell")]
+    #[cfg(feature = "shell-base")]
     editor_cancelled: bool,
 }
 impl Io {
@@ -55,14 +55,14 @@ impl Io {
             next: 0,
             active: None,
             work: None,
-            #[cfg(feature = "shell")]
+            #[cfg(feature = "shell-base")]
             editor_cancelled: false,
         }
     }
     pub fn configured(&self) -> bool {
         self.config.is_some()
     }
-    #[cfg(all(test, feature = "shell"))]
+    #[cfg(all(test, feature = "shell-base"))]
     pub(in crate::document) fn expire(&mut self) {
         self.work.as_mut().expect("pending clipboard").deadline = Instant::now();
     }
@@ -85,7 +85,7 @@ fn pending(state: &State, consumer: Consumer) -> bool {
             .tree()
             .clipboard_pending(node, request, revision)
             .unwrap_or(false),
-        #[cfg(feature = "shell")]
+        #[cfg(feature = "shell-base")]
         Consumer::Editor(lease) => editor::current(state, lease),
     }
 }
@@ -96,7 +96,7 @@ fn available(state: &State, consumer: Consumer) -> bool {
                 && state.mapper.tree().enabled(node)
                 && !state.mapper.tree().inert(node)
         }
-        #[cfg(feature = "shell")]
+        #[cfg(feature = "shell-base")]
         Consumer::Editor(lease) => editor::current(state, lease),
     }
 }
@@ -110,7 +110,7 @@ fn finish(state: &mut State, consumer: Consumer, result: Completion) {
             request,
             revision,
         } => (node, request, revision),
-        #[cfg(feature = "shell")]
+        #[cfg(feature = "shell-base")]
         Consumer::Editor(lease) => {
             editor::finish(state, lease, result);
             return;
@@ -191,7 +191,7 @@ fn schedule(
     timeout: std::time::Duration,
 ) {
     state.clipboard.active = Some(ticket);
-    #[cfg(feature = "shell")]
+    #[cfg(feature = "shell-base")]
     {
         state.clipboard.editor_cancelled = false;
     }

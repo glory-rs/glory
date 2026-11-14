@@ -9,6 +9,9 @@ cargo run --manifest-path examples/counter/Cargo.toml --bin counter-wry --featur
 
 `desktop`/`counter-desktop` continue selecting Apace. `desktop-wry`/`counter-wry`
 select the independent `glory-wry` backend; desktop logic does not use WASM.
+The Apace window defaults to Vello Hybrid GPU drawing. CPU windows are available
+through `glory/apace-accesskit-cpu` instead of `glory/apace-accesskit` (or
+`apace-shell-cpu` without the accessibility bridge).
 
 The project-local CLI explicitly selects `counter-desktop` by default, since
 the package now contains both desktop binaries.

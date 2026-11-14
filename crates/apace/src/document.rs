@@ -43,14 +43,14 @@ mod graphic_motion;
 mod layers;
 #[path = "native_select.rs"]
 mod native_select;
-#[cfg(feature = "shell")]
+#[cfg(feature = "shell-base")]
 #[path = "plot_pointer.rs"]
 mod plot_pointer;
 #[path = "presence.rs"]
 mod presence;
 #[path = "scroll_into_view.rs"]
 mod scroll_into_view;
-#[cfg(feature = "shell")]
+#[cfg(feature = "shell-base")]
 #[path = "swipe.rs"]
 mod swipe;
 #[path = "translation.rs"]
@@ -205,7 +205,7 @@ mod paint;
 #[cfg(feature = "paint")]
 pub use paint::*;
 #[cfg(all(
-    feature = "shell",
+    feature = "shell-base",
     any(
         target_os = "windows",
         target_os = "linux",
@@ -254,7 +254,7 @@ struct Range {
 }
 #[derive(Default)]
 struct Editing {
-    #[cfg(feature = "shell")]
+    #[cfg(feature = "shell-base")]
     input_before: Option<(
         u64,
         glory_render::TextSelection,
@@ -282,7 +282,7 @@ struct Dom {
     display_queue: Rc<glory_html::display::Queue>,
     displays: HashMap<NodeId, display::Instance>,
     display_controls: HashMap<EngineId, (NodeId, Option<u16>)>,
-    #[cfg(feature = "shell")]
+    #[cfg(feature = "shell-base")]
     display_space: Option<EngineId>,
     open_select: Option<NodeId>,
     translations: translation::Translations,
@@ -392,7 +392,7 @@ impl Dom {
             display_queue: Rc::new(glory_html::display::Queue::default()),
             displays: HashMap::new(),
             display_controls: HashMap::new(),
-            #[cfg(feature = "shell")]
+            #[cfg(feature = "shell-base")]
             display_space: None,
             translations: translation::Translations::new(translation_sheet, config.motion),
             collapses: collapse::Collapses::default(),
@@ -854,7 +854,7 @@ impl Dom {
             if let Some(display) = self.displays.remove(&child) {
                 for control in display.controls {
                     self.display_controls.remove(&control);
-                    #[cfg(feature = "shell")]
+                    #[cfg(feature = "shell-base")]
                     if self.display_space == Some(control) {
                         self.display_space = None;
                     }
@@ -1118,7 +1118,7 @@ impl Sink for Dom {
     }
 }
 
-#[cfg(feature = "shell")]
+#[cfg(feature = "shell-base")]
 struct DragSession {
     from: NodeId,
     pointer: apace_traits::events::ApacePointerId,
@@ -1128,25 +1128,25 @@ struct DragSession {
     captured: bool,
 }
 struct State {
-    #[cfg(feature = "shell")]
+    #[cfg(feature = "shell-base")]
     plot_pointer: plot_pointer::Pointers,
     #[cfg(feature = "files")]
     files: files_io::Io,
     #[cfg(feature = "clipboard")]
     clipboard: clipboard_io::Io,
-    #[cfg(feature = "shell")]
+    #[cfg(feature = "shell-base")]
     keyboard_clock: std::time::Instant,
     // One AppKit command awaiting its immediately following physical key.
-    #[cfg(feature = "shell")]
+    #[cfg(feature = "shell-base")]
     apple_input: Option<(NodeId, shell::AppleInput)>,
     layers: layers::Layers,
     focus_scopes: focus_scope::Scopes,
     color_scheme: Option<bool>,
-    #[cfg(feature = "shell")]
+    #[cfg(feature = "shell-base")]
     drag: Option<DragSession>,
-    #[cfg(feature = "shell")]
+    #[cfg(feature = "shell-base")]
     swipe: Option<swipe::Session>,
-    #[cfg(feature = "shell")]
+    #[cfg(feature = "shell-base")]
     suppress_click: bool,
     #[cfg(feature = "paint")]
     runtime: RuntimeId,
@@ -1172,7 +1172,7 @@ impl Drop for State {
     }
 }
 impl State {
-    #[cfg(feature = "shell")]
+    #[cfg(feature = "shell-base")]
     fn captured_text_value(&self, node: NodeId) -> Result<String, Error> {
         if let Some(max) = self
             .mapper
@@ -1303,12 +1303,12 @@ impl State {
             return;
         }
         self.space = None;
-        #[cfg(all(feature = "clipboard", feature = "shell"))]
+        #[cfg(all(feature = "clipboard", feature = "shell-base"))]
         clipboard_io::editor::cancel(self);
         if self.dom.open_select != next {
             native_select::close(&mut self.dom);
         }
-        #[cfg(feature = "shell")]
+        #[cfg(feature = "shell-base")]
         {
             self.apple_input = None;
         }
@@ -1336,7 +1336,7 @@ impl State {
         layers::repair_focus(self);
         focus_scope::repair(self);
         let physical = self.dom.doc.get_focussed_node_id();
-        #[cfg(feature = "shell")]
+        #[cfg(feature = "shell-base")]
         if self.dom.display_space.is_some() && self.dom.display_space != physical {
             self.dom.display_space = None;
         }
@@ -1355,7 +1355,7 @@ impl State {
             self.dom.invalidate();
             self.focus_changed(None);
         } else {
-            #[cfg(feature = "shell")]
+            #[cfg(feature = "shell-base")]
             if self.focused != next {
                 layers::outside_focus(self, next);
             }
@@ -1431,15 +1431,15 @@ impl Renderer {
             (config, files)
         };
         Self(Rc::new(RefCell::new(State {
-            #[cfg(feature = "shell")]
+            #[cfg(feature = "shell-base")]
             plot_pointer: Default::default(),
             #[cfg(feature = "files")]
             files,
             #[cfg(feature = "clipboard")]
             clipboard: clipboard_io::Io::new(config.clipboard.clone()),
-            #[cfg(feature = "shell")]
+            #[cfg(feature = "shell-base")]
             keyboard_clock: std::time::Instant::now(),
-            #[cfg(feature = "shell")]
+            #[cfg(feature = "shell-base")]
             apple_input: None,
             layers: layers::Layers::default(),
             focus_scopes: focus_scope::Scopes::default(),
@@ -1458,12 +1458,12 @@ impl Renderer {
             subscriptions: BTreeSet::new(),
             input_error: None,
             space: None,
-            #[cfg(feature = "shell")]
+            #[cfg(feature = "shell-base")]
             drag: None,
-            #[cfg(feature = "shell")]
+            #[cfg(feature = "shell-base")]
             swipe: None,
             color_scheme: None,
-            #[cfg(feature = "shell")]
+            #[cfg(feature = "shell-base")]
             suppress_click: false,
         })))
     }
@@ -1479,9 +1479,9 @@ impl Renderer {
             return Err(Error::InvalidProps("Apace logical viewport overflow"));
         }
         if state.dom.doc.viewport() != &viewport {
-            #[cfg(feature = "shell")]
+            #[cfg(feature = "shell-base")]
             plot_pointer::cancel(&mut state);
-            #[cfg(feature = "shell")]
+            #[cfg(feature = "shell-base")]
             swipe::cancel(&mut state);
             state.dom.doc.set_viewport(viewport);
             state.dom.invalidate();
@@ -1593,11 +1593,11 @@ impl Renderer {
 }
 impl Render for Renderer {
     fn supports_plot_pointer(&self) -> bool {
-        #[cfg(feature = "shell")]
+        #[cfg(feature = "shell-base")]
         {
             self.0.borrow().interactive
         }
-        #[cfg(not(feature = "shell"))]
+        #[cfg(not(feature = "shell-base"))]
         {
             false
         }
@@ -1814,7 +1814,7 @@ impl Render for Renderer {
             Ok(mapper.receipt())
         })();
         state.receipt = state.mapper.receipt();
-        #[cfg(feature = "shell")]
+        #[cfg(feature = "shell-base")]
         swipe::update(&mut state);
         let translated = {
             let State { mapper, dom, .. } = &mut *state;
@@ -1851,7 +1851,7 @@ impl Render for Renderer {
         interests.retain(|(id, _), _| mapper.tree().node(*id).is_ok());
         subscriptions.retain(|(id, _)| mapper.tree().node(*id).is_ok());
         state.sync_focus();
-        #[cfg(feature = "shell")]
+        #[cfg(feature = "shell-base")]
         plot_pointer::sync(&mut state);
         native_select::sync(&mut state);
         #[cfg(feature = "files")]
@@ -1895,7 +1895,7 @@ impl Render for Renderer {
             }
         } else {
             state.subscriptions.remove(&(node, kind));
-            #[cfg(feature = "shell")]
+            #[cfg(feature = "shell-base")]
             if kind == EventKind::Swipe
                 && state
                     .swipe
@@ -1905,7 +1905,7 @@ impl Render for Renderer {
                 swipe::cancel(&mut state);
             }
         }
-        #[cfg(feature = "shell")]
+        #[cfg(feature = "shell-base")]
         if kind == EventKind::PlotPointer {
             plot_pointer::interest(&mut state, node, enabled);
         }
@@ -2042,7 +2042,7 @@ impl Render for Renderer {
                 state.dom.doc.with_text_input(control, |mut driver| {
                     driver.select_byte_range(anchor, focus)
                 });
-                #[cfg(all(feature = "clipboard", feature = "shell"))]
+                #[cfg(all(feature = "clipboard", feature = "shell-base"))]
                 clipboard_io::editor::cancel(&mut state);
                 state.dom.invalidate_pixels();
                 state.observation_pending = true;
@@ -2050,11 +2050,11 @@ impl Render for Renderer {
             }
             glory_render::Action::RevealOption { node } => choice::reveal(&mut state, node),
             glory_render::Action::ExitMenu { node, backwards } => {
-                #[cfg(feature = "shell")]
+                #[cfg(feature = "shell-base")]
                 {
                     shell::menu::exit(&mut state, node, backwards)
                 }
-                #[cfg(not(feature = "shell"))]
+                #[cfg(not(feature = "shell-base"))]
                 {
                     let _ = (node, backwards);
                     Err(Error::Unsupported("headless Apace menu focus"))
@@ -2223,7 +2223,7 @@ impl Render for Renderer {
             state.input_error = Some(error);
         }
         state.dom.resolve();
-        #[cfg(feature = "shell")]
+        #[cfg(feature = "shell-base")]
         plot_pointer::observe(&mut state);
         collapse::collect(&mut state);
         presence::collect(&mut state);

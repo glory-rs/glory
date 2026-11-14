@@ -33,9 +33,13 @@ apace-android-assets = ["apace", "glory-apace/android-assets"]
 apace-paint = ["apace", "glory-apace/paint"]
 apace-raster = ["apace-paint", "glory-apace/raster"]
 apace-shell = ["apace-paint", "glory-apace/shell"]
+apace-shell-cpu = ["apace-paint", "glory-apace/shell-cpu"]
 apace-android-native-activity = ["apace-shell", "glory-apace/android-native-activity"]
 apace-android-game-activity = ["apace-shell", "glory-apace/android-game-activity"]
+apace-android-native-activity-cpu = ["apace-shell-cpu", "glory-apace/android-native-activity-cpu"]
+apace-android-game-activity-cpu = ["apace-shell-cpu", "glory-apace/android-game-activity-cpu"]
 apace-accesskit = ["apace-shell", "glory-apace/accesskit"]
+apace-accesskit-cpu = ["apace-shell-cpu", "glory-apace/accesskit-cpu"]
 
 [dependencies]
 glory-routing = { path = "../routing", version = "0.8.0", optional = true }

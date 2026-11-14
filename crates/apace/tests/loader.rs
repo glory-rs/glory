@@ -436,7 +436,7 @@ fn png_height(height: u32) -> Vec<u8> {
     bytes
 }
 
-#[cfg(feature = "shell")]
+#[cfg(feature = "shell-base")]
 #[test]
 fn delayed_http_intrinsic_images_preserve_anchor_and_end_navigation() {
     use glory_apace::shell::WindowApp;

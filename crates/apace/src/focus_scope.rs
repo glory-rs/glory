@@ -30,7 +30,7 @@ fn live(state: &State, open: &Open) -> bool {
         })
         && state.layers.allowed(state.mapper.tree(), open.id)
 }
-#[cfg(all(test, feature = "shell"))]
+#[cfg(all(test, feature = "shell-base"))]
 impl Scopes {
     pub(super) fn is_empty(&self) -> bool {
         self.0.is_empty()
@@ -220,7 +220,7 @@ pub(super) fn repair(state: &mut State) {
         open.focused = focused;
     }
 }
-#[cfg(feature = "shell")]
+#[cfg(feature = "shell-base")]
 pub(super) fn prevent_pointer_focus(
     state: &State,
     target: EngineId,
@@ -237,7 +237,7 @@ pub(super) fn prevent_pointer_focus(
             .get_node(target)
             .is_some_and(|node| node.is_focussable())
 }
-#[cfg(feature = "shell")]
+#[cfg(feature = "shell-base")]
 pub(super) fn receive(
     state: &mut State,
     target: EngineId,

@@ -345,7 +345,7 @@ fn intrinsic_image_height_changes_preserve_a_huge_list_anchor() {
 }
 
 #[cfg(all(
-    feature = "shell",
+    feature = "shell-base",
     any(target_os = "windows", target_os = "linux", target_os = "macos")
 ))]
 #[test]

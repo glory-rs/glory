@@ -14,7 +14,7 @@ use std::{
     time::Instant,
 };
 #[cfg(all(
-    feature = "shell",
+    feature = "shell-base",
     any(target_os = "windows", target_os = "linux", target_os = "macos")
 ))]
 #[path = "file_drop.rs"]
@@ -61,7 +61,7 @@ pub(super) struct Io {
     config: Option<Files>,
     drop_enabled: bool,
     #[cfg(all(
-        feature = "shell",
+        feature = "shell-base",
         any(target_os = "windows", target_os = "linux", target_os = "macos")
     ))]
     drop: file_drop::DropState,
@@ -90,7 +90,7 @@ impl Io {
         let document = config.as_ref().and_then(|_| FileDocumentId::new().ok());
         let drop_enabled = interactive
             && cfg!(all(
-                feature = "shell",
+                feature = "shell-base",
                 any(
                     target_os = "windows",
                     target_os = "linux",
@@ -102,7 +102,7 @@ impl Io {
             config,
             drop_enabled,
             #[cfg(all(
-                feature = "shell",
+                feature = "shell-base",
                 any(target_os = "windows", target_os = "linux", target_os = "macos")
             ))]
             drop: file_drop::DropState::default(),
@@ -210,7 +210,7 @@ pub(super) fn action(state: &mut State, action: Action) -> Result<(), Error> {
     }
     state.mapper.admit_file_action(action)?;
     #[cfg(all(
-        feature = "shell",
+        feature = "shell-base",
         any(target_os = "windows", target_os = "linux", target_os = "macos")
     ))]
     if matches!(action, Action::ClearFiles { .. } | Action::RemoveFile(_)) {
@@ -260,7 +260,7 @@ pub(super) fn action(state: &mut State, action: Action) -> Result<(), Error> {
 }
 pub(super) fn sync(state: &mut State) {
     #[cfg(all(
-        feature = "shell",
+        feature = "shell-base",
         any(target_os = "windows", target_os = "linux", target_os = "macos")
     ))]
     file_drop::sync(state);
@@ -581,7 +581,7 @@ fn select(
     }
     state.files.serial = next;
     #[cfg(all(
-        feature = "shell",
+        feature = "shell-base",
         any(target_os = "windows", target_os = "linux", target_os = "macos")
     ))]
     file_drop::retire(state, node);
@@ -699,7 +699,7 @@ pub(super) fn poll(renderer: &Renderer) {
     }
     poll_reads(renderer, reads, &mut cx);
     #[cfg(all(
-        feature = "shell",
+        feature = "shell-base",
         any(target_os = "windows", target_os = "linux", target_os = "macos")
     ))]
     file_drop::poll(renderer, &mut cx);
