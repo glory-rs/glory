@@ -278,6 +278,56 @@ fn file_reader_returns_exact_bounded_chunks_at_the_original_watermark_and_never_
     ));
 }
 #[test]
+fn disabled_picker_can_read_selected_chunks_and_clear_still_revokes_pending_delivery() {
+    let f = fixture();
+    let reader = Arc::new(Reader::default());
+    accept(&f, reader.clone(), 8);
+    let file = token(&f);
+    f.app
+        .scope()
+        .patch(f.id, Patch::Enabled(Change::Set(false)))
+        .unwrap();
+    f.app.flush().unwrap();
+    assert!(f.app.scope().pick_files(f.id).is_err());
+    assert!(f.app.scope().remove_file(file).is_err());
+    for (index, offset) in [0, 4].into_iter().enumerate() {
+        let reply = read(&f, file, offset, 4);
+        f.app.pump().unwrap();
+        assert_eq!(reader.len(), index + 1);
+        reader.finish(index, Ok(vec![offset as u8; 4]));
+        f.app.pump().unwrap();
+        assert_eq!(
+            reply.borrow_mut().take().unwrap().unwrap(),
+            QueryValue::FileBytes(Box::new(FileChunk {
+                file,
+                offset,
+                bytes: vec![offset as u8; 4],
+            }))
+        );
+    }
+    let bad_range = read(&f, file, 7, 2);
+    f.app.pump().unwrap();
+    assert!(bad_range.borrow().as_ref().is_some_and(Result::is_err));
+    assert_eq!(reader.len(), 2);
+    let pending = read(&f, file, 0, 1);
+    f.app.pump().unwrap();
+    assert_eq!(reader.len(), 3);
+    f.app.scope().clear_files(f.id).unwrap();
+    f.app.flush().unwrap();
+    f.app.pump().unwrap();
+    assert!(pending.borrow().as_ref().is_some_and(Result::is_err));
+    assert_eq!(f.service.stats().reads, 1);
+    reader.finish(2, Ok(vec![1]));
+    f.app.pump().unwrap();
+    assert_eq!(f.service.stats().reads, 0);
+    assert!(f.app.tree().selected_file(file).is_err());
+    let retired = read(&f, file, 0, 1);
+    f.app.pump().unwrap();
+    assert!(retired.borrow().as_ref().is_some_and(Result::is_err));
+    assert_eq!(reader.len(), 3);
+    assert_eq!(f.picker.len(), 1);
+}
+#[test]
 fn revoked_reads_complete_queries_once_without_refunding_four_native_operations() {
     let f = fixture();
     let reader = Arc::new(Reader::default());

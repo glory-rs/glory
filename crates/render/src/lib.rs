@@ -265,9 +265,9 @@ impl Query {
                     incoming: file.revision,
                 });
             }
-            if !props.enabled {
-                return Err(Error::Unsupported("file control is disabled"));
-            }
+            // Disabling selection does not revoke an already selected file.
+            // Reads/previews retain their token and configuration checks;
+            // picker/removal actions still enforce the enabled state.
             if matches!(self, Self::FilePreview(_)) && props.configuration.preview.is_none() {
                 return Err(Error::Unsupported("file previews are not enabled"));
             }

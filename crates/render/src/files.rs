@@ -232,6 +232,8 @@ impl FileConfig {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct FileProps {
     pub label: String,
+    /// Enables selection and user removal; disabling alone does not revoke
+    /// read rights for an existing selected token.
     pub enabled: bool,
     pub configuration: FileConfig,
     pub revision: u64,

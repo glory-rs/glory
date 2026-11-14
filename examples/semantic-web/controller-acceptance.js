@@ -87,11 +87,28 @@ async function controllerAcceptance(page) {
             check(trusted && run(20).validFiles === 1, 'trusted native file drop accepted');
             const selected = run(1);
             check(selected.validFiles === 1, 'unrelated update preserves file rights');
+            run(21);
+            check(document.querySelector('.controller-file').disabled, 'picker is disabled during read');
             run(19);
             for (let i = 0; i < 100 && run(20).read === 'pending'; i++) {
                 await new Promise(resolve => setTimeout(resolve, 10));
             }
             check(run(20).read === '[97, 115, 121]', 'selected file bytes remain readable');
+            run(23);
+            for (let i = 0; i < 100 && run(20).read === 'pending'; i++) {
+                await new Promise(resolve => setTimeout(resolve, 10));
+            }
+            check(run(20).read === '[110, 99, 32]', 'next chunk remains readable while picker stays disabled');
+            for (const [blocked, restored] of [[2, 3], [8, 9]]) {
+                run(blocked);
+                run(19);
+                for (let i = 0; i < 100 && run(20).read === 'pending'; i++) {
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                }
+                check(run(20).read.includes('inactive or inert'), 'inert/suspended file control still blocks reads');
+                run(restored);
+            }
+            run(22);
             const retired = run(12);
             check(retired.validFiles === 0, 'configuration revision revokes selected tokens');
             check(input === document.querySelector('input[type=file]'), 'file control identity retained');
@@ -100,7 +117,7 @@ async function controllerAcceptance(page) {
             check(!oldEditor.isConnected && !input.isConnected, 'all controls removed');
             check(document.querySelector('#app').childNodes.length === 0, 'application released');
             delete window.__controllerProbe;
-            return { compositionEnds: retired.ends, filesRead: selected.files, trustedDrop: true, revokedConfiguration: true };
+            return { compositionEnds: retired.ends, filesRead: selected.files, trustedDrop: true, disabledChunkReads: true, blockedInertAndSuspendedReads: true, revokedConfiguration: true };
         });
         assert(errors.length === 0, JSON.stringify(errors));
         return { ...result, ...fileResult };

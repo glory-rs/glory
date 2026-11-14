@@ -707,10 +707,8 @@ impl Dom {
             _ => return Err(Error::Unsupported("file query kind")),
         };
         query.validate_target(&tree.node(file.node)?.descriptor)?;
-        if !tree.active(file.node) || !tree.enabled(file.node) || tree.inert(file.node) {
-            return Err(Error::Unsupported(
-                "file control is inactive, disabled or inert",
-            ));
+        if !tree.active(file.node) || tree.inert(file.node) {
+            return Err(Error::Unsupported("file control is inactive or inert"));
         }
         let info = tree.selected_file(file)?;
         let (raw, kind, length, offset, shared) = {
