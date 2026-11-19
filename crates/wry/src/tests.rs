@@ -344,8 +344,8 @@ fn preflight_and_direct_apply_reject_unsupported_metadata_with_accepted_prefix()
     let applied = renderer.0.borrow().mapper.receipt().applied;
     assert!(applied > 0);
     assert_eq!(renderer.apply(&[]).unwrap().applied, applied);
-    assert!(renderer.listen(id, EventKind::Drag, true).is_err());
-    renderer.listen(id, EventKind::Drag, false).unwrap();
+    assert!(renderer.listen(id, EventKind::Swipe, true).is_err());
+    renderer.listen(id, EventKind::Swipe, false).unwrap();
 }
 
 #[test]
@@ -436,7 +436,7 @@ fn captured_drag_is_supported_and_rejects_nonfinite_coordinates_and_unknown_phas
     };
     for phase in ["start", "move", "drop", "cancel"] {
         let wire: WireEvent = serde_json::from_str(&event(phase)).unwrap();
-        let event = wire.into_event(id).unwrap();
+        let event = wire.into_event(id, id).unwrap();
         assert!(
             renderer
                 .0
@@ -450,7 +450,7 @@ fn captured_drag_is_supported_and_rejects_nonfinite_coordinates_and_unknown_phas
     assert!(
         serde_json::from_str::<WireEvent>(&event("foreign"))
             .unwrap()
-            .into_event(id)
+            .into_event(id, id)
             .is_err()
     );
     ready(&renderer);
@@ -512,6 +512,65 @@ fn captured_drag_is_supported_and_rejects_nonfinite_coordinates_and_unknown_phas
             .is_err()
     );
 }
+#[test]
+fn hit_tested_drop_preserves_the_threshold_source() {
+    let runtime = RuntimeId::new();
+    let mut ids = NodeIds::new(runtime);
+    let source = ids.allocate();
+    let target = ids.allocate();
+    let mut renderer = Renderer::new(runtime);
+    let mut descriptor = Descriptor::new(Props::View);
+    descriptor.semantics = Some(Box::new(Semantics {
+        drag_capture: Some(glory_render::DragCapture::Threshold),
+        ..Default::default()
+    }));
+    renderer
+        .apply(&[
+            Mutation::Create {
+                id: source,
+                node: Box::new(descriptor),
+            },
+            Mutation::Place {
+                id: source,
+                parent: None,
+                before: None,
+            },
+            Mutation::Create {
+                id: target,
+                node: Box::new(Descriptor::new(Props::View)),
+            },
+            Mutation::Place {
+                id: target,
+                parent: None,
+                before: None,
+            },
+        ])
+        .unwrap();
+    renderer.listen(source, EventKind::Drag, true).unwrap();
+    renderer.listen(target, EventKind::Drag, true).unwrap();
+    ready(&renderer);
+
+    let drop = |source_id: NodeId, phase: &str| {
+        message(
+            &renderer,
+            json!({
+                "type":"event", "node":protocol::id(target),
+                "event":{"kind":"drag","phase":phase,"x":12.5,"y":22.5,"from":protocol::id(source_id)}
+            }),
+        )
+    };
+    assert!(renderer.receive(&drop(source, "move")).is_err());
+    assert!(renderer.receive(&drop(target, "drop")).is_err());
+    assert!(renderer.receive(&drop(source, "drop")).unwrap());
+    assert!(matches!(
+        renderer.0.borrow().inputs.as_slice(),
+        [Input::Event {
+            node,
+            event: Event::Drag { from, phase: glory_render::DragPhase::Drop, .. },
+        }] if *node == target && *from == source
+    ));
+}
+
 #[test]
 fn selection_boundaries_validate_before_transport_changes() {
     let runtime = RuntimeId::new();

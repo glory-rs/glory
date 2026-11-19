@@ -361,6 +361,7 @@ function gloryWry(config) {
       if(batch.v!==config.v || batch.session!==config.session || BigInt(batch.sequence)!==sequence+1n) throw Error("batch identity/order");
       sequence=BigInt(batch.sequence);
       for(const command of batch.commands) apply(command);
+      syncContextLayers();
       flushActions();
       post({type:"ack",sequence:batch.sequence});
     } catch(error) {fault(error);}
@@ -369,16 +370,75 @@ function gloryWry(config) {
   // interpreter; applications decide what a completed drag means.
   let drag=null, suppressClick=false;
   const dragBlocked=e=>!alive(e) || main(e)?.closest("[hidden],[inert],[data-gly-hidden],[aria-disabled=true],[aria-readonly=true]");
+  function dragObserver(target) {
+    let entry = origin(target);
+    while (entry && !entry.interests.has("Drag")) {
+      entry = entry.parent ? entries.get(entry.parent) : null;
+    }
+    return entry;
+  }
+
+  const thresholdCapture = capture => capture === "threshold" || capture === "threshold-preview";
+
+  function hitDragTarget(x, y) {
+    let entry = origin(document.elementFromPoint(x, y));
+    while (entry) {
+      const capture = main(entry)?.getAttribute("data-gly-drag-capture");
+      if (entry.interests.has("Drag") && !dragBlocked(entry)
+          && (!capture || thresholdCapture(capture))) return entry;
+      entry = entry.parent ? entries.get(entry.parent) : null;
+    }
+    return null;
+  }
+
+  function createDragPreview(source) {
+    const label = source.getAttribute("aria-label");
+    if (!label) return null;
+    const preview = document.createElement("div");
+    preview.setAttribute("data-gly-drag-preview", "");
+    preview.setAttribute("aria-hidden", "true");
+    preview.textContent = label;
+    preview.style.visibility = "hidden";
+    const style = getComputedStyle(source);
+    for (const property of ["font", "color-scheme", "--gly-drag-preview-bg",
+                             "--gly-drag-preview-text", "--gly-drag-preview-line"]) {
+      const value = style.getPropertyValue(property);
+      if (value) preview.style.setProperty(property, value);
+    }
+    document.body.appendChild(preview);
+    return preview;
+  }
+
+  function placeDragPreview(session) {
+    const preview = session.preview;
+    if (!preview) return;
+    const x = Math.max(8, Math.min(session.x + 14, innerWidth - preview.offsetWidth - 8));
+    const y = Math.max(8, Math.min(session.y + 16, innerHeight - preview.offsetHeight - 8));
+    const position = "translate(" + x + "px," + y + "px)";
+    if (session.previewPosition !== position) {
+      preview.style.transform = position;
+      preview.style.removeProperty("visibility");
+      session.previewPosition = position;
+    }
+  }
+
   function finishDrag(phase,x,y) {
     const previous=drag;drag=null;
-    if(!previous)return;
-    if(entries.get(previous.e.id)===previous.e)
-      event(previous.e,{kind:"drag",phase,x,y});
+    if (!previous?.started) return;
+    previous.preview?.remove();
+    if (entries.get(previous.e.id) === previous.e) {
+      const targeted = phase === "drop" && previous.threshold;
+      const target = targeted ? hitDragTarget(x, y) : previous.e;
+      if (!target) event(previous.e, {kind:"drag",phase:"cancel",x,y});
+      else if (targeted) event(target, {kind:"drag",phase,x,y,from:previous.e.id});
+      else event(target, {kind:"drag",phase,x,y});
+    }
     try{previous.element.releasePointerCapture(previous.pointer);}catch(_){}
   }
-  function dragScroll() {
-    if(!drag)return;
+  function dragScroll(session) {
+    if (drag !== session || !session.started) return;
     if(dragBlocked(drag.e)){finishDrag("cancel",drag.x,drag.y);return;}
+    placeDragPreview(drag);
     let changed=false, vertical=false, horizontal=false;
     for(let element=document.elementFromPoint(drag.x,drag.y);element && element!==root;element=element.parentElement) {
       const rect=element.getBoundingClientRect(),style=getComputedStyle(element);
@@ -393,42 +453,144 @@ function gloryWry(config) {
       }
     }
     if(changed)event(drag.e,{kind:"drag",phase:"move",x:drag.x,y:drag.y});
-    requestAnimationFrame(dragScroll);
+    requestAnimationFrame(() => dragScroll(session));
   }
-  function receiveDrag(raw) {
-    if(raw.type==="pointerdown") {
-      suppressClick=false;
-      if(drag)finishDrag("cancel",drag.x,drag.y);
-      if(raw.button!==0 || !raw.isPrimary || raw.target.closest?.("input,textarea,select,button,a,[contenteditable=true]"))return;
-      let e=origin(raw.target);
-      while(e && !e.interests.has("Drag"))e=e.parent?entries.get(e.parent):null;
-      if(!e || dragBlocked(e))return;
-      const element=main(e), capture=element.getAttribute("data-gly-drag-capture");
-      // This host supports explicit source capture. Threshold/hit-target drag
-      // remains unsupported rather than silently changing its event contract.
-      if(!capture)return;
-      try{element.setPointerCapture(raw.pointerId);}catch(_){return;}
-      raw.preventDefault();
-      if(capture==="press-focus")element.focus({preventScroll:true});
-      drag={e,element,pointer:raw.pointerId,x:raw.clientX,y:raw.clientY};
-      event(e,{kind:"drag",phase:"start",x:raw.clientX,y:raw.clientY});requestAnimationFrame(dragScroll);return;
-    }
-    if(!drag || raw.pointerId!==drag.pointer)return;
-    if(dragBlocked(drag.e)){finishDrag("cancel",raw.clientX,raw.clientY);return;}
+  function startDrag(raw, session) {
+    try { session.element.setPointerCapture(raw.pointerId); }
+    catch (_) { drag = null; return false; }
+    session.started = true;
+    if (session.showPreview) session.preview = createDragPreview(session.element);
     raw.preventDefault();
-    drag.x=raw.clientX;drag.y=raw.clientY;
-    if(raw.type==="pointermove")event(drag.e,{kind:"drag",phase:"move",x:drag.x,y:drag.y});
-    else if(raw.type==="pointerup"){suppressClick=true;finishDrag("drop",drag.x,drag.y);}
-    else finishDrag("cancel",drag.x,drag.y);
+    if (session.focus) session.element.focus({preventScroll:true});
+    event(session.e,{kind:"drag",phase:"start",x:session.x,y:session.y});
+    requestAnimationFrame(() => dragScroll(session));
+    return true;
+  }
+
+  function receiveDrag(raw) {
+    if (raw.type === "pointerdown") {
+      if (raw.button !== 0 || !raw.isPrimary) return;
+      suppressClick = false;
+      if (drag) finishDrag("cancel",drag.x,drag.y);
+      const entry = dragObserver(raw.target);
+      if (!entry || dragBlocked(entry)) return;
+      const element = main(entry), capture = element.getAttribute("data-gly-drag-capture");
+      if (!capture || raw.target.closest?.("input,textarea,select,[contenteditable=true]")) return;
+      const threshold = thresholdCapture(capture);
+      if (!threshold && raw.target.closest?.("button,a")) return;
+      drag = {e:entry,element,pointer:raw.pointerId,x:raw.clientX,y:raw.clientY,
+              threshold,focus:capture==="press-focus",showPreview:capture==="threshold-preview",started:false};
+      if (!threshold) startDrag(raw,drag);
+      return;
+    }
+    if (!drag || raw.pointerId !== drag.pointer) return;
+    const x = raw.clientX, y = raw.clientY;
+    if (dragBlocked(drag.e) || raw.type === "pointercancel" || raw.type === "lostpointercapture") {
+      finishDrag("cancel",x,y);
+      return;
+    }
+    if (raw.type === "pointermove") {
+      if (!drag.started && (Math.hypot(x-drag.x,y-drag.y) < 6 || !startDrag(raw,drag))) return;
+      raw.preventDefault();
+      drag.x=x; drag.y=y;
+      event(drag.e,{kind:"drag",phase:"move",x,y});
+    } else if (raw.type === "pointerup") {
+      if (drag.started) {
+        raw.preventDefault();
+        suppressClick = true;
+      }
+      finishDrag("drop",x,y);
+    }
   }
   window.addEventListener("blur",()=>{if(drag)finishDrag("cancel",drag.x,drag.y);});
-  window.addEventListener("keydown",raw=>{if(raw.key==="Escape" && drag){raw.preventDefault();finishDrag("cancel",drag.x,drag.y);}},true);
+  window.addEventListener("keydown",raw=>{if(raw.key==="Escape" && drag){if(drag.started)raw.preventDefault();finishDrag("cancel",drag.x,drag.y);}},true);
+  // Wry supports nonmodal context-point layers. The DOM owns their top-layer
+  // placement, while the widget owns visibility, item selection and commands.
+  let openContext = null;
+  function contextDismiss(reason) {
+    if (openContext && !openContext.dismissed) {
+      openContext.dismissed = true;
+      event(openContext.entry,{kind:"dismiss",reason});
+    }
+  }
+
+  function syncContextLayers() {
+    const next = root.querySelector('[data-gly-layer="context-point"]:not([hidden])');
+    if (openContext && (openContext.panel !== next || !next?.isConnected)) {
+      const {panel, anchor} = openContext;
+      const restore = panel.contains(document.activeElement) || document.activeElement === document.body;
+      panel.hidePopover?.();
+      openContext = null;
+      if (!next && restore && anchor?.isConnected) anchor.focus({preventScroll:true});
+    }
+    if (!next) return;
+    const anchor = document.getElementById(next.dataset.glyContextAnchor);
+    if (anchor && !anchor.closest("[hidden],[inert],[data-gly-hidden]") && anchor.getClientRects().length) {
+      const opening = !openContext;
+      if (opening) {
+        openContext = {panel:next,anchor,entry:origin(next),dismissed:false};
+        next.showPopover();
+      }
+      const clamp = (point, space) => Math.max(8, Math.min(Number(point), space - 8));
+      next.style.setProperty("--gly-layer-x", clamp(next.dataset.glyContextX, innerWidth-next.offsetWidth)+"px");
+      next.style.setProperty("--gly-layer-y", clamp(next.dataset.glyContextY, innerHeight-next.offsetHeight)+"px");
+      if (opening) (next.querySelector('[data-gly-menu-item]:not(:disabled):not([aria-disabled=true])') || next).focus({preventScroll:true});
+    } else if (openContext) {
+      contextDismiss("anchor_lost");
+    } else {
+      const entry = origin(next);
+      if (entry?.interests.has("Dismiss")) event(entry,{kind:"dismiss",reason:"anchor_lost"});
+    }
+  }
+
+  function receiveContext(raw, keyboard) {
+    const target = raw.target.closest?.("[data-gly-context]");
+    const entry = origin(target);
+    if (!entry?.interests.has("ContextMenu") || dragBlocked(entry)) return false;
+    if (target.dataset.glyContext === "native-editors" &&
+        raw.target.closest?.("input,textarea,select,[contenteditable=true]")) return false;
+    const rect = keyboard ? target.getBoundingClientRect() : null;
+    raw.preventDefault();
+    raw.stopImmediatePropagation();
+    if (openContext && openContext.anchor !== target) contextDismiss("outside");
+    event(entry,{kind:"context_menu",keyboard,x:rect ? rect.left : raw.clientX,y:rect ? rect.bottom : raw.clientY});
+    return true;
+  }
+
+  window.addEventListener("resize",()=>{if(openContext)syncContextLayers();});
+  document.addEventListener("pointerdown",raw=>{
+    if (openContext && !openContext.panel.contains(raw.target)) contextDismiss("outside");
+  },true);
+  document.addEventListener("focusin",raw=>{
+    if (openContext && !openContext.panel.contains(raw.target)) contextDismiss("outside");
+  },true);
+  window.addEventListener("keydown",raw=>{
+    if (openContext && raw.key === "Escape" && !raw.isComposing) {
+      raw.preventDefault(); raw.stopImmediatePropagation(); contextDismiss("escape");
+    }
+  },true);
+
+  let movedMenuItem = null;
+  function receiveMenuPointer(raw) {
+    const item = raw.target.closest?.("[data-gly-menu-item]");
+    const entry = origin(item);
+    if (!entry || !openContext?.panel.contains(item) || dragBlocked(entry)) return;
+    const phase = {pointerover:"enter",pointerout:"leave",pointermove:"move"}[raw.type];
+    if (phase !== "move" && item.contains(raw.relatedTarget)) return;
+    if (phase === "move" && movedMenuItem === item) return;
+    movedMenuItem = phase === "move" ? item : null;
+    if (entry.interests.has("Pointer") || observed(entry,"PointerWithin")) {
+      event(entry,{kind:"pointer",phase});
+    }
+  }
+
   function receive(domEvent) {
     const e=origin(domEvent.target);
     if(!e || !alive(e)) return;
     const input=control(e), element=main(e);
     const disabled=!input || input.disabled || element.getAttribute("aria-disabled")==="true";
     switch(domEvent.type) {
+      case "contextmenu": receiveContext(domEvent,false);break;
       case "click":
         if(suppressClick){suppressClick=false;domEvent.preventDefault();domEvent.stopPropagation();return;}
         if(disabled || input.readOnly && e.edit==="Check") {domEvent.preventDefault();return;}
@@ -457,6 +619,9 @@ function gloryWry(config) {
       case "keydown": {
         if(domEvent.isComposing || e.composing || domEvent.repeat || domEvent.altKey) return;
         const key=domEvent.key,editable=e.edit==="Text";
+        const chord=domEvent.ctrlKey || domEvent.metaKey;
+        if (!chord && ((key==="F10" && domEvent.shiftKey) || (key==="ContextMenu" && !domEvent.shiftKey)) &&
+            receiveContext(domEvent,true)) return;
         if(key==="Enter" && editable && input.tagName!=="TEXTAREA" && !disabled && !input.readOnly && e.interests.has("Commit")) {
           domEvent.preventDefault();event(e,{kind:"commit",value:readValue(e),revision:e.revision});
         }
@@ -464,7 +629,12 @@ function gloryWry(config) {
           const command={ArrowUp:"previous",ArrowDown:"next",Home:"first",End:"last",PageUp:"page_previous",PageDown:"page_next"}[key];
           if(command) {domEvent.preventDefault();event(e,{kind:"navigate",command});return;}
         }
-        const chord=domEvent.ctrlKey || domEvent.metaKey;
+        if (!editable && !chord && key.length===1 && /\S/.test(key) &&
+            openContext?.panel.contains(domEvent.target) && observed(e,"Typeahead")) {
+          domEvent.preventDefault();
+          event(e,{kind:"typeahead",text:key,at_millis:Math.floor(performance.now())});
+          return;
+        }
         const command=key==="Escape"?"dismiss":editable?(key==="Enter"&&!domEvent.shiftKey?"submit":null):
           chord&&!domEvent.shiftKey&&key.toLowerCase()==="k"?"palette":chord&&!domEvent.shiftKey&&key.toLowerCase()==="f"?"search":
           key==="?"||chord&&key==="/"||domEvent.shiftKey&&key==="/"?"help":null;
@@ -476,9 +646,11 @@ function gloryWry(config) {
   function start() {
     root=document.getElementById("glory-root");
     if(!root) {fault("missing Glory mount");return;}
-    for(const name of ["click","input","change","compositionstart","compositionend","focusin","focusout","scroll","keydown"])
+    for(const name of ["contextmenu","click","input","change","compositionstart","compositionend","focusin","focusout","scroll","keydown"])
       root.addEventListener(name,receive,true);
     for(const name of ["pointerdown","pointermove","pointerup","pointercancel","lostpointercapture"])root.addEventListener(name,receiveDrag,true);
+    for (const name of ["pointerover","pointerout","pointermove"])
+      root.addEventListener(name,receiveMenuPointer,true);
     post({type:"ready"});
   }
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",start,{once:true}); else start();

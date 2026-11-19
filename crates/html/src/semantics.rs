@@ -574,6 +574,9 @@ pub(crate) fn attributes(
         if let glory_render::LayerPlacement::ContextPoint(point) = layer.placement {
             attrs.insert("data-gly-context-x", point.x.to_string());
             attrs.insert("data-gly-context-y", point.y.to_string());
+            if let Some(anchor) = &layer.anchor {
+                attrs.insert("data-gly-context-anchor", anchor.as_str().into());
+            }
         }
         if let Some(sheet) = &layer.sheet {
             attrs.insert(
