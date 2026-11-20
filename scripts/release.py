@@ -305,7 +305,7 @@ def main():
                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
     if not exists:
         command = ["gh", "release", "create", tag, "--repo", plan["repository"], "--verify-tag",
-                   "--title", plan["title"] + " " + version, "--notes-file", str(notes)]
+                   "--title", plan["title"] + " " + version, "--notes-file", str(notes), "--latest=false"]
         if "-" in version:
             command.append("--prerelease")
         run(*command, str(evidence), *map(str, artifacts))
