@@ -123,6 +123,8 @@ pub enum WireEvent {
         phase: String,
         x: f64,
         y: f64,
+        #[serde(default)]
+        from: Option<String>,
     },
     Value {
         value: String,
@@ -160,6 +162,21 @@ pub enum WireEvent {
     },
     Navigate {
         command: String,
+    },
+    ContextMenu {
+        x: f64,
+        y: f64,
+        keyboard: bool,
+    },
+    Dismiss {
+        reason: String,
+    },
+    Typeahead {
+        text: String,
+        at_millis: u64,
+    },
+    Pointer {
+        phase: String,
     },
     ColorScheme {
         dark: bool,

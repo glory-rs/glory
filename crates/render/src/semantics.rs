@@ -261,7 +261,7 @@ pub struct Semantics {
     pub collapse: Option<crate::CollapseConfig>,
     /// Optional finite opacity/transform presence; logical availability is immediate.
     pub presence: Option<Box<crate::PresenceConfig>>,
-    /// Immediate primary-pointer capture, in viewport CSS pixels.
+    /// Primary-pointer capture, in viewport CSS pixels.
     pub drag_capture: Option<crate::DragCapture>,
     /// Axis intent capture preserves orthogonal native panning.
     pub swipe_capture: Option<crate::SwipeCapture>,

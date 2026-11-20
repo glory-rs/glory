@@ -308,7 +308,36 @@ impl Renderer {
                 let Some(node) = state.nodes.id_for_token(&node) else {
                     return Ok(false);
                 };
-                let event = event.into_event(node)?;
+                let from = if let WireEvent::Drag {
+                    from: Some(source),
+                    phase,
+                    ..
+                } = &event
+                {
+                    let Some(source) = state.nodes.id_for_token(source) else {
+                        return Ok(false);
+                    };
+                    if phase != "drop"
+                        || !state
+                            .mapper
+                            .tree()
+                            .node(source)?
+                            .descriptor
+                            .view()
+                            .semantics
+                            .as_ref()
+                            .and_then(|s| s.drag_capture)
+                            .is_some_and(glory_render::DragCapture::is_threshold)
+                    {
+                        return Err(Error::InvalidEvent(
+                            "Wry hit-tested drop requires a threshold drag source",
+                        ));
+                    }
+                    source
+                } else {
+                    node
+                };
+                let event = event.into_event(node, from)?;
                 let editing = matches!(event, Event::ValueChanged { .. });
                 if editing {
                     if state.edit_receipts.len() >= protocol::MAX_INPUTS
@@ -426,6 +455,20 @@ fn preflight(node: DescriptorView<'_>, patch: Option<&Patch>) -> Result<(), Erro
         Some(Patch::Semantics(Change::Set(value))) => value.as_deref(),
         _ => None,
     };
+    let context_layer = |layer: &glory_render::Layer| {
+        !layer.modal
+            && layer.sheet.is_none()
+            && layer.escape
+            && layer.outside
+            && layer.anchor.is_some()
+            && layer.initial_focus.is_none()
+            && layer.return_focus.is_none()
+            && layer.focus == glory_render::LayerFocus::Manage
+            && matches!(
+                layer.placement,
+                glory_render::LayerPlacement::ContextPoint(_)
+            )
+    };
     if let Some(s) = semantics
         && (s.focus_scope.is_some()
             || s.input_edit.is_some()
@@ -433,7 +476,6 @@ fn preflight(node: DescriptorView<'_>, patch: Option<&Patch>) -> Result<(), Erro
             || s.collapse.is_some()
             || s.presence.is_some()
             || s.swipe_capture.is_some()
-            || s.context_menu.is_some()
             || s.tags_input.is_some()
             || s.splitter.is_some()
             || s.slider.is_some()
@@ -441,16 +483,15 @@ fn preflight(node: DescriptorView<'_>, patch: Option<&Patch>) -> Result<(), Erro
             || s.scroll_keyboard.is_some()
             || s.combobox.is_some()
             || s.option.is_some()
-            || s.menu_item.is_some()
             || s.menu_search.is_some()
             || s.menubar_item
-            || s.layer.is_some()
+            || s.layer.as_ref().is_some_and(|layer| !context_layer(layer))
             || s.sheet_grip
-            || s.navigation.is_some()
+            || ((s.navigation.is_some() || s.typeahead)
+                && !s.layer.as_ref().is_some_and(context_layer))
             || s.grid_navigation.is_some()
             || s.tree_navigation.is_some()
             || s.navigation_panel.is_some()
-            || s.typeahead
             || s.form_action.is_some()
             || s.form_control.is_some()
             || s.field_part == Some(FieldPart::Form))
@@ -480,6 +521,12 @@ fn supported_event(kind: EventKind) -> bool {
             | EventKind::Clipboard
             | EventKind::ImageStatus
             | EventKind::Drag
+            | EventKind::ContextMenu
+            | EventKind::Dismiss
+            | EventKind::Menu
+            | EventKind::Typeahead
+            | EventKind::Pointer
+            | EventKind::PointerWithin
     )
 }
 impl Render for Renderer {
@@ -514,17 +561,6 @@ impl Render for Renderer {
             kind.validate_target(descriptor)?;
             if !supported_event(kind) {
                 return Err(Error::Unsupported("Wry event"));
-            }
-            if kind == EventKind::Drag
-                && descriptor
-                    .semantics
-                    .as_deref()
-                    .and_then(|s| s.drag_capture)
-                    .is_none()
-            {
-                return Err(Error::Unsupported(
-                    "Wry drag requires explicit source capture",
-                ));
             }
         }
         state.transport.push(json!({"op":"listen","id":protocol::id(node),"kind":format!("{kind:?}"),"enabled":enabled}))?;
@@ -722,7 +758,7 @@ impl Render for Renderer {
 }
 
 impl WireEvent {
-    fn into_event(self, node: NodeId) -> Result<Event, Error> {
+    fn into_event(self, node: NodeId, drag_source: NodeId) -> Result<Event, Error> {
         Ok(match self {
             Self::Clipboard {
                 request,
@@ -808,8 +844,8 @@ impl WireEvent {
                     ImageStatus::Failed
                 },
             },
-            Self::Drag { phase, x, y } => Event::Drag {
-                from: node,
+            Self::Drag { phase, x, y, .. } => Event::Drag {
+                from: drag_source,
                 x,
                 y,
                 phase: match phase.as_str() {
@@ -829,6 +865,36 @@ impl WireEvent {
                     "help" => KeyboardCommand::Help,
                     "dismiss" => KeyboardCommand::Dismiss,
                     _ => return Err(Error::InvalidEvent("Wry keyboard command")),
+                },
+            },
+            Self::ContextMenu { x, y, keyboard } => Event::ContextMenu {
+                from: node,
+                point: glory_render::ContextPoint { x, y },
+                source: if keyboard {
+                    glory_render::ContextSource::Keyboard
+                } else {
+                    glory_render::ContextSource::Pointer
+                },
+            },
+            Self::Dismiss { reason } => Event::Dismiss(match reason.as_str() {
+                "escape" => glory_render::DismissReason::Escape,
+                "outside" => glory_render::DismissReason::Outside,
+                "anchor_lost" => glory_render::DismissReason::AnchorLost,
+                _ => return Err(Error::InvalidEvent("Wry dismissal reason")),
+            }),
+            Self::Typeahead { text, at_millis } => Event::Typeahead {
+                from: node,
+                text,
+                at_millis,
+            },
+            Self::Pointer { phase } => Event::Pointer {
+                from: node,
+                related: None,
+                phase: match phase.as_str() {
+                    "enter" => glory_render::PointerPhase::Enter,
+                    "leave" => glory_render::PointerPhase::Leave,
+                    "move" => glory_render::PointerPhase::Move,
+                    _ => return Err(Error::InvalidEvent("Wry pointer phase")),
                 },
             },
             Self::Navigate { command } => Event::Navigate {
