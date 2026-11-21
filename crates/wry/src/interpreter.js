@@ -514,7 +514,9 @@ function gloryWry(config) {
           && !button.disabled && button.tabIndex>=0 && button.getAttribute("aria-disabled")!=="true") {
         // Cancel WebKit's subsequent default mouse focus clearing. Click still
         // activates on release; no activation is sent from this press handler.
-        raw.preventDefault();
+        // A canceled press also suppresses native dragstart on draggable rows
+        // containing buttons. Leave the drag gesture to the WebView there.
+        if (!button.closest('[draggable="true" i]')) raw.preventDefault();
         button.focus({preventScroll:true});
       }
       suppressClick = false;
