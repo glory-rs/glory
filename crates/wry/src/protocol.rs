@@ -24,10 +24,28 @@ fn property(value: Property) -> Result<Value, Error> {
     Ok(match value {
         Property::Text(text) => json!(text),
         Property::Bool(value) => json!(value),
+        Property::SelectedKeys(keys) => json!(keys),
         _ => return Err(Error::Unsupported("Wry structured control property")),
     })
 }
 fn shape(shape: Shape) -> Result<Value, Error> {
+    fn option(value: &glory_render::SelectOption) -> Value {
+        json!({"key":value.key.as_str(),"label":value.label,"value":value.value,"disabled":value.disabled})
+    }
+    let options = shape.select_options.as_ref().map(|config| {
+        let entries = config
+            .entries
+            .iter()
+            .map(|entry| match entry {
+                glory_render::SelectEntry::Option(value) => option(value),
+                glory_render::SelectEntry::Group(group) => json!({
+                    "label":group.label,"disabled":group.disabled,
+                    "options":group.options.iter().map(option).collect::<Vec<_>>()
+                }),
+            })
+            .collect::<Vec<_>>();
+        json!({"entries":entries,"placeholder":config.placeholder})
+    });
     let pieces = shape
         .pieces
         .into_iter()
@@ -49,11 +67,13 @@ fn shape(shape: Shape) -> Result<Value, Error> {
             Ok(json!({"part":piece.part.name(),"parent":piece.parent.map(|p|p.name()),"kind":kind}))
         })
         .collect::<Result<Vec<_>, Error>>()?;
-    Ok(
-        json!({"pieces":pieces,"children":shape.children.map(|p|p.name()),
+    let mut value = json!({"pieces":pieces,"children":shape.children.map(|p|p.name()),
         "control":shape.control.map(|p|p.name()),"edit":format!("{:?}",shape.edit),
-        "revision":shape.revision.to_string(),"prevent":shape.prevent_activate_default}),
-    )
+        "revision":shape.revision.to_string(),"prevent":shape.prevent_activate_default});
+    if let Some(options) = options {
+        value["options"] = options;
+    }
+    Ok(value)
 }
 pub fn op(op: Op) -> Result<Value, Error> {
     Ok(match op {
@@ -133,6 +153,10 @@ pub enum WireEvent {
     },
     Commit {
         value: String,
+        revision: String,
+    },
+    Select {
+        keys: Vec<String>,
         revision: String,
     },
     Checked {

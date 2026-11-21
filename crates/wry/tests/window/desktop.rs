@@ -1,5 +1,8 @@
 //! Real system WebView acceptance, opt in on the platform's UI/main thread.
-use glory_render::{Query, QueryValue, TextSelection, style::*};
+use glory_render::{
+    Query, QueryValue, SelectEntry, SelectGroup, SelectOption, SelectProps, SemanticId,
+    TextSelection, style::*,
+};
 use glory_ui::{events::*, *};
 use glory_wry::shell::{Config, Shell, ShellError, WindowApp};
 use std::{
@@ -62,6 +65,48 @@ pub fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
         std::future::pending::<()>().await;
         drop(guard);
     })?;
+    // Exercise the same structured select and controlled echo that Sapid NativeSelect mounts.
+    let choice = scope.cage(Vec::<SemanticId>::new());
+    let option = |key: &str, label: &str| SelectOption {
+        key: SemanticId::new(key).unwrap(),
+        value: "shared-value".into(),
+        label: label.into(),
+        disabled: false,
+    };
+    app.mount(
+        group().fill((
+            select()
+                .name("Refresh interval")
+                .configuration(SelectProps {
+                    entries: Rc::new(vec![
+                        SelectEntry::Option(option("auto", "Follow application")),
+                        SelectEntry::Group(SelectGroup {
+                            label: "Intervals".into(),
+                            disabled: false,
+                            options: vec![
+                                option("three", "Every 3 s"),
+                                option("five", "Every 5 s"),
+                            ],
+                        }),
+                    ]),
+                    placeholder: "Choose an interval".into(),
+                    ..Default::default()
+                })
+                .selected(choice)
+                .on(select_changed, move |event| {
+                    if let Event::SelectChanged { keys, .. } = event {
+                        choice.revise(|saved| *saved = keys);
+                    }
+                }),
+            text()
+                .class("select-echo")
+                .content(choice.map(|keys| keys.first().map_or("", SemanticId::as_str).to_owned())),
+            button()
+                .class("select-reset")
+                .label("Reset interval")
+                .on(activate, move |_| choice.revise(Vec::clear)),
+        )),
+    )?;
     let output = app.renderer().clone();
     let author = output.clone();
     app.mount(

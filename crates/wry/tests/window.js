@@ -5,6 +5,16 @@ document.addEventListener("DOMContentLoaded",()=>{
     const input=document.querySelector('input[aria-label="Message"]');
     document.querySelector(".increment").click();
     await wait(()=>document.querySelector(".count").textContent==="Count:1");
+    const menu=document.querySelector('select[aria-label="Refresh interval"]');
+    const group=menu.querySelector('optgroup');
+    if (!menu.selectedOptions[0].hidden || !menu.selectedOptions[0].disabled || group.label!=="Intervals")
+      throw Error("Native select placeholder or option group missing");
+    menu.querySelector('[data-gly-option="five"]').selected=true;
+    menu.dispatchEvent(new Event("change",{bubbles:true}));
+    await wait(()=>document.querySelector(".select-echo").textContent==="five");
+    document.querySelector(".select-reset").click();
+    await wait(()=>menu.selectedOptions[0]?.hasAttribute("data-gly-placeholder"));
+    if(menu!==document.querySelector('select[aria-label="Refresh interval"]')) throw Error("Controlled reset replaced native select");
     const capture=document.querySelector(".capture");
     const press=()=>{
       const event=new PointerEvent("pointerdown",{bubbles:true,cancelable:true,button:0,isPrimary:true,pointerId:1});

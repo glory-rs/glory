@@ -317,13 +317,68 @@ fn malformed_foreign_stale_and_future_inputs_never_reenter_business_code() {
     assert!(renderer.take_script().is_err());
 }
 #[test]
+fn native_multi_select_transports_keys_and_validates_changes() {
+    let runtime = RuntimeId::new();
+    let id = NodeIds::new(runtime).allocate();
+    let mut renderer = Renderer::new(runtime);
+    let option = |key: &str, disabled| SelectOption {
+        key: SemanticId::new(key).unwrap(),
+        label: key.into(),
+        value: "shared".into(),
+        disabled,
+    };
+    create(
+        &mut renderer,
+        id,
+        Props::Select(SelectProps {
+            multiple: true,
+            entries: Rc::new(vec![SelectEntry::Group(SelectGroup {
+                label: "Group".into(),
+                disabled: false,
+                options: vec![option("a", false), option("b", false), option("c", true)],
+            })]),
+            selection: SelectSelection {
+                keys: vec![SemanticId::new("b").unwrap()],
+                revision: 3,
+            },
+            ..Default::default()
+        }),
+    );
+    renderer.listen(id, EventKind::SelectChanged, true).unwrap();
+    ready(&renderer);
+    let initial = batch(&renderer);
+    let shape = &initial["commands"][0]["shape"];
+    assert_eq!(
+        shape["options"]["entries"][0]["options"][1]["value"],
+        "shared"
+    );
+    assert_eq!(
+        shape["pieces"][0]["kind"]["properties"]["selectedKeys"],
+        json!(["b"])
+    );
+    let change = |keys: &[&str], revision| {
+        renderer.receive(&message(&renderer, json!({
+        "type":"event", "node":protocol::id(id), "event":{"kind":"select","keys":keys,"revision":revision}
+    })))
+    };
+    assert!(change(&["a", "b"], "3").unwrap());
+    assert!(change(&["b", "a"], "3").is_err());
+    assert!(change(&["c"], "3").is_err());
+    assert!(change(&["a"], "4").is_err());
+    assert!(
+        matches!(&renderer.0.borrow().inputs[..], [Input::Event {event: Event::SelectChanged{keys,revision:3},..}]
+        if keys.iter().map(SemanticId::as_str).eq(["a","b"]))
+    );
+}
+
+#[test]
 fn preflight_and_direct_apply_reject_unsupported_metadata_with_accepted_prefix() {
     let runtime = RuntimeId::new();
     let mut ids = NodeIds::new(runtime);
     let id = ids.allocate();
     let bad = ids.allocate();
     let mut renderer = Renderer::new(runtime);
-    let unsupported = Descriptor::new(Props::Select(SelectProps::default()));
+    let unsupported = Descriptor::new(Props::File(FileProps::default()));
     assert!(renderer.preflight(unsupported.view(), None).is_err());
     assert!(
         renderer
