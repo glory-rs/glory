@@ -34,7 +34,7 @@ repository's approved cache environment before Cargo (on macOS, source
 | Basic UI | View, Group, Text, Button, Input/textarea, Check, native single/multiple Select and Image/Link |
 | Updates | Shared HTML create/field patch/place/suspend/resume/dispose, including detached Groups and explicit Plans |
 | State | Native Cage/Bond and Owner lifecycle; one ready-task executor per WindowApp |
-| Input | Activation, canonical text, controlled revision echoes, composition protocol, commit and checked state |
+| Input | Activation, canonical text, controlled revision echoes, composition protocol, commit and checked state, native radio groups with directional keyboard navigation |
 | Focus | Actual focus observations and queries, focus without scrolling, exact UTF-16 selection actions/queries |
 | Geometry | Bounds, scroll offsets/metrics, ResizeObserver interests and scroll acknowledgements |
 | Commands | Finite Keyboard/Navigate events on explicitly observed ancestors |

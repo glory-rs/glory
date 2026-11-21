@@ -633,6 +633,17 @@ function gloryWry(config) {
     }
   }
 
+  function radioNavigation(group,key) {
+    if(key==="Home") return "first";
+    if(key==="End") return "last";
+    if(group.dataset.glyNavigation==="vertical") {
+      if(key==="ArrowUp") return "previous";
+      if(key==="ArrowDown") return "next";
+    } else {
+      if(key==="ArrowLeft") return group.dir==="rtl" ? "next" : "previous";
+      if(key==="ArrowRight") return group.dir==="rtl" ? "previous" : "next";
+    }
+  }
   function receive(domEvent) {
     const e=origin(domEvent.target);
     if(!e || !alive(e)) return;
@@ -671,15 +682,23 @@ function gloryWry(config) {
         if(observed(e,"FocusWithin") || e.interests.has("FocusChanged")) event(e,{kind:"focus",focused:domEvent.type==="focusin"});break;
       case "scroll": if(domEvent.target===element) scroll(e);break;
       case "keydown": {
-        if(domEvent.isComposing || e.composing || domEvent.repeat || domEvent.altKey) return;
+        if(domEvent.isComposing || e.composing || domEvent.altKey) return;
         const key=domEvent.key,editable=e.edit==="Text";
         const chord=domEvent.ctrlKey || domEvent.metaKey;
+        const boundary=domEvent.target.closest?.("[data-gly-navigation]");
+        const radioGroup=boundary?.getAttribute("role")==="radiogroup";
+        if(radioGroup && !disabled && !chord && !domEvent.shiftKey && origin(boundary)?.interests.has("Navigate")
+            && (domEvent.target===boundary || (domEvent.target===input && input.type==="radio" && input.hasAttribute("data-gly-navigation-item")))) {
+          const command=radioNavigation(boundary,key);
+          if(command) {domEvent.preventDefault();event(e,{kind:"navigate",command});return;}
+        }
+        if(domEvent.repeat) return;
         if (!chord && ((key==="F10" && domEvent.shiftKey) || (key==="ContextMenu" && !domEvent.shiftKey)) &&
             receiveContext(domEvent,true)) return;
         if(key==="Enter" && editable && input.tagName!=="TEXTAREA" && !disabled && !input.readOnly && e.interests.has("Commit")) {
           domEvent.preventDefault();event(e,{kind:"commit",value:readValue(e),revision:e.revision});
         }
-        if(!editable && e.edit!=="Select" && !domEvent.ctrlKey && !domEvent.metaKey && !domEvent.shiftKey && observed(e,"Navigate")) {
+        if(!radioGroup && !editable && e.edit!=="Select" && !domEvent.ctrlKey && !domEvent.metaKey && !domEvent.shiftKey && observed(e,"Navigate")) {
           const command={ArrowUp:"previous",ArrowDown:"next",Home:"first",End:"last",PageUp:"page_previous",PageDown:"page_next"}[key];
           if(command) {domEvent.preventDefault();event(e,{kind:"navigate",command});return;}
         }

@@ -15,6 +15,13 @@ document.addEventListener("DOMContentLoaded",()=>{
     document.querySelector(".select-reset").click();
     await wait(()=>menu.selectedOptions[0]?.hasAttribute("data-gly-placeholder"));
     if(menu!==document.querySelector('select[aria-label="Refresh interval"]')) throw Error("Controlled reset replaced native select");
+    const radios=document.querySelectorAll('[role=radiogroup] input[name=mode]');
+    if(radios.length!==2 || radios[1].value!=="dark")throw Error("Native radio name/value missing");
+    radios[1].click();
+    await wait(()=>radios[1].getAttribute("aria-checked")==="true" && !radios[0].checked);
+    const arrow=key=>radios[1].dispatchEvent(new KeyboardEvent("keydown",{key,bubbles:true,cancelable:true}));
+    if(arrow("ArrowRight") || !arrow("ArrowUp"))throw Error("Radio group did not respect its horizontal axis");
+    await wait(()=>document.querySelector(".radio-event").textContent==="Previous");
     const capture=document.querySelector(".capture");
     const press=()=>{
       const event=new PointerEvent("pointerdown",{bubbles:true,cancelable:true,button:0,isPrimary:true,pointerId:1});
