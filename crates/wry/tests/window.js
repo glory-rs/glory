@@ -5,6 +5,23 @@ document.addEventListener("DOMContentLoaded",()=>{
     const input=document.querySelector('input[aria-label="Message"]');
     document.querySelector(".increment").click();
     await wait(()=>document.querySelector(".count").textContent==="Count:1");
+    const menu=document.querySelector('select[aria-label="Refresh interval"]');
+    const group=menu.querySelector('optgroup');
+    if (!menu.selectedOptions[0].hidden || !menu.selectedOptions[0].disabled || group.label!=="Intervals")
+      throw Error("Native select placeholder or option group missing");
+    menu.querySelector('[data-gly-option="five"]').selected=true;
+    menu.dispatchEvent(new Event("change",{bubbles:true}));
+    await wait(()=>document.querySelector(".select-echo").textContent==="five");
+    document.querySelector(".select-reset").click();
+    await wait(()=>menu.selectedOptions[0]?.hasAttribute("data-gly-placeholder"));
+    if(menu!==document.querySelector('select[aria-label="Refresh interval"]')) throw Error("Controlled reset replaced native select");
+    const radios=document.querySelectorAll('[role=radiogroup] input[name=mode]');
+    if(radios.length!==2 || radios[1].value!=="dark")throw Error("Native radio name/value missing");
+    radios[1].click();
+    await wait(()=>radios[1].getAttribute("aria-checked")==="true" && !radios[0].checked);
+    const arrow=key=>radios[1].dispatchEvent(new KeyboardEvent("keydown",{key,bubbles:true,cancelable:true}));
+    if(arrow("ArrowRight") || !arrow("ArrowUp"))throw Error("Radio group did not respect its horizontal axis");
+    await wait(()=>document.querySelector(".radio-event").textContent==="Previous");
     const capture=document.querySelector(".capture");
     const press=()=>{
       const event=new PointerEvent("pointerdown",{bubbles:true,cancelable:true,button:0,isPrimary:true,pointerId:1});
@@ -16,6 +33,11 @@ document.addEventListener("DOMContentLoaded",()=>{
     if(document.activeElement!==input)throw Error("Programmatic-only pointer button stole editor focus");
     capture.tabIndex=0;if(!press())throw Error("Button press left WebKit default focus clearing enabled");
     if(document.activeElement!==capture)throw Error("Primary button press did not transfer actual focus before blur");
+    for(const draggable of [capture,capture.parentElement]){
+      draggable.draggable=true;input.focus();
+      if(press() || document.activeElement!==capture)throw Error("Draggable button press must allow native drag and focus");
+      draggable.removeAttribute("draggable");
+    }
     const large="\\".repeat(512*1024);
     input.focus();input.value=large;
     input.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:large}));
