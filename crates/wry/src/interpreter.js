@@ -104,6 +104,32 @@ function gloryWry(config) {
     }
     return value;
   }
+  function selectOptions(element, config) {
+    function appendOption(parent, entry) {
+      const option = document.createElement("option");
+      option.dataset.glyOption = entry.key;
+      option.textContent = entry.label;
+      option.value = entry.value;
+      option.disabled = entry.disabled;
+      parent.append(option);
+    }
+    if (config.placeholder !== null) {
+      const placeholder = document.createElement("option");
+      placeholder.dataset.glyPlaceholder = "";
+      placeholder.value = "";
+      placeholder.textContent = config.placeholder;
+      placeholder.hidden = placeholder.disabled = true;
+      element.append(placeholder);
+    }
+    for (const entry of config.entries) {
+      if (!entry.options) { appendOption(element, entry); continue; }
+      const group = document.createElement("optgroup");
+      group.label = entry.label;
+      group.disabled = entry.disabled;
+      for (const option of entry.options) appendOption(group, option);
+      element.append(group);
+    }
+  }
   function property(e,part,name,value) {
     const element=e.parts.get(part);
     if(name==="value" && e.edit==="Text") {
@@ -118,6 +144,13 @@ function gloryWry(config) {
       if(readValue(e)!==value) element.value=value;
       e.revision=e.requested;
       e.pending=null;
+    } else if(name==="selectedKeys" && e.edit==="Select") {
+      const keys = new Set(value);
+      for (const option of element.options) {
+        const selected = option.hasAttribute("data-gly-option") ? keys.has(option.dataset.glyOption) : !keys.size;
+        option.defaultSelected = selected;
+        option.selected = selected;
+      }
     } else if(element[name]!==value) element[name]=value;
   }
   function attribute(e,part,name,value) {
@@ -143,6 +176,7 @@ function gloryWry(config) {
       park.append(e.start,e.end);
     } else { e.start=park.firstChild; e.end=park.lastChild; }
     entries.set(e.id,e);
+    if(shape.options) selectOptions(control(e),shape.options);
     for(const piece of shape.pieces) if(piece.kind.tag)
       for(const [name,value] of Object.entries(piece.kind.properties)) property(e,piece.part,name,value);
     const element=main(e);
@@ -615,6 +649,11 @@ function gloryWry(config) {
         e.composing ||= !!domEvent.isComposing;
         if(e.interests.has("ValueChanged")) event(e,{kind:"value",value:readValue(e),revision:e.revision,composing:e.composing});break;
       case "change":
+        if (e.edit==="Select" && !disabled && e.interests.has("SelectChanged")) {
+          const keys = Array.from(input.selectedOptions)
+            .filter(option => option.hasAttribute("data-gly-option")).map(option => option.dataset.glyOption);
+          event(e,{kind:"select",keys,revision:e.revision});
+        }
         if(e.edit==="Check" && !disabled && !input.readOnly && e.interests.has("CheckedChanged")) event(e,{kind:"checked",value:input.checked});break;
       case "compositionstart":
         if(e.edit!=="Text") return;
@@ -638,7 +677,7 @@ function gloryWry(config) {
         if(key==="Enter" && editable && input.tagName!=="TEXTAREA" && !disabled && !input.readOnly && e.interests.has("Commit")) {
           domEvent.preventDefault();event(e,{kind:"commit",value:readValue(e),revision:e.revision});
         }
-        if(!editable && !domEvent.ctrlKey && !domEvent.metaKey && !domEvent.shiftKey && observed(e,"Navigate")) {
+        if(!editable && e.edit!=="Select" && !domEvent.ctrlKey && !domEvent.metaKey && !domEvent.shiftKey && observed(e,"Navigate")) {
           const command={ArrowUp:"previous",ArrowDown:"next",Home:"first",End:"last",PageUp:"page_previous",PageDown:"page_next"}[key];
           if(command) {domEvent.preventDefault();event(e,{kind:"navigate",command});return;}
         }

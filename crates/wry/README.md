@@ -31,7 +31,7 @@ repository's approved cache environment before Cargo (on macOS, source
 
 | Facility | Boundary |
 | --- | --- |
-| Basic UI | View, Group, Text, Button, Input/textarea, Check and Image/Link |
+| Basic UI | View, Group, Text, Button, Input/textarea, Check, native single/multiple Select and Image/Link |
 | Updates | Shared HTML create/field patch/place/suspend/resume/dispose, including detached Groups and explicit Plans |
 | State | Native Cage/Bond and Owner lifecycle; one ready-task executor per WindowApp |
 | Input | Activation, canonical text, controlled revision echoes, composition protocol, commit and checked state |
@@ -47,7 +47,7 @@ repository's approved cache environment before Cargo (on macOS, source
 | Native lifecycle | Optional `Config::native` on the window thread; application-owned tray/close/shutdown integration, absent by default |
 | Platform | Wry system WebView and Tao event loop on Windows/macOS/Linux; Linux uses Tao's GTK container for X11/Wayland |
 
-Raw display/XML templates, structured Select, File, RichEditor, Graphic, virtual collections and advanced
+Raw display/XML templates, File, RichEditor, Graphic, virtual collections and advanced
 interaction metadata (layers, focus scopes, motion, drag/swipe, choice/menu/tree
 controllers, forms and rich clipboard services) currently return `Unsupported`.
 Checks run in both staged preflight and direct application. They are not silently

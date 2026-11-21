@@ -444,10 +444,7 @@ fn preflight(node: DescriptorView<'_>, patch: Option<&Patch>) -> Result<(), Erro
     if node.options.get::<VirtualPart>().is_some() {
         return Err(Error::Unsupported("Wry virtual collection handover"));
     }
-    if matches!(
-        node.props,
-        Props::Select(_) | Props::File(_) | Props::RichEditor(_)
-    ) {
+    if matches!(node.props, Props::File(_) | Props::RichEditor(_)) {
         return Err(Error::Unsupported("Wry structured control"));
     }
     let semantics = match patch {
@@ -509,6 +506,7 @@ fn supported_event(kind: EventKind) -> bool {
         EventKind::Activate
             | EventKind::ValueChanged
             | EventKind::Commit
+            | EventKind::SelectChanged
             | EventKind::CheckedChanged
             | EventKind::Composition
             | EventKind::FocusChanged
@@ -789,6 +787,18 @@ impl WireEvent {
                 value,
                 revision: protocol::integer(&revision)?,
             },
+            Self::Select { keys, revision } => {
+                if keys.len() > MAX_SELECT_OPTIONS || keys.iter().any(|key| key.len() > 64) {
+                    return Err(Error::InvalidEvent("Wry select key budget"));
+                }
+                Event::SelectChanged {
+                    keys: keys
+                        .into_iter()
+                        .map(SemanticId::new)
+                        .collect::<Result<_, _>>()?,
+                    revision: protocol::integer(&revision)?,
+                }
+            }
             Self::Checked { value } => Event::CheckedChanged(value),
             Self::Composition { active } => Event::Composition { active },
             Self::Focus { focused } => Event::FocusChanged(focused),
