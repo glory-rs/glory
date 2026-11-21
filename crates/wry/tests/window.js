@@ -26,6 +26,11 @@ document.addEventListener("DOMContentLoaded",()=>{
     if(document.activeElement!==input)throw Error("Programmatic-only pointer button stole editor focus");
     capture.tabIndex=0;if(!press())throw Error("Button press left WebKit default focus clearing enabled");
     if(document.activeElement!==capture)throw Error("Primary button press did not transfer actual focus before blur");
+    for(const draggable of [capture,capture.parentElement]){
+      draggable.draggable=true;input.focus();
+      if(press() || document.activeElement!==capture)throw Error("Draggable button press must allow native drag and focus");
+      draggable.removeAttribute("draggable");
+    }
     const large="\\".repeat(512*1024);
     input.focus();input.value=large;
     input.dispatchEvent(new InputEvent("input",{bubbles:true,inputType:"insertText",data:large}));
