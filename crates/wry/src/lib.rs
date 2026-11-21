@@ -484,13 +484,16 @@ fn preflight(node: DescriptorView<'_>, patch: Option<&Patch>) -> Result<(), Erro
             || s.menubar_item
             || s.layer.as_ref().is_some_and(|layer| !context_layer(layer))
             || s.sheet_grip
-            || ((s.navigation.is_some() || s.typeahead)
+            || (s.navigation.is_some()
+                && node.role != Some(Role::RadioGroup)
                 && !s.layer.as_ref().is_some_and(context_layer))
+            || (s.typeahead && !s.layer.as_ref().is_some_and(context_layer))
             || s.grid_navigation.is_some()
             || s.tree_navigation.is_some()
             || s.navigation_panel.is_some()
             || s.form_action.is_some()
-            || s.form_control.is_some()
+            || (s.form_control.is_some()
+                && !matches!(node.props, Props::Check(check) if check.mode == CheckMode::Radio))
             || s.field_part == Some(FieldPart::Form))
     {
         return Err(Error::Unsupported("Wry interaction metadata"));

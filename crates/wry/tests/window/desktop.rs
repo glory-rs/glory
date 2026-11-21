@@ -67,6 +67,48 @@ pub fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
     })?;
     // Exercise the same structured select and controlled echo that Sapid NativeSelect mounts.
     let choice = scope.cage(Vec::<SemanticId>::new());
+    let mode = scope.cage("light");
+    let navigation = scope.cage(String::new());
+    let radio = |value: &'static str| {
+        check()
+            .mode(glory_render::CheckMode::Radio)
+            .label(value)
+            .checked(mode.map(move |current| *current == value))
+            .semantics(Some(Box::new(glory_render::Semantics {
+                check_group: Some(SemanticId::new("mode").unwrap()),
+                form_control: Some(glory_render::FormControl {
+                    name: "mode".into(),
+                    value: Some(value.into()),
+                }),
+                navigation_item: true,
+                ..Default::default()
+            })))
+            .on(checked_changed, move |event| {
+                if event == Event::CheckedChanged(true) {
+                    mode.revise(|current| *current = value);
+                }
+            })
+    };
+    app.mount(
+        view()
+            .role(glory_render::Role::RadioGroup)
+            .name("Mode")
+            .semantics(Some(Box::new(glory_render::Semantics {
+                navigation: Some(glory_render::Orientation::Horizontal),
+                navigation_direction: glory_render::Direction::Rtl,
+                ..Default::default()
+            })))
+            .on(navigate, move |event| {
+                if let Event::Navigate { command, .. } = event {
+                    navigation.revise(|value| *value = format!("{command:?}"));
+                }
+            })
+            .fill((
+                radio("light"),
+                radio("dark"),
+                text().class("radio-event").content(navigation),
+            )),
+    )?;
     let option = |key: &str, label: &str| SelectOption {
         key: SemanticId::new(key).unwrap(),
         value: "shared-value".into(),
