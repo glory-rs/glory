@@ -1,6 +1,6 @@
 # Coordinated release versions
 
-Glory and Sapid 0.7.0 use Apace 0.3.0, Takia 0.15.1 and Wingy 0.31.1.
+Glory and Sapid 0.9.0 use Apace 0.4.0, Takia 0.16.0 and Wingy 0.31.2.
 Publish Glory before Sapid, after validating the exact published engine prerequisites.
 Use the five sibling source repositories. Exact dependency requirements prevent
 silently mixing these changes with older published packages.

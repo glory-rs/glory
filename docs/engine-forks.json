@@ -25,7 +25,7 @@
     {
       "name": "apace",
       "git": "https://github.com/glory-rs/apace",
-      "rev": "f4b2edfa3fc1f3a080712adbebff64a275446fb5",
+      "rev": "38de803919aab577edaf04bb3126236718685d1c",
       "upstream": "https://github.com/DioxusLabs/blitz",
       "upstream_rev": "cec303355bb0b83adca5136eb5cf9fbd66900bd8",
       "packages": [

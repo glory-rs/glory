@@ -1,7 +1,7 @@
 # 引擎依赖维护
 
-0.7.0 协调发布使用 Apace 0.3.0、Takia 0.15.1、Wingy 0.31.1；支持包为
-`apace_accesskit` 0.2.2、`apace_debug_timer` 0.1.4、`wingy-dpi` 0.1.3。
+0.9.0 协调发布使用 Apace 0.4.0、Takia 0.16.0、Wingy 0.31.2；支持包为
+`apace_accesskit` 0.2.3、`apace_debug_timer` 0.1.5、`wingy-dpi` 0.1.4。
 源码开发仍将 apace、takia、wingy、glory 和 Sapid 放在同一父目录。
 发布的 crate 使用精确注册表依赖，消费者不需要这些同级路径。
 
