@@ -1,5 +1,6 @@
-function gloryWry(config) {
+function gloryWry(config, factories) {
   "use strict";
+  const {createLayers, createKeyboard, createFiles, createPlots, createMotion, createRichEditor} = factories;
   if (window !== window.top) return;
   const entries = new Map(), owners = new WeakMap();
   let root, stopped = false, sequence = 0n;
@@ -25,11 +26,13 @@ function gloryWry(config) {
   const editing = new Set(), deferred = [];
   let deferredBytes=0;
   const event = (e,value) => {
-    if(value.kind==="value") {
+    if(value.kind==="value" || value.kind==="input_edit") {
       if(e.proposal) { e.dirty=true; return; }
-      e.proposal={value:value.value,composing:value.composing};
+      e.proposal=value.kind==="input_edit" ? value.edit : value;
       e.dirty=false; editing.add(e);
-    } else if(editing.size && ["activate","commit","keyboard","focus"].includes(value.kind)) {
+    } else if(value.kind==="rich_edit") {
+      editing.add(e);
+    } else if(editing.size && ["rich_command","activate","commit","keyboard","key_binding","tags","form_submit","form_reset","focus"].includes(value.kind)) {
       const bytes=new TextEncoder().encode(JSON.stringify(value)).length;
       if(deferred.length>=128 || deferredBytes+bytes>config.maxDeferredBytes) throw Error("pending input action budget");
       deferredBytes+=bytes; deferred.push({e,value,bytes}); return;
@@ -41,8 +44,13 @@ function gloryWry(config) {
       const {e,value,bytes}=deferred.shift();
       deferredBytes-=bytes;
       if(!entries.has(e.id) || !alive(e)) continue;
+      if(value.kind==="rich_command") value.revision=e.revision;
       if(value.kind==="commit") {
         if(readValue(e)!==value.value) continue;
+        value.revision=e.revision;
+      }
+      if(value.kind==="tags") {
+        if(value.data.value!==undefined && readValue(e)!==value.data.value) continue;
         value.revision=e.revision;
       }
       event(e,value);
@@ -50,6 +58,7 @@ function gloryWry(config) {
   }
   function inputDone(command) {
     const e=entries.get(command.id);
+    if(e?.edit==="Rich") { editing.delete(e);return rich.done(e,command); }
     if(!e || !e.proposal) return;
     const proposal=e.proposal, dirty=e.dirty;
     e.proposal=null; e.dirty=false; editing.delete(e);
@@ -57,7 +66,9 @@ function gloryWry(config) {
     if(command.reset) { e.requested=command.revision; property(e,e.control,"value",command.value); return; }
     if(e.pending!==null && e.composing) return;
     e.revision=command.revision;
-    if(dirty && alive(e) && e.interests.has("ValueChanged")) {
+    if(dirty && alive(e) && e.interests.has("InputEdit")) {
+      sendTextEdit(e);
+    } else if(dirty && alive(e) && e.interests.has("ValueChanged")) {
       const value=readValue(e);
       if(value!==proposal.value || e.composing!==proposal.composing)
         event(e,{kind:"value",value,revision:e.revision,composing:e.composing});
@@ -72,6 +83,8 @@ function gloryWry(config) {
     for (let n=node;n && n!==root;n=n.parentNode) { const e=owners.get(n); if(e) return e; }
     return null;
   };
+  const rich=createRichEditor({main,event,origin,alive});
+  const files=createFiles({post,main,origin,alive,enabled:config.files});
   const viewport = element => ({viewport_width:element.clientWidth,viewport_height:element.clientHeight});
   const scroll = e => {
     const element=main(e);
@@ -104,6 +117,34 @@ function gloryWry(config) {
     }
     return value;
   }
+  function textSelection(input,limit) {
+    const start=input.selectionStart, end=input.selectionEnd;
+    if (!Number.isInteger(start) || !Number.isInteger(end) ||
+        start<0 || end<start || end>limit) return null;
+    return {start,end,direction:input.selectionDirection || "none"};
+  }
+  function sendTextEdit(e) {
+    const limit=Number(main(e).dataset.glyInputEdit), input=control(e);
+    if(!limit) {
+      if(e.interests.has("ValueChanged")) event(e,{kind:"value",value:readValue(e),revision:e.revision,composing:e.composing});
+      return;
+    }
+    if(!e.interests.has("InputEdit")) return;
+    // Preserve the latest beforeinput snapshot while the previous native
+    // proposal is awaiting Rust's program barrier.
+    if(e.proposal) { e.dirty=true; return; }
+    const prior=e.beforeEdit?.revision===e.revision ? e.beforeEdit : null;
+    e.beforeEdit=null;
+    let edit;
+    if(input.value.length>limit || new TextEncoder().encode(input.value).length>limit) {
+      edit={status:"too_long"};
+    } else {
+      const value=readValue(e), selection=textSelection(input,value.length);
+      edit=selection ? {status:"value",value,selection,before:prior?.selection ?? null,
+        intent:prior?.intent ?? "replace",composing:e.composing} : {status:"selection_unavailable"};
+    }
+    event(e,{kind:"input_edit",edit,revision:e.revision});
+  }
   function selectOptions(element, config) {
     function appendOption(parent, entry) {
       const option = document.createElement("option");
@@ -132,6 +173,7 @@ function gloryWry(config) {
   }
   function property(e,part,name,value) {
     const element=e.parts.get(part);
+    if(name==="richDocument" && e.edit==="Rich") { rich.property(e,value);return; }
     if(name==="value" && e.edit==="Text") {
       value=canonical(value);
       // An echo acknowledges the submitted snapshot. It must not replace newer
@@ -156,6 +198,8 @@ function gloryWry(config) {
   function attribute(e,part,name,value) {
     const element=e.parts.get(part);
     if(value===null) element.removeAttribute(name); else element.setAttribute(name,value);
+    if (["data-gly-layer","data-gly-focus-scope","data-gly-presence","data-gly-collapse","data-gly-translation"].includes(name))
+      layers.track(element);
     if(name==="data-gly-drag-capture" && value===null && drag?.e===e)finishDrag("cancel",drag.x,drag.y);
   }
   function create(command) {
@@ -166,10 +210,13 @@ function gloryWry(config) {
       composing:false,pending:null,proposal:null,dirty:false,parent:null,interests:new Set(),park,ack:null};
     for(const piece of shape.pieces) {
       const kind=piece.kind;
-      const element=kind.tag ? document.createElement(kind.tag) : document.createTextNode(kind.text);
+      const parent = piece.parent ? e.parts.get(piece.parent) : park;
+      const svg = kind.tag === "svg" || parent.namespaceURI === "http://www.w3.org/2000/svg";
+      const element = !kind.tag ? document.createTextNode(kind.text) : svg
+        ? document.createElementNS("http://www.w3.org/2000/svg",kind.tag) : document.createElement(kind.tag);
       e.parts.set(piece.part,element); owners.set(element,e);
       if(kind.tag) for(const [name,value] of Object.entries(kind.attributes)) element.setAttribute(name,value);
-      (piece.parent ? e.parts.get(piece.parent) : park).appendChild(element);
+      parent.appendChild(element);
     }
     if(!shape.pieces.length) {
       e.start=document.createComment("glory-group"); e.end=document.createComment("/glory-group");
@@ -180,6 +227,7 @@ function gloryWry(config) {
     for(const piece of shape.pieces) if(piece.kind.tag)
       for(const [name,value] of Object.entries(piece.kind.properties)) property(e,piece.part,name,value);
     const element=main(e);
+    layers.track(element);
     if(element?.hasAttribute("data-gly-virtual")) element.setAttribute("data-gly-live","");
     if(element?.tagName==="IMG") {
       const status=loaded => {
@@ -277,19 +325,26 @@ function gloryWry(config) {
     if(focused && contains(e,document.activeElement)) {
       if(focused.composing) {
         focused.composing=false;
-        if(focused.pending!==null) property(focused,focused.control,"value",focused.pending);
+        if(focused.edit==="Rich") {
+          if(focused.richPending) {const pending=focused.richPending;focused.richPending=null;rich.property(focused,pending);}
+          focused.revision=focused.requested;
+        } else if(focused.pending!==null) property(focused,focused.control,"value",focused.pending);
         event(focused,{kind:"composition",active:false});
       }
       control(focused).blur();
     }
     e.park.appendChild(extract(e));
   }
-  function query(command) {
+  async function query(command) {
     let value=null,error=null;
     try {
       const e=get(command.id),element=main(e),input=control(e);
-      if(!alive(e)) throw Error("inactive");
+      // Inert presentation subtrees can still be measured (for example an
+      // animated duplicate). Detached ranges have no physical host box.
+      if(!e.start.isConnected) throw Error("disconnected range");
       switch(command.kind) {
+        case "rich_selection": value=rich.snapshot(e);break;
+        case "file_read": case "file_preview": case "file_preview_url": value=await files.query(e,command);break;
         case "bounds": {const r=element.getBoundingClientRect();value={x:r.x,y:r.y,width:r.width,height:r.height};break;}
         case "scroll": value={x:element.scrollLeft,y:element.scrollTop};break;
         case "scroll_metrics": value={x:element.scrollLeft,y:element.scrollTop,...viewport(element),content_width:element.scrollWidth,content_height:element.scrollHeight};break;
@@ -324,13 +379,21 @@ function gloryWry(config) {
   }
   function action(command) {
     const e=get(command.id),element=main(e),input=control(e),a=command.action;
+    if(files.action(e,a)) return;
     if(a.kind==='copy_text'){copyText(e,a).catch(fault);return;}
+    if(a.kind==="exit_menu") {
+      if(element?.isConnected && !element.closest("[inert]")) layers.exitMenu(element,a.backwards);
+      return;
+    }
     if(!alive(e)) return;
     switch(a.kind) {
+      case "rich_selection": if(!e.composing && e.revision===a.revision) rich.select(e,a.selection);break;
       case "focus": input.focus({preventScroll:true});break;
       case "scroll":
         element.scrollTo({left:a.x,top:a.y,behavior:"instant"});
         e.ack={requested_x:a.x,requested_y:a.y,x:element.scrollLeft,y:element.scrollTop};scroll(e);break;
+      case "raise_layer": layers.raise(element);break;
+      case "reveal_option": keyboard.revealOption(element);break;
       case "reveal": element.scrollIntoView({block:"nearest",inline:"nearest",behavior:"instant"});break;
       case "selection":
         if(e.revision===a.revision && !e.composing) input.setSelectionRange(a.start,a.end,a.direction);
@@ -342,6 +405,7 @@ function gloryWry(config) {
   const color = () => { for(const e of entries.values()) if(e.interests.has("ColorSchemeChanged") && alive(e)) event(e,{kind:"color_scheme",dark:media.matches}); };
   media.addEventListener("change",color);
   function apply(command) {
+    if(command.op==="file_result") return files.accept(command.batch,command.accepted);
     if(command.op==="input_done") return inputDone(command);
     if(command.op==="create") return create(command);
     if(command.op==="query") return query(command);
@@ -359,7 +423,7 @@ function gloryWry(config) {
       }
       case "patch":
         for(const edit of command.edits) switch(edit.kind) {
-          case "revision": e.requested=edit.value; if(e.edit!=="Text") e.revision=edit.value;break;
+          case "revision": if(e.parts.has("picker") && e.revision!==edit.value) files.clear(e); e.requested=edit.value; if(e.edit!=="Text" && !(e.edit==="Rich" && e.composing)) e.revision=edit.value;break;
           case "attribute": attribute(e,edit.part,edit.name,edit.value);break;
           case "property": property(e,edit.part,edit.name,edit.value);break;
           case "text": {
@@ -379,11 +443,12 @@ function gloryWry(config) {
         break;
       }
       case "suspend": suspend(e);break;
+      case "layer_position": layers.position(command); break;
       case "dispose":
         extract(e);
         for(const id of command.subtree) {
           const old=entries.get(id);
-          if(old) { if(drag?.e===old)finishDrag("cancel",drag.x,drag.y); stopMedia(old); if(main(old)) observer.unobserve(main(old)); entries.delete(id); editing.delete(old); old.proposal=null; old.dirty=false; old.park.replaceChildren(); }
+          if(old) { layers.track(main(old),false); files.clear(old); if(drag?.e===old)finishDrag("cancel",drag.x,drag.y); stopMedia(old); if(main(old)) observer.unobserve(main(old)); entries.delete(id); editing.delete(old); old.proposal=null; old.dirty=false; old.park.replaceChildren(); }
         }
         break;
       default: throw Error("unknown operation");
@@ -395,7 +460,8 @@ function gloryWry(config) {
       if(batch.v!==config.v || batch.session!==config.session || BigInt(batch.sequence)!==sequence+1n) throw Error("batch identity/order");
       sequence=BigInt(batch.sequence);
       for(const command of batch.commands) apply(command);
-      syncContextLayers();
+      plots.refresh();
+      layers.sync(root);
       flushActions();
       post({type:"ack",sequence:batch.sequence});
     } catch(error) {fault(error);}
@@ -503,7 +569,7 @@ function gloryWry(config) {
 
   function receiveDrag(raw) {
     if (raw.type === "pointerdown") {
-      if (raw.button !== 0 || !raw.isPrimary) return;
+      if (raw.button !== 0 || !raw.isPrimary || keyboard.pointer(raw)) return;
       // WebKit on macOS does not focus buttons on a mouse press. Give enabled
       // tab stops actual focus before the editor loses it, so focus-within forms
       // can distinguish Cancel/Add from an outside click. Programmatic-only
@@ -524,11 +590,12 @@ function gloryWry(config) {
       const entry = dragObserver(raw.target);
       if (!entry || dragBlocked(entry)) return;
       const element = main(entry), capture = element.getAttribute("data-gly-drag-capture");
-      if (!capture || raw.target.closest?.("input,textarea,select,[contenteditable=true]")) return;
+      const range = element.matches("[data-gly-slider],[data-gly-splitter]");
+      if ((!capture && !range) || raw.target.closest?.("input,textarea,select,[contenteditable=true]")) return;
       const threshold = thresholdCapture(capture);
       if (!threshold && raw.target.closest?.("button,a")) return;
       drag = {e:entry,element,pointer:raw.pointerId,x:raw.clientX,y:raw.clientY,
-              threshold,focus:capture==="press-focus",showPreview:capture==="threshold-preview",started:false};
+              threshold,focus:range || capture==="press-focus",showPreview:capture==="threshold-preview",started:false};
       if (!threshold) startDrag(raw,drag);
       return;
     }
@@ -553,45 +620,9 @@ function gloryWry(config) {
   }
   window.addEventListener("blur",()=>{if(drag)finishDrag("cancel",drag.x,drag.y);});
   window.addEventListener("keydown",raw=>{if(raw.key==="Escape" && drag){if(drag.started)raw.preventDefault();finishDrag("cancel",drag.x,drag.y);}},true);
-  // Wry supports nonmodal context-point layers. The DOM owns their top-layer
-  // placement, while the widget owns visibility, item selection and commands.
-  let openContext = null;
-  function contextDismiss(reason) {
-    if (openContext && !openContext.dismissed) {
-      openContext.dismissed = true;
-      event(openContext.entry,{kind:"dismiss",reason});
-    }
-  }
-
-  function syncContextLayers() {
-    const next = root.querySelector('[data-gly-layer="context-point"]:not([hidden])');
-    if (openContext && (openContext.panel !== next || !next?.isConnected)) {
-      const {panel, anchor} = openContext;
-      const restore = panel.contains(document.activeElement) || document.activeElement === document.body;
-      panel.hidePopover?.();
-      openContext = null;
-      if (!next && restore && anchor?.isConnected) anchor.focus({preventScroll:true});
-    }
-    if (!next) return;
-    const anchor = document.getElementById(next.dataset.glyContextAnchor);
-    if (anchor && !anchor.closest("[hidden],[inert],[data-gly-hidden]") && anchor.getClientRects().length) {
-      const opening = !openContext;
-      if (opening) {
-        openContext = {panel:next,anchor,entry:origin(next),dismissed:false};
-        next.showPopover();
-      }
-      const clamp = (point, space) => Math.max(8, Math.min(Number(point), space - 8));
-      next.style.setProperty("--gly-layer-x", clamp(next.dataset.glyContextX, innerWidth-next.offsetWidth)+"px");
-      next.style.setProperty("--gly-layer-y", clamp(next.dataset.glyContextY, innerHeight-next.offsetHeight)+"px");
-      if (opening) (next.querySelector('[data-gly-menu-item]:not(:disabled):not([aria-disabled=true])') || next).focus({preventScroll:true});
-    } else if (openContext) {
-      contextDismiss("anchor_lost");
-    } else {
-      const entry = origin(next);
-      if (entry?.interests.has("Dismiss")) event(entry,{kind:"dismiss",reason:"anchor_lost"});
-    }
-  }
-
+  const keyboard = createKeyboard({bindings:config.keyBindings,event,origin,observed,control,readValue,canonical});
+  const plots = createPlots({origin, parent:e => entries.get(e.parent), main, alive, event});
+  const layers = createLayers({origin, event, post, createMotion});
   function receiveContext(raw, keyboard) {
     const target = raw.target.closest?.("[data-gly-context]");
     const entry = origin(target);
@@ -601,66 +632,68 @@ function gloryWry(config) {
     const rect = keyboard ? target.getBoundingClientRect() : null;
     raw.preventDefault();
     raw.stopImmediatePropagation();
-    if (openContext && openContext.anchor !== target) contextDismiss("outside");
+    layers.dismissOtherContext(target);
     event(entry,{kind:"context_menu",keyboard,x:rect ? rect.left : raw.clientX,y:rect ? rect.bottom : raw.clientY});
     return true;
   }
 
-  window.addEventListener("resize",()=>{if(openContext)syncContextLayers();});
-  document.addEventListener("pointerdown",raw=>{
-    if (openContext && !openContext.panel.contains(raw.target)) contextDismiss("outside");
-  },true);
-  document.addEventListener("focusin",raw=>{
-    if (openContext && !openContext.panel.contains(raw.target)) contextDismiss("outside");
-  },true);
-  window.addEventListener("keydown",raw=>{
-    if (openContext && raw.key === "Escape" && !raw.isComposing) {
-      raw.preventDefault(); raw.stopImmediatePropagation(); contextDismiss("escape");
-    }
-  },true);
-
-  let movedMenuItem = null;
-  function receiveMenuPointer(raw) {
-    const item = raw.target.closest?.("[data-gly-menu-item]");
-    const entry = origin(item);
-    if (!entry || !openContext?.panel.contains(item) || dragBlocked(entry)) return;
-    const phase = {pointerover:"enter",pointerout:"leave",pointermove:"move"}[raw.type];
-    if (phase !== "move" && item.contains(raw.relatedTarget)) return;
-    if (phase === "move" && movedMenuItem === item) return;
-    movedMenuItem = phase === "move" ? item : null;
-    if (entry.interests.has("Pointer") || observed(entry,"PointerWithin")) {
-      event(entry,{kind:"pointer",phase});
-    }
-  }
-
-  function radioNavigation(group,key) {
-    if(key==="Home") return "first";
-    if(key==="End") return "last";
-    if(group.dataset.glyNavigation==="vertical") {
-      if(key==="ArrowUp") return "previous";
-      if(key==="ArrowDown") return "next";
-    } else {
-      if(key==="ArrowLeft") return group.dir==="rtl" ? "next" : "previous";
-      if(key==="ArrowRight") return group.dir==="rtl" ? "previous" : "next";
-    }
+  function receivePointer(raw) {
+    if (raw.pointerType !== "mouse" && raw.pointerType !== "pen") return;
+    const entry = origin(raw.target);
+    if (!entry || !alive(entry) || !(observed(entry, "PointerWithin") || observed(entry, "Pointer"))) return;
+    const phase = {pointerover:"enter", pointerout:"leave", pointermove:"move"}[raw.type];
+    const related = phase === "move" ? null : origin(raw.relatedTarget);
+    if (related !== entry) event(entry, {kind:"pointer", phase, related:related?.id});
   }
   function receive(domEvent) {
     const e=origin(domEvent.target);
     if(!e || !alive(e)) return;
+    if(rich.receive(e,domEvent)) return;
     const input=control(e), element=main(e);
     const disabled=!input || input.disabled || element.getAttribute("aria-disabled")==="true";
     switch(domEvent.type) {
+      case "paste": keyboard.paste(domEvent,e);break;
+      case "submit": case "reset": {
+        if(!element.matches("form[data-gly-form]")) return;
+        domEvent.preventDefault();
+        if(domEvent.type==="reset") {
+          if(e.interests.has("Reset")) event(e,{kind:"form_reset"});
+        } else if(e.interests.has("Submit")) {
+          const submitter=origin(domEvent.submitter);
+          if(!domEvent.submitter || submitter) event(e,{kind:"form_submit",submitter:submitter?.id ?? null});
+        }
+        return;
+      }
       case "contextmenu": receiveContext(domEvent,false);break;
       case "click":
         if(suppressClick){suppressClick=false;domEvent.preventDefault();domEvent.stopPropagation();return;}
         if(disabled || input.readOnly && e.edit==="Check") {domEvent.preventDefault();return;}
+        if(e.edit==="Check" && domEvent.target!==input && keyboard.menuSearchPointer(domEvent.target)) {
+          domEvent.preventDefault();input.click();return;
+        }
+        const formAction=domEvent.target.closest?.("[data-gly-form-action]");
+        if(formAction) {
+          domEvent.preventDefault();
+          const action=origin(formAction);
+          if(action && !formAction.matches(":disabled") && !formAction.closest("[aria-disabled=true]")) event(action,{kind:"activate"});
+          return;
+        }
         if(e.prevent || element.tagName==="A") domEvent.preventDefault();
         if(observed(e,"Activate")) event(e,{kind:"activate"});break;
+      case "beforeinput":
+        if(e.edit==="Text" && !disabled && !input.readOnly && e.interests.has("InputEdit")) {
+          const selection=textSelection(input,Number(element.dataset.glyInputEdit));
+          const type=domEvent.inputType || "";
+          const intent=type==="deleteContentBackward" ? "delete_backward" :
+            type==="deleteContentForward" ? "delete_forward" : type.startsWith("insert") ? "insert" : "replace";
+          e.beforeEdit=selection ? {revision:e.revision,selection,intent} : null;
+        }
+        break;
       case "input":
         if(e.edit!=="Text" || disabled || input.readOnly) return;
         if(!e.composing && domEvent.isComposing) event(e,{kind:"composition",active:true});
         e.composing ||= !!domEvent.isComposing;
-        if(e.interests.has("ValueChanged")) event(e,{kind:"value",value:readValue(e),revision:e.revision,composing:e.composing});break;
+        sendTextEdit(e);break;
       case "change":
         if (e.edit==="Select" && !disabled && e.interests.has("SelectChanged")) {
           const keys = Array.from(input.selectedOptions)
@@ -677,19 +710,20 @@ function gloryWry(config) {
         e.composing=false;
         if(e.pending!==null) property(e,e.control,"value",e.pending);
         event(e,{kind:"composition",active:false});
-        if(e.interests.has("ValueChanged")) event(e,{kind:"value",value:readValue(e),revision:e.revision,composing:false});break;
+        sendTextEdit(e);break;
       case "focusin": case "focusout":
         if(observed(e,"FocusWithin") || e.interests.has("FocusChanged")) event(e,{kind:"focus",focused:domEvent.type==="focusin"});break;
       case "scroll": if(domEvent.target===element) scroll(e);break;
       case "keydown": {
-        if(domEvent.isComposing || e.composing || domEvent.altKey) return;
+        if(keyboard.key(domEvent,e) || domEvent.defaultPrevented || domEvent.isComposing || e.composing || domEvent.altKey) return;
         const key=domEvent.key,editable=e.edit==="Text";
         const chord=domEvent.ctrlKey || domEvent.metaKey;
         const boundary=domEvent.target.closest?.("[data-gly-navigation]");
-        const radioGroup=boundary?.getAttribute("role")==="radiogroup";
-        if(radioGroup && !disabled && !chord && !domEvent.shiftKey && origin(boundary)?.interests.has("Navigate")
-            && (domEvent.target===boundary || (domEvent.target===input && input.type==="radio" && input.hasAttribute("data-gly-navigation-item")))) {
-          const command=radioNavigation(boundary,key);
+        const virtual=element.closest("[data-gly-virtual=root]");
+        if(!boundary && !editable && e.edit!=="Select" && !domEvent.ctrlKey && !domEvent.metaKey && !domEvent.shiftKey &&
+            (!virtual ? observed(e,"Navigate") : domEvent.target===element && document.activeElement===element &&
+              element.matches("[data-gly-virtual=root],[data-gly-virtual=row]") && origin(virtual)?.interests.has("Navigate"))) {
+          const command={ArrowUp:"previous",ArrowDown:"next",Home:"first",End:"last",PageUp:"page_previous",PageDown:"page_next"}[key];
           if(command) {domEvent.preventDefault();event(e,{kind:"navigate",command});return;}
         }
         if(domEvent.repeat) return;
@@ -698,20 +732,12 @@ function gloryWry(config) {
         if(key==="Enter" && editable && input.tagName!=="TEXTAREA" && !disabled && !input.readOnly && e.interests.has("Commit")) {
           domEvent.preventDefault();event(e,{kind:"commit",value:readValue(e),revision:e.revision});
         }
-        if(!radioGroup && !editable && e.edit!=="Select" && !domEvent.ctrlKey && !domEvent.metaKey && !domEvent.shiftKey && observed(e,"Navigate")) {
-          const command={ArrowUp:"previous",ArrowDown:"next",Home:"first",End:"last",PageUp:"page_previous",PageDown:"page_next"}[key];
-          if(command) {domEvent.preventDefault();event(e,{kind:"navigate",command});return;}
-        }
-        if (!editable && !chord && key.length===1 && /\S/.test(key) &&
-            openContext?.panel.contains(domEvent.target) && observed(e,"Typeahead")) {
-          domEvent.preventDefault();
-          event(e,{kind:"typeahead",text:key,at_millis:Math.floor(performance.now())});
-          return;
-        }
         const command=key==="Escape"?"dismiss":editable?(key==="Enter"&&!domEvent.shiftKey?"submit":null):
           chord&&!domEvent.shiftKey&&key.toLowerCase()==="k"?"palette":chord&&!domEvent.shiftKey&&key.toLowerCase()==="f"?"search":
           key==="?"||chord&&key==="/"||domEvent.shiftKey&&key==="/"?"help":null;
-        if(command && observed(e,"Keyboard")) {domEvent.preventDefault();event(e,{kind:"keyboard",command});}
+        if(command==="palette" && observed(e,"Palette")) {domEvent.preventDefault();event(e,{kind:"palette"});return;}
+        const implicitSubmit=command==="submit" && !chord && !domEvent.shiftKey && editable && input.tagName!=="TEXTAREA" && element.closest("form[data-gly-form]");
+        if(command && (implicitSubmit || observed(e,"Keyboard"))) {domEvent.preventDefault();event(e,{kind:"keyboard",command});}
         break;
       }
     }
@@ -719,11 +745,12 @@ function gloryWry(config) {
   function start() {
     root=document.getElementById("glory-root");
     if(!root) {fault("missing Glory mount");return;}
-    for(const name of ["contextmenu","click","input","change","compositionstart","compositionend","focusin","focusout","scroll","keydown"])
+    for(const name of ["submit","reset","contextmenu","drop","click","paste","beforeinput","input","change","compositionstart","compositionend","focusin","focusout","scroll","keydown"])
       root.addEventListener(name,receive,true);
     for(const name of ["pointerdown","pointermove","pointerup","pointercancel","lostpointercapture"])root.addEventListener(name,receiveDrag,true);
     for (const name of ["pointerover","pointerout","pointermove"])
-      root.addEventListener(name,receiveMenuPointer,true);
+      root.addEventListener(name,receivePointer,true);
+    if(config.files) for(const name of ["dragover","drop"]) root.addEventListener(name,files.drop,true);
     post({type:"ready"});
   }
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",start,{once:true}); else start();

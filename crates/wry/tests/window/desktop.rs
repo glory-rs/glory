@@ -1,4 +1,12 @@
 //! Real system WebView acceptance, opt in on the platform's UI/main thread.
+#[path = "graphics.rs"]
+mod graphics;
+#[path = "keys.rs"]
+mod keys;
+#[path = "layers.rs"]
+mod layers;
+#[path = "structured.rs"]
+mod structured;
 use glory_render::{
     Query, QueryValue, SelectEntry, SelectGroup, SelectOption, SelectProps, SemanticId,
     TextSelection, style::*,
@@ -271,6 +279,10 @@ pub fn run() -> std::result::Result<(), Box<dyn std::error::Error>> {
                 .on(activate, move |_| resume.place_before(None).unwrap()),
         )),
     )?;
+    layers::mount(&app)?;
+    keys::mount(&app)?;
+    graphics::mount(&app)?;
+    structured::mount(&app)?;
     let start = Instant::now();
     Shell::new().run_until(
         app,

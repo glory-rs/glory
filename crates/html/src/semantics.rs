@@ -531,6 +531,20 @@ pub(crate) fn attributes(
         attrs.insert("data-gly-sheet-grip", String::new());
     }
     if let Some(layer) = &value.layer {
+        attrs.insert("data-gly-layer-escape", layer.escape.to_string());
+        attrs.insert("data-gly-layer-outside", layer.outside.to_string());
+        if layer.focus == glory_render::LayerFocus::Preserve {
+            attrs.insert("data-gly-layer-preserve", String::new());
+        }
+        for (name, id) in [
+            ("data-gly-layer-anchor", &layer.anchor),
+            ("data-gly-layer-initial", &layer.initial_focus),
+            ("data-gly-layer-return", &layer.return_focus),
+        ] {
+            if let Some(id) = id {
+                attrs.insert(name, id.as_str().into());
+            }
+        }
         if let glory_render::LayerPlacement::Viewport(placement) = layer.placement {
             attrs.insert("data-gly-viewport-x", placement.x.to_string());
             attrs.insert("data-gly-viewport-y", placement.y.to_string());

@@ -2,10 +2,13 @@
 //! No WASM, second reactive runtime, HTML snapshot replacement or VDOM diff.
 #![cfg(not(target_arch = "wasm32"))]
 
+mod files;
 #[cfg(any(feature = "shell", test))]
 mod host_inbox;
+mod keys;
 mod local_media;
 mod protocol;
+mod rich;
 pub use local_media::{LocalMedia, MediaKind};
 #[cfg(all(
     feature = "shell",
@@ -30,7 +33,25 @@ use std::{
 };
 
 /// The interpreter is shared by the native shell and browser transport tests.
-pub const INTERPRETER: &str = include_str!("interpreter.js");
+pub const INTERPRETER: &str = concat!(
+    "function(config){return (",
+    include_str!("interpreter.js"),
+    ")(config,{",
+    "createLayers:",
+    include_str!("layers.js"),
+    ",createKeyboard:",
+    include_str!("keys.js"),
+    ",createFiles:",
+    include_str!("files.js"),
+    ",createPlots:",
+    include_str!("plots.js"),
+    ",createMotion:",
+    include_str!("motion.js"),
+    ",createRichEditor:",
+    include_str!("rich_editor.js"),
+    "});}"
+);
+mod layers;
 
 #[derive(Default)]
 struct Live {
@@ -39,6 +60,7 @@ struct Live {
 }
 #[derive(Clone, Copy)]
 struct Pending {
+    preview: Option<FileImageInfo>,
     query: Query,
     applied: u64,
 }
@@ -77,6 +99,7 @@ impl Transport {
     }
 }
 struct State {
+    files: Option<FileDocumentId>,
     local_media: bool,
     text_clipboard: bool,
     mapper: Mapper,
@@ -133,6 +156,7 @@ impl Renderer {
             .expect("Wry document identities exhausted");
         Self(Rc::new(RefCell::new(State {
             mapper: Mapper::new(runtime),
+            files: None,
             local_media: false,
             text_clipboard: false,
             transport: Transport {
@@ -157,6 +181,15 @@ impl Renderer {
     pub fn enable_text_clipboard(&self) {
         self.0.borrow_mut().text_clipboard = true;
     }
+    /// Opt in before mounting widgets to file handles explicitly selected or
+    /// dropped by the user. No host paths or filesystem authority are exposed.
+    pub fn enable_files(&self) -> Result<(), Error> {
+        let mut state = self.0.borrow_mut();
+        if state.files.is_none() {
+            state.files = Some(FileDocumentId::new()?);
+        }
+        Ok(())
+    }
     pub fn session(&self) -> String {
         self.0.borrow().transport.session.clone()
     }
@@ -164,7 +197,7 @@ impl Renderer {
     pub fn initialization_script(&self) -> String {
         format!(
             "({INTERPRETER})({});",
-            json!({"v":protocol::VERSION,"session":self.session(),"maxIpcBytes":protocol::MAX_IPC_BYTES,"maxDeferredBytes":protocol::MAX_PENDING_BYTES,"textClipboard":self.0.borrow().text_clipboard})
+            json!({"v":protocol::VERSION,"session":self.session(),"maxIpcBytes":protocol::MAX_IPC_BYTES,"keyBindings":keys::profiles(),"maxDeferredBytes":protocol::MAX_PENDING_BYTES,"textClipboard":self.0.borrow().text_clipboard,"files":self.0.borrow().files.is_some()})
         )
     }
     /// Take at most one ordered batch; the WebView must acknowledge it before
@@ -184,17 +217,25 @@ impl Renderer {
             .collect();
         for (id, accepted) in receipts {
             state.edit_receipts.remove(&id);
-            let command = if let Ok(node) = state.mapper.tree().node(id)
-                && let Props::Input(props) = node.descriptor.view().props
-            {
-                let mut command = json!({"op":"input_done","id":protocol::id(id),"revision":props.revision.to_string(),"reset":!accepted});
-                if !accepted {
-                    command["value"] = json!(props.value);
+            let editor = state.mapper.tree().node(id).ok().and_then(|node| {
+                match node.descriptor.view().props {
+                    Props::Input(p) => Some((p.revision, (!accepted).then(|| json!(p.value)))),
+                    Props::RichEditor(p) => {
+                        Some((p.revision, (!accepted).then(|| rich::document(&p.document))))
+                    }
+                    _ => None,
                 }
-                command
+            });
+            let mut command = json!({"op":"input_done","id":protocol::id(id)});
+            if let Some((revision, reset)) = editor {
+                command["revision"] = json!(revision.to_string());
+                command["reset"] = json!(reset.is_some());
+                if let Some(value) = reset {
+                    command["value"] = value;
+                }
             } else {
-                json!({"op":"input_done","id":protocol::id(id),"retired":true})
-            };
+                command["retired"] = json!(true);
+            }
             state.transport.push(command)?;
         }
         let transport = &mut state.transport;
@@ -256,12 +297,15 @@ impl Renderer {
         }
         if matches!(
             incoming.payload,
-            Payload::Event { .. } | Payload::Response { .. }
+            Payload::Files { .. } | Payload::Event { .. } | Payload::Response { .. }
         ) && state.input_bytes.saturating_add(message.len()) > protocol::MAX_PENDING_BYTES
         {
             return Err(Error::InvalidEvent("Wry queued input byte budget"));
         }
         match incoming.payload {
+            Payload::Files { observation } => {
+                return observation.receive(&mut state, message.len());
+            }
             Payload::Ready => {
                 if state.transport.ready {
                     return Err(Error::InvalidEvent("Wry document restarted"));
@@ -275,6 +319,39 @@ impl Renderer {
                 }
                 state.transport.flight = None;
             }
+            Payload::LayerBounds {
+                node,
+                request,
+                anchor,
+                panel,
+                viewport,
+            } => {
+                let Some(id) = state.nodes.id_for_token(&node) else {
+                    return Ok(false);
+                };
+                let tree = state.mapper.tree();
+                let Some(layer) = tree
+                    .node(id)?
+                    .descriptor
+                    .view()
+                    .semantics
+                    .as_ref()
+                    .filter(|s| !s.hidden && tree.active(id) && !tree.inert(id))
+                    .and_then(|s| s.layer.as_ref())
+                else {
+                    return Ok(false);
+                };
+                if let Some(command) = layers::position(
+                    id,
+                    protocol::integer(&request)?,
+                    layer,
+                    anchor,
+                    panel,
+                    viewport,
+                )? {
+                    state.transport.push(command)?;
+                }
+            }
             Payload::Fault { message } => {
                 let error = Error::Backend(format!("Wry interpreter: {message}"));
                 state.transport.fault = Some(error.clone());
@@ -286,17 +363,35 @@ impl Renderer {
                 error,
             } => {
                 let token = QueryToken(protocol::integer(&token)?);
-                let Some(pending) = state.pending.remove(&token) else {
+                let Some(mut pending) = state.pending.remove(&token) else {
                     return Ok(false);
+                };
+                let result = if error.is_some() {
+                    Err(Error::Unsupported("Wry physical query unavailable"))
+                } else {
+                    let value = value.unwrap_or(Value::Null);
+                    if matches!(pending.query, Query::FileRead(_) | Query::FilePreview(_)) {
+                        match files::response(pending, value, &state) {
+                            Ok(files::Completion::Done(value)) => Ok(value),
+                            Ok(files::Completion::Preview(image)) => {
+                                let Query::FilePreview(file) = pending.query else {
+                                    unreachable!()
+                                };
+                                let cmd = json!({"op":"query","kind":"file_preview_url","id":protocol::id(file.node),"serial":file.serial.to_string(),"revision":file.revision.to_string(),"token":token.0.to_string()});
+                                state.transport.push(cmd)?;
+                                pending.preview = Some(image);
+                                state.pending.insert(token, pending);
+                                return Ok(true);
+                            }
+                            Err(error) => Err(error),
+                        }
+                    } else {
+                        response(pending.query, value)
+                    }
                 };
                 if let Some(live) = state.nodes.get_mut(&pending.query.node()) {
                     live.queries.remove(&token);
                 }
-                let result = if error.is_some() {
-                    Err(Error::Unsupported("Wry physical query unavailable"))
-                } else {
-                    response(pending.query, value.unwrap_or(Value::Null))
-                };
                 state.inputs.push(Input::Response {
                     token,
                     applied: pending.applied,
@@ -308,7 +403,19 @@ impl Renderer {
                 let Some(node) = state.nodes.id_for_token(&node) else {
                     return Ok(false);
                 };
-                let from = if let WireEvent::Drag {
+                let from = if let WireEvent::FormSubmit {
+                    submitter: Some(source),
+                }
+                | WireEvent::KeyBinding {
+                    from: Some(source), ..
+                }
+                | WireEvent::TreeSearch { from: source, .. } = &event
+                {
+                    let Some(source) = state.nodes.id_for_token(source) else {
+                        return Ok(false);
+                    };
+                    source
+                } else if let WireEvent::Drag {
                     from: Some(source),
                     phase,
                     ..
@@ -337,8 +444,39 @@ impl Renderer {
                 } else {
                     node
                 };
-                let event = event.into_event(node, from)?;
-                let editing = matches!(event, Event::ValueChanged { .. });
+                let related = if let WireEvent::Pointer {
+                    related: Some(key), ..
+                } = &event
+                {
+                    let Some(id) = state.nodes.id_for_token(key) else {
+                        return Ok(false);
+                    };
+                    Some(id)
+                } else {
+                    None
+                };
+                let sheet = if matches!(&event, WireEvent::Sheet { .. }) {
+                    state
+                        .mapper
+                        .tree()
+                        .node(node)?
+                        .descriptor
+                        .view()
+                        .semantics
+                        .as_ref()
+                        .and_then(|s| s.layer.as_ref())
+                        .and_then(|layer| layer.sheet.as_ref())
+                } else {
+                    None
+                };
+                let mut event = event.into_event(node, from, sheet)?;
+                if let Event::Pointer { related: other, .. } = &mut event {
+                    *other = related;
+                }
+                let editing = matches!(
+                    event,
+                    Event::ValueChanged { .. } | Event::InputEdit(_) | Event::RichEdit(_)
+                );
                 if editing {
                     if state.edit_receipts.len() >= protocol::MAX_INPUTS
                         && !state.edit_receipts.contains_key(&node)
@@ -346,6 +484,14 @@ impl Renderer {
                         return Err(Error::InvalidEvent("Wry edit receipt budget"));
                     }
                     state.edit_receipts.insert(node, Some(false));
+                }
+                if matches!(event, Event::RichEdit(_)) {
+                    let descriptor = state.mapper.tree().node(node)?.descriptor.view();
+                    if descriptor.readonly() {
+                        // A valid edit may have been in flight when Rust made the editor readonly.
+                        event.validate_payload(node, descriptor)?;
+                        return Ok(false);
+                    }
                 }
                 if !state.mapper.tree().validate_event(node, &event)? {
                     return Ok(false);
@@ -361,19 +507,24 @@ impl Renderer {
                     return Ok(false);
                 }
                 let descriptor = state.mapper.tree().node(node)?.descriptor.view();
-                if let Event::ValueChanged { revision, .. } | Event::Commit { revision, .. } =
-                    &event
-                {
+                let edit_revision = match &event {
+                    Event::ValueChanged { revision, .. } | Event::Commit { revision, .. } => {
+                        Some(*revision)
+                    }
+                    Event::InputEdit(edit) => Some(edit.revision()),
+                    _ => None,
+                };
+                if let Some(revision) = edit_revision {
                     let Props::Input(props) = descriptor.props else {
                         return Err(Error::InvalidEvent("Wry edit target"));
                     };
-                    if *revision < props.revision {
+                    if revision < props.revision {
                         return Ok(false);
                     }
-                    if *revision > props.revision {
+                    if revision > props.revision {
                         return Err(Error::InputRevision {
                             current: props.revision,
-                            incoming: *revision,
+                            incoming: revision,
                         });
                     }
                 }
@@ -441,92 +592,57 @@ fn preflight(node: DescriptorView<'_>, patch: Option<&Patch>) -> Result<(), Erro
     {
         return Err(Error::Unsupported("Wry sparse display templates"));
     }
-    if node.options.get::<VirtualPart>().is_some() {
-        return Err(Error::Unsupported("Wry virtual collection handover"));
-    }
-    if matches!(node.props, Props::File(_) | Props::RichEditor(_)) {
-        return Err(Error::Unsupported("Wry structured control"));
-    }
-    let semantics = match patch {
-        None => node.semantics.as_deref(),
-        Some(Patch::Semantics(Change::Set(value))) => value.as_deref(),
-        _ => None,
-    };
-    let context_layer = |layer: &glory_render::Layer| {
-        !layer.modal
-            && layer.sheet.is_none()
-            && layer.escape
-            && layer.outside
-            && layer.anchor.is_some()
-            && layer.initial_focus.is_none()
-            && layer.return_focus.is_none()
-            && layer.focus == glory_render::LayerFocus::Manage
-            && matches!(
-                layer.placement,
-                glory_render::LayerPlacement::ContextPoint(_)
-            )
-    };
-    if let Some(s) = semantics
-        && (s.focus_scope.is_some()
-            || s.input_edit.is_some()
-            || s.translation.is_some()
-            || s.collapse.is_some()
-            || s.presence.is_some()
-            || s.swipe_capture.is_some()
-            || s.tags_input.is_some()
-            || s.splitter.is_some()
-            || s.slider.is_some()
-            || s.spinbutton.is_some()
-            || s.scroll_keyboard.is_some()
-            || s.combobox.is_some()
-            || s.option.is_some()
-            || s.menu_search.is_some()
-            || s.menubar_item
-            || s.layer.as_ref().is_some_and(|layer| !context_layer(layer))
-            || s.sheet_grip
-            || (s.navigation.is_some()
-                && node.role != Some(Role::RadioGroup)
-                && !s.layer.as_ref().is_some_and(context_layer))
-            || (s.typeahead && !s.layer.as_ref().is_some_and(context_layer))
-            || s.grid_navigation.is_some()
-            || s.tree_navigation.is_some()
-            || s.navigation_panel.is_some()
-            || s.form_action.is_some()
-            || (s.form_control.is_some()
-                && !matches!(node.props, Props::Check(check) if check.mode == CheckMode::Radio))
-            || s.field_part == Some(FieldPart::Form))
-    {
-        return Err(Error::Unsupported("Wry interaction metadata"));
-    }
-    if matches!(node.props, Props::Graphic(_)) {
-        return Err(Error::Unsupported("Wry animated graphic"));
-    }
     Ok(())
 }
 fn supported_event(kind: EventKind) -> bool {
     matches!(
         kind,
         EventKind::Activate
+            | EventKind::Submit
+            | EventKind::Reset
             | EventKind::ValueChanged
+            | EventKind::RichEdit
+            | EventKind::RichSelection
+            | EventKind::RichRejected
+            | EventKind::RichCommand
+            | EventKind::Files
+            | EventKind::InputEdit
             | EventKind::Commit
             | EventKind::SelectChanged
             | EventKind::CheckedChanged
             | EventKind::Composition
             | EventKind::FocusChanged
             | EventKind::FocusWithin
+            // Anchor is a passive SSR handover notification. A fresh Wry
+            // document starts at its declared scroll position.
+            | EventKind::Anchor
             | EventKind::Resize
             | EventKind::Scroll
             | EventKind::Keyboard
             | EventKind::Navigate
+            | EventKind::GridNavigate
+            | EventKind::TreeNavigate
+            | EventKind::ScrollKeyboard
+            | EventKind::Spin
+            | EventKind::Choice
+            | EventKind::Tags
+            | EventKind::Palette
+            | EventKind::NavigationPanel
             | EventKind::ColorSchemeChanged
             | EventKind::Clipboard
             | EventKind::ImageStatus
             | EventKind::Drag
+            | EventKind::Range
+            | EventKind::CollapseComplete
+            | EventKind::PresenceComplete
+            | EventKind::Sheet
+            | EventKind::Swipe
             | EventKind::ContextMenu
             | EventKind::Dismiss
             | EventKind::Menu
             | EventKind::Typeahead
             | EventKind::Pointer
+            | EventKind::PlotPointer
             | EventKind::PointerWithin
     )
 }
@@ -542,6 +658,9 @@ impl Render for Renderer {
     ) -> Result<(), Error> {
         glory_html::preflight_place(tree, child, parent)
     }
+    fn supports_plot_pointer(&self) -> bool {
+        true
+    }
     fn style_profile(&self) -> style::Profile {
         style::Profile::HTML
     }
@@ -551,8 +670,17 @@ impl Render for Renderer {
             scroll: true,
             focus: true,
             input: true,
+            collapse_completion: true,
+            presence_completion: true,
+            presence_transforms: true,
             clipboard_write: self.0.borrow().text_clipboard,
-            ..Capabilities::default()
+            files: self.0.borrow().files.map(|document| FileCapabilities {
+                document,
+                picker: true,
+                drop: true,
+                read: true,
+                preview: true,
+            }),
         }
     }
     fn listen(&mut self, node: NodeId, kind: EventKind, enabled: bool) -> Result<(), Error> {
@@ -648,35 +776,43 @@ impl Render for Renderer {
             .tree()
             .node(query.node())
             .and_then(|node| query.validate_target(node.descriptor.view()))
-            .and({
-                if matches!(
-                    query,
-                    Query::FileRead(_) | Query::FilePreview(_) | Query::RichSelection(_)
-                ) {
-                    Err(Error::Unsupported("Wry structured query"))
-                } else {
-                    Ok(())
-                }
+            .and_then(|()| match query {
+                Query::FileRead(_) | Query::FilePreview(_) => files::query(query, &state).map(Some),
+                _ => Ok(None),
             });
         let applied = state.mapper.receipt().applied;
-        if let Err(error) = result {
-            state.inputs.push(Input::Response {
-                token,
-                applied,
-                result: Err(error),
-            });
-            return Ok(());
-        }
-        let kind = match query {
-            Query::Bounds(_) => "bounds",
-            Query::Focus(_) => "focus",
-            Query::Scroll(_) => "scroll",
-            Query::ScrollMetrics(_) => "scroll_metrics",
-            Query::Selection(_) => "selection",
-            _ => unreachable!(),
+        let mut command = match result {
+            Ok(Some(command)) => command,
+            Ok(None) => json!({"kind":match query {
+                Query::RichSelection(_) => "rich_selection",
+                Query::Bounds(_) => "bounds",
+                Query::Focus(_) => "focus",
+                Query::Scroll(_) => "scroll",
+                Query::ScrollMetrics(_) => "scroll_metrics",
+                Query::Selection(_) => "selection",
+                Query::FileRead(_)|Query::FilePreview(_)=>unreachable!(),
+            }}),
+            Err(error) => {
+                state.inputs.push(Input::Response {
+                    token,
+                    applied,
+                    result: Err(error),
+                });
+                return Ok(());
+            }
         };
-        state.transport.push(json!({"op":"query","id":protocol::id(query.node()),"kind":kind,"token":token.0.to_string()}))?;
-        state.pending.insert(token, Pending { query, applied });
+        command["id"] = json!(protocol::id(query.node()));
+        command["op"] = json!("query");
+        command["token"] = json!(token.0.to_string());
+        state.transport.push(command)?;
+        state.pending.insert(
+            token,
+            Pending {
+                query,
+                applied,
+                preview: None,
+            },
+        );
         state
             .nodes
             .get_mut(&query.node())
@@ -689,10 +825,27 @@ impl Render for Renderer {
         let mut state = self.0.borrow_mut();
         let descriptor = state.mapper.tree().node(action.node())?.descriptor.view();
         action.validate_target(descriptor)?;
-        if !state.mapper.tree().active(action.node()) {
-            return Err(Error::Unsupported("Wry inactive action target"));
+        let tree = state.mapper.tree();
+        match action {
+            Action::RevealOption { node } if !tree.active(node) || !tree.enabled(node) => {
+                return Ok(());
+            }
+            // A controlled menu commonly closes in the same commit that
+            // requests Tab exit. Its retained declaration still owns the
+            // return-focus relation, even when the panel is already hidden.
+            Action::ExitMenu { node, .. } if tree.inert(node) => {
+                return Err(Error::Unsupported("menu exit in an inert region"));
+            }
+            Action::ExitMenu { .. } => {}
+            _ if !tree.active(action.node()) => {
+                return Err(Error::Unsupported("Wry inactive action target"));
+            }
+            _ => {}
         }
         let value = match action {
+            Action::PickFiles { .. } | Action::ClearFiles { .. } | Action::RemoveFile(_) => {
+                files::action(action, &mut state)?
+            }
             Action::CopyText {
                 revision, request, ..
             } => {
@@ -711,8 +864,18 @@ impl Render for Renderer {
                 state.mapper.admit_clipboard(action)?;
                 json!({"kind":"copy_text","revision":revision.to_string(),"request":request.to_string(),"text":text})
             }
+            Action::RaiseLayer(_) => json!({"kind":"raise_layer"}),
+            Action::SelectRich {
+                revision,
+                selection,
+                ..
+            } => {
+                json!({"kind":"rich_selection","revision":revision.to_string(),"selection":rich::selection(selection)})
+            }
             Action::Focus(_) => json!({"kind":"focus"}),
             Action::ScrollTo { x, y, .. } => json!({"kind":"scroll","x":x,"y":y}),
+            Action::ExitMenu { backwards, .. } => json!({"kind":"exit_menu","backwards":backwards}),
+            Action::RevealOption { .. } => json!({"kind":"reveal_option"}),
             Action::ScrollIntoView(_) => json!({"kind":"reveal"}),
             Action::SelectText {
                 revision,
@@ -731,7 +894,6 @@ impl Render for Renderer {
                 selection.byte_range(&props.value)?;
                 json!({"kind":"selection","revision":revision.to_string(),"start":selection.start,"end":selection.end,"direction":selection.direction.as_str()})
             }
-            _ => return Err(Error::Unsupported("Wry platform action")),
         };
         state
             .transport
@@ -745,7 +907,7 @@ impl Render for Renderer {
             .filter_map(|input| match input {
                 Input::Event {
                     node,
-                    event: Event::ValueChanged { .. },
+                    event: Event::ValueChanged { .. } | Event::InputEdit(_) | Event::RichEdit(_),
                 } => Some(*node),
                 _ => None,
             })
@@ -758,8 +920,22 @@ impl Render for Renderer {
     }
 }
 
+fn drag_phase(phase: &str) -> Result<glory_render::DragPhase, Error> {
+    Ok(match phase {
+        "start" => glory_render::DragPhase::Start,
+        "move" => glory_render::DragPhase::Move,
+        "drop" => glory_render::DragPhase::Drop,
+        "cancel" => glory_render::DragPhase::Cancel,
+        _ => return Err(Error::InvalidEvent("Wry drag phase")),
+    })
+}
 impl WireEvent {
-    fn into_event(self, node: NodeId, drag_source: NodeId) -> Result<Event, Error> {
+    fn into_event(
+        self,
+        node: NodeId,
+        drag_source: NodeId,
+        sheet: Option<&glory_render::SheetConfig>,
+    ) -> Result<Event, Error> {
         Ok(match self {
             Self::Clipboard {
                 request,
@@ -776,7 +952,42 @@ impl WireEvent {
                     _ => return Err(Error::InvalidEvent("Wry clipboard outcome")),
                 },
             },
+            Self::RichEdit { snapshot } => Event::RichEdit(snapshot.decode()?),
+            Self::RichSelection { snapshot } => Event::RichSelection(snapshot.decode()?),
+            Self::RichRejected { revision } => Event::RichRejected {
+                revision: protocol::integer(&revision)?,
+            },
+            Self::RichCommand { revision, command } => Event::RichCommand {
+                revision: protocol::integer(&revision)?,
+                command: match command.as_str() {
+                    "undo" => RichCommand::Undo,
+                    "redo" => RichCommand::Redo,
+                    "bold" => RichCommand::Bold,
+                    "italic" => RichCommand::Italic,
+                    "code" => RichCommand::Code,
+                    _ => return Err(Error::InvalidEvent("Wry rich command")),
+                },
+            },
             Self::Activate => Event::Activate,
+            Self::FormSubmit { submitter } => Event::Submit {
+                submitter: submitter.map(|_| drag_source),
+            },
+            Self::FormReset => Event::Reset,
+            Self::KeyBinding { binding, from } => {
+                keys::event(binding, drag_source, from.is_some())?
+            }
+            Self::TreeSearch {
+                text, at_millis, ..
+            } => Event::TreeNavigate {
+                from: drag_source,
+                command: glory_render::TreeCommand::Search { text, at_millis },
+            },
+            Self::Palette => Event::Palette { from: node },
+            Self::Tags { revision, data } => Event::Tags {
+                from: node,
+                revision: protocol::integer(&revision)?,
+                command: data.into(),
+            },
             Self::Value {
                 value,
                 composing,
@@ -786,6 +997,9 @@ impl WireEvent {
                 composing,
                 revision: protocol::integer(&revision)?,
             },
+            Self::InputEdit { revision, edit } => {
+                Event::InputEdit(edit.decode(protocol::integer(&revision)?))
+            }
             Self::Commit { value, revision } => Event::Commit {
                 value,
                 revision: protocol::integer(&revision)?,
@@ -857,17 +1071,40 @@ impl WireEvent {
                     ImageStatus::Failed
                 },
             },
+            Self::Sheet {
+                revision,
+                viewport,
+                extent,
+            } => Event::Sheet {
+                from: node,
+                revision: protocol::integer(&revision)?,
+                command: sheet
+                    .ok_or(Error::InvalidEvent("Wry sheet release requires a sheet"))?
+                    .nearest(viewport, extent)?,
+            },
+            Self::CollapseComplete { revision } => Event::CollapseComplete {
+                revision: protocol::integer(&revision)?,
+            },
+            Self::PresenceComplete { revision } => Event::PresenceComplete {
+                revision: protocol::integer(&revision)?,
+            },
+            Self::Swipe {
+                phase,
+                revision,
+                x,
+                y,
+            } => Event::Swipe {
+                from: node,
+                phase: drag_phase(&phase)?,
+                revision: protocol::integer(&revision)?,
+                x,
+                y,
+            },
             Self::Drag { phase, x, y, .. } => Event::Drag {
                 from: drag_source,
                 x,
                 y,
-                phase: match phase.as_str() {
-                    "start" => glory_render::DragPhase::Start,
-                    "move" => glory_render::DragPhase::Move,
-                    "drop" => glory_render::DragPhase::Drop,
-                    "cancel" => glory_render::DragPhase::Cancel,
-                    _ => return Err(Error::InvalidEvent("Wry drag phase")),
-                },
+                phase: drag_phase(&phase)?,
             },
             Self::Keyboard { command } => Event::Keyboard {
                 from: node,
@@ -900,7 +1137,46 @@ impl WireEvent {
                 text,
                 at_millis,
             },
-            Self::Pointer { phase } => Event::Pointer {
+            Self::PlotPointer {
+                pointer_id,
+                device,
+                phase,
+                x,
+                y,
+                width,
+                height,
+            } => {
+                let pointer = PlotPointer {
+                    pointer_id,
+                    x,
+                    y,
+                    viewport: Rect {
+                        width,
+                        height,
+                        ..Rect::default()
+                    },
+                    device: match device.as_str() {
+                        "mouse" => PlotPointerDevice::Mouse,
+                        "pen" => PlotPointerDevice::Pen,
+                        "touch" => PlotPointerDevice::Touch,
+                        _ => return Err(Error::InvalidEvent("Wry plot pointer device")),
+                    },
+                    phase: match phase.as_str() {
+                        "down" => PlotPointerPhase::Down,
+                        "up" => PlotPointerPhase::Up,
+                        "move" => PlotPointerPhase::Move,
+                        "leave" => PlotPointerPhase::Leave,
+                        "cancel" => PlotPointerPhase::Cancel,
+                        _ => return Err(Error::InvalidEvent("Wry plot pointer phase")),
+                    },
+                };
+                pointer.validate()?;
+                Event::PlotPointer {
+                    from: node,
+                    pointer,
+                }
+            }
+            Self::Pointer { phase, .. } => Event::Pointer {
                 from: node,
                 related: None,
                 phase: match phase.as_str() {
@@ -933,6 +1209,11 @@ fn response(query: Query, value: Value) -> Result<QueryValue, Error> {
             .ok_or(Error::InvalidResponse("Wry query number"))
     };
     let result = match query {
+        Query::RichSelection(_) => QueryValue::RichSelection(
+            serde_json::from_value::<rich::Snapshot>(value.clone())
+                .map_err(|_| Error::InvalidResponse("invalid Wry rich selection"))?
+                .decode()?,
+        ),
         Query::Bounds(_) => QueryValue::Bounds(Rect {
             x: number("x")?,
             y: number("y")?,

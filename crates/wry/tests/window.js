@@ -1,7 +1,150 @@
 document.addEventListener("DOMContentLoaded",()=>{
-  const wait=async predicate=>{for(let n=0;n<800;n++){if(predicate())return;await new Promise(r=>setTimeout(r,10));}throw Error("acceptance wait timeout");};
+  const wait=async predicate=>{for(let n=0;n<800;n++){if(predicate())return;await new Promise(r=>setTimeout(r,10));}throw Error("acceptance wait timeout: "+predicate);};
   (async()=>{
     await wait(()=>document.querySelector(".increment"));
+    const plot=document.querySelector(".plot-viewport"), path=plot.querySelector("svg path");
+    if (!(path instanceof SVGPathElement) || path.getTotalLength() < 20) throw Error("Missing vector geometry");
+    if (!matchMedia("(prefers-reduced-motion: reduce)").matches &&
+        !plot.getAnimations({subtree:true}).some(animation => animation.playState==="running")) throw Error("Vector motion is inactive");
+    plot.scrollIntoView({block:"center",behavior:"instant"});
+    for (let i=0;i<4;i++) await new Promise(requestAnimationFrame);
+    const box=plot.getBoundingClientRect(), last=document.querySelector(".plot-observation");
+    if(box.width<1 || box.height<1) throw Error("Empty chart fixture: "+JSON.stringify(box));
+    for (const [name,phase] of [["pointerdown","Down"],["pointermove","Move"],["pointerup","Up"]]) {
+      const raw = new PointerEvent(name,{bubbles:true,pointerId:3,pointerType:"pen",button:0,
+        clientX:box.x+7.5,clientY:box.y+4.5});
+      path.dispatchEvent(raw);
+      try {await wait(()=>last.textContent.startsWith(phase+":"));} catch {throw Error("Missing plot "+phase+"; received "+last.textContent+"; box "+JSON.stringify(plot.getBoundingClientRect()));}
+      const [,x,y]=last.textContent.split(":");
+      if (Math.abs(Number(x)-(raw.clientX-box.x))>.11 || Math.abs(Number(y)-(raw.clientY-box.y))>.11)
+        throw Error("Incorrect local plot coordinates: "+last.textContent);
+    }
+    const form=document.querySelector(".structured-form"), submitted=document.querySelector(".structured-form-state");
+    const submit=form.querySelector(".structured-submit");
+    submit.click();await wait(()=>submitted.textContent==="S");
+    form.querySelector(".structured-reset").click();await wait(()=>submitted.textContent==="SR");
+    const implicit=form.querySelector(".structured-form-input");implicit.focus();
+    implicit.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",bubbles:true,cancelable:true}));
+    await wait(()=>submitted.textContent==="SRS");
+    form.requestSubmit(submit);await wait(()=>submitted.textContent==="SRSS");
+    const structuredInput=document.querySelector(".structured-input"), editState=document.querySelector(".structured-edit-state");
+    structuredInput.focus();structuredInput.setSelectionRange(0,0);
+    structuredInput.dispatchEvent(new InputEvent("beforeinput",{bubbles:true,inputType:"insertText"}));
+    structuredInput.value="🦀";structuredInput.setSelectionRange(2,2);
+    structuredInput.dispatchEvent(new InputEvent("input",{bubbles:true}));
+    await wait(()=>editState.textContent==="Insert 🦀 Some(0) 2");
+    structuredInput.value="too many bytes";
+    structuredInput.dispatchEvent(new InputEvent("input",{bubbles:true}));
+    await wait(()=>editState.textContent==="TooLong");
+    const rich=document.querySelector(".structured-rich"),richStatus=document.querySelector(".structured-rich-state");
+    rich.focus();rich.querySelector("p").textContent="Finite 🦀";
+    rich.dispatchEvent(new InputEvent("input",{bubbles:true}));
+    await wait(()=>richStatus.textContent==="Finite 🦀");
+    rich.querySelector("p").append(document.createElement("img"));
+    rich.dispatchEvent(new InputEvent("input",{bubbles:true}));
+    await wait(()=>richStatus.textContent==="rejected" && rich.textContent==="Finite 🦀" && !rich.querySelector("img"));
+    const canvas=document.createElement("canvas");canvas.width=2;canvas.height=3;
+    const pixels=canvas.getContext("2d");pixels.fillStyle="rgb(175,45,98)";pixels.fillRect(0,0,2,3);
+    const encoded=await new Promise(resolve=>canvas.toBlob(resolve,"image/png"));
+    const sendFile=file=>{
+      const transfer=new DataTransfer();transfer.items.add(file);
+      document.querySelector(".structured-file").dispatchEvent(new DragEvent("drop",{dataTransfer:transfer,bubbles:true,cancelable:true}));
+    };
+    sendFile(new File([encoded],"fixture.png",{type:"image/png"}));
+    const source=document.querySelector(".structured-preview"),header=document.querySelector(".structured-header");
+    await wait(()=>source.textContent.startsWith("blob:") && header.textContent==="[137, 80, 78, 71]");
+    const verified=new Image();verified.src=source.textContent;await verified.decode();
+    if(verified.naturalWidth!==2 || verified.naturalHeight!==3) throw Error("wrong preview dimensions");
+    pixels.clearRect(0,0,2,3);pixels.drawImage(verified,0,0);
+    if(pixels.getImageData(0,0,1,1).data.join(",")!=="175,45,98,255") throw Error("wrong preview pixel");
+    sendFile(new File(["incorrect signature"],"invalid.png",{type:"image/png"}));
+    await wait(()=>source.textContent==="rejected");
+    const trigger=document.querySelector(".popup-trigger"),panel=document.querySelector(".popup-panel");
+    trigger.scrollIntoView({block:"center"});trigger.focus();trigger.click();
+    await wait(()=>panel.matches(":popover-open") && panel.dataset.glyAnchorResolved && document.activeElement.matches(".popup-confirm"));
+    const anchorBox=trigger.getBoundingClientRect(),panelBox=panel.getBoundingClientRect();
+    if(Math.abs(anchorBox.width-panelBox.width)>1 || Math.abs(anchorBox.x-panelBox.x)>1)
+      throw Error("Anchored popup failed physical alignment");
+    document.activeElement.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true,cancelable:true}));
+    await wait(()=>!panel.matches(":popover-open") && document.activeElement===trigger);
+    const toggle=document.querySelector(".collapse-toggle"), receiptHeight=document.querySelector(".collapse-receipt");
+    toggle.click();
+    await wait(()=>receiptHeight.textContent==="1" && document.querySelector(".collapse-observed").getBoundingClientRect().height<1);
+    toggle.click();
+    await wait(()=>receiptHeight.textContent==="2" && document.querySelector(".collapse-observed").getBoundingClientRect().height>0);
+    await wait(()=>document.querySelector(".presence-receipt").textContent==="2");
+    const scopeTrigger=document.querySelector(".scope-trigger"),scopeFirst=document.querySelector(".scope-first"),scopeLast=document.querySelector(".scope-last");
+    scopeTrigger.focus();scopeTrigger.click();
+    await wait(()=>document.activeElement===scopeFirst);
+    scopeFirst.dispatchEvent(new KeyboardEvent("keydown",{key:"Tab",shiftKey:true,bubbles:true,cancelable:true}));
+    if(document.activeElement!==scopeLast)throw Error("Focus scope did not wrap backwards");
+    scopeTrigger.focus();
+    // A background system WebView can update activeElement without emitting focusin.
+    if(!document.hasFocus())window.dispatchEvent(new Event("focus"));
+    if(document.activeElement!==scopeFirst)throw Error("Active focus scope leaked focus");
+    scopeLast.click();
+    await wait(()=>document.activeElement===scopeTrigger);
+    const stream=document.querySelector(".looping");
+    if(!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      await wait(()=>stream.getAnimations().some(animation=>animation.playState==="running" && animation.currentTime>0));
+    }
+    const sheetTrigger=document.querySelector(".sheet-trigger"), sheet=document.querySelector(".snap-sheet");
+    sheetTrigger.focus();sheetTrigger.click();
+    const expected=Math.min(window.visualViewport?.height || innerHeight,500);
+    await wait(()=>sheet.matches(":popover-open") && Math.abs(sheet.getBoundingClientRect().height-expected*0.4)<1);
+    document.querySelector(".snap-next").click();
+    await wait(()=>Math.abs(sheet.getBoundingClientRect().height-expected*0.8)<1);
+    document.activeElement.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape",bubbles:true,cancelable:true}));
+    await wait(()=>!sheet.matches(":popover-open") && document.activeElement===sheetTrigger);
+    const toggleWindows=document.querySelector(".window-toggle"),raiseWindow=document.querySelector(".window-raise");
+    const win1=document.querySelector(".window-first"),win2=document.querySelector(".window-last");
+    toggleWindows.click();
+    const topWindow=()=>{const r=win1.getBoundingClientRect();return document.elementFromPoint(r.left+10,r.top+10)?.closest("[data-gly-layer]");};
+    await wait(()=>win1.matches(":popover-open") && win2.matches(":popover-open") && topWindow()===win2);
+    raiseWindow.focus();raiseWindow.click();
+    await wait(()=>topWindow()===win1);
+    if(document.activeElement!==raiseWindow)throw Error("Raising a floating window stole outside focus");
+    toggleWindows.click();await wait(()=>!win1.matches(":popover-open") && !win2.matches(":popover-open"));
+    if(document.activeElement!==raiseWindow)throw Error("Closing floating windows stole outside focus");
+    const pressKey=(selector,key,options={})=>{
+      const target=document.querySelector(selector);
+      target.focus();
+      return !target.dispatchEvent(new KeyboardEvent("keydown",{key,bubbles:true,cancelable:true,...options}));
+    };
+    const receipt=expected=>wait(()=>document.querySelector(".key-receipt").textContent===expected);
+    if(!pressKey(".key-day","ArrowLeft") || pressKey(".key-grid-editor","ArrowRight") || pressKey(".key-day","Home",{ctrlKey:true}))
+      throw Error("grid consumed a modifier or editor key, or missed RTL navigation");
+    await receipt("grid Right");
+    if(!pressKey(".key-day","PageUp",{shiftKey:true}))throw Error("grid large page");
+    await receipt("grid PreviousLargePage");
+    if(!pressKey(".key-branch","😀"))throw Error("tree Unicode typeahead");
+    await receipt("tree 😀");
+    if(pressKey(".key-scroll","ArrowRight") || !pressKey(".key-scroll","End"))throw Error("scroll axis");
+    await receipt("scroll End");
+    if(pressKey(".key-tags",",",{isComposing:true}) || !pressKey(".key-tags","Enter"))throw Error("tag commit/IME");
+    await receipt("commit text");
+    const tags=document.querySelector(".key-tags"), clipboard=new DataTransfer();
+    tags.setSelectionRange(1,3);clipboard.setData("text/plain","one,two");
+    if(tags.dispatchEvent(new ClipboardEvent("paste",{bubbles:true,cancelable:true,clipboardData:clipboard})))throw Error("tag paste not handled");
+    await receipt("paste 1-3 one,two");
+    const listbox=document.querySelector(".key-list"), option=listbox.querySelector("[data-gly-option-owner]");
+    listbox.style.cssText="height:30px;overflow:auto";option.style.marginTop="100px";
+    const combo=document.querySelector(".key-combo");combo.focus({preventScroll:true});
+    const outerScroll=scrollY;
+    if(!pressKey(".key-combo","End"))throw Error("combobox did not capture End");
+    await wait(()=>listbox.scrollTop>50);
+    if(document.activeElement!==combo || scrollY!==outerScroll)throw Error("revealing an option moved focus or document scroll");
+    document.querySelector(".key-menu-trigger").click();
+    await wait(()=>document.activeElement===document.querySelector(".key-menu-next"));
+    const virtual=document.querySelector("[data-gly-virtual=root]");
+    virtual.focus();
+    if(virtual.dispatchEvent(new KeyboardEvent("keydown",{key:"End",bubbles:true,cancelable:true})))throw Error("virtual End was not captured");
+    await wait(()=>document.activeElement?.dataset.glyVirtual==="row" && document.activeElement.textContent==="Virtual row 499");
+    const rows=virtual.querySelectorAll("[data-gly-virtual=row]");
+    if(rows.length>24)throw Error("virtual navigation mounted the whole list");
+    const nested=document.activeElement.querySelector("button");
+    nested.focus();
+    if(!nested.dispatchEvent(new KeyboardEvent("keydown",{key:"Home",bubbles:true,cancelable:true})))throw Error("virtual descendant lost its native key");
     const input=document.querySelector('input[aria-label="Message"]');
     document.querySelector(".increment").click();
     await wait(()=>document.querySelector(".count").textContent==="Count:1");
@@ -19,6 +162,7 @@ document.addEventListener("DOMContentLoaded",()=>{
     if(radios.length!==2 || radios[1].value!=="dark")throw Error("Native radio name/value missing");
     radios[1].click();
     await wait(()=>radios[1].getAttribute("aria-checked")==="true" && !radios[0].checked);
+    radios[1].focus();
     const arrow=key=>radios[1].dispatchEvent(new KeyboardEvent("keydown",{key,bubbles:true,cancelable:true}));
     if(arrow("ArrowRight") || !arrow("ArrowUp"))throw Error("Radio group did not respect its horizontal axis");
     await wait(()=>document.querySelector(".radio-event").textContent==="Previous");

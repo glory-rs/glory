@@ -138,6 +138,26 @@ impl AnchorPlacement {
         }
         Ok(())
     }
+    /// Arrow center along the panel cross axis, inset to keep the arrow on its edge.
+    pub fn arrow_cross(self, anchor: Rect, panel: Rect, resolved: AnchorPosition) -> Option<f64> {
+        let arrow = self.arrow?;
+        let (extent, centered) = match resolved.side {
+            AnchorSide::Top | AnchorSide::Bottom => {
+                (panel.width, anchor.x + anchor.width / 2.0 - resolved.x)
+            }
+            AnchorSide::Left | AnchorSide::Right => {
+                (panel.height, anchor.y + anchor.height / 2.0 - resolved.y)
+            }
+        };
+        let requested = match (arrow.position, self.align) {
+            (AnchorArrowPosition::Side, AnchorAlign::Start) => arrow.offset + arrow.size / 2.0,
+            (AnchorArrowPosition::Side, AnchorAlign::End) => {
+                extent - arrow.offset - arrow.size / 2.0
+            }
+            _ => centered,
+        };
+        Some(requested.clamp(arrow.size, (extent - arrow.size).max(arrow.size)))
+    }
     /// Pure finite geometry. `panel` contributes dimensions only. The host
     /// supplies the current anchor, including any pending ancestor-layer delta.
     pub fn resolve(

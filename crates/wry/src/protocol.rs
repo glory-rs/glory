@@ -25,7 +25,7 @@ fn property(value: Property) -> Result<Value, Error> {
         Property::Text(text) => json!(text),
         Property::Bool(value) => json!(value),
         Property::SelectedKeys(keys) => json!(keys),
-        _ => return Err(Error::Unsupported("Wry structured control property")),
+        Property::RichDocument(value) => super::rich::document(&value),
     })
 }
 fn shape(shape: Shape) -> Result<Value, Error> {
@@ -114,6 +114,16 @@ pub struct Incoming {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Payload {
     Ready,
+    Files {
+        observation: super::files::Observation,
+    },
+    LayerBounds {
+        node: String,
+        request: String,
+        anchor: [f64; 4],
+        panel: [f64; 2],
+        viewport: [f64; 2],
+    },
     Ack {
         sequence: String,
     },
@@ -133,6 +143,54 @@ pub enum Payload {
 #[derive(Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum WireEvent {
+    RichEdit {
+        snapshot: super::rich::Snapshot,
+    },
+    RichSelection {
+        snapshot: super::rich::Snapshot,
+    },
+    RichRejected {
+        revision: String,
+    },
+    RichCommand {
+        revision: String,
+        command: String,
+    },
+    Sheet {
+        revision: String,
+        viewport: f64,
+        extent: f64,
+    },
+    FormSubmit {
+        submitter: Option<String>,
+    },
+    FormReset,
+    CollapseComplete {
+        revision: String,
+    },
+    PresenceComplete {
+        revision: String,
+    },
+    Swipe {
+        phase: String,
+        revision: String,
+        x: f64,
+        y: f64,
+    },
+    KeyBinding {
+        binding: u16,
+        from: Option<String>,
+    },
+    TreeSearch {
+        from: String,
+        text: String,
+        at_millis: u64,
+    },
+    Palette,
+    Tags {
+        revision: String,
+        data: WireTags,
+    },
     Clipboard {
         request: String,
         revision: String,
@@ -150,6 +208,10 @@ pub enum WireEvent {
         value: String,
         composing: bool,
         revision: String,
+    },
+    InputEdit {
+        revision: String,
+        edit: WireInputEdit,
     },
     Commit {
         value: String,
@@ -199,7 +261,17 @@ pub enum WireEvent {
         text: String,
         at_millis: u64,
     },
+    PlotPointer {
+        pointer_id: i32,
+        device: String,
+        phase: String,
+        x: f64,
+        y: f64,
+        width: f64,
+        height: f64,
+    },
     Pointer {
+        related: Option<String>,
         phase: String,
     },
     ColorScheme {
@@ -209,6 +281,133 @@ pub enum WireEvent {
         revision: String,
         loaded: bool,
     },
+}
+#[derive(Deserialize)]
+#[serde(tag = "status", rename_all = "snake_case", deny_unknown_fields)]
+pub enum WireInputEdit {
+    Value {
+        value: String,
+        selection: WireSelection,
+        before: Option<WireSelection>,
+        intent: WireIntent,
+        composing: bool,
+    },
+    TooLong,
+    SelectionUnavailable,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct WireSelection {
+    start: u32,
+    end: u32,
+    direction: WireDirection,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum WireDirection {
+    None,
+    Forward,
+    Backward,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WireIntent {
+    Insert,
+    DeleteBackward,
+    DeleteForward,
+    Replace,
+}
+
+impl From<WireSelection> for glory_render::TextSelection {
+    fn from(value: WireSelection) -> Self {
+        use glory_render::SelectionDirection;
+        Self {
+            start: value.start as usize,
+            end: value.end as usize,
+            direction: match value.direction {
+                WireDirection::None => SelectionDirection::None,
+                WireDirection::Forward => SelectionDirection::Forward,
+                WireDirection::Backward => SelectionDirection::Backward,
+            },
+        }
+    }
+}
+
+impl WireInputEdit {
+    pub fn decode(self, revision: u64) -> glory_render::InputEdit {
+        use glory_render::{InputEdit, InputEditIntent, InputEditRejection};
+        match self {
+            Self::Value {
+                value,
+                selection,
+                before,
+                intent,
+                composing,
+            } => InputEdit::Value {
+                value,
+                revision,
+                selection: selection.into(),
+                before: before.map(Into::into),
+                intent: match intent {
+                    WireIntent::Insert => InputEditIntent::Insert,
+                    WireIntent::DeleteBackward => InputEditIntent::DeleteBackward,
+                    WireIntent::DeleteForward => InputEditIntent::DeleteForward,
+                    WireIntent::Replace => InputEditIntent::Replace,
+                },
+                composing,
+            },
+            Self::TooLong => InputEdit::Rejected {
+                revision,
+                reason: InputEditRejection::TooLong,
+            },
+            Self::SelectionUnavailable => InputEdit::Rejected {
+                revision,
+                reason: InputEditRejection::SelectionUnavailable,
+            },
+        }
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "command", rename_all = "snake_case", deny_unknown_fields)]
+pub enum WireTags {
+    Commit {
+        value: String,
+    },
+    RemoveLast,
+    Paste {
+        value: String,
+        text: String,
+        start: u32,
+        end: u32,
+    },
+    InputBudget,
+    ClipboardBudget,
+}
+impl From<WireTags> for glory_render::TagsCommand {
+    fn from(value: WireTags) -> Self {
+        use glory_render::TagHostRejection;
+        match value {
+            WireTags::Commit { value } => Self::Commit { value },
+            WireTags::RemoveLast => Self::RemoveLast,
+            WireTags::Paste {
+                value,
+                text,
+                start,
+                end,
+            } => Self::Paste {
+                value,
+                text,
+                start,
+                end,
+            },
+            WireTags::InputBudget => Self::Reject(TagHostRejection::InputBudget),
+            WireTags::ClipboardBudget => Self::Reject(TagHostRejection::ClipboardBudget),
+        }
+    }
 }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]

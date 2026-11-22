@@ -378,7 +378,14 @@ fn preflight_and_direct_apply_reject_unsupported_metadata_with_accepted_prefix()
     let id = ids.allocate();
     let bad = ids.allocate();
     let mut renderer = Renderer::new(runtime);
-    let unsupported = Descriptor::new(Props::File(FileProps::default()));
+    static TEMPLATE: glory_html::view::Template =
+        glory_html::view::Template::new(&[glory_html::view::div(&[], &[])]);
+    let mut unsupported = Descriptor::new(Props::Group);
+    unsupported
+        .options
+        .insert(glory_html::display::Placement::Root(
+            glory_html::display::Frame::new(&TEMPLATE).unwrap(),
+        ));
     assert!(renderer.preflight(unsupported.view(), None).is_err());
     assert!(
         renderer
@@ -399,12 +406,12 @@ fn preflight_and_direct_apply_reject_unsupported_metadata_with_accepted_prefix()
     let applied = renderer.0.borrow().mapper.receipt().applied;
     assert!(applied > 0);
     assert_eq!(renderer.apply(&[]).unwrap().applied, applied);
-    assert!(renderer.listen(id, EventKind::Swipe, true).is_err());
-    renderer.listen(id, EventKind::Swipe, false).unwrap();
+    assert!(renderer.listen(id, EventKind::DisplayClick, true).is_err());
+    renderer.listen(id, EventKind::DisplayClick, false).unwrap();
 }
 
 #[test]
-fn menu_search_is_explicitly_unsupported_before_wry_identity_allocation() {
+fn menu_search_maps_its_declared_editor_and_owner() {
     let runtime = RuntimeId::new();
     let id = NodeIds::new(runtime).allocate();
     let mut renderer = Renderer::new(runtime);
@@ -419,47 +426,63 @@ fn menu_search_is_explicitly_unsupported_before_wry_identity_allocation() {
         ..Default::default()
     }));
     editor.validate().unwrap();
-    assert!(renderer.preflight(editor.view(), None).is_err());
-    assert!(
-        renderer
-            .apply(&[Mutation::Create {
-                id,
-                node: Box::new(editor)
-            }])
-            .is_err()
-    );
-    assert!(renderer.0.borrow().mapper.tree().node(id).is_err());
+    renderer.preflight(editor.view(), None).unwrap();
+    renderer
+        .apply(&[Mutation::Create {
+            id,
+            node: Box::new(editor),
+        }])
+        .unwrap();
+    ready(&renderer);
+    let mapped = batch(&renderer).to_string();
+    assert!(mapped.contains("data-gly-menu-search") && mapped.contains("menu"));
 }
 #[test]
-fn presence_is_explicitly_unsupported_before_wry_identity_allocation() {
+fn presence_accepts_only_the_current_terminal_revision_while_hidden() {
     let runtime = RuntimeId::new();
     let id = NodeIds::new(runtime).allocate();
     let mut renderer = Renderer::new(runtime);
-    let before = renderer.0.borrow().mapper.tree().stats();
+    ready(&renderer);
     let mut descriptor = Descriptor::new(Props::View);
-    descriptor.semantics = Some(Box::new(glory_render::Semantics {
-        presence: Some(Box::new(glory_render::PresenceConfig {
-            open: true,
+    descriptor.semantics = Some(Box::new(Semantics {
+        hidden: true,
+        inert: true,
+        presence: Some(Box::new(PresenceConfig {
+            open: false,
+            revision: 2,
             duration_millis: 200,
             ..Default::default()
         })),
         ..Default::default()
     }));
-    descriptor.validate().unwrap();
-    assert!(matches!(
-        renderer.preflight(descriptor.view(), None),
-        Err(Error::Unsupported(_))
-    ));
-    assert!(
-        renderer
-            .apply(&[Mutation::Create {
+    renderer.preflight(descriptor.view(), None).unwrap();
+    renderer
+        .apply(&[
+            Mutation::Create {
                 id,
-                node: Box::new(descriptor)
-            }])
-            .is_err()
-    );
-    assert_eq!(renderer.0.borrow().mapper.tree().stats(), before);
-    assert!(renderer.0.borrow().mapper.tree().node(id).is_err());
+                node: Box::new(descriptor),
+            },
+            Mutation::Place {
+                id,
+                parent: None,
+                before: None,
+            },
+        ])
+        .unwrap();
+    renderer
+        .listen(id, EventKind::PresenceComplete, true)
+        .unwrap();
+    let complete = |revision| {
+        message(
+            &renderer,
+            json!({
+                "type":"event", "node":protocol::id(id), "event":{"kind":"presence_complete","revision":revision}
+            }),
+        )
+    };
+    assert!(!renderer.receive(&complete("1")).unwrap());
+    assert!(renderer.receive(&complete("2")).unwrap());
+    assert!(renderer.receive(&complete("3")).is_err());
 }
 #[test]
 fn captured_drag_is_supported_and_rejects_nonfinite_coordinates_and_unknown_phases() {
@@ -491,7 +514,7 @@ fn captured_drag_is_supported_and_rejects_nonfinite_coordinates_and_unknown_phas
     };
     for phase in ["start", "move", "drop", "cancel"] {
         let wire: WireEvent = serde_json::from_str(&event(phase)).unwrap();
-        let event = wire.into_event(id, id).unwrap();
+        let event = wire.into_event(id, id, None).unwrap();
         assert!(
             renderer
                 .0
@@ -505,7 +528,7 @@ fn captured_drag_is_supported_and_rejects_nonfinite_coordinates_and_unknown_phas
     assert!(
         serde_json::from_str::<WireEvent>(&event("foreign"))
             .unwrap()
-            .into_event(id, id)
+            .into_event(id, id, None)
             .is_err()
     );
     ready(&renderer);
@@ -830,4 +853,89 @@ fn clipboard_opt_in_revision_and_original_receipts_refuse_stale_duplicate_and_re
         renderer.apply(&[Mutation::Dispose { id }]).unwrap();
         assert!(!renderer.receive(&completion(&renderer, "3", "2")).unwrap());
     }
+}
+
+#[test]
+fn file_tokens_require_opt_in_live_selection_and_exact_bounded_reads() {
+    let runtime = RuntimeId::new();
+    let id = NodeIds::new(runtime).allocate();
+    let mut renderer = Renderer::new(runtime);
+    create(&mut renderer, id, Props::File(FileProps::default()));
+    let pick = Action::PickFiles {
+        node: id,
+        revision: 0,
+        request: 1,
+    };
+    assert!(renderer.action(pick).is_err());
+    renderer.enable_files().unwrap();
+    renderer.listen(id, EventKind::Files, true).unwrap();
+    renderer.action(pick).unwrap();
+    let selected = message(
+        &renderer,
+        json!({"type":"files","observation":{"node":protocol::id(id),"revision":"0","request":"1","batch":"1","outcome":{"kind":"selected","files":[{"serial":"1","name":"sample.txt","media_type":"text/plain","size":4}]}}}),
+    );
+    assert!(renderer.receive(&selected).unwrap());
+    assert!(!renderer.receive(&selected).unwrap());
+    let mut inputs = Vec::new();
+    renderer.drain(&mut inputs);
+    let Input::Event {
+        event: Event::Files(observed),
+        ..
+    } = inputs.pop().unwrap()
+    else {
+        panic!("missing selection")
+    };
+    let FileOutcome::Selected(files) = observed.outcome else {
+        panic!("unexpected outcome")
+    };
+    let file = files[0].token;
+    let read = Query::FileRead(FileRead {
+        file,
+        offset: 1,
+        length: 2,
+    });
+    renderer.request(read, QueryToken(1)).unwrap();
+    assert!(
+        renderer
+            .receive(&message(
+                &renderer,
+                json!({"type":"response","token":"1","value":{"bytes":[65,66]}})
+            ))
+            .unwrap()
+    );
+    renderer.drain(&mut inputs);
+    assert!(
+        matches!(inputs.pop(),Some(Input::Response{result:Ok(QueryValue::FileBytes(chunk)),..}) if chunk.bytes==[65,66])
+    );
+    renderer.request(read, QueryToken(2)).unwrap();
+    renderer.action(Action::RemoveFile(file)).unwrap();
+    renderer
+        .receive(&message(
+            &renderer,
+            json!({"type":"response","token":"2","value":{"bytes":[65,66]}}),
+        ))
+        .unwrap();
+    renderer.drain(&mut inputs);
+    assert!(matches!(
+        inputs.pop(),
+        Some(Input::Response { result: Err(_), .. })
+    ));
+}
+#[test]
+fn rich_snapshot_checks_links_text_budget_and_utf16_boundaries() {
+    let snapshot = |link: Value, end: usize| {
+        json!({"blocks":[{"tag":"p","runs":[{"text":"😀","bold":true,"italic":false,"code":false,"link":link}]}],
+        "selection":{"anchor":{"block":0,"offset":0},"focus":{"block":0,"offset":end}},"revision":"0","composing":false})
+    };
+    let decode = |v: Value| {
+        serde_json::from_value::<rich::Snapshot>(v)
+            .unwrap()
+            .decode()
+    };
+    assert!(decode(snapshot(json!("https://example.org"), 2)).is_ok());
+    assert!(decode(snapshot(json!("javascript:alert(1)"), 2)).is_err());
+    assert!(decode(snapshot(Value::Null, 1)).is_err());
+    let mut large = snapshot(Value::Null, 0);
+    large["blocks"][0]["runs"][0]["text"] = json!("x".repeat(MAX_RICH_TEXT_BYTES + 1));
+    assert!(decode(large).is_err());
 }

@@ -252,49 +252,27 @@ fn position(dom: &Dom, open: &Open, offset: (f64, f64)) -> Result<Option<Positio
         .set_property("--gly-anchor-width", &format!("{}px", anchor.width()))
         .map_err(backend)?;
     let bounds = open.element.get_bounding_client_rect();
+    let anchor = glory_render::Rect {
+        x: anchor.x() + offset.0,
+        y: anchor.y() + offset.1,
+        width: anchor.width(),
+        height: anchor.height(),
+    };
+    let panel = glory_render::Rect {
+        width: bounds.width(),
+        height: bounds.height(),
+        ..Default::default()
+    };
     let resolved = placement.resolve(
-        glory_render::Rect {
-            x: anchor.x() + offset.0,
-            y: anchor.y() + offset.1,
-            width: anchor.width(),
-            height: anchor.height(),
-        },
-        glory_render::Rect {
-            width: bounds.width(),
-            height: bounds.height(),
-            ..Default::default()
-        },
+        anchor,
+        panel,
         glory_render::Rect {
             width,
             height,
             ..Default::default()
         },
     )?;
-    let arrow_cross = placement.arrow.map(|arrow| {
-        let vertical = matches!(
-            resolved.side,
-            glory_render::AnchorSide::Top | glory_render::AnchorSide::Bottom
-        );
-        let extent = if vertical {
-            bounds.width()
-        } else {
-            bounds.height()
-        };
-        let centered = if vertical {
-            anchor.x() + anchor.width() / 2.0 + offset.0 - resolved.x
-        } else {
-            anchor.y() + anchor.height() / 2.0 + offset.1 - resolved.y
-        };
-        let requested = match arrow.position {
-            glory_render::AnchorArrowPosition::Center => centered,
-            glory_render::AnchorArrowPosition::Side => match placement.align {
-                glory_render::AnchorAlign::Start => arrow.offset + arrow.size / 2.0,
-                glory_render::AnchorAlign::Center => centered,
-                glory_render::AnchorAlign::End => extent - arrow.offset - arrow.size / 2.0,
-            },
-        };
-        requested.clamp(arrow.size, (extent - arrow.size).max(arrow.size))
-    });
+    let arrow_cross = placement.arrow_cross(anchor, panel, resolved);
     Ok(Some(Position {
         element: open.element.clone(),
         x: resolved.x,

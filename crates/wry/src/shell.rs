@@ -251,13 +251,18 @@ impl Shell {
         let index = html.into_bytes();
         let assets = config.assets;
         let local_media = app.renderer.0.borrow().local_media;
+        let preview_policy = if app.renderer.0.borrow().files.is_some() {
+            " blob:"
+        } else {
+            ""
+        };
         let media_policy = if local_media {
             "; media-src glory: http://glory.localhost"
         } else {
             ""
         };
         let policy = format!(
-            "default-src 'none'; script-src 'none'; style-src 'unsafe-inline' glory: http://glory.localhost; img-src glory: http://glory.localhost data:; font-src glory: http://glory.localhost; base-uri 'none'; frame-src 'none'; form-action 'none'{media_policy}"
+            "default-src 'none'; script-src 'none'; style-src 'unsafe-inline' glory: http://glory.localhost; img-src glory: http://glory.localhost data:{preview_policy}; font-src glory: http://glory.localhost; base-uri 'none'; frame-src 'none'; form-action 'none'{media_policy}"
         );
         let asset_pool = config.asset_provider.map(assets::Pool::new).transpose()?;
         let builder = WebViewBuilder::new()
