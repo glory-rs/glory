@@ -406,7 +406,9 @@ fn native_select_suspension_resume_and_drop_keep_only_current_popup_lease() {
 
 #[test]
 fn native_select_touch_pan_and_wheel_stay_in_popup_without_accidental_selection() {
-    use apace_traits::events::{ApacePointerId, ApaceWheelDelta, ApaceWheelEvent};
+    use apace_traits::events::{
+        ApacePointerId, ApaceWheelDelta, ApaceWheelEvent, ApaceWheelPhase, ApaceWheelSource,
+    };
     let mut f = fixture(false);
     f.host.app.clear().unwrap();
     let entries = (0..60)
@@ -483,6 +485,8 @@ fn native_select_touch_pan_and_wheel_stay_in_popup_without_accidental_selection(
         buttons: Default::default(),
         element: Default::default(),
         delta: ApaceWheelDelta::Pixels(0., -10000.),
+        phase: ApaceWheelPhase::Moved,
+        source: ApaceWheelSource::Wheel,
         mods: Default::default(),
     }));
     settle(&mut f.host);

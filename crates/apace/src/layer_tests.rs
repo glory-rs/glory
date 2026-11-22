@@ -690,7 +690,9 @@ fn native_nonmodal_outside_pointer_preserves_clicked_focus_and_tab_leaves_the_sc
 
 #[test]
 fn native_modal_wheel_scrolls_its_viewport_and_never_chains_to_the_document() {
-    use apace_traits::events::{ApaceWheelDelta, ApaceWheelEvent};
+    use apace_traits::events::{
+        ApaceWheelDelta, ApaceWheelEvent, ApaceWheelPhase, ApaceWheelSource,
+    };
     let mut app = WindowApp::new();
     let open = app.app.scope().cage(false);
     let panel_ref = app.app.scope().cage(None);
@@ -740,9 +742,15 @@ fn native_modal_wheel_scrolls_its_viewport_and_never_chains_to_the_document() {
     let mut hover = pointer((rect.x + 20.) as f32, (rect.y + 10.) as f32, false);
     hover.coords.page_y += 240.;
     app.handle_ui_event(UiEvent::PointerMove(hover));
-    for _ in 0..5 {
+    for phase in [
+        ApaceWheelPhase::Started,
+        ApaceWheelPhase::Moved,
+        ApaceWheelPhase::Ended,
+    ] {
         app.handle_ui_event(UiEvent::Wheel(ApaceWheelEvent {
-            delta: ApaceWheelDelta::Pixels(0., -120.),
+            delta: ApaceWheelDelta::Pixels(-5., -120.),
+            phase,
+            source: ApaceWheelSource::Finger,
             coords,
             buttons: Default::default(),
             mods: Default::default(),

@@ -1,7 +1,7 @@
 use super::*;
 use apace_traits::events::{
-    ApacePointerEvent, ApacePointerId, ApaceWheelDelta, ApaceWheelEvent, MouseEventButton,
-    MouseEventButtons, Point, PointerCoords,
+    ApacePointerEvent, ApacePointerId, ApaceWheelDelta, ApaceWheelEvent, ApaceWheelPhase,
+    ApaceWheelSource, MouseEventButton, MouseEventButtons, Point, PointerCoords,
 };
 use glory_core::{Cage, Host};
 use glory_ui::{Widget, button, events::activate, input, list, text, view, widget};
@@ -367,9 +367,11 @@ fn native_wheel_bursts_observe_the_final_offset_without_scaling_or_scanning_the_
             coords.page_y,
             false,
         )));
-        let wheel = || {
+        let wheel = |delta, phase, source| {
             UiEvent::Wheel(ApaceWheelEvent {
-                delta: ApaceWheelDelta::Pixels(0., -1.),
+                delta,
+                phase,
+                source,
                 coords,
                 buttons: MouseEventButtons::empty(),
                 mods: Default::default(),
@@ -377,7 +379,28 @@ fn native_wheel_bursts_observe_the_final_offset_without_scaling_or_scanning_the_
             })
         };
         let before = data.logical.get();
-        app.handle_ui_event(wheel());
+        for phase in [
+            ApaceWheelPhase::Started,
+            ApaceWheelPhase::Moved,
+            ApaceWheelPhase::Ended,
+        ] {
+            app.handle_ui_event(wheel(
+                ApaceWheelDelta::Pixels(-30., -3.),
+                phase,
+                ApaceWheelSource::Finger,
+            ));
+        }
+        tick(&mut app);
+        assert!(
+            (data.logical.get() - before).abs() < 0.03,
+            "horizontal gesture moved the vertical list"
+        );
+        let before = data.logical.get();
+        app.handle_ui_event(wheel(
+            ApaceWheelDelta::Pixels(0., -1.),
+            ApaceWheelPhase::Moved,
+            ApaceWheelSource::Wheel,
+        ));
         tick(&mut app);
         assert!(!app.renderer.needs_observe());
         assert!(
@@ -388,7 +411,11 @@ fn native_wheel_bursts_observe_the_final_offset_without_scaling_or_scanning_the_
         let before = data.logical.get();
         let reads = data.reads.get();
         for _ in 0..200 {
-            app.handle_ui_event(wheel());
+            app.handle_ui_event(wheel(
+                ApaceWheelDelta::Pixels(0., -1.),
+                ApaceWheelPhase::Moved,
+                ApaceWheelSource::Wheel,
+            ));
         }
         assert_eq!(
             data.reads.get(),
