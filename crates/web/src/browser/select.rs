@@ -137,6 +137,10 @@ pub fn create(
     }
     for entry in config.entries.iter() {
         match entry {
+            SelectEntry::Divider => {
+                let divider = document.create_element("hr").map_err(backend)?;
+                parent.append_child(&divider).map_err(backend)?;
+            }
             SelectEntry::Option(value) => option(document, parent, value, keys)?,
             SelectEntry::Group(group) => {
                 let node = document.create_element("optgroup").map_err(backend)?;

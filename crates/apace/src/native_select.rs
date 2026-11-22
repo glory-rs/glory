@@ -45,6 +45,7 @@ impl Control {
     pub fn option(&self, index: usize) -> (&SelectOption, bool) {
         let row = &self.rows[index];
         match &self.options.entries[row.entry] {
+            SelectEntry::Divider => unreachable!("dividers are not selectable rows"),
             SelectEntry::Option(option) => (option, option.disabled),
             SelectEntry::Group(group) => {
                 let option = &group.options[row.child.expect("group row")];
@@ -93,6 +94,11 @@ impl Control {
         let mut rows = Vec::new();
         for (entry, value) in options.entries.iter().enumerate() {
             let (items, group_disabled) = match value {
+                SelectEntry::Divider => {
+                    let divider = m.create_element(tag("hr"), Vec::new());
+                    m.append_children(panel, &[divider]);
+                    continue;
+                }
                 SelectEntry::Option(option) => (std::slice::from_ref(option), false),
                 SelectEntry::Group(group) => {
                     let label = m.create_element(tag("div"), Vec::new());

@@ -39,6 +39,10 @@ impl PlanShape {
                 nodes += usize::from(options.placeholder.is_some());
                 for entry in options.entries.iter() {
                     let opts = match entry {
+                        glory_render::SelectEntry::Divider => {
+                            nodes += 1;
+                            continue;
+                        }
                         glory_render::SelectEntry::Option(option) => std::slice::from_ref(option),
                         glory_render::SelectEntry::Group(group) => {
                             nodes += 1;

@@ -128,7 +128,8 @@
         if (!keys.length) item.setAttribute('selected',''); item.textContent = config.placeholder; node.append(item);
       }
       for (const value of config.entries) {
-        if (!value.options) option(node, value);
+        if (value.divider === true) node.append(document.createElement('hr'));
+        else if (!value.options) option(node, value);
         else {
           const group = document.createElement('optgroup'); group.setAttribute('label',value.label); if (value.disabled) group.setAttribute('disabled','');
           for (const value of value.options) option(group, value); node.append(group);
@@ -320,6 +321,10 @@
           let count = 0, groups = 0, bytes = new TextEncoder().encode(config.placeholder || '').length; const keys = new Set();
           const text = (value, limit) => typeof value === 'string' && new TextEncoder().encode(value).length <= limit && !/[\0\r]/.test(value);
           for (const entry of config.entries) {
+            if (entry.divider !== undefined) {
+              if (entry.divider !== true || Object.keys(entry).length !== 1) fail('select divider');
+              continue;
+            }
             const values = entry.options || [entry];
             if (!Array.isArray(values) || values.length > 1024) fail('select option count');
             if (entry.options && (++groups > 32 || !entry.label || !text(entry.label,256) || typeof entry.disabled !== 'boolean')) fail('select group');

@@ -716,6 +716,7 @@ impl Tree {
                     let mut index = 0;
                     for entry in select.options.entries.iter() {
                         let (count, group_parent) = match entry {
+                            glory_render::SelectEntry::Divider => continue,
                             glory_render::SelectEntry::Option(_) => (1, None),
                             glory_render::SelectEntry::Group(group) => {
                                 let key = Key::SelectGroup(id, group_index);

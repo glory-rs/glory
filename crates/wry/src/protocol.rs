@@ -37,6 +37,7 @@ fn shape(shape: Shape) -> Result<Value, Error> {
             .entries
             .iter()
             .map(|entry| match entry {
+                glory_render::SelectEntry::Divider => json!({"divider":true}),
                 glory_render::SelectEntry::Option(value) => option(value),
                 glory_render::SelectEntry::Group(group) => json!({
                     "label":group.label,"disabled":group.disabled,

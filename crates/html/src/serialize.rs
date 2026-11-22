@@ -285,6 +285,7 @@ pub fn select_options(config: &crate::SelectOptions, keys: &[String]) -> String 
     }
     for entry in config.entries.iter() {
         match entry {
+            glory_render::SelectEntry::Divider => out.push_str("<hr>"),
             glory_render::SelectEntry::Option(value) => option(value, keys, &mut out),
             glory_render::SelectEntry::Group(group) => {
                 out.push_str("<optgroup label=\"");

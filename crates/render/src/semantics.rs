@@ -758,7 +758,7 @@ impl Semantics {
         }
         if let Some(item) = &self.menu_item {
             let valid = match (&d.props, item.kind) {
-                (Props::Button(_), MenuItemKind::Action) => {
+                (Props::Button(_) | Props::Link(_), MenuItemKind::Action) => {
                     !self.tab && self.pressed.is_none() && self.form_action.is_none()
                 }
                 (Props::Check(check), MenuItemKind::Checkbox) => matches!(
@@ -1031,6 +1031,7 @@ impl Semantics {
         if (self.tab
             || (self.expanded.is_some() && d.role != Some(Role::TreeItem))
             || (self.disabled
+                && !matches!(d.props, Props::Link(_))
                 && self.splitter.is_none()
                 && self.slider.is_none()
                 && self.context_menu.is_none()

@@ -16,6 +16,7 @@ fn select() -> SelectProps {
     SelectProps {
         entries: Rc::new(vec![
             SelectEntry::Option(option("a")),
+            SelectEntry::Divider,
             SelectEntry::Group(SelectGroup {
                 label: "Group".into(),
                 disabled: true,

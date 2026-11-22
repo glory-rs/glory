@@ -156,7 +156,8 @@ pub(super) fn shape(shape: Shape) -> Value {
     }
     let options = shape.select_options.as_ref().map(|config| {
         let entries: Vec<_> = config.entries.iter().map(|entry| match entry {
-            glory_render::SelectEntry::Option(value) => option(value),
+            glory_render::SelectEntry::Divider => json!({"divider":true}),
+                glory_render::SelectEntry::Option(value) => option(value),
             glory_render::SelectEntry::Group(group) => json!({"label":group.label,"disabled":group.disabled,"options":group.options.iter().map(option).collect::<Vec<_>>()})
         }).collect();
         json!({"entries":entries,"placeholder":config.placeholder})

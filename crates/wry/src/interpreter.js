@@ -163,6 +163,7 @@ function gloryWry(config, factories) {
       element.append(placeholder);
     }
     for (const entry of config.entries) {
+      if (entry.divider === true) { element.append(document.createElement("hr")); continue; }
       if (!entry.options) { appendOption(element, entry); continue; }
       const group = document.createElement("optgroup");
       group.label = entry.label;

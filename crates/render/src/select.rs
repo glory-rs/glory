@@ -26,6 +26,8 @@ pub struct SelectGroup {
 pub enum SelectEntry {
     Option(SelectOption),
     Group(SelectGroup),
+    /// A decorative, non-selectable boundary between options or groups.
+    Divider,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -64,6 +66,7 @@ impl SelectProps {
     pub fn options(&self) -> impl Iterator<Item = (&SelectOption, bool)> {
         self.entries.iter().flat_map(|entry| {
             let (options, disabled) = match entry {
+                SelectEntry::Divider => (&[][..], false),
                 SelectEntry::Option(option) => (std::slice::from_ref(option), false),
                 SelectEntry::Group(group) => (group.options.as_slice(), group.disabled),
             };
@@ -84,6 +87,7 @@ impl SelectProps {
         let mut keys = HashSet::new();
         for entry in self.entries.iter() {
             let options = match entry {
+                SelectEntry::Divider => continue,
                 SelectEntry::Option(option) => std::slice::from_ref(option),
                 SelectEntry::Group(group) => {
                     groups += 1;
