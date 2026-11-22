@@ -34,21 +34,21 @@ accesskit = ["shell", "accesskit-base"]
 accesskit-cpu = ["shell-cpu", "accesskit-base"]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-glory-routing = { path = "../routing", version = "0.8.1", optional = true }
-glory-html = { path = "../html", version = "0.8.1" }
-glory-render = { path = "../render", version = "0.8.1" }
-glory-core = { path = "../core", version = "0.8.1", optional = true }
-glory-ui = { path = "../ui", version = "0.8.1", optional = true }
+glory-routing = { path = "../routing", version = "0.9.0", optional = true }
+glory-html = { path = "../html", version = "0.9.0" }
+glory-render = { path = "../render", version = "0.9.0" }
+glory-core = { path = "../core", version = "0.9.0", optional = true }
+glory-ui = { path = "../ui", version = "0.9.0", optional = true }
 tokio = { version = "1.54.1", default-features = false, features = ["rt", "sync", "time", "macros"], optional = true }
 futures-timer = { version = "=3.0.4", optional = true }
 percent-encoding = { version = "2.3.2", optional = true }
-apace-dom = { path = "../../../apace/packages/apace-dom", version = "=0.3.0", default-features = false, features = ["system-fonts", "complex-scripts"] }
-apace-traits = { path = "../../../apace/packages/apace-traits", version = "=0.3.0", default-features = false }
+apace-dom = { path = "../../../apace/packages/apace-dom", version = "=0.4.0", default-features = false, features = ["system-fonts", "complex-scripts"] }
+apace-traits = { path = "../../../apace/packages/apace-traits", version = "=0.4.0", default-features = false }
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp"] }
 # Typed visibility returned by Apace's public computed-style API. Keep this
 # engine detail inside the adapter; glory-style remains the portable value crate.
 style = { package = "stylo", version = "=0.23.0", default-features = false }
-apace-paint = { path = "../../../apace/packages/apace-paint", version = "=0.3.0", default-features = false, optional = true }
+apace-paint = { path = "../../../apace/packages/apace-paint", version = "=0.4.0", default-features = false, optional = true }
 anyrender = { version = "=0.14.0", optional = true }
 kurbo = { version = "=0.13.1", optional = true }
 peniko = { version = "=0.6.1", optional = true }
@@ -61,7 +61,7 @@ rfd = { version = "=0.16.1", default-features = false, features = ["xdg-portal",
 mime_guess = { version = "=2.0.5", optional = true }
 libc = { version = "=0.2.191", optional = true }
 accesskit = { version = "=0.25.2", optional = true }
-apace_accesskit = { path = "../../../apace/packages/apace_accesskit", version = "=0.2.2", optional = true }
+apace_accesskit = { path = "../../../apace/packages/apace_accesskit", version = "=0.2.3", optional = true }
 cap-std = { version = "=3.4.6", optional = true }
 cap-fs-ext = { version = "=3.4.6", optional = true }
 
@@ -73,8 +73,8 @@ jni = { version = "=0.22.4", default-features = false, optional = true }
 reqwest = { version = "0.13.5", default-features = false, features = ["rustls-no-provider"], optional = true }
 rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"], optional = true }
 rustls-platform-verifier = { version = "0.7.1", optional = true }
-apace-shell = { path = "../../../apace/packages/apace-shell", version = "=0.3.0", default-features = false, optional = true }
-wingy = { path = "../../../wingy/wingy", version = "=0.31.1", optional = true }
+apace-shell = { path = "../../../apace/packages/apace-shell", version = "=0.4.0", default-features = false, optional = true }
+wingy = { path = "../../../wingy/wingy", version = "=0.31.2", optional = true }
 keyboard-types = { version = "0.8.3", optional = true }
 softbuffer_window_renderer = { version = "=0.9.0", optional = true }
 
@@ -84,10 +84,10 @@ softbuffer_window_renderer = { version = "=0.9.0", optional = true }
 fontique = { version = "=0.12.0", default-features = false, features = ["fontconfig-dlopen"] }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-glory-web = { path = "../web", version = "0.8.1" }
-glory-core = { path = "../core", version = "0.8.1" }
-glory-render = { path = "../render", version = "0.8.1", features = ["conformance"] }
-glory-ui = { path = "../ui", version = "0.8.1" }
+glory-web = { path = "../web", version = "0.9.0" }
+glory-core = { path = "../core", version = "0.9.0" }
+glory-render = { path = "../render", version = "0.9.0", features = ["conformance"] }
+glory-ui = { path = "../ui", version = "0.9.0" }
 png = "0.18.1"
 
 [target.'cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))'.dev-dependencies]

@@ -38,9 +38,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git clone --depth 1 --branch takia-v0.15.1 https://github.com/glory-rs/takia ../takia
-          git clone --depth 1 --branch wingy-v0.31.1 https://github.com/glory-rs/wingy ../wingy
-          git clone --depth 1 --branch apace-v0.3.0 https://github.com/glory-rs/apace ../apace
+          git clone --depth 1 --branch takia-v0.16.0 https://github.com/glory-rs/takia ../takia
+          git clone --depth 1 --branch wingy-v0.31.2 https://github.com/glory-rs/wingy ../wingy
+          git clone --depth 1 --branch apace-v0.4.0 https://github.com/glory-rs/apace ../apace
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0
         with:
           python-version: '3.13'

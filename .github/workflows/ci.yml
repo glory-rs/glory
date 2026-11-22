@@ -31,21 +31,21 @@ jobs:
         run: |
           if [ ! -d ../apace/.git ]; then
             if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-              git clone --filter=blob:none --branch apace-v0.3.0 https://github.com/glory-rs/apace ../apace
+              git clone --filter=blob:none --branch apace-v0.4.0 https://github.com/glory-rs/apace ../apace
             else
               git clone --filter=blob:none https://github.com/glory-rs/apace ../apace
             fi
           fi
           if [ ! -d ../takia/.git ]; then
             if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-              git clone --filter=blob:none --branch takia-v0.15.1 https://github.com/glory-rs/takia ../takia
+              git clone --filter=blob:none --branch takia-v0.16.0 https://github.com/glory-rs/takia ../takia
             else
               git clone --filter=blob:none https://github.com/glory-rs/takia ../takia
             fi
           fi
           if [ ! -d ../wingy/.git ]; then
             if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-              git clone --filter=blob:none --branch wingy-v0.31.1 https://github.com/glory-rs/wingy ../wingy
+              git clone --filter=blob:none --branch wingy-v0.31.2 https://github.com/glory-rs/wingy ../wingy
             else
               git clone --filter=blob:none https://github.com/glory-rs/wingy ../wingy
             fi

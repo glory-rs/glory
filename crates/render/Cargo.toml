@@ -13,7 +13,7 @@ default = []
 conformance = []
 
 [dependencies]
-glory-style = { path = "../style", version = "0.8.1" }
+glory-style = { path = "../style", version = "0.9.0" }
 
 [[bench]]
 name = "children_order"
