@@ -27,6 +27,29 @@ Counter component also has a `counter-wry` binary; see its README. Use the
 repository's approved cache environment before Cargo (on macOS, source
 `scripts/apple-env.sh`). No global CLI or JavaScript build tool is needed.
 
+## Structured inputs and local files
+
+Input controls with `InputEditCapture` report bounded UTF-8 values, the native
+UTF-16 selection, the selection before editing, input intent and composition
+state. RichEditor projects Glory's finite block and mark model into a native
+contenteditable element. Selection, formatting commands and plain-text paste
+use revisioned Rust observations. Invalid or oversized DOM edits restore the
+last program document.
+
+Call `window.renderer().enable_files()?` before mounting a File control or
+starting the shell to enable the system WebView picker, file drops, range
+reads and previews. The WebView retains the handles selected by the user.
+Rust receives display metadata and opaque tokens scoped to the document,
+control and configuration revision. Range reads are limited to 64 KiB, with
+at most four outstanding reads or previews. The preview path checks PNG/JPEG
+headers against the configured byte, dimension and pixel limits in Rust before
+issuing a document-local image URL. Removal, replacement, configuration
+changes and disposal revoke the corresponding handles and preview URLs.
+
+The opt-in `window` test exercises bounded input edits, restoration of an
+invalid rich document, file transfer, range reads and decoded preview pixels
+in the actual system WebView.
+
 ## Current support
 
 | Facility | Boundary |
@@ -37,7 +60,10 @@ repository's approved cache environment before Cargo (on macOS, source
 | Input | Activation, canonical text, controlled revision echoes, composition protocol, commit and checked state, native radio groups with directional keyboard navigation |
 | Focus | Actual focus observations and queries, focus without scrolling, exact UTF-16 selection actions/queries |
 | Geometry | Bounds, scroll offsets/metrics, ResizeObserver interests and scroll acknowledgements |
-| Commands | Finite Keyboard/Navigate events on explicitly observed ancestors |
+| Keyboard | Directional navigation, grids, trees, menus, comboboxes, tags, ranges and scroll areas use the renderer's semantic keyboard commands |
+| Layers | Anchored, context-point and viewport placement, nested modal and nonmodal panels, dismissal, focus scopes and return targets |
+| Motion | Graphic rotation and pulse, translation, swipe, collapse and presence completion |
+| Graphics | SVG geometry and live attribute updates, fractional plot pointer coordinates and measured viewports |
 | Styles | Shared HTML inline profile, raw app CSS, optional validated `css` Sheet replacement |
 | Resources | Explicit immutable `Config::assets` served by exact URL path; no implicit filesystem or remote-network access |
 | Local media | Explicit `Renderer::enable_local_media` and scoped `set_local_media`; native audio/video controls and original image zoom/pan/rotate/fit, revoked on suspend/dispose |
@@ -47,11 +73,8 @@ repository's approved cache environment before Cargo (on macOS, source
 | Native lifecycle | Optional `Config::native` on the window thread; application-owned tray/close/shutdown integration, absent by default |
 | Platform | Wry system WebView and Tao event loop on Windows/macOS/Linux; Linux uses Tao's GTK container for X11/Wayland |
 
-Raw display/XML templates, File, RichEditor, Graphic, virtual collections and advanced
-interaction metadata (layers, focus scopes, motion, drag/swipe, choice/menu/tree
-controllers, forms and rich clipboard services) currently return `Unsupported`.
-Checks run in both staged preflight and direct application. They are not silently
-advertised through capabilities. The HTML mapper retains its remount requirement
+Sparse display/XML templates still return `Unsupported` during preflight and
+direct application. The HTML mapper retains its remount requirement
 for physical tag changes.
 
 `Renderer::set_author_css` updates the trusted application CSS layer (up to 1 MiB)

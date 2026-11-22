@@ -221,7 +221,13 @@ pub(crate) fn lower(next: glory_render::DescriptorView<'_>, inverse: &Patch) -> 
             );
             let before = crate::mapping::file_attributes(old);
             let after = crate::mapping::file_attributes(&value.configuration);
-            for name in ["accept", "multiple"] {
+            for name in [
+                "accept",
+                "multiple",
+                "data-gly-file-count",
+                "data-gly-file-bytes",
+                "data-gly-file-total",
+            ] {
                 attribute(
                     &mut edits,
                     Part::Picker,

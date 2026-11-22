@@ -659,6 +659,9 @@ pub fn shape_in(tree: &Memory, id: NodeId) -> Result<Shape, Error> {
 
 pub(crate) fn file_attributes(config: &glory_render::FileConfig) -> BTreeMap<&'static str, String> {
     let mut attrs = BTreeMap::new();
+    attrs.insert("data-gly-file-count", config.max_files.to_string());
+    attrs.insert("data-gly-file-bytes", config.max_file_bytes.to_string());
+    attrs.insert("data-gly-file-total", config.max_total_bytes.to_string());
     if config.multiple {
         attrs.insert("multiple", String::new());
     }
