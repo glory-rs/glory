@@ -263,9 +263,7 @@ def main():
             # immutable registry upload, including Windows Git symlink failures.
             run("cargo", "package", "--locked", "--no-verify", "--manifest-path", package["manifest_path"], "-p", name, *bootstrap)
             validate_archive(package_targets[name] / "package" / f"{name}-{package_version}.crate", head)
-            command = ["cargo", "publish", "--locked", "--manifest-path", package["manifest_path"], "-p", name, *bootstrap]
-            if name in cross:
-                command.append("--no-verify")
+            command = ["cargo", "publish", "--locked", "--no-verify", "--manifest-path", package["manifest_path"], "-p", name, *bootstrap]
             publish(command, before_upload=lambda: verify_remote_tag(tag, head))
         # Let sparse-index propagation finish before building dependent crates.
         ready = False

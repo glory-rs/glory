@@ -25,7 +25,8 @@ existing registry archives must retain that same commit and checksum.
 Cargo resolves dev dependencies while packaging. Unpublished owned dev-only
 edges may use command-local Cargo patches to the same frozen source, without
 changing manifests, normal/build dependencies or consumer configuration. The
-publisher still builds each package and finishes with the registry-only consumer.
+publisher inspects each archive and uses `cargo publish --locked --no-verify`
+after the required checks pass. A registry-only consumer tests the published crates.
 The GitHub Release attaches only the generated `release.json`, which records
 each crate's name, version, SHA-256 checksum and source commit. The package
 archives are available from crates.io.
