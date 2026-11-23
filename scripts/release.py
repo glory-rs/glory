@@ -234,7 +234,6 @@ def main():
             raise SystemExit("Required platform validation jobs have not all succeeded")
     validation = verify_validation_run(plan["repository"], tag, head, options.validation_run) if options.validation_run else None
     verify_remote_tag(tag, head)
-    artifacts = []
     ensure_library_lockfiles(ROOT)
     release_packages = []
     output = target / "release" / tag
@@ -292,12 +291,10 @@ def main():
             raise SystemExit(f"Registry checksum differs from packaged artifact: {name}")
         validate_archive(archive, expected_commit)
         completed_publications.add(name)
-        artifacts.append(archive)
         release_packages.append({"name": name, "version": package_version,
                                  "checksum": checksum, "source_commit": expected_commit})
     if plan.get("registry_verifier"):
         run("python", str(ROOT / plan["registry_verifier"]), "--tag", tag)
-        artifacts.extend([output / "registry-consumer.json", output / "registry-consumer.lock"])
     evidence = output / "release.json"
     evidence.write_text(json.dumps({"repository": plan["repository"], "tag": tag, "commit": head,
         "packages": release_packages, "validation": validation}, indent=2) + "\n", encoding="utf-8")
@@ -308,7 +305,7 @@ def main():
                    "--title", plan["title"] + " " + version, "--notes-file", str(notes)]
         if "-" in version:
             command.append("--prerelease")
-        run(*command, str(evidence), *map(str, artifacts))
+        run(*command, str(evidence))
 
 
 if __name__ == "__main__":

@@ -26,4 +26,7 @@ Cargo resolves dev dependencies while packaging. Unpublished owned dev-only
 edges may use command-local Cargo patches to the same frozen source, without
 changing manifests, normal/build dependencies or consumer configuration. The
 publisher still builds each package and finishes with the registry-only consumer.
+The GitHub Release attaches only the generated `release.json`, which records
+each crate's name, version, SHA-256 checksum and source commit. The package
+archives are available from crates.io.
 The remote immutable tag is rechecked before each upload, including rate-limit retries.
